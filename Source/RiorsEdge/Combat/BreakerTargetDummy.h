@@ -13,6 +13,15 @@ class UStaticMeshComponent;
 class USphereComponent;
 class UBoxComponent;
 
+UENUM(BlueprintType)
+enum class EBreakerTargetProfile : uint8
+{
+    Health,
+    Shielded,
+    Armored,
+    Moving
+};
+
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerTargetDummy : public AActor, public IAbilitySystemInterface
 {
@@ -21,9 +30,13 @@ class RIORSEDGE_API ABreakerTargetDummy : public AActor, public IAbilitySystemIn
 public:
     ABreakerTargetDummy();
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+    UFUNCTION(BlueprintCallable, Category="Playtest") void ConfigureProfile(EBreakerTargetProfile NewProfile);
+    UFUNCTION(BlueprintPure, Category="Playtest") EBreakerTargetProfile GetProfile() const { return Profile; }
+    UFUNCTION(BlueprintPure, Category="Playtest") FString GetProfileLabel() const;
 
 protected:
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
     UFUNCTION() void HandleDeath();
     UFUNCTION() void RespawnDummy();
 
@@ -36,4 +49,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Playtest", meta=(ClampMin="0.1")) float RespawnDelay = 2.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Playtest") EBreakerTargetProfile Profile = EBreakerTargetProfile::Health;
+    FVector MotionOrigin = FVector::ZeroVector;
+    float MotionPhase = 0.0f;
 };

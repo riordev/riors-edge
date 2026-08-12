@@ -14,6 +14,7 @@ class UBreakerProgressionComponent;
 class UBreakerCombatComponent;
 class UBreakerWeaponComponent;
 class UStaticMeshComponent;
+class UBreakerPlaytestComponent;
 struct FInputActionValue;
 
 UCLASS(Blueprintable)
@@ -31,6 +32,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement") UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerAttributeSet* GetAttributes() const { return Attributes; }
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
+    UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
+    UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
+    UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash();
     UFUNCTION(BlueprintCallable, Category="Movement") void StartSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") void StopSlide();
@@ -46,6 +50,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Playtest") TObjectPtr<UBreakerPlaytestComponent> Playtest;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UBreakerInputConfig> InputConfig;
 
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);
@@ -70,5 +75,16 @@ private:
     void StartAim();
     void StopAim();
     void HandleReloadInput();
+    void ResetPlaytest();
+    void CopyPlaytestReport();
+    void TogglePlaytestDiagnostics();
+    void IncreaseFOV();
+    void DecreaseFOV();
+    void IncreaseSensitivity();
+    void DecreaseSensitivity();
+    void SavePlaytestSettings() const;
+
+    FTransform PlaytestSpawnTransform;
+    float LookSensitivity = 1.0f;
 
 };

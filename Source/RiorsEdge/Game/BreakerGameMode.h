@@ -12,7 +12,9 @@ class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 public:
     ABreakerGameMode();
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+    UFUNCTION(BlueprintCallable, Category="Playtest") void ResetPlaytestTargets();
 
 private:
     bool bPlaytestTargetsSpawned = false;
+    void SpawnPlaytestTargets(const APawn* Pawn);
 };

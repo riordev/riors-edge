@@ -4,7 +4,7 @@ The existing First Person map now becomes a zero-setup combat and movement test 
 
 ## What appears at runtime
 
-- Three recycling target dummies approximately 12 m, 24 m, and 45 m ahead of the initial player spawn.
+- Four recycling diagnostic targets: health, shield, armour, and lateral movement.
 - A code-driven crosshair and debug HUD showing movement state, horizontal speed, health, shields, ammunition, and reload state.
 - Red body-hit feedback, gold weak-point feedback, and applied damage numbers.
 - A deliberately simple first-person placeholder weapon block. It exists only to communicate viewmodel position until proper art and animation replace it.
@@ -22,6 +22,13 @@ The targets use engine basic-shape meshes, so this setup does not depend on new 
 - Fire: Left mouse
 - Aim: Right mouse
 - Reload: R
+- Reset player, ammunition, targets, and session stats: F1
+- Copy a structured session report to the clipboard: F2
+- Toggle diagnostics: F3
+- FOV: left/right bracket
+- Mouse sensitivity: minus/equals
+
+FOV and sensitivity persist locally between launches. Diagnostics show frame rate, session accuracy, weak-point rate, damage, reload count, target types/distances, and a brief shot trace. The copied report is formatted for pasting into the Notion Signals database.
 
 ## First feedback pass
 

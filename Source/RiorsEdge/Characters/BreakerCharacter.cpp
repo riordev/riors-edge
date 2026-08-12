@@ -18,6 +18,10 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Playtest/BreakerPlaytestComponent.h"
+#include "Game/BreakerGameMode.h"
+#include "GameFramework/GameModeBase.h"
+#include "Misc/ConfigCacheIni.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UBreakerCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -34,6 +38,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
+    Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
 
     PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));
     PrototypeWeaponVisual->SetupAttachment(FirstPersonCamera);
@@ -51,6 +56,12 @@ void ABreakerCharacter::BeginPlay()
 {
     Super::BeginPlay();
     AbilitySystem->InitAbilityActorInfo(this, this);
+    PlaytestSpawnTransform = GetActorTransform();
+    float SavedFOV = 90.0f;
+    GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
+    GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
+    LookSensitivity = FMath::Clamp(LookSensitivity, 0.2f, 3.0f);
+    FirstPersonCamera->SetFieldOfView(FMath::Clamp(SavedFOV, 70.0f, 120.0f));
     if (const APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
@@ -86,6 +97,13 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Pressed, this, &ThisClass::StartAim);
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Released, this, &ThisClass::StopAim);
         PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ThisClass::HandleReloadInput);
+        PlayerInputComponent->BindAction(TEXT("PlaytestReset"), IE_Pressed, this, &ThisClass::ResetPlaytest);
+        PlayerInputComponent->BindAction(TEXT("PlaytestReport"), IE_Pressed, this, &ThisClass::CopyPlaytestReport);
+        PlayerInputComponent->BindAction(TEXT("PlaytestDiagnostics"), IE_Pressed, this, &ThisClass::TogglePlaytestDiagnostics);
+        PlayerInputComponent->BindAction(TEXT("FOVUp"), IE_Pressed, this, &ThisClass::IncreaseFOV);
+        PlayerInputComponent->BindAction(TEXT("FOVDown"), IE_Pressed, this, &ThisClass::DecreaseFOV);
+        PlayerInputComponent->BindAction(TEXT("SensitivityUp"), IE_Pressed, this, &ThisClass::IncreaseSensitivity);
+        PlayerInputComponent->BindAction(TEXT("SensitivityDown"), IE_Pressed, this, &ThisClass::DecreaseSensitivity);
         return;
     }
     if (InputConfig->Move) Input->BindAction(InputConfig->Move, ETriggerEvent::Triggered, this, &ThisClass::Move);
@@ -125,8 +143,8 @@ void ABreakerCharacter::Move(const FInputActionValue& Value)
 void ABreakerCharacter::Look(const FInputActionValue& Value)
 {
     const FVector2D Axis = Value.Get<FVector2D>();
-    AddControllerYawInput(Axis.X);
-    AddControllerPitchInput(Axis.Y);
+    AddControllerYawInput(Axis.X * LookSensitivity);
+    AddControllerPitchInput(Axis.Y * LookSensitivity);
 }
 
 void ABreakerCharacter::MoveForwardLegacy(float Value)
@@ -143,8 +161,8 @@ void ABreakerCharacter::MoveRightLegacy(float Value)
     AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), Value);
 }
 
-void ABreakerCharacter::TurnLegacy(float Value) { AddControllerYawInput(Value); }
-void ABreakerCharacter::LookUpLegacy(float Value) { AddControllerPitchInput(Value); }
+void ABreakerCharacter::TurnLegacy(float Value) { AddControllerYawInput(Value * LookSensitivity); }
+void ABreakerCharacter::LookUpLegacy(float Value) { AddControllerPitchInput(Value * LookSensitivity); }
 
 float ABreakerCharacter::GetHorizontalSpeed() const
 {
@@ -221,3 +239,29 @@ void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput
 void ABreakerCharacter::StartAim() { if (Weapon) Weapon->SetAiming(true); OnAimInput(true); }
 void ABreakerCharacter::StopAim() { if (Weapon) Weapon->SetAiming(false); OnAimInput(false); }
 void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
+
+float ABreakerCharacter::GetCurrentFOV() const { return FirstPersonCamera ? FirstPersonCamera->FieldOfView : 90.0f; }
+
+void ABreakerCharacter::ResetPlaytest()
+{
+    SetActorTransform(PlaytestSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    GetCharacterMovement()->StopMovementImmediately();
+    if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
+    if (Weapon) Weapon->ResetAmmunition();
+    if (Playtest) Playtest->ResetStats();
+    if (ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr) GameMode->ResetPlaytestTargets();
+}
+
+void ABreakerCharacter::CopyPlaytestReport() { if (Playtest) Playtest->CopyReportToClipboard(); }
+void ABreakerCharacter::TogglePlaytestDiagnostics() { if (Playtest) Playtest->ToggleDiagnostics(); }
+void ABreakerCharacter::IncreaseFOV() { FirstPersonCamera->SetFieldOfView(FMath::Clamp(GetCurrentFOV() + 5.0f, 70.0f, 120.0f)); SavePlaytestSettings(); }
+void ABreakerCharacter::DecreaseFOV() { FirstPersonCamera->SetFieldOfView(FMath::Clamp(GetCurrentFOV() - 5.0f, 70.0f, 120.0f)); SavePlaytestSettings(); }
+void ABreakerCharacter::IncreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity + 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
+void ABreakerCharacter::DecreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity - 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
+
+void ABreakerCharacter::SavePlaytestSettings() const
+{
+    GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), GetCurrentFOV(), GGameUserSettingsIni);
+    GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
+    GConfig->Flush(false, GGameUserSettingsIni);
+}

@@ -5,6 +5,10 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Playtest/BreakerPlaytestComponent.h"
+#include "Combat/BreakerTargetDummy.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerController.h"
 
 void ABreakerPlaytestHUD::DrawHUD()
 {
@@ -21,6 +25,7 @@ void ABreakerPlaytestHUD::DrawHUD()
 
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
     const UBreakerAttributeSet* Attributes = Character->GetAttributes();
+    const UBreakerPlaytestComponent* Playtest = Character->GetPlaytest();
     const bool bRecentShot = Weapon && Weapon->GetSecondsSinceLastShot() < 0.14f;
     const FBreakerShotResult* Shot = Weapon ? &Weapon->GetLastShot() : nullptr;
     FLinearColor CrosshairColor = FLinearColor::White;
@@ -38,8 +43,9 @@ void ABreakerPlaytestHUD::DrawHUD()
         const FString Reload = Weapon->IsReloading() ? TEXT("  RELOADING") : TEXT("");
         DrawLabel(FString::Printf(TEXT("%d / %d%s"), Weapon->GetMagazineAmmo(), Weapon->GetReserveAmmo(), *Reload), Canvas->ClipX - 190.0f, Canvas->ClipY - 50.0f, FLinearColor::White, 1.2f);
     }
-    DrawLabel(TEXT("WASD Move  |  Shift Sprint  |  Q Dash  |  C/Ctrl Slide  |  Space Jump/Wall Jump"), 24.0f, 24.0f, FLinearColor(0.75f, 0.8f, 0.85f), 0.85f);
-    DrawLabel(TEXT("LMB Fire  |  RMB Aim  |  R Reload   -   Red hit / Gold weak point"), 24.0f, 47.0f, FLinearColor(0.75f, 0.8f, 0.85f), 0.85f);
+    DrawLabel(TEXT("WASD Move | Shift Sprint | Q Dash | C/Ctrl Slide | Space Jump/Wall Jump"), 24.0f, 24.0f, FLinearColor(0.75f, 0.8f, 0.85f), 0.82f);
+    DrawLabel(TEXT("LMB Fire | RMB Aim | R Reload | F1 Reset | F2 Copy Report | F3 Diagnostics"), 24.0f, 46.0f, FLinearColor(0.75f, 0.8f, 0.85f), 0.82f);
+    DrawLabel(TEXT("[ / ] FOV | - / = Sensitivity"), 24.0f, 68.0f, FLinearColor(0.75f, 0.8f, 0.85f), 0.82f);
 
     const float AppliedDamage = Shot ? Shot->DamageResult.ShieldDamage + Shot->DamageResult.HealthDamage : 0.0f;
     if (bRecentShot && Shot && Shot->bHit && AppliedDamage > 0.0f)
@@ -49,6 +55,34 @@ void ABreakerPlaytestHUD::DrawHUD()
             : FString::Printf(TEXT("%.0f"), AppliedDamage);
         DrawLabel(DamageText, Center.X + 24.0f, Center.Y + 18.0f, CrosshairColor, 1.1f);
     }
+
+    if (Playtest && Playtest->AreDiagnosticsVisible())
+    {
+        const FBreakerPlaytestStats& Stats = Playtest->GetStats();
+        const float FPS = GetWorld() && GetWorld()->GetDeltaSeconds() > UE_SMALL_NUMBER ? 1.0f / GetWorld()->GetDeltaSeconds() : 0.0f;
+        DrawLabel(FString::Printf(TEXT("FPS %.0f | FOV %.0f | SENS %.1f"), FPS, Character->GetCurrentFOV(), Character->GetLookSensitivity()), Canvas->ClipX - 250.0f, 24.0f, FLinearColor(0.5f, 1.0f, 0.65f), 0.9f);
+        DrawLabel(FString::Printf(TEXT("SHOTS %d | ACC %.1f%% | WEAK %.1f%% | DMG %.0f | RELOADS %d"), Stats.ShotsFired, Stats.Accuracy(), Stats.WeakPointRate(), Stats.DamageDealt, Stats.Reloads), Canvas->ClipX - 500.0f, 48.0f, FLinearColor(0.5f, 1.0f, 0.65f), 0.82f);
+
+        if (Weapon && bRecentShot)
+        {
+            FVector2D StartScreen;
+            FVector2D EndScreen;
+            if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(Shot->TraceStart, StartScreen) && PlayerOwner->ProjectWorldLocationToScreen(Shot->TraceEnd, EndScreen))
+                DrawLine(StartScreen.X, StartScreen.Y, EndScreen.X, EndScreen.Y, FLinearColor(0.3f, 0.8f, 1.0f, 0.65f), 1.0f);
+        }
+
+        for (TActorIterator<ABreakerTargetDummy> It(GetWorld()); It; ++It)
+        {
+            FVector2D Screen;
+            if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen))
+            {
+                const float DistanceMeters = FVector::Distance(Character->GetActorLocation(), It->GetActorLocation()) / 100.0f;
+                DrawLabel(FString::Printf(TEXT("%s  %.0fm"), *It->GetProfileLabel(), DistanceMeters), Screen.X - 34.0f, Screen.Y, FLinearColor(0.8f, 0.9f, 1.0f), 0.75f);
+            }
+        }
+    }
+    if (Playtest && Playtest->GetSecondsSinceReportCopy() < 2.0f)
+        DrawLabel(TEXT("PLAYTEST REPORT COPIED"), Center.X - 100.0f, Center.Y + 72.0f, FLinearColor(0.5f, 1.0f, 0.65f), 1.0f);
 }
 
 void ABreakerPlaytestHUD::DrawCrosshair(const FVector2D& Center, const FLinearColor& Color, float Size, float Thickness)

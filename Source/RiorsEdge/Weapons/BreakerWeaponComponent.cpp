@@ -212,5 +212,19 @@ float UBreakerWeaponComponent::GetSecondsSinceLastShot() const
     return GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastCosmeticShotTime) : BIG_NUMBER;
 }
 
+void UBreakerWeaponComponent::ResetAmmunition()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    StopFire();
+    GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (!Definition) return;
+    MagazineAmmo = Definition->MagazineSize;
+    ReserveAmmo = Definition->StartingReserveAmmo;
+    bReloading = false;
+    OnReloadChanged.Broadcast(false);
+    OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+}
+
 void UBreakerWeaponComponent::OnRep_Ammo() { OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo); }
 void UBreakerWeaponComponent::OnRep_Reloading() { OnReloadChanged.Broadcast(bReloading); }

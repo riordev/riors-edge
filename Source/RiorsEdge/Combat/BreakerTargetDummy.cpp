@@ -12,7 +12,7 @@
 
 ABreakerTargetDummy::ABreakerTargetDummy()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
     bReplicates = true;
     BodyCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("BodyCollision"));
     SetRootComponent(BodyCollision);
@@ -59,9 +59,42 @@ void ABreakerTargetDummy::BeginPlay()
     Super::BeginPlay();
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
+    MotionOrigin = GetActorLocation();
+    ConfigureProfile(Profile);
 }
 
 UAbilitySystemComponent* ABreakerTargetDummy::GetAbilitySystemComponent() const { return AbilitySystem; }
+
+void ABreakerTargetDummy::ConfigureProfile(EBreakerTargetProfile NewProfile)
+{
+    Profile = NewProfile;
+    if (!Attributes) return;
+    Attributes->SetMaxHealth(Profile == EBreakerTargetProfile::Armored ? 180.0f : 120.0f);
+    Attributes->SetHealth(Attributes->GetMaxHealth());
+    Attributes->SetMaxShield(Profile == EBreakerTargetProfile::Shielded ? 100.0f : 0.0f);
+    Attributes->SetShield(Attributes->GetMaxShield());
+    Attributes->SetArmor(Profile == EBreakerTargetProfile::Armored ? 100.0f : 0.0f);
+    PrimaryActorTick.SetTickFunctionEnable(Profile == EBreakerTargetProfile::Moving);
+}
+
+FString ABreakerTargetDummy::GetProfileLabel() const
+{
+    switch (Profile)
+    {
+        case EBreakerTargetProfile::Shielded: return TEXT("SHIELD");
+        case EBreakerTargetProfile::Armored: return TEXT("ARMOR");
+        case EBreakerTargetProfile::Moving: return TEXT("MOVING");
+        default: return TEXT("HEALTH");
+    }
+}
+
+void ABreakerTargetDummy::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (Profile != EBreakerTargetProfile::Moving || !HasAuthority()) return;
+    MotionPhase += DeltaSeconds * 1.4f;
+    SetActorLocation(MotionOrigin + FVector(0.0f, FMath::Sin(MotionPhase) * 260.0f, 0.0f), false);
+}
 
 void ABreakerTargetDummy::HandleDeath()
 {
@@ -78,6 +111,7 @@ void ABreakerTargetDummy::RespawnDummy()
     if (!GetWorld()) return;
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    GetWorld()->SpawnActor<ABreakerTargetDummy>(GetClass(), GetActorTransform(), Params);
+    ABreakerTargetDummy* Replacement = GetWorld()->SpawnActor<ABreakerTargetDummy>(GetClass(), GetActorTransform(), Params);
+    if (Replacement) Replacement->ConfigureProfile(Profile);
     Destroy();
 }
