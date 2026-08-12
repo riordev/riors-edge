@@ -15,6 +15,7 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UBreakerCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -30,6 +31,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Attributes = CreateDefaultSubobject<UBreakerAttributeSet>(TEXT("Attributes"));
     Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
+    Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
@@ -72,7 +74,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("Fire"), IE_Released, this, &ThisClass::StopFire);
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Pressed, this, &ThisClass::StartAim);
         PlayerInputComponent->BindAction(TEXT("Aim"), IE_Released, this, &ThisClass::StopAim);
-        PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ThisClass::OnReloadInput);
+        PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ThisClass::HandleReloadInput);
         return;
     }
     if (InputConfig->Move) Input->BindAction(InputConfig->Move, ETriggerEvent::Triggered, this, &ThisClass::Move);
@@ -98,7 +100,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         Input->BindAction(InputConfig->Aim, ETriggerEvent::Started, this, &ThisClass::StartAim);
         Input->BindAction(InputConfig->Aim, ETriggerEvent::Completed, this, &ThisClass::StopAim);
     }
-    if (InputConfig->Reload) Input->BindAction(InputConfig->Reload, ETriggerEvent::Started, this, &ThisClass::OnReloadInput);
+    if (InputConfig->Reload) Input->BindAction(InputConfig->Reload, ETriggerEvent::Started, this, &ThisClass::HandleReloadInput);
 }
 
 void ABreakerCharacter::Move(const FInputActionValue& Value)
@@ -203,7 +205,8 @@ void ABreakerCharacter::StopSlide()
     }
 }
 
-void ABreakerCharacter::StartFire() { OnFireInput(true); }
-void ABreakerCharacter::StopFire() { OnFireInput(false); }
-void ABreakerCharacter::StartAim() { OnAimInput(true); }
-void ABreakerCharacter::StopAim() { OnAimInput(false); }
+void ABreakerCharacter::StartFire() { if (Weapon) Weapon->StartFire(); OnFireInput(true); }
+void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput(false); }
+void ABreakerCharacter::StartAim() { if (Weapon) Weapon->SetAiming(true); OnAimInput(true); }
+void ABreakerCharacter::StopAim() { if (Weapon) Weapon->SetAiming(false); OnAimInput(false); }
+void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
