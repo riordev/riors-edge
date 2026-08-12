@@ -13,6 +13,7 @@ class UBreakerCharacterMovementComponent;
 class UBreakerProgressionComponent;
 class UBreakerCombatComponent;
 class UBreakerWeaponComponent;
+class UStaticMeshComponent;
 struct FInputActionValue;
 
 UCLASS(Blueprintable)
@@ -28,6 +29,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRiding() const;
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const;
     UFUNCTION(BlueprintPure, Category="Movement") UBreakerCharacterMovementComponent* GetBreakerMovement() const;
+    UFUNCTION(BlueprintPure, Category="Combat") UBreakerAttributeSet* GetAttributes() const { return Attributes; }
+    UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash();
     UFUNCTION(BlueprintCallable, Category="Movement") void StartSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") void StopSlide();
@@ -42,6 +45,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Progression") TObjectPtr<UBreakerProgressionComponent> Progression;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UBreakerInputConfig> InputConfig;
 
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);

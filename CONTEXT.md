@@ -35,14 +35,15 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - `UBreakerAttributeSet` defines replicated health, shield, armour, stamina, class-resource, critical, damage, DoT, and movement attributes.
 - The first progression framework is implemented under `Source/RiorsEdge/Progression`: stable class/node IDs, class and tree Data Assets, ranked allocation validation, two class-ability slots plus ultimate, Forge-only respec, versionable runtime state, and snapshot-ready DoT application specs. Content assets and save persistence are not created yet.
 - The shared combat foundation is implemented under `Source/RiorsEdge/Combat` and documented in `Docs/Combat-Foundation.md`: replicated GAS attributes, a unified damage request/result contract, armour and penetration, shield routing, snapshot-critical DoT ticks, stamina/resource helpers, and damage/death events. It is framework code; weapons, status lifetime management, and class generation rules are not implemented yet.
-- The first weapon foundation is implemented under `Source/RiorsEdge/Weapons` and documented in `Docs/Weapon-Foundation.md`: data-driven hitscan definitions, fallback prototype rifle, replicated ammunition/reload state, deterministic spread, falloff, weak points, server damage submission, cosmetic events, and a reusable C++ target dummy. The test map does not yet contain a dummy or visible weapon model.
+- The first weapon foundation is implemented under `Source/RiorsEdge/Weapons` and documented in `Docs/Weapon-Foundation.md`: data-driven hitscan definitions, fallback prototype rifle, replicated ammunition/reload state, deterministic spread, falloff, weak points, server damage submission, cosmetic events, and a reusable C++ target dummy.
+- Playtest Gym v1 adds a code-driven HUD, placeholder weapon visual, hit/weak-point feedback, and three automatically spawned recycling target dummies. See `Docs/Playtest-Gym-v1.md`.
 - Gameplay Tags exist for initial movement, weapon, cooldown, damage, rarity, and state concepts.
 - The C++ character is the default fallback pawn but still needs an editor-created Blueprint child for meshes, arms, weapon presentation, VFX, audio, and tuned input assets.
 - The canonical private GitHub remote is configured and `main` is the cross-machine integration branch.
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiled and linked successfully on Apple Silicon with Unreal Engine 5.8. A focused headless automation run loaded `Lvl_FirstPerson`, entered Play-In-Editor for approximately five seconds with the C++ `BreakerGameMode` configured as the global default, and exited successfully. This verifies project/module/map/pawn startup but does not substitute for a human movement-feel test. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon with Unreal Engine 5.8. The nine project automation tests pass. A headless game startup loads `Lvl_FirstPerson` and confirms its world override selects `BreakerGameMode`; this verifies project/module/map/pawn startup but does not substitute for a human movement-and-weapon-feel test. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 

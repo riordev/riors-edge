@@ -45,6 +45,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetMagazineAmmo() const { return MagazineAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") const UBreakerWeaponDefinition* GetDefinition() const { return WeaponDefinition; }
+    UFUNCTION(BlueprintPure, Category="Weapon|Debug") const FBreakerShotResult& GetLastShot() const { return LastShot; }
+    UFUNCTION(BlueprintPure, Category="Weapon|Debug") float GetSecondsSinceLastShot() const;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponDefinition> WeaponDefinition;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerShotEvent OnShot;
@@ -70,6 +72,8 @@ private:
     double LastShotTime = -1000.0;
     FTimerHandle AutomaticFireTimer;
     FTimerHandle ReloadTimer;
+    FBreakerShotResult LastShot;
+    double LastCosmeticShotTime = -1000.0;
 
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     void FireOnce();

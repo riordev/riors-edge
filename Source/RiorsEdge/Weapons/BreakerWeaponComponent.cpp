@@ -202,7 +202,14 @@ void UBreakerWeaponComponent::GetViewPoint(FVector& OutLocation, FRotator& OutRo
 
 void UBreakerWeaponComponent::MulticastShotCosmetics_Implementation(const FBreakerShotResult& Shot)
 {
+    LastShot = Shot;
+    LastCosmeticShotTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     OnShot.Broadcast(Shot);
+}
+
+float UBreakerWeaponComponent::GetSecondsSinceLastShot() const
+{
+    return GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastCosmeticShotTime) : BIG_NUMBER;
 }
 
 void UBreakerWeaponComponent::OnRep_Ammo() { OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo); }

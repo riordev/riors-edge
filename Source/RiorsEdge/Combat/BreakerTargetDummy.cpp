@@ -7,6 +7,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
+#include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 ABreakerTargetDummy::ABreakerTargetDummy()
 {
@@ -20,6 +22,9 @@ ABreakerTargetDummy::ABreakerTargetDummy()
     BodyVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyVisual"));
     BodyVisual->SetupAttachment(BodyCollision);
     BodyVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    BodyVisual->SetRelativeScale3D(FVector(0.75f, 0.75f, 1.5f));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    if (CylinderMesh.Succeeded()) BodyVisual->SetStaticMesh(CylinderMesh.Object);
 
     BodyHitBox = CreateDefaultSubobject<UBoxComponent>(TEXT("BodyHitBox"));
     BodyHitBox->SetupAttachment(BodyCollision);
@@ -35,6 +40,13 @@ ABreakerTargetDummy::ABreakerTargetDummy()
     WeakPoint->ComponentTags.Add(TEXT("WeakPoint"));
     WeakPoint->SetCollisionResponseToAllChannels(ECR_Ignore);
     WeakPoint->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
+
+    WeakPointVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeakPointVisual"));
+    WeakPointVisual->SetupAttachment(WeakPoint);
+    WeakPointVisual->SetRelativeScale3D(FVector(0.36f));
+    WeakPointVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+    if (SphereMesh.Succeeded()) WeakPointVisual->SetStaticMesh(SphereMesh.Object);
 
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AbilitySystem->SetIsReplicated(true);
@@ -54,5 +66,18 @@ UAbilitySystemComponent* ABreakerTargetDummy::GetAbilitySystemComponent() const 
 void ABreakerTargetDummy::HandleDeath()
 {
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SetLifeSpan(3.0f);
+    BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    BodyVisual->SetVisibility(false, true);
+    FTimerHandle RespawnTimer;
+    GetWorldTimerManager().SetTimer(RespawnTimer, this, &ThisClass::RespawnDummy, RespawnDelay, false);
+}
+
+void ABreakerTargetDummy::RespawnDummy()
+{
+    if (!GetWorld()) return;
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    GetWorld()->SpawnActor<ABreakerTargetDummy>(GetClass(), GetActorTransform(), Params);
+    Destroy();
 }

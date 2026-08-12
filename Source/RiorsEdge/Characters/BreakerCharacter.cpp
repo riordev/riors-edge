@@ -4,6 +4,8 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -32,6 +34,15 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
+
+    PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));
+    PrototypeWeaponVisual->SetupAttachment(FirstPersonCamera);
+    PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 18.0f, -18.0f));
+    PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.42f, 0.08f, 0.08f));
+    PrototypeWeaponVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    PrototypeWeaponVisual->SetOnlyOwnerSee(true);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (CubeMesh.Succeeded()) PrototypeWeaponVisual->SetStaticMesh(CubeMesh.Object);
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
