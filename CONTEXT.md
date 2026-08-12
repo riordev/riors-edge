@@ -34,6 +34,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - `UBreakerInputConfig` is a Data Asset contract for Move, Look, Jump, Sprint, Dash, Slide, Fire, Aim, and Reload.
 - `UBreakerAttributeSet` currently defines Health, MaxHealth, and MoveSpeed.
 - The first progression framework is implemented under `Source/RiorsEdge/Progression`: stable class/node IDs, class and tree Data Assets, ranked allocation validation, two class-ability slots plus ultimate, Forge-only respec, versionable runtime state, and snapshot-ready DoT application specs. Content assets and save persistence are not created yet.
+- The shared combat foundation is implemented under `Source/RiorsEdge/Combat` and documented in `Docs/Combat-Foundation.md`: replicated GAS attributes, a unified damage request/result contract, armour and penetration, shield routing, snapshot-critical DoT ticks, stamina/resource helpers, and damage/death events. It is framework code; weapons, status lifetime management, and class generation rules are not implemented yet.
 - Gameplay Tags exist for initial movement, weapon, cooldown, damage, rarity, and state concepts.
 - The C++ character is not yet wired to an editor-created Blueprint or set as the default pawn.
 - No baseline Git commit or remote has been created yet.
@@ -135,6 +136,7 @@ After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot 
 - `Docs/Roadmap.md` — milestone sequence
 - `Docs/Godot-Mechanics-Audit.md` — confirmed prototype mechanics and Unreal mapping
 - `Docs/Character-Progression-Architecture.md` — class, Core Tree, status, and GAS architecture
+- `Docs/Combat-Foundation.md` — damage order, armour, shields, critical DoTs, attributes, and stamina
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done
 
 ## Handoff discipline

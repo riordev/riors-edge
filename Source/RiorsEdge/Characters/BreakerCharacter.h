@@ -11,6 +11,7 @@ class UBreakerInputConfig;
 class UCameraComponent;
 class UBreakerCharacterMovementComponent;
 class UBreakerProgressionComponent;
+class UBreakerCombatComponent;
 struct FInputActionValue;
 
 UCLASS(Blueprintable)
@@ -38,6 +39,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UAbilitySystemComponent> AbilitySystem;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Progression") TObjectPtr<UBreakerProgressionComponent> Progression;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UBreakerInputConfig> InputConfig;
 
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);

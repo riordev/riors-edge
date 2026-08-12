@@ -74,7 +74,7 @@ struct RIORSEDGE_API FBreakerDamageSnapshot
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourcePower = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourcePower = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalMultiplier = 1.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float DamageOverTimeMultiplier = 1.0f;
