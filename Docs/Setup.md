@@ -14,8 +14,8 @@ Install Visual Studio 2022 with **Game development with C++**, Unreal tooling, a
 
 Close Unreal, commit and push, then pull before opening the project elsewhere. Never commit `Binaries`, `Intermediate`, `Saved`, or `DerivedDataCache`. Avoid concurrent edits to the same Blueprint or map because binary Unreal assets cannot be merged reliably.
 
-## First integration pass
+## Player assembly
 
-Create `Content/ProjectBreaker/Input/DA_PlayerInputConfig` as a `BreakerInputConfig` Data Asset. Reuse the template's `IA_Move`, `IA_Look`, `IA_Jump`, and `IMC_Default`; add Sprint, Dash, Fire, Aim, and Reload actions as needed. Create a Blueprint child of `BreakerCharacter`, assign the data asset, then migrate visual components or logic from `BP_FirstPersonCharacter` incrementally.
+`Content/ProjectBreaker/Characters/BP_BreakerCharacter` is the active assembly and remains a child of the C++ `BreakerCharacter`. It uses `Content/ProjectBreaker/Input/DA_PlayerInputConfig` and `IMC_Player`, which include keyboard/mouse and controller mappings. `Scripts/create_movement_gym_assets.py` can recreate or validate these assets through Unreal Editor automation.
 
-Until that Data Asset exists, the C++ character uses keyboard/mouse fallback mappings: WASD, mouse look, Space jump/wall jump, Shift sprint, Q dash, C or Left Ctrl slide, mouse buttons fire/aim, and R reload. The C++ game mode is the current global default so a clean clone can immediately test movement.
+If those assets are absent, the C++ character remains a functional fallback. Its legacy mappings support WASD or left stick movement, mouse or right stick look, Space / gamepad south jump, Shift / left-stick click sprint, Q / gamepad east dash, C or Left Ctrl / gamepad west slide, mouse buttons or triggers fire/aim, and R / gamepad north reload.

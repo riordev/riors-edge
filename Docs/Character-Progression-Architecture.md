@@ -94,14 +94,17 @@ Architecture note: support must remain viable in solo play. Every support branch
 
 ### Class Points
 
-- One per level with approximately 30 available by level 50.
+- One per level from level 1 to level 30. Thirty total.
+- No class points are granted after level 30; class identity is complete at
+  that point and levels 31-50 are pure universal specialization.
 - Spent only within the selected class and its branches.
 - Free respec at a Forge.
 - Define class identity and access to class mechanics.
 
 ### Core Points
 
-- One per level plus world-content rewards, targeting approximately 65 total.
+- One per level from level 1 to level 50, plus approximately 15 from
+  world content. Approximately 65 total.
 - Shared across all classes.
 - Free respec unless later playtests establish a meaningful reason for friction.
 - Intended to fully develop two constellations and partially develop a third.
@@ -128,11 +131,11 @@ Owns status buildup and cross-element reactions. Reactions need an explicit matr
 
 ### Bulwark
 
-Owns block, armour, mitigation, stamina efficiency, and parry. Guard unlocking Block is a meaningful verb unlock and should be represented as an ability grant, not a Boolean stat.
+Owns armour, mitigation, stamina efficiency, and parry, and deepens the universal Block action. Block itself is base kit and is not granted by this tree. Guard should therefore improve block quality — reduced stamina cost, wider effective arc, reflect behavior — rather than unlocking the verb. Parry remains a genuine ability grant and is the constellation's one verb unlock.
 
 ### Kinesis
 
-Owns dodge, modest movement efficiency, slide handling, and optional aerial investment. It should not turn advanced traversal into a universal requirement.
+Owns dodge quality, modest movement efficiency, slide handling, and optional aerial investment. Dodge, slide, dash, and wall ride are all base kit; Kinesis improves them rather than unlocking them. Air jump remains a verb unlock and is this tree's one genuine grant. Kinesis should not turn advanced traversal into a universal requirement.
 
 Recommended revisions:
 
@@ -261,11 +264,18 @@ Gunsmith, Tank, and Support depend on deployables, threat/AI, shielding, healing
 - Solo is the primary balance target; cooperative parties support up to five players.
 - Damage-over-time effects can critically strike and snapshot offensive stats when applied.
 - Respecs require interaction with a Forge.
+- Level cap is 50 and is a hard stop. There is no post-cap power
+  progression: no paragon track, no infinite stat trickle. All endgame
+  character power comes from gear.
+- Dash is part of the base movement kit. Swift and Kinesis improve it;
+  neither unlocks it.
+- Block and Dodge are universal actions available to every character.
+  Certain classes and constellations use them better, but no tree grants
+  them.
 
 ## Decisions still open
 
 - Are branch nodes freely mixed with investment gates, or mutually exclusive at major tiers?
-- Does the base movement kit include dash, with Swift improving it, or does Swift uniquely unlock dash?
-- Are Block and Dodge universal once purchased, and what dedicated input slots do they use?
+- What dedicated input slots do Block and Dodge use? Dodge should use a dedicated action rather than double-tap detection, which conflicts with precise strafing and accessibility.
 - Can snapshot DoTs trigger ordinary on-hit effects on each tick, or only explicitly DoT-compatible effects?
 - Does multiplayer scale enemy count, enemy health, elite density, or a mixture? Initial policy values are placeholders.

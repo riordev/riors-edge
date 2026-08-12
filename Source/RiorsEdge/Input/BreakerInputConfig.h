@@ -22,4 +22,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Fire;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Aim;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Reload;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestReset;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestReport;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestDiagnostics;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Settings") TObjectPtr<UInputAction> FOVUp;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Settings") TObjectPtr<UInputAction> FOVDown;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Settings") TObjectPtr<UInputAction> SensitivityUp;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Settings") TObjectPtr<UInputAction> SensitivityDown;
 };

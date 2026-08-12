@@ -46,6 +46,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
     Attributes->SetShield(Result.RemainingShield);
     Attributes->SetHealth(Result.RemainingHealth);
+    LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     OnDamageReceived.Broadcast(Result);
     if (Result.bKilled && !bDeathBroadcast)
     {
@@ -75,7 +76,21 @@ void UBreakerCombatComponent::AddClassResource(float Amount)
     if (Attributes && Amount > 0.0f) Attributes->SetClassResource(FMath::Min(Attributes->GetMaxClassResource(), Attributes->GetClassResource() + Amount));
 }
 
+void UBreakerCombatComponent::RestoreVitals()
+{
+    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    Attributes->SetHealth(Attributes->GetMaxHealth());
+    Attributes->SetShield(Attributes->GetMaxShield());
+    Attributes->SetStamina(Attributes->GetMaxStamina());
+    bDeathBroadcast = false;
+}
+
 bool UBreakerCombatComponent::IsDead() const
 {
     return Attributes && Attributes->GetHealth() <= 0.0f;
+}
+
+float UBreakerCombatComponent::GetSecondsSinceDamage() const
+{
+    return GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastDamageTime) : BIG_NUMBER;
 }

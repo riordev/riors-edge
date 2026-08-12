@@ -24,7 +24,9 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendStamina(float Cost);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendClassResource(float Cost);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") void AddClassResource(float Amount);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") void RestoreVitals();
     UFUNCTION(BlueprintPure, Category="Combat") bool IsDead() const;
+    UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceDamage() const;
 
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDamageReceived OnDamageReceived;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDeathEvent OnDeath;
@@ -35,4 +37,5 @@ private:
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     float TimeSinceStaminaSpend = 1000.0f;
     bool bDeathBroadcast = false;
+    double LastDamageTime = -1000.0;
 };

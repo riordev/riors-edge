@@ -2,7 +2,11 @@
 
 The first weapon pipeline is a server-authoritative hitscan prototype with a Data Asset definition and a built-in fallback rifle so clean clones can fire without editor-authored content.
 
-## Current prototype rifle
+## Playable archetypes
+
+The player carries two weapons. Keys 1-2 select the equipped primary and secondary slots; the current gym loadout is rifle / scattergun. All three clean-clone fallback definitions remain available to the future loadout and pickup systems, but only two may be equipped at once. These remain prototype values rather than balance commitments.
+
+### Rifle
 
 - 24 base physical damage.
 - 600 rounds per minute, automatic.
@@ -13,7 +17,21 @@ The first weapon pipeline is a server-authoritative hitscan prototype with a Dat
 - Full damage through 20m, linear falloff to 55% at 60m.
 - 120m maximum trace range.
 
-These values are scaffolding, not balance commitments.
+### Scattergun
+
+- Eight deterministic pellets at 10 base physical damage each.
+- 85 rounds per minute, semi-automatic.
+- Eight-round magazine and 40 reserve.
+- Wide close-range spread and aggressive falloff after 8m.
+
+### Marksman
+
+- 72 base physical damage and 2.0x weak-point multiplier.
+- 150 rounds per minute, semi-automatic.
+- Eight-round magazine and 40 reserve.
+- Very tight aimed spread and strong long-range retention.
+
+The composite placeholder model changes proportions per archetype and provides muzzle flash, procedural kick, ADS alignment, ammunition state, and hit/weak-point feedback. Authored meshes, animation, VFX, and audio remain Blueprint presentation work.
 
 ## Runtime flow
 

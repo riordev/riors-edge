@@ -30,6 +30,7 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1")) float RoundsPerMinute = 600.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing") bool bAutomatic = true;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1", ClampMax="32")) int32 PelletsPerShot = 1;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="0")) float HipSpreadDegrees = 1.2f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="0")) float AimSpreadDegrees = 0.25f;
 

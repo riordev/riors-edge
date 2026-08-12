@@ -10,12 +10,14 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     MaxAcceleration = 4200.0f;
     BrakingDecelerationWalking = 1800.0f;
     GroundFriction = 7.5f;
-    AirControl = 0.32f;
+    AirControl = 0.55f;
     AirControlBoostMultiplier = 1.4f;
     AirControlBoostVelocityThreshold = 300.0f;
     JumpZVelocity = 700.0f;
-    GravityScale = 1.25f;
-    FallingLateralFriction = 0.15f;
+    GravityScale = 1.35f;
+    FallingLateralFriction = 0.05f;
+    MaxSimulationTimeStep = 1.0f / 60.0f;
+    MaxSimulationIterations = 8;
     NavAgentProps.bCanCrouch = true;
 }
 
@@ -25,7 +27,8 @@ float UBreakerCharacterMovementComponent::GetMaxSpeed() const
     {
         return FMath::Max(SprintSpeed, Velocity.Size2D());
     }
-    return bWantsToSprint ? SprintSpeed : WalkSpeed;
+    const float GroundedCap = bWantsToSprint ? SprintSpeed : WalkSpeed;
+    return FMath::Max(GroundedCap, BoostedSpeedCeiling);
 }
 
 void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
@@ -33,10 +36,24 @@ void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)
     bWantsToSprint = bEnabled;
 }
 
+void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
+{
+    if (bEnabled && !bSlideRequested)
+    {
+        bSlideRequestConsumed = false;
+    }
+    bSlideRequested = bEnabled;
+    if (!bEnabled)
+    {
+        bSlideRequestConsumed = false;
+        EndSlide();
+    }
+}
+
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)
 {
     const UWorld* World = GetWorld();
-    if (!World || World->GetTimeSeconds() - LastDashTime < DashCooldown)
+    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown)
     {
         return false;
     }
@@ -51,11 +68,12 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
         return false;
     }
 
-    const float OutputSpeed = FMath::Max(Velocity.Size2D(), DashSpeedFloor) + DashSpeedBonus;
+    const float OutputSpeed = FMath::Min(FMath::Max(Velocity.Size2D(), DashSpeedFloor) + DashSpeedBonus, MomentumHardCap);
     Velocity.X = Direction.X * OutputSpeed;
     Velocity.Y = Direction.Y * OutputSpeed;
     Velocity.Z = FMath::Max(Velocity.Z, DashVerticalFloor);
     LastDashTime = World->GetTimeSeconds();
+    BoostedSpeedCeiling = OutputSpeed;
     return true;
 }
 
@@ -67,14 +85,24 @@ bool UBreakerCharacterMovementComponent::BeginSlide()
     }
 
     bSliding = true;
+    bSlideRequestConsumed = true;
+    SlideElapsed = 0.0f;
+    const double CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    if (CurrentTime - LastSlideBoostTime >= SlideBoostCooldown)
+    {
+        SlideEntryBoostRemaining = SlideEntryBoost;
+        LastSlideBoostTime = CurrentTime;
+    }
+    else
+    {
+        SlideEntryBoostRemaining = 0.0f;
+    }
     SavedGroundFriction = GroundFriction;
     SavedBrakingDeceleration = BrakingDecelerationWalking;
     GroundFriction = SlideGroundFriction;
     BrakingDecelerationWalking = SlideBrakingDeceleration;
     CharacterOwner->Crouch();
 
-    const FVector Direction = Velocity.GetSafeNormal2D();
-    Velocity += Direction * SlideEntryBoost;
     return true;
 }
 
@@ -86,12 +114,27 @@ void UBreakerCharacterMovementComponent::EndSlide()
     }
 
     bSliding = false;
+    SlideElapsed = 0.0f;
+    SlideEntryBoostRemaining = 0.0f;
     GroundFriction = SavedGroundFriction;
     BrakingDecelerationWalking = SavedBrakingDeceleration;
     if (CharacterOwner)
     {
         CharacterOwner->UnCrouch();
     }
+}
+
+void UBreakerCharacterMovementComponent::PrepareSlideJump()
+{
+    if (!bSliding) return;
+
+    const FVector PreservedHorizontalVelocity(Velocity.X, Velocity.Y, 0.0f);
+    const float PreservedSpeed = PreservedHorizontalVelocity.Size();
+    EndSlide();
+    SetSprinting(true);
+    BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, PreservedSpeed);
+    Velocity.X = PreservedHorizontalVelocity.X;
+    Velocity.Y = PreservedHorizontalVelocity.Y;
 }
 
 void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -127,23 +170,88 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
         }
     }
 
+    const float SpeedBeforeMovement = Velocity.Size2D();
+    const FVector DirectionBeforeMovement = Velocity.GetSafeNormal2D();
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    if (BoostedSpeedCeiling > 0.0f)
+    {
+        const float SpeedAfterMovement = Velocity.Size2D();
+        const FVector DirectionAfterMovement = Velocity.GetSafeNormal2D();
+        const bool bMovementReleased = Acceleration.SizeSquared2D() <= UE_KINDA_SMALL_NUMBER;
+        const bool bCollisionSlowed = SpeedBeforeMovement > SprintSpeed
+            && SpeedAfterMovement < SpeedBeforeMovement - 100.0f;
+        const bool bCollisionRedirected = !DirectionBeforeMovement.IsNearlyZero()
+            && !DirectionAfterMovement.IsNearlyZero()
+            && FVector::DotProduct(DirectionBeforeMovement, DirectionAfterMovement) < 0.65f;
+        if (bMovementReleased || bCollisionSlowed || bCollisionRedirected)
+        {
+            BoostedSpeedCeiling = 0.0f;
+        }
+        else
+        {
+            BoostedSpeedCeiling = FMath::Min(FMath::Max(BoostedSpeedCeiling, SpeedAfterMovement), MomentumHardCap);
+        }
+    }
+
+    ApplyAirSteering(DeltaTime);
+
+    if (bSlideRequested && !bSlideRequestConsumed && !bSliding && IsMovingOnGround())
+    {
+        BeginSlide();
+    }
 
     if (!bSliding)
     {
         return;
     }
 
-    if (!IsMovingOnGround() || Velocity.Size2D() < SlideExitSpeed)
+    SlideElapsed += DeltaTime;
+    if (!IsMovingOnGround() || Velocity.Size2D() < SlideExitSpeed || SlideElapsed >= SlideMaxDuration)
     {
         EndSlide();
         return;
     }
 
     const FVector FloorNormal = CurrentFloor.HitResult.ImpactNormal.GetSafeNormal();
+    if (SlideEntryBoostRemaining > 0.0f && SlideEntryBoostDuration > UE_SMALL_NUMBER)
+    {
+        const float BoostRoom = FMath::Max(0.0f, SprintSpeed + SlideEntryBoost - Velocity.Size2D());
+        const float AppliedBoost = FMath::Min3(SlideEntryBoostRemaining, SlideEntryBoost / SlideEntryBoostDuration * DeltaTime, BoostRoom);
+        Velocity += Velocity.GetSafeNormal2D() * AppliedBoost;
+        SlideEntryBoostRemaining -= AppliedBoost;
+    }
     const FVector DownSlope = FVector::VectorPlaneProject(FVector::DownVector, FloorNormal).GetSafeNormal2D();
     const float SlopeAmount = FMath::Clamp(1.0f - FloorNormal.Z, 0.0f, 1.0f);
     Velocity += DownSlope * SlideSlopeAcceleration * SlopeAmount * DeltaTime;
+}
+
+void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
+{
+    if (!IsFalling() || bWallRiding)
+    {
+        return;
+    }
+
+    const FVector WishDirection = Acceleration.GetSafeNormal2D();
+    const float HorizontalSpeed = Velocity.Size2D();
+    if (WishDirection.IsNearlyZero() || HorizontalSpeed <= UE_KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    const FVector HorizontalDirection = Velocity.GetSafeNormal2D();
+    const float Alignment = FVector::DotProduct(HorizontalDirection, WishDirection);
+    if (Alignment <= AirSteerMinimumAlignment)
+    {
+        return;
+    }
+
+    const float SteerRate = AirSteerRate * (0.35f + 0.65f * FMath::Max(Alignment, 0.0f));
+    const float Alpha = FMath::Clamp(SteerRate * DeltaTime, 0.0f, 1.0f);
+    const FVector SteeredDirection = FMath::Lerp(HorizontalDirection, WishDirection, Alpha).GetSafeNormal2D();
+    Velocity.X = SteeredDirection.X * HorizontalSpeed;
+    Velocity.Y = SteeredDirection.Y * HorizontalSpeed;
 }
 
 bool UBreakerCharacterMovementComponent::FindRunnableWall(FHitResult& OutHit) const

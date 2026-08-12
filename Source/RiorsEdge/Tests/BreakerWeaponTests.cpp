@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Weapons/BreakerWeaponDefinition.h"
+#include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -46,6 +47,31 @@ bool FBreakerWeaponSpreadTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Same seed returns same direction"), First.Equals(Second));
     TestTrue(TEXT("Spread remains normalized"), FMath::IsNearlyEqual(First.Size(), 1.0f));
     TestTrue(TEXT("Spread remains inside requested cone"), FMath::RadiansToDegrees(FMath::Acos(Direction.Dot(First))) <= 2.0f + KINDA_SMALL_NUMBER);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponArchetypeTest,
+    "RiorsEdge.Weapons.Archetypes",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponArchetypeTest::RunTest(const FString& Parameters)
+{
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    TestEqual(TEXT("Rifle is the default archetype"), Weapon->GetArchetype(), EBreakerWeaponArchetype::Rifle);
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Scattergun);
+    TestEqual(TEXT("Scattergun can be equipped"), Weapon->GetArchetypeName(), FString(TEXT("SCATTERGUN")));
+    TestEqual(TEXT("Scattergun receives its eight-round magazine"), Weapon->GetMagazineAmmo(), 8);
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Marksman);
+    TestEqual(TEXT("Marksman can be equipped"), Weapon->GetArchetypeName(), FString(TEXT("MARKSMAN")));
+    TestEqual(TEXT("Marksman receives its eight-round magazine"), Weapon->GetMagazineAmmo(), 8);
+    UBreakerWeaponComponent* Loadout = NewObject<UBreakerWeaponComponent>();
+    Loadout->EquipSlot(2);
+    TestEqual(TEXT("Players can equip the secondary slot"), Loadout->GetCurrentSlot(), 2);
+    TestEqual(TEXT("The prototype secondary slot carries the scattergun"), Loadout->GetArchetypeName(), FString(TEXT("SCATTERGUN")));
+    Loadout->EquipSlot(1);
+    TestEqual(TEXT("Players can return to the primary slot"), Loadout->GetCurrentSlot(), 1);
+    TestEqual(TEXT("The prototype primary slot carries the rifle"), Loadout->GetArchetypeName(), FString(TEXT("RIFLE")));
     return true;
 }
 

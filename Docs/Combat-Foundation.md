@@ -28,6 +28,12 @@ This means an individual application either critically ticks for its full lifeti
 
 DoT ticks carry a proc coefficient. They must not trigger arbitrary on-hit effects unless those effects declare DoT compatibility.
 
+## Critical policy
+
+Critical hits are the only damage multiplier of their kind. `CriticalChance` and `CriticalMultiplier` on the attribute set are the single source of truth.
+
+An earlier itemization draft proposed a separate "chance to deal double damage" affix. That is cut. A second independent multiplier duplicates the critical mechanic, and stacking two of them is the multiplicative-explosion risk identified as the first balance concern in the progression architecture. Do not reintroduce a parallel multiplier through affixes, nodes, or class mechanics without revisiting this section.
+
 ## Replicated attributes
 
 The GAS attribute set currently contains Health, MaxHealth, Shield, MaxShield, Armor, Stamina, MaxStamina, ClassResource, MaxClassResource, CriticalChance, CriticalMultiplier, DamageMultiplier, DamageOverTimeMultiplier, and MoveSpeed.

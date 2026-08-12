@@ -10,7 +10,7 @@ The immediate goal is a small vertical slice, not the full world: one graybox bi
 
 The current character concept proposes five classes—Caster, Swift, Gunsmith, Tank, and Support—with three branches each, class-specific resources, and a separate six-constellation universal Core Tree. The implementation analysis is in `Docs/Character-Progression-Architecture.md`. Class identity, universal progression, and equipment affixes are separate layers; do not merge their data models.
 
-Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge.
+Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge; the level cap is 50 with a hard stop and no post-cap power progression, so all endgame character power comes from gear; dash, slide, wall ride, block, and dodge are all base kit, with trees improving them rather than unlocking them, leaving air jump and parry as the only tree-granted verbs.
 
 ## Canonical project
 
@@ -24,6 +24,8 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 ## Current state
 
+- An asset-free Slate front end opens on launch with title, pause, loadout, and settings screens. Settings persist sensitivity, FOV, and vertical-look inversion; Escape backs out one menu layer at a time.
+- The playtest HUD uses a compact bottom-left band for health, shield, armor, movement state, speed, weapon slot, and ammunition, followed by presentation-only placeholders for two class abilities and one ultimate.
 - The project began as Unreal's Blueprint First Person template.
 - Existing template content, input assets, character Blueprint, game mode, and `Lvl_FirstPerson` were preserved.
 - The active global game mode uses `BreakerGameMode` and the C++ `BreakerCharacter` fallback pawn; existing template assets remain preserved for reference and presentation migration.
@@ -35,15 +37,15 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - `UBreakerAttributeSet` defines replicated health, shield, armour, stamina, class-resource, critical, damage, DoT, and movement attributes.
 - The first progression framework is implemented under `Source/RiorsEdge/Progression`: stable class/node IDs, class and tree Data Assets, ranked allocation validation, two class-ability slots plus ultimate, Forge-only respec, versionable runtime state, and snapshot-ready DoT application specs. Content assets and save persistence are not created yet.
 - The shared combat foundation is implemented under `Source/RiorsEdge/Combat` and documented in `Docs/Combat-Foundation.md`: replicated GAS attributes, a unified damage request/result contract, armour and penetration, shield routing, snapshot-critical DoT ticks, stamina/resource helpers, and damage/death events. It is framework code; weapons, status lifetime management, and class generation rules are not implemented yet.
-- The first weapon foundation is implemented under `Source/RiorsEdge/Weapons` and documented in `Docs/Weapon-Foundation.md`: data-driven hitscan definitions, fallback prototype rifle, replicated ammunition/reload state, deterministic spread, falloff, weak points, server damage submission, cosmetic events, and a reusable C++ target dummy.
-- Playtest Gym v1 adds a code-driven HUD, placeholder weapon visual, hit/weak-point feedback, four diagnostic recycling targets, persistent FOV/sensitivity controls, reset/recovery, session statistics, performance readout, and a clipboard-ready report. See `Docs/Playtest-Gym-v1.md`.
+- The weapon foundation under `Source/RiorsEdge/Weapons` now exposes rifle, scattergun, and marksman fallback archetypes with distinct cadence, ammunition, spread, falloff, damage, composite placeholder presentation, deterministic multi-pellet handling, server damage submission, and cosmetic events. The combat sandbox also includes reusable targets, three patrol/chase/attack enemies, incoming player damage/recovery, and runtime-spawned movement facilities. See `Docs/Weapon-Foundation.md` and `Docs/Playtest-Gym-v1.md`.
+- Playtest Gym v1 adds a code-driven combat HUD, placeholder weapon visual, hit/weak-point feedback, four diagnostic recycling targets, persistent sensitivity/FOV/invert controls, reset/recovery, session statistics, performance readout, a clipboard-ready report, and title/pause/settings/loadout menus. See `Docs/Playtest-Gym-v1.md`.
 - Gameplay Tags exist for initial movement, weapon, cooldown, damage, rarity, and state concepts.
-- The C++ character is the default fallback pawn but still needs an editor-created Blueprint child for meshes, arms, weapon presentation, VFX, audio, and tuned input assets.
+- `BP_BreakerCharacter` is the active pawn assembly and remains a child of the C++ `BreakerCharacter`; the C++ class is retained as the clean-clone fallback. `DA_PlayerInputConfig` and `IMC_Player` provide keyboard/mouse and controller mappings. Blockout first-person arms and weapon geometry remain intentionally replaceable presentation.
 - The canonical private GitHub remote is configured and `main` is the cross-machine integration branch.
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon with Unreal Engine 5.8. The nine project automation tests pass. A headless game startup loads `Lvl_FirstPerson` and confirms its world override selects `BreakerGameMode`; this verifies project/module/map/pawn startup but does not substitute for a human movement-and-weapon-feel test. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 13-test project automation suite passes on Windows. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -125,8 +127,8 @@ Recommended sequence:
 2. Tune grounded acceleration, braking, jump behavior, and moderate air control through combat-oriented tests rather than copying the Godot speed scale.
 3. Integrate and smoke-test the implemented deterministic slide, short speed-neutral wall ride, and restrained wall jump in the character Blueprint.
 4. Move dash cooldown and activation into GAS after the base movement behavior is validated.
-5. In Unreal Editor, create the input Data Asset and Blueprint child of `BreakerCharacter`, then migrate first-person presentation.
-6. Build and measure a lightweight traversal gym, then begin the combat sandbox.
+5. Replace the current blockout first-person presentation in `BP_BreakerCharacter` with authored meshes, animation, VFX, and audio after baseline feel feedback.
+6. Use the Playtest Gym report to tune the existing movement and combat baseline, then begin the combat sandbox presentation pass.
 
 After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot loop, progression, and encounter slice.
 
@@ -138,6 +140,7 @@ After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot 
 - `Docs/Roadmap.md` — milestone sequence
 - `Docs/Godot-Mechanics-Audit.md` — confirmed prototype mechanics and Unreal mapping
 - `Docs/Character-Progression-Architecture.md` — class, Core Tree, status, and GAS architecture
+- `Docs/Layer-Ownership.md` — which layer owns verbs, scaling, and identity
 - `Docs/Combat-Foundation.md` — damage order, armour, shields, critical DoTs, attributes, and stamina
 - `Docs/Weapon-Foundation.md` — hitscan flow, prototype rifle, weak points, and target dummy
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done

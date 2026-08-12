@@ -5,6 +5,8 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "CollisionShape.h"
 #include "UObject/ConstructorHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -22,15 +24,20 @@
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/GameModeBase.h"
 #include "Misc/ConfigCacheIni.h"
+#include "InputCoreTypes.h"
+#include "Engine/GameViewportClient.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "UI/BreakerMenu.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UBreakerCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(-10.0, 0.0, 64.0));
     FirstPersonCamera->bUsePawnControlRotation = true;
+    JumpMaxCount = 2;
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AbilitySystem->SetIsReplicated(true);
     AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
@@ -48,19 +55,84 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     PrototypeWeaponVisual->SetOnlyOwnerSee(true);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (CubeMesh.Succeeded()) PrototypeWeaponVisual->SetStaticMesh(CubeMesh.Object);
+
+    PrototypeWeaponBarrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponBarrel"));
+    PrototypeWeaponBarrel->SetupAttachment(PrototypeWeaponVisual);
+    PrototypeWeaponBarrel->SetRelativeLocation(FVector(75.0f, 0.0f, 0.0f));
+    PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.75f, 0.32f, 0.32f));
+    PrototypeWeaponBarrel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    PrototypeWeaponBarrel->SetOnlyOwnerSee(true);
+    if (CubeMesh.Succeeded()) PrototypeWeaponBarrel->SetStaticMesh(CubeMesh.Object);
+
+    PrototypeWeaponSight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponSight"));
+    PrototypeWeaponSight->SetupAttachment(PrototypeWeaponVisual);
+    PrototypeWeaponSight->SetRelativeLocation(FVector(15.0f, 0.0f, 65.0f));
+    PrototypeWeaponSight->SetRelativeScale3D(FVector(0.12f, 0.3f, 0.32f));
+    PrototypeWeaponSight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    PrototypeWeaponSight->SetOnlyOwnerSee(true);
+    if (CubeMesh.Succeeded()) PrototypeWeaponSight->SetStaticMesh(CubeMesh.Object);
+
+    PrototypeMuzzleFlash = CreateDefaultSubobject<UPointLightComponent>(TEXT("PrototypeMuzzleFlash"));
+    PrototypeMuzzleFlash->SetupAttachment(FirstPersonCamera);
+    PrototypeMuzzleFlash->SetRelativeLocation(FVector(90.0f, 0.0f, -10.0f));
+    PrototypeMuzzleFlash->SetLightColor(FLinearColor(1.0f, 0.35f, 0.05f));
+    PrototypeMuzzleFlash->SetIntensity(0.0f);
+    PrototypeMuzzleFlash->SetAttenuationRadius(220.0f);
+
+    // Lightweight first-person assembly for the movement gym. Blueprint can
+    // replace these blocks with authored arms without changing gameplay rules.
+    LeftArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArmVisual"));
+    LeftArmVisual->SetupAttachment(FirstPersonCamera);
+    LeftArmVisual->SetRelativeLocation(FVector(25.0f, -17.0f, -22.0f));
+    LeftArmVisual->SetRelativeScale3D(FVector(0.28f, 0.045f, 0.045f));
+    LeftArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftArmVisual->SetOnlyOwnerSee(true);
+    if (CubeMesh.Succeeded()) LeftArmVisual->SetStaticMesh(CubeMesh.Object);
+
+    RightArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArmVisual"));
+    RightArmVisual->SetupAttachment(FirstPersonCamera);
+    RightArmVisual->SetRelativeLocation(FVector(31.0f, 13.0f, -24.0f));
+    RightArmVisual->SetRelativeScale3D(FVector(0.32f, 0.045f, 0.045f));
+    RightArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightArmVisual->SetOnlyOwnerSee(true);
+    if (CubeMesh.Succeeded()) RightArmVisual->SetStaticMesh(CubeMesh.Object);
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
+
+void ABreakerCharacter::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (!bMantling) return;
+
+    MantleElapsed += DeltaSeconds;
+    const float Alpha = FMath::Clamp(MantleElapsed / MantleDuration, 0.0f, 1.0f);
+    const float SmoothedAlpha = Alpha * Alpha * (3.0f - 2.0f * Alpha);
+    FHitResult MoveHit;
+    SetActorLocation(FMath::Lerp(MantleStart, MantleTarget, SmoothedAlpha), true, &MoveHit, ETeleportType::None);
+    if (MoveHit.bBlockingHit || Alpha >= 1.0f)
+    {
+        bMantling = false;
+        if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+        {
+            Movement->SetMovementMode(MOVE_Falling);
+            Movement->Velocity = MoveHit.bBlockingHit ? FVector::ZeroVector : MantleExitVelocity;
+        }
+    }
+}
 
 void ABreakerCharacter::BeginPlay()
 {
     Super::BeginPlay();
     AbilitySystem->InitAbilityActorInfo(this, this);
+    if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
+    if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
     PlaytestSpawnTransform = GetActorTransform();
     float SavedFOV = 90.0f;
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
-    GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
-    LookSensitivity = FMath::Clamp(LookSensitivity, 0.2f, 3.0f);
+    GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
+    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("InvertLookY"), bInvertLookY, GGameUserSettingsIni);
+    LookSensitivity = FMath::Clamp(LookSensitivity, 0.2f, 2.0f);
     FirstPersonCamera->SetFieldOfView(FMath::Clamp(SavedFOV, 70.0f, 120.0f));
     if (const APlayerController* PC = Cast<APlayerController>(GetController()))
     {
@@ -73,11 +145,29 @@ void ABreakerCharacter::BeginPlay()
             }
         }
     }
+    if (IsLocallyControlled())
+    {
+        GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::ShowInitialMenu);
+    }
+}
+
+void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (MenuWidget.IsValid() && GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
+        MenuWidget.Reset();
+    }
+    Super::EndPlay(EndPlayReason);
 }
 
 void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
+    PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ThisClass::EquipPrimaryWeapon);
+    PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ThisClass::EquipSecondaryWeapon);
+    PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ThisClass::TogglePauseMenu).bExecuteWhenPaused = true;
+
     UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!InputConfig || !Input)
     {
@@ -88,7 +178,6 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("Jump"), IE_Pressed, this, &ThisClass::HandleJumpInput);
         PlayerInputComponent->BindAction(TEXT("Jump"), IE_Released, this, &ACharacter::StopJumping);
         PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Pressed, this, &ThisClass::StartSprint);
-        PlayerInputComponent->BindAction(TEXT("Sprint"), IE_Released, this, &ThisClass::StopSprint);
         PlayerInputComponent->BindAction(TEXT("Dash"), IE_Pressed, this, &ThisClass::HandleDashInput);
         PlayerInputComponent->BindAction(TEXT("Slide"), IE_Pressed, this, &ThisClass::StartSlide);
         PlayerInputComponent->BindAction(TEXT("Slide"), IE_Released, this, &ThisClass::StopSlide);
@@ -102,8 +191,6 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         PlayerInputComponent->BindAction(TEXT("PlaytestDiagnostics"), IE_Pressed, this, &ThisClass::TogglePlaytestDiagnostics);
         PlayerInputComponent->BindAction(TEXT("FOVUp"), IE_Pressed, this, &ThisClass::IncreaseFOV);
         PlayerInputComponent->BindAction(TEXT("FOVDown"), IE_Pressed, this, &ThisClass::DecreaseFOV);
-        PlayerInputComponent->BindAction(TEXT("SensitivityUp"), IE_Pressed, this, &ThisClass::IncreaseSensitivity);
-        PlayerInputComponent->BindAction(TEXT("SensitivityDown"), IE_Pressed, this, &ThisClass::DecreaseSensitivity);
         return;
     }
     if (InputConfig->Move) Input->BindAction(InputConfig->Move, ETriggerEvent::Triggered, this, &ThisClass::Move);
@@ -114,7 +201,6 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     }
     if (InputConfig->Sprint) {
         Input->BindAction(InputConfig->Sprint, ETriggerEvent::Started, this, &ThisClass::StartSprint);
-        Input->BindAction(InputConfig->Sprint, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
     }
     if (InputConfig->Dash) Input->BindAction(InputConfig->Dash, ETriggerEvent::Started, this, &ThisClass::HandleDashInput);
     if (InputConfig->Slide) {
@@ -130,6 +216,11 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         Input->BindAction(InputConfig->Aim, ETriggerEvent::Completed, this, &ThisClass::StopAim);
     }
     if (InputConfig->Reload) Input->BindAction(InputConfig->Reload, ETriggerEvent::Started, this, &ThisClass::HandleReloadInput);
+    if (InputConfig->PlaytestReset) Input->BindAction(InputConfig->PlaytestReset, ETriggerEvent::Started, this, &ThisClass::ResetPlaytest);
+    if (InputConfig->PlaytestReport) Input->BindAction(InputConfig->PlaytestReport, ETriggerEvent::Started, this, &ThisClass::CopyPlaytestReport);
+    if (InputConfig->PlaytestDiagnostics) Input->BindAction(InputConfig->PlaytestDiagnostics, ETriggerEvent::Started, this, &ThisClass::TogglePlaytestDiagnostics);
+    if (InputConfig->FOVUp) Input->BindAction(InputConfig->FOVUp, ETriggerEvent::Started, this, &ThisClass::IncreaseFOV);
+    if (InputConfig->FOVDown) Input->BindAction(InputConfig->FOVDown, ETriggerEvent::Started, this, &ThisClass::DecreaseFOV);
 }
 
 void ABreakerCharacter::Move(const FInputActionValue& Value)
@@ -144,7 +235,7 @@ void ABreakerCharacter::Look(const FInputActionValue& Value)
 {
     const FVector2D Axis = Value.Get<FVector2D>();
     AddControllerYawInput(Axis.X * LookSensitivity);
-    AddControllerPitchInput(Axis.Y * LookSensitivity);
+    AddControllerPitchInput(Axis.Y * LookSensitivity * (bInvertLookY ? 1.0f : -1.0f));
 }
 
 void ABreakerCharacter::MoveForwardLegacy(float Value)
@@ -162,7 +253,7 @@ void ABreakerCharacter::MoveRightLegacy(float Value)
 }
 
 void ABreakerCharacter::TurnLegacy(float Value) { AddControllerYawInput(Value * LookSensitivity); }
-void ABreakerCharacter::LookUpLegacy(float Value) { AddControllerPitchInput(Value * LookSensitivity); }
+void ABreakerCharacter::LookUpLegacy(float Value) { AddControllerPitchInput(Value * LookSensitivity * (bInvertLookY ? -1.0f : 1.0f)); }
 
 float ABreakerCharacter::GetHorizontalSpeed() const
 {
@@ -194,12 +285,7 @@ bool ABreakerCharacter::IsWallRiding() const
 
 void ABreakerCharacter::StartSprint()
 {
-    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement()) Movement->SetSprinting(true);
-}
-
-void ABreakerCharacter::StopSprint()
-{
-    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement()) Movement->SetSprinting(false);
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement()) Movement->SetSprinting(!Movement->IsSprinting());
 }
 
 void ABreakerCharacter::HandleDashInput() { TryDash(); }
@@ -207,7 +293,73 @@ void ABreakerCharacter::HandleDashInput() { TryDash(); }
 void ABreakerCharacter::HandleJumpInput()
 {
     UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
-    if (!Movement || !Movement->TryWallJump()) Jump();
+    if (Movement && Movement->TryWallJump())
+    {
+        return;
+    }
+    if (Movement && Movement->IsSliding())
+    {
+        Movement->PrepareSlideJump();
+        OnSlideChanged(false);
+        LaunchCharacter(FVector(0.0f, 0.0f, Movement->JumpZVelocity), false, true);
+        JumpCurrentCount = FMath::Max(JumpCurrentCount, 1);
+        return;
+    }
+    if (TryMantle())
+    {
+        return;
+    }
+    Jump();
+}
+
+bool ABreakerCharacter::TryMantle()
+{
+    if (bMantling || !GetWorld() || !GetCapsuleComponent()) return false;
+
+    const FVector Up = FVector::UpVector;
+    const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+    const FVector ActorLocation = GetActorLocation();
+    const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+    const float CapsuleRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
+    const FVector FeetLocation = ActorLocation - Up * CapsuleHalfHeight;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerMantle), false, this);
+
+    FHitResult WallHit;
+    const FVector WallTraceStart = ActorLocation + Up * 15.0f;
+    if (!GetWorld()->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceStart + Forward * MantleReach, ECC_Visibility, Params)
+        || FMath::Abs(WallHit.ImpactNormal.Z) > 0.35f)
+    {
+        return false;
+    }
+
+    FHitResult TopHit;
+    const FVector TopProbe = WallHit.ImpactPoint + Forward * (CapsuleRadius + 12.0f) + Up * MantleMaximumHeight;
+    if (!GetWorld()->LineTraceSingleByChannel(TopHit, TopProbe, TopProbe - Up * (MantleMaximumHeight + 25.0f), ECC_Visibility, Params)
+        || TopHit.ImpactNormal.Z < 0.65f)
+    {
+        return false;
+    }
+
+    const float LedgeHeight = TopHit.ImpactPoint.Z - FeetLocation.Z;
+    if (LedgeHeight < MantleMinimumHeight || LedgeHeight > MantleMaximumHeight) return false;
+
+    MantleTarget = TopHit.ImpactPoint + Up * (CapsuleHalfHeight + 3.0f) + Forward * 18.0f;
+    const FCollisionShape Capsule = FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight);
+    if (GetWorld()->OverlapBlockingTestByChannel(MantleTarget, FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), Capsule, Params))
+    {
+        return false;
+    }
+
+    UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
+    if (!Movement) return false;
+    MantleExitVelocity = Movement->Velocity;
+    MantleExitVelocity.Z = 0.0f;
+    MantleStart = ActorLocation;
+    MantleElapsed = 0.0f;
+    bMantling = true;
+    Movement->StopMovementImmediately();
+    Movement->SetMovementMode(MOVE_Flying);
+    return true;
 }
 
 bool ABreakerCharacter::TryDash()
@@ -222,23 +374,108 @@ bool ABreakerCharacter::TryDash()
 
 void ABreakerCharacter::StartSlide()
 {
-    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement(); Movement && Movement->BeginSlide()) OnSlideChanged(true);
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+    {
+        Movement->SetSlideRequested(true);
+        if (Movement->BeginSlide()) OnSlideChanged(true);
+    }
 }
 
 void ABreakerCharacter::StopSlide()
 {
-    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement(); Movement && Movement->IsSliding())
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
     {
+        const bool bWasSliding = Movement->IsSliding();
+        Movement->SetSlideRequested(false);
         Movement->EndSlide();
-        OnSlideChanged(false);
+        if (bWasSliding) OnSlideChanged(false);
     }
 }
 
 void ABreakerCharacter::StartFire() { if (Weapon) Weapon->StartFire(); OnFireInput(true); }
 void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput(false); }
-void ABreakerCharacter::StartAim() { if (Weapon) Weapon->SetAiming(true); OnAimInput(true); }
-void ABreakerCharacter::StopAim() { if (Weapon) Weapon->SetAiming(false); OnAimInput(false); }
+void ABreakerCharacter::StartAim()
+{
+    if (Weapon) Weapon->SetAiming(true);
+    if (PrototypeWeaponVisual) PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 0.0f, -12.0f));
+    OnAimInput(true);
+}
+
+void ABreakerCharacter::StopAim()
+{
+    if (Weapon) Weapon->SetAiming(false);
+    if (PrototypeWeaponVisual) PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 18.0f, -18.0f));
+    OnAimInput(false);
+}
 void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
+
+void ABreakerCharacter::EquipPrimaryWeapon()
+{
+    if (Weapon) Weapon->EquipSlot(1);
+    ApplyWeaponPresentation();
+}
+
+void ABreakerCharacter::EquipSecondaryWeapon()
+{
+    if (Weapon) Weapon->EquipSlot(2);
+    ApplyWeaponPresentation();
+}
+
+void ABreakerCharacter::ApplyWeaponPresentation()
+{
+    if (!Weapon || !PrototypeWeaponVisual || !PrototypeWeaponBarrel || !PrototypeWeaponSight) return;
+    switch (Weapon->GetArchetype())
+    {
+        case EBreakerWeaponArchetype::Scattergun:
+            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.34f, 0.12f, 0.11f));
+            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.55f, 0.48f, 0.48f));
+            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.08f, 0.22f, 0.22f));
+            break;
+        case EBreakerWeaponArchetype::Marksman:
+            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.52f, 0.065f, 0.065f));
+            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(1.05f, 0.22f, 0.22f));
+            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.22f, 0.45f, 0.45f));
+            break;
+        default:
+            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.42f, 0.08f, 0.08f));
+            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.75f, 0.32f, 0.32f));
+            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.12f, 0.3f, 0.32f));
+            break;
+    }
+}
+
+void ABreakerCharacter::HandlePlayerDeath()
+{
+    ResetPlaytest();
+}
+
+void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
+{
+    if (!Shot.bFired) return;
+    if (PrototypeMuzzleFlash)
+    {
+        PrototypeMuzzleFlash->SetIntensity(8500.0f);
+    }
+    if (PrototypeWeaponVisual)
+    {
+        const FVector RestingLocation = Weapon && Weapon->IsAiming()
+            ? FVector(48.0f, 0.0f, -12.0f)
+            : FVector(48.0f, 18.0f, -18.0f);
+        PrototypeWeaponVisual->SetRelativeLocation(RestingLocation - FVector(4.0f, 0.0f, 0.0f));
+    }
+    GetWorldTimerManager().SetTimer(ShotCosmeticTimer, this, &ThisClass::EndShotCosmetics, 0.055f, false);
+}
+
+void ABreakerCharacter::EndShotCosmetics()
+{
+    if (PrototypeMuzzleFlash) PrototypeMuzzleFlash->SetIntensity(0.0f);
+    if (PrototypeWeaponVisual)
+    {
+        PrototypeWeaponVisual->SetRelativeLocation(Weapon && Weapon->IsAiming()
+            ? FVector(48.0f, 0.0f, -12.0f)
+            : FVector(48.0f, 18.0f, -18.0f));
+    }
+}
 
 float ABreakerCharacter::GetCurrentFOV() const { return FirstPersonCamera ? FirstPersonCamera->FieldOfView : 90.0f; }
 
@@ -248,6 +485,7 @@ void ABreakerCharacter::ResetPlaytest()
     GetCharacterMovement()->StopMovementImmediately();
     if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
     if (Weapon) Weapon->ResetAmmunition();
+    if (Combat) Combat->RestoreVitals();
     if (Playtest) Playtest->ResetStats();
     if (ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr) GameMode->ResetPlaytestTargets();
 }
@@ -262,6 +500,86 @@ void ABreakerCharacter::DecreaseSensitivity() { LookSensitivity = FMath::Clamp(L
 void ABreakerCharacter::SavePlaytestSettings() const
 {
     GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), GetCurrentFOV(), GGameUserSettingsIni);
-    GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
+    GConfig->SetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
+    GConfig->SetBool(TEXT("RiorsEdge.Playtest"), TEXT("InvertLookY"), bInvertLookY, GGameUserSettingsIni);
     GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bool bNewInvertLookY)
+{
+    LookSensitivity = FMath::Clamp(NewSensitivity, 0.2f, 2.0f);
+    bInvertLookY = bNewInvertLookY;
+    if (FirstPersonCamera) FirstPersonCamera->SetFieldOfView(FMath::Clamp(NewFOV, 70.0f, 120.0f));
+    SavePlaytestSettings();
+}
+
+void ABreakerCharacter::ShowInitialMenu()
+{
+    OpenMenu(true);
+}
+
+void ABreakerCharacter::OpenMenu(bool bInitialMenu)
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC || !GEngine || !GEngine->GameViewport) return;
+
+    bShowingInitialMenu = bInitialMenu;
+    if (!MenuWidget.IsValid())
+    {
+        MenuWidget = SNew(SBreakerMenu).Character(this);
+        GEngine->GameViewport->AddViewportWidgetContent(MenuWidget.ToSharedRef(), 100);
+    }
+    if (bInitialMenu) MenuWidget->ShowMainMenu();
+    else MenuWidget->ShowPauseMenu();
+
+    PC->SetPause(true);
+    PC->bShowMouseCursor = true;
+    PC->bEnableClickEvents = true;
+    PC->bEnableMouseOverEvents = true;
+    FInputModeGameAndUI InputMode;
+    InputMode.SetWidgetToFocus(MenuWidget);
+    InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+    InputMode.SetHideCursorDuringCapture(false);
+    PC->SetInputMode(InputMode);
+}
+
+void ABreakerCharacter::ResumeFromMenu()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (MenuWidget.IsValid() && GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
+        MenuWidget.Reset();
+    }
+    bShowingInitialMenu = false;
+    if (!PC) return;
+    PC->SetPause(false);
+    PC->bShowMouseCursor = false;
+    PC->bEnableClickEvents = false;
+    PC->bEnableMouseOverEvents = false;
+    PC->SetInputMode(FInputModeGameOnly());
+}
+
+void ABreakerCharacter::ReturnToTitleMenu()
+{
+    bShowingInitialMenu = true;
+    if (MenuWidget.IsValid()) MenuWidget->ShowMainMenu();
+}
+
+void ABreakerCharacter::QuitFromMenu()
+{
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
+    }
+}
+
+void ABreakerCharacter::TogglePauseMenu()
+{
+    if (!MenuWidget.IsValid())
+    {
+        OpenMenu(false);
+        return;
+    }
+    MenuWidget->HandleEscape();
 }

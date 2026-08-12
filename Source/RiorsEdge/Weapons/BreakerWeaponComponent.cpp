@@ -13,15 +13,60 @@
 
 namespace
 {
-    UBreakerWeaponDefinition* GetPrototypeDefinition()
+    UBreakerWeaponDefinition* GetPrototypeDefinition(EBreakerWeaponArchetype Archetype)
     {
-        static TObjectPtr<UBreakerWeaponDefinition> Prototype;
-        if (!Prototype)
+        static TObjectPtr<UBreakerWeaponDefinition> Prototypes[3];
+        const int32 Index = static_cast<int32>(Archetype);
+        if (!Prototypes[Index])
         {
-            Prototype = NewObject<UBreakerWeaponDefinition>(GetTransientPackage(), TEXT("PrototypeRifleDefinition"));
-            Prototype->AddToRoot();
+            const FName Names[] = { TEXT("PrototypeRifleDefinition"), TEXT("PrototypeScattergunDefinition"), TEXT("PrototypeMarksmanDefinition") };
+            Prototypes[Index] = NewObject<UBreakerWeaponDefinition>(GetTransientPackage(), Names[Index]);
+            Prototypes[Index]->AddToRoot();
+            UBreakerWeaponDefinition* Definition = Prototypes[Index];
+            if (Archetype == EBreakerWeaponArchetype::Scattergun)
+            {
+                Definition->WeaponId = TEXT("Scattergun");
+                Definition->DisplayName = FText::FromString(TEXT("Scattergun"));
+                Definition->Damage = 10.0f;
+                Definition->WeakPointMultiplier = 1.35f;
+                Definition->RoundsPerMinute = 85.0f;
+                Definition->bAutomatic = false;
+                Definition->PelletsPerShot = 8;
+                Definition->HipSpreadDegrees = 4.5f;
+                Definition->AimSpreadDegrees = 3.0f;
+                Definition->MagazineSize = 8;
+                Definition->StartingReserveAmmo = 40;
+                Definition->ReloadDuration = 2.2f;
+                Definition->FalloffStart = 800.0f;
+                Definition->FalloffEnd = 2500.0f;
+                Definition->MinimumFalloffMultiplier = 0.25f;
+                Definition->MaximumRange = 4000.0f;
+            }
+            else if (Archetype == EBreakerWeaponArchetype::Marksman)
+            {
+                Definition->WeaponId = TEXT("Marksman");
+                Definition->DisplayName = FText::FromString(TEXT("Marksman"));
+                Definition->Damage = 72.0f;
+                Definition->WeakPointMultiplier = 2.0f;
+                Definition->RoundsPerMinute = 150.0f;
+                Definition->bAutomatic = false;
+                Definition->PelletsPerShot = 1;
+                Definition->HipSpreadDegrees = 2.0f;
+                Definition->AimSpreadDegrees = 0.05f;
+                Definition->MagazineSize = 8;
+                Definition->StartingReserveAmmo = 40;
+                Definition->ReloadDuration = 2.3f;
+                Definition->FalloffStart = 3500.0f;
+                Definition->FalloffEnd = 9000.0f;
+                Definition->MinimumFalloffMultiplier = 0.7f;
+                Definition->MaximumRange = 15000.0f;
+            }
+            else
+            {
+                Definition->DisplayName = FText::FromString(TEXT("Rifle"));
+            }
         }
-        return Prototype;
+        return Prototypes[Index];
     }
 }
 
@@ -34,11 +79,11 @@ UBreakerWeaponComponent::UBreakerWeaponComponent()
 void UBreakerWeaponComponent::BeginPlay()
 {
     Super::BeginPlay();
-    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (GetOwner() && GetOwner()->HasAuthority() && Definition)
+    if (GetOwner() && GetOwner()->HasAuthority())
     {
-        MagazineAmmo = Definition->MagazineSize;
-        ReserveAmmo = Definition->StartingReserveAmmo;
+        InitializeSlotAmmunition();
+        MagazineAmmo = SlotOneMagazineAmmo;
+        ReserveAmmo = SlotOneReserveAmmo;
     }
 }
 
@@ -48,16 +93,101 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(UBreakerWeaponComponent, MagazineAmmo);
     DOREPLIFETIME(UBreakerWeaponComponent, ReserveAmmo);
     DOREPLIFETIME(UBreakerWeaponComponent, bReloading);
+    DOREPLIFETIME(UBreakerWeaponComponent, CurrentArchetype);
+    DOREPLIFETIME(UBreakerWeaponComponent, CurrentSlot);
 }
 
 const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() const
 {
-    return WeaponDefinition ? WeaponDefinition.Get() : GetPrototypeDefinition();
+    return WeaponDefinition ? WeaponDefinition.Get() : GetPrototypeDefinition(CurrentArchetype);
+}
+
+void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetype)
+{
+    if (CurrentArchetype == NewArchetype) return;
+    StopFire();
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
+    CurrentArchetype = NewArchetype;
+    bReloading = false;
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    MagazineAmmo = Definition ? Definition->MagazineSize : 0;
+    ReserveAmmo = Definition ? Definition->StartingReserveAmmo : 0;
+    OnReloadChanged.Broadcast(false);
+    OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+}
+
+void UBreakerWeaponComponent::InitializeSlotAmmunition()
+{
+    if (SlotOneMagazineAmmo < 0)
+    {
+        const UBreakerWeaponDefinition* Rifle = GetPrototypeDefinition(EBreakerWeaponArchetype::Rifle);
+        SlotOneMagazineAmmo = Rifle->MagazineSize;
+        SlotOneReserveAmmo = Rifle->StartingReserveAmmo;
+    }
+    if (SlotTwoMagazineAmmo < 0)
+    {
+        const UBreakerWeaponDefinition* Scattergun = GetPrototypeDefinition(EBreakerWeaponArchetype::Scattergun);
+        SlotTwoMagazineAmmo = Scattergun->MagazineSize;
+        SlotTwoReserveAmmo = Scattergun->StartingReserveAmmo;
+    }
+}
+
+void UBreakerWeaponComponent::StoreActiveSlotAmmunition()
+{
+    if (CurrentSlot == 1)
+    {
+        SlotOneMagazineAmmo = MagazineAmmo;
+        SlotOneReserveAmmo = ReserveAmmo;
+    }
+    else
+    {
+        SlotTwoMagazineAmmo = MagazineAmmo;
+        SlotTwoReserveAmmo = ReserveAmmo;
+    }
+}
+
+void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
+{
+    SlotNumber = FMath::Clamp(SlotNumber, 1, 2);
+    if (GetOwner() && !GetOwner()->HasAuthority())
+    {
+        ServerEquipSlot(SlotNumber);
+        return;
+    }
+    if (CurrentSlot == SlotNumber) return;
+
+    StopFire();
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
+    InitializeSlotAmmunition();
+    StoreActiveSlotAmmunition();
+    CurrentSlot = SlotNumber;
+    CurrentArchetype = CurrentSlot == 1 ? EBreakerWeaponArchetype::Rifle : EBreakerWeaponArchetype::Scattergun;
+    MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
+    ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
+    bReloading = false;
+    OnReloadChanged.Broadcast(false);
+    OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+}
+
+void UBreakerWeaponComponent::ServerEquipSlot_Implementation(int32 SlotNumber)
+{
+    EquipSlot(SlotNumber);
+}
+
+FString UBreakerWeaponComponent::GetArchetypeName() const
+{
+    switch (CurrentArchetype)
+    {
+        case EBreakerWeaponArchetype::Scattergun: return TEXT("SCATTERGUN");
+        case EBreakerWeaponArchetype::Marksman: return TEXT("MARKSMAN");
+        default: return TEXT("RIFLE");
+    }
 }
 
 void UBreakerWeaponComponent::StartFire()
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority())
+    if (!GetOwner()) return;
+    if (!GetOwner()->HasAuthority())
     {
         ServerStartFire();
         return;
@@ -74,7 +204,8 @@ void UBreakerWeaponComponent::StartFire()
 
 void UBreakerWeaponComponent::StopFire()
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority())
+    if (!GetOwner()) return;
+    if (!GetOwner()->HasAuthority())
     {
         ServerStopFire();
         return;
@@ -85,7 +216,8 @@ void UBreakerWeaponComponent::StopFire()
 
 void UBreakerWeaponComponent::StartReload()
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority())
+    if (!GetOwner()) return;
+    if (!GetOwner()->HasAuthority())
     {
         ServerStartReload();
         return;
@@ -133,21 +265,25 @@ void UBreakerWeaponComponent::FireOnce()
     FRotator ViewRotation;
     GetViewPoint(ViewLocation, ViewRotation);
     const float Spread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
-    const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
-
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.TraceStart = ViewLocation;
-    Shot.TraceEnd = ViewLocation + Direction * Definition->MaximumRange;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
-    FHitResult Hit;
-    if (GetWorld()->LineTraceSingleByChannel(Hit, Shot.TraceStart, Shot.TraceEnd, ECC_GameTraceChannel2, Params))
+    const int32 PelletCount = FMath::Max(1, Definition->PelletsPerShot);
+    for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
+        const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
+        const FVector PelletEnd = ViewLocation + Direction * Definition->MaximumRange;
+        if (PelletIndex == 0) Shot.TraceEnd = PelletEnd;
+        FHitResult Hit;
+        if (!GetWorld()->LineTraceSingleByChannel(Hit, ViewLocation, PelletEnd, ECC_GameTraceChannel2, Params)) continue;
+
         Shot.bHit = true;
         Shot.HitActor = Hit.GetActor();
         Shot.ImpactPoint = Hit.ImpactPoint;
         Shot.TraceEnd = Hit.ImpactPoint;
-        Shot.bWeakPoint = Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"));
+        const bool bPelletWeakPoint = Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"));
+        Shot.bWeakPoint |= bPelletWeakPoint;
 
         if (UBreakerCombatComponent* TargetCombat = Hit.GetActor() ? Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
         {
@@ -161,12 +297,22 @@ void UBreakerWeaponComponent::FireOnce()
             Damage.DamageFamily = EBreakerDamageFamily::Physical;
             Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
             Damage.ArmorPenetration = Definition->ArmorPenetration;
-            Damage.bWeakPointHit = Shot.bWeakPoint;
+            Damage.bWeakPointHit = bPelletWeakPoint;
             Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
             Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
-            Shot.DamageResult = TargetCombat->ReceiveDamage(Damage);
+            const FBreakerDamageResult PelletDamage = TargetCombat->ReceiveDamage(Damage);
+            Shot.DamageResult.RawDamage += PelletDamage.RawDamage;
+            Shot.DamageResult.MitigatedDamage += PelletDamage.MitigatedDamage;
+            Shot.DamageResult.ShieldDamage += PelletDamage.ShieldDamage;
+            Shot.DamageResult.HealthDamage += PelletDamage.HealthDamage;
+            Shot.DamageResult.RemainingShield = PelletDamage.RemainingShield;
+            Shot.DamageResult.RemainingHealth = PelletDamage.RemainingHealth;
+            Shot.DamageResult.bCritical |= PelletDamage.bCritical;
+            Shot.DamageResult.bWeakPoint |= PelletDamage.bWeakPoint;
+            Shot.DamageResult.bShieldBroken |= PelletDamage.bShieldBroken;
+            Shot.DamageResult.bKilled |= PelletDamage.bKilled;
         }
     }
     MulticastShotCosmetics(Shot);
@@ -217,10 +363,11 @@ void UBreakerWeaponComponent::ResetAmmunition()
     if (!GetOwner() || !GetOwner()->HasAuthority()) return;
     StopFire();
     GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
-    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition) return;
-    MagazineAmmo = Definition->MagazineSize;
-    ReserveAmmo = Definition->StartingReserveAmmo;
+    SlotOneMagazineAmmo = -1;
+    SlotTwoMagazineAmmo = -1;
+    InitializeSlotAmmunition();
+    MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
+    ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
     bReloading = false;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);

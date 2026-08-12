@@ -18,30 +18,42 @@ public:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSprinting(bool bEnabled);
+    UFUNCTION(BlueprintCallable, Category="Movement") void SetSlideRequested(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash(const FVector& RequestedDirection);
     UFUNCTION(BlueprintCallable, Category="Movement") bool BeginSlide();
+    UFUNCTION(BlueprintCallable, Category="Movement") void PrepareSlideJump();
     UFUNCTION(BlueprintCallable, Category="Movement") void EndSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryWallJump();
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const { return bWantsToSprint; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const { return bSliding; }
+    UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequested() const { return bSlideRequested; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRiding() const { return bWallRiding; }
     UFUNCTION(BlueprintPure, Category="Movement") FVector GetWallRideNormal() const { return WallRideNormal; }
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const { return Velocity.Size2D(); }
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 650.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 950.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 700.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1100.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedFloor = 1250.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedBonus = 150.0f;
+    // Forgiving Source-style air steering: turns existing momentum toward
+    // input without increasing its magnitude or allowing a free reversal.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Air Movement", meta=(ClampMin="0")) float AirSteerRate = 4.2f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Air Movement", meta=(ClampMin="-1", ClampMax="1")) float AirSteerMinimumAlignment = -0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedFloor = 1500.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedBonus = 200.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashVerticalFloor = 80.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashCooldown = 2.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashCooldown = 4.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float MomentumHardCap = 4200.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 750.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 550.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoost = 120.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoostDuration = 0.35f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBoostCooldown = 1.2f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideExitSpeed = 450.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideGroundFriction = 1.2f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBrakingDeceleration = 350.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideSlopeAcceleration = 900.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideMaxDuration = 1.0f;
 
     // Reserved for the short, grounded wall-ride implementation. It will
     // preserve traversal flow without generating speed or replacing combat.
@@ -57,10 +69,16 @@ public:
 
 private:
     bool bWantsToSprint = false;
+    bool bSlideRequested = false;
+    bool bSlideRequestConsumed = false;
     bool bSliding = false;
     double LastDashTime = -1000.0;
+    double LastSlideBoostTime = -1000.0;
+    float BoostedSpeedCeiling = 0.0f;
     float SavedGroundFriction = 0.0f;
     float SavedBrakingDeceleration = 0.0f;
+    float SlideElapsed = 0.0f;
+    float SlideEntryBoostRemaining = 0.0f;
     bool bWallRiding = false;
     FVector WallRideNormal = FVector::ZeroVector;
     float WallRideElapsed = 0.0f;
@@ -68,6 +86,7 @@ private:
     double LastWallRideEndTime = -1000.0;
 
     bool FindRunnableWall(FHitResult& OutHit) const;
+    void ApplyAirSteering(float DeltaTime);
     void BeginWallRide(const FHitResult& WallHit);
     void EndWallRide();
 };

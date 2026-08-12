@@ -17,4 +17,6 @@ public:
 private:
     bool bPlaytestTargetsSpawned = false;
     void SpawnPlaytestTargets(const APawn* Pawn);
+    void SpawnMovementCourse(const APawn* Pawn);
+    void SpawnCombatEncounter(const APawn* Pawn);
 };

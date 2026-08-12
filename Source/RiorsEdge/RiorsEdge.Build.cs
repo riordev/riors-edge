@@ -9,7 +9,7 @@ public class RiorsEdge : ModuleRules
         PublicDependencyModuleNames.AddRange(new[]
         {
             "Core", "CoreUObject", "Engine", "InputCore", "ApplicationCore", "EnhancedInput",
-            "GameplayAbilities", "GameplayTags", "GameplayTasks"
+            "GameplayAbilities", "GameplayTags", "GameplayTasks", "Slate", "SlateCore"
         });
     }
 }
