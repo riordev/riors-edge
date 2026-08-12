@@ -8,6 +8,10 @@ Rior's Edge (working codename Project Breaker) is a fast first-person, movement-
 
 The immediate goal is a small vertical slice, not the full world: one graybox biome or arena, expressive movement, three weapon archetypes, three normal enemies, one elite modifier, one boss, a small affix pool, three build-defining legendary items, roughly 15 skill nodes, and save/resume.
 
+The current character concept proposes five classes—Caster, Swift, Gunsmith, Tank, and Support—with three branches each, class-specific resources, and a separate six-constellation universal Core Tree. The implementation analysis is in `Docs/Character-Progression-Architecture.md`. Class identity, universal progression, and equipment affixes are separate layers; do not merge their data models.
+
+Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge.
+
 ## Canonical project
 
 - Unreal project: `UnrealProject/riors_edge.uproject`
@@ -29,6 +33,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - `UBreakerCharacterMovementComponent` now owns grounded tuning, dash, deterministic sliding/slope response, and a short speed-neutral wall ride with a controlled wall jump. Wall ride presentation remains for Blueprint.
 - `UBreakerInputConfig` is a Data Asset contract for Move, Look, Jump, Sprint, Dash, Slide, Fire, Aim, and Reload.
 - `UBreakerAttributeSet` currently defines Health, MaxHealth, and MoveSpeed.
+- The first progression framework is implemented under `Source/RiorsEdge/Progression`: stable class/node IDs, class and tree Data Assets, ranked allocation validation, two class-ability slots plus ultimate, Forge-only respec, versionable runtime state, and snapshot-ready DoT application specs. Content assets and save persistence are not created yet.
 - Gameplay Tags exist for initial movement, weapon, cooldown, damage, rarity, and state concepts.
 - The C++ character is not yet wired to an editor-created Blueprint or set as the default pawn.
 - No baseline Git commit or remote has been created yet.
@@ -129,6 +134,7 @@ After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot 
 - `Docs/Architecture.md` — ownership boundaries
 - `Docs/Roadmap.md` — milestone sequence
 - `Docs/Godot-Mechanics-Audit.md` — confirmed prototype mechanics and Unreal mapping
+- `Docs/Character-Progression-Architecture.md` — class, Core Tree, status, and GAS architecture
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done
 
 ## Handoff discipline

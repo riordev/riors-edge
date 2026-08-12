@@ -13,6 +13,7 @@
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UBreakerCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -26,6 +27,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     AbilitySystem->SetIsReplicated(true);
     AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
     Attributes = CreateDefaultSubobject<UBreakerAttributeSet>(TEXT("Attributes"));
+    Progression = CreateDefaultSubobject<UBreakerProgressionComponent>(TEXT("Progression"));
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
