@@ -310,7 +310,12 @@ bool FBreakerAbilityResolutionTest::RunTest(const FString& Parameters)
     TestNull(TEXT("Caster has no fallback kit yet"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, EBreakerAbilitySlot::ClassAbilityOne, NAME_None));
     // An explicitly equipped ability that does not fit the slot is refused.
     TestNull(TEXT("Overdrive cannot be equipped into a class slot"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Overdrive")));
-    TestNull(TEXT("An unknown equipped id resolves to nothing"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Nonsense")));
+    // Rule changed after the owner hit dead abilities from a stale loadout:
+    // an unknown equipped id falls back to the class default instead of
+    // silently granting nothing.
+    const UBreakerAbilityDefinition* UnknownFallback = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Nonsense"));
+    TestNotNull(TEXT("An unknown equipped id falls back to the class default"), UnknownFallback);
+    if (UnknownFallback) TestEqual(TEXT("Fallback is the slot default"), UnknownFallback->AbilityId, FName(TEXT("Swift.Skim")));
     return true;
 }
 

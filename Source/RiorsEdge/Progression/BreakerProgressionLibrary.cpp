@@ -370,8 +370,10 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     Swift->ClassId = EBreakerClassId::Swift;
     Swift->DisplayName = LOCTEXT("SwiftName", "Swift");
     Swift->Description = LOCTEXT("SwiftDescription", "Momentum: a decaying state built by moving and spent on short-cooldown bursts.");
-    Swift->StartingClassAbilityIds = {TEXT("Skim"), TEXT("Sever")};
-    Swift->BaseUltimateId = TEXT("Overdrive");
+    // Ids must match the ability fallback registry exactly, or a loadout
+    // seeded from them resolves to nothing.
+    Swift->StartingClassAbilityIds = {TEXT("Swift.Skim"), TEXT("Swift.Lead")};
+    Swift->BaseUltimateId = TEXT("Swift.Overdrive");
     Swift->BranchTrees.Add(GetSwiftKineticTree());
     Swift->BranchTrees.Add(GetSwiftMarksmanTree());
     Swift->BranchTrees.Add(GetCoreSliceTree());

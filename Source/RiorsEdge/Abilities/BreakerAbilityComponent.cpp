@@ -85,12 +85,10 @@ UBreakerAbilityDefinition* UBreakerAbilityComponent::ResolveDefinition(EBreakerC
     {
         return Equipped->CanOccupySlot(Slot) ? Equipped : nullptr;
     }
-    // Nothing equipped (or an unknown id): fall back to the class default so
-    // the slice is playable before the loadout UI writes anything.
-    if (!EquippedId.IsNone())
-    {
-        return nullptr;
-    }
+    // Nothing equipped OR an unknown id: fall back to the class default so
+    // the slice is playable no matter what a stale save's loadout carries.
+    // Granting the default beats granting nothing — an unknown id silently
+    // killing every ability is exactly the failure the owner hit.
     return UBreakerAbilityDefinition::FindFallback(UBreakerAbilityDefinition::DefaultAbilityIdForSlot(ClassId, Slot));
 }
 

@@ -376,6 +376,14 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
 
     DrawPanel(X, BodyY, Width, BodyH, BreakerHUD::Orange);
 
+    // Silent-dead-keys guard: only Swift has an implemented kit. If nothing
+    // is granted, say so instead of letting E/T/G feel broken.
+    if (const UBreakerAbilityComponent* AbilityGuard = Character->GetAbilities(); AbilityGuard && AbilityGuard->GetGrantedCount() == 0)
+    {
+        DrawLabel(TEXT("NO ABILITY KIT — ONLY SWIFT IS IMPLEMENTED (BREAKER CLASS screen)"),
+            X - 120.0f, BodyY - 16.0f, FLinearColor(1.0f, 0.45f, 0.12f, 0.9f), 0.72f);
+    }
+
     // --- Weapon block (left of the cluster body) ------------------------
     if (const UBreakerWeaponComponent* Weapon = Character->GetWeapon())
     {
