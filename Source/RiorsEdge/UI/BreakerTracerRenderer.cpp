@@ -13,8 +13,14 @@ namespace
     // Both stock primitives are 100 cm across their bounding box, so a unit of
     // scale is a metre and every dimension below divides by this once.
     constexpr float UnitMeshCm = 100.0f;
-    const TCHAR* ShapeCube = TEXT("/Engine/BasicShapes/Cube.Cube");
-    const TCHAR* ShapeSphere = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+    // Prefixed, not bare. An anonymous namespace is per translation unit,
+    // but a unity build concatenates several .cpp files INTO one TU, so a
+    // bare ShapeCube here collides with the identical constant in
+    // BreakerRocketProjectile.cpp. Neither file's own build catches it,
+    // because an adaptive non-unity build excludes exactly the files being
+    // edited — it only appears when the whole module compiles together.
+    const TCHAR* TracerShapeCube = TEXT("/Engine/BasicShapes/Cube.Cube");
+    const TCHAR* TracerShapeSphere = TEXT("/Engine/BasicShapes/Sphere.Sphere");
 
     UStaticMeshComponent* MakePooledMesh(AActor* Owner, USceneComponent* Parent,
         const FString& Name, const TCHAR* MeshPath)
@@ -60,14 +66,14 @@ ABreakerTracerRenderer::ABreakerTracerRenderer()
     TrailMeshes.Reserve(TracerSlots);
     for (int32 Index = 0; Index < TracerSlots; ++Index)
     {
-        HeadMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("TracerHead%d"), Index), ShapeCube));
-        TrailMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("TracerTrail%d"), Index), ShapeCube));
+        HeadMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("TracerHead%d"), Index), TracerShapeCube));
+        TrailMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("TracerTrail%d"), Index), TracerShapeCube));
     }
 
     SparkMeshes.Reserve(SparkSlots);
     for (int32 Index = 0; Index < SparkSlots; ++Index)
     {
-        SparkMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("Spark%d"), Index), ShapeSphere));
+        SparkMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("Spark%d"), Index), TracerShapeSphere));
     }
 }
 
