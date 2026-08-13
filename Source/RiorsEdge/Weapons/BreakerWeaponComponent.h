@@ -39,6 +39,10 @@ struct RIORSEDGE_API FBreakerShotResult
     // Seed for this shot's small random recoil component.
     UPROPERTY(BlueprintReadOnly) int32 RecoilSeed = 0;
     UPROPERTY(BlueprintReadOnly) bool bAimedShot = false;
+    // How far into ADS the weapon was when this round left it, 0 (hip) to 1
+    // (fully sighted). Carried with the cosmetic event so every machine
+    // reproduces the same partial-ADS kick.
+    UPROPERTY(BlueprintReadOnly) float AimAlpha = 0.0f;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerShotEvent, const FBreakerShotResult&, Shot);
@@ -106,6 +110,14 @@ public:
     // included.
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") float GetNextShotSpreadDegrees() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") int32 GetBurstShotIndex() const { return BurstShotIndex; }
+    // How far into ADS the weapon is, 0 (hip) to 1 (fully sighted). Ramps over
+    // the profile's AimInSeconds while the aim button is held and drops to 0
+    // the instant it is released: committing to sights takes time, abandoning
+    // them does not.
+    UFUNCTION(BlueprintPure, Category="Weapon|Feel") float GetAimAlpha() const;
+    // Extra cone the owner is currently paying for being in motion. Aimed
+    // movement costs AimMoveSpreadMultiplier times as much as hip movement.
+    UFUNCTION(BlueprintPure, Category="Weapon|Feel") float GetMovementSpreadDegrees() const;
     // Camera-relative offset of the placeholder weapon mesh, in centimetres:
     // X back toward the player, Y lateral. Presentation reads this; nothing in
     // the damage path does.
@@ -148,6 +160,24 @@ public:
     // can tune every weapon's feel in the editor without a recompile. An entry
     // here wins over the definition's own profile.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") TMap<EBreakerWeaponArchetype, FBreakerRecoilProfile> RecoilOverrides;
+    // Ground speed at which a weapon pays its full MoveSpreadDegrees. Below
+    // this the penalty scales down linearly; standing still costs nothing.
+    // Set near walk rather than sprint so "planted" means actually planted.
+    // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel", meta=(ClampMin="1")) float MoveSpreadReferenceSpeed = 600.0f;
+
+    // ---- Weak-point forgiveness -------------------------------------------
+    // The enemy head is a 20 cm sphere and the shot is a zero-radius line, so
+    // weak-point acceptance is a hard binary with no felt edge: the round that
+    // clips the ear and the round that misses the shoulder read identically to
+    // the player. This is a world-space halo added around any component tagged
+    // WeakPoint on the actor that was hit — the same physical generosity at
+    // 5 m and at 50 m. It never creates a hit; it only upgrades a hit that
+    // already landed on that actor.
+    //
+    // THE knob for "weak points feel stingy". 0 restores the exact old
+    // geometric test. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel", meta=(ClampMin="0")) float WeakPointToleranceCm = 14.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponDefinition> WeaponDefinition;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerShotEvent OnShot;
@@ -181,6 +211,8 @@ private:
     int32 SlotTwoMagazineAmmo = -1;
     int32 SlotTwoReserveAmmo = -1;
     bool bAiming = false;
+    // When the aim button went down. ADS benefits ramp from here.
+    double AimStartTime = -1000.0;
     bool bTriggerHeld = false;
     int32 ShotSequence = 0;
     double LastShotTime = -1000.0;
@@ -207,13 +239,19 @@ private:
 
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;
+    // Owner ground speed over MoveSpreadReferenceSpeed, clamped to [0,1].
+    float GetSpeedFraction() const;
+    void SetAimingInternal(bool bNewAiming);
+    // True when this pellet should be paid as a weak point: the geometric hit,
+    // Lead's marked-target rule, or the forgiveness halo.
+    bool ResolveWeakPointHit(const struct FHitResult& Hit, const FVector& RayOrigin, const FVector& RayDirection) const;
     void ApplyShotFeel(const FBreakerShotResult& Shot);
     void TickRecoil(float DeltaSeconds);
     void UpdateFeelTickEnabled();
     void StoreActiveSlotAmmunition();
     void InitializeSlotAmmunition();
     void FireOnce();
-    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed);
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha);
     void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes);
     void FinishReload();
     void FinishSwap();

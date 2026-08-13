@@ -24,9 +24,14 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float Damage = 24.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="1")) float WeakPointMultiplier = 1.75f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float ArmorPenetration = 0.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float FalloffStart = 2000.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float FalloffEnd = 6000.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0", ClampMax="1")) float MinimumFalloffMultiplier = 0.55f;
+    // Falloff, rifle values (the archetype table states only its differences).
+    // The gym is now an open field whose ranged enemy holds 9-19 m, so the
+    // ordinary fight happens past where a small-arena curve started biting.
+    // The curve keeps its shape and the archetypes keep their spread; it is
+    // the SEVERITY that was tuned for a room. O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float FalloffStart = 2800.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float FalloffEnd = 7000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0", ClampMax="1")) float MinimumFalloffMultiplier = 0.72f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="1")) float MaximumRange = 12000.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1")) float RoundsPerMinute = 600.0f;

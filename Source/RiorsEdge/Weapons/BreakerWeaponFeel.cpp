@@ -95,16 +95,42 @@ float FBreakerWeaponFeel::BloomAfterTime(const FBreakerRecoilProfile& Profile, f
     return FMath::Max(0.0f, CurrentBloom - Profile.BloomRecoveryDegreesPerSecond * DeltaSeconds);
 }
 
-float FBreakerWeaponFeel::EffectiveSpreadDegrees(const FBreakerRecoilProfile& Profile, float BaseSpreadDegrees, float CurrentBloom, int32 BurstShotIndex)
+float FBreakerWeaponFeel::EffectiveSpreadDegrees(const FBreakerRecoilProfile& Profile, float BaseSpreadDegrees, float CurrentBloom, int32 BurstShotIndex, float ExtraMovementSpread)
 {
     const float Base = FMath::Max(0.0f, BaseSpreadDegrees);
+    const float Movement = FMath::Max(0.0f, ExtraMovementSpread);
     if (BurstShotIndex <= 0)
     {
         // First shot of a burst ignores bloom entirely and scales the base
         // cone: at 0.0 the weapon puts the round exactly on the crosshair.
-        return Base * FMath::Clamp(Profile.FirstShotSpreadMultiplier, 0.0f, 1.0f);
+        // Movement is not forgiven — standing still is what buys the perfect
+        // shot, and that is the same decision ADS is now asking for.
+        return Base * FMath::Clamp(Profile.FirstShotSpreadMultiplier, 0.0f, 1.0f) + Movement;
     }
-    return Base + FMath::Clamp(CurrentBloom, 0.0f, Profile.MaxBloomDegrees);
+    return Base + FMath::Clamp(CurrentBloom, 0.0f, Profile.MaxBloomDegrees) + Movement;
+}
+
+float FBreakerWeaponFeel::MovementSpreadDegrees(const FBreakerRecoilProfile& Profile, float SpeedFraction, float AimAlpha)
+{
+    const float Speed = FMath::Clamp(SpeedFraction, 0.0f, 1.0f);
+    if (Speed <= 0.0f || Profile.MoveSpreadDegrees <= 0.0f) return 0.0f;
+    const float Alpha = FMath::Clamp(AimAlpha, 0.0f, 1.0f);
+    const float AimScale = FMath::Lerp(1.0f, FMath::Max(0.0f, Profile.AimMoveSpreadMultiplier), Alpha);
+    return Profile.MoveSpreadDegrees * Speed * AimScale;
+}
+
+FBreakerRecoilProfile FBreakerWeaponFeel::ProfileAtAimAlpha(const FBreakerRecoilProfile& Profile, float AimAlpha)
+{
+    const float Alpha = FMath::Clamp(AimAlpha, 0.0f, 1.0f);
+    if (Alpha >= 1.0f) return Profile;
+
+    // 1.0 is the hip value of every one of these multipliers, so lerping from
+    // 1.0 toward the authored number is exactly "this much of the sights".
+    FBreakerRecoilProfile Blended = Profile;
+    Blended.AimRecoilMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimRecoilMultiplier, 0.0f, 1.0f), Alpha);
+    Blended.AimBloomMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimBloomMultiplier, 0.0f, 1.0f), Alpha);
+    Blended.AimViewmodelMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimViewmodelMultiplier, 0.0f, 1.0f), Alpha);
+    return Blended;
 }
 
 void FBreakerWeaponFeel::AddViewmodelKick(const FBreakerRecoilProfile& Profile, FBreakerViewmodelState& State, float HorizontalKickSign, bool bAiming)

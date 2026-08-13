@@ -7,6 +7,7 @@
 #include "AbilitySystemComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
@@ -56,6 +57,12 @@ namespace
             Profile.ViewmodelKickLateralUnits = 1.0f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 1.6f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 320.0f;        // O2 PLACEHOLDER
+            // Fastest into the sights and the least punished for running with
+            // them up: the SMG is the one weapon that is allowed to be a
+            // run-and-gun ADS weapon.
+            Profile.AimInSeconds = 0.14f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.30f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 1.8f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Sniper:
             // One enormous, slow kick that has to be re-aimed rather than
@@ -84,6 +91,12 @@ namespace
             Profile.ViewmodelSpringStiffness = 150.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 17.0f;           // O2 PLACEHOLDER
             Profile.AimViewmodelMultiplier = 0.5f;            // O2 PLACEHOLDER
+            // Slowest scope in the table and the harshest movement penalty:
+            // the sniper is the weapon that must be PLANTED, and hip firing
+            // one is deliberately close to useless.
+            Profile.AimInSeconds = 0.38f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 1.10f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 3.0f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Shotgun:
             // A shove. Note FirstShotSpreadMultiplier stays at 1.0: the pellet
@@ -111,6 +124,12 @@ namespace
             Profile.ViewmodelKickPitchDegrees = 5.2f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 180.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 19.0f;           // O2 PLACEHOLDER
+            // Smallest movement penalty in the table. Hip firing a shotgun
+            // while strafing is the thing it is FOR, and its own 4.5 degree
+            // pellet cone dwarfs a quarter-degree of movement anyway.
+            Profile.AimInSeconds = 0.16f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.25f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 2.0f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Rocket:
             // Heaviest single kick in the table and the slowest settle. Almost
@@ -137,6 +156,8 @@ namespace
             Profile.ViewmodelKickPitchDegrees = 6.8f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 140.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 16.0f;           // O2 PLACEHOLDER
+            Profile.AimInSeconds = 0.30f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.30f;                // O2 PLACEHOLDER
             break;
         default:
             // Rifle: the struct defaults. A learnable climb with a gentle
@@ -174,9 +195,9 @@ namespace
                 Definition->MagazineSize = 35;
                 Definition->StartingReserveAmmo = 175;
                 Definition->ReloadDuration = 1.5f;
-                Definition->FalloffStart = 1200.0f;
-                Definition->FalloffEnd = 3500.0f;
-                Definition->MinimumFalloffMultiplier = 0.4f;
+                Definition->FalloffStart = 1800.0f;   // O2 PLACEHOLDER
+                Definition->FalloffEnd = 4500.0f;     // O2 PLACEHOLDER
+                Definition->MinimumFalloffMultiplier = 0.58f; // O2 PLACEHOLDER
                 Definition->MaximumRange = 6000.0f;
                 Definition->SwapInDuration = 0.35f;
                 Definition->BleedChance = 0.25f;
@@ -196,9 +217,10 @@ namespace
                 Definition->MagazineSize = 8;
                 Definition->StartingReserveAmmo = 40;
                 Definition->ReloadDuration = 2.3f;
-                Definition->FalloffStart = 3500.0f;
-                Definition->FalloffEnd = 9000.0f;
-                Definition->MinimumFalloffMultiplier = 0.7f;
+                // The sniper barely falls off at all: 12% across sixty metres.
+                Definition->FalloffStart = 5000.0f;   // O2 PLACEHOLDER
+                Definition->FalloffEnd = 11000.0f;    // O2 PLACEHOLDER
+                Definition->MinimumFalloffMultiplier = 0.88f; // O2 PLACEHOLDER
                 Definition->MaximumRange = 15000.0f;
                 Definition->SwapInDuration = 0.7f;
                 break;
@@ -215,9 +237,13 @@ namespace
                 Definition->MagazineSize = 8;
                 Definition->StartingReserveAmmo = 40;
                 Definition->ReloadDuration = 2.2f;
-                Definition->FalloffStart = 800.0f;
-                Definition->FalloffEnd = 2500.0f;
-                Definition->MinimumFalloffMultiplier = 0.25f;
+                // Still the steepest curve in the table by a wide margin —
+                // 3.5% per metre against the rifle's 0.67% — because falling
+                // off hard is what a shotgun IS. It just starts a little
+                // further out and bottoms out a little higher.
+                Definition->FalloffStart = 1100.0f;   // O2 PLACEHOLDER
+                Definition->FalloffEnd = 2800.0f;     // O2 PLACEHOLDER
+                Definition->MinimumFalloffMultiplier = 0.40f; // O2 PLACEHOLDER
                 Definition->MaximumRange = 4000.0f;
                 break;
             case EBreakerWeaponArchetype::Rocket:
@@ -318,12 +344,35 @@ FBreakerRecoilProfile UBreakerWeaponComponent::ResolveRecoilProfile() const
     return Profile;
 }
 
+float UBreakerWeaponComponent::GetAimAlpha() const
+{
+    if (!bAiming) return 0.0f;
+    const float AimIn = ResolveRecoilProfile().AimInSeconds;
+    if (AimIn <= 0.0f || !GetWorld()) return 1.0f;
+    return FMath::Clamp(static_cast<float>(GetWorld()->GetTimeSeconds() - AimStartTime) / AimIn, 0.0f, 1.0f);
+}
+
+float UBreakerWeaponComponent::GetSpeedFraction() const
+{
+    if (!GetOwner() || MoveSpreadReferenceSpeed <= 0.0f) return 0.0f;
+    return FMath::Clamp(static_cast<float>(GetOwner()->GetVelocity().Size2D()) / MoveSpreadReferenceSpeed, 0.0f, 1.0f);
+}
+
+float UBreakerWeaponComponent::GetMovementSpreadDegrees() const
+{
+    return FBreakerWeaponFeel::MovementSpreadDegrees(ResolveRecoilProfile(), GetSpeedFraction(), GetAimAlpha());
+}
+
 float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return 0.0f;
-    const float BaseSpread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
-    return FBreakerWeaponFeel::EffectiveSpreadDegrees(ResolveRecoilProfile(), BaseSpread, BloomDegrees, BurstShotIndex);
+    const float Alpha = GetAimAlpha();
+    // Partway into ADS is partway to the aimed cone, not the whole thing.
+    const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha);
+    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
+    const float Movement = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, GetSpeedFraction(), Alpha);
+    return FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, BloomDegrees, BurstShotIndex, Movement);
 }
 
 FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
@@ -359,12 +408,16 @@ void UBreakerWeaponComponent::UpdateFeelTickEnabled()
 
 void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
 {
-    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
-    const FBreakerRecoilKick Kick = FBreakerWeaponFeel::ComputeShotKick(Profile, Shot.BurstShotIndex, Shot.RecoilSeed, Shot.bAimedShot);
+    // The shot carries the ADS progress it was fired at, so a round loosed
+    // halfway into the sights kicks halfway between hip and aimed — on every
+    // machine, not just the shooter's.
+    const FBreakerRecoilProfile Profile = FBreakerWeaponFeel::ProfileAtAimAlpha(ResolveRecoilProfile(), Shot.AimAlpha);
+    const bool bAimedKick = Shot.AimAlpha > 0.0f;
+    const FBreakerRecoilKick Kick = FBreakerWeaponFeel::ComputeShotKick(Profile, Shot.BurstShotIndex, Shot.RecoilSeed, bAimedKick);
 
     if (bViewmodelKickEnabled)
     {
-        FBreakerWeaponFeel::AddViewmodelKick(Profile, Viewmodel, Kick.YawDegrees, Shot.bAimedShot);
+        FBreakerWeaponFeel::AddViewmodelKick(Profile, Viewmodel, Kick.YawDegrees, bAimedKick);
     }
 
     // Recoil moves the aim, and only the aim, and only for the player who is
@@ -661,9 +714,20 @@ void UBreakerWeaponComponent::StartReload()
     GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ThisClass::FinishReload, Definition->ReloadDuration, false);
 }
 
+void UBreakerWeaponComponent::SetAimingInternal(bool bNewAiming)
+{
+    // Only a fresh press restarts the ramp; re-asserting an aim already held
+    // must not hand the player a second aim-in window.
+    if (bNewAiming && !bAiming)
+    {
+        AimStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    }
+    bAiming = bNewAiming;
+}
+
 void UBreakerWeaponComponent::SetAiming(bool bNewAiming)
 {
-    bAiming = bNewAiming;
+    SetAimingInternal(bNewAiming);
     if (GetOwner() && !GetOwner()->HasAuthority())
     {
         ServerSetAiming(bNewAiming);
@@ -673,7 +737,7 @@ void UBreakerWeaponComponent::SetAiming(bool bNewAiming)
 void UBreakerWeaponComponent::ServerStartFire_Implementation() { StartFire(); }
 void UBreakerWeaponComponent::ServerStopFire_Implementation() { StopFire(); }
 void UBreakerWeaponComponent::ServerStartReload_Implementation() { StartReload(); }
-void UBreakerWeaponComponent::ServerSetAiming_Implementation(bool bNewAiming) { bAiming = bNewAiming; }
+void UBreakerWeaponComponent::ServerSetAiming_Implementation(bool bNewAiming) { SetAimingInternal(bNewAiming); }
 
 bool UBreakerWeaponComponent::CanFire() const
 {
@@ -707,21 +771,27 @@ void UBreakerWeaponComponent::FireOnce()
     FRotator ViewRotation;
     GetViewPoint(ViewLocation, ViewRotation);
     // ADS tightens the cone twice over: the definition's aimed spread is the
-    // floor, and bloom grows more slowly on top of it.
-    const float BaseSpread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
-    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(RecoilProfile, BaseSpread, BloomDegrees, BurstShotIndex);
+    // floor, and bloom grows more slowly on top of it. Both are now bought
+    // over AimInSeconds rather than granted on the button down, and both are
+    // paid for in movement — a moving aimed shot is wider than a moving hip
+    // shot, which is the whole reason to ever leave the sights.
+    const float ShotAimAlpha = GetAimAlpha();
+    const FBreakerRecoilProfile AimedProfile = FBreakerWeaponFeel::ProfileAtAimAlpha(RecoilProfile, ShotAimAlpha);
+    const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, ShotAimAlpha);
+    const float MovementSpread = FBreakerWeaponFeel::MovementSpreadDegrees(AimedProfile, GetSpeedFraction(), ShotAimAlpha);
+    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread);
 
     // Recoil state for this shot, resolved before the pellets so the cosmetic
     // event can carry it to every machine and they all kick identically.
     const int32 FiredBurstIndex = BurstShotIndex;
     const int32 RecoilSeed = static_cast<int32>(HashCombine(GetTypeHash(GetOwner()), static_cast<uint32>(ShotSequence + 1)));
     ++BurstShotIndex;
-    BloomDegrees = FBreakerWeaponFeel::BloomAfterShot(RecoilProfile, BloomDegrees, bAiming);
+    BloomDegrees = FBreakerWeaponFeel::BloomAfterShot(AimedProfile, BloomDegrees, ShotAimAlpha > 0.0f);
     UpdateFeelTickEnabled();
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return;
     }
@@ -731,6 +801,7 @@ void UBreakerWeaponComponent::FireOnce()
     Shot.BurstShotIndex = FiredBurstIndex;
     Shot.RecoilSeed = RecoilSeed;
     Shot.bAimedShot = bAiming;
+    Shot.AimAlpha = ShotAimAlpha;
     Shot.TraceStart = ViewLocation;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
 
@@ -754,12 +825,14 @@ void UBreakerWeaponComponent::FireOnce()
         Shot.HitActor = Hit.GetActor();
         Shot.ImpactPoint = Hit.ImpactPoint;
         Shot.TraceEnd = Hit.ImpactPoint;
-        const bool bGeometryWeakPoint = Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"));
-        // Lead (Class-Kits §1.2 S6): shots that hit the mark from beyond the
-        // range gate are weak-point hits regardless of impact location. The
-        // gate is the ability's own rule, called here rather than reimplemented.
-        const bool bPelletWeakPoint = bGeometryWeakPoint || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
-            MarkedTarget != nullptr && Hit.GetActor() == MarkedTarget, Hit.Distance, LeadMinimumRangeCm);
+        // The geometric hit, the forgiveness halo around it, or Lead's mark.
+        const bool bPelletWeakPoint = ResolveWeakPointHit(Hit, ViewLocation, Direction)
+            // Lead (Class-Kits §1.2 S6): shots that hit the mark from beyond
+            // the range gate are weak-point hits regardless of impact
+            // location. The gate is the ability's own rule, called here rather
+            // than reimplemented.
+            || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
+                MarkedTarget != nullptr && Hit.GetActor() == MarkedTarget, Hit.Distance, LeadMinimumRangeCm);
         Shot.bWeakPoint |= bPelletWeakPoint;
 
         if (UBreakerCombatComponent* TargetCombat = Hit.GetActor() ? Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
@@ -812,6 +885,35 @@ void UBreakerWeaponComponent::FireOnce()
     if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
 }
 
+bool UBreakerWeaponComponent::ResolveWeakPointHit(const FHitResult& Hit, const FVector& RayOrigin, const FVector& RayDirection) const
+{
+    // The exact geometric hit always counts and costs nothing to check.
+    if (Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"))) return true;
+    if (WeakPointToleranceCm <= 0.0f) return false;
+
+    const AActor* HitActor = Hit.GetActor();
+    if (!HitActor) return false;
+
+    // Only a round that already hit THIS actor may be upgraded. The halo is
+    // forgiveness for imprecise aim on a target you hit, never a second chance
+    // at a target you missed, and never a reason to reward shooting the wall
+    // in front of an enemy's head.
+    for (const UActorComponent* Component : HitActor->GetComponents())
+    {
+        const UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component);
+        if (!Primitive || !Primitive->ComponentHasTag(TEXT("WeakPoint"))) continue;
+        // A weak point whose collision is off (a corpse, a phase) is not a
+        // weak point; the halo must not outlive the thing it surrounds.
+        if (!Primitive->IsCollisionEnabled()) continue;
+        if (FBreakerWeaponMath::IsWithinWeakPointTolerance(RayOrigin, RayDirection,
+            Primitive->GetComponentLocation(), Primitive->Bounds.SphereRadius, WeakPointToleranceCm))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes)
 {
     if (!Definition || !Target || Definition->BleedChance <= 0.0f || Definition->BleedDamagePerTick <= 0.0f || Definition->BleedDuration <= 0.0f) return;
@@ -838,7 +940,7 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha)
 {
     const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
 
@@ -881,6 +983,7 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Shot.BurstShotIndex = BurstIndex;
     Shot.RecoilSeed = RecoilSeed;
     Shot.bAimedShot = bAiming;
+    Shot.AimAlpha = ShotAimAlpha;
     Shot.TraceStart = ViewLocation;
     Shot.TraceEnd = SpawnLocation + Direction * 400.0f;
     MulticastShotCosmetics(Shot);

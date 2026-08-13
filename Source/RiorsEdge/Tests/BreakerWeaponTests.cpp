@@ -36,6 +36,243 @@ bool FBreakerWeaponFalloffTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Owner playtest report: "dmg fall off is too high". The gym is an open field
+// whose ranged enemy holds 9-19 m, so the ordinary fight now happens where a
+// small-arena curve had already started biting. These tests pin the SHAPE the
+// softening must keep: the archetypes stay different, and the ordering of how
+// hard each one falls off is the identity, not the severity.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerArchetypeFalloffTest,
+    "RiorsEdge.Weapons.ArchetypeFalloff",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerArchetypeFalloffTest::RunTest(const FString& Parameters)
+{
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    auto DefinitionFor = [Weapon](EBreakerWeaponArchetype Archetype)
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Weapon->GetActiveDefinition();
+    };
+    // Damage lost per centimetre across the ramp: the honest measure of "how
+    // hard does this weapon fall off", independent of where the ramp sits.
+    auto Severity = [](const UBreakerWeaponDefinition* Definition)
+    {
+        return (1.0f - Definition->MinimumFalloffMultiplier) / (Definition->FalloffEnd - Definition->FalloffStart);
+    };
+
+    const UBreakerWeaponDefinition* Rifle = DefinitionFor(EBreakerWeaponArchetype::Rifle);
+    const UBreakerWeaponDefinition* SMG = DefinitionFor(EBreakerWeaponArchetype::SMG);
+    const UBreakerWeaponDefinition* Sniper = DefinitionFor(EBreakerWeaponArchetype::Sniper);
+    const UBreakerWeaponDefinition* Shotgun = DefinitionFor(EBreakerWeaponArchetype::Shotgun);
+
+    // The mechanic is not being removed: every one of them still falls off.
+    for (const UBreakerWeaponDefinition* Definition : { Rifle, SMG, Sniper, Shotgun })
+    {
+        TestTrue(TEXT("Every archetype still loses damage at range"), Definition->MinimumFalloffMultiplier < 1.0f);
+        TestTrue(TEXT("Every falloff ramp has a positive length"), Definition->FalloffEnd > Definition->FalloffStart);
+    }
+
+    // And they are still five different weapons, hardest-falling to softest.
+    TestTrue(TEXT("The shotgun falls off hardest of all"),
+        Severity(Shotgun) > Severity(SMG) && Severity(Shotgun) > Severity(Rifle) && Severity(Shotgun) > Severity(Sniper));
+    TestTrue(TEXT("The SMG falls off harder than the rifle"), Severity(SMG) > Severity(Rifle));
+    TestTrue(TEXT("The rifle falls off harder than the sniper"), Severity(Rifle) > Severity(Sniper));
+    TestTrue(TEXT("The sniper barely falls off at all"), Sniper->MinimumFalloffMultiplier >= 0.85f);
+    TestTrue(TEXT("The shotgun's severity is at least triple the rifle's"), Severity(Shotgun) > Severity(Rifle) * 3.0f);
+
+    // The engagement band the gym actually produces (the ranged enemy holds
+    // 900-1900 cm). The primary must be untouched across all of it, so a
+    // falloff pass cannot silently move the measured trash/elite TTK.
+    TestEqual(TEXT("The rifle is at full damage where the ranged enemy opens"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Rifle, 900.0f), 1.0f);
+    TestEqual(TEXT("The rifle is still at full damage at the far edge of the band"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Rifle, 1900.0f), 1.0f);
+    // The secondary is where the band actually hurt, and it must now hold on
+    // to more than half its damage out to the far edge of it.
+    TestTrue(TEXT("The scattergun keeps over two thirds of its damage at 19 m"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Shotgun, 1900.0f) > 0.67f);
+    // But not so much that the shotgun becomes a rifle.
+    TestTrue(TEXT("The scattergun is still clearly punished at 19 m"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Shotgun, 1900.0f) < 0.80f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Owner playtest report: "weakpoints dont feel forgiving as they should".
+// The head is a 20 cm sphere and the shot is a zero-radius line, so acceptance
+// is a binary a player cannot feel the edges of. The halo is world-space, so
+// the generosity is the same physical size at 5 m and 50 m.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeakPointToleranceTest,
+    "RiorsEdge.Weapons.WeakPointTolerance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeakPointToleranceTest::RunTest(const FString& Parameters)
+{
+    const FVector Muzzle = FVector::ZeroVector;
+    const FVector Forward = FVector::ForwardVector;
+    // A head-sized sphere ten metres downrange, at the enemy's head height.
+    const FVector Head(1000.0f, 0.0f, 78.0f);
+    const float Radius = 20.0f;
+    const float Tolerance = 14.0f;
+
+    auto RayAtHeight = [](float Height) { return FVector(1000.0f, 0.0f, Height).GetSafeNormal(); };
+
+    TestEqual(TEXT("A ray straight at the centre is at zero distance"),
+        FBreakerWeaponMath::DistanceFromRayToPoint(Muzzle, RayAtHeight(78.0f), Head), 0.0f, 0.01f);
+
+    // Dead centre and a clean clip of the sphere both count, as they did.
+    TestTrue(TEXT("A centre hit is a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(78.0f), Head, Radius, Tolerance));
+    TestTrue(TEXT("A shot inside the sphere is a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(62.0f), Head, Radius, Tolerance));
+
+    // The point of the change: a near-miss that used to read as a body shot.
+    TestFalse(TEXT("Without tolerance a near-miss is only a body shot"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(50.0f), Head, Radius, 0.0f));
+    TestTrue(TEXT("With tolerance the same near-miss reads as a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(50.0f), Head, Radius, Tolerance));
+
+    // Generosity has an edge, and it is where the authored number puts it.
+    TestFalse(TEXT("A chest shot is still a chest shot"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(20.0f), Head, Radius, Tolerance));
+
+    // World space, not screen space: the halo is the same physical size at
+    // every range, so aiming does not get easier by walking backwards.
+    const FVector FarHead(6000.0f, 0.0f, 78.0f);
+    const FVector NearHead(300.0f, 0.0f, 78.0f);
+    auto OffsetRay = [](float Distance, float Offset)
+    {
+        return FVector(Distance, 0.0f, 78.0f + Offset).GetSafeNormal();
+    };
+    TestTrue(TEXT("A 30 cm near-miss counts at 60 m"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(6000.0f, 30.0f), FarHead, Radius, Tolerance));
+    TestTrue(TEXT("The same 30 cm near-miss counts at 3 m"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(300.0f, 30.0f), NearHead, Radius, Tolerance));
+    TestFalse(TEXT("A 40 cm miss counts at neither range"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(6000.0f, 40.0f), FarHead, Radius, Tolerance)
+        || FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(300.0f, 40.0f), NearHead, Radius, Tolerance));
+
+    // A weak point behind the muzzle is not shootable, however close the
+    // infinite line would pass to it.
+    TestFalse(TEXT("A weak point behind the shooter is never a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, Forward, FVector(-1000.0f, 0.0f, 0.0f), Radius, Tolerance));
+    TestEqual(TEXT("Distance behind the muzzle clamps to the muzzle"),
+        FBreakerWeaponMath::DistanceFromRayToPoint(Muzzle, Forward, FVector(-500.0f, 0.0f, 0.0f)), 500.0f, 0.01f);
+
+    // Zero tolerance restores the exact geometric test, so the owner can turn
+    // the whole change off with one number.
+    TestTrue(TEXT("Zero tolerance still accepts the sphere itself"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(78.0f), Head, Radius, 0.0f));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Owner playtest report: "hip firing feels worse than ads". It was, at every
+// range, because ADS tightened four axes at once and cost nothing. ADS now
+// pays in TIME (it ramps in) and in MOBILITY (movement widens an aimed shot
+// harder than a hip shot). The decision is: plant and aim, or move and hip.
+// These tests prove the trade exists without deleting it.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHipFireTradeTest,
+    "RiorsEdge.Weapons.HipFireTrade",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHipFireTradeTest::RunTest(const FString& Parameters)
+{
+    FBreakerRecoilProfile Profile;
+    Profile.AimRecoilMultiplier = 0.5f;
+    Profile.AimBloomMultiplier = 0.5f;
+    Profile.AimViewmodelMultiplier = 0.5f;
+    Profile.MoveSpreadDegrees = 0.4f;
+    Profile.AimMoveSpreadMultiplier = 2.0f;
+
+    // ---- ADS costs time -------------------------------------------------
+    const FBreakerRecoilProfile Hip = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 0.0f);
+    const FBreakerRecoilProfile Half = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 0.5f);
+    const FBreakerRecoilProfile Full = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 1.0f);
+
+    TestEqual(TEXT("Before the sights come up there is no aim benefit at all"), Hip.AimRecoilMultiplier, 1.0f);
+    TestEqual(TEXT("Halfway into the sights buys half the benefit"), Half.AimRecoilMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Halfway into the sights buys half the bloom benefit"), Half.AimBloomMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Halfway into the sights buys half the viewmodel benefit"), Half.AimViewmodelMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Fully sighted is the authored profile, unchanged"), Full.AimRecoilMultiplier, Profile.AimRecoilMultiplier);
+
+    // A shot snapped off the instant the aim button goes down kicks like a hip
+    // shot, because that is what it is.
+    const FBreakerRecoilKick SnapShot = FBreakerWeaponFeel::ComputeShotKick(Hip, 2, 9, true);
+    const FBreakerRecoilKick TrueHip = FBreakerWeaponFeel::ComputeShotKick(Profile, 2, 9, false);
+    const FBreakerRecoilKick Settled = FBreakerWeaponFeel::ComputeShotKick(Full, 2, 9, true);
+    TestEqual(TEXT("Snapping to sights and firing gets no recoil benefit"), SnapShot.PitchDegrees, TrueHip.PitchDegrees, 0.0001f);
+    TestTrue(TEXT("Waiting for the sights is still strictly better"), Settled.PitchDegrees < SnapShot.PitchDegrees);
+
+    // ---- ADS costs mobility ---------------------------------------------
+    TestEqual(TEXT("Standing still costs nothing, aimed or not"),
+        FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 0.0f, 1.0f), 0.0f);
+    const float HipMoving = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 1.0f, 0.0f);
+    const float AimedMoving = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 1.0f, 1.0f);
+    TestEqual(TEXT("Hip fire pays the authored movement cone"), HipMoving, 0.4f, 0.0001f);
+    TestEqual(TEXT("Aimed movement costs the authored multiple of it"), AimedMoving, 0.8f, 0.0001f);
+    TestTrue(TEXT("Movement punishes the sights harder than the hip"), AimedMoving > HipMoving);
+    TestTrue(TEXT("Half speed costs less than full speed"),
+        FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 0.5f, 0.0f) < HipMoving);
+
+    // ---- The decision itself --------------------------------------------
+    // Planted: ADS wins, as it must. Moving: hip fire wins the first shot.
+    // Neither of these is allowed to become the other.
+    const float PlantedHip = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.3f, 3, 0.0f);
+    const float PlantedAimed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Full, 0.25f, 0.3f, 3, 0.0f);
+    TestTrue(TEXT("Planted, the sights are still the accurate option"), PlantedAimed < PlantedHip);
+
+    const float MovingHipFirst = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.0f, 0, HipMoving);
+    const float MovingAimedFirst = FBreakerWeaponFeel::EffectiveSpreadDegrees(Full, 0.25f, 0.0f, 0, AimedMoving);
+    TestTrue(TEXT("On the move, the first hip shot is tighter than the first aimed shot"),
+        MovingHipFirst < MovingAimedFirst);
+
+    // Movement is not forgiven by first-shot accuracy: a runner does not get a
+    // free perfect shot for letting the trigger rest.
+    TestEqual(TEXT("A moving first shot still pays the movement cone"), MovingHipFirst, HipMoving, 0.0001f);
+    TestEqual(TEXT("A planted first shot is still dead accurate"),
+        FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.0f, 0, 0.0f), 0.0f);
+
+    // ---- And the archetype table honours all of it -----------------------
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    const EBreakerWeaponArchetype Archetypes[] = {
+        EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::SMG, EBreakerWeaponArchetype::Sniper,
+        EBreakerWeaponArchetype::Shotgun, EBreakerWeaponArchetype::Rocket };
+    for (const EBreakerWeaponArchetype Archetype : Archetypes)
+    {
+        Weapon->EquipArchetype(Archetype);
+        const FBreakerRecoilProfile Live = Weapon->GetRecoilProfile();
+        TestTrue(TEXT("Every archetype makes ADS cost time"), Live.AimInSeconds > 0.0f);
+        TestTrue(TEXT("Every archetype makes movement cost cone"), Live.MoveSpreadDegrees > 0.0f);
+        TestTrue(TEXT("Every archetype punishes aimed movement harder than hip movement"),
+            Live.AimMoveSpreadMultiplier > 1.0f);
+    }
+
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Sniper);
+    const FBreakerRecoilProfile LiveSniper = Weapon->GetRecoilProfile();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Shotgun);
+    const FBreakerRecoilProfile LiveShotgun = Weapon->GetRecoilProfile();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::SMG);
+    const FBreakerRecoilProfile LiveSMG = Weapon->GetRecoilProfile();
+
+    // Five weapons, five relationships with standing still.
+    TestTrue(TEXT("The sniper is the weapon that must be planted"),
+        LiveSniper.MoveSpreadDegrees > LiveShotgun.MoveSpreadDegrees * 3.0f);
+    TestTrue(TEXT("The sniper is the slowest into its sights"),
+        LiveSniper.AimInSeconds > LiveSMG.AimInSeconds && LiveSniper.AimInSeconds > LiveShotgun.AimInSeconds);
+    TestTrue(TEXT("The SMG is the fastest into its sights"), LiveSMG.AimInSeconds <= LiveShotgun.AimInSeconds);
+    TestTrue(TEXT("The shotgun is the least punished for moving"),
+        LiveShotgun.MoveSpreadDegrees < LiveSMG.MoveSpreadDegrees);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponSpreadTest,
     "RiorsEdge.Weapons.DeterministicSpread",
