@@ -34,7 +34,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Movement code currently includes walk, sprint, directional dash with cooldown, and a grounded speed-gated slide.
 - `UBreakerCharacterMovementComponent` now owns grounded tuning, dash, deterministic sliding/slope response, and a short speed-neutral wall ride with a controlled wall jump. Wall ride presentation remains for Blueprint.
 - `UBreakerInputConfig` is a Data Asset contract for Move, Look, Jump, Sprint, Dash, Slide, Fire, Aim, and Reload.
-- `UBreakerAttributeSet` defines replicated health, shield, armour, stamina, class-resource, critical, damage, DoT, and movement attributes.
+- `UBreakerAttributeSet` defines replicated health, shield, armour, class-resource, critical, damage, DoT, and movement attributes. (Stamina was removed by ruling O1; never re-add it.)
 - The first progression framework is implemented under `Source/RiorsEdge/Progression`: stable class/node IDs, class and tree Data Assets, ranked allocation validation, two class-ability slots plus ultimate, Forge-only respec, versionable runtime state, and snapshot-ready DoT application specs. Content assets and save persistence are not created yet.
 - The shared combat foundation is implemented under `Source/RiorsEdge/Combat` and documented in `Docs/Combat-Foundation.md`: replicated GAS attributes, a unified damage request/result contract, armour and penetration, shield routing, snapshot-critical DoT ticks, stamina/resource helpers, and damage/death events. It is framework code; weapons, status lifetime management, and class generation rules are not implemented yet.
 - The weapon foundation under `Source/RiorsEdge/Weapons` now exposes rifle, scattergun, and marksman fallback archetypes with distinct cadence, ammunition, spread, falloff, damage, composite placeholder presentation, deterministic multi-pellet handling, server damage submission, and cosmetic events. The combat sandbox also includes reusable targets, three patrol/chase/attack enemies, incoming player damage/recovery, and runtime-spawned movement facilities. See `Docs/Weapon-Foundation.md` and `Docs/Playtest-Gym-v1.md`.
@@ -68,7 +68,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 19-test project automation suite passes on Windows. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 53-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -86,13 +86,22 @@ When C++ changes are made, verify with Unreal Build Tool on the relevant platfor
 
 ```text
 Source/RiorsEdge/
-  Attributes/     GAS attribute sets
-  Characters/     Player/enemy character bases
-  Game/           Game modes and orchestration
-  Input/          Enhanced Input data contracts
+  Abilities/      GAS ability defs/base, Skim/Lead/Overdrive, state windows
+  Attributes/     GAS attribute set
+  Characters/     ABreakerCharacter (input, save, interact, components)
+  Classes/        Class resource loops: Momentum (Swift), Mana (Caster)
+  Combat/         Damage contract/library, combat + status components, enemy
+  Game/           BreakerGameMode: gym spawning, waves, safe zone, dressing
+  Input/          Enhanced Input data contract
+  Interaction/    NPCs + dialogue
+  Items/          Item types, affixes, loot rolls, equipment, ground pickups
+  Movement/       Custom CharacterMovementComponent (dash/slide/wall/redirect)
+  Playtest/       Instrumentation + report (TTK vs O18 targets)
+  Progression/    Trees/nodes, fallback content, purchase/respec, node effects
+  Save/           UBreakerSaveGame (slot BreakerSave0)
+  Tests/          53 automation tests (RiorsEdge.* filter)
+  UI/             SBreakerMenu (all screens) + ABreakerPlaytestHUD (canvas)
 ```
-
-Add future systems in focused directories such as `Abilities`, `Combat`, `Inventory`, `Items`, `Movement`, `Save`, and `UI` only when implementing a real vertical feature.
 
 ## Content conventions
 
@@ -140,21 +149,50 @@ The first audit is recorded in `Docs/Godot-Mechanics-Audit.md`. It confirms the 
 
 The user's future affix system is intentionally different from the Godot attachment/perk model. Do not design or implement Unreal affixes by copying those systems. Affix architecture is deferred to a dedicated design pass.
 
-## Current milestone and next actions
+## Current milestone and next actions (updated 2026-08-13)
 
-Current milestone: **Movement gym**.
+Current milestone: **Vertical-slice systems — Swift playable end-to-end**.
+Movement gym, combat sandbox, loot loop, and the progression framework are
+all live; presentation is deliberately blockout.
 
-Recommended sequence:
+The whole loop works in Play In Editor today: spawn at the safe ring →
+talk to camp NPCs (F) → fight the encounter/waves (F4) → loot ground drops
+(F) → equip (I, tabs for EQUIPMENT | SKILL TREES) → spend points → use
+Swift abilities (E Skim / T Lead / G Overdrive). Playtest keys: F1 reset,
+F2 copy report (includes engagement-gapped TTK vs O18 targets), F3
+diagnostics, 1/2 weapon slots. Dev tools (class swap, test gear, point
+grants) gate on the DEV checkbox on the BREAKER CLASS screen.
 
-1. Add `UBreakerCharacterMovementComponent` and move locomotion velocity rules out of `ABreakerCharacter`.
-2. Tune grounded acceleration, braking, jump behavior, and moderate air control through combat-oriented tests rather than copying the Godot speed scale.
-3. Integrate and smoke-test the implemented deterministic slide, short speed-neutral wall ride, and restrained wall jump in the character Blueprint.
-4. Move dash cooldown and activation into GAS after the base movement behavior is validated.
-5. Replace the current blockout first-person presentation in `BP_BreakerCharacter` with authored meshes, animation, VFX, and audio after baseline feel feedback.
-6. Use the Playtest Gym report to tune the existing movement and combat baseline, then begin the combat sandbox presentation pass.
-7. Wire the equipment movement multipliers (slide/air-control/dash) into `UBreakerCharacterMovementComponent`, add Block/Dodge input actions to `DA_PlayerInputConfig`, and surface backpack/equip in the loadout menu.
+Next actions, in priority order:
 
-After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot loop, progression, and encounter slice.
+1. **Awaiting owner ruling — TTK re-anchor ("tune it")**: session 4
+   measured trash 2.61s / elite 6.18s engaged-TTK vs targets <1s / ~3s.
+   Solve enemy chassis backwards from O18 (trash ~90-100 HP).
+2. **UI style-guide implementation**: the owner is generating design docs
+   from `Docs/Design/UI-Generation-Prompts.md` in a separate session;
+   when they land in Docs/Design/, implement the color/typography/shape
+   system into `SBreakerMenu` and `ABreakerPlaytestHUD`.
+3. Caster abilities (Spellblade first), Overdrive keystone branch stubs,
+   remaining inert node tags (ledger in `BreakerAbilityStateComponent.h`).
+4. Fold the equipment + progression attribute passes into one application
+   path (both cache bases and write absolutes; last recalc wins — known
+   issue, comment in `BreakerProgressionComponent::BeginPlay`).
+5. Real gym map authored in-editor (the stock First Person template
+   geometry still crowds the runtime-spawned field) — editor work.
+6. Pending owner decisions beyond TTK: Overdrive's +25% damage window is a
+   4th More vs the O3 budget of 3 (flag in `BreakerAbility_Overdrive.h`);
+   the replication position page (O22, owner-authored, gates Damage-
+   Pipeline sign-off); the held items in Decisions.md's pending list.
+
+## Session workflow facts (read before working)
+
+- Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 53 pass as of addfd85.
+- Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
+- `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
+- The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after green tests. All work to date is committed and pushed through addfd85.
+- Zero-setup convention: all content (weapons, affixes, trees, abilities, class defs) has C++ fallback registries so a clean clone plays with no assets; Data Assets replace them later one-for-one.
+- IMPORTANT UI lesson: never use SWrapBox with UseAllottedSize inside a scroll box (layout oscillation), and never poll input/rebuild widgets from per-frame Text_Lambda attributes — both caused owner-visible bugs.
 
 ## Working documents
 
