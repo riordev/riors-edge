@@ -11,17 +11,160 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     MaxWalkSpeed = WalkSpeed;
     MaxWalkSpeedCrouched = WalkSpeed * 0.55f;
     MaxAcceleration = 4200.0f;
-    BrakingDecelerationWalking = 1800.0f;
-    GroundFriction = 7.5f;
+    // Weight pass: floaty is often really "slow to stop". Braking and friction
+    // both go up so a released stick plants the character instead of skating
+    // it out. Acceleration is deliberately unchanged — it is already twice the
+    // engine default, and raising it further reads as twitchy, not heavy.
+    BrakingDecelerationWalking = 2400.0f; // OLD: 1800.0f
+    GroundFriction = 8.5f; // OLD: 7.5f
+    // Air control is NOT reduced. The audit asks for restrained air control and
+    // this is already restrained; cutting it further would remove the player's
+    // authority in the air, which reads as MORE drift, not less.
     AirControl = 0.55f;
     AirControlBoostMultiplier = 1.4f;
     AirControlBoostVelocityThreshold = 300.0f;
+    // Jump impulse is deliberately left alone. The gravity change below already
+    // lowers the apex (185 cm -> ~156 cm) and shortens the arc; cutting the
+    // impulse as well would compound into a >25% height loss that could stop
+    // authored ledges and wall-ride approaches from being reachable, and that
+    // cannot be verified without playing the level.
     JumpZVelocity = 700.0f;
-    GravityScale = 1.35f;
+    // The single biggest weight lever. 1.35 -> 1.60 shortens the rise from
+    // 0.53 s to 0.45 s and drops the apex by ~16%; the fall curve below takes
+    // the descent the rest of the way.
+    GravityScale = 1.60f; // OLD: 1.35f
+    // Explicit rather than inherited: JumpHoldWindow makes the engine's jump
+    // force window non-zero, and gravity must keep applying inside it. False
+    // here would be a zero-gravity hold — maximum floatiness.
+    bApplyGravityWhileJumping = true;
     FallingLateralFriction = 0.05f;
     MaxSimulationTimeStep = 1.0f / 60.0f;
     MaxSimulationIterations = 8;
     NavAgentProps.bCanCrouch = true;
+}
+
+void UBreakerCharacterMovementComponent::BeginPlay()
+{
+    Super::BeginPlay();
+    // The jump-release signal lives on ACharacter, not here: with
+    // JumpMaxHoldTime at the engine default of 0 the character clears
+    // bPressedJump one frame after the press, so a movement component can
+    // never tell a tap from a hold. Writing the window here keeps the variable
+    // jump entirely inside the movement layer instead of asking the character
+    // class (owned elsewhere) to know about it. Setting JumpHoldWindow to 0 in
+    // the editor restores stock engine behaviour and disables the cut.
+    if (CharacterOwner)
+    {
+        CharacterOwner->JumpMaxHoldTime = JumpHoldWindow;
+    }
+}
+
+float UBreakerCharacterMovementComponent::ComputeGravityMultiplier(float VerticalVelocity, float ApexBand, float ApexMultiplier, float FallMultiplier)
+{
+    const float Band = FMath::Max(ApexBand, UE_KINDA_SMALL_NUMBER);
+    if (VerticalVelocity >= Band)
+    {
+        // Rising freely: the rise keeps the authored jump feel.
+        return 1.0f;
+    }
+    if (VerticalVelocity <= -Band)
+    {
+        return FallMultiplier;
+    }
+    return VerticalVelocity >= 0.0f
+        ? FMath::Lerp(ApexMultiplier, 1.0f, VerticalVelocity / Band)
+        : FMath::Lerp(ApexMultiplier, FallMultiplier, -VerticalVelocity / Band);
+}
+
+float UBreakerCharacterMovementComponent::ClampFallSpeed(float VerticalVelocity, float MaxDownwardSpeed)
+{
+    return MaxDownwardSpeed > 0.0f ? FMath::Max(VerticalVelocity, -MaxDownwardSpeed) : VerticalVelocity;
+}
+
+float UBreakerCharacterMovementComponent::ApplyJumpCut(float VerticalVelocity, float CutMultiplier, float MinimumRiseSpeed)
+{
+    if (VerticalVelocity <= FMath::Max(MinimumRiseSpeed, 0.0f))
+    {
+        return VerticalVelocity;
+    }
+    return VerticalVelocity * FMath::Clamp(CutMultiplier, 0.0f, 1.0f);
+}
+
+float UBreakerCharacterMovementComponent::LandingSpeedScale(float ImpactSpeed, float HeavyFallSpeed, float MaxImpactSpeed, float MinimumScale)
+{
+    const float Clamped = FMath::Clamp(MinimumScale, 0.0f, 1.0f);
+    if (ImpactSpeed <= HeavyFallSpeed || MaxImpactSpeed <= HeavyFallSpeed)
+    {
+        return 1.0f;
+    }
+    const float Alpha = FMath::Clamp((ImpactSpeed - HeavyFallSpeed) / (MaxImpactSpeed - HeavyFallSpeed), 0.0f, 1.0f);
+    return FMath::Lerp(1.0f, Clamped, Alpha);
+}
+
+FVector UBreakerCharacterMovementComponent::NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const
+{
+    // Wall riding is exempt on purpose. It already runs its own reduced
+    // GravityScale, it is capped at WallRideMaxDuration, and it is specified as
+    // short and SPEED-NEUTRAL; letting the fall multiplier through would both
+    // change its arc and let it end faster than its own duration cap intends.
+    if (bWallRiding)
+    {
+        return Super::NewFallVelocity(InitialVelocity, Gravity, DeltaTime);
+    }
+
+    // The project uses standard downward gravity everywhere (wall ride, dash
+    // and slide all reason in world Z), so the phase is read off Z directly.
+    const float Multiplier = ComputeGravityMultiplier(InitialVelocity.Z, ApexBandSpeed, ApexGravityMultiplier, FallGravityMultiplier);
+    FVector Result = Super::NewFallVelocity(InitialVelocity, Gravity * Multiplier, DeltaTime);
+    Result.Z = ClampFallSpeed(Result.Z, MaxFallSpeed);
+    return Result;
+}
+
+bool UBreakerCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
+{
+    // JumpHoldWindow makes the engine call DoJump on every held frame and
+    // re-floor Velocity.Z at JumpZVelocity, which is a constant-speed rise —
+    // exactly the floaty segment this pass removes. One impulse per press: the
+    // hold window exists only so the release can be seen.
+    if (CharacterOwner && CharacterOwner->bWasJumping)
+    {
+        return true;
+    }
+
+    const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
+    if (bJumped)
+    {
+        bJumpCutArmed = true;
+    }
+    return bJumped;
+}
+
+void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations)
+{
+    // Super zeroes the fall, so the impact has to be read first.
+    const float ImpactSpeed = FMath::Max(-Velocity.Z, 0.0f);
+    // A queued slide owns its landing: scrubbing speed here would drop the
+    // player under SlideEntrySpeed and silently eat the slide.
+    const bool bSlideOwnsLanding = bSliding || (bSlideRequested && !bSlideRequestConsumed);
+    const float Scale = bSlideOwnsLanding
+        ? 1.0f
+        : LandingSpeedScale(ImpactSpeed, LandingHeavyFallSpeed, LandingMaxFallSpeed, LandingMinimumSpeedScale);
+    if (Scale < 1.0f)
+    {
+        Velocity.X *= Scale;
+        Velocity.Y *= Scale;
+        // BoostedSpeedCeiling is left alone: it is a ceiling, not a floor, so
+        // the player does not snap back to it, and clearing it here would
+        // quietly change how dash momentum survives a landing.
+    }
+    bJumpCutArmed = false;
+
+    Super::ProcessLanded(Hit, remainingTime, Iterations);
+
+    if (ImpactSpeed >= LandingHeavyFallSpeed)
+    {
+        OnLandingImpact.Broadcast(ImpactSpeed);
+    }
 }
 
 UBreakerEquipmentComponent* UBreakerCharacterMovementComponent::GetEquipment() const
@@ -232,6 +375,9 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
     Velocity.Z = FMath::Max(Velocity.Z, DashVerticalFloor);
     LastDashTime = World->GetTimeSeconds();
     BoostedSpeedCeiling = OutputSpeed;
+    // The dash owns its vertical floor from here on; releasing jump after an
+    // air dash must not cut it.
+    bJumpCutArmed = false;
     return true;
 }
 
@@ -352,6 +498,16 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
         }
     }
 
+    // Variable jump height. The character clears bPressedJump on release (and
+    // again when the hold window expires, which is well past the apex, where a
+    // cut is a no-op by construction), so one armed jump can be cut at most
+    // once and only while it is still rising.
+    if (bJumpCutArmed && CharacterOwner && !CharacterOwner->bPressedJump)
+    {
+        Velocity.Z = ApplyJumpCut(Velocity.Z, JumpCutMultiplier, JumpCutMinimumRiseSpeed);
+        bJumpCutArmed = false;
+    }
+
     ApplyAirSteering(DeltaTime);
 
     if (bSlideRequested && !bSlideRequestConsumed && !bSliding && IsMovingOnGround())
@@ -448,6 +604,8 @@ bool UBreakerCharacterMovementComponent::FindRunnableWall(FHitResult& OutHit) co
 void UBreakerCharacterMovementComponent::BeginWallRide(const FHitResult& WallHit)
 {
     bWallRiding = true;
+    // The wall owns the vertical arc while it lasts.
+    bJumpCutArmed = false;
     WallRideElapsed = 0.0f;
     WallRideNormal = WallHit.ImpactNormal.GetSafeNormal();
     SavedGravityScale = GravityScale;
