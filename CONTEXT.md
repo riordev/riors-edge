@@ -80,6 +80,43 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Caster is playable on E/T/G. `UBreakerCasterAbility` is the shared base holding the two class-wide rules (no cooldowns ever — Mana *is* the cooldown, so no Caster definition authors a cooldown tag; and Unmake rewrites the price of every Caster cast). Three abilities are implemented end-to-end: **Cleave** (E, 20 Mana, 3 m forward arc via the new `UBreakerMeleeSweep` — the project's first melee damage path — tagged `Damage.Melee`, always applies Bleed, GAS-native animation lock that the Edgework keystone removes), **Closequarter** (T, 35 Mana, swept blink to the target under the crosshair arriving 2 m short, velocity zeroed, 15 Mana refund at or below 40% target health), and **Unmake** (G, ultimate, 80 Mana, 6s window in which Caster casts are free and Mana generation is suspended; the Long Dark keystone's 12s-at-50% rewrite is fully parametric). The grant chain is: BREAKER CLASS screen → `ChoosePermanentClassById(Caster)` (leaves the loadout ids None, since no Caster `UBreakerClassDefinition` is authored) → `UBreakerAbilityComponent::ResolveDefinition` → `UBreakerAbilityDefinition::DefaultAbilityIdForSlot`, which now has a Caster row per slot. `UBreakerAbilityStateComponent` windows gained an optional float payload; Unmake's window carries the cost scalar. Not built: Rot, Siphon, Fracture, Resonance (all need Combat/ systems — zones, healing, projectiles, status consumption), and the Edgework-on-Closequarter and Cascade keystone halves (their variant rows exist and resolve, so the gap is visible rather than silent).
 - Skim currently routes through TryDash (inherits dash speed floor — wrong for its design intent; needs the TryRedirect movement hook).
 - Playtest-feedback QoL wave: HUD redesigned around a Destiny-style bottom-right combat cluster (weapon/ammo/ability slots with cooldowns/resource bar) with bullet tracers, outlined floating damage numbers, and overhead enemy health bars; enemies are primitive humanoids (torso/head-weakpoint/limbs) with a three-gear approach (closing sprint, weave, telegraphed lunge; elites implacable); loot drops as ground pickups with rarity beams, look-at popups, F pickup, 5-min despawn; ammo returns on kills/wave clears/camp supply crate; the field is ~2.5x larger with combat pockets, a marked sniper lane, and wall-ride walls; inventory has EQUIPMENT|SKILL TREES tabs, node cards with hover/Alt details, discards, and dev test-gear grants.
+- THERE IS A RANGED ENEMY (owner: "an enemy that stands a certain distance
+  away and shoots ranged projectiles (that i can see)"). Every enemy before it
+  was a melee chaser whose three gears all ended in contact, so nothing asked
+  the player to take cover, strafe, or care about distance.
+  `ABreakerRangedEnemy` (Combat/, LATTICE per Encounter-Design §2.2) SUBCLASSES
+  `ABreakerEnemy`, so loot, ammo return, the on-death chain, engagement-gapped
+  TTK sampling, HUD health bars/state labels, and wave-mode alive counts are
+  all inherited untouched. To make that possible `ABreakerEnemy::Tick` now
+  delegates its engaged decision to a virtual `TickEngagedBehaviour` (the melee
+  three-gear chase is the base implementation, moved verbatim), `PerformAttack`
+  and `SetBodyVisible` are virtual, and a new protected `DesiredFacing` lets an
+  archetype strafe sideways while facing the player. Behaviour: holds a
+  900–1900cm band — advances when too far, backs off FASTER than it advances
+  when crowded, strafes with a reversing cadence while firing, no contact
+  attack at all. The shot is a real replicated actor `ABreakerEnemyProjectile`
+  (Combat/): a ~42cm violet-magenta orb at 1100 cm/s (player sprint is 950)
+  with its own point light, straight-line, no gravity, no splash, single
+  target, routed through the ordinary `FBreakerDamageRequest`/`ReceiveDamage`
+  contract with a proper Instigator so the player's passive dodge/block layer
+  applies. Telegraph: 0.85s wind-up ramping the chest emitter's scale, colour
+  and light (squared curve) plus a drop to 30% move speed — tuned for PASSIVE
+  defence per O1/Encounter-Design §0 and NOT to be shortened. Lead is
+  deliberately PARTIAL (`LeadFraction` 0.35): §2.2's zero lead never hits a
+  moving player and reads as harmless, a full lead only loses to a direction
+  change; 0.35 punishes holding a straight sprint line and loses to any change
+  of direction. Set it to 0 to recover the doc's pure Lattice. All pure maths
+  (band classification with hysteresis, the intercept solve, the telegraph
+  ramp) lives world-free in `UBreakerRangedBehaviorLibrary`
+  (Combat/BreakerRangedBehavior.h) and is covered by 5 automation tests.
+  Health is deliberately the base chassis' 220, NOT §2.2's 1.6x, because trash
+  and elite health are mid-re-anchor — apply the ratio when the ruling lands.
+  Spawned in the gym encounter (2, wide on the flanks) and in wave mode (from
+  wave 2, `Wave/2` capped at 3 per §5.3, taken OUT OF the melee budget so
+  density is unchanged). EVERY value is O2 PLACEHOLDER and NOT PLAYTESTED —
+  whether the orb actually reads in flight is exactly what automation cannot
+  check. Knob table in `Docs/Playtest-Gym-v1.md`. Known gap: the playtest
+  report does not separate ranged from melee TTK samples (Playtest/ untouched).
 - The gym has an overgrown-Earth dressing pass (O24) in BreakerGameMode: seeded vegetation/ruins/tech props via dynamic material instances, saturated teal on exactly two suppression objects per the object-chroma law. Cosmetic only.
 - A parallel design sprint produced nine docs under `Docs/Design/` (class kits, constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, synthesis overview). `Design-Overview.md` §7 is the ranked owner-decision list; consult it before authoring content in any of those domains.
 - `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.
@@ -94,7 +131,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 90-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 95-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -116,7 +153,8 @@ Source/RiorsEdge/
   Attributes/     GAS attribute set
   Characters/     ABreakerCharacter (input, save, interact, components)
   Classes/        Class resource loops: Momentum (Swift), Mana (Caster)
-  Combat/         Damage contract/library, combat + status components, enemy
+  Combat/         Damage contract/library, combat + status components, melee
+                  and LATTICE ranged enemies + their projectile
   Game/           BreakerGameMode: gym spawning, waves, safe zone, dressing
   Input/          Enhanced Input data contract
   Interaction/    NPCs + dialogue
@@ -125,7 +163,7 @@ Source/RiorsEdge/
   Playtest/       Instrumentation + report (TTK vs O18 targets)
   Progression/    Trees/nodes, fallback content, purchase/respec, node effects
   Save/           UBreakerSaveGame (slot BreakerSave0)
-  Tests/          85 automation tests (RiorsEdge.* filter)
+  Tests/          95 automation tests (RiorsEdge.* filter)
   UI/             SBreakerMenu (all screens) + ABreakerPlaytestHUD (canvas)
 ```
 
@@ -194,7 +232,12 @@ Next actions, in priority order:
 
 1. **Awaiting owner ruling — TTK re-anchor ("tune it")**: session 4
    measured trash 2.61s / elite 6.18s engaged-TTK vs targets <1s / ~3s.
-   Solve enemy chassis backwards from O18 (trash ~90-100 HP).
+   Solve enemy chassis backwards from O18 (trash ~90-100 HP). Two riders
+   from the ranged archetype: it deliberately ships at the base 220 health
+   instead of Encounter-Design §2.2's 1.6x, which should be applied once the
+   re-anchor lands; and `UBreakerPlaytestComponent` still books ranged and
+   melee kills into the SAME trash TTK bucket, so the sample is now mixed —
+   it needs an archetype dimension before the numbers are read again.
 2. **UI follow-ups** (the style-guide implementation itself is done — see
    the FIELDPLATE bullet above and the five `Docs/Design/UI-*.md` specs):
    import the three OFL font families and point the tokens at them;
@@ -236,7 +279,7 @@ Next actions, in priority order:
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
-- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 90 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 95 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
 - Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
 - `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
 - The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after green tests. All work to date is committed and pushed through addfd85.

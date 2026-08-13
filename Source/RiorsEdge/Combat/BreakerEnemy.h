@@ -41,9 +41,19 @@ protected:
     // Ammo economy: kills return reserve ammo to the killer (O2 placeholder).
     void GrantAmmo();
     void RespawnEnemy();
-    void PerformAttack(APawn* TargetPawn);
+    virtual void PerformAttack(APawn* TargetPawn);
     // Shows/hides the whole humanoid assembly across death and respawn.
-    void SetBodyVisible(bool bVisible);
+    // Virtual so archetypes with extra presentation (a charging emitter) can
+    // clear it on the same edges.
+    virtual void SetBodyVisible(bool bVisible);
+
+    // The per-frame decision an enemy makes while it has a live target. The
+    // base implementation is the melee three-gear chase below; ranged
+    // archetypes override it to hold an engagement band instead of closing.
+    // Everything shared — target selection, the safe-zone rules, applying the
+    // move, and the ground snap — stays in Tick and is not overridable.
+    virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+        FVector& OutDirection, float& OutSpeedScale);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> BodyCollision;
     // Primitive humanoid assembly. BodyVisual is the torso; the rest are
@@ -100,12 +110,21 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeDuration = 0.35f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeCooldown = 1.2f;
 
-private:
-    FVector LeashOrigin = FVector::ZeroVector;
+    // Shared state a derived archetype legitimately needs to read or drive.
+    // PatrolPhase doubles as the per-enemy desync seed so a pack never acts in
+    // lockstep; StateLabel is what the playtest HUD prints over the enemy.
     float PatrolPhase = 0.0f;
     double LastAttackTime = -1000.0;
     bool bDead = false;
     bool bIsElite = false;
+    FString StateLabel = TEXT("PATROL");
+    // Optional facing override for one frame. Zero means "face the direction
+    // you are moving", which is the melee behaviour. A ranged enemy strafes
+    // sideways while facing the player, so it sets this every frame.
+    FVector DesiredFacing = FVector::ZeroVector;
+
+private:
+    FVector LeashOrigin = FVector::ZeroVector;
     int32 KillCount = 0;
     double FirstDamageTime = -1.0;
     // Engagement-gapped TTK: sums time between damage events, capping each
@@ -113,7 +132,6 @@ private:
     // time as time-to-kill.
     double LastDamageEventTime = -1.0;
     float EngagedSeconds = 0.0f;
-    FString StateLabel = TEXT("PATROL");
     float WeaveTime = 0.0f;
     double LungeStartTime = -1000.0;
 };
