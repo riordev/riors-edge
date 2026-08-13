@@ -72,6 +72,12 @@ public:
     // Starting a window that is already open replaces its remaining time
     // rather than stacking: a re-cast refreshes, it does not accumulate.
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void StartWindow(FName Key, float Duration);
+    // One scalar carried by the window itself, so a state that rewrites a rule
+    // can also carry the rule's magnitude without a second registry. Unmake is
+    // the first user: it opens a window whose payload is the cost scalar every
+    // Caster ability multiplies by (0 base, 0.5 under the Long Dark keystone).
+    UFUNCTION(BlueprintCallable, Category="Abilities|State") void StartWindowWithPayload(FName Key, float Duration, float Payload);
+    UFUNCTION(BlueprintPure, Category="Abilities|State") float GetWindowPayload(FName Key, float DefaultValue = 0.0f) const;
     UFUNCTION(BlueprintCallable, Category="Abilities|State") void ExtendWindow(FName Key, float ExtraSeconds);
     // Closing broadcasts OnWindowEnded exactly like a natural expiry, so
     // listeners have one teardown path.
@@ -128,6 +134,7 @@ private:
     struct FWindowState
     {
         float EndTime = 0.0f;
+        float Payload = 0.0f;
     };
     TMap<FName, FWindowState> Windows;
 

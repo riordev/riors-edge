@@ -30,6 +30,11 @@ struct RIORSEDGE_API FBreakerAbilityVariant
     // Seconds without a landed hit before the window self-terminates. <= 0
     // disables the check (Bloodrhythm is the only user today).
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant", meta=(ClampMin="0")) float HitTimeoutSeconds = 0.0f;
+    // What the window does to the price of the OWNER'S OTHER abilities while it
+    // is open. 1.0 = unchanged; Caster's Unmake authors 0.0 (free casts) and
+    // 0.5 under the Long Dark keystone (Class-Kits §2.2). Ignored by windows
+    // that do not rewrite costs.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant", meta=(ClampMin="0")) float AbilityCostMultiplier = 1.0f;
 };
 
 // Data contract for one class ability (Ability-Implementation-Spec SI-10).

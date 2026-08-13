@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Classes/BreakerManaComponent.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -91,6 +92,83 @@ bool FBreakerManaInertTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A Swift never runs the Mana loop"), Progression->GetProgressionState().PermanentClass == EBreakerClassId::Caster);
     Progression->DevForceClass(EBreakerClassId::Caster);
     TestTrue(TEXT("Caster runs the Mana loop"), Progression->GetProgressionState().PermanentClass == EBreakerClassId::Caster);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerManaIncomingDamageTest,
+    "RiorsEdge.Classes.ManaIncomingDamage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerManaIncomingDamageTest::RunTest(const FString& Parameters)
+{
+    // Class-Kits §2.1: while Overcast the player takes 15% increased damage.
+    TestEqual(TEXT("Not Overcast means no penalty"), UBreakerManaComponent::OvercastIncomingMultiplier(false, 0.15f), 1.0f);
+    TestEqual(TEXT("Overcast means 1.15x incoming"), UBreakerManaComponent::OvercastIncomingMultiplier(true, 0.15f), 1.15f);
+    // Overcast is a cost. A node that somehow supplied a negative penalty must
+    // not turn the debt into a defensive buff.
+    TestEqual(TEXT("A negative penalty never becomes mitigation"), UBreakerManaComponent::OvercastIncomingMultiplier(true, -0.5f), 1.0f);
+    TestFalse(TEXT("The modifier key is real"), UBreakerManaComponent::OvercastDamageModifierKey().IsNone());
+
+    // The combat-side chain the penalty rides on.
+    UBreakerCombatComponent* Combat = NewObject<UBreakerCombatComponent>();
+    TestEqual(TEXT("An untouched chain changes nothing"), Combat->GetComposedIncomingDamageMultiplier(), 1.0f);
+
+    Combat->PushIncomingDamageModifier(UBreakerManaComponent::OvercastDamageModifierKey(), 1.15f);
+    TestEqual(TEXT("The Overcast penalty composes in"), Combat->GetComposedIncomingDamageMultiplier(), 1.15f);
+    // Re-pushing replaces rather than stacks: a debt re-entered mid-window must
+    // not compound into 1.32x.
+    Combat->PushIncomingDamageModifier(UBreakerManaComponent::OvercastDamageModifierKey(), 1.15f);
+    TestEqual(TEXT("Re-pushing the same key replaces rather than stacks"), Combat->GetComposedIncomingDamageMultiplier(), 1.15f);
+
+    // Independent keys compose multiplicatively, and each reverts alone.
+    Combat->PushIncomingDamageModifier(TEXT("Test.Window"), 0.5f);
+    TestEqual(TEXT("Independent modifiers compose"), Combat->GetComposedIncomingDamageMultiplier(), 1.15f * 0.5f);
+    Combat->RemoveIncomingDamageModifier(TEXT("Test.Window"));
+    TestEqual(TEXT("Removing one leaves the other"), Combat->GetComposedIncomingDamageMultiplier(), 1.15f);
+    Combat->RemoveIncomingDamageModifier(UBreakerManaComponent::OvercastDamageModifierKey());
+    TestEqual(TEXT("Clearing the debt clears the penalty"), Combat->GetComposedIncomingDamageMultiplier(), 1.0f);
+
+    // Full immunity is expressible, and a nameless push is ignored.
+    Combat->PushIncomingDamageModifier(TEXT("Test.Immune"), 0.0f);
+    TestEqual(TEXT("A zero multiplier is immunity"), Combat->GetComposedIncomingDamageMultiplier(), 0.0f);
+    Combat->RemoveIncomingDamageModifier(TEXT("Test.Immune"));
+    Combat->PushIncomingDamageModifier(NAME_None, 2.0f);
+    TestEqual(TEXT("A nameless modifier is refused"), Combat->GetComposedIncomingDamageMultiplier(), 1.0f);
+    // Negative multipliers would heal the victim. Clamped at push.
+    Combat->PushIncomingDamageModifier(TEXT("Test.Negative"), -3.0f);
+    TestEqual(TEXT("A negative multiplier is clamped to immunity, never healing"), Combat->GetComposedIncomingDamageMultiplier(), 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerManaSuspensionTest,
+    "RiorsEdge.Classes.ManaSuspension",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerManaSuspensionTest::RunTest(const FString& Parameters)
+{
+    // Class-Kits §2.2 UNMAKE: "Mana generation is suspended."
+    UBreakerManaComponent* Mana = NewObject<UBreakerManaComponent>();
+    TestFalse(TEXT("A fresh component generates normally"), Mana->IsGenerationSuspended());
+
+    Mana->PushGenerationSuspension(TEXT("Unmake"));
+    TestTrue(TEXT("Unmake suspends generation"), Mana->IsGenerationSuspended());
+
+    // Overlapping sources each revert independently: popping one must not
+    // resume generation while another still holds it.
+    Mana->PushGenerationSuspension(TEXT("Test.Other"));
+    Mana->PopGenerationSuspension(TEXT("Unmake"));
+    TestTrue(TEXT("A second holder keeps generation suspended"), Mana->IsGenerationSuspended());
+    Mana->PopGenerationSuspension(TEXT("Test.Other"));
+    TestFalse(TEXT("Generation resumes when the last holder releases"), Mana->IsGenerationSuspended());
+
+    // Popping something that was never pushed is a no-op, not an underflow.
+    Mana->PopGenerationSuspension(TEXT("Never.Pushed"));
+    TestFalse(TEXT("Popping an unheld key changes nothing"), Mana->IsGenerationSuspended());
+    // A nameless push cannot silently freeze the class.
+    Mana->PushGenerationSuspension(NAME_None);
+    TestFalse(TEXT("A nameless suspension is refused"), Mana->IsGenerationSuspended());
     return true;
 }
 

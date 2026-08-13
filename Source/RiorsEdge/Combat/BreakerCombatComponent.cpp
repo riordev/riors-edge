@@ -50,6 +50,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             Defense.IncomingDamageMultiplier *= 1.0f - Equipment->GetStats().PhysicalDamageReductionPercent / 100.0f;
         }
     }
+    // Pushed incoming modifiers compose on top, in the same stage: Caster's
+    // Overcast penalty, and defensive windows when they land.
+    Defense.IncomingDamageMultiplier *= GetComposedIncomingDamageMultiplier();
     Defense.DodgeChance = DodgeChance;
     Defense.BlockChance = BlockChance;
     Defense.BlockMitigation = BlockMitigation;
@@ -161,6 +164,26 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
             Product, ComposedMoreCeiling);
         Product = ComposedMoreCeiling;
     }
+    return Product;
+}
+
+void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)
+{
+    if (Key.IsNone()) return;
+    // Re-pushing the same key replaces rather than stacks, matching the
+    // outgoing chain's rule.
+    IncomingDamageModifiers.Add(Key, FMath::Max(0.0f, Multiplier));
+}
+
+void UBreakerCombatComponent::RemoveIncomingDamageModifier(FName Key)
+{
+    IncomingDamageModifiers.Remove(Key);
+}
+
+float UBreakerCombatComponent::GetComposedIncomingDamageMultiplier() const
+{
+    float Product = 1.0f;
+    for (const TPair<FName, float>& Entry : IncomingDamageModifiers) Product *= Entry.Value;
     return Product;
 }
 
