@@ -34,6 +34,7 @@ public:
 
 private:
     void Rebuild(EBreakerMenuScreen NewScreen);
+    void ApplyScreen(EBreakerMenuScreen NewScreen);
     TSharedRef<SWidget> BuildMainScreen();
     TSharedRef<SWidget> BuildPauseScreen();
     TSharedRef<SWidget> BuildSettingsScreen();
@@ -68,6 +69,8 @@ private:
     // purchase/respec message echoed under the node grid.
     int32 SelectedTreeIndex = 0;
     FText SkillTreeStatus;
+    EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
+    bool bRebuildScheduled = false;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;
     FName DialogueNodeId = NAME_None;
     EBreakerMenuScreen RootScreen = EBreakerMenuScreen::Main;

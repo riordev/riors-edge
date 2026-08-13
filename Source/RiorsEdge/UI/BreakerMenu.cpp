@@ -97,6 +97,33 @@ void SBreakerMenu::HandleEscape()
 
 void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
 {
+    // Diagnostic for the reported screen flip-flop: every transition is
+    // logged with a timestamp so a repro session shows exactly what drives
+    // the loop. Cheap enough to leave in during playtests.
+    UE_LOG(LogTemp, Log, TEXT("[MenuRebuild] %d -> %d at %.3f"),
+        static_cast<int32>(CurrentScreen), static_cast<int32>(NewScreen),
+        FPlatformTime::Seconds());
+
+    // Deferred: swapping the content synchronously destroys the button whose
+    // OnClicked is still on the callstack — a Slate re-entrancy footgun and
+    // the prime suspect for the screen flip-flop. Coalesce all requests made
+    // this frame and apply once on the next Slate tick.
+    PendingScreen = NewScreen;
+    if (!bRebuildScheduled)
+    {
+        bRebuildScheduled = true;
+        RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateLambda(
+            [this](double, float) -> EActiveTimerReturnType
+            {
+                bRebuildScheduled = false;
+                ApplyScreen(PendingScreen);
+                return EActiveTimerReturnType::Stop;
+            }));
+    }
+}
+
+void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
+{
     CurrentScreen = NewScreen;
     // Consume the one-shot cleanup arm: only the rebuild triggered by the
     // arming click sees it, everything else disarms.
