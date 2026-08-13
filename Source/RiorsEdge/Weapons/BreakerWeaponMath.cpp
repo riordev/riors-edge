@@ -20,3 +20,20 @@ FVector FBreakerWeaponMath::ApplyConeSpread(const FVector& Direction, float Spre
     FRandomStream Random(RandomSeed);
     return Random.VRandCone(Direction.GetSafeNormal(), FMath::DegreesToRadians(SpreadDegrees));
 }
+
+float FBreakerWeaponMath::DistanceFromRayToPoint(const FVector& RayOrigin, const FVector& RayDirection, const FVector& Point)
+{
+    const FVector Direction = RayDirection.GetSafeNormal();
+    if (Direction.IsNearlyZero()) return static_cast<float>(FVector::Dist(RayOrigin, Point));
+    const FVector ToPoint = Point - RayOrigin;
+    // Clamped at zero: only what is downrange of the muzzle can be shot.
+    const double Along = FMath::Max(0.0, FVector::DotProduct(ToPoint, Direction));
+    return static_cast<float>(FVector::Dist(RayOrigin + Direction * Along, Point));
+}
+
+bool FBreakerWeaponMath::IsWithinWeakPointTolerance(const FVector& RayOrigin, const FVector& RayDirection, const FVector& WeakPointCenter, float WeakPointRadius, float ToleranceCm)
+{
+    const float Accept = FMath::Max(0.0f, WeakPointRadius) + FMath::Max(0.0f, ToleranceCm);
+    if (Accept <= 0.0f) return false;
+    return DistanceFromRayToPoint(RayOrigin, RayDirection, WeakPointCenter) <= Accept;
+}

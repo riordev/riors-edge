@@ -65,6 +65,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
+    // 0 at rest, 1 at the peak of the dash camera punch, decaying back to 0.
+    // Exposed so presentation that is NOT owned here — a HUD speed-line burst,
+    // a Blueprint effect, a rumble curve — can ride the same envelope instead
+    // of inventing its own timer and drifting out of sync with the camera.
+    UFUNCTION(BlueprintPure, Category="Movement") float GetDashFeedbackAlpha() const;
+    // Direction the last dash committed to, in world space, horizontal.
+    UFUNCTION(BlueprintPure, Category="Movement") FVector GetLastDashDirection() const { return LastDashDirection; }
     UFUNCTION(BlueprintPure, Category="UI") bool IsLookInverted() const { return bInvertLookY; }
     UFUNCTION(BlueprintPure, Category="UI") bool IsMenuOpen() const { return MenuWidget.IsValid(); }
     void ApplyMenuSettings(float NewSensitivity, float NewFOV, bool bNewInvertLookY);
@@ -102,6 +109,40 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleMaximumHeight = 150.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0.05")) float MantleDuration = 0.20f;
 
+    // --- Dash camera feedback -------------------------------------------
+    // Owner report: the dash's speed change is correct but unreadable. In a
+    // first-person view over open ground a pure velocity change has almost no
+    // optical flow to read, so the fix is a camera cue, not a movement change:
+    // no dash value is touched.
+    // Two cues, because they answer different questions. A short FOV punch that
+    // recovers is the genre-standard "you just got fast" signal (it widens the
+    // frustum, which multiplies the peripheral motion the eye actually uses to
+    // judge speed) and it answers HOW MUCH. A brief camera roll answers WHICH
+    // WAY: a pure forward dash rolls not at all and a side dash rolls fully,
+    // which is exactly the information FOV alone cannot carry.
+    // Both obey the Movement-Design guardrail that camera roll and FOV changes
+    // stay subtle and configurable — set either amplitude to 0, or clear
+    // bDashCameraFeedback, to remove it without a rebuild.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback") bool bDashCameraFeedback = true;
+    // Peak FOV added on top of the player's own setting, in degrees. The base
+    // FOV is never overwritten, so this can never leak into saved settings.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0", ClampMax="40")) float DashFOVPunch = 12.0f;
+    // Attack is deliberately near-instant: the punch has to arrive with the
+    // velocity change or it reads as a separate event.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0.01")) float DashFOVPunchAttack = 0.05f;
+    // Recovery is long enough to be felt as a settle rather than a snap, and
+    // short enough to be finished well inside the 4 s dash cooldown.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0.01")) float DashFOVPunchRecovery = 0.30f;
+    // Peak roll, degrees, applied about the view axis and signed by how lateral
+    // the dash was. Kept small: roll is a readability cue, not a stunt.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0", ClampMax="20")) float DashCameraRoll = 5.0f;
+    // Dash speed that maps to the full punch. Faster dashes (gear, momentum
+    // carried in) punch proportionally harder, so the cue tracks the thing the
+    // owner could not see rather than being a fixed stamp.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="1")) float DashFeedbackReferenceSpeed = 1700.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0.1", ClampMax="2")) float DashFeedbackMinimumScale = 0.6f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="1", ClampMax="3")) float DashFeedbackMaximumScale = 1.35f;
+
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnAimInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnReloadInput();
@@ -131,6 +172,9 @@ private:
     // per-shot kick offset is added on top of it in Tick.
     FVector GetWeaponRestLocation() const;
     void UpdateViewmodelKick();
+    UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
+    void UpdateDashCameraFeedback(float DeltaSeconds);
+    void ApplyBaseFieldOfView();
     void ResetPlaytest();
     void CopyPlaytestReport();
     void TogglePlaytestDiagnostics();
@@ -167,4 +211,15 @@ private:
     FVector MantleTarget = FVector::ZeroVector;
     FVector MantleExitVelocity = FVector::ZeroVector;
 
+    // The player's chosen FOV, kept separately from the camera's live FOV so
+    // the dash punch is a pure offset. GetCurrentFOV() reports THIS, which is
+    // what the settings screen edits and SavePlaytestSettings persists — a
+    // punch mid-frame must never be able to become the saved preference.
+    float BaseFieldOfView = 90.0f;
+    // Negative = no dash feedback in flight.
+    float DashFeedbackElapsed = -1.0f;
+    float DashFeedbackScale = 1.0f;
+    float DashFeedbackRollSign = 0.0f;
+    FVector LastDashDirection = FVector::ZeroVector;
+    bool bDashRollApplied = false;
 };

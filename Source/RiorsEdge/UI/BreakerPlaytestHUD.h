@@ -15,29 +15,11 @@
 #include "BreakerPlaytestHUD.generated.h"
 
 class ABreakerCharacter;
+class ABreakerTracerRenderer;
 class UBreakerAbilityComponent;
 class UBreakerAbilityStateComponent;
 class UBreakerCombatComponent;
 class UBreakerWeaponComponent;
-
-// One recorded round in flight. Plain (non-reflected) because it holds no
-// UObject references: the ring buffer must survive the shot actor being
-// destroyed.
-//
-// Start is the VISUAL muzzle, not the trace start. See
-// UBreakerWeaponComponent::GetVisualMuzzleLocation for why those differ.
-struct FBreakerHUDTracer
-{
-    FVector Start = FVector::ZeroVector;
-    FVector End = FVector::ZeroVector;
-    FVector Impact = FVector::ZeroVector;
-    bool bHit = false;
-    bool bWeakPoint = false;
-    double Time = -1000.0;
-    // Seconds from the trigger pull to the round landing, resolved once when
-    // the shot is recorded so the impact burst is not rescheduled per frame.
-    float FlightSeconds = 0.0f;
-};
 
 // One floating damage number. Also plain: it outlives the target it came from.
 struct FBreakerHUDDamageNumber
@@ -95,11 +77,10 @@ private:
     static BreakerHUD::FResourceRow ResolveResourceRow(const ABreakerCharacter* Character);
     void DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height);
     void DrawWaveBanner(const FVector2D& Center);
-    void DrawTracers();
-    // The impact spark, drawn in the world plane the round punched through
-    // rather than as a flat screen-space X. Progress runs 0..1 over the burst.
-    void DrawImpactBurst(const FVector& Impact, const FVector& TravelDirection, float Progress,
-        const FLinearColor& Color, float VerticalHalfFOVRadians);
+    // Rounds in flight are no longer drawn here at all. The HUD records the
+    // shot and hands it to a world-space pooled renderer, spawned lazily on
+    // the first shot and never replicated; see BreakerTracerRenderer.h.
+    ABreakerTracerRenderer* GetTracerRenderer();
     void DrawDamageNumbers();
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
@@ -142,9 +123,10 @@ private:
     // Skim, not only the first three.
     double SkimBurstTime = -1000.0;
 
-    static constexpr int32 MaxTracers = 16;
-    TArray<FBreakerHUDTracer> Tracers;
-    int32 NextTracerIndex = 0;
+    UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
+    // Every round the player has fired, used only to decide which of them get
+    // a visible streak. Never reset: the modulo is what matters, not the count.
+    int32 RoundsFired = 0;
 
     static constexpr int32 MaxDamageNumbers = 24;
     TArray<FBreakerHUDDamageNumber> DamageNumbers;

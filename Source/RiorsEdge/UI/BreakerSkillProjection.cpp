@@ -1,0 +1,273 @@
+#include "UI/BreakerSkillProjection.h"
+
+#include "Attributes/BreakerAttributeSet.h"
+#include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerProgressionNode.h"
+#include "Progression/BreakerProgressionTree.h"
+
+bool FBreakerStatLine::Changed() const
+{
+    return !FMath::IsNearlyEqual(Before, After, 0.0001f);
+}
+
+namespace
+{
+    // The row set, in one place, so Before and After can never disagree about
+    // what row 3 is. Order is the reading order on the rail.
+    enum class EStatRow : uint8
+    {
+        Damage,
+        CriticalChance,
+        CriticalDamage,
+        MaxHealth,
+        DamageOverTime,
+        MoveSpeed,
+        SlideSpeed,
+        AirControl,
+        DodgeChance,
+        BlockChance,
+        Count
+    };
+
+    struct FStatRowDescriptor
+    {
+        const TCHAR* Label;
+        EBreakerStatFormat Format;
+        // Rows below this index are attribute-backed when the character has a
+        // captured attribute set; the rest only ever carry the tree layer,
+        // because nothing else writes them.
+        bool bAlwaysTreeOnly;
+    };
+
+    const FStatRowDescriptor StatRows[] =
+    {
+        { TEXT("DAMAGE"),        EBreakerStatFormat::Multiplier,    false },
+        { TEXT("CRIT CHANCE"),   EBreakerStatFormat::PercentPoints, false },
+        { TEXT("CRIT DAMAGE"),   EBreakerStatFormat::Multiplier,    false },
+        { TEXT("MAX HEALTH"),    EBreakerStatFormat::Absolute,      false },
+        { TEXT("DOT DAMAGE"),    EBreakerStatFormat::Multiplier,    false },
+        { TEXT("MOVE SPEED"),    EBreakerStatFormat::Multiplier,    true  },
+        { TEXT("SLIDE SPEED"),   EBreakerStatFormat::Multiplier,    true  },
+        { TEXT("AIR CONTROL"),   EBreakerStatFormat::Multiplier,    true  },
+        { TEXT("DODGE CHANCE"),  EBreakerStatFormat::PercentPoints, true  },
+        { TEXT("BLOCK CHANCE"),  EBreakerStatFormat::PercentPoints, true  },
+    };
+
+    static_assert(UE_ARRAY_COUNT(StatRows) == static_cast<int32>(EStatRow::Count),
+        "Stat row table and row enum must stay in step.");
+
+    float ComposeWithOffer(const FBreakerSkillSnapshot& Snapshot, const FBreakerAttributeContribution& Offer,
+        EBreakerAggregatedAttribute Attribute)
+    {
+        // A copy, so the character's live aggregator is never touched by a
+        // hypothetical. Everything except the progression offer — the true
+        // bases, the gear contribution, the fold itself — is the real one.
+        FBreakerAttributeAggregator Hypothetical = Snapshot.Aggregator;
+        Hypothetical.SetContribution(EBreakerAttributeContributor::Progression, Offer);
+        return Hypothetical.Compose(Attribute);
+    }
+
+    void CollectRowValues(const FBreakerSkillSnapshot& Snapshot, const FBreakerAttributeContribution& Offer,
+        const FBreakerNodeStats& Stats, float (&OutValues)[static_cast<int32>(EStatRow::Count)])
+    {
+        const bool bComposed = Snapshot.bHasComposedAttributes;
+
+        OutValues[static_cast<int32>(EStatRow::Damage)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::DamageMultiplier)
+            : Stats.DamageMultiplier;
+        OutValues[static_cast<int32>(EStatRow::CriticalChance)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::CriticalChance)
+            : Stats.CriticalChanceBonus;
+        OutValues[static_cast<int32>(EStatRow::CriticalDamage)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::CriticalMultiplier)
+            // No captured base to add the bonus to, so the tree half alone is
+            // shown against an implied 1.0 and flagged tree-only.
+            : 1.0f + Stats.CriticalMultiplierBonus;
+        OutValues[static_cast<int32>(EStatRow::MaxHealth)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::MaxHealth)
+            : Stats.BonusHealth;
+        OutValues[static_cast<int32>(EStatRow::DamageOverTime)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::DamageOverTimeMultiplier)
+            : Stats.DamageOverTimeMultiplier;
+
+        // These four have no aggregated attribute at all: the movement and
+        // combat components read FBreakerNodeStats directly, so the node stats
+        // ARE the real numbers here, composed or not.
+        OutValues[static_cast<int32>(EStatRow::MoveSpeed)] = Stats.MoveSpeedMultiplier;
+        OutValues[static_cast<int32>(EStatRow::SlideSpeed)] = Stats.SlideSpeedMultiplier;
+        OutValues[static_cast<int32>(EStatRow::AirControl)] = Stats.AirControlMultiplier;
+        OutValues[static_cast<int32>(EStatRow::DodgeChance)] = Stats.DodgeChanceBonus;
+        OutValues[static_cast<int32>(EStatRow::BlockChance)] = Stats.BlockChanceBonus;
+    }
+}
+
+FBreakerSkillSnapshot BreakerSkillProjection::MakeSnapshot(const UBreakerProgressionComponent* Progression, const UBreakerAttributeSet* Attributes)
+{
+    FBreakerSkillSnapshot Snapshot;
+    if (!Progression) return Snapshot;
+
+    // Same two sources UBreakerProgressionComponent::CollectKnownNodes walks,
+    // in the same order: the class definition's branch trees, then every
+    // fallback tree. A node reachable by the component must be reachable here
+    // or a projection would silently ignore an owned rank.
+    auto AddTree = [&Snapshot](const UBreakerProgressionTree* Tree)
+    {
+        if (!Tree) return;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            if (Node) Snapshot.Nodes.AddUnique(Node);
+        }
+    };
+    if (const UBreakerClassDefinition* ClassDef = Progression->ClassDefinition)
+    {
+        for (const TObjectPtr<UBreakerProgressionTree>& Tree : ClassDef->BranchTrees) AddTree(Tree.Get());
+    }
+    for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees()) AddTree(Tree);
+
+    const FBreakerProgressionState& State = Progression->GetProgressionState();
+    Snapshot.Ranks = State.ClassNodeRanks;
+    Snapshot.Ranks.Append(State.CoreNodeRanks);
+    Snapshot.IncreasedDamagePerSpentPoint = Progression->IncreasedDamagePerSpentPoint;
+
+    if (Attributes && Attributes->HasCapturedAttributeBases())
+    {
+        Snapshot.Aggregator = Attributes->GetAttributeAggregator();
+        Snapshot.bHasComposedAttributes = true;
+    }
+    return Snapshot;
+}
+
+TArray<FBreakerNodeRank> BreakerSkillProjection::WithRankDelta(const TArray<FBreakerNodeRank>& Ranks, FName NodeId, int32 Delta)
+{
+    TArray<FBreakerNodeRank> Result = Ranks;
+    if (NodeId.IsNone() || Delta == 0) return Result;
+
+    for (FBreakerNodeRank& Rank : Result)
+    {
+        if (Rank.NodeId != NodeId) continue;
+        Rank.Rank = FMath::Max(0, Rank.Rank + Delta);
+        return Result;
+    }
+
+    if (Delta > 0)
+    {
+        FBreakerNodeRank Added;
+        Added.NodeId = NodeId;
+        Added.Rank = Delta;
+        Result.Add(Added);
+    }
+    return Result;
+}
+
+int32 BreakerSkillProjection::CommittedPoints(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks)
+{
+    int32 Total = 0;
+    for (const FBreakerNodeRank& Rank : Ranks)
+    {
+        if (Rank.Rank <= 0) continue;
+        const UBreakerProgressionNode* const* Found = Nodes.FindByPredicate(
+            [&Rank](const UBreakerProgressionNode* Node) { return Node && Node->NodeId == Rank.NodeId; });
+        Total += Rank.Rank * (Found ? (*Found)->CostPerRank : 1);
+    }
+    return Total;
+}
+
+FBreakerNodeStats BreakerSkillProjection::BuildOffer(const FBreakerSkillSnapshot& Snapshot,
+    const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution& OutOffer)
+{
+    // The production fold, not a second implementation of it.
+    FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Snapshot.Nodes, Ranks, &OutOffer);
+
+    // The one line RecalculateStats adds afterwards, mirrored here. If that
+    // baseline ever moves, RiorsEdge.UI.SkillProjection.MirrorsLiveComponent
+    // fails, which is the whole reason the test exists.
+    const float SpendPercent = CommittedPoints(Snapshot.Nodes, Ranks)
+        * FMath::Max(0.0f, Snapshot.IncreasedDamagePerSpentPoint);
+    if (SpendPercent > 0.0f)
+    {
+        OutOffer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, SpendPercent);
+        Stats.DamageMultiplier += SpendPercent / 100.0f;
+    }
+    return Stats;
+}
+
+TArray<FBreakerStatLine> BreakerSkillProjection::Project(const FBreakerSkillSnapshot& Snapshot, const TArray<FBreakerNodeRank>& AfterRanks)
+{
+    constexpr int32 RowCount = static_cast<int32>(EStatRow::Count);
+
+    FBreakerAttributeContribution BeforeOffer;
+    const FBreakerNodeStats BeforeStats = BuildOffer(Snapshot, Snapshot.Ranks, BeforeOffer);
+    float BeforeValues[RowCount] = {};
+    CollectRowValues(Snapshot, BeforeOffer, BeforeStats, BeforeValues);
+
+    FBreakerAttributeContribution AfterOffer;
+    const FBreakerNodeStats AfterStats = BuildOffer(Snapshot, AfterRanks, AfterOffer);
+    float AfterValues[RowCount] = {};
+    CollectRowValues(Snapshot, AfterOffer, AfterStats, AfterValues);
+
+    TArray<FBreakerStatLine> Lines;
+    Lines.Reserve(RowCount);
+    for (int32 Row = 0; Row < RowCount; ++Row)
+    {
+        FBreakerStatLine Line;
+        Line.Label = StatRows[Row].Label;
+        Line.Format = StatRows[Row].Format;
+        Line.bTreeOnly = StatRows[Row].bAlwaysTreeOnly || !Snapshot.bHasComposedAttributes;
+        Line.Before = BeforeValues[Row];
+        Line.After = AfterValues[Row];
+        Lines.Add(MoveTemp(Line));
+    }
+    return Lines;
+}
+
+TArray<FBreakerStatLine> BreakerSkillProjection::ProjectPurchase(const FBreakerSkillSnapshot& Snapshot, FName NodeId, int32 RankDelta)
+{
+    return Project(Snapshot, WithRankDelta(Snapshot.Ranks, NodeId, RankDelta));
+}
+
+TArray<FBreakerStatLine> BreakerSkillProjection::CurrentTotals(const FBreakerSkillSnapshot& Snapshot)
+{
+    return Project(Snapshot, Snapshot.Ranks);
+}
+
+float BreakerSkillProjection::LayerIncreasedPercent(const FBreakerSkillSnapshot& Snapshot,
+    EBreakerAttributeContributor Contributor, EBreakerAggregatedAttribute Attribute)
+{
+    if (Contributor == EBreakerAttributeContributor::Count) return 0.0f;
+    return Snapshot.Aggregator.GetContribution(Contributor).GetIncreasedPercent(Attribute);
+}
+
+FString BreakerSkillProjection::FormatStat(float Value, EBreakerStatFormat Format)
+{
+    switch (Format)
+    {
+        case EBreakerStatFormat::PercentPoints: return FString::Printf(TEXT("%.1f%%"), Value * 100.0f);
+        case EBreakerStatFormat::Absolute:      return FString::Printf(TEXT("%.0f"), Value);
+        default:                                return FString::Printf(TEXT("%.2fx"), Value);
+    }
+}
+
+FString BreakerSkillProjection::FormatDelta(const FBreakerStatLine& Line)
+{
+    if (!Line.Changed()) return FString();
+    const float Delta = Line.After - Line.Before;
+    switch (Line.Format)
+    {
+        case EBreakerStatFormat::PercentPoints: return FString::Printf(TEXT("%+.1f%%"), Delta * 100.0f);
+        case EBreakerStatFormat::Absolute:      return FString::Printf(TEXT("%+.0f"), Delta);
+        default:
+            // A multiplier's delta reads as percentage points of the 1.0 base,
+            // which is how the affix and node tables author it in the first
+            // place: 1.13x -> 1.16x is "+3%".
+            return FMath::Abs(Delta) < 0.0095f
+                ? FString::Printf(TEXT("%+.2f%%"), Delta * 100.0f)
+                : FString::Printf(TEXT("%+.0f%%"), Delta * 100.0f);
+    }
+}
+
+FString BreakerSkillProjection::FormatTransition(const FBreakerStatLine& Line)
+{
+    return FormatStat(Line.Before, Line.Format) + TEXT(" -> ") + FormatStat(Line.After, Line.Format);
+}

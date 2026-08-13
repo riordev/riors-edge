@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "UI/BreakerGlowMaterial.h"
 #include "UI/BreakerUIStyle.h"
 
 namespace
@@ -46,13 +47,17 @@ namespace
 
     const TCHAR* ShapeCube = TEXT("/Engine/BasicShapes/Cube.Cube");
     const TCHAR* ShapeCone = TEXT("/Engine/BasicShapes/Cone.Cone");
-    const TCHAR* ShapeSphere = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+
+    // The flame's brightness multiplier in flight, and at detonation. Both are
+    // colour magnitudes on an additive surface, not alphas. O2 PLACEHOLDER.
+    constexpr float ExhaustIntensity = 2.4f;
+    constexpr float FireballIntensity = 6.0f;
 }
 
 ABreakerRocketProjectile::ABreakerRocketProjectile()
 {
-    // Ticks only to roll the warhead and pulse the exhaust. One rocket in the
-    // air at a time on a four-round magazine; this is not the SMG.
+    // Ticks only to flicker the flame. One rocket in the air at a time on a
+    // four-round magazine; this is not the SMG.
     PrimaryActorTick.bCanEverTick = true;
     bReplicates = true;
     SetReplicateMovement(true);
@@ -64,35 +69,33 @@ ABreakerRocketProjectile::ABreakerRocketProjectile()
 
     // Casing. X is forward: the projectile movement component keeps the actor
     // rotation on the velocity, so every part is authored nose-down-X.
+    // Dark, not orange — the flame behind it is the bright thing, and a body
+    // the same colour as its own thrust has no silhouette.
     Visual = MakePart(this, Collision, TEXT("Visual"), ShapeCube,
         FVector(-6.0f, 0.0f, 0.0f), FRotator::ZeroRotator, FVector(0.34f, 0.12f, 0.12f));
-    ApplyShapeColor(Visual, BreakerUI::OrangeDeep);
+    ApplyShapeColor(Visual, BreakerUI::Panel20);
 
     // Nose. The engine cone points +Z, so it is pitched onto +X.
     Nose = MakePart(this, Collision, TEXT("Nose"), ShapeCone,
         FVector(22.0f, 0.0f, 0.0f), FRotator(-90.0f, 0.0f, 0.0f), FVector(0.11f, 0.11f, 0.16f));
-    ApplyShapeColor(Nose, BreakerUI::Orange);
+    ApplyShapeColor(Nose, BreakerUI::BorderEmphasis);
 
-    FinVertical = MakePart(this, Collision, TEXT("FinVertical"), ShapeCube,
-        FVector(-19.0f, 0.0f, 0.0f), FRotator::ZeroRotator, FVector(0.10f, 0.02f, 0.20f));
-    ApplyShapeColor(FinVertical, BreakerUI::OrangeDeep);
-
-    FinHorizontal = MakePart(this, Collision, TEXT("FinHorizontal"), ShapeCube,
-        FVector(-19.0f, 0.0f, 0.0f), FRotator::ZeroRotator, FVector(0.10f, 0.20f, 0.02f));
-    ApplyShapeColor(FinHorizontal, BreakerUI::OrangeDeep);
-
-    // Exhaust bloom trailing the casing. Bright orange so the round is legible
-    // against the gym's bright sand from behind as well as from the side.
-    Exhaust = MakePart(this, Collision, TEXT("Exhaust"), ShapeSphere,
-        FVector(-26.0f, 0.0f, 0.0f), FRotator::ZeroRotator, FVector(0.22f, 0.14f, 0.14f));
-    ApplyShapeColor(Exhaust, BreakerUI::Orange);
+    // The flame. A stretched box rather than a ball, because thrust has a
+    // direction and a sphere has none; unlit additive, so it is light rather
+    // than a painted object, and so it survives the gym's bright sand.
+    // Rebuilt in BeginPlay if the glow material is unavailable.
+    Exhaust = MakePart(this, Collision, TEXT("Exhaust"), ShapeCube,
+        FVector(-40.0f, 0.0f, 0.0f), FRotator::ZeroRotator, FVector(0.46f, 0.10f, 0.10f));
 
     Glow = CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
     Glow->SetupAttachment(Collision);
-    Glow->SetRelativeLocation(FVector(-26.0f, 0.0f, 0.0f));
+    Glow->SetRelativeLocation(FVector(-34.0f, 0.0f, 0.0f));
     Glow->SetLightColor(BreakerUI::Orange);
-    Glow->SetIntensity(3200.0f);
-    Glow->SetAttenuationRadius(420.0f);
+    // Was 3200 over 420 cm. A rocket that lights the whole corridor as
+    // brightly as a muzzle flash reads as a floating lamp; this is a warm
+    // pool that moves with it.
+    Glow->SetIntensity(2000.0f);
+    Glow->SetAttenuationRadius(340.0f);
     Glow->SetCastShadows(false);
 
     Movement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Movement"));
@@ -103,13 +106,23 @@ ABreakerRocketProjectile::ABreakerRocketProjectile()
 void ABreakerRocketProjectile::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (bExploded || !Visual) return;
-    // Roll about the travel axis. bRotationFollowsVelocity owns the actor's
-    // pitch/yaw, so the spin lives on the mesh instead.
-    const float Roll = SpinDegreesPerSecond * DeltaSeconds;
-    Visual->AddLocalRotation(FRotator(0.0f, 0.0f, Roll));
-    if (FinVertical) FinVertical->AddLocalRotation(FRotator(0.0f, 0.0f, Roll));
-    if (FinHorizontal) FinHorizontal->AddLocalRotation(FRotator(0.0f, 0.0f, Roll));
+    if (bExploded || !Exhaust) return;
+
+    // The flame breathes; the rocket does not spin. Two detuned sine terms so
+    // the cadence does not read as a loop, driven off world time so every
+    // rocket in the air is out of phase with every other one.
+    const float Time = GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds()) : 0.0f;
+    const float Phase = Time * ExhaustFlickerHz;
+    const float Flicker = 1.0f + ExhaustFlickerAmount *
+        (FMath::Sin(Phase) * 0.6f + FMath::Sin(Phase * 1.7f) * 0.4f);
+
+    const float Length = FMath::Max(ExhaustLengthCm, 1.0f) * Flicker;
+    // BasicShapes/Cube is 100 cm on a side, so a unit of scale is a metre.
+    Exhaust->SetRelativeScale3D(FVector(Length / 100.0f, 0.10f, 0.10f));
+    // The flame grows BACKWARD from the tail of the casing rather than around
+    // its own centre, so the nozzle stays put while the plume lengthens.
+    Exhaust->SetRelativeLocation(FVector(-17.0f - Length * 0.5f, 0.0f, 0.0f));
+    BreakerUI::SetGlowColor(ExhaustMaterial, BreakerUI::Orange, ExhaustIntensity * Flicker);
 }
 
 void ABreakerRocketProjectile::InitializeRocket(const FBreakerDamageRequest& InDamage, float Speed, float InExplosionRadius)
@@ -124,6 +137,13 @@ void ABreakerRocketProjectile::InitializeRocket(const FBreakerDamageRequest& InD
 void ABreakerRocketProjectile::BeginPlay()
 {
     Super::BeginPlay();
+    // Dynamic material instances cannot be made in a constructor. If the
+    // engine's emissive material is missing the flame falls back to the same
+    // lit shape material every other placeholder uses — dimmer, but present.
+    ExhaustMaterial = BreakerUI::MakeGlowMaterial(Exhaust);
+    if (ExhaustMaterial) BreakerUI::SetGlowColor(ExhaustMaterial, BreakerUI::Orange, ExhaustIntensity);
+    else ApplyShapeColor(Exhaust, BreakerUI::Orange);
+
     if (GetInstigator()) Collision->IgnoreActorWhenMoving(GetInstigator(), true);
     Collision->OnComponentHit.AddDynamic(this, &ThisClass::HandleImpact);
     SetLifeSpan(MaximumLifetime);
@@ -185,21 +205,22 @@ void ABreakerRocketProjectile::PlayExplosionCosmetics(const FVector& Location, f
     }
     if (Collision) Collision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // Casing parts off; the exhaust bloom becomes the fireball, scaled to the
-    // radius the damage actually used so the visual does not lie about reach.
-    for (UStaticMeshComponent* Part : { Visual.Get(), Nose.Get(), FinVertical.Get(), FinHorizontal.Get() })
+    // Casing parts off; the flame becomes the fireball, scaled to the radius
+    // the damage actually used so the visual does not lie about reach.
+    for (UStaticMeshComponent* Part : { Visual.Get(), Nose.Get() })
     {
         if (Part) Part->SetVisibility(false);
     }
     if (Exhaust)
     {
         Exhaust->SetRelativeLocation(FVector::ZeroVector);
-        // BasicShapes/Sphere is 100 cm across, so a unit of scale is 50 cm of
-        // radius. Two thirds of the blast: a fireball drawn at the full lethal
-        // radius reads as far bigger than it is.
-        const float Scale = FMath::Max(Radius, 50.0f) * 2.0f / 3.0f / 50.0f;
+        // BasicShapes/Cube is 100 cm on a side. Two thirds of the blast: a
+        // fireball drawn at the full lethal radius reads as far bigger than it
+        // is. Uniform now — a directional plume becomes a ball on detonation.
+        const float Scale = FMath::Max(Radius, 50.0f) * 2.0f / 3.0f * 2.0f / 100.0f;
         Exhaust->SetRelativeScale3D(FVector(Scale));
         Exhaust->SetVisibility(true);
+        BreakerUI::SetGlowColor(ExhaustMaterial, BreakerUI::Orange, FireballIntensity);
     }
     if (Glow)
     {

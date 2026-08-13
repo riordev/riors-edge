@@ -36,6 +36,243 @@ bool FBreakerWeaponFalloffTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Owner playtest report: "dmg fall off is too high". The gym is an open field
+// whose ranged enemy holds 9-19 m, so the ordinary fight now happens where a
+// small-arena curve had already started biting. These tests pin the SHAPE the
+// softening must keep: the archetypes stay different, and the ordering of how
+// hard each one falls off is the identity, not the severity.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerArchetypeFalloffTest,
+    "RiorsEdge.Weapons.ArchetypeFalloff",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerArchetypeFalloffTest::RunTest(const FString& Parameters)
+{
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    auto DefinitionFor = [Weapon](EBreakerWeaponArchetype Archetype)
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Weapon->GetActiveDefinition();
+    };
+    // Damage lost per centimetre across the ramp: the honest measure of "how
+    // hard does this weapon fall off", independent of where the ramp sits.
+    auto Severity = [](const UBreakerWeaponDefinition* Definition)
+    {
+        return (1.0f - Definition->MinimumFalloffMultiplier) / (Definition->FalloffEnd - Definition->FalloffStart);
+    };
+
+    const UBreakerWeaponDefinition* Rifle = DefinitionFor(EBreakerWeaponArchetype::Rifle);
+    const UBreakerWeaponDefinition* SMG = DefinitionFor(EBreakerWeaponArchetype::SMG);
+    const UBreakerWeaponDefinition* Sniper = DefinitionFor(EBreakerWeaponArchetype::Sniper);
+    const UBreakerWeaponDefinition* Shotgun = DefinitionFor(EBreakerWeaponArchetype::Shotgun);
+
+    // The mechanic is not being removed: every one of them still falls off.
+    for (const UBreakerWeaponDefinition* Definition : { Rifle, SMG, Sniper, Shotgun })
+    {
+        TestTrue(TEXT("Every archetype still loses damage at range"), Definition->MinimumFalloffMultiplier < 1.0f);
+        TestTrue(TEXT("Every falloff ramp has a positive length"), Definition->FalloffEnd > Definition->FalloffStart);
+    }
+
+    // And they are still five different weapons, hardest-falling to softest.
+    TestTrue(TEXT("The shotgun falls off hardest of all"),
+        Severity(Shotgun) > Severity(SMG) && Severity(Shotgun) > Severity(Rifle) && Severity(Shotgun) > Severity(Sniper));
+    TestTrue(TEXT("The SMG falls off harder than the rifle"), Severity(SMG) > Severity(Rifle));
+    TestTrue(TEXT("The rifle falls off harder than the sniper"), Severity(Rifle) > Severity(Sniper));
+    TestTrue(TEXT("The sniper barely falls off at all"), Sniper->MinimumFalloffMultiplier >= 0.85f);
+    TestTrue(TEXT("The shotgun's severity is at least triple the rifle's"), Severity(Shotgun) > Severity(Rifle) * 3.0f);
+
+    // The engagement band the gym actually produces (the ranged enemy holds
+    // 900-1900 cm). The primary must be untouched across all of it, so a
+    // falloff pass cannot silently move the measured trash/elite TTK.
+    TestEqual(TEXT("The rifle is at full damage where the ranged enemy opens"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Rifle, 900.0f), 1.0f);
+    TestEqual(TEXT("The rifle is still at full damage at the far edge of the band"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Rifle, 1900.0f), 1.0f);
+    // The secondary is where the band actually hurt, and it must now hold on
+    // to more than half its damage out to the far edge of it.
+    TestTrue(TEXT("The scattergun keeps over two thirds of its damage at 19 m"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Shotgun, 1900.0f) > 0.67f);
+    // But not so much that the shotgun becomes a rifle.
+    TestTrue(TEXT("The scattergun is still clearly punished at 19 m"),
+        FBreakerWeaponMath::DamageMultiplierAtDistance(Shotgun, 1900.0f) < 0.80f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Owner playtest report: "weakpoints dont feel forgiving as they should".
+// The head is a 20 cm sphere and the shot is a zero-radius line, so acceptance
+// is a binary a player cannot feel the edges of. The halo is world-space, so
+// the generosity is the same physical size at 5 m and 50 m.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeakPointToleranceTest,
+    "RiorsEdge.Weapons.WeakPointTolerance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeakPointToleranceTest::RunTest(const FString& Parameters)
+{
+    const FVector Muzzle = FVector::ZeroVector;
+    const FVector Forward = FVector::ForwardVector;
+    // A head-sized sphere ten metres downrange, at the enemy's head height.
+    const FVector Head(1000.0f, 0.0f, 78.0f);
+    const float Radius = 20.0f;
+    const float Tolerance = 14.0f;
+
+    auto RayAtHeight = [](float Height) { return FVector(1000.0f, 0.0f, Height).GetSafeNormal(); };
+
+    TestEqual(TEXT("A ray straight at the centre is at zero distance"),
+        FBreakerWeaponMath::DistanceFromRayToPoint(Muzzle, RayAtHeight(78.0f), Head), 0.0f, 0.01f);
+
+    // Dead centre and a clean clip of the sphere both count, as they did.
+    TestTrue(TEXT("A centre hit is a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(78.0f), Head, Radius, Tolerance));
+    TestTrue(TEXT("A shot inside the sphere is a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(62.0f), Head, Radius, Tolerance));
+
+    // The point of the change: a near-miss that used to read as a body shot.
+    TestFalse(TEXT("Without tolerance a near-miss is only a body shot"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(50.0f), Head, Radius, 0.0f));
+    TestTrue(TEXT("With tolerance the same near-miss reads as a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(50.0f), Head, Radius, Tolerance));
+
+    // Generosity has an edge, and it is where the authored number puts it.
+    TestFalse(TEXT("A chest shot is still a chest shot"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(20.0f), Head, Radius, Tolerance));
+
+    // World space, not screen space: the halo is the same physical size at
+    // every range, so aiming does not get easier by walking backwards.
+    const FVector FarHead(6000.0f, 0.0f, 78.0f);
+    const FVector NearHead(300.0f, 0.0f, 78.0f);
+    auto OffsetRay = [](float Distance, float Offset)
+    {
+        return FVector(Distance, 0.0f, 78.0f + Offset).GetSafeNormal();
+    };
+    TestTrue(TEXT("A 30 cm near-miss counts at 60 m"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(6000.0f, 30.0f), FarHead, Radius, Tolerance));
+    TestTrue(TEXT("The same 30 cm near-miss counts at 3 m"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(300.0f, 30.0f), NearHead, Radius, Tolerance));
+    TestFalse(TEXT("A 40 cm miss counts at neither range"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(6000.0f, 40.0f), FarHead, Radius, Tolerance)
+        || FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, OffsetRay(300.0f, 40.0f), NearHead, Radius, Tolerance));
+
+    // A weak point behind the muzzle is not shootable, however close the
+    // infinite line would pass to it.
+    TestFalse(TEXT("A weak point behind the shooter is never a weak point"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, Forward, FVector(-1000.0f, 0.0f, 0.0f), Radius, Tolerance));
+    TestEqual(TEXT("Distance behind the muzzle clamps to the muzzle"),
+        FBreakerWeaponMath::DistanceFromRayToPoint(Muzzle, Forward, FVector(-500.0f, 0.0f, 0.0f)), 500.0f, 0.01f);
+
+    // Zero tolerance restores the exact geometric test, so the owner can turn
+    // the whole change off with one number.
+    TestTrue(TEXT("Zero tolerance still accepts the sphere itself"),
+        FBreakerWeaponMath::IsWithinWeakPointTolerance(Muzzle, RayAtHeight(78.0f), Head, Radius, 0.0f));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Owner playtest report: "hip firing feels worse than ads". It was, at every
+// range, because ADS tightened four axes at once and cost nothing. ADS now
+// pays in TIME (it ramps in) and in MOBILITY (movement widens an aimed shot
+// harder than a hip shot). The decision is: plant and aim, or move and hip.
+// These tests prove the trade exists without deleting it.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHipFireTradeTest,
+    "RiorsEdge.Weapons.HipFireTrade",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHipFireTradeTest::RunTest(const FString& Parameters)
+{
+    FBreakerRecoilProfile Profile;
+    Profile.AimRecoilMultiplier = 0.5f;
+    Profile.AimBloomMultiplier = 0.5f;
+    Profile.AimViewmodelMultiplier = 0.5f;
+    Profile.MoveSpreadDegrees = 0.4f;
+    Profile.AimMoveSpreadMultiplier = 2.0f;
+
+    // ---- ADS costs time -------------------------------------------------
+    const FBreakerRecoilProfile Hip = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 0.0f);
+    const FBreakerRecoilProfile Half = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 0.5f);
+    const FBreakerRecoilProfile Full = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, 1.0f);
+
+    TestEqual(TEXT("Before the sights come up there is no aim benefit at all"), Hip.AimRecoilMultiplier, 1.0f);
+    TestEqual(TEXT("Halfway into the sights buys half the benefit"), Half.AimRecoilMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Halfway into the sights buys half the bloom benefit"), Half.AimBloomMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Halfway into the sights buys half the viewmodel benefit"), Half.AimViewmodelMultiplier, 0.75f, 0.0001f);
+    TestEqual(TEXT("Fully sighted is the authored profile, unchanged"), Full.AimRecoilMultiplier, Profile.AimRecoilMultiplier);
+
+    // A shot snapped off the instant the aim button goes down kicks like a hip
+    // shot, because that is what it is.
+    const FBreakerRecoilKick SnapShot = FBreakerWeaponFeel::ComputeShotKick(Hip, 2, 9, true);
+    const FBreakerRecoilKick TrueHip = FBreakerWeaponFeel::ComputeShotKick(Profile, 2, 9, false);
+    const FBreakerRecoilKick Settled = FBreakerWeaponFeel::ComputeShotKick(Full, 2, 9, true);
+    TestEqual(TEXT("Snapping to sights and firing gets no recoil benefit"), SnapShot.PitchDegrees, TrueHip.PitchDegrees, 0.0001f);
+    TestTrue(TEXT("Waiting for the sights is still strictly better"), Settled.PitchDegrees < SnapShot.PitchDegrees);
+
+    // ---- ADS costs mobility ---------------------------------------------
+    TestEqual(TEXT("Standing still costs nothing, aimed or not"),
+        FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 0.0f, 1.0f), 0.0f);
+    const float HipMoving = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 1.0f, 0.0f);
+    const float AimedMoving = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 1.0f, 1.0f);
+    TestEqual(TEXT("Hip fire pays the authored movement cone"), HipMoving, 0.4f, 0.0001f);
+    TestEqual(TEXT("Aimed movement costs the authored multiple of it"), AimedMoving, 0.8f, 0.0001f);
+    TestTrue(TEXT("Movement punishes the sights harder than the hip"), AimedMoving > HipMoving);
+    TestTrue(TEXT("Half speed costs less than full speed"),
+        FBreakerWeaponFeel::MovementSpreadDegrees(Profile, 0.5f, 0.0f) < HipMoving);
+
+    // ---- The decision itself --------------------------------------------
+    // Planted: ADS wins, as it must. Moving: hip fire wins the first shot.
+    // Neither of these is allowed to become the other.
+    const float PlantedHip = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.3f, 3, 0.0f);
+    const float PlantedAimed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Full, 0.25f, 0.3f, 3, 0.0f);
+    TestTrue(TEXT("Planted, the sights are still the accurate option"), PlantedAimed < PlantedHip);
+
+    const float MovingHipFirst = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.0f, 0, HipMoving);
+    const float MovingAimedFirst = FBreakerWeaponFeel::EffectiveSpreadDegrees(Full, 0.25f, 0.0f, 0, AimedMoving);
+    TestTrue(TEXT("On the move, the first hip shot is tighter than the first aimed shot"),
+        MovingHipFirst < MovingAimedFirst);
+
+    // Movement is not forgiven by first-shot accuracy: a runner does not get a
+    // free perfect shot for letting the trigger rest.
+    TestEqual(TEXT("A moving first shot still pays the movement cone"), MovingHipFirst, HipMoving, 0.0001f);
+    TestEqual(TEXT("A planted first shot is still dead accurate"),
+        FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.0f, 0, 0.0f), 0.0f);
+
+    // ---- And the archetype table honours all of it -----------------------
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    const EBreakerWeaponArchetype Archetypes[] = {
+        EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::SMG, EBreakerWeaponArchetype::Sniper,
+        EBreakerWeaponArchetype::Shotgun, EBreakerWeaponArchetype::Rocket };
+    for (const EBreakerWeaponArchetype Archetype : Archetypes)
+    {
+        Weapon->EquipArchetype(Archetype);
+        const FBreakerRecoilProfile Live = Weapon->GetRecoilProfile();
+        TestTrue(TEXT("Every archetype makes ADS cost time"), Live.AimInSeconds > 0.0f);
+        TestTrue(TEXT("Every archetype makes movement cost cone"), Live.MoveSpreadDegrees > 0.0f);
+        TestTrue(TEXT("Every archetype punishes aimed movement harder than hip movement"),
+            Live.AimMoveSpreadMultiplier > 1.0f);
+    }
+
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Sniper);
+    const FBreakerRecoilProfile LiveSniper = Weapon->GetRecoilProfile();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Shotgun);
+    const FBreakerRecoilProfile LiveShotgun = Weapon->GetRecoilProfile();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::SMG);
+    const FBreakerRecoilProfile LiveSMG = Weapon->GetRecoilProfile();
+
+    // Five weapons, five relationships with standing still.
+    TestTrue(TEXT("The sniper is the weapon that must be planted"),
+        LiveSniper.MoveSpreadDegrees > LiveShotgun.MoveSpreadDegrees * 3.0f);
+    TestTrue(TEXT("The sniper is the slowest into its sights"),
+        LiveSniper.AimInSeconds > LiveSMG.AimInSeconds && LiveSniper.AimInSeconds > LiveShotgun.AimInSeconds);
+    TestTrue(TEXT("The SMG is the fastest into its sights"), LiveSMG.AimInSeconds <= LiveShotgun.AimInSeconds);
+    TestTrue(TEXT("The shotgun is the least punished for moving"),
+        LiveShotgun.MoveSpreadDegrees < LiveSMG.MoveSpreadDegrees);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponSpreadTest,
     "RiorsEdge.Weapons.DeterministicSpread",
@@ -404,6 +641,18 @@ bool FBreakerViewmodelKickTest::RunTest(const FString& Parameters)
 // Tracer flight. The shot is still hitscan — these tests are about the round
 // APPEARING to travel, which is the whole difference between a bullet and a
 // laser. The drawing is untestable; the maths behind it is not.
+//
+// UPDATED with the second visual pass. Three of the old assertions are gone
+// because the things they asserted are gone, not because they were in the way:
+//   * ImpactBasis — the impact was a six-spoke star drawn in the plane
+//     perpendicular to travel. It is a point flash now, which has no plane and
+//     therefore no basis to test.
+//   * WorldRadiusToPixels — the round was a canvas line whose PIXEL width was
+//     derived from its depth. It is a world primitive now, so it has a world
+//     thickness and the depth maths belongs to the renderer; the replacement
+//     is TracerThicknessCm, tested below.
+// What replaces them is the head/trail split, the shortened streak, the
+// screen-width floor, and tracer cadence.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerTracerFlightTest,
@@ -450,30 +699,78 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
         BreakerHUD::SampleTracer(Flight, Muzzle, FVector(20.0f, 0.0f, 0.0f), 0.01f);
     TestFalse(TEXT("A contact-range shot draws no streak"), Contact.bVisible);
 
-    // The impact star is drawn in the plane the round punched through.
-    FVector U, V;
-    BreakerHUD::ImpactBasis(FVector(1.0f, 2.0f, -0.5f), U, V);
-    TestTrue(TEXT("Impact basis is unit length"),
-        FMath::IsNearlyEqual(static_cast<float>(U.Size()), 1.0f, 0.001f) &&
-        FMath::IsNearlyEqual(static_cast<float>(V.Size()), 1.0f, 0.001f));
-    TestTrue(TEXT("Impact basis is perpendicular to travel"),
-        FMath::IsNearlyZero(FVector::DotProduct(U, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f) &&
-        FMath::IsNearlyZero(FVector::DotProduct(V, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f));
-    TestTrue(TEXT("Impact basis axes are perpendicular to each other"),
-        FMath::IsNearlyZero(FVector::DotProduct(U, V), 0.001f));
-    // Straight down the world Z is the case that degenerates if the seed axis
-    // is chosen carelessly.
-    BreakerHUD::ImpactBasis(FVector::UpVector, U, V);
-    TestTrue(TEXT("A straight-up shot still yields a usable basis"),
-        !U.IsNearlyZero() && !V.IsNearlyZero());
+    // --- Head and trail -----------------------------------------------------
+    // The streak is not a uniform bar. Most of its brightness is in a short
+    // head at the front, with a dim trail behind; the renderer draws those as
+    // two primitives, so the split has to be well ordered at every age.
+    TestTrue(TEXT("The head section sits between the tail and the head"),
+        Late.HeadStart.X >= Late.Tail.X - KINDA_SMALL_NUMBER &&
+        Late.HeadStart.X <= Late.Head.X + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The bright head is never longer than its authored length"),
+        (Late.Head - Late.HeadStart).Size() <= Flight.HeadLengthCm + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("A settled round has a trail behind its head"),
+        BreakerHUD::TracerHasTrail(Late));
 
-    // Distance-correct thickness: the old tracer was the same width at 2 m and
-    // at 80 m, which is most of why it read as a HUD line rather than a round.
-    const float Near = BreakerHUD::WorldRadiusToPixels(2.0f, 200.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
-    const float Far = BreakerHUD::WorldRadiusToPixels(2.0f, 8000.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
-    TestTrue(TEXT("A near round is fatter than a far one"), Near > Far);
-    TestTrue(TEXT("Thickness falls off inversely with depth"),
-        FMath::IsNearlyEqual(Near / Far, 40.0f, 0.1f));
+    // On the first frames the whole round IS the head: the trail has not been
+    // paid out of the muzzle yet, and drawing a degenerate one would be a
+    // flickering sliver at the barrel.
+    const BreakerHUD::FTracerSample JustLeft =
+        BreakerHUD::SampleTracer(Flight, Muzzle, Impact, Flight.HeadLengthCm * 0.5f / Flight.SpeedCms);
+    if (JustLeft.bVisible)
+    {
+        TestFalse(TEXT("A round that has only just left has no trail yet"),
+            BreakerHUD::TracerHasTrail(JustLeft));
+    }
+
+    // The streak is SHORT. Nine metres was the previous authored length and it
+    // read as a rod; this is the assertion that stops it drifting back.
+    TestTrue(TEXT("The whole streak is under three metres"), Flight.LengthCm <= 300.0f);
+    TestTrue(TEXT("Most of the streak is trail, not head"),
+        Flight.HeadLengthCm < Flight.LengthCm * 0.5f);
+
+    // --- Screen-width floor -------------------------------------------------
+    // The round is a world primitive now, so its thickness is world
+    // centimetres and a far round would be sub-pixel and strobe. The floor
+    // widens it in world space only as far as it must, and leaves near rounds
+    // exactly as authored.
+    const BreakerHUD::FTracerLook Look;
+    const float HalfFOV = FMath::DegreesToRadians(30.0f);
+    const float NearThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 200.0f, Look.MinScreenFraction, HalfFOV);
+    const float FarThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 8000.0f, Look.MinScreenFraction, HalfFOV);
+    TestTrue(TEXT("A near round keeps its authored world thickness"),
+        FMath::IsNearlyEqual(NearThickness, Look.ThicknessCm, 0.01f));
+    TestTrue(TEXT("A far round is widened rather than left sub-pixel"), FarThickness > NearThickness);
+    // Once the floor is doing the work, thickness is linear in distance, which
+    // is exactly what holds the on-screen width constant.
+    const float FarerThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 16000.0f, Look.MinScreenFraction, HalfFOV);
+    TestTrue(TEXT("Beyond the floor, world thickness scales with distance"),
+        FMath::IsNearlyEqual(FarerThickness / FarThickness, 2.0f, 0.01f));
+
+    // --- Cadence ------------------------------------------------------------
+    // Every round used to leave a streak, which is what made held automatic
+    // fire read as one continuous beam. Fast weapons now trace one in three;
+    // slow ones trace every round, because a bolt-action that skipped two
+    // shots in three would read as broken rather than as restrained.
+    const int32 RifleCadence = BreakerHUD::TracerRoundsPerTracer(600.0f);
+    const int32 SniperCadence = BreakerHUD::TracerRoundsPerTracer(55.0f);
+    TestTrue(TEXT("A fast weapon traces a fraction of its rounds"), RifleCadence > 1);
+    TestEqual(TEXT("A slow weapon traces every round"), SniperCadence, 1);
+
+    int32 Traced = 0;
+    for (int32 Round = 0; Round < 30; ++Round)
+    {
+        if (BreakerHUD::ShouldTraceRound(Round, RifleCadence)) ++Traced;
+    }
+    TestEqual(TEXT("Thirty rifle rounds leave ten streaks"), Traced, 10);
+    TestTrue(TEXT("The first round of a burst always traces"),
+        BreakerHUD::ShouldTraceRound(0, RifleCadence));
+
+    Traced = 0;
+    for (int32 Round = 0; Round < 8; ++Round)
+    {
+        if (BreakerHUD::ShouldTraceRound(Round, SniperCadence)) ++Traced;
+    }
+    TestEqual(TEXT("Every slow round leaves a streak"), Traced, 8);
     return true;
 }
 
