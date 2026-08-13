@@ -116,6 +116,63 @@ struct RIORSEDGE_API FBreakerItemInstance
     bool IsValid() const { return ItemId.IsValid(); }
 };
 
+// Which way one affix line moves the player relative to the piece it would
+// replace. Every stat target in the slice pool is "higher is better" — Dash
+// Cooldown Reduction included, because it is authored as an increase to the
+// reduction — so one polarity rule covers the whole pool. A target where lower
+// is better would need a polarity flag on FBreakerAffixDefinition first.
+UENUM(BlueprintType)
+enum class EBreakerAffixDelta : uint8
+{
+    Better,
+    Worse,
+    Parity
+};
+
+// One affix line of a candidate item, already compared against the piece it
+// would replace. The UI renders the glyph; the rule lives here.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerAffixComparison
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) FName AffixId = NAME_None;
+    UPROPERTY(BlueprintReadOnly) int32 Tier = 8;
+    // The candidate's rolled value.
+    UPROPERTY(BlueprintReadOnly) float Value = 0.0f;
+    // What the equipped piece contributes to the SAME stat target in the SAME
+    // bucket, summed. Zero when the equipped piece does not touch that stat.
+    UPROPERTY(BlueprintReadOnly) float ComparedValue = 0.0f;
+    UPROPERTY(BlueprintReadOnly) EBreakerAffixDelta Delta = EBreakerAffixDelta::Better;
+
+    float GetDifference() const { return Value - ComparedValue; }
+};
+
+// The complete consequence of equipping one item, answered before the click.
+// Two displacements can happen at once and they are deliberately separate:
+// the ORDINARY one is the piece in the same slot, which every equip swaps out;
+// the LIMIT one is a second piece ejected because the rarity cap (O11 /
+// master sheet 4.1: Aberrant 3, Anomalous 1) is already met. The cap is never
+// a refusal — it is disclosed, and the named piece is the piece that actually
+// leaves.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerEquipPreview
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) bool bSlotOccupied = false;
+    UPROPERTY(BlueprintReadOnly) FBreakerItemInstance SlotDisplaced;
+    // True when equipping would put the player over the cap for the
+    // candidate's rarity, counting the slot swap's own departure first.
+    UPROPERTY(BlueprintReadOnly) bool bExceedsRarityLimit = false;
+    UPROPERTY(BlueprintReadOnly) FBreakerItemInstance LimitDisplaced;
+    // Equipped count of the candidate's rarity right now, and the cap for it.
+    // A limit of INDEX_NONE means the rarity is uncapped.
+    UPROPERTY(BlueprintReadOnly) int32 RarityCount = 0;
+    UPROPERTY(BlueprintReadOnly) int32 RarityLimit = INDEX_NONE;
+    UPROPERTY(BlueprintReadOnly) TArray<FBreakerAffixComparison> AffixDeltas;
+};
+
 // Aggregated result of everything equipped. Flat and Increased buckets are
 // already combined; consumers read final values.
 USTRUCT(BlueprintType)
