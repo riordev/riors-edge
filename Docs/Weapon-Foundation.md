@@ -14,7 +14,7 @@ The player carries two weapons. Keys 1-2 select the equipped primary and seconda
 - 1.8-second reload.
 - 1.2-degree hip spread and 0.25-degree aimed spread.
 - 1.75x weak-point multiplier.
-- Full damage through 20m, linear falloff to 55% at 60m.
+- Full damage through 28m, linear falloff to 72% at 70m.
 - 120m maximum trace range.
 
 ### Scattergun
@@ -22,7 +22,8 @@ The player carries two weapons. Keys 1-2 select the equipped primary and seconda
 - Eight deterministic pellets at 10 base physical damage each.
 - 85 rounds per minute, semi-automatic.
 - Eight-round magazine and 40 reserve.
-- Wide close-range spread and aggressive falloff after 8m.
+- Wide close-range spread and aggressive falloff after 11m, bottoming at 40%
+  by 28m. Still by far the steepest curve in the table.
 
 ### Marksman
 
@@ -98,10 +99,135 @@ Tuning order, highest leverage first:
    punishes, `ViewmodelKickUnits`/`ViewmodelKickPitchDegrees` for how much the
    mesh moves.
 
+One knob per playtest complaint, highest leverage first:
+
+| Complaint | Turn this first | Default | Effect of raising it |
+|---|---|---|---|
+| Weak points feel stingy | `WeakPointToleranceCm` (component) | 14 | Wider forgiveness halo. 0 = old exact test |
+| Falloff is too high | `MinimumFalloffMultiplier` (per definition) | rifle 0.72 | Raises the floor without moving where the curve starts |
+| Hip fire is the worse option | `AimMoveSpreadMultiplier` (per profile) | 2.2 | Widens aimed movement further, growing hip fire's band |
+
 Feel is not verifiable by automation. The tests prove the maths — accumulation,
 clamping, monotone recovery to exactly zero, compensation credit, the ADS
 difference, bloom growth and decay, spring return to rest — and prove nothing
 about whether it feels good.
+
+## Range, weak points, and the hip/ADS trade
+
+Owner playtest report, three complaints that interact:
+
+> "hip firing feels worse than ads"
+> "weakpoints dont feel forgiving as they should and dmg fall off is too high"
+
+### Weak points: a world-space forgiveness halo
+
+The enemy weak point is a 20 cm sphere at the head (`ABreakerEnemy`, 18 cm on
+`ABreakerTargetDummy`) and the shot is a zero-radius line, so acceptance was a
+binary the player could not feel the edges of: the round that clipped the ear
+and the round that missed the shoulder read identically, and no amount of
+aiming better told you which one you had got. Worse, the body box
+(42 cm half-width) sits in FRONT of the head sphere in the 58-62 cm band where
+they overlap, so the bottom of the head was shadowed by the torso and could not
+be hit at all from the front.
+
+`FBreakerWeaponMath::IsWithinWeakPointTolerance` widens acceptance to
+`Radius + WeakPointToleranceCm` measured as the closest approach of the shot
+ray to the weak point's centre, clamped to the forward half of the ray. The
+halo is **world space**, so the generosity is the same physical size at 5 m and
+at 50 m — aiming does not get easier by walking backwards, and the reward for a
+near-miss is legible instead of random. It also fixes the torso-shadow bug for
+free, because a chest-height round that passes 18 cm under the head centre is
+now inside even the untoleranced radius.
+
+Two rules keep it forgiveness rather than aim assist:
+
+1. **It never creates a hit.** Only a round that already hit that actor may be
+   upgraded. A shot that misses the enemy entirely, or hits the wall in front
+   of their head, is unchanged.
+2. **It never outlives the weak point.** A weak point whose collision is off
+   (a corpse) is skipped.
+
+`WeakPointToleranceCm` is O2 PLACEHOLDER **14**, on the component instance, and
+**0 restores the exact old geometric test**. At 14 the head's effective radius
+goes 20 -> 34 cm, about 2.9x the projected area.
+
+**This raises DPS and therefore contaminates TTK.** The measured session landed
+36.5% of hits on weak points, an average rifle multiplier of
+`1 + 0.365 x 0.75 = 1.274`. The ceiling if every hit became a weak point is
+1.75, i.e. **+37%**; a realistic move to a 50-60% rate is **+8% to +14%**
+average damage per hit. Subtract this before ruling on the trash re-anchor, or
+set the tolerance to 0 for the measuring run.
+
+### Falloff: softer severity, same shape, same archetype ordering
+
+The curves were tuned for a small arena. The gym is now an open field whose
+ranged enemy holds a 9-19 m band, so the ordinary fight happens past where the
+old curves started biting. Only the severity moved; the mechanic and the
+archetype spread are intact and `RiorsEdge.Weapons.ArchetypeFalloff` pins the
+ordering (shotgun steepest, then SMG, rifle, sniper) rather than the values.
+
+| Archetype | Start (cm) | End (cm) | Floor | Severity (lost per m) |
+|---|---|---|---|---|
+| Rifle | 2000 -> **2800** | 6000 -> **7000** | 0.55 -> **0.72** | 1.13% -> **0.67%** |
+| SMG | 1200 -> **1800** | 3500 -> **4500** | 0.40 -> **0.58** | 2.61% -> **1.56%** |
+| Sniper | 3500 -> **5000** | 9000 -> **11000** | 0.70 -> **0.88** | 0.55% -> **0.20%** |
+| Shotgun | 800 -> **1100** | 2500 -> **2800** | 0.25 -> **0.40** | 4.41% -> **3.53%** |
+
+Effective damage multiplier, old -> new:
+
+| Range | Rifle | Shotgun | SMG | Sniper |
+|---|---|---|---|---|
+| 9 m | 1.00 -> 1.00 (0%) | 0.956 -> 1.00 (+4.6%) | 1.00 -> 1.00 (0%) | 1.00 -> 1.00 (0%) |
+| 15 m | 1.00 -> 1.00 (0%) | 0.691 -> 0.859 (+24.3%) | 0.922 -> 1.00 (+8.5%) | 1.00 -> 1.00 (0%) |
+| 19 m | 1.00 -> 1.00 (0%) | 0.515 -> 0.718 (+39.4%) | 0.817 -> 0.984 (+20.4%) | 1.00 -> 1.00 (0%) |
+| 25 m | 0.944 -> 1.00 (+6.0%) | 0.250 -> 0.506 (+102%) | 0.661 -> 0.891 (+34.8%) | 1.00 -> 1.00 (0%) |
+| 40 m | 0.775 -> 0.920 (+18.7%) | 0.250 -> 0.400 (+60%) | 0.400 -> 0.658 (+64.5%) | 1.00 -> 1.00 (0%) |
+| 60 m | 0.550 -> 0.787 (+43.0%) | 0.250 -> 0.400 (+60%) | 0.400 -> 0.580 (+45%) | 0.918 -> 1.00 (+8.9%) |
+| 90 m | 0.550 -> 0.720 (+30.9%) | — | — | 0.700 -> 0.920 (+31.4%) |
+
+**The rifle's effective DPS is unchanged across the entire 9-19 m engagement
+band** — it never fell off there — so a rifle-measured trash/elite TTK inside
+20 m carries NO contamination from this change. The secondary is where the
+band actually hurt.
+
+### Hip fire: giving ADS a bill instead of buffing hip accuracy
+
+ADS tightened aimed spread, recoil, bloom and viewmodel all at once and cost
+nothing, so hip fire was simply the worse option at every range and there was
+no decision. Hip fire's accuracy is deliberately NOT buffed — that would delete
+the decision rather than create one. Instead ADS now pays twice:
+
+- **Time.** `AimInSeconds` (rifle 0.20, SMG 0.14, shotgun 0.16, rocket 0.30,
+  sniper 0.38). `FBreakerWeaponFeel::ProfileAtAimAlpha` interpolates every aim
+  benefit from its hip value (1.0) toward the authored one, and the base cone
+  lerps hip -> aimed alongside it. A round snapped off the instant the button
+  goes down is a hip shot in every respect. **Releasing aim is instant**, so
+  the fast-to-first-shot option is always one release away. The alpha rides on
+  `FBreakerShotResult::AimAlpha` so remote machines reproduce a partial-ADS
+  kick exactly.
+- **Mobility.** `MoveSpreadDegrees` adds cone scaled by ground speed over
+  `MoveSpreadReferenceSpeed` (600 cm/s, near walk rather than sprint, so
+  "planted" means planted), and `AimMoveSpreadMultiplier` above 1.0 makes an
+  aimed moving shot **wider** than a hip moving shot. Movement is not forgiven
+  by first-shot accuracy: standing still is what buys the perfect shot.
+
+The resulting decision, rifle, at walking speed: planted, ADS wins everything.
+Moving, the first hip shot is 0.35 degrees against ADS's 0.77, so hip fire owns
+the moving opener while ADS still wins sustained fire. Per archetype the sniper
+must be planted (1.10 / 3.0x), the shotgun barely cares (0.25 / 2.0x), the SMG
+is the one legitimate run-and-gun ADS weapon (0.30 / 1.8x).
+
+**Not done, and needing an owner ruling:** ADS does not slow the player down.
+`Source/RiorsEdge/Movement` has no aim awareness at all, and
+`ABreakerCharacter::StartAim`/`StopAim` only forward to the weapon and nudge
+the viewmodel rest pose. A movement-speed
+penalty while aimed is the other half of this bill and is the natural next
+lever if the trade still reads weak; it is a Movement/Characters change, not a
+Weapons one.
+
+All values above are O2 PLACEHOLDER and **none of this has been playtested**.
+`RiorsEdge.Weapons.ArchetypeFalloff`, `.WeakPointTolerance` and `.HipFireTrade`
+prove the maths and the archetype ordering; they prove nothing about feel.
 
 ## Round presentation (tracers, muzzle origin, impacts, rocket)
 

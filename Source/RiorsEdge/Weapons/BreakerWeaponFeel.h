@@ -72,6 +72,36 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil", meta=(ClampMin="0", ClampMax="1"))
     float AimRecoilMultiplier = 0.7f;
 
+    // ---- What ADS costs ----------------------------------------------------
+    //
+    // Hip fire has to be a real option, not the worse option at every range.
+    // ADS still wins everything it used to win; it now PAYS for it twice.
+    //
+    // 1. Time. The aimed spread, aimed recoil, aimed bloom and aimed viewmodel
+    //    all ramp in over AimInSeconds instead of snapping on. Hip fire is the
+    //    fast-to-first-shot option; dropping ADS is instant, so the fast option
+    //    is always one release away.
+    // 2. Mobility. Movement adds cone, and it adds MORE cone while aimed
+    //    (AimMoveSpreadMultiplier > 1). Planted and aimed is the accurate
+    //    build; moving and aimed is worse than moving and hip firing. That is
+    //    the decision: plant to shoot, or move and shoot close.
+
+    // Seconds from pressing aim to the sights being fully worth it.
+    // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
+    float AimInSeconds = 0.20f;
+
+    // Extra cone half-angle at MoveSpreadReferenceSpeed, hip fired.
+    // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
+    float MoveSpreadDegrees = 0.35f;
+
+    // How much harder movement punishes an aimed shot. Above 1.0 by design:
+    // this is the mobility half of the ADS bill, and it is what gives hip fire
+    // a range band it genuinely owns. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
+    float AimMoveSpreadMultiplier = 2.2f;
+
     // ---- Recovery ----------------------------------------------------------
 
     // Dead time after the last shot before the aim starts settling back.
@@ -222,8 +252,30 @@ public:
     /**
      * Cone half-angle for this shot: the definition's hip/aim spread, scaled
      * by first-shot accuracy on shot 0 and widened by bloom thereafter.
+     *
+     * ExtraMovementSpread is added on TOP of both branches, including the
+     * first shot. That is deliberate: first-shot accuracy is the reward for
+     * trigger discipline, not for running, and a moving player must not get a
+     * free perfect shot just because they let the trigger rest.
      */
-    static float EffectiveSpreadDegrees(const FBreakerRecoilProfile& Profile, float BaseSpreadDegrees, float CurrentBloom, int32 BurstShotIndex);
+    static float EffectiveSpreadDegrees(const FBreakerRecoilProfile& Profile, float BaseSpreadDegrees, float CurrentBloom, int32 BurstShotIndex, float ExtraMovementSpread = 0.0f);
+
+    /**
+     * Extra cone from being in motion. SpeedFraction is the owner's ground
+     * speed over the reference speed, clamped to [0,1]; AimAlpha is how far
+     * into ADS the weapon is. Aimed movement costs AimMoveSpreadMultiplier
+     * times as much, which is the entire reason hip fire exists.
+     */
+    static float MovementSpreadDegrees(const FBreakerRecoilProfile& Profile, float SpeedFraction, float AimAlpha);
+
+    /**
+     * The profile as it stands partway into ADS. Every aim benefit is
+     * interpolated from its hip value (1.0, i.e. no benefit) toward its
+     * authored aimed value, so snapping to sights and firing immediately gets
+     * a fraction of the sights. Alpha 0 returns hip behaviour exactly; alpha 1
+     * returns the authored profile unchanged.
+     */
+    static FBreakerRecoilProfile ProfileAtAimAlpha(const FBreakerRecoilProfile& Profile, float AimAlpha);
 
     /** Displaces the viewmodel instantly; the spring returns it. */
     static void AddViewmodelKick(const FBreakerRecoilProfile& Profile, FBreakerViewmodelState& State, float HorizontalKickSign, bool bAiming);
