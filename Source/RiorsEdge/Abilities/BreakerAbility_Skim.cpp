@@ -44,9 +44,11 @@ void UBreakerAbility_Skim::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // TryDash applies the movement component's own short boosted-speed window,
-    // which is the only public speed-boost mechanism available.
-    Movement->TryDash(HorizontalDirectionForView(Character->GetControlRotation()));
+    // Pure redirect: no speed floor, no bonus, and no dash charge consumed.
+    // TryRedirect is allowed to fail (below walk speed) after the cost is
+    // committed; that matches the design — Skim is a verb for a moving player,
+    // and refunding here would make it a free "am I fast enough" probe.
+    Movement->TryRedirect(HorizontalDirectionForView(Character->GetControlRotation()));
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

@@ -76,7 +76,105 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         bDeathBroadcast = true;
         OnDeath.Broadcast();
     }
+    DispatchHitDealt(Request, Result);
     return Result;
+}
+
+void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result) const
+{
+    AActor* Dealer = Request.Instigator.Get();
+    // Self-damage would otherwise let a listener that deals damage on hit
+    // re-enter its own dealer component without bound.
+    if (!Dealer || Dealer == GetOwner()) return;
+    UBreakerCombatComponent* DealerCombat = Dealer->FindComponentByClass<UBreakerCombatComponent>();
+    if (!DealerCombat) return;
+
+    FBreakerHitContext Context;
+    Context.Instigator = Dealer;
+    Context.Target = GetOwner();
+    Context.Result = Result;
+    Context.bFromDoT = Request.bIsDamageOverTime;
+    Context.bWeakPoint = Result.bWeakPoint;
+    Context.DamageFamily = Request.DamageFamily;
+    Context.WorldLocation = GetOwner() ? GetOwner()->GetActorLocation() : Request.SourceLocation;
+
+    DealerCombat->OnHitDealt.Broadcast(Context);
+    if (Result.bKilled) DealerCombat->OnKillDealt.Broadcast(Context);
+}
+
+void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds)
+{
+    if (Key.IsNone()) return;
+    FBreakerOutgoingModifier Modifier;
+    Modifier.Key = Key;
+    Modifier.FlatBonus = FlatBonus;
+    Modifier.MoreMultiplier = FMath::Max(0.0f, MoreMultiplier);
+    Modifier.ExpiryTime = ExpirySeconds > 0.0f && GetWorld()
+        ? static_cast<float>(GetWorld()->GetTimeSeconds()) + ExpirySeconds
+        : -1.0f;
+
+    // Re-pushing the same key replaces rather than stacks: a window refreshed
+    // mid-flight must not compose with itself.
+    for (FBreakerOutgoingModifier& Existing : OutgoingModifiers)
+    {
+        if (Existing.Key == Key)
+        {
+            Existing = Modifier;
+            return;
+        }
+    }
+    OutgoingModifiers.Add(Modifier);
+}
+
+void UBreakerCombatComponent::RemoveOutgoingModifier(FName Key)
+{
+    OutgoingModifiers.RemoveAll([Key](const FBreakerOutgoingModifier& Modifier) { return Modifier.Key == Key; });
+}
+
+void UBreakerCombatComponent::PruneExpiredOutgoingModifiers()
+{
+    if (OutgoingModifiers.IsEmpty() || !GetWorld()) return;
+    const float Now = static_cast<float>(GetWorld()->GetTimeSeconds());
+    OutgoingModifiers.RemoveAll([Now](const FBreakerOutgoingModifier& Modifier)
+    {
+        return Modifier.ExpiryTime >= 0.0f && Modifier.ExpiryTime <= Now;
+    });
+}
+
+float UBreakerCombatComponent::GetComposedMoreMultiplier() const
+{
+    float Product = 1.0f;
+    const float Now = GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds()) : -1.0f;
+    for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers)
+    {
+        if (Now >= 0.0f && Modifier.ExpiryTime >= 0.0f && Modifier.ExpiryTime <= Now) continue;
+        Product *= Modifier.MoreMultiplier;
+    }
+    // Damage-Pipeline §4: the composed More product may never exceed 2.20x.
+    // Exceeding it is a design bug, not a runtime condition — surface it loudly
+    // and clamp so a live session degrades instead of running away.
+    if (Product > ComposedMoreCeiling)
+    {
+        // Loud but suite-safe: the automation test intentionally crosses the
+        // ceiling, and an ensure would fail the run it exists to protect.
+        UE_LOG(LogTemp, Warning, TEXT("Composed More product %.3f exceeds the %.2f ceiling (Damage-Pipeline S4); clamping."),
+            Product, ComposedMoreCeiling);
+        Product = ComposedMoreCeiling;
+    }
+    return Product;
+}
+
+void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Request)
+{
+    PruneExpiredOutgoingModifiers();
+    if (OutgoingModifiers.IsEmpty()) return;
+
+    float Flat = 0.0f;
+    for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers) Flat += Modifier.FlatBonus;
+
+    // Flat first, then the More product — resolution order step 1.
+    Request.BaseDamage = FMath::Max(0.0f, Request.BaseDamage + Flat);
+    Request.SourceDamageMultiplier *= GetComposedMoreMultiplier();
 }
 
 bool UBreakerCombatComponent::SpendClassResource(float Cost)

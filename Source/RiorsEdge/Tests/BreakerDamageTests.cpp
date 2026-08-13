@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -55,7 +56,7 @@ bool FBreakerSnapshotDotTest::RunTest(const FString& Parameters)
     Status.Snapshot.CriticalMultiplier = 2.0f;
     Status.Snapshot.bRolledCritical = true;
 
-    FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 3);
+    FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 3, nullptr);
     Tick.bBypassShield = true;
     FBreakerDefenseState Defense;
     Defense.Health = 100.0f;
@@ -96,3 +97,106 @@ bool FBreakerLethalDamageTest::RunTest(const FString& Parameters)
 }
 
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDotInstigatorTest,
+    "RiorsEdge.Combat.Damage.DotTickCarriesInstigator",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDotInstigatorTest::RunTest(const FString& Parameters)
+{
+    FBreakerStatusApplicationSpec Status;
+    Status.BaseDamagePerTick = 10.0f;
+
+    AActor* Applier = NewObject<AActor>(GetTransientPackage());
+    const FBreakerDamageRequest Credited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, Applier);
+    TestTrue(TEXT("Tick carries its applier"), Credited.Instigator.Get() == Applier);
+
+    const FBreakerDamageRequest Uncredited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, nullptr);
+    TestFalse(TEXT("An applierless tick credits nobody"), Uncredited.Instigator.IsValid());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHitContextTest,
+    "RiorsEdge.Combat.Damage.HitContextPopulation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHitContextTest::RunTest(const FString& Parameters)
+{
+    // World-free half of the SI-8 plumbing: the request carries the dealer and
+    // the resolved result supplies everything else the context reports.
+    AActor* Dealer = NewObject<AActor>(GetTransientPackage());
+    AActor* Target = NewObject<AActor>(GetTransientPackage());
+
+    FBreakerDamageRequest Request;
+    Request.BaseDamage = 200.0f;
+    Request.bCanCritical = false;
+    Request.bWeakPointHit = true;
+    Request.WeakPointMultiplier = 2.0f;
+    Request.DamageFamily = EBreakerDamageFamily::TrueDamage;
+    Request.SetInstigator(Dealer);
+
+    FBreakerDefenseState Defense;
+    Defense.Health = 100.0f;
+    const FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
+
+    FBreakerHitContext Context;
+    Context.Instigator = Request.Instigator.Get();
+    Context.Target = Target;
+    Context.Result = Result;
+    Context.bFromDoT = Request.bIsDamageOverTime;
+    Context.bWeakPoint = Result.bWeakPoint;
+    Context.DamageFamily = Request.DamageFamily;
+
+    TestTrue(TEXT("Context names the dealer"), Context.Instigator == Dealer);
+    TestTrue(TEXT("Context names the target"), Context.Target == Target);
+    TestTrue(TEXT("Weak point survives into the context"), Context.bWeakPoint);
+    TestFalse(TEXT("A direct hit is not a DoT"), Context.bFromDoT);
+    TestTrue(TEXT("Damage family survives into the context"), Context.DamageFamily == EBreakerDamageFamily::TrueDamage);
+    TestTrue(TEXT("A lethal hit reports the kill"), Context.Result.bKilled);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOutgoingModifierTest,
+    "RiorsEdge.Combat.Damage.OutgoingModifierChain",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOutgoingModifierTest::RunTest(const FString& Parameters)
+{
+    UBreakerCombatComponent* Combat = NewObject<UBreakerCombatComponent>(GetTransientPackage());
+
+    FBreakerDamageRequest Request;
+    Request.BaseDamage = 100.0f;
+    Combat->ApplyOutgoingModifiers(Request);
+    TestEqual(TEXT("An empty chain changes nothing"), Request.BaseDamage, 100.0f);
+    TestEqual(TEXT("An empty chain leaves the multiplier alone"), Request.SourceDamageMultiplier, 1.0f);
+
+    Combat->PushOutgoingModifier(TEXT("FlatA"), 15.0f, 1.0f, 0.0f);
+    Combat->PushOutgoingModifier(TEXT("FlatB"), 5.0f, 1.0f, 0.0f);
+    Combat->PushOutgoingModifier(TEXT("MoreA"), 0.0f, 1.30f, 0.0f);
+    Combat->PushOutgoingModifier(TEXT("MoreB"), 0.0f, 1.20f, 0.0f);
+
+    FBreakerDamageRequest Modified;
+    Modified.BaseDamage = 100.0f;
+    Combat->ApplyOutgoingModifiers(Modified);
+    TestEqual(TEXT("Flat bonuses sum into base damage"), Modified.BaseDamage, 120.0f);
+    TestEqual(TEXT("More multipliers compose as a product"), Modified.SourceDamageMultiplier, 1.56f, 0.0001f);
+
+    // Re-pushing a key replaces it rather than stacking with itself.
+    Combat->PushOutgoingModifier(TEXT("FlatA"), 15.0f, 1.0f, 0.0f);
+    TestEqual(TEXT("Re-push does not double the More product"), Combat->GetComposedMoreMultiplier(), 1.56f, 0.0001f);
+
+    Combat->RemoveOutgoingModifier(TEXT("MoreB"));
+    TestEqual(TEXT("Removal drops that factor"), Combat->GetComposedMoreMultiplier(), 1.30f, 0.0001f);
+
+    // Damage-Pipeline S4: the composed product is clamped at 2.20x, loudly.
+    AddExpectedError(TEXT("exceeds the"), EAutomationExpectedErrorFlags::Contains, 0);
+    Combat->PushOutgoingModifier(TEXT("MoreC"), 0.0f, 1.30f, 0.0f);
+    Combat->PushOutgoingModifier(TEXT("MoreD"), 0.0f, 1.30f, 0.0f);
+    Combat->PushOutgoingModifier(TEXT("MoreE"), 0.0f, 1.30f, 0.0f);
+    TestEqual(TEXT("Composed More product clamps at the ceiling"),
+        Combat->GetComposedMoreMultiplier(), UBreakerCombatComponent::ComposedMoreCeiling, 0.0001f);
+    return true;
+}

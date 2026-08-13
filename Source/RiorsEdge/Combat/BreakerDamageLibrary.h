@@ -18,5 +18,7 @@ public:
     static float CalculateArmorMitigation(float Armor, float ArmorPenetration);
 
     UFUNCTION(BlueprintPure, Category="Combat|Status")
-    static FBreakerDamageRequest MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex);
+    // Instigator is the actor that applied the status; it is carried weakly on
+    // the tick request so attacker-side hit events fire for DoT damage too.
+    static FBreakerDamageRequest MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator);
 };

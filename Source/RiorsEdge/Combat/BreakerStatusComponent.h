@@ -18,6 +18,9 @@ struct RIORSEDGE_API FBreakerActiveStatus
     UPROPERTY(BlueprintReadOnly) float RemainingDuration = 0.0f;
     UPROPERTY(BlueprintReadOnly) float TimeUntilNextTick = 0.0f;
     UPROPERTY(BlueprintReadOnly) int32 TicksDelivered = 0;
+    // Who applied this status. Weak: a DoT outliving its applier keeps
+    // ticking, it just stops crediting anyone.
+    UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerStatusEvent, const FBreakerActiveStatus&, Status);
@@ -41,7 +44,9 @@ public:
     // refreshes duration, but keeps the ORIGINAL snapshot: an application
     // either critically ticks for its whole lifetime or never does.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
-    void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily);
+    // Instigator is remembered weakly so every tick this application produces
+    // credits the applier through the attacker-side hit events.
+    void ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator);
 
     UFUNCTION(BlueprintPure, Category="Combat|Status") const TArray<FBreakerActiveStatus>& GetActiveStatuses() const { return ActiveStatuses; }
     UFUNCTION(BlueprintPure, Category="Combat|Status") bool HasStatus(FGameplayTag StatusTag) const;

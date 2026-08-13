@@ -3,8 +3,13 @@
 #include "Misc/AutomationTest.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbility_Lead.h"
+#include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
 #include "Abilities/BreakerGameplayAbility.h"
+#include "GameFramework/Actor.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilityRegistryTest,
@@ -69,7 +74,8 @@ bool FBreakerAbilityDefinitionValuesTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("Lead costs 40 Momentum"), Lead->GetResourceCost(), 40.0f);
     TestEqual(TEXT("Lead has a 10s cooldown"), Lead->GetCooldownSeconds(), 10.0f);
-    TestFalse(TEXT("Lead is not implemented yet"), Lead->IsImplemented());
+    TestTrue(TEXT("Lead is implemented"), Lead->IsImplemented());
+    TestEqual(TEXT("Lead's mark lasts 6s"), Lead->WindowDuration, 6.0f);
 
     const UBreakerAbilityDefinition* Overdrive = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Overdrive"));
     if (!Overdrive)
@@ -80,6 +86,184 @@ bool FBreakerAbilityDefinitionValuesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Overdrive costs a full bar"), Overdrive->GetResourceCost(), 100.0f);
     TestFalse(TEXT("Overdrive is cost-gated, not cooldown-gated"), Overdrive->HasCooldown());
     TestTrue(TEXT("Overdrive is the ultimate"), Overdrive->IsUltimate());
+    TestTrue(TEXT("Overdrive is implemented"), Overdrive->IsImplemented());
+    TestEqual(TEXT("Overdrive's base window is 8s"), Overdrive->WindowDuration, 8.0f);
+
+    // The whole Swift kit is now activatable: E, T and G all resolve to an
+    // ability class rather than a designed-but-unbuilt slot.
+    for (const EBreakerAbilitySlot Slot : { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate })
+    {
+        const UBreakerAbilityDefinition* Definition = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, Slot, NAME_None);
+        TestNotNull(TEXT("Every Swift slot resolves"), Definition);
+        if (Definition)
+        {
+            TestTrue(TEXT("Every Swift slot is implemented"), Definition->IsImplemented());
+            TestTrue(TEXT("Every Swift ability derives from the Breaker base"), Definition->AbilityClass->IsChildOf(UBreakerGameplayAbility::StaticClass()));
+        }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityKeystoneVariantTest,
+    "RiorsEdge.Abilities.KeystoneVariants",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityKeystoneVariantTest::RunTest(const FString& Parameters)
+{
+    const UBreakerAbilityDefinition* Overdrive = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Overdrive"));
+    if (!Overdrive)
+    {
+        AddError(TEXT("Overdrive is missing from the fallback registry"));
+        return false;
+    }
+    TestEqual(TEXT("Overdrive authors a base row and three keystone rows"), Overdrive->Variants.Num(), 4);
+
+    // No keystone: the base row.
+    const FGameplayTagContainer NoTags;
+    const FBreakerAbilityVariant Base = Overdrive->ResolveVariant(NoTags);
+    TestFalse(TEXT("The base row carries no keystone tag"), Base.KeystoneTag.IsValid());
+    TestEqual(TEXT("The base row is the 8s window"), Base.WindowDuration, 8.0f);
+
+    // One keystone at a time: Class-Kits §0.2 caps a character at one, so
+    // resolution is a lookup rather than a merge.
+    FGameplayTagContainer Bloodrhythm;
+    Bloodrhythm.AddTag(BreakerAbilityTags::Keystone_Swift_Bloodrhythm);
+    const FBreakerAbilityVariant BloodrhythmRow = Overdrive->ResolveVariant(Bloodrhythm);
+    TestEqual(TEXT("Bloodrhythm resolves to its own row"), BloodrhythmRow.KeystoneTag, BreakerAbilityTags::Keystone_Swift_Bloodrhythm.GetTag());
+    TestEqual(TEXT("Bloodrhythm carries the 1.5s no-hit exit"), BloodrhythmRow.HitTimeoutSeconds, 1.5f);
+
+    FGameplayTagContainer TerminalVelocity;
+    TerminalVelocity.AddTag(BreakerAbilityTags::Keystone_Swift_TerminalVelocity);
+    const FBreakerAbilityVariant TerminalRow = Overdrive->ResolveVariant(TerminalVelocity);
+    TestEqual(TEXT("Terminal Velocity resolves to its own row"), TerminalRow.KeystoneTag, BreakerAbilityTags::Keystone_Swift_TerminalVelocity.GetTag());
+    // Master 5.4: Terminal Velocity is an availability rewrite, never a speed one.
+    TestEqual(TEXT("Terminal Velocity grants no speed"), TerminalRow.SpeedMultiplier, 1.0f);
+
+    FGameplayTagContainer StandingWave;
+    StandingWave.AddTag(BreakerAbilityTags::Keystone_Swift_StandingWave);
+    TestEqual(TEXT("Standing Wave resolves to its own row"),
+        Overdrive->ResolveVariant(StandingWave).KeystoneTag, BreakerAbilityTags::Keystone_Swift_StandingWave.GetTag());
+
+    // An unrelated tag must not select a keystone row.
+    FGameplayTagContainer Unrelated;
+    Unrelated.AddTag(BreakerAbilityTags::State_Ability_Skim);
+    TestFalse(TEXT("An unrelated tag falls back to the base row"), Overdrive->ResolveVariant(Unrelated).KeystoneTag.IsValid());
+
+    // A definition with no rows authored still answers with the definition's
+    // own window, so an unauthored ability cannot resolve to a zero duration.
+    UBreakerAbilityDefinition* Bare = NewObject<UBreakerAbilityDefinition>();
+    Bare->WindowDuration = 4.0f;
+    TestEqual(TEXT("An unauthored definition inherits its own window"), Bare->ResolveVariant(NoTags).WindowDuration, 4.0f);
+
+    TestTrue(TEXT("A full bar meets the ultimate threshold"), UBreakerAbility_Overdrive::MeetsUltimateThreshold(100.0f, 100.0f));
+    TestFalse(TEXT("A near-full bar does not"), UBreakerAbility_Overdrive::MeetsUltimateThreshold(99.9f, 100.0f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityLeadRangeGateTest,
+    "RiorsEdge.Abilities.LeadRangeGate",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityLeadRangeGateTest::RunTest(const FString& Parameters)
+{
+    // Class-Kits §1.2 S6: the 25 m gate is what stops Lead being a free crit
+    // engine at close quarters.
+    const float Gate = 2500.0f;
+    TestTrue(TEXT("A marked target beyond 25 m is a weak point"), UBreakerAbility_Lead::ShouldTreatAsWeakPoint(true, 2500.1f, Gate));
+    TestFalse(TEXT("Exactly at the gate does not qualify"), UBreakerAbility_Lead::ShouldTreatAsWeakPoint(true, Gate, Gate));
+    TestFalse(TEXT("Point-blank on a mark does not qualify"), UBreakerAbility_Lead::ShouldTreatAsWeakPoint(true, 500.0f, Gate));
+    TestFalse(TEXT("An unmarked target never qualifies"), UBreakerAbility_Lead::ShouldTreatAsWeakPoint(false, 9000.0f, Gate));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityStateWindowTest,
+    "RiorsEdge.Abilities.StateWindows",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityStateWindowTest::RunTest(const FString& Parameters)
+{
+    UBreakerAbilityStateComponent* State = NewObject<UBreakerAbilityStateComponent>();
+    const FName Key = TEXT("Window.Test");
+
+    TestFalse(TEXT("Nothing is open on a fresh component"), State->IsWindowActive(Key));
+    TestEqual(TEXT("An unopened window has no remaining time"), State->GetWindowRemaining(Key), 0.0f);
+    State->StartWindow(Key, 0.0f);
+    TestFalse(TEXT("A zero-length window never opens"), State->IsWindowActive(Key));
+
+    State->StartWindow(Key, 3.0f);
+    TestTrue(TEXT("The window opens"), State->IsWindowActive(Key));
+    TestEqual(TEXT("Remaining time starts at the full duration"), State->GetWindowRemaining(Key), 3.0f);
+
+    State->AdvanceTime(1.0f);
+    TestEqual(TEXT("Remaining time counts down"), State->GetWindowRemaining(Key), 2.0f);
+
+    // Re-starting refreshes rather than stacking.
+    State->StartWindow(Key, 3.0f);
+    TestEqual(TEXT("A re-cast refreshes the window"), State->GetWindowRemaining(Key), 3.0f);
+    State->ExtendWindow(Key, 1.0f);
+    TestEqual(TEXT("Extending adds to the remainder"), State->GetWindowRemaining(Key), 4.0f);
+
+    // OnWindowEnded is a dynamic delegate and an automation test cannot declare
+    // a UFUNCTION to bind to it, so expiry is asserted through the component's
+    // own queries.
+    State->AdvanceTime(4.0f);
+    TestFalse(TEXT("The window closes when its time elapses"), State->IsWindowActive(Key));
+    TestEqual(TEXT("A closed window reports no remaining time"), State->GetWindowRemaining(Key), 0.0f);
+    TestEqual(TEXT("No windows remain active"), State->GetActiveWindowCount(), 0);
+
+    // Explicit close is the same teardown path.
+    State->StartWindow(Key, 5.0f);
+    State->CloseWindow(Key);
+    TestFalse(TEXT("Closing ends the window immediately"), State->IsWindowActive(Key));
+
+    // Windows are independent.
+    State->StartWindow(TEXT("Window.A"), 1.0f);
+    State->StartWindow(TEXT("Window.B"), 5.0f);
+    State->AdvanceTime(2.0f);
+    TestFalse(TEXT("The short window expired"), State->IsWindowActive(TEXT("Window.A")));
+    TestTrue(TEXT("The long window survived"), State->IsWindowActive(TEXT("Window.B")));
+    TestEqual(TEXT("Exactly one window is active"), State->GetActiveWindowCount(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityStateStreakTest,
+    "RiorsEdge.Abilities.StateStreaks",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityStateStreakTest::RunTest(const FString& Parameters)
+{
+    // The rule first, world-free.
+    TestTrue(TEXT("A same-target hit inside the gap continues the streak"), UBreakerAbilityStateComponent::ShouldContinueStreak(true, 1.0f, 3.0f));
+    TestTrue(TEXT("Exactly at the gap still continues"), UBreakerAbilityStateComponent::ShouldContinueStreak(true, 3.0f, 3.0f));
+    TestFalse(TEXT("Past the gap resets"), UBreakerAbilityStateComponent::ShouldContinueStreak(true, 3.01f, 3.0f));
+    TestFalse(TEXT("A target switch resets regardless of timing"), UBreakerAbilityStateComponent::ShouldContinueStreak(false, 0.1f, 3.0f));
+
+    UBreakerAbilityStateComponent* State = NewObject<UBreakerAbilityStateComponent>();
+    AActor* TargetA = NewObject<AActor>();
+    AActor* TargetB = NewObject<AActor>();
+
+    TestEqual(TEXT("An untouched target has no streak"), State->GetStreak(TargetA), 0);
+    TestEqual(TEXT("A null target records nothing"), State->RecordHit(nullptr), 0);
+
+    TestEqual(TEXT("The first hit starts the streak at one"), State->RecordHit(TargetA), 1);
+    TestEqual(TEXT("The second consecutive hit stacks"), State->RecordHit(TargetA), 2);
+    TestEqual(TEXT("The streak reads back"), State->GetStreak(TargetA), 2);
+
+    // Target switch resets.
+    TestEqual(TEXT("Switching targets restarts the streak"), State->RecordHit(TargetB), 1);
+    TestEqual(TEXT("The abandoned target has no streak"), State->GetStreak(TargetA), 0);
+
+    // A gap resets even on the same target.
+    State->AdvanceTime(3.5f);
+    TestEqual(TEXT("A stale streak reads as zero without a tick to clear it"), State->GetStreak(TargetB), 0);
+    TestEqual(TEXT("A hit after the gap restarts the streak"), State->RecordHit(TargetB), 1);
+
+    State->ResetStreak();
+    TestEqual(TEXT("An explicit reset clears the streak"), State->GetStreak(TargetB), 0);
     return true;
 }
 

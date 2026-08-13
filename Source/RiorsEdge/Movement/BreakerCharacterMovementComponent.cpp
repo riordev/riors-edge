@@ -78,8 +78,115 @@ float UBreakerCharacterMovementComponent::GetMaxSpeed() const
     {
         return FMath::Max(SprintSpeed * GearSlideSpeedMultiplier(), Velocity.Size2D());
     }
-    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GearMoveSpeedMultiplier();
+    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GearMoveSpeedMultiplier() * GetSpeedMultiplier();
     return FMath::Max(GroundedCap, BoostedSpeedCeiling);
+}
+
+bool UBreakerCharacterMovementComponent::CanRedirect(float HorizontalSpeed, float MinimumSpeed)
+{
+    return HorizontalSpeed >= MinimumSpeed && MinimumSpeed > 0.0f;
+}
+
+FVector UBreakerCharacterMovementComponent::RedirectHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float MinimumSpeed)
+{
+    const FVector Heading = Direction.GetSafeNormal2D();
+    if (Heading.IsNearlyZero())
+    {
+        return HorizontalVelocity;
+    }
+    const float InputSpeed = HorizontalVelocity.Size2D();
+    // Floor keeps a redirect from dead-stopping the player; the input speed is
+    // the ceiling, so this can never manufacture speed (Master 5.4).
+    const float OutputSpeed = FMath::Max(InputSpeed, FMath::Max(MinimumSpeed, 0.0f));
+    return FVector(Heading.X * OutputSpeed, Heading.Y * OutputSpeed, 0.0f);
+}
+
+bool UBreakerCharacterMovementComponent::TryRedirect(const FVector& Direction)
+{
+    const FVector Heading = Direction.GetSafeNormal2D();
+    if (Heading.IsNearlyZero())
+    {
+        return false;
+    }
+    // The redirect floor is the walk speed as it stands right now, gear and
+    // tree multipliers included, so the same call reads the same threshold the
+    // rest of the movement layer uses.
+    const float MinimumSpeed = WalkSpeed * GearMoveSpeedMultiplier() * GetSpeedMultiplier();
+    const FVector Horizontal(Velocity.X, Velocity.Y, 0.0f);
+    if (!CanRedirect(Horizontal.Size(), MinimumSpeed))
+    {
+        return false;
+    }
+
+    const FVector Redirected = RedirectHorizontalVelocity(Horizontal, Heading, MinimumSpeed);
+    Velocity.X = Redirected.X;
+    Velocity.Y = Redirected.Y;
+    // Vertical velocity is deliberately untouched: Skim is horizontal only, and
+    // it must not double as an air-time extender.
+    // No dash bookkeeping here on purpose: a redirect neither consumes nor
+    // starts the dash cooldown, and it owns no cooldown of its own — the
+    // ability pays for it.
+    return true;
+}
+
+void UBreakerCharacterMovementComponent::PushSpeedMultiplier(FName Key, float Multiplier, float Duration)
+{
+    if (Key.IsNone() || Multiplier <= 0.0f)
+    {
+        return;
+    }
+    FSpeedMultiplierEntry Entry;
+    Entry.Multiplier = Multiplier;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    SpeedMultipliers.Add(Key, Entry);
+}
+
+void UBreakerCharacterMovementComponent::PopSpeedMultiplier(FName Key)
+{
+    SpeedMultipliers.Remove(Key);
+}
+
+void UBreakerCharacterMovementComponent::PruneSpeedMultipliers() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || SpeedMultipliers.Num() == 0)
+    {
+        return;
+    }
+    const double Now = World->GetTimeSeconds();
+    for (auto It = SpeedMultipliers.CreateIterator(); It; ++It)
+    {
+        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+float UBreakerCharacterMovementComponent::ComposeSpeedMultipliers(const TArray<float>& Multipliers)
+{
+    float Composed = 1.0f;
+    for (const float Multiplier : Multipliers)
+    {
+        if (Multiplier > 0.0f)
+        {
+            Composed *= Multiplier;
+        }
+    }
+    return Composed;
+}
+
+float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
+{
+    PruneSpeedMultipliers();
+    TArray<float> Active;
+    Active.Reserve(SpeedMultipliers.Num());
+    for (const TPair<FName, FSpeedMultiplierEntry>& Pair : SpeedMultipliers)
+    {
+        Active.Add(Pair.Value.Multiplier);
+    }
+    return ComposeSpeedMultipliers(Active);
 }
 
 void UBreakerCharacterMovementComponent::SetSprinting(bool bEnabled)

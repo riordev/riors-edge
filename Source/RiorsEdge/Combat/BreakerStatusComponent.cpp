@@ -14,7 +14,7 @@ void UBreakerStatusComponent::BeginPlay()
     Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
 }
 
-void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily)
+void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
 
@@ -24,6 +24,8 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
         {
             Active.Stacks = FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), MaximumStacksPerStatus);
             Active.RemainingDuration = FMath::Max(Active.RemainingDuration, Spec.Duration);
+            // Refresh credit to whoever most recently reapplied it.
+            if (Instigator) Active.Instigator = Instigator;
             OnStatusApplied.Broadcast(Active);
             return;
         }
@@ -35,6 +37,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, MaximumStacksPerStatus);
     Status.RemainingDuration = Spec.Duration;
     Status.TimeUntilNextTick = Spec.TickInterval;
+    Status.Instigator = Instigator;
     ActiveStatuses.Add(Status);
     OnStatusApplied.Broadcast(Status);
 }
@@ -57,7 +60,7 @@ void UBreakerStatusComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
             FBreakerStatusApplicationSpec TickSpec = Status.Spec;
             TickSpec.InitialStacks = Status.Stacks;
-            FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered);
+            FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get());
             // Physical DoTs — Bleed, Poison — ignore shields and take half
             // armour mitigation via the damage library's global status rule.
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;

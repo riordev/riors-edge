@@ -8,12 +8,14 @@
 // grants from the loadout, binds to a slot, spends Momentum, starts a cooldown,
 // and moves the character.
 //
-// DEVIATION: the design calls for a pure redirect with no speed gain, which
-// needs UBreakerCharacterMovementComponent::TryRedirect (spec §4.3 MISSING
-// HOOK). The movement component is owned elsewhere this pass, so Skim routes
-// through the existing public TryDash. That means it currently carries the
-// dash speed floor/bonus and its short boosted-speed window, which is wrong
-// for Skim's design. Swap to TryRedirect when that hook lands.
+// Skim routes through UBreakerCharacterMovementComponent::TryRedirect: a pure
+// rotation of existing horizontal velocity, no speed floor, no bonus, and no
+// dash charge consumed (Class-Kits S3, "Not a dash ... It redirects").
+//
+// GAP: "usable airborne once per airtime" is not enforced yet — it needs the
+// spec's ConsumeAirborneAction counter on the movement component, which K7
+// Skim Discipline also raises to 2. Cost and cooldown bound the ability in the
+// meantime.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Skim : public UBreakerGameplayAbility
 {

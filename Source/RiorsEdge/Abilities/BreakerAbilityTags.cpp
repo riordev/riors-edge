@@ -14,4 +14,10 @@ namespace BreakerAbilityTags
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Overdrive, "Cooldown.Class.Swift.Overdrive");
 
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Skim, "State.Ability.Skim");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Lead, "State.Ability.Lead");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ultimate_Overdrive, "State.Ultimate.Overdrive");
+
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_Bloodrhythm, "Keystone.Swift.Bloodrhythm");
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_TerminalVelocity, "Keystone.Swift.TerminalVelocity");
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_StandingWave, "Keystone.Swift.StandingWave");
 }

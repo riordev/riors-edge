@@ -21,6 +21,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -57,6 +58,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));
+    Mana = CreateDefaultSubobject<UBreakerManaComponent>(TEXT("Mana"));
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
 
     PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));

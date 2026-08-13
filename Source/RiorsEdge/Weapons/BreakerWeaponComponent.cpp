@@ -436,6 +436,13 @@ void UBreakerWeaponComponent::FireOnce()
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
             Damage.SourceLocation = GetOwner()->GetActorLocation();
             Damage.bHasSourceLocation = true;
+            Damage.SetInstigator(GetOwner());
+            // Outgoing modifiers compose on the shooter's own component before
+            // the request leaves the weapon.
+            if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+            {
+                OwnerCombat->ApplyOutgoingModifiers(Damage);
+            }
             const FBreakerDamageResult PelletDamage = TargetCombat->ReceiveDamage(Damage);
             Shot.DamageResult.RawDamage += PelletDamage.RawDamage;
             Shot.DamageResult.MitigatedDamage += PelletDamage.MitigatedDamage;
@@ -479,7 +486,7 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     // The critical result is rolled once at application; every tick of this
     // application then crits or does not for its whole lifetime.
     Spec.Snapshot.bRolledCritical = Stream.FRand() < Spec.Snapshot.CriticalChance;
-    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical);
+    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 
 void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread)
@@ -500,6 +507,13 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
     Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
+    Damage.SetInstigator(GetOwner());
+    // The rocket carries an already-composed request; modifiers active at the
+    // moment of firing are the ones that count, not those at detonation.
+    if (UBreakerCombatComponent* OwnerCombat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+    {
+        OwnerCombat->ApplyOutgoingModifiers(Damage);
+    }
 
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

@@ -1,6 +1,8 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbility_Lead.h"
+#include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
 
 bool UBreakerAbilityDefinition::CanOccupySlot(EBreakerAbilitySlot Slot) const
@@ -10,6 +12,33 @@ bool UBreakerAbilityDefinition::CanOccupySlot(EBreakerAbilitySlot Slot) const
         return SlotAffinity == Slot;
     }
     return true;
+}
+
+FBreakerAbilityVariant UBreakerAbilityDefinition::ResolveVariant(const FGameplayTagContainer& OwnerTags) const
+{
+    const FBreakerAbilityVariant* Base = nullptr;
+    for (const FBreakerAbilityVariant& Variant : Variants)
+    {
+        if (!Variant.KeystoneTag.IsValid())
+        {
+            if (!Base)
+            {
+                Base = &Variant;
+            }
+            continue;
+        }
+        if (OwnerTags.HasTag(Variant.KeystoneTag))
+        {
+            return Variant;
+        }
+    }
+    if (Base)
+    {
+        return *Base;
+    }
+    FBreakerAbilityVariant Fallback;
+    Fallback.WindowDuration = WindowDuration;
+    return Fallback;
 }
 
 namespace
@@ -66,7 +95,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Lead->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Lead->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Lead;
     Lead->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Lead;
-    Lead->AbilityClass = nullptr; // Not yet implemented — Phase 2 (mark component).
+    Lead->AbilityClass = UBreakerAbility_Lead::StaticClass();
     Lead->ResourceCost = 40.0f;
     Lead->CooldownSeconds = 10.0f;
     Lead->WindowDuration = 6.0f; // Class-Kits §1.2 row S6: mark lasts 6s.
@@ -83,10 +112,50 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Overdrive->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Overdrive;
     // Deliberately no cooldown tag: cost-gated, and the HUD must be able to
     // tell "no cooldown" from "cooldown of zero" (spec D3).
-    Overdrive->AbilityClass = nullptr; // Not yet implemented — Phase 2.
+    Overdrive->AbilityClass = UBreakerAbility_Overdrive::StaticClass();
     Overdrive->ResourceCost = 100.0f;
     Overdrive->CooldownSeconds = 0.0f;
     Overdrive->WindowDuration = 8.0f;
+
+    // Keystone variant rows (spec D1). Index 0 is the base row. Class-Kits
+    // specifies the *behavior* of each rewrite but no numbers for the
+    // parametric part, so every SpeedMultiplier below and the Bloodrhythm
+    // timeout's companion values are O2 PLACEHOLDER — structure is the
+    // deliverable, not balance. Durations are quoted (8s base, 1.5s
+    // Bloodrhythm hit timeout).
+    {
+        FBreakerAbilityVariant BaseRow;
+        BaseRow.VariantName = FText::FromString(TEXT("Overdrive"));
+        BaseRow.WindowDuration = 8.0f;
+        BaseRow.SpeedMultiplier = 1.10f; // O2 PLACEHOLDER
+        Overdrive->Variants.Add(BaseRow);
+
+        FBreakerAbilityVariant Bloodrhythm;
+        Bloodrhythm.KeystoneTag = BreakerAbilityTags::Keystone_Swift_Bloodrhythm;
+        Bloodrhythm.VariantName = FText::FromString(TEXT("Overdrive — Bloodrhythm"));
+        Bloodrhythm.WindowDuration = 8.0f;
+        Bloodrhythm.SpeedMultiplier = 1.10f; // O2 PLACEHOLDER
+        // Class-Kits F12: the ultimate ends if the player goes 1.5s without a hit.
+        Bloodrhythm.HitTimeoutSeconds = 1.5f;
+        Overdrive->Variants.Add(Bloodrhythm);
+
+        FBreakerAbilityVariant TerminalVelocity;
+        TerminalVelocity.KeystoneTag = BreakerAbilityTags::Keystone_Swift_TerminalVelocity;
+        TerminalVelocity.VariantName = FText::FromString(TEXT("Overdrive — Terminal Velocity"));
+        TerminalVelocity.WindowDuration = 8.0f;
+        // Availability rewrite, not a speed rewrite (Class-Kits K12 quotes
+        // Master 5.4 explicitly), so the multiplier stays at 1.0.
+        TerminalVelocity.SpeedMultiplier = 1.0f;
+        Overdrive->Variants.Add(TerminalVelocity);
+
+        FBreakerAbilityVariant StandingWave;
+        StandingWave.KeystoneTag = BreakerAbilityTags::Keystone_Swift_StandingWave;
+        StandingWave.VariantName = FText::FromString(TEXT("Overdrive — Standing Wave"));
+        StandingWave.WindowDuration = 8.0f;
+        // The stationary Swift ultimate: no movement contribution at all.
+        StandingWave.SpeedMultiplier = 1.0f;
+        Overdrive->Variants.Add(StandingWave);
+    }
     Registry.Add(Overdrive);
 
     return Registry;

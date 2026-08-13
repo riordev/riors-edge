@@ -32,14 +32,14 @@ bool FBreakerStatusStackingTest::RunTest(const FString& Parameters)
 
     FBreakerStatusApplicationSpec Spec = MakeBleedSpec();
     Spec.Snapshot.bRolledCritical = true;
-    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical);
+    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, nullptr);
     TestTrue(TEXT("Bleed is applied"), Status->HasStatus(Spec.StatusTag));
     TestEqual(TEXT("A single application creates one status"), Status->GetActiveStatuses().Num(), 1);
     TestEqual(TEXT("A single application starts at one stack"), Status->GetActiveStatuses()[0].Stacks, 1);
 
     FBreakerStatusApplicationSpec Reapply = MakeBleedSpec();
     Reapply.Snapshot.bRolledCritical = false;
-    for (int32 Index = 0; Index < 5; ++Index) Status->ApplyStatus(Reapply, EBreakerDamageFamily::Physical);
+    for (int32 Index = 0; Index < 5; ++Index) Status->ApplyStatus(Reapply, EBreakerDamageFamily::Physical, nullptr);
     TestEqual(TEXT("Reapplication never creates a second status"), Status->GetActiveStatuses().Num(), 1);
     TestEqual(TEXT("Stacks are capped"), Status->GetActiveStatuses()[0].Stacks, 3);
     TestTrue(TEXT("Reapplication keeps the original critical snapshot"), Status->GetActiveStatuses()[0].Spec.Snapshot.bRolledCritical);
@@ -47,7 +47,7 @@ bool FBreakerStatusStackingTest::RunTest(const FString& Parameters)
     FBreakerStatusApplicationSpec Invalid = MakeBleedSpec();
     Invalid.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
     Invalid.Duration = 0.0f;
-    Status->ApplyStatus(Invalid, EBreakerDamageFamily::Physical);
+    Status->ApplyStatus(Invalid, EBreakerDamageFamily::Physical, nullptr);
     TestEqual(TEXT("A zero-duration status is rejected"), Status->GetActiveStatuses().Num(), 1);
     return true;
 }

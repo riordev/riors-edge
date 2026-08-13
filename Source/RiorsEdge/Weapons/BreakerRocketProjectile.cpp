@@ -74,6 +74,9 @@ void ABreakerRocketProjectile::Explode(const FVector& Location)
         AreaDamage.SourceLocation = Location;
         AreaDamage.bHasSourceLocation = true;
         AreaDamage.RandomSeed = HashCombine(Damage.RandomSeed, GetTypeHash(Candidate));
+        // The firing request normally already carries the shooter; fall back to
+        // the spawn instigator so a rocket fired without one still credits.
+        if (!AreaDamage.Instigator.IsValid()) AreaDamage.SetInstigator(GetInstigator());
         Combat->ReceiveDamage(AreaDamage);
     }
 

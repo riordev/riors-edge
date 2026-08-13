@@ -270,6 +270,28 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         AddActorWorldOffset(Step, true, &MoveHit);
         SetActorRotation(DesiredDirection.Rotation());
     }
+
+    // Ground snap: enemies move by offset with no gravity, so without this
+    // they hover over the apron slabs or float where spawn height was off.
+    // Trace down, plant the capsule base on whatever is below.
+    {
+        const float HalfHeight = BodyCollision ? BodyCollision->GetScaledCapsuleHalfHeight() : 88.0f;
+        const FVector TraceStart = GetActorLocation() + FVector(0, 0, 60.0f);
+        const FVector TraceEnd = TraceStart - FVector(0, 0, 4000.0f);
+        FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(BreakerEnemyGround), false, this);
+        FHitResult Ground;
+        if (GetWorld()->LineTraceSingleByChannel(Ground, TraceStart, TraceEnd, ECC_WorldStatic, GroundParams))
+        {
+            const float TargetZ = Ground.ImpactPoint.Z + HalfHeight;
+            const float CurrentZ = GetActorLocation().Z;
+            // Snap down instantly, step up smoothly, so slabs read as steps
+            // rather than teleports.
+            const float NewZ = CurrentZ > TargetZ
+                ? FMath::Max(TargetZ, CurrentZ - 1200.0f * DeltaSeconds)
+                : FMath::Min(TargetZ, CurrentZ + 600.0f * DeltaSeconds);
+            SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, NewZ), false);
+        }
+    }
 }
 
 void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
@@ -281,6 +303,7 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     Damage.BaseDamage = AttackDamage;
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.bCanCritical = false;
+    Damage.SetInstigator(this);
     TargetCombat->ReceiveDamage(Damage);
     LastAttackTime = GetWorld()->GetTimeSeconds();
 }
@@ -320,6 +343,7 @@ void ABreakerEnemy::HandleDeath()
             ChainDamage.bCanCritical = false;
             ChainDamage.SourceLocation = GetActorLocation();
             ChainDamage.bHasSourceLocation = true;
+            ChainDamage.SetInstigator(this);
             It->Combat->ReceiveDamage(ChainDamage);
         }
     }

@@ -18,6 +18,7 @@ class UPointLightComponent;
 class UBreakerPlaytestComponent;
 class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
+class UBreakerManaComponent;
 class UBreakerAbilityComponent;
 class ABreakerNPC;
 class ABreakerLootPickup;
@@ -46,6 +47,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
     UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
     UFUNCTION(BlueprintPure, Category="Momentum") UBreakerMomentumComponent* GetMomentum() const { return Momentum; }
+    UFUNCTION(BlueprintPure, Category="Mana") UBreakerManaComponent* GetMana() const { return Mana; }
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAbilityComponent* GetAbilities() const { return Abilities; }
     UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
     UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
@@ -85,6 +87,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mana") TObjectPtr<UBreakerManaComponent> Mana;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UBreakerAbilityComponent> Abilities;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponBarrel;

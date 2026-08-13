@@ -39,6 +39,13 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // and hazards without a position keep working.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FVector SourceLocation = FVector::ZeroVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceLocation = false;
+    // Who dealt this damage. Weak so a request outliving its dealer (a rocket
+    // in flight, a DoT ticking after the shooter died) never keeps the actor
+    // alive and never dereferences a stale pointer. Optional: hazards and
+    // tests leave it null.
+    UPROPERTY(BlueprintReadWrite) TWeakObjectPtr<AActor> Instigator = nullptr;
+
+    void SetInstigator(AActor* InInstigator) { Instigator = InInstigator; }
 };
 
 USTRUCT(BlueprintType)
@@ -76,4 +83,20 @@ struct RIORSEDGE_API FBreakerDamageResult
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) bool bShieldBroken = false;
     UPROPERTY(BlueprintReadOnly) bool bKilled = false;
+};
+
+// Attacker-side view of one resolved damage instance (SI-8). Broadcast on the
+// INSTIGATOR's combat component, not the victim's.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerHitContext
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Instigator = nullptr;
+    UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> Target = nullptr;
+    UPROPERTY(BlueprintReadOnly) FBreakerDamageResult Result;
+    UPROPERTY(BlueprintReadOnly) bool bFromDoT = false;
+    UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
+    UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
+    UPROPERTY(BlueprintReadOnly) FVector WorldLocation = FVector::ZeroVector;
 };

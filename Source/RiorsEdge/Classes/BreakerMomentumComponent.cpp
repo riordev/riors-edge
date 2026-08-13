@@ -3,6 +3,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
@@ -27,12 +28,21 @@ void UBreakerMomentumComponent::BeginPlay()
     }
     if (AActor* Owner = GetOwner())
     {
-        CachedProgression = Owner->FindComponentByClass<UBreakerProgressionComponent>();
+        if (UBreakerProgressionComponent* Progression = Owner->FindComponentByClass<UBreakerProgressionComponent>())
+        {
+            CachedProgression = Progression;
+            Progression->OnProgressionChanged.AddDynamic(this, &UBreakerMomentumComponent::HandleProgressionChanged);
+        }
         if (UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>())
         {
             Weapon->OnShot.AddDynamic(this, &UBreakerMomentumComponent::HandleShot);
         }
+        if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+        {
+            Combat->OnDamageReceived.AddDynamic(this, &UBreakerMomentumComponent::HandleDamageReceived);
+        }
     }
+    HandleProgressionChanged();
     CachedState = StateForFraction(GetMomentumFraction());
 }
 
@@ -72,14 +82,20 @@ UBreakerCharacterMovementComponent* UBreakerMomentumComponent::GetBreakerMovemen
     return CachedMovement.Get();
 }
 
-bool UBreakerMomentumComponent::IsActiveForOwner() const
+void UBreakerMomentumComponent::HandleProgressionChanged()
 {
     if (!CachedProgression.IsValid() && GetOwner())
     {
-        const_cast<UBreakerMomentumComponent*>(this)->CachedProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+        CachedProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
-    return Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
+    bIsSwift = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift;
+    if (!bIsSwift) PendingGrants = 0.0f;
+}
+
+bool UBreakerMomentumComponent::IsActiveForOwner() const
+{
+    return bIsSwift;
 }
 
 float UBreakerMomentumComponent::GetMomentum() const
@@ -128,6 +144,18 @@ void UBreakerMomentumComponent::HandleShot(const FBreakerShotResult& Shot)
     if (Now - LastWeakPointGrantTime < WeakPointInterval) return;
     LastWeakPointGrantTime = Now;
     PendingGrants += WeakPointGrant;
+}
+
+void UBreakerMomentumComponent::HandleDamageReceived(const FBreakerDamageResult& Result)
+{
+    // The passive evade proc, not a dodge input: the player cannot time this
+    // source (Class-Kits 1.1, O1). Queued like every other one-shot grant so
+    // it is spent against the same global generation budget.
+    if (!Result.bDodged || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    if (Now - LastDodgeGrantTime < DodgeProcInterval) return;
+    LastDodgeGrantTime = Now;
+    PendingGrants += DodgeProcGrant;
 }
 
 void UBreakerMomentumComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

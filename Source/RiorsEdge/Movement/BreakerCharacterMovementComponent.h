@@ -20,6 +20,20 @@ public:
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSprinting(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSlideRequested(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryDash(const FVector& RequestedDirection);
+    // Ability-Implementation-Spec §4.3: rotates existing horizontal velocity onto
+    // Direction with NO magnitude gain. Skim's verb. It owns no cooldown of its
+    // own — the ability pays cost and cooldown — and it never consumes the dash
+    // charge. Returns false when there is not enough horizontal speed to
+    // redirect (below walk speed), so a standing player cannot use it as a
+    // free reposition.
+    UFUNCTION(BlueprintCallable, Category="Movement") bool TryRedirect(const FVector& Direction);
+    // Tag/key-keyed temporary speed multiplier, composed multiplicatively with
+    // the gear and tree multipliers (Ability-Implementation-Spec §6, the shape
+    // Gunsmith's Disruptor and Swift's Overdrive both need). Lazily expired:
+    // no timers, no tick cost when nothing is pushed.
+    UFUNCTION(BlueprintCallable, Category="Movement") void PushSpeedMultiplier(FName Key, float Multiplier, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Movement") void PopSpeedMultiplier(FName Key);
+    UFUNCTION(BlueprintPure, Category="Movement") float GetSpeedMultiplier() const;
     UFUNCTION(BlueprintCallable, Category="Movement") bool BeginSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") void PrepareSlideJump();
     UFUNCTION(BlueprintCallable, Category="Movement") void EndSlide();
@@ -70,7 +84,28 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Movement|Wall Ride") FWallRideStateChanged OnWallRideStateChanged;
 
+    // Pure rules, exposed for world-free tests.
+    // A redirect is legal only when there is real horizontal speed to turn.
+    static bool CanRedirect(float HorizontalSpeed, float MinimumSpeed);
+    // Rotates HorizontalVelocity onto Direction. The output magnitude is the
+    // input magnitude, floored at MinimumSpeed so a redirect never dead-stops,
+    // and never above the input magnitude (Master 5.4: no self-acceleration).
+    static FVector RedirectHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float MinimumSpeed);
+    // Multiplicative composition of the active temporary multipliers.
+    static float ComposeSpeedMultipliers(const TArray<float>& Multipliers);
+
 private:
+    struct FSpeedMultiplierEntry
+    {
+        float Multiplier = 1.0f;
+        // Negative = no expiry; popped explicitly.
+        double ExpiryTime = -1.0;
+    };
+    // Mutable: GetMaxSpeed() is const and is the natural place to drop expired
+    // entries, which is what "lazy expiry" means here.
+    mutable TMap<FName, FSpeedMultiplierEntry> SpeedMultipliers;
+    void PruneSpeedMultipliers() const;
+
     // Gear-rolled movement multipliers, read from the owner's equipment
     // component: move/slide speed, air control, dash cooldown.
     class UBreakerEquipmentComponent* GetEquipment() const;

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "BreakerMomentumComponent.generated.h"
 
@@ -62,6 +63,10 @@ public:
     // Floor only: the real internal cooldown is the movement component's dash
     // cooldown, so refunded charges cannot be farmed.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DashGrantMinimumInterval = 1.0f;
+    // "Swift converts evasion into Momentum" — an RNG proc off the passive
+    // evade layer, never a timed input (Class-Kits 1.1, O1).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DodgeProcGrant = 15.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DodgeProcInterval = 0.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float WeakPointGrant = 5.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float WeakPointInterval = 0.25f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation") bool bWeakPointRequiresAirborneOrSlide = true;
@@ -74,6 +79,8 @@ public:
 
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
+    UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
+    UFUNCTION() void HandleProgressionChanged();
 
     UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     bool IsInSafeZone() const;
@@ -84,6 +91,7 @@ private:
     mutable TWeakObjectPtr<UBreakerCharacterMovementComponent> CachedMovement;
     TWeakObjectPtr<UBreakerProgressionComponent> CachedProgression;
 
+    bool bIsSwift = false;
     EBreakerMomentumState CachedState = EBreakerMomentumState::Settled;
     FVector LastLocation = FVector::ZeroVector;
     bool bHasLastLocation = false;
@@ -93,5 +101,6 @@ private:
     float PendingGrants = 0.0f;
     double LastDashGrantTime = -1000.0;
     double LastWeakPointGrantTime = -1000.0;
+    double LastDodgeGrantTime = -1000.0;
     double LastObservedDashTime = -1000.0;
 };

@@ -23,4 +23,14 @@ namespace BreakerAbilityTags
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Overdrive);
 
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Skim);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Lead);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ultimate_Overdrive);
+
+    // Branch keystones (spec D1). A keystone node grants a passive GE whose
+    // only job is to add one of these to the owner; the ultimate reads its own
+    // owner's container at activation and selects a variant row. No keystone
+    // ever grants, replaces, or blocks an ability.
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_Bloodrhythm);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_TerminalVelocity);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_StandingWave);
 }

@@ -78,9 +78,10 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     return Result;
 }
 
-FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex)
+FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator)
 {
     FBreakerDamageRequest Request;
+    Request.SetInstigator(Instigator);
     Request.BaseDamage = StatusSpec.BaseDamagePerTick * FMath::Max(1, StatusSpec.InitialStacks);
     Request.DamageFamily = DamageFamily;
     Request.DamageTypeTag = StatusSpec.StatusTag;

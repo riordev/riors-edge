@@ -1,0 +1,146 @@
+#include "Abilities/BreakerAbilityStateComponent.h"
+
+#include "GameFramework/Actor.h"
+
+UBreakerAbilityStateComponent::UBreakerAbilityStateComponent()
+{
+    PrimaryComponentTick.bCanEverTick = true;
+}
+
+UBreakerAbilityStateComponent* UBreakerAbilityStateComponent::FindOrAdd(AActor* Owner)
+{
+    if (!Owner)
+    {
+        return nullptr;
+    }
+    if (UBreakerAbilityStateComponent* Existing = Owner->FindComponentByClass<UBreakerAbilityStateComponent>())
+    {
+        return Existing;
+    }
+    UBreakerAbilityStateComponent* Created = NewObject<UBreakerAbilityStateComponent>(Owner);
+    Created->RegisterComponent();
+    return Created;
+}
+
+void UBreakerAbilityStateComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    AdvanceTime(DeltaTime);
+}
+
+void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
+{
+    Clock += FMath::Max(DeltaSeconds, 0.0f);
+    if (Windows.Num() == 0)
+    {
+        return;
+    }
+
+    // Collect first, broadcast after: a listener is allowed to open a new
+    // window from inside OnWindowEnded, and iterating the map while it mutates
+    // is a crash.
+    TArray<FName, TInlineAllocator<4>> Expired;
+    for (const TPair<FName, FWindowState>& Pair : Windows)
+    {
+        if (Pair.Value.EndTime <= Clock)
+        {
+            Expired.Add(Pair.Key);
+        }
+    }
+    for (const FName Key : Expired)
+    {
+        Windows.Remove(Key);
+    }
+    for (const FName Key : Expired)
+    {
+        OnWindowEnded.Broadcast(Key);
+    }
+}
+
+void UBreakerAbilityStateComponent::StartWindow(FName Key, float Duration)
+{
+    if (Key.IsNone() || Duration <= 0.0f)
+    {
+        return;
+    }
+    FWindowState State;
+    State.EndTime = Clock + Duration;
+    Windows.Add(Key, State);
+}
+
+void UBreakerAbilityStateComponent::ExtendWindow(FName Key, float ExtraSeconds)
+{
+    if (FWindowState* State = Windows.Find(Key))
+    {
+        State->EndTime += FMath::Max(ExtraSeconds, 0.0f);
+    }
+}
+
+void UBreakerAbilityStateComponent::CloseWindow(FName Key)
+{
+    if (Windows.Remove(Key) > 0)
+    {
+        OnWindowEnded.Broadcast(Key);
+    }
+}
+
+bool UBreakerAbilityStateComponent::IsWindowActive(FName Key) const
+{
+    const FWindowState* State = Windows.Find(Key);
+    return State && State->EndTime > Clock;
+}
+
+float UBreakerAbilityStateComponent::GetWindowRemaining(FName Key) const
+{
+    const FWindowState* State = Windows.Find(Key);
+    return State ? FMath::Max(State->EndTime - Clock, 0.0f) : 0.0f;
+}
+
+int32 UBreakerAbilityStateComponent::GetActiveWindowCount() const
+{
+    int32 Count = 0;
+    for (const TPair<FName, FWindowState>& Pair : Windows)
+    {
+        if (Pair.Value.EndTime > Clock)
+        {
+            ++Count;
+        }
+    }
+    return Count;
+}
+
+bool UBreakerAbilityStateComponent::ShouldContinueStreak(bool bSameTarget, float SecondsSinceLastHit, float GapSeconds)
+{
+    return bSameTarget && SecondsSinceLastHit <= GapSeconds;
+}
+
+int32 UBreakerAbilityStateComponent::RecordHit(AActor* Target)
+{
+    if (!Target)
+    {
+        return StreakCount;
+    }
+    const bool bSameTarget = StreakTarget.Get() == Target;
+    const float SinceLastHit = Clock - LastHitTime;
+    StreakCount = ShouldContinueStreak(bSameTarget, SinceLastHit, StreakGapSeconds) ? StreakCount + 1 : 1;
+    StreakTarget = Target;
+    LastHitTime = Clock;
+    return StreakCount;
+}
+
+int32 UBreakerAbilityStateComponent::GetStreak(AActor* Target) const
+{
+    if (!Target || StreakTarget.Get() != Target)
+    {
+        return 0;
+    }
+    // A stale streak reads as zero without needing a tick to clear it.
+    return ShouldContinueStreak(true, Clock - LastHitTime, StreakGapSeconds) ? StreakCount : 0;
+}
+
+void UBreakerAbilityStateComponent::ResetStreak()
+{
+    StreakTarget = nullptr;
+    StreakCount = 0;
+    LastHitTime = -1000.0f;
+}

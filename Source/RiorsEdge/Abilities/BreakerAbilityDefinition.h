@@ -8,6 +8,30 @@
 
 class UGameplayAbility;
 
+// One keystone variant row (Ability-Implementation-Spec D1). A branch keystone
+// grants a passive GE carrying KeystoneTag; the ultimate resolves the matching
+// row at activation. The row holds only the *parametric* deltas — the
+// behavioral differences that are not expressible as parameters (Bloodrhythm's
+// hit-timeout exit, Terminal Velocity's dash-charge availability) live as named
+// C++ branches in the ability, guarded by this row's tag. That split is D1's
+// whole point.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerAbilityVariant
+{
+    GENERATED_BODY()
+
+    // Empty = the base row, used when the owner holds no keystone.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant") FGameplayTag KeystoneTag;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant") FText VariantName;
+    // <= 0 means "inherit the definition's WindowDuration".
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant", meta=(ClampMin="0")) float WindowDuration = 0.0f;
+    // Temporary movement speed multiplier applied for the window.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant", meta=(ClampMin="0")) float SpeedMultiplier = 1.0f;
+    // Seconds without a landed hit before the window self-terminates. <= 0
+    // disables the check (Bloodrhythm is the only user today).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variant", meta=(ClampMin="0")) float HitTimeoutSeconds = 0.0f;
+};
+
 // Data contract for one class ability (Ability-Implementation-Spec SI-10).
 // All tuning lives here, never in the ability's C++.
 UCLASS(BlueprintType)
@@ -43,6 +67,14 @@ public:
     // cooldown that happens to be ready.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cost", meta=(ClampMin="0")) float CooldownSeconds = 0.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cost", meta=(ClampMin="0")) float WindowDuration = 0.0f;
+
+    // Index 0 is the base row when authored. Empty on non-ultimates.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Variants") TArray<FBreakerAbilityVariant> Variants;
+
+    // Spec D1 selector: at most one keystone can be held (Class-Kits §0.2), so
+    // this is a lookup, not a merge. Falls back to the base row, and to a
+    // default-constructed row when nothing is authored.
+    UFUNCTION(BlueprintPure, Category="Abilities") FBreakerAbilityVariant ResolveVariant(const FGameplayTagContainer& OwnerTags) const;
 
     UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const { return ResourceCost; }
     UFUNCTION(BlueprintPure, Category="Abilities") float GetCooldownSeconds() const { return CooldownSeconds; }
