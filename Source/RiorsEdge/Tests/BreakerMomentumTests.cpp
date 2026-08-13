@@ -117,4 +117,40 @@ bool FBreakerMomentumLoopOverrideTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerClassLockNotifiesLoopTest,
+    "RiorsEdge.Classes.ClassLockNotifiesLoop",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+// Regression. UBreakerMomentumComponent caches bIsSwift in
+// HandleProgressionChanged, which BeginPlay runs exactly once and the
+// OnProgressionChanged delegate runs thereafter. For a while none of the three
+// class-selection paths broadcast, so a character who locked Swift mid-session
+// had a completely inert Momentum loop until some unrelated purchase happened
+// to fire the event. It stayed invisible because a save that already carries a
+// locked class resolves at BeginPlay.
+bool FBreakerClassLockNotifiesLoopTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>(Owner);
+    // The suite has no world, so BeginPlay never runs: bind the way it would.
+    Progression->OnProgressionChanged.AddDynamic(Momentum, &UBreakerMomentumComponent::HandleProgressionChanged);
+
+    TestFalse(TEXT("Momentum is inert before any class is locked"), Momentum->IsActiveForOwner());
+
+    TestTrue(TEXT("Locking Swift succeeds"), Progression->ChoosePermanentClassById(EBreakerClassId::Swift));
+    TestTrue(TEXT("Locking a class wakes its resource loop without a second event"), Momentum->IsActiveForOwner());
+
+    // The dev swap is the other way in, and it is what a playtest actually uses.
+    UBreakerProgressionComponent* DevProgression = NewObject<UBreakerProgressionComponent>(NewObject<AActor>());
+    UBreakerMomentumComponent* DevMomentum = NewObject<UBreakerMomentumComponent>(DevProgression->GetOwner());
+    DevProgression->OnProgressionChanged.AddDynamic(DevMomentum, &UBreakerMomentumComponent::HandleProgressionChanged);
+    DevProgression->DevForceClass(EBreakerClassId::Swift);
+    TestTrue(TEXT("A dev swap to Swift wakes the loop"), DevMomentum->IsActiveForOwner());
+    DevProgression->DevForceClass(EBreakerClassId::Caster);
+    TestFalse(TEXT("A dev swap away from Swift puts the loop back to sleep"), DevMomentum->IsActiveForOwner());
+    return true;
+}
+
 #endif

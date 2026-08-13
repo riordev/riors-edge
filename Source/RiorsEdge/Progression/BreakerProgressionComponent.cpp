@@ -52,6 +52,12 @@ void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
     }
     RecalculateStats();
+    // KNOWN GAP, deliberately not fixed here: a dev swap keeps whatever
+    // ClassDefinition is already held, so it can describe the class we just
+    // left. Re-fetching unconditionally would stomp an authored Data Asset
+    // with the C++ fallback, which is the worse failure. Needs a rule about
+    // which source wins; not a dev-tool decision.
+    OnProgressionChanged.Broadcast();
 }
 
 bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId ClassId)
@@ -63,6 +69,12 @@ bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId Clas
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
     }
     RecalculateStats();
+    // Locking a class is a progression change like any other. Without this the
+    // class-resource loops never learn they went live: UBreakerMomentumComponent
+    // caches bIsSwift in HandleProgressionChanged, which runs once at BeginPlay
+    // and then only on this event, so a character who picks Swift mid-session
+    // had dead Momentum until some unrelated purchase happened to broadcast.
+    OnProgressionChanged.Broadcast();
     return true;
 }
 
@@ -79,6 +91,9 @@ bool UBreakerProgressionComponent::ChoosePermanentClass(const UBreakerClassDefin
     if (NewClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = NewClassDefinition->StartingClassAbilityIds[1];
     State.AbilityLoadout.Ultimate = NewClassDefinition->BaseUltimateId;
     RecalculateStats();
+    // Same reason as ChoosePermanentClassById: this is the Data-Asset-driven
+    // twin of that path and the listeners cannot tell them apart.
+    OnProgressionChanged.Broadcast();
     return true;
 }
 

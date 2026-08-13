@@ -100,10 +100,16 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|PhantomStep", meta=(ClampMin="0")) float PhantomStepWindowSeconds = 0.5f;  // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|PhantomStep", meta=(ClampMin="0")) float PhantomStepCooldownSeconds = 2.0f; // Class-Kits node text
 
+    // Public because it is the listener half of a contract that silently broke
+    // once: the loop caches bIsSwift here, BeginPlay calls it exactly once, and
+    // for a while nothing on the class-selection path broadcast. The suite has
+    // no world, so a test cannot rely on BeginPlay to bind the delegate — it
+    // binds this directly. Idempotent; calling it spuriously costs a lookup.
+    UFUNCTION() void HandleProgressionChanged();
+
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
-    UFUNCTION() void HandleProgressionChanged();
 
     UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     bool IsInSafeZone() const;
