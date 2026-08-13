@@ -108,8 +108,16 @@ namespace BreakerUI
     // line to change, not a pass over the card builder.
     // This file is UTF-8 without a BOM, matching BreakerMenu.cpp, which
     // already ships non-ASCII inside TEXT() literals.
-    inline const TCHAR* DeltaBetterGlyph = TEXT("▲");  // BLACK UP-POINTING TRIANGLE
-    inline const TCHAR* DeltaWorseGlyph = TEXT("▼");   // BLACK DOWN-POINTING TRIANGLE
+    // MEASURED, not assumed: the engine's Slate face
+    // (Engine/Content/Slate/Fonts/Roboto-*.ttf) carries 878 codepoints and its
+    // cmap has NO Geometric Shapes block — U+25B2/U+25BC, the arrows, and every
+    // other triangle are absent, so the spec's triangles would have rendered as
+    // tofu on the most-scanned line of the screen. ASCII until the shipping
+    // faces are imported; colour is what actually carries the meaning here, and
+    // the glyph sits alone in its own column, so a sign reads cleanly.
+    // Restore the triangles in this one place once Barlow/JetBrains land.
+    inline const TCHAR* DeltaBetterGlyph = TEXT("+");
+    inline const TCHAR* DeltaWorseGlyph = TEXT("-");
     inline const TCHAR* DeltaParityGlyph = TEXT("=");
     // Fixed column so the affix names form a straight edge whatever the glyph.
     inline constexpr float DeltaGlyphColumn = 14.0f;
@@ -188,9 +196,13 @@ namespace BreakerUI
     inline constexpr float DamageRisePixels = 40.0f;
 
     // Thousands take a space, never a comma: at 40px a comma collapses into a
-    // dot. The spec asks for U+2009 THIN SPACE; the engine's small font has no
-    // glyph for it, so this uses a normal space until the real numeric face is
-    // imported. The rule the spec is protecting — never a comma — holds.
+    // dot. The spec asks for U+2009 THIN SPACE; this uses a normal space until
+    // the real numeric face is imported. The rule the spec is protecting —
+    // never a comma — holds either way.
+    // NOTE for anyone tempted to "fix" this from the measurement above: that
+    // one is the Slate TTF, which does carry U+2009. This function feeds the
+    // CANVAS HUD, which draws with GEngine->GetSmallFont() — a different font
+    // asset with its own charset. Verify that asset before changing this.
     inline FString FormatTicker(float Value)
     {
         const int32 Whole = FMath::RoundToInt(Value);
