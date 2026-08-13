@@ -1,0 +1,537 @@
+# Class Kits — Resource Loops, Abilities, and Branch Trees
+
+Status: design draft. Numbers are placeholder and must be re-anchored after the Playtest Gym TTK pass, exactly as the affix tables are.
+
+Scope: the five classes (Caster, Swift, Gunsmith, Tank, Support) — resource loop, three branches, ability list, ultimate, and branch skill trees costed against the 30 Class Points granted across levels 1-30.
+
+Detail level follows the master sheet's prototyping order (7.5): **Swift and Caster are authored in full.** Gunsmith, Tank, and Support are one-page treatments — enough to prove the resource grammar generalizes, not enough to build from.
+
+---
+
+## 0. Rules this document obeys
+
+Restated so a reader does not have to hold four documents open.
+
+| Constraint | Source | Consequence here |
+|---|---|---|
+| Level cap 50, hard stop; gear is the entire endgame | Master 7.1 / 9.1 | Class trees complete at 30 and never grow again. No node scales with level. |
+| Class selection permanent | Master 7.5 | Branch identity may be strong; class identity must be legible in the first hour. |
+| Equip exactly 2 abilities + 1 ultimate | Master 7.5 | Six abilities per class = a real loadout decision, not a rotation. |
+| Solo is the primary balance target | Master 11.1 | Every resource loop generates solo. Every Support branch has a self path. |
+| Crit is the only multiplier of its kind | Master 6.3 | No node grants "chance to deal double damage", "chance to double-hit for full", or any parallel roll-and-multiply. |
+| Affixes scale verbs, trees rewrite rules, classes own the fantasy | Layer-Ownership | **No node in this document is a flat percentage.** Every node is a rule rewrite or a resource-loop modifier. |
+| Air jump (Kinesis) and Parry (Bulwark) are the only tree-granted verbs | Master 5.2 / 7.6 | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
+| No grapple / tether | Master 5.1 | Kinetic and Demolitionist reposition with impulses and dashes only. |
+| Flat sums -> one additive Increased bucket -> More reserved for trees/Anomalous | Item-Foundation | Class nodes may author More multipliers, but each class gets a **hard budget of three** (see 0.1). |
+| Stat aggregation buckets unresolved | Master 3.15 / 6.6 | BLOCKED: the More-multiplier budget below cannot be implemented until buckets are decided. Design it now, build it after. |
+
+### 0.1 The More-multiplier budget — EXTENDS
+
+The master sheet reserves More multipliers for trees and Anomalous items but does not say how many a tree may author. Without a cap, five classes x three branches is fifteen independent multipliers and the explosion risk in Master 7.10.1 arrives through the class layer instead of the affix layer.
+
+**Proposed rule: each class may author at most three More multipliers across all three branches — at most one per branch, and only on a branch keystone.** Every other node must be a rule rewrite, a resource-loop change, or a flat/Increased contribution that folds into the existing buckets.
+
+This is an EXTENDS on Master 7.6 and Layer-Ownership. Flagged for approval before any class content asset is authored.
+
+### 0.2 Tree shape and cost grammar — EXTENDS
+
+Master 7.11 leaves open whether branch nodes are freely mixed or mutually exclusive at major tiers. This document assumes **freely mixed with investment gates**, because permanent class selection already carries the "you cannot have everything" weight and a second lock is punitive.
+
+Every branch uses the same five-tier shape:
+
+| Tier | Gate (points already spent in this branch) | Node count | Cost per rank | Max ranks |
+|---|---|---|---|---|
+| 1 — Entry | 0 | 3 | 1 | 2 |
+| 2 — Loop | 3 | 3 | 1 | 2 |
+| 3 — Ability | 6 | 2 | 2 | 1 (grants an equippable ability) |
+| 4 — Rewrite | 10 | 3 | 2 | 1 |
+| 5 — Keystone | 16 | 1 | 4 | 1 |
+
+Nodes per branch: **12**. Full branch cost: **3x2 + 3x2 + 2x2 + 3x2 + 4 = 26 points.**
+
+Against 30 Class Points this produces exactly the intended shape:
+
+- **One branch complete + 4 points elsewhere** (two entry nodes in a second branch, or one Tier-2 loop node). The specialist.
+- **Two branches to Tier 4** (16 + 14 = 30, one Rewrite each, no keystone). The hybrid, and genuinely competitive.
+- **Three branches to Tier 3** (10 + 10 + 10 = 30). Three abilities, no rewrites — deliberately the weakest of the three shapes, because breadth without a rule rewrite should feel thin.
+
+Keystone gating at 16 means a keystone costs a real 20-point commitment. A character can hold at most **one** keystone. That is the intended ceiling.
+
+**Ability access:** the two Tier-3 nodes in each branch each grant one equippable ability. Six abilities per class, two of them free at level 1 (one from each of the two "starter" branches per class, listed below) so a level-1 character has both ability slots filled.
+
+**Ultimate:** each class has **one** ultimate, available from level 1, per Master 7.5. Branch keystones *rewrite* the ultimate rather than replacing it. This gives three distinct ultimate behaviors per class without three ultimate assets and without breaking the "one ultimate" lock.
+
+### 0.3 Resource grammar — shared rules
+
+All five resources are replicated GAS attributes on `UBreakerAttributeSet` (the class-resource attribute already exists). They share these rules so the HUD, affixes, and tuning generalize:
+
+- **Range:** 0-100 base. `Maximum Resource` (universal core affix, Master 3.2) raises the ceiling. `Resource (regen /s)` raises passive regeneration where the class has any.
+- **Generation is capped per second, per source.** Each class defines a per-source rate cap. This is the anti-farm rule and it is not optional; it is what stops wall-humping for Momentum and self-harm for Grit.
+- **Generation events carry a proc coefficient**, consistent with Master 6.4. A DoT tick generates at its proc coefficient, not at 1.0.
+- **Spending is the only gate on class abilities in three of five classes.** Caster and Gunsmith spend resource with no cooldown; Swift, Tank, and Support use a short cooldown *plus* resource, because their generation is event-driven and spikier.
+- **No resource decays in a menu, at a Forge, or in the Anchor.** Decay is combat-state gated.
+- **Resource on Kill / Resource on Damage Taken / Resource Cost Reduction affixes (Master 3.9) apply to all five.** Cost reduction is the additive Increased bucket; it does not create a More multiplier.
+
+---
+
+# 1. SWIFT — Momentum
+
+**Prototypes first.** Kinetic tests the movement boundary; Marksman tests the projectile framework (Master 7.5).
+
+**Fantasy:** the character who is punished for standing still. Not the fastest character in a straight line — the character whose damage, defense, and resource all come from *not being where the enemy aimed*.
+
+## 1.1 The Momentum loop
+
+Momentum is a 0-100 bar that fills from purposeful movement and drains when the player stops. It is the only resource in the game that is *lost* by inaction rather than merely un-generated.
+
+**Generation**
+
+| Source | Rate | Cap / anti-farm rule |
+|---|---|---|
+| Ground speed above 750 cm/s (slide entry threshold) | +6/s at sprint, scaling linearly to +10/s at 1250 cm/s | Requires net displacement: 3.0 m of world-space displacement per second of credit. Running into a wall generates nothing. |
+| Airborne | +8/s | Capped at 3.0s of continuous air credit; resets on ground contact. Kills bunny-farm loops. |
+| Slide | +12/s | Only while the slide is above the 750 cm/s threshold. Braked slides stop generating. |
+| Dash | +10 flat | Once per dash charge consumed; no credit from cooldown-refunded charges beyond one per 1.0s. |
+| Wall ride | +10/s | Master 5.4 forbids wall riding generating *speed*; it may generate *resource*. Capped at 0.85s, the wall-ride maximum. |
+| Successful dodge (passive evade fires) | +15 flat | 0.5s internal cooldown. This is the class fantasy line in Layer-Ownership: "Swift converts evasion into Momentum." |
+| Weak-point hit while airborne or sliding | +5 flat | 0.25s internal cooldown. Proc coefficient applies. |
+
+**Global generation cap: 25 Momentum per second from all sources combined.** Without it, an airborne sliding dashing headshot stacks four sources into a full bar in under a second.
+
+**Decay**
+
+- Grounded and below 400 cm/s for 1.0s: **-15/s**.
+- Grounded and below 750 cm/s but above 400: **-6/s**.
+- Above threshold, airborne, sliding, or wall riding: no decay.
+- ADS while stationary: decay applies at the normal rate. Swift does not get to camp scoped at full bar. Marksman's Tier-4 rewrite is the *only* thing that changes this, and it is a deliberate branch payoff.
+
+**Spending**
+
+Swift abilities cost Momentum **and** carry a short cooldown (3-8s). The cooldown prevents a full bar from being dumped into one instant; the cost prevents the cooldown from being the only constraint.
+
+**Momentum tiers** — several nodes and the ultimate read thresholds rather than the raw value. Three bands, displayed on the HUD as distinct states:
+
+| Band | Range | Name |
+|---|---|---|
+| Low | 0-33 | Settled |
+| Mid | 34-66 | Running |
+| High | 67-100 | **Redline** |
+
+Redline is the state the whole class is built to hold. Nodes that reward it are the spine of the tree.
+
+**Solo viability:** every generation source is self-produced. No ally, no target, no ability required. A Swift with an empty weapon still fills the bar by moving. CONFIRMED against Master 11.1.
+
+## 1.2 Swift abilities (6) + ultimate
+
+Two are granted free at level 1 (marked *starter*): Slipcut and Skim. The other four are Tier-3 node grants.
+
+| # | Ability | Branch | Cost | CD | Behavior |
+|---|---|---|---|---|---|
+| S1 | **Slipcut** *starter* | Frenzy | 20 Momentum | 4s | 0.4s window in which every weapon hit has its cadence cost halved (fires at 2x rate, consumes ammo normally). Ends early on reload. Rewards holding a full magazine into the window. |
+| S2 | **Cadence Break** | Frenzy | 35 Momentum | 8s | Instantly completes the current reload and grants a 3s state: each consecutive hit on the same target adds a stacking flat damage bonus (10 stacks max, resets on miss or target swap). Explicitly the *flat* bucket, not Increased — it must not double-dip with Damage Ramp. |
+| S3 | **Skim** *starter* | Kinetic | 15 Momentum | 3s | Directional impulse that preserves current horizontal speed and converts it into a lateral or backward vector. Not a dash (dash is base kit and untouched) — Skim has no speed floor and *cannot* increase speed. It redirects. Usable airborne once per airtime. |
+| S4 | **Hard Stop** | Kinetic | 30 Momentum | 6s | Cancels all velocity instantly and grants 0.6s of Damage Reduction While Airborne treatment on the ground. The counter-intuitive Swift ability: dumping Momentum to stop is a real tactical option, and it feeds Kinetic's "spend to survive" identity. |
+| S5 | **Sightline** | Marksman | 25 Momentum | 6s | Next shot fired within 2s pierces all targets in a line and cannot be blocked by cover-state enemies. Pierce here is a granted rule, distinct from the Pierce affix, and stacks additively with it (max +3 total). |
+| S6 | **Lead** | Marksman | 40 Momentum | 10s | Marks the target under the crosshair for 6s. Shots that hit the mark from more than 25 m away are treated as weak-point hits regardless of impact location. Range gate is what stops it being a free crit engine at close quarters. |
+
+**ULTIMATE — OVERDRIVE.** Cost: 100 Momentum (full bar). No cooldown; the cost *is* the cooldown.
+
+Base behavior: for 8 seconds, Momentum does not decay and all Momentum generation is doubled against the per-second cap (cap raised to 40/s). The player is locked at whatever band they entered at, minimum Redline.
+
+Branch keystones rewrite it:
+
+- **Frenzy keystone (Bloodrhythm):** Overdrive additionally makes every weapon hit refund 1 Momentum, and the ultimate ends immediately if the player goes 1.5s without landing a hit. Aggression-gated.
+- **Kinetic keystone (Terminal Velocity):** Overdrive grants unlimited dash charges for its duration and removes the wall-ride timer. Speed guardrails in Master 5.4 still apply — no self-acceleration past sprint, wall ride still generates no speed. This is an *availability* rewrite, not a speed rewrite.
+- **Marksman keystone (Standing Wave):** Overdrive freezes Momentum entirely (no gain, no loss) and converts the frozen value into weapon range and projectile speed treatment: shots behave as if fired at point-blank regardless of distance for the duration. The stationary Swift ultimate.
+
+## 1.3 Swift branch — FRENZY
+
+Identity: trigger discipline and cadence. The branch that wants a full magazine and a target that stays in front of it. Frenzy is the *least* mobile Swift branch on purpose — it is the answer to "what if I want Swift's resource but a shooter's rhythm."
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| F1 — Trigger Discipline | 1 | 2 | 1 | Momentum generation from weak-point hits no longer requires being airborne or sliding. R2: internal cooldown 0.25s -> 0.15s. |
+| F2 — Loaded | 1 | 2 | 1 | Reloading while at Redline refunds ammunition to the magazine equal to the shots fired in the previous 2s (R1: half, R2: all). Rule rewrite; does not touch reload speed. |
+| F3 — Short Leash | 1 | 2 | 1 | Momentum decay below 400 cm/s is delayed by 0.6s per rank. The node that makes Frenzy playable as a grounded shooter. |
+| F4 — Rhythm | 2 | 2 | 1 | Every 5th consecutive hit on any target generates +8 Momentum, ignoring the global per-second cap. R2: every 4th. Missing resets the counter. |
+| F5 — Dry Fire | 2 | 2 | 1 | Firing the last round in a magazine generates +12 Momentum. R2: also refunds 1s of ability cooldown. Rewards emptying rather than tapping. |
+| F6 — Feed | 2 | 2 | 1 | Kills refund Momentum equal to 10% of the ability cost most recently paid (R2: 20%). Ties the loop to the kill without a flat Resource on Kill duplicate. |
+| F7 — Slipcut Mastery | 3 | 1 | 2 | **Grants S2 Cadence Break.** Slipcut's window extends by 0.15s for each ability cooldown currently active. |
+| F8 — Ammunition Economy | 3 | 1 | 2 | Ammo Returned on Kill triggers also generate 5 Momentum. Explicit affix-to-class bridge: this is the class layer *reading* the affix layer, not duplicating it. |
+| F9 — Second Wind | 4 | 1 | 2 | Cadence Break's stacking flat bonus no longer resets on target swap; it resets only on a full second without a hit. Rewrite. |
+| F10 — Redline Trigger | 4 | 1 | 2 | While at Redline, weapon cadence is treated as one tier faster for the purposes of the Damage Ramp Primary affix (stacks accrue at double rate). Reads an affix, changes its rule, adds no percentage. |
+| F11 — No Safety | 4 | 1 | 2 | Momentum decay is doubled, and abilities cost 40% less Momentum. Straight rewrite with a real downside; this is the node that makes Frenzy read as a *class* choice rather than a bonus. |
+| F12 — BLOODRHYTHM (keystone) | 5 | 1 | 4 | Rewrites Overdrive (above). **More multiplier (1 of 3):** while at Redline, weapon damage is multiplied by 1.20. This is Swift's Frenzy More and the only one in this branch. |
+
+## 1.4 Swift branch — KINETIC
+
+Identity: the specialist home for velocity, aerial work, and evasion. Kinetic does not make the player *faster* — Master 5.4 forbids it. It makes the player *harder to resolve*: more direction changes, more air time, more value extracted per unit of speed.
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| K1 — Read the Room | 1 | 2 | 1 | Airborne Momentum generation credit cap 3.0s -> 4.0s (R2: 5.0s). Loop modifier. |
+| K2 — Contact | 1 | 2 | 1 | Wall ride Momentum generation continues for 0.4s after loss of contact (R2: 0.8s). Does not extend the wall ride itself — Master 5.3's 0.85s cap is untouched. |
+| K3 — Carry | 1 | 2 | 1 | Slide-into-slide chaining generates a flat +10 Momentum on each successful chain (R2: +18), ignoring the per-second cap. Reads the Boots exclusive affix; does not grant chaining. |
+| K4 — Redirect | 2 | 2 | 1 | Skim's cooldown is reduced by 1.0s each time the player changes horizontal facing by more than 90 degrees while airborne (R2: 1.5s), max once per airtime. |
+| K5 — Evade Conversion | 2 | 2 | 1 | Successful dodge Momentum gain 15 -> 25 (R2: 35), and the internal cooldown drops to 0.3s. The Layer-Ownership class-fantasy node stated literally. |
+| K6 — Landing | 2 | 2 | 1 | Landing from more than 4 m of fall converts the fall's kinetic energy into Momentum (+1 per metre above 4, cap +25). R2: also refunds one dash charge. Interacts with Fall Damage Reduction; does not require it. |
+| K7 — Skim Discipline | 3 | 1 | 2 | **Grants S4 Hard Stop.** Skim may be used twice per airtime instead of once. |
+| K8 — Air Work | 3 | 1 | 2 | While airborne at Redline, the Accuracy While Airborne affix is treated as if one tier higher. If the player has none, grants the T5 value. Scales a verb the affix layer owns — flagged below as a CONFLICT candidate. |
+| K9 — Momentum Shield | 4 | 1 | 2 | While at Redline, incoming damage is reduced by an amount equal to the Damage Reduction While Airborne affix value even when grounded. Rewrite: it changes *when* an existing stat applies, not its magnitude. |
+| K10 — Spend to Live | 4 | 1 | 2 | Hard Stop's protective window becomes full damage immunity for its 0.6s, but its cost rises to 60 Momentum. Explicit cost-for-power rewrite, and the invulnerability-loop risk in Master 7.10.4 is bounded by the 6s cooldown and the 60 cost. |
+| K11 — No Ground | 4 | 1 | 2 | Momentum no longer decays while airborne *or* within 0.5s of leaving the ground, and grounded decay increases by 50%. |
+| K12 — TERMINAL VELOCITY (keystone) | 5 | 1 | 4 | Rewrites Overdrive (above). **More multiplier (2 of 3):** while airborne, weapon damage is multiplied by 1.25. Airborne-only is the tax that keeps it from being a general 1.25x. |
+
+## 1.5 Swift branch — MARKSMAN
+
+Identity: projectile behavior — ricochet, pierce, arcs, range. Marksman is the branch that makes Momentum *bankable*: the only branch that can hold a bar while stationary, and it pays for that privilege with a Tier-4 node rather than getting it free.
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| M1 — Long Lens | 1 | 2 | 1 | Weak-point hits beyond 30 m generate +8 Momentum (R2: +14), separate internal cooldown from F1. |
+| M2 — Steady | 1 | 2 | 1 | ADS while moving above the slide threshold does not increase spread. R2: ADS while airborne likewise. A rule rewrite of a handling behavior; no percentage. |
+| M3 — Ledger | 1 | 2 | 1 | Momentum spent on Marksman abilities is refunded at 25% (R2: 50%) if the ability's effect lands a hit within its window. Anti-whiff. |
+| M4 — Angle | 2 | 2 | 1 | Ricochets from the Ricochet Chance affix seek the nearest target within 12 m instead of reflecting geometrically (R2: 20 m). Rewrites an affix's behavior; adds no chance. |
+| M5 — Mark Economy | 2 | 2 | 1 | Lead's mark persists through the target's death and jumps to the nearest enemy within 15 m (R2: 25 m). Proc coefficient 0 on the jump — it cannot chain-generate. |
+| M6 — Pierce Discipline | 2 | 2 | 1 | Each target pierced by a single shot generates +4 Momentum (R2: +7). Caps at 3 targets to bound Multishot/Pierce interaction. |
+| M7 — Sightline | 3 | 1 | 2 | **Grants S5 Sightline.** Sightline's pierce also ignores Armour on the second and subsequent targets. |
+| M8 — Lead | 3 | 1 | 2 | **Grants S6 Lead.** Lead may be held on two targets simultaneously. |
+| M9 — Reserve | 4 | 1 | 2 | **Momentum does not decay while ADS.** The stationary-Swift unlock, deliberately priced at Tier 4 in a single branch. Generation while ADS-stationary remains zero — this holds a bar, it does not build one. |
+| M10 — Overpenetration | 4 | 1 | 2 | Shots that kill a target continue with their full remaining damage instead of the Pierce falloff. Bounded by the Pierce cap. |
+| M11 — Called Shot | 4 | 1 | 2 | While at Redline, Lead's range gate drops from 25 m to 10 m. Band-gated rewrite of the ability's own rule. |
+| M12 — STANDING WAVE (keystone) | 5 | 1 | 4 | Rewrites Overdrive (above). **More multiplier (3 of 3):** shots that hit beyond 40 m are multiplied by 1.25. Swift's three More multipliers are now spent; no further node in this class may author one. |
+
+## 1.6 Swift — worked builds against 30 points
+
+| Build | Spend | Reads as |
+|---|---|---|
+| Pure Kinetic | K1(2) K2(2) K3(2) K4(2) K5(2) K6(2) K7(2) K8(2) K9(2) K10(2) K11(2) K12(4) = 26, +4 into F1/F3 | Airborne duelist. 1.25x airborne. Never lands. |
+| Kinetic/Marksman hybrid | K1-K7 to 16, M1-M3 + M7 to 14 = 30 | Two abilities, one rewrite each side, no keystone. Air-mobile pierce. |
+| Frenzy specialist | F1-F12 = 26, +4 into M1/M2 | Grounded shooter with a resource bar. Redline 1.20x. |
+| Triple splash | Each branch to Tier 3 (10 each) = 30 | Three abilities available, two equippable. Deliberately flat. |
+
+## 1.7 Swift acceptance criteria
+
+1. A player who ignores every advanced movement verb (walk, sprint, jump only) reaches and holds the Running band during a normal encounter, and reaches Redline at least once per encounter. If not, Momentum is a mobility tax and Master 7.10.7 is violated.
+2. Standing still in an open room for 8 seconds drains a full bar to zero. Measured, not assumed.
+3. No input pattern generates more than 25 Momentum/s. Verify by driving every source simultaneously in the Gym.
+4. Wall-riding into a corner with no net displacement generates zero Momentum from the ground source and stops generating from the wall source at 0.85s.
+5. Overdrive cannot be re-cast within 8 seconds of ending under any node combination. Verify with Bloodrhythm + Feed + Rhythm, the fastest known refill.
+6. A Kinetic build's effective damage multiplier from class sources never exceeds 1.25x. Verify no second More has crept in via an ability.
+7. Equipping two Frenzy abilities and a Kinetic keystone is legal and produces a coherent, non-degenerate character. Cross-branch loadouts must not be punished by the tree topology.
+
+---
+
+# 2. CASTER — Mana
+
+**Prototypes second.** Multispell and Void Whisperer validate statuses and reactions; Spellblade tests ability-driven close combat (Master 7.5).
+
+**Fantasy:** the only class whose weapon is a *resource generator* rather than the primary damage source. The Caster shoots to pay for spells. A Caster with a full Mana bar and no ammunition is still dangerous; a Caster with full ammunition and no Mana is a worse shooter than every other class.
+
+## 2.1 The Mana loop
+
+Mana is a 0-100 bar with slow passive regeneration and fast conditional generation. Unlike Momentum it never decays — it is a *bank*, not a *state*. This is the deliberate opposite of Swift, and it is why the two classes prototype together: they prove the resource attribute supports both a decaying state machine and an accumulating wallet.
+
+**Generation**
+
+| Source | Rate | Cap / anti-farm rule |
+|---|---|---|
+| Passive regeneration | +2.0/s, always, in and out of combat | Scaled by the universal `Resource (regen /s)` affix. Alone, a full bar takes 50s — usable but never sufficient. |
+| Weapon hit | +1.5 | Proc coefficient applies. Multishot pellets generate at 1/n, so a shotgun and a rifle bank at comparable rates. **This is the anti-Multishot rule and it is mandatory.** |
+| Weak-point hit | +4.0 | Replaces the weapon-hit gain, does not stack with it. |
+| Kill | +8.0 | Flat. Stacks with `Resource on Kill`. |
+| Status application (Bleed, Poison, and later elemental) | +3.0 | 0.4s internal cooldown *per status type*. DoT ticks generate nothing — only applications. Prevents Tick Frequency from becoming a Mana engine. |
+| Reload completed | +6.0 | Once per reload; no credit for cancelled reloads. Rewards the down-time the class already has. |
+
+**Global generation cap: 20 Mana per second.** Lower than Swift's because Caster generation is target-dependent and a dense pack would otherwise fill the bar instantly.
+
+**Spending**
+
+Caster abilities cost Mana and have **no cooldown**. Mana *is* the cooldown. This is the class's defining ergonomic: a Caster can cast the same spell three times in a row if they can pay, and that decision is the gameplay.
+
+Exception: the ultimate has a cost and no cooldown, like everything else.
+
+**Overcast — EXTENDS.** Any Caster ability may be cast at up to 20 Mana below zero, driving the bar negative. While Mana is negative:
+
+- All passive and conditional generation is doubled until the bar returns to zero.
+- The player takes 15% increased damage from all sources.
+- No further ability may be cast until Mana is at or above zero.
+
+Overcast is the mechanic that makes the Caster solo-viable in a burst window without giving them infinite resource, and it is the hook every Caster branch modifies. It is an EXTENDS on the master sheet, which specifies Mana only as "rewards active spell use, kills, and precision without becoming infinite during dense encounters." Overcast satisfies that clause by making the fourth cast expensive rather than impossible.
+
+**Solo viability:** passive regeneration alone sustains a Caster at a slow rate with no target present. CONFIRMED against Master 11.1.
+
+## 2.2 Caster abilities (6) + ultimate
+
+Starters: Cleave and Rot.
+
+| # | Ability | Branch | Cost | CD | Behavior |
+|---|---|---|---|---|---|
+| C1 | **Cleave** *starter* | Spellblade | 20 Mana | — | Short forward melee arc, 3 m, physical damage scaled by weapon damage. Applies Bleed at a 100% base chance. The Caster's only melee verb and the reason Melee Damage % affixes have a class home. |
+| C2 | **Closequarter** | Spellblade | 35 Mana | — | Blink to the target under the crosshair within 12 m, arriving 2 m short of it. Not a dash and not a grapple — instantaneous, no travel, no tether, no velocity carried. Landing refunds 15 Mana if the target is at or below 40% health. |
+| C3 | **Rot** *starter* | Void Whisperer | 25 Mana | — | 4 m radius zone at the aim point, 6s duration. Enemies inside take Poison and have their Armour reduced by a flat 40. Zones are the Void Whisperer's whole grammar. |
+| C4 | **Siphon** | Void Whisperer | 30 Mana | — | 5s channel on one target: deals Void damage over time and heals the caster for a portion. Channel breaks on the caster taking damage above a threshold. The class's only self-heal and the branch's solo answer. |
+| C5 | **Fracture** | Multispell | 30 Mana | — | Projectile that applies one status, cycling deterministically through the caster's available status types on each cast. The sequencing enabler; the cycle order is visible on the HUD. |
+| C6 | **Resonance** | Multispell | 40 Mana | — | Detonates every status currently on the target for a burst of damage, consuming them. Damage scales with the *number* of distinct status types, not their stacks — an explicit anti-stacking rule that protects Master 7.10.5. |
+
+**ULTIMATE — UNMAKE.** Cost: 80 Mana. No cooldown.
+
+Base behavior: for 6 seconds, all Caster abilities cost 0 Mana, and Mana generation is suspended. The bar's remaining value at cast time is irrelevant; the window is fixed. Interacts cleanly with Overcast — a Caster can Overcast into Unmake and spend the debt during the free window.
+
+Branch keystones rewrite it:
+
+- **Spellblade keystone (Edgework):** during Unmake, Cleave has no animation lock and Closequarter has no range limit within line of sight. The mobility ultimate.
+- **Void Whisperer keystone (Long Dark):** Unmake's duration becomes 12s but abilities cost 50% instead of 0%. Zones placed during it do not expire until the window ends. The attrition ultimate.
+- **Multispell keystone (Cascade):** during Unmake, every status application also applies the next status in Fracture's cycle at proc coefficient 0. The reaction ultimate. Proc coefficient 0 is load-bearing: without it this is the recursion bomb named in Master 7.10.1.
+
+## 2.3 Caster branch — SPELLBLADE
+
+Identity: close-range spell/melee hybrid and target-crossing mobility. The branch that converts the Mana bank into position.
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| SB1 — Contact Charge | 1 | 2 | 1 | Melee hits generate Mana at the weak-point rate (+4.0) instead of the weapon-hit rate. R2: +6.0. |
+| SB2 — Follow Through | 1 | 2 | 1 | Cleave's Bleed application also generates its status-application Mana even if Bleed is already present (R2: and refunds 5 Mana on kill). Bypasses the 0.4s per-type internal cooldown for melee only. |
+| SB3 — Close | 1 | 2 | 1 | Weapon hits within 8 m generate double Mana (R2: within 12 m). The range-gated generation node that defines the branch's play distance. |
+| SB4 — Debt | 2 | 2 | 1 | Overcast's negative floor extends from -20 to -35 (R2: -50). More rope. |
+| SB5 — Momentum Transfer | 2 | 2 | 1 | Closequarter's arrival grants 0.4s in which the next melee hit cannot be blocked or dodged by the target (R2: 0.8s). Rewrites the target's defensive roll, not the player's damage. |
+| SB6 — Bloodprice | 2 | 2 | 1 | While Mana is negative, melee hits restore health equal to a portion of damage dealt (R2: doubled). Turns the Overcast penalty into a sustain window. |
+| SB7 — Blink | 3 | 1 | 2 | **Grants C2 Closequarter.** Closequarter may be cast with no target to blink 12 m in the aim direction. |
+| SB8 — Edge | 3 | 1 | 2 | Cleave's arc widens to 180 degrees and its Bleed applies to every target hit. Rule change; no damage percentage. |
+| SB9 — Reprisal | 4 | 1 | 2 | When the passive Block roll fires, the next Cleave within 2s costs 0 Mana. Reads the passive defensive layer as a resource source. |
+| SB10 — No Distance | 4 | 1 | 2 | Closequarter's Mana refund triggers at 100% health instead of 40%, but its cost rises to 50. Reshapes the ability from an execute tool into a traversal tool. |
+| SB11 — Overreach | 4 | 1 | 2 | While Mana is negative, all Caster abilities are cast at no cost *and* the damage-taken penalty rises from 15% to 30%. The full Overcast commitment. |
+| SB12 — EDGEWORK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (1 of 3):** melee damage is multiplied by 1.30. Melee-only is the tax. |
+
+## 2.4 Caster branch — VOID WHISPERER
+
+Identity: damage over time, sustain, and controlled zones. The attrition branch and the one that most directly exercises the status architecture.
+
+**BLOCKED:** every elemental line in this branch (Fire, Frost, Shock references) waits on the resistance model missing from Master 6.1. Void, Bleed, and Poison are physical or armour-facing and can ship now. Nodes below are authored so that **no node requires an element to function** — elemental interactions are additive upgrades, not prerequisites.
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| VW1 — Seep | 1 | 2 | 1 | Status applications generate +5.0 Mana instead of +3.0 (R2: +7.0). |
+| VW2 — Standing Water | 1 | 2 | 1 | Zones generate 2 Mana/s while at least one enemy is inside (R2: 4/s), independent of enemy count. Count-independence is the anti-farm rule. |
+| VW3 — Patience | 1 | 2 | 1 | Passive Mana regeneration doubles while the caster has not fired a weapon for 2s (R2: 1.2s). The stand-back generation node. |
+| VW4 — Lingering | 2 | 2 | 1 | Zone duration is refreshed, not stacked, when a second zone overlaps it (R2: refreshed and its radius grows by 1 m, once). Explicit anti-stack rule. |
+| VW5 — Attrition | 2 | 2 | 1 | Enemies killed while affected by a Caster DoT refund 15 Mana (R2: 25). |
+| VW6 — Drain | 2 | 2 | 1 | Siphon's channel no longer breaks on damage below 15% of max health (R2: 30%). |
+| VW7 — Zonework | 3 | 1 | 2 | **Grants C3 Rot upgrade path / grants C4 Siphon.** Rot's Armour reduction becomes 40 flat plus an additional 40 against targets already affected by a DoT. Flat armour, not percentage — protects the boss cap in Master 7.10.5. |
+| VW8 — Wellspring | 3 | 1 | 2 | Zones may be placed on the caster's own position and move with them for their duration. One at a time. |
+| VW9 — Snapshot Discipline | 4 | 1 | 2 | DoTs applied while the caster is standing inside their own zone snapshot as if the caster's Critical Chance were 25 points higher. Reads Master 6.4's snapshot contract directly. Does not create a second multiplier. |
+| VW10 — Terminal | 4 | 1 | 2 | DoTs applied by this Caster do not expire on targets below 25% health; they persist until death or cleanse. |
+| VW11 — Long Debt | 4 | 1 | 2 | While Mana is negative, all Caster DoTs tick at double frequency and the caster takes 25% increased damage instead of 15%. **CONFLICT — this interacts with the unresolved Tick Frequency cap (Master 3.7 / 3.15). If tick interval is snapshotted, this node must apply at application time only. Do not implement before that question resolves.** |
+| VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. |
+
+## 2.5 Caster branch — MULTISPELL
+
+Identity: sequencing different statuses to create reactions. The branch that reads the shared status container and the Elements constellation without duplicating either.
+
+**BLOCKED:** cross-element reactions require the reaction matrix Data Asset (Character-Progression-Architecture, Elements) and the missing resistance step. Multispell ships in a physical-only form (Bleed/Poison/Void) and expands when elements exist. Every node below is authored against "distinct status types," not against named elements, so the branch does not need rewriting later.
+
+| Node | Tier | Ranks | Cost/rank | Effect |
+|---|---|---|---|---|
+| MS1 — Variance | 1 | 2 | 1 | Applying a status type the target does not already have generates double Mana (R2: triple). The core sequencing incentive stated as a resource rule. |
+| MS2 — Cycle | 1 | 2 | 1 | Fracture's cycle advances on hit rather than on cast, so a missed cast does not waste a position (R2: the next position is previewed on the HUD 1 cast ahead). |
+| MS3 — Reservoir | 1 | 2 | 1 | Maximum Mana +15 (R2: +25). **The one intentional stat node in this document** — Multispell needs headroom to hold multi-cast sequences and the alternative is a cost reduction that would double-dip with the affix layer. Flagged as a knowing exception in Open Questions. |
+| MS4 — Chain | 2 | 2 | 1 | A target carrying 2 distinct status types spreads the *newest* one to the nearest enemy within 8 m on application (R2: 12 m). Proc coefficient 0 on the spread; the spread cannot itself spread. Mirrors Affliction's Contagion normalization rule. |
+| MS5 — Payment | 2 | 2 | 1 | Resonance refunds 5 Mana per distinct status consumed (R2: 10). |
+| MS6 — Sequence | 2 | 2 | 1 | Applying 3 distinct status types to one target within 4s generates 20 Mana (R2: 30), once per target per 10s. |
+| MS7 — Fracture | 3 | 1 | 2 | **Grants C5 Fracture.** Fracture applies two cycle positions at once instead of one. |
+| MS8 — Resonance | 3 | 1 | 2 | **Grants C6 Resonance.** Resonance no longer consumes the statuses it detonates; instead it halves their remaining duration. |
+| MS9 — Interference | 4 | 1 | 2 | Resonance's damage scaling changes from linear in distinct-status-count to a fixed value per status *plus* a flat bonus at 3+. Deliberately re-shaped away from a count multiplier — the anti-explosion rewrite. |
+| MS10 — Prepared | 4 | 1 | 2 | Overcast's doubled generation also applies to Multispell's status-application bonuses, and the negative floor drops to -35. |
+| MS11 — Conductor's Rule | 4 | 1 | 2 | Only one reaction may trigger per target per 0.5s, and reactions that would have triggered instead grant 10 Mana. Turns the "same application must not trigger multiple reactions" architecture requirement into a *player-facing benefit* rather than an invisible clamp. |
+| MS12 — CASCADE (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (3 of 3):** damage against targets carrying 3 or more distinct status types is multiplied by 1.25. Caster's three More multipliers are now spent. |
+
+## 2.6 Caster — worked builds against 30 points
+
+| Build | Spend | Reads as |
+|---|---|---|
+| Pure Void Whisperer | VW1-VW12 = 26, +4 into MS1/MS3 | Zone attrition. 1.30x DoT. Slow, safe, boss-facing. |
+| Spellblade specialist | SB1-SB12 = 26, +4 into VW1/VW3 | Melee burst, Overcast-fueled, 1.30x melee. Highest risk profile in the game. |
+| Multispell/Void hybrid | MS to Tier 4 (16) + VW1-VW6 + VW7 (14) = 30 | Status breadth, no keystone, best generalist. |
+| Spellblade/Multispell | SB to 16, MS1-MS3 + MS7 (14) = 30 | Melee applicator. Cleave applies, Resonance detonates. |
+
+## 2.7 Caster acceptance criteria
+
+1. A Caster who never fires their weapon can still cast one 25-cost ability roughly every 13 seconds from passive regeneration alone. Verified in an empty Gym room.
+2. A Caster firing a Shotgun and a Caster firing a Rifle generate Mana within 15% of each other over a 30-second sustained window. If not, the Multishot 1/n rule is wrong.
+3. DoT ticks generate zero Mana under every node combination. Verify with VW1 + MS1 + maximum Tick Frequency.
+4. Overcast cannot produce a net-positive Mana loop: entering Overcast and spending the debt must always cost more real time than casting from a positive bar. Verify with SB4 + SB11 + MS10, the deepest debt configuration.
+5. Resonance's damage against a target with 6 statuses is no more than 2.2x its damage against a target with 2 statuses, after MS9. Bounds Master 7.10.5.
+6. Cascade + MS4 (Chain) does not produce unbounded status propagation. Verify with 20 enemies in a 10 m radius; propagation must terminate within one generation.
+7. No Caster node grants a movement verb. Closequarter is an *ability* occupying a loadout slot, not a base-kit addition — a Caster who equips neither Spellblade ability has base-kit mobility only.
+
+---
+
+# 3. GUNSMITH — Scrap (one-page treatment)
+
+**Fantasy:** the battlefield is a workshop. The Gunsmith's power is *placed* rather than held, and their weakness is that placement takes time they may not have.
+
+**Scrap loop.** 0-100, no decay, no passive regeneration. Purely event-driven — the only class with zero idle generation, because deployables are permanent-until-destroyed and idle generation would mean free permanent power.
+
+| Source | Rate | Cap rule |
+|---|---|---|
+| Kill | +12 | Flat. |
+| Reload completed | +4 | Once per reload. |
+| Emptying a magazine before reloading | +8 additional | Rewards commitment. |
+| Deployable destroyed (yours) | +50% of its cost | Refund, not profit. |
+| Damage dealt by your deployables | +1 per 500 damage | 0.5s internal cooldown. The solo self-sufficiency line: a placed turret pays for the next one. |
+
+Global cap 15/s. Spending: deployables cost 25-60 Scrap and are the only Gunsmith abilities with no cooldown; personal abilities have cooldowns and no cost.
+
+**Deployable density cap: 4 active, 2 of any one type.** Enforced by the owning component per Character-Progression-Architecture. Placing a fifth destroys the oldest and refunds it.
+
+**Branches.** *Armory* — personal weapon modification and ammunition economy; the branch that is playable with zero deployables placed and is therefore the solo baseline. *Field Tech* — turrets, ammo crates, buff pylons; the branch that pays for itself. *Tinkerer* — traps, mines, disruption; the branch that requires knowing where the enemy will be.
+
+**Abilities (6).** Sidearm Rig *(starter, Armory: 10s CD, next magazine deals bonus flat damage and pierces)*; Overhaul *(Armory: converts reserve ammo into magazine capacity for 10s)*; Turret *(starter, Field Tech: 40 Scrap, autonomous, 30s lifetime)*; Ammo Crate *(Field Tech: 30 Scrap, refills reserve on interact, solo-usable)*; Mine Cluster *(Tinkerer: 35 Scrap, 3 proximity charges)*; Disruptor *(Tinkerer: 45 Scrap, field that slows and strips Armour)*.
+
+**Ultimate — FIELD ASSEMBLY.** 100 Scrap. Deploys all currently unlocked deployable types at once at no individual cost, and raises the density cap to 8 for 20s. Keystone rewrites: *Armory (Machinist)* — Field Assembly instead applies every deployable's effect to the player's own weapon for 20s, the solo/no-deployable ultimate; *Field Tech (Foundry)* — deployables placed during it never expire; *Tinkerer (Minefield)* — deployables placed during it are invisible until triggered.
+
+**Tree shape.** Standard 12-node/26-point shape from 0.2. Node character: Armory nodes rewrite ammunition rules (magazine-to-reserve conversion, reload-as-a-resource-event); Field Tech nodes rewrite deployable lifetime, targeting, and the density cap itself; Tinkerer nodes rewrite trigger conditions and rearm behavior. **More budget: three, one per branch keystone.**
+
+**Solo note.** Field Tech's Ammo Crate and Turret both function with no allies present; the deployable-damage Scrap source means a solo Gunsmith's economy closes without a party. CONFIRMED against Master 11.1.
+
+**Acceptance criteria.** (1) A Gunsmith who places nothing is still a functional shooter via Armory. (2) Deployable density never exceeds the cap under Field Assembly + any node combination. (3) Deployable damage cannot generate more Scrap than the deployable cost, over the deployable's full lifetime, against a stationary target. (4) No deployable can be placed inside geometry or outside line of sight of the placement point.
+
+---
+
+# 4. TANK — Grit (one-page treatment)
+
+**Fantasy:** the only class that gets stronger by being hit, without ever wanting to be hit more than necessary.
+
+**Grit loop.** 0-100. Generation is post-mitigation damage taken, per the architecture doc's explicit instruction, plus aggression sources so the loop is not purely masochistic.
+
+| Source | Rate | Cap rule |
+|---|---|---|
+| Post-mitigation damage taken | +1 Grit per 2% of maximum health lost | **Post-mitigation is mandatory.** A high-Armour Tank must not out-generate a low-Armour Tank by taking the same hit. |
+| Self-inflicted damage | Generates at 25% rate | The Demolitionist anti-farm rule. Rocket-jumping must not be a Grit engine. |
+| Melee kill | +10 | |
+| Passive Block roll firing | +6 | 0.4s internal cooldown. The Layer-Ownership line: "Tank converts mitigation into Grit." |
+| Enemy within 5 m | +1.5/s | Count-independent. Rewards holding ground without rewarding pack size. |
+
+Decay: -5/s after 6s without taking damage or being within 5 m of an enemy. Global cap 20/s.
+
+Spending: abilities cost Grit and carry a 5-12s cooldown.
+
+**Branches.** *Leech* — sustain and overheal-to-shield conversion. *Bastion* — cover, shielding, enemy attention; the branch that is a genuine party role and must therefore have the strongest solo conversion (its shields convert to damage). *Demolitionist* — explosives and self-knockback traversal.
+
+**Abilities (6).** Rend *(starter, Leech: melee that heals for a portion of damage; overheal becomes shield)*; Bloodline *(Leech: 8s, all Life on Hit is doubled and applies to DoT ticks at proc coefficient)*; Anchor Point *(starter, Bastion: deployable frontal cover, 12s)*; Provoke *(Bastion: forces enemies within 10 m to target you for 4s; solo conversion — each enemy provoked grants a stacking flat damage bonus)*; Breach Charge *(Demolitionist: thrown explosive, strong self-knockback, heavily reduced self-damage)*; Ground Zero *(Demolitionist: downward slam from airborne, radial damage and stagger)*.
+
+**Ultimate — HOLD.** 100 Grit. For 10s, incoming damage is reduced to a fixed maximum per hit and Grit generation is tripled. Keystone rewrites: *Leech (Vein)* — Hold instead converts all incoming damage into healing over its duration at reduced rate; *Bastion (Wall)* — Hold's mitigation extends to all allies within 8 m and, solo, doubles for the Tank; *Demolitionist (Detonation)* — Hold ends early on command, releasing all damage absorbed during it as a radial explosion.
+
+**Self-damage policy — EXTENDS.** Per Character-Progression-Architecture, full self-damage immunity is rejected. Proposed: Demolitionist nodes grant up to 80% self-damage reduction and full self-*knockback* control, never immunity. Rocket-jumping keeps a cost. This also settles Master 12.5's open self-damage question for the Tank case only; the general weapon rule is still open.
+
+**Tree shape.** Standard 12-node/26-point shape. Node character: Leech rewrites where healing goes (overheal routing, DoT eligibility); Bastion rewrites threat, cover behavior, and shield decay; Demolitionist rewrites self-knockback and explosive falloff. **More budget: three.**
+
+**Acceptance criteria.** (1) A Tank with maximum Armour generates the same Grit per incoming hit as a Tank with none, at equal health lost. (2) Self-damage cannot sustain a Grit loop: 60 seconds of uninterrupted rocket-jumping with no enemies present must not fill the bar. (3) Provoke has a solo effect that is meaningful with zero allies. (4) No combination of Leech nodes, Hold, and the passive Block layer produces indefinite survivability — verify against Master 7.10.4.
+
+---
+
+# 5. SUPPORT — Charge (one-page treatment)
+
+**Fantasy:** force multiplication that works on a party of five and on a party of one. The hardest solo problem in the game and the one the master sheet calls out by name (7.10.6).
+
+**Charge loop — the solo rule is the design.** Charge generation must never require an ally. Every group source has a self-facing twin.
+
+| Source | Rate | Cap rule |
+|---|---|---|
+| Healing done to allies | +1 per 3% of the target's maximum health | Overheal generates nothing. |
+| **Healing or shielding done to self** | +1 per 3% of own maximum health | Identical rate. This is the anti-7.10.6 clause and it is non-negotiable. |
+| Damage dealt to a marked target | +1 per 2% of the target's maximum health | The offensive conversion path, available in all three branches. |
+| Buff uptime on any target including self | +2/s while at least one Support buff is active | Count-independent — buffing five allies generates the same as buffing yourself. **Critical:** without this, Support is a party class with a solo penalty. |
+| Assist (damage to an enemy killed by an ally within 5s) | +8 | Party-only bonus. Efficiency advantage, never a requirement. |
+
+Decay: none. Global cap 18/s. Spending: abilities cost Charge, 4-10s cooldowns.
+
+**Branches.** *Medic* — direct healing, cleanse, revive; self path is self-healing at full rate. *Conductor* — allied cadence buffs (reload, fire rate, swap); self path is that every Conductor buff applies to the Support first and to allies second. *Warden* — marks, suppression, debuffs, CC; the natively solo branch and therefore the recommended starting branch.
+
+**Abilities (6).** Patch *(starter, Medic: instant heal, applies to self at full value)*; Purge *(Medic: cleanse plus 3s status immunity, self-castable)*; Cadence *(starter, Conductor: 8s aura, reload speed and swap tempo; applies to self)*; Metronome *(Conductor: allies including self gain a stacking cadence bonus per consecutive hit)*; Mark *(Warden: 10s target mark; marked targets take increased damage and generate Charge when damaged)*; Suppress *(Warden: field that slows and reduces enemy accuracy)*.
+
+**Ultimate — CONDUIT.** 100 Charge. For 12s, all Support abilities affect every valid target in a 15 m radius simultaneously and cost no Charge. Solo, this means every self-buff runs at once. Keystone rewrites: *Medic (Triage)* — Conduit continuously heals instead of enabling free casts, and prevents one lethal hit per target; *Conductor (Downbeat)* — Conduit's cadence effects double and extend to weapon damage as a flat contribution; *Warden (Blackout)* — Conduit marks and suppresses every enemy in radius, and the Support's own damage against marked targets is the More multiplier.
+
+**Tree shape.** Standard 12-node/26-point shape. Node character: Medic rewrites where healing routes (overheal-to-shield, healing-as-damage against marked targets); Conductor rewrites buff propagation and duration rules; Warden rewrites mark behavior, mark propagation, and CC resistance handling. **More budget: three — and Warden's is the only one that is unconditional offense, which is intentional: it is the solo branch.**
+
+**Acceptance criteria.** (1) A solo Support fills the Charge bar in a normal encounter within 20% of the time a partied Support takes. This is the single most important number in the class. (2) Every branch has at least one ability that is fully effective with zero allies present. (3) Buff-uptime generation is provably count-independent. (4) Overheal generates zero Charge under all node combinations. (5) A Support's solo damage output is within 25% of the five-class median. Support may be the worst solo damage dealer; it may not be unplayable.
+
+---
+
+# 6. Cross-class checks
+
+## 6.1 More-multiplier ledger
+
+| Class | Branch | Multiplier | Condition |
+|---|---|---|---|
+| Swift | Frenzy | 1.20x weapon damage | At Redline |
+| Swift | Kinetic | 1.25x weapon damage | Airborne |
+| Swift | Marksman | 1.25x | Beyond 40 m |
+| Caster | Spellblade | 1.30x melee | Melee only |
+| Caster | Void Whisperer | 1.30x DoT | DoT only |
+| Caster | Multispell | 1.25x | Target has 3+ distinct statuses |
+| Gunsmith / Tank / Support | one per branch | TBD | To be authored with the full treatments |
+
+A character can hold **one** keystone (0.2). Therefore the class layer contributes at most **one** More multiplier, maximum 1.30x, always conditional. Combined with Anomalous items — the only other More source — the theoretical ceiling from non-crit multipliers is two conditional multipliers. This is the intended bound and should be re-verified whenever a keystone or Anomalous is added.
+
+## 6.2 Crit policy compliance
+
+No node, ability, or resource loop in this document rolls a chance to multiply damage. VW9 (Snapshot Discipline) raises Critical Chance, which is the sanctioned stat, not a parallel roll. Master 6.3 CONFIRMED.
+
+## 6.3 Verb compliance
+
+No class tree grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, block, dodge, air jump, or parry. Skim (S3) and Closequarter (C2) are *abilities occupying loadout slots*, not base-kit additions, and both are gated behind Tier-3 nodes or the starter grant. Master 5.2 CONFIRMED.
+
+## 6.4 Affix-layer compliance
+
+Nodes that reference affixes (F8, F10, K3, K8, K9, M4) read or re-rule an existing affix; none of them grants an affix's capability, and none is expressed as a flat percentage of a stat the affix layer owns. **K8 (Air Work) is the closest to the line** — it grants a floor value of Accuracy While Airborne to players who have none. Flagged in Open Questions.
+
+## 6.5 Solo compliance
+
+| Class | Idle generation | Target-free generation | Ally-free generation |
+|---|---|---|---|
+| Swift | No (decays) | **Yes** — movement | Yes |
+| Caster | **Yes** — passive regen | Yes | Yes |
+| Gunsmith | No | No — kills/reloads only | Yes |
+| Tank | No (decays) | No — requires enemies | Yes |
+| Support | No | Partial — self-buff uptime | **Yes, by explicit rule** |
+
+Gunsmith and Tank both require enemies to generate, which is correct — neither is a resource the player should bank before a fight. Master 11.1 CONFIRMED.
+
+## 6.6 Build-time compliance
+
+Class identity completes at level 30 with 30 points and a 26-point branch. A player who reaches 30 having spent every point has a complete character, and levels 31-50 add nothing to this document's systems. Master 7.1 / 7.3 CONFIRMED.
+
+---
+
+# 7. Implementation notes for the slice
+
+Per Master 7.9's vertical-slice override (slice cap 10, ~15 nodes), the slice should ship **Swift only, Kinetic and Marksman only, Tiers 1-3 only**: 6 entry nodes, 6 loop nodes, 4 ability nodes = 16 nodes, 10 points spendable. That exercises point validation, ability granting, respec, and save/load without authoring 60 nodes.
+
+Data assets required, mapping to the existing `UClassDefinitionDataAsset` / `UProgressionNodeDataAsset` shapes:
+
+- `DA_Class_Swift` — ClassId, Momentum attribute binding, 3 branch references, 2 starter abilities, 1 ultimate.
+- `DA_Branch_Kinetic`, `DA_Branch_Marksman` — node lists, tier gates, cost curve.
+- `DA_MomentumPolicy` — generation rates, per-source caps, global cap, decay thresholds and rates, band boundaries. **All Momentum tuning must live here, not in C++.** The same shape generalizes to `DA_ManaPolicy` and the other three.
+- Node effects that are pure Gameplay Effects (SB1, VW1, MS3) are content. Node effects that rewrite a rule (F2, K9, M9, MS11) need a code-side hook and should be enumerated before any of them is authored.
+
+---
+
+# 8. OPEN QUESTIONS
+
+1. **Block and dodge as passive rolls versus player inputs — CONFLICT, and it is load-bearing.** This document's brief specifies dodge as a passive chance to fully evade and block as a passive chance to reduce damage, neither being a player input. Master 5.2/7.7, Layer-Ownership, and the shipped `UBreakerCombatComponent` all treat them as *active* stamina-spending actions (frontal block stance, instant dodge negation window). Every Swift node keyed to "successful dodge" (K5, F-adjacent generation) and every Tank node keyed to "Block roll firing" reads differently under each model — passive rolls make these generation sources uncontrollable and gear-driven; active inputs make them skill-driven and stamina-gated. **This must be resolved before any class node referencing block or dodge is implemented.** Nodes above are written against the passive-roll reading per the brief, and are marked so.
+2. **Stat aggregation buckets (Master 3.15 / 6.6) still block the More-multiplier budget in 0.1.** The three-per-class cap is meaningless until modifier ordering is decided. Should the class-layer More apply before or after the Anomalous More, and do they multiply or take the highest?
+3. **Is the one-keystone-per-character ceiling correct, or should 30 points allow two?** Two keystones would require dropping branch cost to ~14, which would make full branches trivial. The current shape forces a genuine specialist/hybrid decision but may make hybrids feel like they got nothing memorable. Playtest question.
+4. Does the Caster's Overcast mechanic survive contact with the damage pipeline, or does a negative resource attribute break GAS cost prediction? Needs a technical spike before Caster prototyping.
+5. K8 (Air Work) grants a floor value of an affix the player may not have. Is that a legal class-layer action, or does it violate "affixes scale verbs the player already owns" from the other direction?
+6. MS3 (Reservoir) is the only flat-stat node in the document, granted as a knowing exception. Should it be cut and Multispell's headroom solved another way, or does one such node per class become the pattern?
+7. Momentum's global 25/s cap and Mana's 20/s are placeholders authored against no TTK. Both must be re-anchored after the Gym feedback pass alongside the affix tables.
+8. Do branch keystones rewriting a shared ultimate hold up in implementation, or does each rewrite become a separate ability asset in practice — and if so, does that violate the "one ultimate" lock?
+9. Tick Frequency's unresolved cap (Master 3.7) blocks VW11 specifically. Does the Void Whisperer branch ship without it, or wait?
+10. Support's Charge count-independence rule means a five-player Support generates no faster than a solo one from buffs. Is that the right call, or should party play retain a modest efficiency edge on that source as it does on assists?
+
+## Top three, if only three get answered
+
+1. Block/dodge — passive rolls or active inputs. Blocks Swift and Tank both.
+2. Stat aggregation buckets and More ordering. Blocks every keystone.
+3. Whether one keystone per character is the right ceiling. Shapes all fifteen branches.
