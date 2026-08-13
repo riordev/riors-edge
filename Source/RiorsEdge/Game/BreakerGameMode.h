@@ -29,4 +29,5 @@ private:
     void SpawnMovementCourse(const APawn* Pawn);
     void SpawnCombatEncounter(const APawn* Pawn);
     void SpawnSafeZone(const APawn* Pawn);
+    void SpawnAnchorCamp(const APawn* Pawn);
 };

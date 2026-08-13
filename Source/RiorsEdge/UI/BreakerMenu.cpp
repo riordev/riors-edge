@@ -4,6 +4,7 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Interaction/BreakerNPC.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -63,8 +64,21 @@ void SBreakerMenu::ShowInventory()
     Rebuild(EBreakerMenuScreen::Inventory);
 }
 
+void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
+{
+    DialogueNPC = NPC;
+    DialogueNodeId = NPC ? NPC->GetStartNodeId() : NAME_None;
+    RootScreen = EBreakerMenuScreen::Pause;
+    Rebuild(EBreakerMenuScreen::Dialogue);
+}
+
 void SBreakerMenu::HandleEscape()
 {
+    if (CurrentScreen == EBreakerMenuScreen::Dialogue)
+    {
+        if (Character.IsValid()) Character->ResumeFromMenu();
+        return;
+    }
     if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect)
     {
         Rebuild(RootScreen);
@@ -86,6 +100,7 @@ void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Loadout: ContentHost->SetContent(BuildLoadoutScreen()); break;
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
         case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
+        case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 }
@@ -755,6 +770,76 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     return BuildFrame(FText::FromString(TEXT("BREAKER CLASS")), FText::FromString(TEXT("PERMANENT SELECTION / FIVE DISCIPLINES")), Body, 860.0f);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
+{
+    ABreakerNPC* NPC = DialogueNPC.Get();
+    FBreakerDialogueNode Node;
+    if (!NPC || !NPC->FindDialogueNode(DialogueNodeId, Node))
+    {
+        if (Character.IsValid()) Character->ResumeFromMenu();
+        return SNew(SBox);
+    }
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 18.0f)
+    [
+        SNew(SBorder)
+        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+        .BorderBackgroundColor(PanelRaised)
+        .Padding(FMargin(20.0f, 16.0f))
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(NPC->GetDisplayName(), 12, Cyan, true)]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(Node.SpeakerLine))
+                .ColorAndOpacity(FLinearColor::White)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
+                .AutoWrapText(true)
+            ]
+        ]
+    ];
+
+    int32 ChoiceNumber = 0;
+    for (const FBreakerDialogueChoice& Choice : Node.Choices)
+    {
+        ++ChoiceNumber;
+        const FName NextNodeId = Choice.NextNodeId;
+        const FName QuestFlag = Choice.SetsQuestFlag;
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(PanelRaised)
+            .ContentPadding(FMargin(16.0f, 10.0f))
+            .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag]()
+            {
+                if (Character.IsValid())
+                {
+                    Character->AddQuestFlag(QuestFlag);
+                    if (NextNodeId == NAME_None)
+                    {
+                        Character->ResumeFromMenu();
+                        return FReply::Handled();
+                    }
+                }
+                DialogueNodeId = NextNodeId;
+                Rebuild(EBreakerMenuScreen::Dialogue);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("%d.  %s"), ChoiceNumber, *Choice.Text)), 12, FLinearColor::White, true)
+            ]
+        ];
+    }
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, 14.0f, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(TEXT("Choices marked [Leave] end the conversation  |  ESC to walk away")), 9, SoftText)
+    ];
+    return BuildFrame(FText::FromString(TEXT("CONVERSATION")), NPC->GetDisplayName(), Body, 780.0f);
 }
 
 FReply SBreakerMenu::GoBack()

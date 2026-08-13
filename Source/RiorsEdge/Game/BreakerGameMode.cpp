@@ -3,6 +3,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
+#include "Interaction/BreakerNPC.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
 #include "GameFramework/PlayerController.h"
@@ -28,6 +29,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
     if (bPlaytestTargetsSpawned || !NewPlayer || !NewPlayer->GetPawn() || !GetWorld()) return;
     SpawnSafeZone(NewPlayer->GetPawn());
+    SpawnAnchorCamp(NewPlayer->GetPawn());
     SpawnPlaytestTargets(NewPlayer->GetPawn());
     SpawnMovementCourse(NewPlayer->GetPawn());
     SpawnCombatEncounter(NewPlayer->GetPawn());
@@ -109,6 +111,40 @@ void ABreakerGameMode::SpawnMovementCourse(const APawn* Pawn)
     // Flat and sloped slide lanes.
     SpawnGymBlock(GetWorld(), Origin - Forward * 900.0f - Right * 1200.0f + FVector(0, 0, 20), FVector(8.0f, 2.5f, 0.2f));
     SpawnGymBlock(GetWorld(), Origin - Forward * 2100.0f + Right * 1200.0f + FVector(0, 0, 240), FVector(8.0f, 2.5f, 0.2f), FRotator(0, 0, -12.0f));
+}
+
+void ABreakerGameMode::SpawnAnchorCamp(const APawn* Pawn)
+{
+    if (!Pawn || !GetWorld()) return;
+    const FVector Origin = Pawn->GetActorLocation() - FVector(0.0f, 0.0f, 88.0f);
+    const FVector Forward = Pawn->GetActorForwardVector().GetSafeNormal2D();
+    const FVector Right = Pawn->GetActorRightVector().GetSafeNormal2D();
+
+    // A small Anchor camp behind the spawn pad: plaza, back wall, a Forge
+    // prop, and two talkable NPCs — the seed of the hub.
+    const FVector CampCenter = Origin - Forward * 1400.0f;
+    SpawnGymBlock(GetWorld(), CampCenter + FVector(0, 0, 8), FVector(14.0f, 14.0f, 0.15f));
+    SpawnGymBlock(GetWorld(), CampCenter - Forward * 700.0f + FVector(0, 0, 180), FVector(14.0f, 0.3f, 3.6f));
+    SpawnGymBlock(GetWorld(), CampCenter - Forward * 500.0f - Right * 450.0f + FVector(0, 0, 110), FVector(1.6f, 1.6f, 2.2f));  // Forge prop
+    SpawnGymBlock(GetWorld(), CampCenter - Forward * 500.0f + Right * 480.0f + FVector(0, 0, 60), FVector(2.4f, 1.2f, 1.2f));   // supply crates
+
+    ABreakerNPC::SpawnForgeKeeper(GetWorld(), CampCenter - Forward * 420.0f - Right * 450.0f + FVector(0, 0, 12), (Forward).Rotation());
+    ABreakerNPC::SpawnQuartermaster(GetWorld(), CampCenter - Forward * 420.0f + Right * 480.0f + FVector(0, 0, 12), (Forward).Rotation());
+
+    // Watchtower platforms flanking the route out — vertical playground and
+    // sniper perches for the encounter approach.
+    SpawnGymBlock(GetWorld(), Origin + Forward * 1800.0f - Right * 2100.0f + FVector(0, 0, 240), FVector(3.0f, 3.0f, 0.3f));
+    SpawnGymBlock(GetWorld(), Origin + Forward * 1800.0f - Right * 2100.0f + FVector(0, 0, 110), FVector(0.4f, 0.4f, 2.2f));
+    SpawnGymBlock(GetWorld(), Origin + Forward * 2600.0f + Right * 2200.0f + FVector(0, 0, 340), FVector(3.0f, 3.0f, 0.3f));
+    SpawnGymBlock(GetWorld(), Origin + Forward * 2600.0f + Right * 2200.0f + FVector(0, 0, 160), FVector(0.4f, 0.4f, 3.2f));
+
+    // Arena boundary markers around the elite's ground.
+    for (int32 Marker = 0; Marker < 6; ++Marker)
+    {
+        const float Angle = Marker * 60.0f;
+        const FVector Offset = Forward.RotateAngleAxis(Angle, FVector::UpVector) * 900.0f;
+        SpawnGymBlock(GetWorld(), Origin + Forward * (SafeZoneRadius + 2400.0f) + Offset + FVector(0, 0, 90), FVector(0.3f, 0.3f, 1.8f));
+    }
 }
 
 void ABreakerGameMode::SpawnSafeZone(const APawn* Pawn)

@@ -17,6 +17,7 @@ class UStaticMeshComponent;
 class UPointLightComponent;
 class UBreakerPlaytestComponent;
 class UBreakerEquipmentComponent;
+class ABreakerNPC;
 class SBreakerMenu;
 struct FInputActionValue;
 
@@ -43,6 +44,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
     UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
     UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
+    // Interaction + quest-state groundwork: F talks to the nearest NPC in
+    // range; dialogue choices set persistent quest flags.
+    UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;
+    UFUNCTION(BlueprintCallable, Category="Interaction") void AddQuestFlag(FName Flag);
+    UFUNCTION(BlueprintPure, Category="Interaction") bool HasQuestFlag(FName Flag) const { return QuestFlags.Contains(Flag); }
+    UFUNCTION(BlueprintPure, Category="Interaction") const TArray<FName>& GetQuestFlags() const { return QuestFlags; }
+    void SetQuestFlags(const TArray<FName>& NewFlags) { QuestFlags = NewFlags; }
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
@@ -115,6 +123,7 @@ private:
     void SavePlaytestSettings() const;
     void TogglePauseMenu();
     void ToggleInventoryMenu();
+    void InteractWithNearbyNPC();
     void ShowInitialMenu();
     void OpenMenu(bool bInitialMenu);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
@@ -123,6 +132,7 @@ private:
 
     FTransform PlaytestSpawnTransform;
     float FallKillZ = -100000.0f;
+    TArray<FName> QuestFlags;
     float LookSensitivity = 1.0f;
     bool bInvertLookY = false;
     bool bShowingInitialMenu = false;

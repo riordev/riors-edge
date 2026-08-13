@@ -22,5 +22,6 @@ public:
     UPROPERTY() TArray<FBreakerItemInstance> BackpackItems;
     UPROPERTY() EBreakerWeaponArchetype SlotOneArchetype = EBreakerWeaponArchetype::Rifle;
     UPROPERTY() EBreakerWeaponArchetype SlotTwoArchetype = EBreakerWeaponArchetype::Shotgun;
+    UPROPERTY() TArray<FName> QuestFlags;
     UPROPERTY() int32 SaveVersion = 1;
 };

@@ -23,6 +23,8 @@
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
+#include "Interaction/BreakerNPC.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/GameModeBase.h"
@@ -174,6 +176,7 @@ void ABreakerCharacter::SaveGameState()
     Save->BackpackItems = Equipment->GetBackpack();
     Save->SlotOneArchetype = Weapon->GetSlotArchetype(1);
     Save->SlotTwoArchetype = Weapon->GetSlotArchetype(2);
+    Save->QuestFlags = QuestFlags;
     UGameplayStatics::SaveGameToSlot(Save, UBreakerSaveGame::DefaultSlotName(), 0);
 }
 
@@ -186,6 +189,7 @@ void ABreakerCharacter::LoadGameState()
     Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
     Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
     Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
+    QuestFlags = Save->QuestFlags;
 }
 
 void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -206,6 +210,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ThisClass::EquipSecondaryWeapon);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ThisClass::TogglePauseMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
+    PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
 
     UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!InputConfig || !Input)
@@ -632,6 +637,37 @@ void ABreakerCharacter::ToggleInventoryMenu()
     }
     OpenMenu(false);
     if (MenuWidget.IsValid()) MenuWidget->ShowInventory();
+}
+
+ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
+{
+    if (!GetWorld()) return nullptr;
+    ABreakerNPC* Nearest = nullptr;
+    float NearestDistanceSq = TNumericLimits<float>::Max();
+    for (TActorIterator<ABreakerNPC> It(GetWorld()); It; ++It)
+    {
+        const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
+        if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
+        {
+            NearestDistanceSq = DistanceSq;
+            Nearest = *It;
+        }
+    }
+    return Nearest;
+}
+
+void ABreakerCharacter::InteractWithNearbyNPC()
+{
+    if (MenuWidget.IsValid()) return;
+    ABreakerNPC* NPC = FindNearbyNPC();
+    if (!NPC) return;
+    OpenMenu(false);
+    if (MenuWidget.IsValid()) MenuWidget->ShowDialogue(NPC);
+}
+
+void ABreakerCharacter::AddQuestFlag(FName Flag)
+{
+    if (Flag != NAME_None) QuestFlags.AddUnique(Flag);
 }
 
 void ABreakerCharacter::TogglePauseMenu()

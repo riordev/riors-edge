@@ -10,6 +10,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Interaction/BreakerNPC.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 
@@ -52,6 +53,10 @@ void ABreakerPlaytestHUD::DrawHUD()
     }
     DrawStatusReadout(Character, LeftPanelX + 16.0f, PanelY - 18.0f);
     DrawDefenseFeedback(Center);
+    if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
+    {
+        DrawLabel(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString()), Center.X - 90.0f, Center.Y + 90.0f, FLinearColor(0.12f, 0.78f, 1.0f), 1.0f);
+    }
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
     {
         const FLinearColor DamageColor(1.0f, 0.12f, 0.05f, 0.85f);
