@@ -162,13 +162,20 @@ private:
     // A vector face rasterised at the requested pixel size. The engine's small
     // font is a bitmap at one native size, so drawing a 40px number with it
     // magnified pixels instead of rendering glyphs.
-    FSlateFontInfo MakeSpecFont(float SpecPixels) const;
+    //
+    // Non-const because the font is loaded on first use, and guarded because
+    // FCanvasTextItem draws NOTHING when its UFont is null — which is exactly
+    // how a whole HUD's worth of text once disappeared.
+    const UFont* GetSpecFont();
+    bool CanDrawSpecFont();
+    FSlateFontInfo MakeSpecFont(float SpecPixels);
+    UPROPERTY() TObjectPtr<const UFont> SpecFont;
 
     // Text authored in spec pixels. Y is the top of the line, matching Canvas.
     void DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
     void DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
     void DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
-    FVector2D MeasureSpecText(const FString& Text, float SpecPixels) const;
+    FVector2D MeasureSpecText(const FString& Text, float SpecPixels);
 
     // Outline + weight pass for numbers that sit over the world. The outline
     // is tinted toward the number's own hue so it never reads as grey mud.

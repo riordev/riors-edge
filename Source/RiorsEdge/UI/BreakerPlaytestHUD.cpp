@@ -33,7 +33,7 @@
 // is asked for rather than magnifying a bitmap face.
 #include "Framework/Application/SlateApplication.h"
 #include "Fonts/FontMeasure.h"
-#include "Styling/CoreStyle.h"
+#include "Engine/Font.h"
 #include "TextureResource.h"
 
 // INTEGRATION: ABreakerLootPickup is being authored in parallel. The hover
@@ -1273,18 +1273,43 @@ void ABreakerPlaytestHUD::DrawCrosshair(const FVector2D& Center, const FLinearCo
 // three to seven times, which is why both read as fuzzy. Slate's font info
 // rasterises a vector face at whatever pixel size it is handed, so every
 // readout below is rendered at its true size instead of scaled up to it.
-FSlateFontInfo ABreakerPlaytestHUD::MakeSpecFont(float SpecPixels) const
+// FCanvasTextItem refuses to draw anything unless its UFont pointer is set:
+// HasValidText() is literally `Font != nullptr`, and the FSlateFontInfo
+// constructor fills that in with Cast<UFont>(FontInfo.FontObject). An
+// FSlateFontInfo from FCoreStyle carries a raw FCompositeFont and NO UObject,
+// so every string silently vanished. The font therefore has to be a real UFont
+// asset — and a Runtime-cached one, because GetFontCacheType() dereferences it
+// to pick the draw path, and the offline path ignores the size in the font
+// info and goes back to magnifying a bitmap.
+const UFont* ABreakerPlaytestHUD::GetSpecFont()
+{
+    if (!SpecFont)
+    {
+        // UMG's default face. Vector, Runtime-cached, and the same Roboto the
+        // Slate menus draw with, so the HUD and the front end agree.
+        SpecFont = LoadObject<UFont>(nullptr, TEXT("/Engine/EngineFonts/Roboto.Roboto"));
+    }
+    return SpecFont;
+}
+
+bool ABreakerPlaytestHUD::CanDrawSpecFont()
+{
+    const UFont* Font = GetSpecFont();
+    return Font && Font->FontCacheType == EFontCacheType::Runtime;
+}
+
+FSlateFontInfo ABreakerPlaytestHUD::MakeSpecFont(float SpecPixels)
 {
     // The type scale carries its own weight rule: display and number tokens are
     // 600-700, body and caption are 400-500. 17px is the boundary between them,
     // so weight follows size rather than needing a flag at every call site.
     const int32 PixelSize = FMath::Max(FMath::RoundToInt(S(SpecPixels)), 6);
-    return FCoreStyle::GetDefaultFontStyle(SpecPixels >= 17.0f ? "Bold" : "Regular", PixelSize);
+    return FSlateFontInfo(GetSpecFont(), PixelSize, SpecPixels >= 17.0f ? TEXT("Bold") : TEXT("Regular"));
 }
 
-FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPixels) const
+FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPixels)
 {
-    if (FSlateApplication::IsInitialized())
+    if (CanDrawSpecFont() && FSlateApplication::IsInitialized())
     {
         if (const FSlateRenderer* Renderer = FSlateApplication::Get().GetRenderer())
         {
@@ -1304,7 +1329,7 @@ void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, co
 {
     if (TextAlpha <= 0.0f || !Canvas) return;
     const FLinearColor Face = BreakerUI::Alpha(Color, Color.A * TextAlpha);
-    if (FSlateApplication::IsInitialized())
+    if (CanDrawSpecFont())
     {
         FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), MakeSpecFont(SpecPixels), Face);
         // No shadow and no engine outline: this system draws its own outline

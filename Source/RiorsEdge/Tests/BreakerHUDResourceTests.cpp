@@ -2,14 +2,16 @@
 
 #include "Misc/AutomationTest.h"
 #include "UI/BreakerHUDResourceRow.h"
+#include "Engine/Font.h"
+#include "Fonts/SlateFontInfo.h"
 
 // The drawing cannot be tested — there is no viewport in the automation suite
 // and no way to assert that a mark reads. The RESOLUTION can: label, signed
 // fraction, state word, state colour and track treatment are pure functions of
 // the class resource's numbers, and that is the part a wrong class would break.
 //
-// These live under UI/ rather than Tests/ because this agent's file ownership
-// is scoped to UI/; discovery is by macro, not by directory.
+// Moved here from UI/ during integration to match the project's source layout;
+// discovery is by macro, not by directory.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerHUDResourceRowTest,
@@ -104,6 +106,45 @@ bool FBreakerHUDResourceRowTest::RunTest(const FString& Parameters)
             ResolveManaRow(-5.0f, 100.0f, 0.0f).Fraction, -1.0f);
     }
 
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDFontContractTest,
+    "RiorsEdge.UI.HUDFontContract",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+// Regression, and a sharp one: the whole HUD's text vanished at once.
+//
+// FCanvasTextItem::HasValidText() is literally `Font != nullptr`, and the
+// FSlateFontInfo constructor sets that member with Cast<UFont>(FontObject).
+// An FSlateFontInfo from FCoreStyle carries a raw FCompositeFont and no
+// UObject at all, so Font came back null, Draw() returned immediately, and
+// every string on the HUD silently disappeared while the plates, bars and
+// glyphs kept drawing.
+//
+// So the HUD's font has two hard requirements, both asserted here rather than
+// discovered in a screenshot: the info must resolve to a real UFont, and that
+// UFont must be Runtime-cached, because GetFontCacheType() picks the draw path
+// from it and the Offline path ignores the size in the font info and goes back
+// to magnifying a bitmap — which is the fuzziness this replaced.
+bool FBreakerHUDFontContractTest::RunTest(const FString& Parameters)
+{
+    const UFont* Font = LoadObject<UFont>(nullptr, TEXT("/Engine/EngineFonts/Roboto.Roboto"));
+    if (!TestNotNull(TEXT("The HUD's font asset resolves"), Font))
+    {
+        return false;
+    }
+    TestEqual(TEXT("It is Runtime-cached, so it rasterises at the size asked for"),
+        Font->FontCacheType, EFontCacheType::Runtime);
+
+    // The exact expression FCanvasTextItem uses to decide whether to draw.
+    for (const TCHAR* Typeface : {TEXT("Regular"), TEXT("Bold")})
+    {
+        const FSlateFontInfo Info(Font, 24, Typeface);
+        TestNotNull(*FString::Printf(TEXT("%s resolves to a UFont, so canvas text draws"), Typeface),
+            Cast<const UFont>(Info.FontObject));
+    }
     return true;
 }
 
