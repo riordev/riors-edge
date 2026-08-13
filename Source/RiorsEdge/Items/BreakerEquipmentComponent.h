@@ -31,6 +31,16 @@ public:
     // Moves a backpack item into its slot; whatever was equipped there
     // returns to the backpack.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpack(const FGuid& ItemId);
+    // Destroys a single backpack item outright. Returns false when the id is
+    // not in the backpack (or on a client).
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool DiscardFromBackpack(const FGuid& ItemId);
+    // Bulk cleanup: destroys every backpack item strictly below MinimumKept
+    // and returns how many were removed. Equipped gear is never touched.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") int32 DiscardBackpackBelowRarity(EBreakerItemRarity MinimumKept);
+    // Playtest helper: rolls one Exceptional item per equip slot at the given
+    // item level and equips it, so TTK passes start from a full loadout.
+    // Whatever was equipped goes back to the backpack the usual way.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void DevGrantTestGear(int32 ItemLevel);
     UFUNCTION(BlueprintPure, Category="Equipment") bool GetEquippedItem(EBreakerEquipSlot Slot, FBreakerItemInstance& OutItem) const;
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetBackpack() const { return Backpack; }
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetEquipped() const { return Equipped; }

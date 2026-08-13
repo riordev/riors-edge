@@ -572,6 +572,36 @@ void UBreakerWeaponComponent::ResetAmmunition()
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 }
 
+void UBreakerWeaponComponent::AddReserveAmmoFraction(float Fraction)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || Fraction <= 0.0f) return;
+    InitializeSlotAmmunition();
+
+    // O2 placeholder: cap at 2x StartingReserveAmmo. Enough headroom that a
+    // good streak banks a cushion, tight enough that reserve still matters.
+    const float ReserveCapMultiplier = 2.0f;
+
+    auto GrantToSlot = [this, Fraction, ReserveCapMultiplier](EBreakerWeaponArchetype Archetype, int32& SlotReserve)
+    {
+        const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(Archetype);
+        if (!Definition) return;
+        const int32 Starting = Definition->StartingReserveAmmo;
+        // Round up so small fractions on low-reserve weapons (rocket: 16)
+        // still grant at least one round.
+        const int32 Granted = FMath::CeilToInt(Starting * Fraction);
+        const int32 Cap = FMath::CeilToInt(Starting * ReserveCapMultiplier);
+        SlotReserve = FMath::Min(SlotReserve + Granted, Cap);
+    };
+
+    // The equipped slot's live counters are the source of truth; sync them
+    // into slot storage first so nothing is lost.
+    StoreActiveSlotAmmunition();
+    GrantToSlot(SlotOneArchetype, SlotOneReserveAmmo);
+    GrantToSlot(SlotTwoArchetype, SlotTwoReserveAmmo);
+    ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
+    OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+}
+
 void UBreakerWeaponComponent::OnRep_Ammo() { OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo); }
 void UBreakerWeaponComponent::OnRep_Reloading() { OnReloadChanged.Broadcast(bReloading); }
 void UBreakerWeaponComponent::OnRep_Swapping()

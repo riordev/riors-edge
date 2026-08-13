@@ -26,6 +26,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Interaction/BreakerNPC.h"
+#include "Items/BreakerLootPickup.h"
 #include "Game/BreakerGameMode.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -694,9 +695,40 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     return Nearest;
 }
 
+ABreakerLootPickup* ABreakerCharacter::FindNearbyPickup() const
+{
+    if (!GetWorld()) return nullptr;
+    ABreakerLootPickup* Nearest = nullptr;
+    float NearestDistanceSq = TNumericLimits<float>::Max();
+    for (TActorIterator<ABreakerLootPickup> It(GetWorld()); It; ++It)
+    {
+        const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
+        if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
+        {
+            NearestDistanceSq = DistanceSq;
+            Nearest = *It;
+        }
+    }
+    return Nearest;
+}
+
+void ABreakerCharacter::ServerPickupLoot_Implementation(ABreakerLootPickup* Pickup)
+{
+    if (Pickup) Pickup->TryPickup(this);
+}
+
 void ABreakerCharacter::InteractWithNearbyNPC()
 {
     if (MenuWidget.IsValid()) return;
+
+    // Loot wins the F key when both are candidates.
+    if (ABreakerLootPickup* Pickup = FindNearbyPickup())
+    {
+        if (HasAuthority()) Pickup->TryPickup(this);
+        else ServerPickupLoot(Pickup);
+        return;
+    }
+
     ABreakerNPC* NPC = FindNearbyNPC();
     if (!NPC) return;
     OpenMenu(false);

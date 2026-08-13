@@ -11,6 +11,7 @@ class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 
 public:
     ABreakerGameMode();
+    virtual void Tick(float DeltaSeconds) override;
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetPlaytestTargets();
 
@@ -28,12 +29,32 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
 
+    // --- Ammo economy (O2 placeholders) ------------------------------------
+    // Third and last resupply channel alongside kill drops and wave-clear:
+    // an amber supply crate in the Anchor camp. Standing next to it for
+    // SupplyCrateDwellSeconds fully restocks, then goes on cooldown.
+    // Chosen over a safe-zone-wide refill because the crate is a visible,
+    // walk-to affordance and needs no NPC/interaction plumbing.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Ammo", meta=(ClampMin="0")) float SupplyCrateRadius = 350.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Ammo", meta=(ClampMin="0")) float SupplyCrateDwellSeconds = 2.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Ammo", meta=(ClampMin="0")) float SupplyCrateCooldownSeconds = 8.0f;
+
 private:
     bool bPlaytestTargetsSpawned = false;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
     FVector SafeZoneCenter = FVector::ZeroVector;
     bool bSafeZoneSet = false;
+    FVector SupplyCrateLocation = FVector::ZeroVector;
+    bool bSupplyCrateSet = false;
+    float SupplyCrateDwell = 0.0f;
+    double LastSupplyCrateUseTime = -1000.0;
+    void TickSupplyCrate(float DeltaSeconds);
+    // Refills the first player's weapon to full (both slots).
+    void RefillPlayerAmmo();
+    // Map expansion: a much larger playable field grown outward from the
+    // existing gym. Nothing already placed moves.
+    void SpawnExpandedField(const APawn* Pawn);
     void SpawnPlaytestTargets(const APawn* Pawn);
     void SpawnMovementCourse(const APawn* Pawn);
     void SpawnCombatEncounter(const APawn* Pawn);

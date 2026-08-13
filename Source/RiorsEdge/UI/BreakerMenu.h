@@ -42,6 +42,9 @@ private:
     TSharedRef<SWidget> BuildClassSelectScreen();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
+    // Shared EQUIPMENT | SKILL TREES tab strip; both character screens live
+    // behind it so the I-key flow reaches trees in one click.
+    TSharedRef<SWidget> BuildScreenTabs(EBreakerMenuScreen ActiveScreen);
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
@@ -52,6 +55,15 @@ private:
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
     // -1 shows every slot; otherwise an EBreakerEquipSlot index.
     int32 BackpackSlotFilter = -1;
+    // Two-click arm for the destructive cleanup buttons. A click sets
+    // PendingCleanupArm and rebuilds; Rebuild() moves it into
+    // CleanupArmedIndex and clears the pending value, so any other
+    // interaction on the screen disarms it on the next rebuild.
+    // -1 none, 0 = discard below Uncommon, 1 = discard below Exceptional.
+    int32 CleanupArmedIndex = -1;
+    int32 PendingCleanupArm = -1;
+    // Result line echoed under the cleanup row after a discard.
+    FText InventoryStatus;
     // Skill trees: which tree the left selector has focused, and the last
     // purchase/respec message echoed under the node grid.
     int32 SelectedTreeIndex = 0;

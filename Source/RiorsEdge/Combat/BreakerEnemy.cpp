@@ -13,9 +13,31 @@
 #include "Game/BreakerGameMode.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerLootLibrary.h"
+#include "Items/BreakerLootPickup.h"
 #include "Playtest/BreakerPlaytestComponent.h"
+#include "Weapons/BreakerWeaponComponent.h"
 #include "TimerManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+    // Muted Vestige-ish grey-violet for the humanoid body parts. Local copy of
+    // the dressing helper so the enemy never pulls in game mode internals.
+    void ApplyEnemyBodyColor(UStaticMeshComponent* Mesh)
+    {
+        if (!Mesh) return;
+        UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
+            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        if (!BaseMaterial) return;
+        if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
+        {
+            Dynamic->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.35f, 0.32f, 0.42f));
+            Mesh->SetMaterial(0, Dynamic);
+        }
+    }
+}
 
 ABreakerEnemy::ABreakerEnemy()
 {
@@ -26,12 +48,63 @@ ABreakerEnemy::ABreakerEnemy()
     BodyCollision->InitCapsuleSize(45.0f, 90.0f);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
 
+    // Humanoid silhouette from basic shapes: torso, head, two arms, two legs.
+    // Purely cosmetic — every piece is NoCollision and the capsule, hit box
+    // and weak point keep doing all the collision work. Elites inherit the
+    // actor scale multiplier, so an elite simply reads as a bigger humanoid.
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> BodySphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+
+    // BodyVisual is the torso now (was the single cylinder body).
     BodyVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyVisual"));
     BodyVisual->SetupAttachment(BodyCollision);
     BodyVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    BodyVisual->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.5f));
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-    if (CylinderMesh.Succeeded()) BodyVisual->SetStaticMesh(CylinderMesh.Object);
+    BodyVisual->SetRelativeLocation(FVector(0.0f, 0.0f, 22.0f));
+    BodyVisual->SetRelativeScale3D(FVector(0.55f, 0.36f, 0.78f));
+    if (CubeMesh.Succeeded()) BodyVisual->SetStaticMesh(CubeMesh.Object);
+    ApplyEnemyBodyColor(BodyVisual);
+
+    HeadVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadVisual"));
+    HeadVisual->SetupAttachment(BodyCollision);
+    HeadVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    HeadVisual->SetRelativeLocation(FVector(0.0f, 0.0f, 78.0f));
+    HeadVisual->SetRelativeScale3D(FVector(0.34f));
+    if (BodySphereMesh.Succeeded()) HeadVisual->SetStaticMesh(BodySphereMesh.Object);
+    ApplyEnemyBodyColor(HeadVisual);
+
+    LeftArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArmVisual"));
+    LeftArmVisual->SetupAttachment(BodyCollision);
+    LeftArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftArmVisual->SetRelativeLocation(FVector(0.0f, -34.0f, 24.0f));
+    LeftArmVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, 12.0f));
+    LeftArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.62f));
+    if (CubeMesh.Succeeded()) LeftArmVisual->SetStaticMesh(CubeMesh.Object);
+    ApplyEnemyBodyColor(LeftArmVisual);
+
+    RightArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArmVisual"));
+    RightArmVisual->SetupAttachment(BodyCollision);
+    RightArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightArmVisual->SetRelativeLocation(FVector(0.0f, 34.0f, 24.0f));
+    RightArmVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, -12.0f));
+    RightArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.62f));
+    if (CubeMesh.Succeeded()) RightArmVisual->SetStaticMesh(CubeMesh.Object);
+    ApplyEnemyBodyColor(RightArmVisual);
+
+    LeftLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftLegVisual"));
+    LeftLegVisual->SetupAttachment(BodyCollision);
+    LeftLegVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LeftLegVisual->SetRelativeLocation(FVector(0.0f, -14.0f, -50.0f));
+    LeftLegVisual->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.80f));
+    if (CubeMesh.Succeeded()) LeftLegVisual->SetStaticMesh(CubeMesh.Object);
+    ApplyEnemyBodyColor(LeftLegVisual);
+
+    RightLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightLegVisual"));
+    RightLegVisual->SetupAttachment(BodyCollision);
+    RightLegVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RightLegVisual->SetRelativeLocation(FVector(0.0f, 14.0f, -50.0f));
+    RightLegVisual->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.80f));
+    if (CubeMesh.Succeeded()) RightLegVisual->SetStaticMesh(CubeMesh.Object);
+    ApplyEnemyBodyColor(RightLegVisual);
 
     BodyHitBox = CreateDefaultSubobject<UBoxComponent>(TEXT("BodyHitBox"));
     BodyHitBox->SetupAttachment(BodyCollision);
@@ -126,12 +199,55 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 
     const float Distance = FMath::Sqrt(NearestDistanceSq);
+    const double Now = GetWorld()->GetTimeSeconds();
     FVector DesiredDirection = FVector::ZeroVector;
+    // Speed multiplier for this frame. 1.0 = the old constant walk.
+    float SpeedScale = 1.0f;
     if (NearestPlayer && Distance <= DetectionRange)
     {
-        DesiredDirection = (NearestPlayer->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+        const FVector ToPlayer = (NearestPlayer->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+        DesiredDirection = ToPlayer;
         StateLabel = Distance <= AttackRange ? TEXT("ATTACK") : TEXT("CHASE");
         if (Distance <= AttackRange) PerformAttack(NearestPlayer);
+
+        // (a) Closing sprint: far away, they commit to closing the gap
+        // instead of ambling. Inside SprintRange they drop to normal so the
+        // player still gets readable spacing at knife range.
+        if (Distance > SprintRange)
+        {
+            SpeedScale = SprintSpeedMultiplier;
+            StateLabel = TEXT("CLOSING");
+        }
+
+        // (b) Strafe weave: a lateral sinusoid folded into the chase vector.
+        // Elites are exempt — the identity is that an elite advances
+        // implacably and does not juke (Encounter-Design §1.1 chassis).
+        if (!bIsElite && Distance > AttackRange)
+        {
+            WeaveTime += DeltaSeconds;
+            const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();
+            const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
+            DesiredDirection = (ToPlayer + Lateral * Weave).GetSafeNormal2D();
+        }
+
+        // (c) Committed lunge: once inside LungeRange, a short burst straight
+        // at the player on a cooldown. Telegraphed via StateLabel so the
+        // playtest HUD shows the tell.
+        const bool bLungeActive = (Now - LungeStartTime) < LungeDuration;
+        if (bLungeActive)
+        {
+            SpeedScale = LungeSpeedMultiplier;
+            DesiredDirection = ToPlayer;   // no weave mid-commit
+            StateLabel = TEXT("LUNGE");
+        }
+        else if (Distance <= LungeRange && Distance > AttackRange
+            && (Now - LungeStartTime) >= (LungeDuration + LungeCooldown))
+        {
+            LungeStartTime = Now;
+            SpeedScale = LungeSpeedMultiplier;
+            DesiredDirection = ToPlayer;
+            StateLabel = TEXT("LUNGE");
+        }
     }
     else
     {
@@ -143,14 +259,15 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
 
     if (!DesiredDirection.IsNearlyZero())
     {
-        const FVector NextLocation = GetActorLocation() + DesiredDirection * MoveSpeed * DeltaSeconds;
+        const FVector Step = DesiredDirection * MoveSpeed * SpeedScale * DeltaSeconds;
+        const FVector NextLocation = GetActorLocation() + Step;
         if (GameMode && GameMode->IsInSafeZone(NextLocation))
         {
             StateLabel = TEXT("HELD");
             return;
         }
         FHitResult MoveHit;
-        AddActorWorldOffset(DesiredDirection * MoveSpeed * DeltaSeconds, true, &MoveHit);
+        AddActorWorldOffset(Step, true, &MoveHit);
         SetActorRotation(DesiredDirection.Rotation());
     }
 }
@@ -168,6 +285,15 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     LastAttackTime = GetWorld()->GetTimeSeconds();
 }
 
+void ABreakerEnemy::SetBodyVisible(bool bVisible)
+{
+    for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
+        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get(), WeakPointVisual.Get() })
+    {
+        if (Part) Part->SetVisibility(bVisible, true);
+    }
+}
+
 void ABreakerEnemy::HandleDeath()
 {
     bDead = true;
@@ -175,8 +301,9 @@ void ABreakerEnemy::HandleDeath()
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    BodyVisual->SetVisibility(false, true);
+    SetBodyVisible(false);
     if (HasAuthority() && bDropsLoot) GrantLoot();
+    if (HasAuthority()) GrantAmmo();
 
     // On-death chain detonation: hurts other enemies only, so packed
     // spawns cascade without turning the player's own kills against them.
@@ -232,7 +359,35 @@ void ABreakerEnemy::GrantLoot()
     if (bIsElite && Rarity < EBreakerItemRarity::Exceptional) Rarity = EBreakerItemRarity::Exceptional;
     const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
-    Equipment->AddToBackpack(Item);
+
+    // Drops land on the ground now instead of teleporting into the backpack:
+    // the player walks over, reads the popup, and presses F. Scatter keeps a
+    // stack of kills on one spot from overlapping into a single column.
+    FRandomStream ScatterStream(Seed ^ 0x5EED);
+    const FVector Scatter(ScatterStream.FRandRange(-80.0f, 80.0f), ScatterStream.FRandRange(-80.0f, 80.0f), 0.0f);
+    const FVector DropLocation = GetActorLocation() + Scatter + FVector(0.0f, 0.0f, 40.0f);
+    if (ABreakerLootPickup* Pickup = GetWorld()->SpawnActor<ABreakerLootPickup>(ABreakerLootPickup::StaticClass(), DropLocation, FRotator::ZeroRotator))
+    {
+        Pickup->SetItem(Item);
+    }
+}
+
+void ABreakerEnemy::GrantAmmo()
+{
+    // Owner feedback: "ran out of ammo after 3 waves — no way to regain
+    // ammo". Kills now feed the gun. O2 placeholders: a normal kill returns
+    // 15% of a magazine-weapon's starting reserve, an elite half of it —
+    // roughly, sustained accurate play is ammo-neutral and sloppy play still
+    // runs dry. Uses the first player pawn, same as GrantLoot.
+    const float NormalKillFraction = 0.15f;
+    const float EliteKillFraction = 0.50f;
+
+    APawn* PlayerPawn = GetWorld() && GetWorld()->GetFirstPlayerController()
+        ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+    if (UBreakerWeaponComponent* Weapon = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
+    {
+        Weapon->AddReserveAmmoFraction(bIsElite ? EliteKillFraction : NormalKillFraction);
+    }
 }
 
 void ABreakerEnemy::RespawnEnemy()
@@ -244,7 +399,7 @@ void ABreakerEnemy::RespawnEnemy()
         BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
         BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-        BodyVisual->SetVisibility(true, true);
+        SetBodyVisible(true);
         bDead = false;
         FirstDamageTime = -1.0;
         Combat->RestoreVitals();

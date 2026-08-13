@@ -77,6 +77,12 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") const FBreakerShotResult& GetLastShot() const { return LastShot; }
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") float GetSecondsSinceLastShot() const;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Playtest") void ResetAmmunition();
+    // Ammo economy (O2 placeholder): grants Fraction of each slot's
+    // StartingReserveAmmo into that slot's reserve, capped at 2x starting
+    // reserve so drops top a player up without making reserve meaningless.
+    // Applies to the equipped weapon AND the stowed slot, so swapping is
+    // never punished by an empty second gun.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Ammo") void AddReserveAmmoFraction(float Fraction);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponDefinition> WeaponDefinition;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerShotEvent OnShot;

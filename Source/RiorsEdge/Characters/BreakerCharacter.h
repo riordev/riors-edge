@@ -20,6 +20,7 @@ class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
 class UBreakerAbilityComponent;
 class ABreakerNPC;
+class ABreakerLootPickup;
 class SBreakerMenu;
 struct FInputActionValue;
 
@@ -51,6 +52,10 @@ public:
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;
+    // Ground loot: the nearest pickup within its interaction range, or null.
+    // F prefers a pickup over NPC dialogue when both are in range — picking
+    // items up is by far the more frequent action.
+    UFUNCTION(BlueprintPure, Category="Interaction") ABreakerLootPickup* FindNearbyPickup() const;
     UFUNCTION(BlueprintCallable, Category="Interaction") void AddQuestFlag(FName Flag);
     UFUNCTION(BlueprintPure, Category="Interaction") bool HasQuestFlag(FName Flag) const { return QuestFlags.Contains(Flag); }
     UFUNCTION(BlueprintPure, Category="Interaction") const TArray<FName>& GetQuestFlags() const { return QuestFlags; }
@@ -130,6 +135,7 @@ private:
     void TogglePauseMenu();
     void ToggleInventoryMenu();
     void InteractWithNearbyNPC();
+    UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);
     void StartWave();
     void ActivateAbilityOne();
     void ActivateAbilityTwo();

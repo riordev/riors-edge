@@ -8,6 +8,7 @@
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -29,6 +30,8 @@ namespace
     const FLinearColor PanelRaised(0.045f, 0.07f, 0.105f, 1.0f);
     const FLinearColor Cyan(0.12f, 0.78f, 1.0f, 1.0f);
     const FLinearColor SoftText(0.62f, 0.72f, 0.82f, 1.0f);
+    // Destructive-confirm accent; only ever used for an armed cleanup button.
+    const FLinearColor Amber(1.0f, 0.5f, 0.08f, 1.0f);
 
     TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = FLinearColor::White, bool bBold = false)
     {
@@ -95,6 +98,10 @@ void SBreakerMenu::HandleEscape()
 void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
 {
     CurrentScreen = NewScreen;
+    // Consume the one-shot cleanup arm: only the rebuild triggered by the
+    // arming click sees it, everything else disarms.
+    CleanupArmedIndex = PendingCleanupArm;
+    PendingCleanupArm = -1;
     if (!ContentHost.IsValid()) return;
     switch (CurrentScreen)
     {
@@ -155,6 +162,36 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
         ];
 }
 
+TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScreen)
+{
+    TSharedRef<SHorizontalBox> Tabs = SNew(SHorizontalBox);
+    auto AddTab = [this, &Tabs, ActiveScreen](const FString& Label, EBreakerMenuScreen Target)
+    {
+        const bool bActive = ActiveScreen == Target;
+        Tabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(bActive ? Cyan : PanelRaised)
+            .ContentPadding(FMargin(16.0f, 6.0f))
+            .OnClicked(FOnClicked::CreateLambda([this, Target, bActive]()
+            {
+                if (!bActive)
+                {
+                    if (Target == EBreakerMenuScreen::SkillTrees) SkillTreeStatus = FText::GetEmpty();
+                    Rebuild(Target);
+                }
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(Label), 11, FLinearColor::White, true)
+            ]
+        ];
+    };
+    AddTab(TEXT("EQUIPMENT"), EBreakerMenuScreen::Inventory);
+    AddTab(TEXT("SKILL TREES"), EBreakerMenuScreen::SkillTrees);
+    return Tabs;
+}
+
 TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary) const
 {
     return SNew(SBox).HeightOverride(52.0f)
@@ -209,15 +246,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
             return FReply::Handled();
         }))
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("SKILL TREES")), FOnClicked::CreateLambda([this]()
-        {
-            SkillTreeStatus = FText::GetEmpty();
-            Rebuild(EBreakerMenuScreen::SkillTrees);
-            return FReply::Handled();
-        }))
-    ];
+    // Skill trees are reached through the INVENTORY tab strip; no separate
+    // top-level entry point.
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
     [
         MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
@@ -263,12 +293,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
         Rebuild(EBreakerMenuScreen::Inventory);
         return FReply::Handled();
     })));
-    AddButton(MakeButton(FText::FromString(TEXT("SKILL TREES")), FOnClicked::CreateLambda([this]()
-    {
-        SkillTreeStatus = FText::GetEmpty();
-        Rebuild(EBreakerMenuScreen::SkillTrees);
-        return FReply::Handled();
-    })));
+    // SKILL TREES intentionally absent: the INVENTORY screen's tab strip owns
+    // that route now.
     AddButton(MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Settings);
@@ -591,30 +617,80 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     for (const FBreakerItemInstance& Item : BackpackItems)
     {
         const FGuid ItemId = Item.ItemId;
+
+        // Readability aid: what clicking this card would displace. One line,
+        // tinted with the rarity being replaced so a downgrade reads at a
+        // glance.
+        FBreakerItemInstance CurrentlyEquipped;
+        const bool bSlotOccupied = Equipment && Equipment->GetEquippedItem(Item.Slot, CurrentlyEquipped);
+        const FString DeltaLine = bSlotOccupied
+            ? FString::Printf(TEXT("replaces: %s ilvl %d"), *RarityName(CurrentlyEquipped.Rarity), CurrentlyEquipped.ItemLevel)
+            : FString(TEXT("slot empty"));
+        const FLinearColor DeltaColor = bSlotOccupied ? RarityColor(CurrentlyEquipped.Rarity) : SoftText;
+
+        const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
+        {
+            if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->DiscardFromBackpack(ItemId);
+            InventoryStatus = FText::FromString(TEXT("Discarded 1 item."));
+            Rebuild(EBreakerMenuScreen::Inventory);
+            return FReply::Handled();
+        });
+
         BackpackGrid->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
         [
             SNew(SBox).WidthOverride(300.0f)
             [
-                SNew(SButton)
-                .ButtonColorAndOpacity(PanelRaised)
-                .ContentPadding(FMargin(12.0f, 9.0f))
-                .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
-                {
-                    if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
-                    Rebuild(EBreakerMenuScreen::Inventory);
-                    return FReply::Handled();
-                }))
+                SNew(SOverlay)
+                + SOverlay::Slot()
                 [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot().AutoHeight()
+                    // The wrapper only exists to catch right-click: SButton
+                    // leaves non-left buttons unhandled, so they bubble here.
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("NoBorder")))
+                    .Padding(0.0f)
+                    .OnMouseButtonDown(FPointerEventHandler::CreateLambda([DiscardOne](const FGeometry&, const FPointerEvent& MouseEvent)
+                    {
+                        if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton) return DiscardOne.Execute();
+                        return FReply::Unhandled();
+                    }))
                     [
-                        SNew(SHorizontalBox)
-                        + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Item.Slot)), 11, Cyan, true)]
-                        + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(RarityName(Item.Rarity)), 11, RarityColor(Item.Rarity), true)]
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(PanelRaised)
+                        .ContentPadding(FMargin(12.0f, 9.0f))
+                        .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
+                        {
+                            if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
+                            Rebuild(EBreakerMenuScreen::Inventory);
+                            return FReply::Handled();
+                        }))
+                        [
+                            SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Item.Slot)), 11, Cyan, true)]
+                                + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 22.0f, 0.0f)[MenuText(FText::FromString(RarityName(Item.Rarity)), 11, RarityColor(Item.Rarity), true)]
+                            ]
+                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                            [
+                                MenuText(FText::FromString(DeltaLine), 9, DeltaColor, true)
+                            ]
+                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                            [
+                                MenuText(FText::FromString(DescribeItem(Item)), 10, FLinearColor::White)
+                            ]
+                        ]
                     ]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                ]
+                + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(4.0f, 4.0f, 4.0f, 0.0f)
+                [
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(Panel)
+                    .ContentPadding(FMargin(6.0f, 1.0f))
+                    .ToolTipText(FText::FromString(TEXT("Discard this item (or right-click the card)")))
+                    .OnClicked(DiscardOne)
                     [
-                        MenuText(FText::FromString(DescribeItem(Item)), 10, FLinearColor::White)
+                        MenuText(FText::FromString(TEXT("X")), 9, SoftText, true)
                     ]
                 ]
             ]
@@ -647,7 +723,76 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         AddFilterChip(SlotName(static_cast<EBreakerEquipSlot>(SlotIndex)), SlotIndex);
     }
 
+    // Clean-up chips. First click arms (amber, "CONFIRM?"), second click
+    // executes; any other interaction rebuilds and disarms.
+    TSharedRef<SHorizontalBox> CleanupRow = SNew(SHorizontalBox);
+    auto AddCleanupChip = [this, &CleanupRow](const FString& Label, int32 ArmIndex, EBreakerItemRarity MinimumKept)
+    {
+        const bool bArmed = CleanupArmedIndex == ArmIndex;
+        CleanupRow->AddSlot().AutoWidth().Padding(4.0f, 0.0f, 0.0f, 0.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(bArmed ? Amber : PanelRaised)
+            .ContentPadding(FMargin(9.0f, 4.0f))
+            .OnClicked(FOnClicked::CreateLambda([this, ArmIndex, MinimumKept, bArmed]()
+            {
+                if (bArmed)
+                {
+                    const int32 Removed = Character.IsValid() && Character->GetEquipment()
+                        ? Character->GetEquipment()->DiscardBackpackBelowRarity(MinimumKept)
+                        : 0;
+                    InventoryStatus = FText::FromString(FString::Printf(TEXT("Discarded %d item%s."), Removed, Removed == 1 ? TEXT("") : TEXT("s")));
+                }
+                else
+                {
+                    PendingCleanupArm = ArmIndex;
+                }
+                Rebuild(EBreakerMenuScreen::Inventory);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(bArmed ? FString(TEXT("CONFIRM?")) : Label), 9, FLinearColor::White, true)
+            ]
+        ];
+    };
+    AddCleanupChip(TEXT("DISCARD < UNCOMMON"), 0, EBreakerItemRarity::Uncommon);
+    AddCleanupChip(TEXT("DISCARD < EXCEPTIONAL"), 1, EBreakerItemRarity::Exceptional);
+
+    // Dev gear grants ride the same playtest flag as dev class swap.
+    bool bDevTools = false;
+    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevTools, GGameUserSettingsIni);
+    TSharedRef<SHorizontalBox> DevRow = SNew(SHorizontalBox);
+    if (bDevTools)
+    {
+        DevRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 8.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("DEV:")), 9, Amber, true)
+        ];
+        auto AddDevChip = [this, &DevRow](int32 ItemLevel)
+        {
+            DevRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 4.0f, 0.0f)
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(PanelRaised)
+                .ContentPadding(FMargin(9.0f, 4.0f))
+                .OnClicked(FOnClicked::CreateLambda([this, ItemLevel]()
+                {
+                    if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->DevGrantTestGear(ItemLevel);
+                    InventoryStatus = FText::FromString(FString::Printf(TEXT("Granted a full Exceptional set at ilvl %d."), ItemLevel));
+                    Rebuild(EBreakerMenuScreen::Inventory);
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(FString::Printf(TEXT("GRANT TEST GEAR ilvl %d"), ItemLevel)), 9, FLinearColor::White, true)
+                ]
+            ];
+        };
+        AddDevChip(30);
+        AddDevChip(50);
+    }
+
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[BuildScreenTabs(EBreakerMenuScreen::Inventory)];
     Body->AddSlot().AutoHeight()
     [
         SNew(SHorizontalBox)
@@ -667,15 +812,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             ]
         ]
     ];
+    // Header band: one fixed row carrying label + filters + cleanup so it
+    // stays put above the scrolling grid.
     Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 6.0f)
     [
         SNew(SHorizontalBox)
         + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
         [
-            MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK (%d/%d) — click to equip"), BackpackItems.Num(), TotalBackpackCount)), 10, SoftText, true)
+            MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK (%d/%d) — click equip / right-click or X discard"), BackpackItems.Num(), TotalBackpackCount)), 10, SoftText, true)
         ]
-        + SHorizontalBox::Slot().FillWidth(1.0f)[FilterRow]
+        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[FilterRow]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[CleanupRow]
     ];
+    if (bDevTools)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[DevRow];
+    }
+    if (!InventoryStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[MenuText(InventoryStatus, 9, Amber, true)];
+    }
     Body->AddSlot().FillHeight(1.0f)
     [
         SNew(SBox).MinDesiredHeight(280.0f)
@@ -877,6 +1033,29 @@ namespace
         }
     }
 
+    // Card body is one short generic line: the first sentence, clipped.
+    FString ShortSummary(const FString& Description, int32 MaxLength = 60)
+    {
+        FString Line = Description;
+        int32 SentenceEnd = INDEX_NONE;
+        if (Line.FindChar(TEXT('.'), SentenceEnd)) Line = Line.Left(SentenceEnd + 1);
+        Line.ReplaceInline(TEXT("\n"), TEXT(" "));
+        Line.ReplaceInline(TEXT("\r"), TEXT(""));
+        Line.TrimStartAndEndInline();
+        if (Line.Len() > MaxLength) Line = Line.Left(MaxLength - 1).TrimEnd() + TEXT("…");
+        return Line;
+    }
+
+    // Rank readout as pips when the node is cheap enough to show them,
+    // otherwise the plain x/y count.
+    FString RankPips(int32 Rank, int32 MaxRank)
+    {
+        if (MaxRank <= 0 || MaxRank > 6) return FString::Printf(TEXT("%d/%d"), Rank, MaxRank);
+        FString Pips;
+        for (int32 Index = 0; Index < MaxRank; ++Index) Pips += Index < Rank ? TEXT("●") : TEXT("○");
+        return Pips;
+    }
+
     FString CurrencyLabel(EBreakerPointCurrency Currency)
     {
         return Currency == EBreakerPointCurrency::ClassPoints ? TEXT("CLASS") : TEXT("CORE");
@@ -948,6 +1127,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     const int32 UnspentCore = ProgressionGetUnspent(Progression, EBreakerPointCurrency::CorePoints);
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];
 
     // Unspent-points banner — the one number the player is spending against.
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
@@ -1071,48 +1251,99 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const UBreakerProgressionTree* CapturedTree = Selected;
                 const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
                 const FString Description = Node->Description.IsEmpty() ? TEXT("—") : Node->Description.ToString();
-                const FString StateLine = bMaxed
-                    ? FString::Printf(TEXT("RANK %d / %d   MAXED"), Rank, Node->MaxRank)
-                    : FString::Printf(TEXT("RANK %d / %d   COST %d %s"), Rank, Node->MaxRank, Node->CostPerRank, *CurrencyLabel(Node->Currency));
+                const FString CostChip = bMaxed
+                    ? FString(TEXT("MAXED"))
+                    : FString::Printf(TEXT("%d %s"), Node->CostPerRank, *CurrencyLabel(Node->Currency));
+
+                // Everything that used to crowd the card now lives in the
+                // hover tooltip; the card keeps name, rank, cost, one line.
+                FString TooltipText;
+                {
+                    TArray<FString> TipLines;
+                    TipLines.Add(NodeName + (Node->bCornerstone ? TEXT("   [CORNERSTONE]") : TEXT("")));
+                    TipLines.Add(FString::Printf(TEXT("RANK %d / %d   COST %d %s PER RANK"), Rank, Node->MaxRank, Node->CostPerRank, *CurrencyLabel(Node->Currency)));
+                    TipLines.Add(TEXT(""));
+                    TipLines.Add(Description);
+                    if (Node->Effects.Num() > 0)
+                    {
+                        TipLines.Add(TEXT(""));
+                        TipLines.Add(TEXT("EFFECTS PER RANK"));
+                        for (const FBreakerNodeEffect& Effect : Node->Effects)
+                        {
+                            const bool bPercent = Effect.StatBucket != EBreakerNodeStatBucket::Flat;
+                            TipLines.Add(FString::Printf(TEXT("  %s  %+.1f%s"),
+                                *UEnum::GetDisplayValueAsText(Effect.StatTarget).ToString().ToUpper(),
+                                Effect.ValuePerRank, bPercent ? TEXT("%") : TEXT("")));
+                        }
+                    }
+                    if (Node->Prerequisites.Num() > 0)
+                    {
+                        TipLines.Add(TEXT(""));
+                        TipLines.Add(TEXT("PREREQUISITES"));
+                        for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
+                        {
+                            TipLines.Add(FString::Printf(TEXT("  %s RANK %d"), *Prereq.NodeId.ToString().ToUpper(), Prereq.RequiredRank));
+                        }
+                    }
+                    if (Node->RequiredTreeInvestment > 0)
+                    {
+                        TipLines.Add(TEXT(""));
+                        TipLines.Add(FString::Printf(TEXT("REQUIRES %d INVESTED IN THIS TREE (%d)"), Node->RequiredTreeInvestment, SelectedSpent));
+                    }
+                    if (!LockReason.IsEmpty())
+                    {
+                        TipLines.Add(TEXT(""));
+                        TipLines.Add(FString::Printf(TEXT("LOCKED: %s"), *LockReason));
+                    }
+                    TooltipText = FString::Join(TipLines, TEXT("\n"));
+                }
 
                 TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
                 Card->AddSlot().AutoHeight()
                 [
                     SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(NodeName), 12, NameColor, true)]
-                    + SHorizontalBox::Slot().AutoWidth()
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(NodeName), 12, NameColor, true)]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 6.0f, 0.0f)
                     [
-                        MenuText(FText::FromString(Node->bCornerstone ? TEXT("CORNERSTONE") : TEXT("")), 9, bOwned ? FLinearColor::White : Cyan, true)
+                        MenuText(FText::FromString(RankPips(Rank, Node->MaxRank)), 10, bOwned ? FLinearColor::White : SoftText, true)
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                    [
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(Background)
+                        .Padding(FMargin(6.0f, 2.0f))
+                        [
+                            MenuText(FText::FromString(CostChip), 9, bMaxed ? SoftText : Cyan, true)
+                        ]
                     ]
                 ];
                 Card->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(StateLine), 9, bOwned ? FLinearColor::White : SoftText, true)
-                ];
-                Card->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
-                [
                     SNew(STextBlock)
-                    .Text(FText::FromString(Description))
+                    // Alt expands the card in place; the tooltip is the
+                    // always-available path to the same detail.
+                    .Text_Lambda([Description, ShortLine = ShortSummary(Description)]()
+                    {
+                        return FText::FromString(FSlateApplication::IsInitialized() && FSlateApplication::Get().GetModifierKeys().IsAltDown() ? Description : ShortLine);
+                    })
                     .ColorAndOpacity(bOwned ? FLinearColor::White : SoftText)
                     .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 9))
                     .AutoWrapText(true)
                 ];
-                if (!LockReason.IsEmpty())
-                {
-                    Card->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(LockReason), 9, bMaxed ? SoftText : FLinearColor(1.0f, 0.45f, 0.35f), true)
-                    ];
-                }
 
                 TierRow->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
                 [
+                    // Tooltip lives on the wrapper too so locked (disabled)
+                    // cards still explain themselves on hover.
                     SNew(SBox).WidthOverride(250.0f)
+                    .ToolTipText(FText::FromString(TooltipText))
                     [
                         SNew(SButton)
                         .ButtonColorAndOpacity(CardColor)
                         .IsEnabled(bPurchasable)
-                        .ContentPadding(FMargin(12.0f, 10.0f))
+                        .ToolTipText(FText::FromString(TooltipText))
+                        .ContentPadding(FMargin(12.0f, 8.0f))
                         .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId]()
                         {
                             UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
@@ -1211,7 +1442,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         + SHorizontalBox::Slot().FillWidth(1.0f).Padding(14.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
         [
             // O2: node numbers are not balanced yet.
-            MenuText(FText::FromString(TEXT("[O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
+            MenuText(FText::FromString(TEXT("Hover a node for full detail, or hold ALT to expand cards  |  [O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
         ]
     ];
     return BuildFrame(FText::FromString(TEXT("SKILL TREES")), FText::FromString(TEXT("CLASS TREE / CORE CONSTELLATIONS")), Body, 1120.0f);

@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
 
 UBreakerEquipmentComponent::UBreakerEquipmentComponent()
@@ -96,6 +97,47 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
     const FBreakerItemInstance Item = Backpack[Index];
     Backpack.RemoveAt(Index);
     return EquipItem(Item);
+}
+
+bool UBreakerEquipmentComponent::DiscardFromBackpack(const FGuid& ItemId)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+    const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+    if (Index == INDEX_NONE) return false;
+    Backpack.RemoveAt(Index);
+    OnEquipmentChanged.Broadcast();
+    return true;
+}
+
+int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity MinimumKept)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return 0;
+    const uint8 Threshold = static_cast<uint8>(MinimumKept);
+    const int32 Removed = Backpack.RemoveAll([Threshold](const FBreakerItemInstance& Existing)
+    {
+        return static_cast<uint8>(Existing.Rarity) < Threshold;
+    });
+    if (Removed > 0) OnEquipmentChanged.Broadcast();
+    return Removed;
+}
+
+void UBreakerEquipmentComponent::DevGrantTestGear(int32 ItemLevel)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    const int32 SafeLevel = FMath::Max(1, ItemLevel);
+    // Distinct seed per slot per grant: the slot index spreads the affix roll,
+    // the counter keeps repeat presses from producing the same eight items.
+    static int32 GrantCounter = 0;
+    ++GrantCounter;
+    for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
+    {
+        const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(SlotIndex);
+        const int32 Seed = GrantCounter * 7919 + SlotIndex * 104729 + SafeLevel * 31;
+        const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
+            FName(*FString::Printf(TEXT("DevTestGear_%s"), *UEnum::GetValueAsString(Slot))),
+            Slot, EBreakerItemRarity::Exceptional, SafeLevel, Seed);
+        EquipItem(Item);
+    }
 }
 
 bool UBreakerEquipmentComponent::GetEquippedItem(EBreakerEquipSlot Slot, FBreakerItemInstance& OutItem) const
