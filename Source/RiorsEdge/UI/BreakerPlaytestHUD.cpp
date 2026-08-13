@@ -29,6 +29,11 @@
 #include "CanvasItem.h"
 #include "CanvasTypes.h"
 #include "Engine/Texture2D.h"
+// Canvas text goes through Slate's font path so it rasterises at the size it
+// is asked for rather than magnifying a bitmap face.
+#include "Framework/Application/SlateApplication.h"
+#include "Fonts/FontMeasure.h"
+#include "Styling/CoreStyle.h"
 #include "TextureResource.h"
 
 // INTEGRATION: ABreakerLootPickup is being authored in parallel. The hover
@@ -1263,8 +1268,31 @@ void ABreakerPlaytestHUD::DrawCrosshair(const FVector2D& Center, const FLinearCo
     DrawLine(Center.X, Center.Y - Size, Center.X, Center.Y + Size, Color, Thickness);
 }
 
+// The engine's small font is a bitmap face at one native size. Asking Canvas
+// for a 40px damage number or a 44px magazine meant magnifying that bitmap
+// three to seven times, which is why both read as fuzzy. Slate's font info
+// rasterises a vector face at whatever pixel size it is handed, so every
+// readout below is rendered at its true size instead of scaled up to it.
+FSlateFontInfo ABreakerPlaytestHUD::MakeSpecFont(float SpecPixels) const
+{
+    // The type scale carries its own weight rule: display and number tokens are
+    // 600-700, body and caption are 400-500. 17px is the boundary between them,
+    // so weight follows size rather than needing a flag at every call site.
+    const int32 PixelSize = FMath::Max(FMath::RoundToInt(S(SpecPixels)), 6);
+    return FCoreStyle::GetDefaultFontStyle(SpecPixels >= 17.0f ? "Bold" : "Regular", PixelSize);
+}
+
 FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPixels) const
 {
+    if (FSlateApplication::IsInitialized())
+    {
+        if (const FSlateRenderer* Renderer = FSlateApplication::Get().GetRenderer())
+        {
+            return FVector2D(Renderer->GetFontMeasureService()->Measure(Text, MakeSpecFont(SpecPixels)));
+        }
+    }
+    // Headless or pre-Slate: fall back to the legacy path so measurement never
+    // returns zero and collapses a right-aligned column onto its neighbour.
     float Width = 0.0f;
     float Height = 0.0f;
     GetTextSize(Text, Width, Height, GEngine ? GEngine->GetSmallFont() : nullptr,
@@ -1274,9 +1302,21 @@ FVector2D ABreakerPlaytestHUD::MeasureSpecText(const FString& Text, float SpecPi
 
 void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)
 {
-    if (TextAlpha <= 0.0f) return;
-    DrawText(Text, BreakerUI::Alpha(Color, Color.A * TextAlpha), X, Y,
-        GEngine ? GEngine->GetSmallFont() : nullptr, S(BreakerUI::CanvasTextScale(SpecPixels)), false);
+    if (TextAlpha <= 0.0f || !Canvas) return;
+    const FLinearColor Face = BreakerUI::Alpha(Color, Color.A * TextAlpha);
+    if (FSlateApplication::IsInitialized())
+    {
+        FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), MakeSpecFont(SpecPixels), Face);
+        // No shadow and no engine outline: this system draws its own outline
+        // pass where it wants one (§4), and a default drop shadow would put a
+        // soft edge on a spec that says flat fills and hard edges only.
+        Item.EnableShadow(FLinearColor::Transparent);
+        Item.bOutlined = false;
+        Canvas->DrawItem(Item);
+        return;
+    }
+    DrawText(Text, Face, X, Y, GEngine ? GEngine->GetSmallFont() : nullptr,
+        S(BreakerUI::CanvasTextScale(SpecPixels)), false);
 }
 
 void ABreakerPlaytestHUD::DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)

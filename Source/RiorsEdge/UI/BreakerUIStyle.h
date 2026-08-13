@@ -196,20 +196,20 @@ namespace BreakerUI
     inline constexpr float DamageRisePixels = 40.0f;
 
     // Thousands take a space, never a comma: at 40px a comma collapses into a
-    // dot. The spec asks for U+2009 THIN SPACE; this uses a normal space until
-    // the real numeric face is imported. The rule the spec is protecting —
-    // never a comma — holds either way.
-    // NOTE for anyone tempted to "fix" this from the measurement above: that
-    // one is the Slate TTF, which does carry U+2009. This function feeds the
-    // CANVAS HUD, which draws with GEngine->GetSmallFont() — a different font
-    // asset with its own charset. Verify that asset before changing this.
+    // dot. U+2009 THIN SPACE, as the spec asks: the canvas HUD now draws
+    // through Slate's font path rather than the engine's bitmap small font,
+    // and the Slate Roboto face carries U+2009 (measured from its cmap — see
+    // the delta-glyph note above, where the same measurement is why the
+    // triangles could NOT stay).
+    // The headless fallback in DrawSpecText still uses the small font, whose
+    // charset is unverified; nothing is on screen in that path.
     inline FString FormatTicker(float Value)
     {
         const int32 Whole = FMath::RoundToInt(Value);
         FString Digits = FString::FromInt(FMath::Abs(Whole));
         for (int32 Index = Digits.Len() - 3; Index > 0; Index -= 3)
         {
-            Digits.InsertAt(Index, TEXT(' '));
+            Digits.InsertAt(Index, TCHAR(0x2009));  // THIN SPACE
         }
         return Whole < 0 ? FString(TEXT("-")) + Digits : Digits;
     }

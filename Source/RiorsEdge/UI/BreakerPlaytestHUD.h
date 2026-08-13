@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/BreakerCombatTypes.h"
+#include "Fonts/SlateFontInfo.h"
 #include "GameFramework/HUD.h"
 #include "Progression/BreakerProgressionTypes.h"
 // The class-resource row's resolved description. Pure, header-only, and the
@@ -157,6 +158,11 @@ private:
     // Chevron-cut block: a rectangle sheared along its top edge. The momentum
     // track changes texture, not just colour, between states.
     void DrawShearedBlock(float X, float Y, float Width, float Height, float Shear, const FLinearColor& Color);
+
+    // A vector face rasterised at the requested pixel size. The engine's small
+    // font is a bitmap at one native size, so drawing a 40px number with it
+    // magnified pixels instead of rendering glyphs.
+    FSlateFontInfo MakeSpecFont(float SpecPixels) const;
 
     // Text authored in spec pixels. Y is the top of the line, matching Canvas.
     void DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
