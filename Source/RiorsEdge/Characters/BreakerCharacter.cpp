@@ -118,6 +118,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     UpdateViewmodelKick();
+    UpdateDashCameraFeedback(DeltaSeconds);
     // Fall-out-of-map recovery: the template level has no kill volume, so
     // enforce our own floor relative to the spawn point.
     if (HasAuthority() && GetActorLocation().Z < FallKillZ)
@@ -157,7 +158,15 @@ void ABreakerCharacter::BeginPlay()
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
     GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("InvertLookY"), bInvertLookY, GGameUserSettingsIni);
     LookSensitivity = FMath::Clamp(LookSensitivity, 0.2f, 2.0f);
-    FirstPersonCamera->SetFieldOfView(FMath::Clamp(SavedFOV, 70.0f, 120.0f));
+    BaseFieldOfView = FMath::Clamp(SavedFOV, 70.0f, 120.0f);
+    ApplyBaseFieldOfView();
+    // Presentation binds to the movement rule, never the other way round: the
+    // component broadcasts that a dash happened and this class decides what the
+    // camera does about it — the same split OnLandingImpact already uses.
+    if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
+    {
+        Movement->OnDashStarted.AddDynamic(this, &ThisClass::HandleDashStarted);
+    }
     if (const APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
@@ -570,12 +579,100 @@ void ABreakerCharacter::EndShotCosmetics()
     if (PrototypeMuzzleFlash) PrototypeMuzzleFlash->SetIntensity(0.0f);
 }
 
-float ABreakerCharacter::GetCurrentFOV() const { return FirstPersonCamera ? FirstPersonCamera->FieldOfView : 90.0f; }
+// Reports the player's SETTING, not the camera's live value, so a dash punch in
+// flight can never be read back by the settings screen, the HUD readout, or
+// SavePlaytestSettings and become the new preference.
+float ABreakerCharacter::GetCurrentFOV() const { return BaseFieldOfView; }
+
+void ABreakerCharacter::ApplyBaseFieldOfView()
+{
+    if (FirstPersonCamera) FirstPersonCamera->SetFieldOfView(BaseFieldOfView);
+}
+
+float ABreakerCharacter::GetDashFeedbackAlpha() const
+{
+    if (DashFeedbackElapsed < 0.0f) return 0.0f;
+    const float Attack = FMath::Max(DashFOVPunchAttack, UE_KINDA_SMALL_NUMBER);
+    const float Recovery = FMath::Max(DashFOVPunchRecovery, UE_KINDA_SMALL_NUMBER);
+    if (DashFeedbackElapsed <= Attack)
+    {
+        return FMath::Clamp(DashFeedbackElapsed / Attack, 0.0f, 1.0f);
+    }
+    // Ease-out on the way back: a linear recovery reads as a mechanical slide,
+    // a decaying one reads as the camera settling.
+    const float Alpha = FMath::Clamp((DashFeedbackElapsed - Attack) / Recovery, 0.0f, 1.0f);
+    const float Remaining = 1.0f - Alpha;
+    return Remaining * Remaining;
+}
+
+void ABreakerCharacter::HandleDashStarted(FVector DashDirection, float DashSpeed)
+{
+    LastDashDirection = DashDirection;
+    if (!bDashCameraFeedback || !IsLocallyControlled()) return;
+
+    DashFeedbackElapsed = 0.0f;
+    // Scale by how fast the dash actually came out, so a dash that carried real
+    // momentum in reads harder than a standing one. This is the number the
+    // owner said they could not see.
+    DashFeedbackScale = FMath::Clamp(
+        DashSpeed / FMath::Max(DashFeedbackReferenceSpeed, 1.0f),
+        FMath::Min(DashFeedbackMinimumScale, DashFeedbackMaximumScale),
+        FMath::Max(DashFeedbackMinimumScale, DashFeedbackMaximumScale));
+    // Roll is signed by how lateral the dash was: a forward dash gets none, a
+    // strafe dash gets all of it, and the sign follows the side you went.
+    const FVector Right = GetActorRightVector().GetSafeNormal2D();
+    DashFeedbackRollSign = FMath::Clamp(static_cast<float>(FVector::DotProduct(DashDirection.GetSafeNormal2D(), Right)), -1.0f, 1.0f);
+}
+
+void ABreakerCharacter::UpdateDashCameraFeedback(float DeltaSeconds)
+{
+    if (DashFeedbackElapsed < 0.0f)
+    {
+        return;
+    }
+
+    DashFeedbackElapsed += DeltaSeconds;
+    const float Alpha = GetDashFeedbackAlpha();
+    const bool bFinished = DashFeedbackElapsed >= DashFOVPunchAttack + DashFOVPunchRecovery;
+
+    if (FirstPersonCamera)
+    {
+        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashFOVPunch * DashFeedbackScale * Alpha, 5.0f, 170.0f));
+    }
+
+    // Roll rides the control rotation rather than the camera transform: the
+    // camera runs bUsePawnControlRotation, so it re-derives its world rotation
+    // from the view rotation every frame and would discard a relative roll.
+    // The character never uses controller roll for anything else
+    // (bUseControllerRotationRoll is false, so the capsule does not tilt), which
+    // is why this is safe to own outright — and roll about the view axis leaves
+    // the aim direction, and therefore every weapon trace, untouched.
+    const float Roll = DashCameraRoll * DashFeedbackScale * DashFeedbackRollSign * Alpha;
+    if (Controller && (bDashRollApplied || !FMath::IsNearlyZero(Roll)))
+    {
+        FRotator ControlRotation = Controller->GetControlRotation();
+        ControlRotation.Roll = bFinished ? 0.0f : Roll;
+        Controller->SetControlRotation(ControlRotation);
+        bDashRollApplied = !bFinished;
+    }
+
+    if (bFinished)
+    {
+        DashFeedbackElapsed = -1.0f;
+        bDashRollApplied = false;
+        ApplyBaseFieldOfView();
+    }
+}
 
 void ABreakerCharacter::ResetPlaytest()
 {
     SetActorTransform(PlaytestSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
     GetCharacterMovement()->StopMovementImmediately();
+    // Drop any dash punch in flight before the rotation is rewritten, or the
+    // next frame would re-apply a roll on top of the reset view.
+    DashFeedbackElapsed = -1.0f;
+    bDashRollApplied = false;
+    ApplyBaseFieldOfView();
     if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
     if (Weapon) Weapon->ResetAmmunition();
     if (Combat) Combat->RestoreVitals();
@@ -585,8 +682,8 @@ void ABreakerCharacter::ResetPlaytest()
 
 void ABreakerCharacter::CopyPlaytestReport() { if (Playtest) Playtest->CopyReportToClipboard(); }
 void ABreakerCharacter::TogglePlaytestDiagnostics() { if (Playtest) Playtest->ToggleDiagnostics(); }
-void ABreakerCharacter::IncreaseFOV() { FirstPersonCamera->SetFieldOfView(FMath::Clamp(GetCurrentFOV() + 5.0f, 70.0f, 120.0f)); SavePlaytestSettings(); }
-void ABreakerCharacter::DecreaseFOV() { FirstPersonCamera->SetFieldOfView(FMath::Clamp(GetCurrentFOV() - 5.0f, 70.0f, 120.0f)); SavePlaytestSettings(); }
+void ABreakerCharacter::IncreaseFOV() { BaseFieldOfView = FMath::Clamp(BaseFieldOfView + 5.0f, 70.0f, 120.0f); ApplyBaseFieldOfView(); SavePlaytestSettings(); }
+void ABreakerCharacter::DecreaseFOV() { BaseFieldOfView = FMath::Clamp(BaseFieldOfView - 5.0f, 70.0f, 120.0f); ApplyBaseFieldOfView(); SavePlaytestSettings(); }
 void ABreakerCharacter::IncreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity + 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
 void ABreakerCharacter::DecreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity - 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
 
@@ -602,7 +699,8 @@ void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bo
 {
     LookSensitivity = FMath::Clamp(NewSensitivity, 0.2f, 2.0f);
     bInvertLookY = bNewInvertLookY;
-    if (FirstPersonCamera) FirstPersonCamera->SetFieldOfView(FMath::Clamp(NewFOV, 70.0f, 120.0f));
+    BaseFieldOfView = FMath::Clamp(NewFOV, 70.0f, 120.0f);
+    ApplyBaseFieldOfView();
     SavePlaytestSettings();
 }
 

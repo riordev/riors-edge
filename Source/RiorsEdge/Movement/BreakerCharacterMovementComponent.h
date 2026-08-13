@@ -9,6 +9,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWallRideStateChanged, bool, bNowWal
 // LandingHeavyFallSpeed. Presentation only (camera dip, dust, audio) — the
 // weight itself is applied in C++ before this fires.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerLandingImpact, float, ImpactSpeed);
+// Broadcast the instant a dash charge is consumed, carrying the horizontal
+// direction the dash committed to and the horizontal speed it produced.
+// Presentation only, exactly like OnLandingImpact: the velocity change itself
+// has already happened in C++ when this fires, so a listener can only dress it
+// (camera punch, speed lines, controller rumble) and can never change the
+// movement rule. Same shape so a HUD or Blueprint can bind either without the
+// movement layer knowing anything about cameras or widgets.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerDashStarted, FVector, DashDirection, float, DashSpeed);
 
 UCLASS(ClassGroup=Movement, BlueprintType)
 class RIORSEDGE_API UBreakerCharacterMovementComponent : public UCharacterMovementComponent
@@ -133,15 +141,39 @@ public:
     // Short wall ride: preserves traversal flow without generating speed or
     // replacing combat.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMaxDuration = 0.85f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMinimumSpeed = 700.0f;
+    // BUG FIX (owner: "wall riding doesnt work"). This gate is read AFTER the
+    // engine has already deflected the approach velocity along the wall, so it
+    // must be sized for the along-wall speed that SURVIVES contact, not for the
+    // approach speed. At the old 700 it sat exactly ON WalkSpeed — the hard
+    // airborne horizontal ceiling when the sprint toggle is off — so a
+    // non-sprinting player could never pass it at all, and a sprinting player
+    // lost it as soon as the approach angle exceeded ~50 degrees
+    // (1100 * cos 50 = 707). 450 restores the invariant every other gate in
+    // this component already follows: an entry threshold sits strictly BELOW
+    // the speed it gates (slide enters at 550, under the 700 walk speed).
+    // Covered by RiorsEdge.Movement.WallRideEntry.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMinimumSpeed = 450.0f; // OLD: 700.0f (== WalkSpeed, unreachable)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideGravityScale = 0.55f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideTraceDistance = 85.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpAwaySpeed = 650.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpUpSpeed = 650.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideCooldown = 0.3f;
+    // The wall jump keeps its own exit floor. It used to borrow
+    // WallRideMinimumSpeed, so lowering the entry gate above would silently
+    // have made every wall jump weaker — two different jobs, two values.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpMinimumSpeed = 700.0f;
+    // FEEL, not a bug fix. Two jumps are base kit (O25) and are spent by the
+    // time most players reach a wall, so a wall jump used to launch you with
+    // nothing left and no way to correct — which is most of what "awkward"
+    // describes. A wall jump now hands back one air jump (never more than the
+    // O25 baseline: the count is clamped, not cleared), so wall-to-wall
+    // traversal is a chain instead of a dead end. False restores the old
+    // behaviour exactly.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride") bool bWallJumpRefreshesAirJump = true;
 
     UPROPERTY(BlueprintAssignable, Category="Movement|Wall Ride") FWallRideStateChanged OnWallRideStateChanged;
     UPROPERTY(BlueprintAssignable, Category="Movement|Weight") FBreakerLandingImpact OnLandingImpact;
+    UPROPERTY(BlueprintAssignable, Category="Movement|Dash") FBreakerDashStarted OnDashStarted;
 
     // Pure rules, exposed for world-free tests.
     // A redirect is legal only when there is real horizontal speed to turn.
@@ -152,6 +184,23 @@ public:
     static FVector RedirectHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float MinimumSpeed);
     // Multiplicative composition of the active temporary multipliers.
     static float ComposeSpeedMultipliers(const TArray<float>& Multipliers);
+
+    // Every non-spatial half of the wall-ride entry decision, lifted out of
+    // TickComponent so it can be tested without a world. Only the wall trace
+    // itself stays in the component. This verb broke silently once; the rule
+    // now has a name and a regression test (RiorsEdge.Movement.WallRideEntry).
+    // HorizontalSpeed is the speed the entry frame actually observes, which —
+    // once the capsule has touched the wall — is the ALONG-WALL component the
+    // engine's falling deflection leaves behind, not the approach speed.
+    static bool CanBeginWallRide(
+        bool bAlreadyWallRiding,
+        bool bFalling,
+        bool bSlidingNow,
+        float HorizontalSpeed,
+        float MinimumSpeed,
+        bool bHasMovementInput,
+        float SecondsSinceLastWallRide,
+        float Cooldown);
 
     // --- Weight rules, pure maths so they can be tested without a world ---
     // Gravity multiplier as a continuous function of vertical velocity:

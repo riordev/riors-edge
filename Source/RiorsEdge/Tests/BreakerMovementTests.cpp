@@ -231,6 +231,78 @@ bool FBreakerMovementWeightTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWallRideEntryTest,
+    "RiorsEdge.Movement.WallRideEntry",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWallRideEntryTest::RunTest(const FString& Parameters)
+{
+    using FMovement = UBreakerCharacterMovementComponent;
+
+    // This verb shipped broken and nothing caught it: the entry speed gate was
+    // set to exactly WalkSpeed, which is the hard airborne horizontal ceiling
+    // when the sprint toggle is off, so the condition could not be satisfied.
+    // Wall JUMP is gated on an active wall RIDE, so the dead gate silently took
+    // both verbs with it. These assertions exist so that cannot recur.
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+
+    // --- The invariant that broke ---------------------------------------
+    TestTrue(TEXT("The wall-ride gate sits strictly below the walk ceiling it is measured against"),
+        Movement->WallRideMinimumSpeed < Movement->WalkSpeed);
+    // Same rule the slide already obeys, stated so both stay comparable.
+    TestTrue(TEXT("The slide gate also sits below the walk ceiling"),
+        Movement->SlideEntrySpeed < Movement->WalkSpeed);
+    // The engine deflects the approach velocity along the wall before this gate
+    // is read, so the gate must survive a steep approach at SPRINT speed. A
+    // 60-degree approach keeps only half the speed.
+    const float DeflectedSprint = Movement->SprintSpeed * 0.5f;
+    TestTrue(TEXT("A steep sprinting approach still passes the gate after wall deflection"),
+        DeflectedSprint >= Movement->WallRideMinimumSpeed);
+    // And a walking player, who can never exceed WalkSpeed in the air, must be
+    // able to start a ride at all rather than needing a perfect exactly-at-cap
+    // float. A 45-degree approach at walk speed is the honest worst case.
+    const float DeflectedWalk = Movement->WalkSpeed * 0.707f;
+    TestTrue(TEXT("A walking player can reach the gate after wall deflection"),
+        DeflectedWalk >= Movement->WallRideMinimumSpeed);
+
+    // --- The rule itself --------------------------------------------------
+    const float Gate = 450.0f;
+    const float Cooldown = 0.3f;
+    TestTrue(TEXT("A falling player with input, speed and no cooldown may start a ride"),
+        FMovement::CanBeginWallRide(false, true, false, 900.0f, Gate, true, 10.0f, Cooldown));
+    TestTrue(TEXT("Exactly at the gate is enough"),
+        FMovement::CanBeginWallRide(false, true, false, Gate, Gate, true, 10.0f, Cooldown));
+    TestFalse(TEXT("Below the gate is refused"),
+        FMovement::CanBeginWallRide(false, true, false, Gate - 1.0f, Gate, true, 10.0f, Cooldown));
+    TestFalse(TEXT("A grounded player cannot start a ride"),
+        FMovement::CanBeginWallRide(false, false, false, 900.0f, Gate, true, 10.0f, Cooldown));
+    TestFalse(TEXT("A slide is not a wall ride"),
+        FMovement::CanBeginWallRide(false, true, true, 900.0f, Gate, true, 10.0f, Cooldown));
+    TestFalse(TEXT("An active ride does not restart itself"),
+        FMovement::CanBeginWallRide(true, true, false, 900.0f, Gate, true, 10.0f, Cooldown));
+    TestFalse(TEXT("Releasing movement input drops out of the entry condition"),
+        FMovement::CanBeginWallRide(false, true, false, 900.0f, Gate, false, 10.0f, Cooldown));
+    TestFalse(TEXT("The cooldown blocks an immediate re-attach"),
+        FMovement::CanBeginWallRide(false, true, false, 900.0f, Gate, true, Cooldown - 0.05f, Cooldown));
+    TestTrue(TEXT("Exactly at the cooldown re-attaches"),
+        FMovement::CanBeginWallRide(false, true, false, 900.0f, Gate, true, Cooldown, Cooldown));
+
+    // --- Wall jump ---------------------------------------------------------
+    // The wall jump used to borrow the entry gate as its exit floor, so
+    // lowering the gate would have quietly weakened every wall jump. They are
+    // now separate values and the jump keeps the higher one.
+    TestTrue(TEXT("The wall jump keeps its own exit floor above the entry gate"),
+        Movement->WallRideJumpMinimumSpeed > Movement->WallRideMinimumSpeed);
+    // Wall jump remains reachable only through an active ride, which is exactly
+    // why a dead ride took the jump with it.
+    TestFalse(TEXT("Wall jump is still gated on an active ride"), Movement->TryWallJump());
+    // The ride must still be speed-neutral: nothing in this fix may raise the
+    // speed the ride itself is allowed to hold.
+    TestTrue(TEXT("Wall ride still has a duration cap"), Movement->WallRideMaxDuration > 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerPlaytestAssemblyTest,
     "RiorsEdge.Playtest.Assembly",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -252,6 +324,13 @@ bool FBreakerPlaytestAssemblyTest::RunTest(const FString& Parameters)
         {
             TestEqual(TEXT("Baseline supports a double jump"), CharacterDefaults->JumpMaxCount, 2);
             TestEqual(TEXT("Baseline look sensitivity remains one-to-one"), CharacterDefaults->GetLookSensitivity(), 1.0f);
+            // Dash camera feedback is presentation and must be idle at rest, or
+            // it would be biasing the FOV and the view roll every frame.
+            TestEqual(TEXT("Dash camera feedback is idle at rest"), CharacterDefaults->GetDashFeedbackAlpha(), 0.0f);
+            // The FOV reported to the settings screen is the player's setting,
+            // never the punched camera value.
+            TestTrue(TEXT("Reported FOV stays inside the settings range"),
+                CharacterDefaults->GetCurrentFOV() >= 70.0f && CharacterDefaults->GetCurrentFOV() <= 120.0f);
         }
     }
     TestEqual(TEXT("Playtest HUD remains active"), GameMode->HUDClass.Get(), ABreakerPlaytestHUD::StaticClass());
