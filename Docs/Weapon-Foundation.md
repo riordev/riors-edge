@@ -103,6 +103,77 @@ clamping, monotone recovery to exactly zero, compensation credit, the ADS
 difference, bloom growth and decay, spring return to rest — and prove nothing
 about whether it feels good.
 
+## Round presentation (tracers, muzzle origin, impacts, rocket)
+
+Owner report: "the bullet projectiles look a bit strange." Four causes were
+real, one was not.
+
+**Real.** (1) The streak was drawn at full length from trace start to impact on
+the frame it was fired, so it read as a static beam, not a round in flight.
+(2) It started at the CAMERA, because `FBreakerShotResult::TraceStart` is the
+view point — at close range and while strafing the line came out of the middle
+of the player's face. (3) Thickness was a constant 1.25 spec px whatever the
+range, so an 80 m shot was as fat as a 2 m one. (4) It was gold, which
+FIELDPLATE reserves for reward and weak points; weapon/heat is the orange
+family. Two further faults were found while reading: the rocket launcher also
+emitted a hitscan streak (`FireProjectile` fills a `FBreakerShotResult` too),
+so every rocket was shadowed by a ghost round; and the impact cross was drawn
+at the moment of firing rather than when the round arrived.
+
+**Not real.** The 0.12 s fade was not the problem — the streak never moved, so
+there was nothing for the fade to sell.
+
+What it is now:
+
+- `Source/RiorsEdge/UI/BreakerTracerMath.h` is a pure, testable header holding
+  the flight maths. A shot is recorded once; the HUD replays it as a short
+  segment (`LengthCm` 900) travelling muzzle-to-impact. Flight time is clamped
+  into `[MinFlightSeconds 0.05, MaxFlightSeconds 0.22]` by trimming the
+  effective speed, so a point-blank shotgun round still occupies ~3 frames and
+  a cross-field sniper round does not float. All O2 PLACEHOLDER.
+- Thickness comes from a world radius (`TracerRadiusCm` 2.2) projected at the
+  round's own depth, clamped to [0.9, 5.0] spec px.
+- Colour is `BreakerUI::Orange` over a wider `OrangeDeep` glow. Never teal.
+- `UBreakerWeaponComponent::GetVisualMuzzleLocation()` is a new **presentation
+  only** accessor: view point plus a camera-space `MuzzleViewOffset`
+  (hip 95/18/-18 cm, ADS 95/2/-6 cm), matching the placeholder weapon assembly
+  on `ABreakerCharacter`. **The trace still starts at the camera.** The feel
+  layer's tested invariant — recoil moves the aim, the round follows the aim,
+  the round lands on the crosshair — is untouched. Visual origin and trace
+  origin differing is standard practice; they converge at the impact, which is
+  the only place they must agree.
+- The impact cross is gone. In its place is a six-spoke star drawn at a world
+  radius in the plane perpendicular to the round's travel, so it sits on the
+  surface and shrinks with distance. It starts when the round ARRIVES.
+  `FBreakerShotResult` carries no impact normal and adding one would touch the
+  shot contract a recoil layer just landed in, so travel direction stands in
+  for the normal; for anything but a glancing shot the two are within a few
+  degrees.
+- Projectile weapons no longer record a HUD tracer at all.
+
+**Depth trade-off.** The tracer stayed on the HUD canvas, so it does not
+depth-sort: a streak composites over whatever is in front of it. This is safe
+here and only here, because every point on the streak lies on a line from
+(almost) the camera to a point the camera's own trace reached unobstructed —
+the muzzle is ~20 cm off the camera, so only geometry inside that sliver can
+wrongly occlude. The alternative (pooled world primitives) buys correct sorting
+at the cost of a pool, a material, and a per-frame transform update for a thing
+that lives 0.2 s. If a streak is ever seen through a wall, that is the trade
+being paid, and the fix is to move the layer into the world, not to tweak it.
+
+`ABreakerRocketProjectile` got the matching pass: casing, nose cone, two fins
+and an emissive exhaust bloom from `/Engine/BasicShapes` primitives with
+dynamic material instances, coloured from the same orange tokens, plus a point
+light and a roll on the warhead. On detonation the rocket becomes its own
+explosion — collision and movement off, casing hidden, the exhaust bloom scaled
+to two thirds of the damage radius, the light flared — and dies
+`ExplosionFlashSeconds` later. No second actor, no pool, and clients see it
+through the existing cosmetic multicast.
+
+Nothing in this section has been PLAYTESTED. `RiorsEdge.Weapons.TracerFlight`
+proves the flight maths, the basis construction and the inverse-depth
+thickness; it proves nothing about whether a round now looks like a round.
+
 ## Runtime flow
 
 1. Input starts or stops the trigger on the weapon component.

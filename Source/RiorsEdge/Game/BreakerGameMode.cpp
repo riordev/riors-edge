@@ -3,6 +3,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -318,6 +319,26 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
     {
         Elite->ConfigureEncounter(EliteLocation, 0.9f);
         Elite->ConfigureElite();
+    }
+
+    // Two LATTICE ranged enemies (Encounter-Design §2.2) flank the pack wide.
+    // Placed off to the sides rather than behind the melee so their fire lanes
+    // CROSS the ground route the chasers push the player along: the melee
+    // enemies deny standing still, the ranged pair deny running in a straight
+    // line, and neither problem is solved by the answer to the other. They are
+    // deliberately at the edge of their own engagement band on spawn, so the
+    // first thing the player sees them do is hold ground rather than charge.
+    const float RangedLateral[] = { -1500.0f, 1500.0f };
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        const FVector SpawnLocation = Origin + Forward * (SafeZoneRadius + 3200.0f) + Right * RangedLateral[Index];
+        FActorSpawnParameters RangedParams;
+        RangedParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        if (ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
+            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
+        {
+            Ranged->ConfigureEncounter(SpawnLocation, 0.4f + Index * 1.1f);
+        }
     }
 }
 
@@ -685,10 +706,19 @@ void ABreakerGameMode::StartNextWave()
     const int32 EnemyCount = FMath::Min(4 + CurrentWave * 3, 24);
     const bool bEliteWave = CurrentWave % 3 == 0;
 
-    for (int32 Index = 0; Index < EnemyCount; ++Index)
+    // LATTICE ranged enemies join from wave 2 and climb to the hard cap of 3
+    // live at once (Encounter-Design §5.3: "four converging projectile sources
+    // removes all safe ground; this is the single most dangerous scaling
+    // knob"). They come OUT OF the melee budget rather than on top of it, so
+    // pack density and the TTK sample size are unchanged — what changes is the
+    // kind of pressure, not the amount.
+    const int32 RangedCount = FMath::Clamp(CurrentWave / 2, 0, 3);
+    const int32 MeleeCount = FMath::Max(EnemyCount - RangedCount, 1);
+
+    for (int32 Index = 0; Index < MeleeCount; ++Index)
     {
         const int32 Pack = Index / 4;
-        const float PackAngle = 360.0f * Pack / FMath::Max(1, (EnemyCount + 3) / 4);
+        const float PackAngle = 360.0f * Pack / FMath::Max(1, (MeleeCount + 3) / 4);
         const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * 1100.0f;
         const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
         FActorSpawnParameters Params;
@@ -700,6 +730,26 @@ void ABreakerGameMode::StartNextWave()
             Enemy->ConfigureWave(10 + CurrentWave * 2);
             if (bEliteWave && Index == 0) Enemy->ConfigureElite();
             WaveEnemies.Add(Enemy);
+        }
+    }
+
+    // Ranged support sits a ring further out and spread evenly around the
+    // arena, so the melee packs push the player ACROSS the ranged fire lanes
+    // instead of away from them. Never promoted to elite: the elite is already
+    // the melee anchor, and two things to read at once is one too many.
+    for (int32 Index = 0; Index < RangedCount; ++Index)
+    {
+        const float Angle = 360.0f * Index / FMath::Max(1, RangedCount) + 45.0f;
+        const FVector SpawnLocation = ArenaCenter
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * 1900.0f;
+        FActorSpawnParameters RangedParams;
+        RangedParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        if (ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
+            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
+        {
+            Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
+            Ranged->ConfigureWave(10 + CurrentWave * 2);
+            WaveEnemies.Add(Ranged);
         }
     }
 }

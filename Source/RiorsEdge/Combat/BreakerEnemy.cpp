@@ -199,55 +199,13 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     }
 
     const float Distance = FMath::Sqrt(NearestDistanceSq);
-    const double Now = GetWorld()->GetTimeSeconds();
     FVector DesiredDirection = FVector::ZeroVector;
     // Speed multiplier for this frame. 1.0 = the old constant walk.
     float SpeedScale = 1.0f;
+    DesiredFacing = FVector::ZeroVector;
     if (NearestPlayer && Distance <= DetectionRange)
     {
-        const FVector ToPlayer = (NearestPlayer->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-        DesiredDirection = ToPlayer;
-        StateLabel = Distance <= AttackRange ? TEXT("ATTACK") : TEXT("CHASE");
-        if (Distance <= AttackRange) PerformAttack(NearestPlayer);
-
-        // (a) Closing sprint: far away, they commit to closing the gap
-        // instead of ambling. Inside SprintRange they drop to normal so the
-        // player still gets readable spacing at knife range.
-        if (Distance > SprintRange)
-        {
-            SpeedScale = SprintSpeedMultiplier;
-            StateLabel = TEXT("CLOSING");
-        }
-
-        // (b) Strafe weave: a lateral sinusoid folded into the chase vector.
-        // Elites are exempt — the identity is that an elite advances
-        // implacably and does not juke (Encounter-Design §1.1 chassis).
-        if (!bIsElite && Distance > AttackRange)
-        {
-            WeaveTime += DeltaSeconds;
-            const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();
-            const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
-            DesiredDirection = (ToPlayer + Lateral * Weave).GetSafeNormal2D();
-        }
-
-        // (c) Committed lunge: once inside LungeRange, a short burst straight
-        // at the player on a cooldown. Telegraphed via StateLabel so the
-        // playtest HUD shows the tell.
-        const bool bLungeActive = (Now - LungeStartTime) < LungeDuration;
-        if (bLungeActive)
-        {
-            SpeedScale = LungeSpeedMultiplier;
-            DesiredDirection = ToPlayer;   // no weave mid-commit
-            StateLabel = TEXT("LUNGE");
-        }
-        else if (Distance <= LungeRange && Distance > AttackRange
-            && (Now - LungeStartTime) >= (LungeDuration + LungeCooldown))
-        {
-            LungeStartTime = Now;
-            SpeedScale = LungeSpeedMultiplier;
-            DesiredDirection = ToPlayer;
-            StateLabel = TEXT("LUNGE");
-        }
+        TickEngagedBehaviour(NearestPlayer, Distance, DeltaSeconds, DesiredDirection, SpeedScale);
     }
     else
     {
@@ -256,6 +214,11 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         DesiredDirection = (PatrolTarget - GetActorLocation()).GetSafeNormal2D();
         StateLabel = TEXT("PATROL");
     }
+
+    // Facing is decided before movement so an archetype that strafes sideways
+    // while aiming at the player still points its muzzle at the player.
+    const FVector Facing = DesiredFacing.IsNearlyZero() ? DesiredDirection : DesiredFacing;
+    if (!Facing.IsNearlyZero()) SetActorRotation(Facing.Rotation());
 
     if (!DesiredDirection.IsNearlyZero())
     {
@@ -268,7 +231,6 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         }
         FHitResult MoveHit;
         AddActorWorldOffset(Step, true, &MoveHit);
-        SetActorRotation(DesiredDirection.Rotation());
     }
 
     // Ground snap: enemies move by offset with no gravity, so without this
@@ -291,6 +253,60 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
                 : FMath::Min(TargetZ, CurrentZ + 600.0f * DeltaSeconds);
             SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, NewZ), false);
         }
+    }
+}
+
+void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
+    FVector& OutDirection, float& OutSpeedScale)
+{
+    // The melee chase, in three gears. Extracted verbatim from Tick so a
+    // ranged archetype can replace the whole decision without forking the
+    // shared target-selection, safe-zone, and ground-snap code around it.
+    if (!Player || !GetWorld()) return;
+    const double Now = GetWorld()->GetTimeSeconds();
+
+    const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+    OutDirection = ToPlayer;
+    StateLabel = Distance <= AttackRange ? TEXT("ATTACK") : TEXT("CHASE");
+    if (Distance <= AttackRange) PerformAttack(Player);
+
+    // (a) Closing sprint: far away, they commit to closing the gap
+    // instead of ambling. Inside SprintRange they drop to normal so the
+    // player still gets readable spacing at knife range.
+    if (Distance > SprintRange)
+    {
+        OutSpeedScale = SprintSpeedMultiplier;
+        StateLabel = TEXT("CLOSING");
+    }
+
+    // (b) Strafe weave: a lateral sinusoid folded into the chase vector.
+    // Elites are exempt — the identity is that an elite advances
+    // implacably and does not juke (Encounter-Design §1.1 chassis).
+    if (!bIsElite && Distance > AttackRange)
+    {
+        WeaveTime += DeltaSeconds;
+        const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();
+        const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
+        OutDirection = (ToPlayer + Lateral * Weave).GetSafeNormal2D();
+    }
+
+    // (c) Committed lunge: once inside LungeRange, a short burst straight
+    // at the player on a cooldown. Telegraphed via StateLabel so the
+    // playtest HUD shows the tell.
+    const bool bLungeActive = (Now - LungeStartTime) < LungeDuration;
+    if (bLungeActive)
+    {
+        OutSpeedScale = LungeSpeedMultiplier;
+        OutDirection = ToPlayer;   // no weave mid-commit
+        StateLabel = TEXT("LUNGE");
+    }
+    else if (Distance <= LungeRange && Distance > AttackRange
+        && (Now - LungeStartTime) >= (LungeDuration + LungeCooldown))
+    {
+        LungeStartTime = Now;
+        OutSpeedScale = LungeSpeedMultiplier;
+        OutDirection = ToPlayer;
+        StateLabel = TEXT("LUNGE");
     }
 }
 
@@ -357,7 +373,7 @@ void ABreakerEnemy::HandleDeath()
             // Engagement-gapped TTK: idle stretches between damage events are
             // capped, so target-switching doesn't inflate the sample the way
             // wall-clock first-damage-to-death did (session 3 finding).
-            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite);
+            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite, IsRangedForTelemetry());
         }
         FirstDamageTime = -1.0;
         LastDamageEventTime = -1.0;

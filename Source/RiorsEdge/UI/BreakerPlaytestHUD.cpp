@@ -10,7 +10,9 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "UI/BreakerUIStyle.h"
+#include "UI/BreakerTracerMath.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Weapons/BreakerWeaponDefinition.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
@@ -62,8 +64,20 @@ namespace BreakerHUD
     // as mud, and the flat-fill rule exists to stop exactly that.
     static const FLinearColor PlateFace = BreakerUI::Alpha(BreakerUI::BgBase, 0.96f);
 
-    static constexpr float TracerLifetime = 0.12f;
-    static constexpr float ImpactLifetime = 0.25f;
+    // --- Rounds in flight ---------------------------------------------------
+    // THE knob: TracerFlight.SpeedCms. Everything else about how a round reads
+    // follows from how long it is on screen. All O2 PLACEHOLDER.
+    static const FTracerFlight TracerFlight;
+    // World radius of the bright core, converted to pixels per frame at the
+    // round's own depth. 2 cm is a fat round, but a 0.9 cm one is sub-pixel
+    // past 30 m and the whole point is that it stays readable.
+    static constexpr float TracerRadiusCm = 2.2f;       // O2 PLACEHOLDER
+    static constexpr float ImpactLifetime = 0.18f;      // O2 PLACEHOLDER
+    // Impact star: outer radius in world centimetres, and the world radius of
+    // each spoke's stroke.
+    static constexpr float ImpactRadiusCm = 26.0f;      // O2 PLACEHOLDER
+    static constexpr float ImpactSparkRadiusCm = 1.4f;  // O2 PLACEHOLDER
+    static constexpr int32 ImpactSpokes = 6;
     // 40ms pop + 520ms rise, FIELDPLATE §04.
     static constexpr float DamageNumberLifetime =
         BreakerUI::MotionDamagePop + BreakerUI::MotionDamageRise;
@@ -657,46 +671,127 @@ void ABreakerPlaytestHUD::DrawWaveBanner(const FVector2D& Center)
 }
 
 // --------------------------------------------------------------------------
-// Hitscan tracers. Ring buffer of world-space lines, projected fresh every
-// frame so they track the camera correctly while they fade.
+// Rounds in flight.
+//
+// The shot itself is hitscan and stays hitscan — the round has already landed
+// before this function runs. What is drawn is a SHORT segment travelling from
+// the visual muzzle to the impact over a handful of frames, with a screen
+// thickness derived from a world radius so a far round is thin, and an impact
+// burst that starts when the round arrives rather than when the trigger was
+// pulled.
+//
+// DEPTH TRADE-OFF, stated plainly: this stays on the HUD canvas, so it does
+// not depth-sort — a streak composites over whatever is in front of it. That
+// is acceptable here and only here, because every point on the streak lies on
+// a line from (almost) the camera to a point the camera's own trace reached
+// without hitting anything. The muzzle is ~20 cm off the camera, so the only
+// geometry that can wrongly occlude is within that sliver. The alternative,
+// pooled world primitives, buys correct sorting at the cost of a pool, a
+// material, and a per-frame transform update for a thing that lives 0.2 s.
+// If the owner ever sees a streak through a wall, that is the trade being
+// paid and the fix is approach (b), not a tweak here.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawTracers()
 {
-    if (Tracers.Num() == 0) return;
+    if (Tracers.Num() == 0 || !Canvas) return;
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+
+    // Canvas FOV is horizontal; the pixel scale below is vertical.
+    float VerticalHalfFOV = FMath::DegreesToRadians(45.0f);
+    if (const APlayerController* PC = GetOwningPlayerController())
+    {
+        if (const APlayerCameraManager* Camera = PC->PlayerCameraManager)
+        {
+            const float HorizontalHalf = FMath::DegreesToRadians(FMath::Clamp(Camera->GetFOVAngle(), 20.0f, 170.0f) * 0.5f);
+            const float Aspect = Canvas->ClipX > 0.0f ? Canvas->ClipY / Canvas->ClipX : 0.5625f;
+            VerticalHalfFOV = FMath::Atan(FMath::Tan(HorizontalHalf) * Aspect);
+        }
+    }
 
     for (const FBreakerHUDTracer& Tracer : Tracers)
     {
         const float Age = static_cast<float>(Now - Tracer.Time);
         if (Age < 0.0f) continue;
+        if (Age > Tracer.FlightSeconds + BreakerHUD::ImpactLifetime) continue;
 
-        if (Age < BreakerHUD::TracerLifetime)
+        const BreakerHUD::FTracerSample Sample =
+            BreakerHUD::SampleTracer(BreakerHUD::TracerFlight, Tracer.Start, Tracer.End, Age);
+
+        if (Sample.bVisible)
         {
             // bClampToZeroPlane=false so a point behind the camera keeps its
             // negative depth and can be rejected instead of folding forward.
-            const FVector StartProj = Project(Tracer.Start, false);
-            const FVector EndProj = Project(Tracer.End, false);
-            if (StartProj.Z > 0.0f && EndProj.Z > 0.0f)
+            const FVector TailProj = Project(Sample.Tail, false);
+            const FVector HeadProj = Project(Sample.Head, false);
+            if (TailProj.Z > 0.0f && HeadProj.Z > 0.0f)
             {
-                const float Fade = 1.0f - Age / BreakerHUD::TracerLifetime;
-                DrawLine(StartProj.X, StartProj.Y, EndProj.X, EndProj.Y,
-                    BreakerUI::Alpha(BreakerUI::Gold, Fade), S(1.25f));
+                // Thickness from the head's depth: a round 80 m out is a
+                // hairline, a round 3 m out has body. Clamped so it never
+                // disappears entirely and never becomes a bar across the
+                // screen at point-blank range.
+                const float Core = FMath::Clamp(
+                    BreakerHUD::WorldRadiusToPixels(BreakerHUD::TracerRadiusCm,
+                        static_cast<float>(HeadProj.Z), Canvas->ClipY, VerticalHalfFOV),
+                    S(0.9f), S(5.0f));
+
+                // Weapon/heat is the orange family (FIELDPLATE function
+                // accents). The old gold belongs to reward and weak points,
+                // which is exactly the read a plain body shot must not have.
+                const float Brightness = FMath::Lerp(1.0f, 0.72f, Sample.HeadFraction);
+                DrawLine(TailProj.X, TailProj.Y, HeadProj.X, HeadProj.Y,
+                    BreakerUI::Alpha(BreakerUI::OrangeDeep, 0.55f * Brightness), Core * 2.4f);
+                DrawLine(TailProj.X, TailProj.Y, HeadProj.X, HeadProj.Y,
+                    BreakerUI::Alpha(BreakerUI::Orange, Brightness), Core);
             }
         }
 
-        if (Tracer.bHit && Age < BreakerHUD::ImpactLifetime)
+        if (Tracer.bHit)
         {
-            const FVector ImpactProj = Project(Tracer.Impact, false);
-            if (ImpactProj.Z > 0.0f)
+            const float BurstAge = Age - Tracer.FlightSeconds;
+            if (BurstAge >= 0.0f && BurstAge < BreakerHUD::ImpactLifetime)
             {
-                const float Fade = 1.0f - Age / BreakerHUD::ImpactLifetime;
-                const FLinearColor CrossColor = BreakerUI::Alpha(
-                    Tracer.bWeakPoint ? BreakerUI::Gold : BreakerUI::Cyan, Fade);
-                const float Arm = S(4.0f);
-                DrawLine(ImpactProj.X - Arm, ImpactProj.Y - Arm, ImpactProj.X + Arm, ImpactProj.Y + Arm, CrossColor, S(1.5f));
-                DrawLine(ImpactProj.X - Arm, ImpactProj.Y + Arm, ImpactProj.X + Arm, ImpactProj.Y - Arm, CrossColor, S(1.5f));
+                DrawImpactBurst(Tracer.Impact, Tracer.End - Tracer.Start,
+                    BurstAge / BreakerHUD::ImpactLifetime,
+                    Tracer.bWeakPoint ? BreakerUI::Gold : BreakerUI::Orange,
+                    VerticalHalfFOV);
             }
         }
+    }
+}
+
+// An expanding star drawn in the plane the round punched through, at a world
+// radius, so it sits on the surface and shrinks with distance. The old version
+// was a fixed-size screen-space X: it read as a HUD marker rather than as
+// something that happened in the world.
+void ABreakerPlaytestHUD::DrawImpactBurst(const FVector& Impact, const FVector& TravelDirection,
+    float Progress, const FLinearColor& Color, float VerticalHalfFOVRadians)
+{
+    if (!Canvas) return;
+    const FVector Center = Project(Impact, false);
+    if (Center.Z <= 0.0f) return;
+
+    FVector U, V;
+    BreakerHUD::ImpactBasis(TravelDirection, U, V);
+
+    // Fast out, slow stop: most of the growth is in the first third.
+    const float Eased = 1.0f - FMath::Square(1.0f - FMath::Clamp(Progress, 0.0f, 1.0f));
+    const float Radius = BreakerHUD::ImpactRadiusCm * Eased;
+    const float Inner = Radius * 0.35f;
+    const FLinearColor Faded = BreakerUI::Alpha(Color, 1.0f - Progress);
+
+    const float Thickness = FMath::Clamp(
+        BreakerHUD::WorldRadiusToPixels(BreakerHUD::ImpactSparkRadiusCm,
+            static_cast<float>(Center.Z), Canvas->ClipY, VerticalHalfFOVRadians),
+        S(0.9f), S(3.5f));
+
+    for (int32 Index = 0; Index < BreakerHUD::ImpactSpokes; ++Index)
+    {
+        const float Angle = (2.0f * PI * Index) / BreakerHUD::ImpactSpokes;
+        const FVector Axis = U * FMath::Cos(Angle) + V * FMath::Sin(Angle);
+        const FVector NearProj = Project(Impact + Axis * Inner, false);
+        const FVector FarProj = Project(Impact + Axis * Radius, false);
+        if (NearProj.Z <= 0.0f || FarProj.Z <= 0.0f) continue;
+        DrawLine(NearProj.X, NearProj.Y, FarProj.X, FarProj.Y, Faded, Thickness);
     }
 }
 
@@ -1159,24 +1254,40 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
 
-    FBreakerHUDTracer Entry;
-    Entry.Start = Shot.TraceStart;
-    // Draw to the impact when there is one, otherwise out to the trace end.
-    Entry.End = Shot.bHit ? Shot.ImpactPoint : Shot.TraceEnd;
-    Entry.Impact = Shot.ImpactPoint;
-    Entry.bHit = Shot.bHit;
-    Entry.bWeakPoint = Shot.bWeakPoint;
-    Entry.Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    // A launcher already puts a real actor in the world; a hitscan streak on
+    // top of it drew a second, faster, ghost round every time the rocket fired.
+    const UBreakerWeaponDefinition* FiredDefinition = BoundWeapon ? BoundWeapon->GetActiveDefinition() : nullptr;
+    const bool bProjectileShot = FiredDefinition && FiredDefinition->bProjectile;
 
-    if (Tracers.Num() < MaxTracers)
+    const double ShotTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+
+    if (!bProjectileShot)
     {
-        Tracers.Add(Entry);
-        NextTracerIndex = Tracers.Num() % MaxTracers;
-    }
-    else
-    {
-        Tracers[NextTracerIndex] = Entry;
-        NextTracerIndex = (NextTracerIndex + 1) % MaxTracers;
+        FBreakerHUDTracer Entry;
+        // VISUAL origin: the gun, not the camera. The trace still starts at
+        // the camera and still lands on the crosshair — see
+        // UBreakerWeaponComponent::GetVisualMuzzleLocation. The two converge
+        // at the impact, which is the only place they have to agree.
+        Entry.Start = BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart;
+        // Draw to the impact when there is one, otherwise out to the trace end.
+        Entry.End = Shot.bHit ? Shot.ImpactPoint : Shot.TraceEnd;
+        Entry.Impact = Shot.ImpactPoint;
+        Entry.bHit = Shot.bHit;
+        Entry.bWeakPoint = Shot.bWeakPoint;
+        Entry.Time = ShotTime;
+        Entry.FlightSeconds = BreakerHUD::TracerFlightSeconds(BreakerHUD::TracerFlight,
+            static_cast<float>((Entry.End - Entry.Start).Size()));
+
+        if (Tracers.Num() < MaxTracers)
+        {
+            Tracers.Add(Entry);
+            NextTracerIndex = Tracers.Num() % MaxTracers;
+        }
+        else
+        {
+            Tracers[NextTracerIndex] = Entry;
+            NextTracerIndex = (NextTracerIndex + 1) % MaxTracers;
+        }
     }
 
     // Same event feeds the floating numbers: one subscription, two readouts.
@@ -1189,7 +1300,7 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     Number.Value = Shown;
     Number.bCritical = Shot.DamageResult.bCritical;
     Number.bWeakPoint = Shot.bWeakPoint || Shot.DamageResult.bWeakPoint;
-    Number.Time = Entry.Time;
+    Number.Time = ShotTime;
 
     if (DamageNumbers.Num() < MaxDamageNumbers)
     {
