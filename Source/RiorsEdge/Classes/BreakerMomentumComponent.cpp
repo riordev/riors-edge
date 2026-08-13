@@ -8,6 +8,8 @@
 #include "GameFramework/Actor.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
+#include "TimerManager.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 UBreakerMomentumComponent::UBreakerMomentumComponent()
@@ -51,6 +53,77 @@ EBreakerMomentumState UBreakerMomentumComponent::StateForFraction(float Fraction
     if (Fraction >= 2.0f / 3.0f) return EBreakerMomentumState::Redline;
     if (Fraction >= 1.0f / 3.0f) return EBreakerMomentumState::Running;
     return EBreakerMomentumState::Settled;
+}
+
+float UBreakerMomentumComponent::ComposeGenerationMultipliers(const TArray<float>& Multipliers)
+{
+    float Composed = 1.0f;
+    for (const float Multiplier : Multipliers)
+    {
+        if (Multiplier > 0.0f) Composed *= Multiplier;
+    }
+    return Composed;
+}
+
+bool UBreakerMomentumComponent::IsLoopOverrideExpired(double ExpiryTime, double Now)
+{
+    return ExpiryTime >= 0.0 && ExpiryTime <= Now;
+}
+
+void UBreakerMomentumComponent::PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration)
+{
+    if (Key.IsNone()) return;
+    FLoopOverrideEntry Entry;
+    Entry.bSuspendDecay = bSuspendDecay;
+    Entry.GenerationMultiplier = GenerationMultiplier > 0.0f ? GenerationMultiplier : 1.0f;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    // Re-pushing the same key replaces rather than stacks: a re-cast refreshes.
+    LoopOverrides.Add(Key, Entry);
+}
+
+void UBreakerMomentumComponent::PopLoopOverride(FName Key)
+{
+    LoopOverrides.Remove(Key);
+}
+
+void UBreakerMomentumComponent::PruneLoopOverrides() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || LoopOverrides.Num() == 0) return;
+    const double Now = World->GetTimeSeconds();
+    for (auto It = LoopOverrides.CreateIterator(); It; ++It)
+    {
+        if (IsLoopOverrideExpired(It.Value().ExpiryTime, Now)) It.RemoveCurrent();
+    }
+}
+
+bool UBreakerMomentumComponent::IsDecaySuspended() const
+{
+    PruneLoopOverrides();
+    for (const TPair<FName, FLoopOverrideEntry>& Pair : LoopOverrides)
+    {
+        if (Pair.Value.bSuspendDecay) return true;
+    }
+    return false;
+}
+
+float UBreakerMomentumComponent::GetGenerationMultiplier() const
+{
+    PruneLoopOverrides();
+    TArray<float> Active;
+    Active.Reserve(LoopOverrides.Num());
+    for (const TPair<FName, FLoopOverrideEntry>& Pair : LoopOverrides)
+    {
+        Active.Add(Pair.Value.GenerationMultiplier);
+    }
+    return ComposeGenerationMultipliers(Active);
+}
+
+int32 UBreakerMomentumComponent::GetActiveLoopOverrideCount() const
+{
+    PruneLoopOverrides();
+    return LoopOverrides.Num();
 }
 
 float UBreakerMomentumComponent::GroundSpeedRate(float Speed, float ThresholdSpeed, float UpperSpeed, float RateAtThreshold, float RateAtUpper)
@@ -151,11 +224,45 @@ void UBreakerMomentumComponent::HandleDamageReceived(const FBreakerDamageResult&
     // The passive evade proc, not a dodge input: the player cannot time this
     // source (Class-Kits 1.1, O1). Queued like every other one-shot grant so
     // it is spent against the same global generation budget.
-    if (!Result.bDodged || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (!Result.bDodged) return;
+    // Phantom Step is a Core node, not a Swift one: it runs before the Swift
+    // gate below and grants no Momentum of its own.
+    TryPhantomStep();
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     if (Now - LastDodgeGrantTime < DodgeProcInterval) return;
     LastDodgeGrantTime = Now;
     PendingGrants += DodgeProcGrant;
+}
+
+void UBreakerMomentumComponent::TryPhantomStep()
+{
+    AActor* Owner = GetOwner();
+    UWorld* World = GetWorld();
+    if (!Owner || !World || !Owner->HasAuthority() || PhantomStepWindowSeconds <= 0.0f) return;
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    if (!Progression || !Progression->HasNodeTag(BreakerNodeTags::Node_PhantomStep.GetTag())) return;
+
+    const double Now = World->GetTimeSeconds();
+    if (Now - LastPhantomStepTime < PhantomStepCooldownSeconds) return;
+
+    UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>();
+    if (!Combat) return;
+    LastPhantomStepTime = Now;
+
+    // "Brief invulnerability" expressed through the only primitive Combat/
+    // already owns: a guaranteed passive dodge for the window. The previous
+    // value is restored on a timer, and the 2.0s internal cooldown is strictly
+    // longer than the window, so the windows can never overlap and the saved
+    // value can never be a value this function itself wrote.
+    const float PreviousDodgeChance = Combat->DodgeChance;
+    Combat->DodgeChance = 1.0f;
+    TWeakObjectPtr<UBreakerCombatComponent> WeakCombat(Combat);
+    FTimerHandle RestoreHandle;
+    World->GetTimerManager().SetTimer(RestoreHandle, FTimerDelegate::CreateWeakLambda(this, [WeakCombat, PreviousDodgeChance]()
+    {
+        if (UBreakerCombatComponent* Restored = WeakCombat.Get()) Restored->DodgeChance = PreviousDodgeChance;
+    }), PhantomStepWindowSeconds, false);
 }
 
 void UBreakerMomentumComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -220,10 +327,21 @@ void UBreakerMomentumComponent::TickComponent(float DeltaTime, ELevelTick TickTy
     if (bSliding && Speed >= GroundThresholdSpeed) Rate += SlideRate;
     if (bWallRiding && WallRideCreditRemaining > 0.0f) Rate += WallRideRate;
 
+    // An active loop override (Overdrive) multiplies both the generated rate
+    // and the per-second cap, so doubling generation is not silently eaten by
+    // the cap it was meant to raise.
+    // FLAGGED: Class-Kits §1.2 quotes "cap raised to 40/s" for the 2x case,
+    // where scaling the 25/s cap by the same 2x gives 50/s. Scaling is the
+    // rule here because a second override must not need a second cap knob;
+    // the exact ceiling is an O2 tuning value either way.
+    const float GenerationMultiplier = GetGenerationMultiplier();
+    const float EffectiveCap = FMath::Max(0.0f, GlobalGenerationCap * GenerationMultiplier);
+    Rate *= GenerationMultiplier;
+
     // Global cap applies to rates and one-shot grants together; grants queue
     // rather than being discarded when the budget is already spent.
-    float Budget = ClampGeneration(GlobalGenerationCap, GlobalGenerationCap) * DeltaTime;
-    float Generated = FMath::Min(ClampGeneration(Rate, GlobalGenerationCap) * DeltaTime, Budget);
+    float Budget = ClampGeneration(EffectiveCap, EffectiveCap) * DeltaTime;
+    float Generated = FMath::Min(ClampGeneration(Rate, EffectiveCap) * DeltaTime, Budget);
     Budget -= Generated;
     if (PendingGrants > 0.0f && Budget > 0.0f)
     {
@@ -240,7 +358,7 @@ void UBreakerMomentumComponent::TickComponent(float DeltaTime, ELevelTick TickTy
         return;
     }
 
-    const bool bDecayBlocked = bAirborne || bSliding || bWallRiding || Speed >= GroundThresholdSpeed;
+    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bWallRiding || Speed >= GroundThresholdSpeed;
     if (bDecayBlocked)
     {
         SettledElapsed = 0.0f;

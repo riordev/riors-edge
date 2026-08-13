@@ -1093,14 +1093,72 @@ namespace
         return Line;
     }
 
-    // Rank readout as pips when the node is cheap enough to show them,
-    // otherwise the plain x/y count.
-    FString RankPips(int32 Rank, int32 MaxRank)
+    // Short, player-facing stat names. UEnum display names read like code
+    // ("DamageOverTime"); the card has room for two words, not a symbol.
+    FString StatTargetLabel(EBreakerNodeStatTarget Target)
     {
-        if (MaxRank <= 0 || MaxRank > 6) return FString::Printf(TEXT("%d/%d"), Rank, MaxRank);
-        FString Pips;
-        for (int32 Index = 0; Index < MaxRank; ++Index) Pips += Index < Rank ? TEXT("●") : TEXT("○");
-        return Pips;
+        switch (Target)
+        {
+        case EBreakerNodeStatTarget::CriticalChance: return TEXT("CRIT CHANCE");
+        case EBreakerNodeStatTarget::CriticalDamage: return TEXT("CRIT DAMAGE");
+        case EBreakerNodeStatTarget::MoveSpeed:      return TEXT("MOVE SPEED");
+        case EBreakerNodeStatTarget::SlideSpeed:     return TEXT("SLIDE SPEED");
+        case EBreakerNodeStatTarget::AirControl:     return TEXT("AIR CONTROL");
+        case EBreakerNodeStatTarget::DodgeChance:    return TEXT("DODGE CHANCE");
+        case EBreakerNodeStatTarget::BlockChance:    return TEXT("BLOCK CHANCE");
+        case EBreakerNodeStatTarget::Health:         return TEXT("HEALTH");
+        case EBreakerNodeStatTarget::DamageOverTime: return TEXT("DOT DAMAGE");
+        default:                                     return TEXT("STAT");
+        }
+    }
+
+    // "+12% MOVE SPEED" / "+7 CRIT CHANCE". Flat crit/dodge/block values are
+    // authored in whole points, so they carry no percent sign here even
+    // though they land as chance fractions.
+    FString FormatNodeEffect(const FBreakerNodeEffect& Effect)
+    {
+        const bool bPercent = Effect.StatBucket != EBreakerNodeStatBucket::Flat;
+        const FString Number = FString::Printf(TEXT("%+g"), Effect.ValuePerRank);
+        return FString::Printf(TEXT("%s%s %s"), *Number, bPercent ? TEXT("%") : TEXT(""), *StatTargetLabel(Effect.StatTarget));
+    }
+
+    // The one line that tells a player what they are buying. Stat nodes show
+    // their strongest-reading first effect; rule and verb nodes have no
+    // number to show, so they name what they grant instead.
+    FString PrimaryEffectLine(const UBreakerProgressionNode* Node)
+    {
+        if (!Node) return FString();
+        if (Node->Effects.Num() > 0)
+        {
+            FString Line = FormatNodeEffect(Node->Effects[0]) + TEXT(" / RANK");
+            if (Node->Effects.Num() > 1) Line += FString::Printf(TEXT("  (+%d MORE)"), Node->Effects.Num() - 1);
+            return Line;
+        }
+        if (Node->GrantedAbilityIds.Num() > 0)
+        {
+            return FString::Printf(TEXT("GRANTS %s"), *Node->GrantedAbilityIds[0].ToString().ToUpper());
+        }
+        return TEXT("CHANGES A RULE");
+    }
+
+    // Post-purchase status line: name, every effect at its per-rank value,
+    // and the rank the player just reached.
+    FString PurchaseFeedback(const UBreakerProgressionNode* Node, int32 NewRank)
+    {
+        if (!Node) return TEXT("ALLOCATED");
+        const FString Name = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
+        TArray<FString> Parts;
+        for (const FBreakerNodeEffect& Effect : Node->Effects) Parts.Add(FormatNodeEffect(Effect));
+        for (const FName AbilityId : Node->GrantedAbilityIds) Parts.Add(FString::Printf(TEXT("GRANTS %s"), *AbilityId.ToString().ToUpper()));
+        if (Parts.Num() == 0) Parts.Add(TEXT("RULE CHANGE ACTIVE"));
+        return FString::Printf(TEXT("%s  %s  (RANK %d/%d)"), *Name, *FString::Join(Parts, TEXT("  ")), NewRank, Node->MaxRank);
+    }
+
+    // Owned rank reads as a word, not a row of small circles the owner had
+    // to squint at.
+    FString RankLabel(int32 Rank, int32 MaxRank)
+    {
+        return FString::Printf(TEXT("RANK %d/%d"), Rank, MaxRank);
     }
 
     // Selector buttons are 240px wide; long authored tree names clip there
@@ -1313,36 +1371,108 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         int32 SelectedTotal = 0;
         ProgressionTreeInvestment(Progression, Selected, SelectedSpent, SelectedTotal);
 
-        TArray<int32> TierGates;
-        for (const UBreakerProgressionNode* Node : Selected->Nodes)
+        // One section per header bar. Class trees section by investment tier;
+        // the Core slice sections by constellation instead, because a flat
+        // tier list mixes five unrelated constellations into one row and the
+        // structure the content is actually built around disappears.
+        struct FTreeSection
         {
-            if (Node) TierGates.AddUnique(Node->RequiredTreeInvestment);
+            FString Header;
+            bool bGated = false;
+            TArray<const UBreakerProgressionNode*> Nodes;
+        };
+        TArray<FTreeSection> Sections;
+
+        const bool bCoreSlice = Selected->TreeId == FName(TEXT("Core.Slice"));
+        if (bCoreSlice)
+        {
+            // Constellation membership is carried by the NodeId prefix
+            // (Core.<Constellation>.<Node>) — the content library has no
+            // constellation field yet. When one lands, read it here instead.
+            static const TCHAR* ConstellationOrder[] = {TEXT("Precision"), TEXT("Volley"), TEXT("Affliction"), TEXT("Bulwark"), TEXT("Kinesis")};
+            TSet<FName> Claimed;
+            for (const TCHAR* Constellation : ConstellationOrder)
+            {
+                FTreeSection Section;
+                Section.Header = FString(Constellation).ToUpper();
+                const FString Prefix = FString::Printf(TEXT("Core.%s."), Constellation);
+                for (const UBreakerProgressionNode* Node : Selected->Nodes)
+                {
+                    if (!Node || !Node->NodeId.ToString().StartsWith(Prefix)) continue;
+                    Section.Nodes.Add(Node);
+                    Claimed.Add(Node->NodeId);
+                }
+                Section.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
+                if (Section.Nodes.Num() > 0) Sections.Add(MoveTemp(Section));
+            }
+            // Anything authored outside the five known prefixes still has to
+            // render — an unlisted node must never silently vanish.
+            FTreeSection Other;
+            Other.Header = TEXT("OTHER");
+            for (const UBreakerProgressionNode* Node : Selected->Nodes)
+            {
+                if (Node && !Claimed.Contains(Node->NodeId)) Other.Nodes.Add(Node);
+            }
+            if (Other.Nodes.Num() > 0) Sections.Add(MoveTemp(Other));
         }
-        TierGates.Sort();
+        else
+        {
+            TArray<int32> TierGates;
+            for (const UBreakerProgressionNode* Node : Selected->Nodes)
+            {
+                if (Node) TierGates.AddUnique(Node->RequiredTreeInvestment);
+            }
+            TierGates.Sort();
+
+            int32 TierNumber = 0;
+            for (const int32 Gate : TierGates)
+            {
+                ++TierNumber;
+                FTreeSection Section;
+                Section.bGated = Gate > SelectedSpent;
+                Section.Header = Gate > 0
+                    ? FString::Printf(TEXT("TIER %d — UNLOCKS AT %d POINTS IN TREE  (%d SPENT)"), TierNumber, Gate, SelectedSpent)
+                    : FString::Printf(TEXT("TIER %d — OPEN"), TierNumber);
+                for (const UBreakerProgressionNode* Node : Selected->Nodes)
+                {
+                    if (Node && Node->RequiredTreeInvestment == Gate) Section.Nodes.Add(Node);
+                }
+                if (Section.Nodes.Num() > 0) Sections.Add(MoveTemp(Section));
+            }
+        }
 
         TSharedRef<SVerticalBox> NodeColumn = SNew(SVerticalBox);
-        int32 TierNumber = 0;
-        for (const int32 Gate : TierGates)
+        int32 SectionNumber = 0;
+        for (const FTreeSection& Section : Sections)
         {
-            ++TierNumber;
-            const FString TierHeader = Gate > 0
-                ? FString::Printf(TEXT("TIER %d — GATE %d INVESTED  (%d)"), TierNumber, Gate, SelectedSpent)
-                : FString::Printf(TEXT("TIER %d"), TierNumber);
-            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, TierNumber == 1 ? 0.0f : 10.0f, 0.0f, 6.0f)
+            ++SectionNumber;
+            // Section bar, not a caption: a filled strip so the eye can find
+            // where one group ends and the next begins while scrolling.
+            const FString HeaderText = Section.bGated
+                ? FString::Printf(TEXT("▮ %s"), *Section.Header)
+                : Section.Header;
+            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, SectionNumber == 1 ? 0.0f : 16.0f, 0.0f, 8.0f)
             [
-                MenuText(FText::FromString(TierHeader), 10, Gate > SelectedSpent ? SoftText : Cyan, true)
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(Section.bGated ? Panel : PanelRaised)
+                .Padding(FMargin(12.0f, 7.0f))
+                [
+                    MenuText(FText::FromString(HeaderText), 11, Section.bGated ? SoftText : Cyan, true)
+                ]
             ];
 
-            // Fixed rows of three, never a wrap box: SWrapBox sized by its
+            // Fixed rows of two, never a wrap box: SWrapBox sized by its
             // allotted width inside a scroll box re-measures to a different
             // answer every frame — the layout oscillation the owner saw as
-            // the screen "bouncing between two sizes".
+            // the screen "bouncing between two sizes". Two per row because
+            // the cards are now 300px wide.
             TSharedRef<SVerticalBox> TierRow = SNew(SVerticalBox);
             TSharedPtr<SHorizontalBox> CurrentRow;
             int32 CardIndex = 0;
-            for (const UBreakerProgressionNode* Node : Selected->Nodes)
+            for (const UBreakerProgressionNode* Node : Section.Nodes)
             {
-                if (!Node || Node->RequiredTreeInvestment != Gate) continue;
+                if (!Node) continue;
 
                 const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                 FString LockReason;
@@ -1380,10 +1510,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         TipLines.Add(TEXT("EFFECTS PER RANK"));
                         for (const FBreakerNodeEffect& Effect : Node->Effects)
                         {
-                            const bool bPercent = Effect.StatBucket != EBreakerNodeStatBucket::Flat;
-                            TipLines.Add(FString::Printf(TEXT("  %s  %+.1f%s"),
-                                *UEnum::GetDisplayValueAsText(Effect.StatTarget).ToString().ToUpper(),
-                                Effect.ValuePerRank, bPercent ? TEXT("%") : TEXT("")));
+                            TipLines.Add(FString::Printf(TEXT("  %s"), *FormatNodeEffect(Effect)));
                         }
                     }
                     if (Node->Prerequisites.Num() > 0)
@@ -1409,27 +1536,42 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 }
                 const FText TooltipTextValue = FText::FromString(TooltipText);
 
-                TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
-                Card->AddSlot().AutoHeight()
+                // Line 2 is the number the player is buying. The generic
+                // description drops to line 3 so a card never reads as flavour
+                // text with no stated effect.
+                const FString EffectLine = PrimaryEffectLine(Node);
+                const FLinearColor Transparent(0.0f, 0.0f, 0.0f, 0.0f);
+
+                TSharedRef<SVerticalBox> CardBody = SNew(SVerticalBox);
+                CardBody->AddSlot().AutoHeight()
                 [
                     SNew(SHorizontalBox)
                     + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(NodeName), 12, NameColor, true)]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 6.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(RankPips(Rank, Node->MaxRank)), 10, bOwned ? FLinearColor::White : SoftText, true)
-                    ]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)
                     [
                         SNew(SBorder)
                         .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
                         .BorderBackgroundColor(Background)
-                        .Padding(FMargin(6.0f, 2.0f))
+                        .Padding(FMargin(7.0f, 3.0f))
                         [
                             MenuText(FText::FromString(CostChip), 9, bMaxed ? SoftText : Cyan, true)
                         ]
                     ]
                 ];
-                Card->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                CardBody->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(EffectLine), 10, bOwned ? FLinearColor::White : (bPurchasable ? Cyan : SoftText), true)
+                ];
+                // Owned rank reads as a word next to the filled edge bar; the
+                // old pip row was too small to parse at a glance.
+                if (bOwned)
+                {
+                    CardBody->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(RankLabel(Rank, Node->MaxRank)), 9, FLinearColor::White, true)
+                    ];
+                }
+                CardBody->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
                 [
                     SNew(STextBlock)
                     // PERF: this line used to be a Text_Lambda that polled
@@ -1443,42 +1585,70 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     .AutoWrapText(true)
                 ];
 
-                if (CardIndex % 3 == 0)
+                // Filled left edge bar: owned state readable from the edge of
+                // the card without reading any text at all.
+                TSharedRef<SHorizontalBox> Card = SNew(SHorizontalBox);
+                Card->AddSlot().AutoWidth()
+                [
+                    SNew(SBox).WidthOverride(5.0f)
+                    [
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(bOwned ? FLinearColor::White : Transparent)
+                        [SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+                    ]
+                ];
+                Card->AddSlot().FillWidth(1.0f).Padding(10.0f, 0.0f, 0.0f, 0.0f)[CardBody];
+
+                if (CardIndex % 2 == 0)
                 {
                     CurrentRow = SNew(SHorizontalBox);
                     TierRow->AddSlot().AutoHeight()[CurrentRow.ToSharedRef()];
                 }
                 ++CardIndex;
-                CurrentRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 8.0f)
+                const UBreakerProgressionNode* CapturedNode = Node;
+                CurrentRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 10.0f, 10.0f)
                 [
                     // Tooltip lives on the wrapper too so locked (disabled)
                     // cards still explain themselves on hover.
-                    SNew(SBox).WidthOverride(250.0f)
+                    SNew(SBox).WidthOverride(300.0f)
                     .ToolTipText(TooltipTextValue)
                     [
-                        SNew(SButton)
-                        .ButtonColorAndOpacity(CardColor)
-                        .IsEnabled(bPurchasable)
-                        .ToolTipText(TooltipTextValue)
-                        .ContentPadding(FMargin(12.0f, 8.0f))
-                        .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId]()
-                        {
-                            UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
-                            FText FailureReason;
-                            if (ProgressionPurchaseNode(Prog, CapturedTree, CapturedNodeId, FailureReason))
-                            {
-                                SkillTreeStatus = FText::FromString(FString::Printf(TEXT("ALLOCATED %s"), *CapturedNodeId.ToString().ToUpper()));
-                                if (Character.IsValid()) Character->SaveGameState();
-                            }
-                            else
-                            {
-                                SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("PURCHASE FAILED")) : FailureReason;
-                            }
-                            Rebuild(EBreakerMenuScreen::SkillTrees);
-                            return FReply::Handled();
-                        }))
+                        // Affordable-right-now cards carry a cyan outline, so
+                        // "what can I buy" is a scan and not a read.
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(bPurchasable && !bOwned ? Cyan : Transparent)
+                        .Padding(FMargin(2.0f))
                         [
-                            Card
+                            SNew(SButton)
+                            .ButtonColorAndOpacity(CardColor)
+                            .IsEnabled(bPurchasable)
+                            .ToolTipText(TooltipTextValue)
+                            .ContentPadding(FMargin(16.0f, 13.0f))
+                            .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId, CapturedNode]()
+                            {
+                                UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                                FText FailureReason;
+                                if (ProgressionPurchaseNode(Prog, CapturedTree, CapturedNodeId, FailureReason))
+                                {
+                                    // Say what changed, not just that something did.
+                                    const int32 NewRank = CapturedNode
+                                        ? ProgressionGetNodeRank(Prog, CapturedNodeId, CapturedNode->Currency)
+                                        : 0;
+                                    SkillTreeStatus = FText::FromString(PurchaseFeedback(CapturedNode, NewRank));
+                                    if (Character.IsValid()) Character->SaveGameState();
+                                }
+                                else
+                                {
+                                    SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("PURCHASE FAILED")) : FailureReason;
+                                }
+                                Rebuild(EBreakerMenuScreen::SkillTrees);
+                                return FReply::Handled();
+                            }))
+                            [
+                                Card
+                            ]
                         ]
                     ]
                 ];

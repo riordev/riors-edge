@@ -20,6 +20,45 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKe
 // their fallback registry by FName and no tag vocabulary exists yet for the
 // window names. The signatures are otherwise the spec's; swapping the key type
 // later is a mechanical change confined to this file and its callers.
+// ---------------------------------------------------------------------------
+// NODE-TAG CONSUMPTION AUDIT
+// ---------------------------------------------------------------------------
+// Every fallback tree node in Progression/BreakerProgressionLibrary.cpp that
+// authors no stat effect ships as a GrantedTag and is worth exactly nothing
+// until some system reads it. This is the ledger of which ones are read. Kept
+// here because Abilities/ is where most of the readers land; move it if a
+// better home appears. Query path in all cases:
+//   UBreakerProgressionComponent::HasNodeTag(BreakerNodeTags::Node_X.GetTag()).
+//
+// CONSUMED
+//   Node_SkimDiscipline  Abilities/BreakerAbility_Skim.cpp — with the node
+//                        owned, Skim aimed steeply down becomes Hard Stop
+//                        (all velocity cancelled). PARTIAL: the node's other
+//                        half, "Skim may be used twice per airtime", still
+//                        needs the airborne-action counter, and Hard Stop's
+//                        0.6s damage-reduction window needs Combat/.
+//   Node_PhantomStep     Classes/BreakerMomentumComponent.cpp — a passive
+//                        dodge proc opens a 0.5s guaranteed-dodge window on a
+//                        2.0s internal cooldown. PARTIAL: guaranteed dodge is
+//                        the nearest primitive Combat/ already owns; real
+//                        invulnerability needs a damage-immunity flag there.
+//
+// STILL INERT (tag granted, nothing reads it)
+//   Core:   Node_Fixate (needs the More bucket), Node_TunnelVision,
+//           Node_TriggerDiscipline, Node_Cyclic, Node_LastRound,
+//           Node_OpenWound, Node_SetStance, Node_Read (needs Parry),
+//           Node_Loft (needs Air Jump), Verb_Parry, Verb_AirJump
+//           — all Weapons/ or Combat/ readers.
+//   Kinetic: Node_ReadTheRoom, Node_Contact, Node_Carry, Node_Landing
+//           (Momentum loop knobs: cheap, all in Classes/, none done here),
+//           Node_Redirect (needs a cooldown-reduction path into GAS),
+//           Node_EvadeConversion (loop knob), Node_AirWork (affix tier read).
+//   Marksman: Node_LongLens, Node_Steady, Node_Ledger, Node_Angle,
+//           Node_MarkEconomy (mark jump on death — belongs with
+//           UBreakerMarkComponent), Node_PierceDiscipline, Node_Sightline,
+//           Node_Lead (second simultaneous mark — needs a mark *list* here,
+//           not a single MarkTarget).
+// ---------------------------------------------------------------------------
 UCLASS(ClassGroup=Abilities, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerAbilityStateComponent : public UActorComponent
 {

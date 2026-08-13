@@ -5,6 +5,8 @@
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Characters/BreakerCharacter.h"
+#include "Classes/BreakerMomentumComponent.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 
 UBreakerAbility_Overdrive::UBreakerAbility_Overdrive()
@@ -23,6 +25,11 @@ UBreakerAbility_Overdrive::UBreakerAbility_Overdrive()
 FName UBreakerAbility_Overdrive::WindowKey()
 {
     return TEXT("Window.Swift.Overdrive");
+}
+
+FName UBreakerAbility_Overdrive::OutgoingModifierKey()
+{
+    return TEXT("Overdrive");
 }
 
 bool UBreakerAbility_Overdrive::MeetsUltimateThreshold(float CurrentResource, float Threshold)
@@ -71,14 +78,25 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
         : (Definition ? Definition->WindowDuration : 8.0f);
 
     // ---- Base effect ---------------------------------------------------
-    // GAP: the real base effect is a Momentum loop override (suspend decay,
-    // double generation, raise the cap to 40/s) plus a Redline floor. Both
-    // hooks live on UBreakerMomentumComponent (Classes/), owned elsewhere. The
-    // window below is the state every consumer of those hooks will read, so
-    // wiring them later is an addition here, not a rewrite.
+    // Three simultaneous state changes, all keyed to the same window and all
+    // self-expiring, so there is no teardown path that can leave the player in
+    // a permanent power state: the loop stops draining and pays double, the
+    // run line speeds up, and shots land harder. GAP: the Redline floor still
+    // needs PushMomentumFloor on the Momentum component.
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
+    }
+    if (UBreakerMomentumComponent* Momentum = Character->FindComponentByClass<UBreakerMomentumComponent>())
+    {
+        Momentum->PushLoopOverride(WindowKey(), /*bSuspendDecay=*/true, LoopGenerationMultiplier, Duration);
+    }
+    if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        // Expiry is the teardown: the modifier chain prunes itself, so nothing
+        // has to survive the ability instance to pop it. RemoveOutgoingModifier
+        // stays available for an early exit (Bloodrhythm's no-hit timeout).
+        Combat->PushOutgoingModifier(OutgoingModifierKey(), /*FlatBonus=*/0.0f, OutgoingMoreMultiplier, Duration);
     }
     if (UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement())
     {

@@ -1,5 +1,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 
+#include "Abilities/BreakerAbilityStateComponent.h"
+#include "Abilities/BreakerAbility_Lead.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -412,6 +414,14 @@ void UBreakerWeaponComponent::FireOnce()
     Shot.TraceStart = ViewLocation;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
     const float GearDamageMultiplier = GearWeaponDamageMultiplier(GetOwner());
+
+    // Lead's mark, resolved once per shot rather than once per pellet: the mark
+    // cannot change between the pellets of a single trigger pull. A mark with
+    // no remaining time reads as no mark at all.
+    const UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
+    const AActor* MarkedTarget = (AbilityState && AbilityState->GetMarkRemaining() > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
+    const float LeadMinimumRangeCm = UBreakerAbility_Lead::DefaultMinimumRangeCm();
+
     const int32 PelletCount = FMath::Max(1, Definition->PelletsPerShot);
     for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
@@ -425,7 +435,12 @@ void UBreakerWeaponComponent::FireOnce()
         Shot.HitActor = Hit.GetActor();
         Shot.ImpactPoint = Hit.ImpactPoint;
         Shot.TraceEnd = Hit.ImpactPoint;
-        const bool bPelletWeakPoint = Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"));
+        const bool bGeometryWeakPoint = Hit.GetComponent() && Hit.GetComponent()->ComponentHasTag(TEXT("WeakPoint"));
+        // Lead (Class-Kits §1.2 S6): shots that hit the mark from beyond the
+        // range gate are weak-point hits regardless of impact location. The
+        // gate is the ability's own rule, called here rather than reimplemented.
+        const bool bPelletWeakPoint = bGeometryWeakPoint || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
+            MarkedTarget != nullptr && Hit.GetActor() == MarkedTarget, Hit.Distance, LeadMinimumRangeCm);
         Shot.bWeakPoint |= bPelletWeakPoint;
 
         if (UBreakerCombatComponent* TargetCombat = Hit.GetActor() ? Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)

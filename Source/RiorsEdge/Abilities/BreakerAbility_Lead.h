@@ -36,6 +36,11 @@ public:
     // quarters (Class-Kits §1.2 S6).
     static bool ShouldTreatAsWeakPoint(bool bTargetIsMarked, float DistanceCm, float MinimumRangeCm);
 
+    // The range gate as the weapon reads it, without the weapon needing an
+    // ability instance: the CDO's authored value, so retuning MarkMinimumRangeCm
+    // in one place retunes the consumer too.
+    static float DefaultMinimumRangeCm();
+
     UFUNCTION(BlueprintPure, Category="Abilities") AActor* GetMarkedTarget() const { return MarkedTarget.Get(); }
 
     // Class-Kits §1.2 S6: 25 m.

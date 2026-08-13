@@ -113,13 +113,13 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Tier 2 notable purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
 
     // Effects are live: crit chance and crit damage both moved.
-    TestEqual(TEXT("Crit chance aggregates from Sightline"), Progression->GetNodeStats().CriticalChanceBonus, 0.04f, 0.0001f);
-    TestEqual(TEXT("Crit damage aggregates from Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.15f, 0.0001f);
+    TestEqual(TEXT("Crit chance aggregates from Sightline"), Progression->GetNodeStats().CriticalChanceBonus, 0.07f, 0.0001f);
+    TestEqual(TEXT("Crit damage aggregates from Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
 
     // Class points are a separate wallet with its own tree.
     TestTrue(TEXT("Class node purchases from class points"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
     TestEqual(TEXT("Class points are spent, core points untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 9);
-    TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.04f, 0.0001f);
+    TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
     // Respec clears effects and refunds every point of that currency.
     TestFalse(TEXT("Respec away from a Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, false, Failure));
@@ -127,7 +127,7 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Core points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
     TestEqual(TEXT("Core ranks are cleared"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 0);
     TestEqual(TEXT("Core effects are cleared"), Progression->GetNodeStats().CriticalChanceBonus, 0.0f, 0.0001f);
-    TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.04f, 0.0001f);
+    TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
     TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
     TestEqual(TEXT("Class points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 10);
@@ -149,22 +149,22 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     }
 
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});     // +4 crit chance
-    Ranks.Add({TEXT("Core.Bulwark.SetStance"), 1});       // +5 block, +15 health
-    Ranks.Add({TEXT("Core.Kinesis.LightFooting"), 1});    // +4 dodge, +3% move
-    Ranks.Add({TEXT("Core.Affliction.Deepen"), 2});       // +10% DoT per rank
-    Ranks.Add({TEXT("Swift.Kinetic.AirWork"), 1});        // +8% air control
-    Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});      // +5 crit damage per rank
+    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});     // +7 crit chance
+    Ranks.Add({TEXT("Core.Bulwark.SetStance"), 1});       // +6 block, +90 health
+    Ranks.Add({TEXT("Core.Kinesis.LightFooting"), 1});    // +5 dodge, +12% move
+    Ranks.Add({TEXT("Core.Affliction.Deepen"), 2});       // +18% DoT per rank
+    Ranks.Add({TEXT("Swift.Kinetic.AirWork"), 1});        // +12% air control
+    Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});      // +18 crit damage per rank
 
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks);
-    TestEqual(TEXT("Flat crit chance sums into a fraction"), Stats.CriticalChanceBonus, 0.04f, 0.0001f);
-    TestEqual(TEXT("Flat crit damage scales with rank"), Stats.CriticalMultiplierBonus, 0.10f, 0.0001f);
-    TestEqual(TEXT("Block chance converts to a fraction"), Stats.BlockChanceBonus, 0.05f, 0.0001f);
-    TestEqual(TEXT("Dodge chance converts to a fraction"), Stats.DodgeChanceBonus, 0.04f, 0.0001f);
-    TestEqual(TEXT("Health is a flat bonus"), Stats.BonusHealth, 15.0f, 0.0001f);
-    TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.03f, 0.0001f);
-    TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.08f, 0.0001f);
-    TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.20f, 0.0001f);
+    TestEqual(TEXT("Flat crit chance sums into a fraction"), Stats.CriticalChanceBonus, 0.07f, 0.0001f);
+    TestEqual(TEXT("Flat crit damage scales with rank"), Stats.CriticalMultiplierBonus, 0.36f, 0.0001f);
+    TestEqual(TEXT("Block chance converts to a fraction"), Stats.BlockChanceBonus, 0.06f, 0.0001f);
+    TestEqual(TEXT("Dodge chance converts to a fraction"), Stats.DodgeChanceBonus, 0.05f, 0.0001f);
+    TestEqual(TEXT("Health is a flat bonus"), Stats.BonusHealth, 90.0f, 0.0001f);
+    TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
+    TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
+    TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.36f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
     // Rule-rewrite and verb nodes publish tags instead of stats.
@@ -179,7 +179,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TArray<FBreakerNodeRank> OverRanks;
     OverRanks.Add({TEXT("Core.Affliction.Deepen"), 9});
     const FBreakerNodeStats ClampedStats = UBreakerProgressionComponent::AggregateStats(Nodes, OverRanks);
-    TestEqual(TEXT("Rank is clamped to the node's max"), ClampedStats.DamageOverTimeMultiplier, 1.30f, 0.0001f);
+    TestEqual(TEXT("Rank is clamped to the node's max"), ClampedStats.DamageOverTimeMultiplier, 1.54f, 0.0001f);
 
     // Unknown ids in a loaded save are ignored, not fatal.
     TArray<FBreakerNodeRank> StaleRanks;

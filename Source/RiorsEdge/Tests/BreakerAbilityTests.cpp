@@ -370,4 +370,45 @@ bool FBreakerAbilityComponentBookkeepingTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityImpactRulesTest,
+    "RiorsEdge.Abilities.ImpactRules",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityImpactRulesTest::RunTest(const FString& Parameters)
+{
+    // Lead's gate as the weapon reads it: one authored value, not a literal
+    // copied into the consumer.
+    TestEqual(TEXT("The weapon reads the ability's own 25 m gate"), UBreakerAbility_Lead::DefaultMinimumRangeCm(), 2500.0f);
+
+    // Hard Stop (K7 Skim Discipline). Without the node the verb never fires,
+    // whatever the player is looking at.
+    TestFalse(TEXT("Without the node, looking down is still a redirect"),
+        UBreakerAbility_Skim::ShouldHardStop(false, -80.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+    TestFalse(TEXT("With the node, a level view is still a redirect"),
+        UBreakerAbility_Skim::ShouldHardStop(true, 0.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+    TestFalse(TEXT("With the node, looking up is still a redirect"),
+        UBreakerAbility_Skim::ShouldHardStop(true, 60.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+    TestTrue(TEXT("With the node, a steep down-aim stops dead"),
+        UBreakerAbility_Skim::ShouldHardStop(true, -80.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+    TestTrue(TEXT("The threshold itself qualifies"),
+        UBreakerAbility_Skim::ShouldHardStop(true, UBreakerAbility_Skim::HardStopPitchDegrees, UBreakerAbility_Skim::HardStopPitchDegrees));
+    // Control rotations arrive unwound (0-360), so the rule must normalize.
+    TestTrue(TEXT("An unwound pitch normalizes before comparison"),
+        UBreakerAbility_Skim::ShouldHardStop(true, 280.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+
+    // Skim's burst must remain a burst, not a state.
+    TestTrue(TEXT("Skim's burst adds speed"), UBreakerAbility_Skim::BurstSpeedMultiplier > 1.0f);
+    TestTrue(TEXT("Skim's burst is shorter than its cooldown"), UBreakerAbility_Skim::BurstSeconds < 3.0f);
+
+    // Overdrive is a power state: doubled generation and a real More.
+    TestEqual(TEXT("Overdrive doubles Momentum generation"), UBreakerAbility_Overdrive::LoopGenerationMultiplier, 2.0f);
+    TestTrue(TEXT("Overdrive raises outgoing damage"), UBreakerAbility_Overdrive::OutgoingMoreMultiplier > 1.0f);
+    // Damage-Pipeline §4 caps any single More at 1.30x.
+    TestTrue(TEXT("Overdrive's More respects the per-modifier ceiling"), UBreakerAbility_Overdrive::OutgoingMoreMultiplier <= 1.30f);
+    TestFalse(TEXT("Overdrive's modifier key is real"), UBreakerAbility_Overdrive::OutgoingModifierKey().IsNone());
+    TestNotEqual(TEXT("The modifier key is distinct from the window key"), UBreakerAbility_Overdrive::OutgoingModifierKey(), UBreakerAbility_Overdrive::WindowKey());
+    return true;
+}
+
 #endif

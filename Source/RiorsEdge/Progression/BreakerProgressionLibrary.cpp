@@ -99,6 +99,7 @@ namespace
     }
 }
 
+// Node stat magnitudes below are gym-perceptibility tuning; wave-mode re-anchors.
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 {
     static UBreakerProgressionTree* Tree = nullptr;
@@ -109,13 +110,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // --- Precision ---------------------------------------------------------
     UBreakerProgressionNode* Sightline = MakeNode(TEXT("Core.Precision.Sightline"), TEXT("Sightline"),
         TEXT("Precision gateway. Weak-point damage is easier to earn."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
-    AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
+    AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 7.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Sightline);
 
     UBreakerProgressionNode* TunnelVision = MakeNode(TEXT("Core.Precision.TunnelVision"), TEXT("Tunnel Vision"),
         TEXT("Notable. Critical damage rises while a single target holds your attention."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2);
     AddPrerequisite(TunnelVision, TEXT("Core.Precision.Sightline"));
-    AddEffect(TunnelVision, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 15.0f); // O2 PLACEHOLDER
+    AddEffect(TunnelVision, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 22.0f); // O2 PLACEHOLDER
     TunnelVision->GrantedTags.AddTag(BreakerNodeTags::Node_TunnelVision.GetTag());
     Tree->Nodes.Add(TunnelVision);
 
@@ -155,14 +156,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     UBreakerProgressionNode* Deepen = MakeNode(TEXT("Core.Affliction.Deepen"), TEXT("Deepen"),
         TEXT("Damage over time hits harder and stacks deeper."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
     AddPrerequisite(Deepen, TEXT("Core.Affliction.OpenWound"));
-    AddEffect(Deepen, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    AddEffect(Deepen, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 18.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Deepen);
 
     // --- Bulwark -----------------------------------------------------------
     UBreakerProgressionNode* SetStance = MakeNode(TEXT("Core.Bulwark.SetStance"), TEXT("Set Stance"),
         TEXT("Bulwark gateway. Block rolls more often and you carry more health."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
-    AddEffect(SetStance, EBreakerNodeStatTarget::BlockChance, EBreakerNodeStatBucket::Flat, 5.0f);  // O2 PLACEHOLDER
-    AddEffect(SetStance, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 15.0f);      // O2 PLACEHOLDER
+    AddEffect(SetStance, EBreakerNodeStatTarget::BlockChance, EBreakerNodeStatBucket::Flat, 6.0f);  // O2 PLACEHOLDER
+    AddEffect(SetStance, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 90.0f);      // O2 PLACEHOLDER
     SetStance->GrantedTags.AddTag(BreakerNodeTags::Node_SetStance.GetTag());
     Tree->Nodes.Add(SetStance);
 
@@ -185,8 +186,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // --- Kinesis -----------------------------------------------------------
     UBreakerProgressionNode* LightFooting = MakeNode(TEXT("Core.Kinesis.LightFooting"), TEXT("Light Footing"),
         TEXT("Kinesis gateway. Dodge rolls more often and you move a little quicker."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
-    AddEffect(LightFooting, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 4.0f);            // O2 PLACEHOLDER
-    AddEffect(LightFooting, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 3.0f);  // O2 PLACEHOLDER
+    AddEffect(LightFooting, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 5.0f);             // O2 PLACEHOLDER
+    AddEffect(LightFooting, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f);  // O2 PLACEHOLDER
     Tree->Nodes.Add(LightFooting);
 
     // Inert until Air Jump is owned — the second inert-node test.
@@ -205,7 +206,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     UBreakerProgressionNode* AirJump = MakeNode(TEXT("Core.Kinesis.AirJump"), TEXT("Air Jump"),
         TEXT("VERB GRANT. One mid-air jump, refreshed on landing, wall contact, or a successful Dodge."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2);
     AddPrerequisite(AirJump, TEXT("Core.Kinesis.LightFooting"));
-    AddEffect(AirJump, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    AddEffect(AirJump, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
     AirJump->GrantedAbilityIds.Add(TEXT("AirJump"));
     AirJump->GrantedTags.AddTag(BreakerNodeTags::Verb_AirJump.GetTag());
     Tree->Nodes.Add(AirJump);
@@ -232,7 +233,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 
     Node = MakeNode(TEXT("Swift.Kinetic.Carry"), TEXT("Carry"),
         TEXT("Slide chaining pays flat Momentum and carries more speed."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Carry.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -244,7 +245,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 
     Node = MakeNode(TEXT("Swift.Kinetic.EvadeConversion"), TEXT("Evade Conversion"),
         TEXT("The passive dodge proc yields more Momentum on a shorter internal cooldown."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_EvadeConversion.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -264,7 +265,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node = MakeNode(TEXT("Swift.Kinetic.AirWork"), TEXT("Air Work"),
         TEXT("Airborne handling improves sharply while at Redline."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Landing"));
-    AddEffect(Node, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AirWork.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -280,7 +281,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
 
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
         TEXT("Distant weak-point hits generate Momentum and land harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 5.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_LongLens.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -309,7 +310,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node = MakeNode(TEXT("Swift.Marksman.PierceDiscipline"), TEXT("Pierce Discipline"),
         TEXT("Each target pierced by a shot generates Momentum, up to three."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
-    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 

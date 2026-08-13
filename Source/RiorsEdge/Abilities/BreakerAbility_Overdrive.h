@@ -18,11 +18,9 @@ struct FBreakerAbilityVariant;
 // C++ branch for the part of the rewrite that is not parametric.
 //
 // GAPS (all outside Abilities/ and Movement/):
-//  - Momentum decay suspension, doubled generation, the raised cap, and the
-//    Redline floor need UBreakerMomentumComponent::PushLoopOverride /
-//    PushMomentumFloor (spec §4.7). Classes/ is owned elsewhere, so the base
-//    effect is currently expressed as the state window plus a temporary
-//    movement speed multiplier.
+//  - The Redline floor still needs UBreakerMomentumComponent::PushMomentumFloor
+//    (spec §4.7). Decay suspension and doubled generation are live through
+//    PushLoopOverride.
 //  - Bloodrhythm's per-hit refund and 1.5s no-hit early exit need SI-8's
 //    OnHitDealt attacker-side event.
 //  - Terminal Velocity needs PushDashChargeOverride / PushWallRideDurationOverride.
@@ -45,4 +43,17 @@ public:
     // from the base IsAffordable so the "full bar" reading is explicit and can
     // diverge (Maximum Resource affixes raise the ceiling).
     static bool MeetsUltimateThreshold(float CurrentResource, float Threshold);
+
+    // The key the outgoing damage modifier is pushed under on the owner's
+    // combat component.
+    static FName OutgoingModifierKey();
+
+    // Class-Kits §1.2: "all Momentum generation is doubled".
+    static constexpr float LoopGenerationMultiplier = 2.0f;
+    // O2 PLACEHOLDER, and FLAGGED: Class-Kits §0.1 budgets Swift three More
+    // multipliers and spends all three on branch keystones (F12/K12/M12), so an
+    // ultimate-owned More is a fourth. It ships because "a temporary speed
+    // multiplier" is not a power state and the owner's feedback is explicit;
+    // the design call (drop it, or re-budget) is owed before sign-off.
+    static constexpr float OutgoingMoreMultiplier = 1.25f;
 };

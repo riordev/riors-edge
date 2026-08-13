@@ -38,9 +38,25 @@ public:
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentum() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentumFraction() const;
 
+    // Loop overrides (Class-Kits §1.2 ULTIMATE). A named, temporary rewrite of
+    // the loop itself rather than of a magnitude: decay can be suspended and
+    // generation multiplied, both against the per-second cap, which is what
+    // "Momentum does not decay and all generation is doubled" actually means.
+    // Lazily expired, mirroring the movement component's PushSpeedMultiplier:
+    // no timers, no teardown path to get wrong if the pusher dies first.
+    UFUNCTION(BlueprintCallable, Category="Momentum|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Momentum|Loop") void PopLoopOverride(FName Key);
+    UFUNCTION(BlueprintPure, Category="Momentum|Loop") bool IsDecaySuspended() const;
+    UFUNCTION(BlueprintPure, Category="Momentum|Loop") float GetGenerationMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Momentum|Loop") int32 GetActiveLoopOverrideCount() const;
+
     // Pure loop rules, exposed for tests and for the eventual DA_MomentumPolicy
     // asset that will own these numbers.
     static EBreakerMomentumState StateForFraction(float Fraction);
+    // Overlapping overrides compose multiplicatively, like the speed stack.
+    static float ComposeGenerationMultipliers(const TArray<float>& Multipliers);
+    // Negative expiry means "never expires on its own".
+    static bool IsLoopOverrideExpired(double ExpiryTime, double Now);
     static float GroundSpeedRate(float Speed, float ThresholdSpeed, float UpperSpeed, float RateAtThreshold, float RateAtUpper);
     static float ClampGeneration(float RequestedRate, float GlobalCap);
     static float DecayRateForSpeed(float Speed, float SettledSpeed, float ThresholdSpeed, float SettledDecay, float SlowDecay);
@@ -77,6 +93,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SlowDecayRate = 6.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float DecayGraceSeconds = 1.0f;
 
+    // Phantom Step (Core.Kinesis.PhantomStep): "a successful Dodge grants brief
+    // invulnerability on a 2.0s internal cooldown". Implemented as a full-dodge
+    // window pushed onto the combat component's existing passive DodgeChance —
+    // the only invulnerability primitive that exists without editing Combat/.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|PhantomStep", meta=(ClampMin="0")) float PhantomStepWindowSeconds = 0.5f;  // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|PhantomStep", meta=(ClampMin="0")) float PhantomStepCooldownSeconds = 2.0f; // Class-Kits node text
+
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
@@ -86,6 +109,19 @@ private:
     bool IsInSafeZone() const;
     void ApplyMomentumDelta(float Delta);
     void RefreshState();
+    void TryPhantomStep();
+
+    struct FLoopOverrideEntry
+    {
+        bool bSuspendDecay = false;
+        float GenerationMultiplier = 1.0f;
+        // Negative = no expiry; popped explicitly.
+        double ExpiryTime = -1.0;
+    };
+    // Mutable: the pure reads below are const and are the natural place to drop
+    // expired entries, which is what "lazy expiry" means here.
+    mutable TMap<FName, FLoopOverrideEntry> LoopOverrides;
+    void PruneLoopOverrides() const;
 
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     mutable TWeakObjectPtr<UBreakerCharacterMovementComponent> CachedMovement;
@@ -102,5 +138,6 @@ private:
     double LastDashGrantTime = -1000.0;
     double LastWeakPointGrantTime = -1000.0;
     double LastDodgeGrantTime = -1000.0;
+    double LastPhantomStepTime = -1000.0;
     double LastObservedDashTime = -1000.0;
 };

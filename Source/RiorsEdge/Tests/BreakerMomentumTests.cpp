@@ -61,4 +61,60 @@ bool FBreakerMomentumInertTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumLoopOverrideTest,
+    "RiorsEdge.Classes.MomentumLoopOverride",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumLoopOverrideTest::RunTest(const FString& Parameters)
+{
+    // Pure expiry rule. A negative expiry is "never expires on its own"; the
+    // boundary is inclusive so an override never survives its own end time.
+    TestFalse(TEXT("A permanent override never expires"), UBreakerMomentumComponent::IsLoopOverrideExpired(-1.0, 1000.0));
+    TestFalse(TEXT("An override before its end time is live"), UBreakerMomentumComponent::IsLoopOverrideExpired(10.0, 9.9));
+    TestTrue(TEXT("An override at its end time is expired"), UBreakerMomentumComponent::IsLoopOverrideExpired(10.0, 10.0));
+    TestTrue(TEXT("An override past its end time is expired"), UBreakerMomentumComponent::IsLoopOverrideExpired(10.0, 11.0));
+
+    TestEqual(TEXT("No override is a 1x loop"), UBreakerMomentumComponent::ComposeGenerationMultipliers({}), 1.0f);
+    TestEqual(TEXT("A single override passes through"), UBreakerMomentumComponent::ComposeGenerationMultipliers({2.0f}), 2.0f);
+    TestEqual(TEXT("Overlapping overrides compose multiplicatively"), UBreakerMomentumComponent::ComposeGenerationMultipliers({2.0f, 1.5f}), 3.0f);
+    TestEqual(TEXT("Non-positive multipliers are ignored, never inverted"), UBreakerMomentumComponent::ComposeGenerationMultipliers({2.0f, -1.0f, 0.0f}), 2.0f);
+
+    // Push/pop bookkeeping with no world: entries with no world clock are
+    // permanent, which is exactly why pop has to work.
+    UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>();
+    TestFalse(TEXT("A fresh loop suspends nothing"), Momentum->IsDecaySuspended());
+    TestEqual(TEXT("A fresh loop generates at 1x"), Momentum->GetGenerationMultiplier(), 1.0f);
+
+    Momentum->PushLoopOverride(NAME_None, true, 2.0f, 8.0f);
+    TestEqual(TEXT("An unnamed override is rejected"), Momentum->GetActiveLoopOverrideCount(), 0);
+
+    Momentum->PushLoopOverride(TEXT("Window.Swift.Overdrive"), true, 2.0f, 8.0f);
+    TestEqual(TEXT("Overdrive pushes exactly one override"), Momentum->GetActiveLoopOverrideCount(), 1);
+    TestTrue(TEXT("Overdrive suspends decay"), Momentum->IsDecaySuspended());
+    TestEqual(TEXT("Overdrive doubles generation"), Momentum->GetGenerationMultiplier(), 2.0f);
+
+    // Re-casting refreshes rather than stacking, like the window it mirrors.
+    Momentum->PushLoopOverride(TEXT("Window.Swift.Overdrive"), true, 2.0f, 8.0f);
+    TestEqual(TEXT("A re-cast refreshes rather than stacks"), Momentum->GetActiveLoopOverrideCount(), 1);
+    TestEqual(TEXT("A re-cast does not compound the multiplier"), Momentum->GetGenerationMultiplier(), 2.0f);
+
+    // A generation-only override must not silently suspend decay.
+    Momentum->PushLoopOverride(TEXT("Test.GenerationOnly"), false, 1.5f, 0.0f);
+    TestEqual(TEXT("Two keys are two overrides"), Momentum->GetActiveLoopOverrideCount(), 2);
+    TestEqual(TEXT("Both multipliers compose"), Momentum->GetGenerationMultiplier(), 3.0f);
+
+    Momentum->PopLoopOverride(TEXT("Window.Swift.Overdrive"));
+    TestFalse(TEXT("Popping the only decay-suspending override resumes decay"), Momentum->IsDecaySuspended());
+    TestEqual(TEXT("The surviving override still generates"), Momentum->GetGenerationMultiplier(), 1.5f);
+    Momentum->PopLoopOverride(TEXT("Test.GenerationOnly"));
+    TestEqual(TEXT("The loop returns to its unmodified rules"), Momentum->GetActiveLoopOverrideCount(), 0);
+    TestEqual(TEXT("An empty stack is 1x"), Momentum->GetGenerationMultiplier(), 1.0f);
+
+    // Phantom Step values are quoted from the node text, not invented.
+    TestEqual(TEXT("Phantom Step keeps the node's 2.0s internal cooldown"), Momentum->PhantomStepCooldownSeconds, 2.0f);
+    TestTrue(TEXT("The window is strictly shorter than the cooldown"), Momentum->PhantomStepWindowSeconds < Momentum->PhantomStepCooldownSeconds);
+    return true;
+}
+
 #endif

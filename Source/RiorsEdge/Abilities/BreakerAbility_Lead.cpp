@@ -30,6 +30,12 @@ bool UBreakerAbility_Lead::ShouldTreatAsWeakPoint(bool bTargetIsMarked, float Di
     return bTargetIsMarked && DistanceCm > MinimumRangeCm;
 }
 
+float UBreakerAbility_Lead::DefaultMinimumRangeCm()
+{
+    const UBreakerAbility_Lead* Defaults = GetDefault<UBreakerAbility_Lead>();
+    return Defaults ? Defaults->MarkMinimumRangeCm : 2500.0f;
+}
+
 void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -70,9 +76,10 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         State->SetMark(MarkedTarget.Get(), Duration);
     }
 
-    // GAP: nothing consumes the mark yet. The distance-gated weak-point forcing
-    // belongs in the outgoing-damage builder (Combat/), which is owned
-    // elsewhere; ShouldTreatAsWeakPoint is the rule it should call, and
-    // UBreakerMarkComponent (spec §4.6) replaces MarkedTarget when it lands.
+    // The mark is consumed in UBreakerWeaponComponent::FireOnce: a hit on the
+    // marked actor beyond the range gate forces bWeakPointHit on the damage
+    // request, through ShouldTreatAsWeakPoint. UBreakerMarkComponent (spec
+    // §4.6) replaces MarkedTarget when it lands; the consumer reads the state
+    // component, not this instance, so that swap does not touch the weapon.
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
