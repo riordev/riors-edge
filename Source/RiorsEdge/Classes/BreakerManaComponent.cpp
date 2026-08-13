@@ -3,6 +3,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -159,8 +160,63 @@ void UBreakerManaComponent::RefreshOvercastState()
     if (bNowOvercast != bOvercast)
     {
         bOvercast = bNowOvercast;
+        SyncOvercastDamagePenalty();
         OnOvercastChanged.Broadcast(bNowOvercast);
     }
+}
+
+FName UBreakerManaComponent::OvercastDamageModifierKey()
+{
+    return TEXT("Caster.Overcast");
+}
+
+float UBreakerManaComponent::OvercastIncomingMultiplier(bool bOvercastNow, float PenaltyFraction)
+{
+    return bOvercastNow ? 1.0f + FMath::Max(0.0f, PenaltyFraction) : 1.0f;
+}
+
+void UBreakerManaComponent::SyncOvercastDamagePenalty()
+{
+    AActor* Owner = GetOwner();
+    UBreakerCombatComponent* Combat = Owner ? Owner->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Combat) return;
+
+    if (bOvercast)
+    {
+        Combat->PushIncomingDamageModifier(OvercastDamageModifierKey(), OvercastIncomingMultiplier(true, OvercastIncomingDamageTaken));
+    }
+    else
+    {
+        Combat->RemoveIncomingDamageModifier(OvercastDamageModifierKey());
+    }
+}
+
+void UBreakerManaComponent::GrantMana(float Amount, bool bIgnoreGlobalCap)
+{
+    if (Amount <= 0.0f || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner()) return;
+    if (IsGenerationSuspended()) return;
+
+    if (bIgnoreGlobalCap)
+    {
+        ApplyManaDelta(Amount * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+        RefreshOvercastState();
+        return;
+    }
+    PendingGrants += Amount;
+}
+
+void UBreakerManaComponent::PushGenerationSuspension(FName Key)
+{
+    if (Key.IsNone()) return;
+    GenerationSuspensions.Add(Key);
+    // Queued credits are dropped, not banked: a bar that leaps the instant the
+    // window closes would read as the suspension never having happened.
+    PendingGrants = 0.0f;
+}
+
+void UBreakerManaComponent::PopGenerationSuspension(FName Key)
+{
+    GenerationSuspensions.Remove(Key);
 }
 
 void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
@@ -168,6 +224,8 @@ void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
     // Landed hits only: a fired-and-missed shot banks nothing, and DoT ticks
     // never arrive here at all (they carry proc coefficient 0 by rule).
     if (!Shot.bFired || !Shot.bHit || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    // Unmake suspends generation outright (Class-Kits §2.2).
+    if (IsGenerationSuspended()) return;
 
     int32 PelletsPerShot = 1;
     if (const UBreakerWeaponComponent* Weapon = GetOwner()->FindComponentByClass<UBreakerWeaponComponent>())
@@ -198,6 +256,13 @@ void UBreakerManaComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
         return;
     }
     if (IsInSafeZone())
+    {
+        PendingGrants = 0.0f;
+        RefreshOvercastState();
+        return;
+    }
+
+    if (IsGenerationSuspended())
     {
         PendingGrants = 0.0f;
         RefreshOvercastState();

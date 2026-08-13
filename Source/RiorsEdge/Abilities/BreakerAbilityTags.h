@@ -33,4 +33,25 @@ namespace BreakerAbilityTags
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_Bloodrhythm);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_TerminalVelocity);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Swift_StandingWave);
+
+    // Caster (Class-Kits §2.2). Deliberately NO Cooldown.* tags: every Caster
+    // ability is cost-gated and Mana *is* the cooldown (Class-Kits §2.1), so
+    // authoring cooldown tags here would let the HUD render a phantom
+    // "cooldown of zero" (spec D3).
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Cleave);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Closequarter);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Unmake);
+
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Cleave);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Closequarter);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ultimate_Unmake);
+
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Caster_Edgework);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Caster_LongDark);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Caster_Cascade);
+
+    // Source tag on melee damage requests. Class-Kits §2.3 gives the Spellblade
+    // branch a 1.30x melee More and Item-Foundation gives Melee Damage % a class
+    // home; both need to recognise a melee hit from the request alone.
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Damage_Melee);
 }

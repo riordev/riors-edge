@@ -44,7 +44,11 @@ public:
     // Resolved definition: the explicitly assigned asset if present, otherwise
     // the C++ fallback registry entry for FallbackAbilityId.
     UFUNCTION(BlueprintPure, Category="Abilities") const UBreakerAbilityDefinition* GetAbilityDefinition() const;
-    UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCost() const;
+    // Virtual because a live window may rewrite the price of a cast: Caster's
+    // Unmake makes every Caster ability free for its duration (Class-Kits §2.2).
+    // CheckCost and ApplyCost both read through this, so there is exactly one
+    // answer to "what does this cost right now".
+    UFUNCTION(BlueprintPure, Category="Abilities") virtual float GetResourceCost() const;
     UFUNCTION(BlueprintPure, Category="Abilities") float GetCooldownSeconds() const;
     UFUNCTION(BlueprintPure, Category="Abilities") ABreakerCharacter* GetBreakerCharacter() const;
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAttributeSet* GetBreakerAttributes() const;

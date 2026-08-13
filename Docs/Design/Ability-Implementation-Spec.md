@@ -496,8 +496,12 @@ Exit test: Class-Kits §1.7 criteria 5–7.
 
 **Phase 3 — Caster, statuses and reactions.** C1 Cleave → C3 Rot (zone actor) → C5 Fracture →
 C6 Resonance → C4 Siphon (channel) → C2 Closequarter → Unmake + three variants.
-Blocked on the D8 Overcast spike. Cleave first because it is the only melee verb in the game and
-melee damage submission does not exist yet.
+Cleave first because it is the only melee verb in the game and melee damage submission does not
+exist yet.
+**PARTLY DONE, out of the listed order:** Cleave, Closequarter, and Unmake shipped together
+because all three were buildable without new `Combat/` systems, while Rot / Siphon / Fracture /
+Resonance each need one (zones, healing, a projectile base, status consumption). D8 was *not*
+resolved and remains the gate on Overcast — see the status block at the top of §5.
 Exit test: Class-Kits §2.7 criteria 1–7.
 
 **Phase 4 — Verbs.** Air Jump (Kinesis K4) → Parry (Bulwark B4). Deliberately after Swift and
@@ -717,14 +721,22 @@ UFUNCTION(BlueprintCallable, Category="Movement") void CancelVelocity(bool bIncl
 UFUNCTION(BlueprintPure, Category="Equipment") float GetAffixValue(FGameplayTag AffixTag) const;
 UFUNCTION(BlueprintPure, Category="Equipment") int32 GetAffixTier(FGameplayTag AffixTag) const;
 ```
-  Then apply it as an incoming-damage reduction for the window:
+  Then apply it as an incoming-damage reduction for the window. **THIS HOOK NOW EXISTS** — built
+  for Caster's Overcast penalty and keyed by `FName` rather than `FGameplayTag`, matching the
+  outgoing chain's existing convention in the same file:
 ```cpp
-// Combat/BreakerCombatComponent.h
-UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat")
-void PushIncomingDamageModifier(FGameplayTag SourceTag, float Multiplier); // 1.0 = none; 0.0 = immune
-UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat")
-void PopIncomingDamageModifier(FGameplayTag SourceTag);
+// Combat/BreakerCombatComponent.h — SHIPPED
+UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
+void PushIncomingDamageModifier(FName Key, float Multiplier); // 1.0 = none; 0.0 = immune
+UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
+void RemoveIncomingDamageModifier(FName Key);
+UFUNCTION(BlueprintPure, Category="Combat|Incoming") float GetComposedIncomingDamageMultiplier() const;
 ```
+  Entries compose multiplicatively into `FBreakerDefenseState::IncomingDamageMultiplier` at the
+  top of `ReceiveDamage` — the same stage gear-rolled physical reduction already occupies, so
+  before armour, shields, and the passive rolls. Re-pushing a key replaces rather than stacks.
+  There is deliberately **no expiry**: an incoming modifier reflects a state whose owner is
+  responsible for removing it, and a silently expiring defence is worse than a visibly stuck one.
   K10 Spend to Live turns the window into full immunity — that is `Multiplier = 0.0f` through the
   same hook plus a cost override to 60, both read from the node's data row. **No new code path.**
   Master 7.10.4's invulnerability-loop risk is bounded by the existing 6s cooldown; add a test that
@@ -882,9 +894,29 @@ escalate rather than adding one silently.
 Resource: `ClassResource` gated by `Class.Caster`. **No cooldowns on any Caster ability** — cost
 only (Class-Kits §2.1). Do not author cooldown GEs for this class.
 
-**BLOCKED on D8 (Overcast spike).** Every Caster ability's `CheckCost` override depends on it.
+> **IMPLEMENTATION STATUS (this section is now partly built).**
+> Shipped: `UBreakerCasterAbility` (the shared base carrying the two class-wide rules — no
+> cooldowns ever, and Unmake's cost rewrite), **C1 Cleave**, **C2 Closequarter**, and the
+> **Unmake** ultimate with its four variant rows. `UBreakerManaComponent` exists and its
+> Overcast incoming-damage penalty is wired into `UBreakerCombatComponent`.
+> Not built: C3 Rot, C4 Siphon, C5 Fracture, C6 Resonance, and the Edgework-on-Closequarter
+> and Cascade keystone halves. Each is blocked on a Combat/ system that does not exist
+> (zone actor, partial healing, projectile base, status consumption).
+>
+> **D8 IS STILL THE BLOCKER, AND IT IS BIGGER THAN A SPIKE.** `UBreakerAttributeSet::
+> PreAttributeChange` clamps `ClassResource` to `[0, MaxClassResource]`, and GAS ability costs
+> are GameplayEffects, which pass through exactly that clamp. So today **no Caster ability can
+> drive the bank negative at all** — Overcast, the class's defining mechanic, is unreachable in
+> play even though the Mana component implements it faithfully. The implemented abilities
+> therefore keep a *strict* affordability rule (`UBreakerCasterAbility::CanCastAt`): a cast the
+> bank cannot fully pay for is refused. Relaxing that before the floor exists would silently
+> hand the player a partial refund instead of a debt, which is worse than refusing. The fix is
+> the `ClassResourceFloor` attribute below; when it lands, `CanCastAt` becomes floor-aware and
+> nothing else changes. **Do not add a second, non-GAS spend path to work around this (D3).**
 
-**Mana loop component does not exist.** Swift has `UBreakerMomentumComponent`; Caster has nothing.
+**Mana loop component EXISTS**: `Source/RiorsEdge/Classes/BreakerManaComponent`. Beyond the shape
+described below it now also carries `GrantMana(Amount, bIgnoreGlobalCap)` (used by Closequarter's
+refund) and keyed `PushGenerationSuspension`/`PopGenerationSuspension` (used by Unmake).
 
 ```cpp
 // Source/RiorsEdge/Classes/BreakerManaComponent.h — mirrors the Momentum component's shape
@@ -902,7 +934,26 @@ The anti-Multishot 1/n rule needs the pellet count at generation time — bind t
 `FBreakerHitContext` needs `int32 ProjectilesInVolley = 1;` so the 1/n rule has an input.
 Class-Kits §2.7.2 makes this a hard acceptance criterion.
 
-## 5.1 C1 — Cleave *(starter, Spellblade)*
+## 5.1 C1 — Cleave *(starter, Spellblade)* — **BUILT**
+
+> **As built** (`Abilities/BreakerAbility_Cleave.{h,cpp}`, `Abilities/BreakerMeleeSweep.{h,cpp}`).
+> Faithful to the ticket below with three recorded deviations:
+> - The melee library lives at `Abilities/BreakerMeleeSweep.h`, not `Combat/BreakerMeleeLibrary.h`.
+>   Cleave is its only caller and the implementing agent did not own `Combat/`. Move it when a
+>   second melee source appears; the API is this spec's.
+> - The animation lock is a GAS activation lock, not a timer plus a flag: the ability stays
+>   active for the lock and lists its own `State.Ability.Cleave` in `ActivationBlockedTags`.
+>   Edgework zeroes the duration through `AnimationLockFor`, so the lock is variant-readable as
+>   required.
+> - `FBreakerHitContext::bMelee` was **not** added (Combat/ is owned elsewhere). Instead the
+>   damage request carries the new `Damage.Melee` source tag, which is what the Spellblade 1.30x
+>   More and Melee Damage % affixes actually need. SB1 Contact Charge will still want `bMelee`
+>   on the hit context.
+> Targets resolve deterministically (centre-most first, distance breaks ties), range is measured
+> horizontally so a target on a crate is still reachable, and the sweep refuses to swing through
+> world geometry. Bleed applies at 100% with a snapshot critical roll, matching the weapon path.
+> O2 PLACEHOLDER values: arc 120°, weapon coefficient 1.5x, unarmed fallback 20, lock 0.45s,
+> Bleed 6/tick for 4s at 1s intervals.
 
 **Design source.** §2.2 C1. Cost 20 Mana, no CD. "Short forward melee arc, 3 m, physical damage
 scaled by weapon damage. Applies Bleed at a 100% base chance."
@@ -944,7 +995,24 @@ sparks via `MulticastAbilityCosmetic`.
 **Tasks.** (1) `SweepMeleeTargets` + determinism test. (2) `Damage.Melee` tag + `bMelee` on the
 hit context. (3) GA + cost GE. (4) SB8 arc-widening data variant. (5) SB2 ICD bypass.
 
-## 5.2 C2 — Closequarter *(Spellblade, granted by SB7)*
+## 5.2 C2 — Closequarter *(Spellblade, granted by SB7)* — **BUILT**
+
+> **As built** (`Abilities/BreakerAbility_Closequarter.{h,cpp}`). Deviations:
+> - `TryBlinkTo` was not added to `UBreakerCharacterMovementComponent` (Movement/ owned
+>   elsewhere). The blink is a swept `SetActorLocation` with `ETeleportType::TeleportPhysics`,
+>   which has exactly the contract this section asks for — it stops at the last non-penetrating
+>   position rather than depositing the player in geometry. Velocity is zeroed explicitly, per
+>   "no velocity carried". Lift it onto the movement component when a second blink consumer
+>   appears.
+> - `bBypassDefensiveRolls` (SB5 Momentum Transfer) was not added; that is a Combat/ change.
+> - Targeting is committed **before** the cost: with nothing valid under the crosshair the cast
+>   is refused rather than charged. Skim deliberately charges on a failed redirect because a
+>   moving player can always redirect; Closequarter with no target provably cannot move the
+>   player at all, so charging for it would be a dead key. Flagging the asymmetry rather than
+>   quietly matching Skim.
+> - The refund reads the target's health fraction from its attribute set and calls
+>   `GrantMana(15, bIgnoreGlobalCap=true)` — payback is not generation and must not be metered
+>   through the 20/s cap. SB10's 100% threshold is `RefundHealthFraction`, a data field.
 
 **Design source.** §2.2 C2. Cost 35 Mana, no CD. "Blink to the target under the crosshair within
 12 m, arriving 2 m short of it. Not a dash and not a grapple — instantaneous, no travel, no tether,
@@ -1165,7 +1233,28 @@ Class-Kits §2.7.5 sets the *bound* (≤2.2× from 2 statuses to 6) but not the 
 (3) GA + cost GE. (4) MS8 / MS9 data variants. (5) Test for §2.7.5's 2.2× bound with placeholder
 values — the test is written now and starts passing when O2 lifts.
 
-## 5.7 ULTIMATE — Unmake + three keystone rewrites
+## 5.7 ULTIMATE — Unmake + three keystone rewrites — **BASE + LONG DARK BUILT**
+
+> **As built** (`Abilities/BreakerAbility_Unmake.{h,cpp}`).
+> - The cost override is a **window payload**, not a tag check. `UBreakerAbilityStateComponent`
+>   gained an optional float on each window; Unmake opens `Window.Caster.Unmake` carrying the
+>   cost scalar, and `UBreakerCasterAbility::GetResourceCost` multiplies by it. Both `CheckCost`
+>   and `ApplyCost` read through that one virtual, so affordability and spend can never
+>   disagree. This is strictly better than the tag form the ticket proposed: Long Dark's 50% is
+>   the same code path as the base 0%, with no branch and no second GE.
+> - Generation suspension is `UBreakerManaComponent::PushGenerationSuspension(FName)` /
+>   `Pop`, keyed rather than boolean so overlapping sources revert independently. Queued
+>   credits are discarded on push, not banked, so the bar cannot leap when the window closes.
+> - Teardown is unconditional in `EndAbility` — including cancel and death. A Caster left with
+>   free casts because the ultimate was interrupted is this design's worst failure mode.
+> - Long Dark is fully built: its variant row carries 12s and 0.5, and nothing branches.
+> - **Edgework is built only for Cleave** (the lock removal). Its Closequarter half needs a
+>   line-of-sight range override and is not built.
+> - **Cascade is not built**: it needs Fracture's status cycle, which does not exist. Its
+>   variant row exists and resolves so the keystone is visibly unfinished rather than silently
+>   inert.
+> - Overcast-into-Unmake (the §2.2 interaction) is **unreachable** for the D8 reason at the top
+>   of §5, not because of anything in this ability.
 
 **Design source.** §2.2. Cost 80 Mana, no cooldown. Base: for 6s all Caster abilities cost 0 Mana
 and Mana generation is suspended.

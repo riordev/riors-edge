@@ -60,6 +60,21 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Combat|Outgoing") float GetComposedMoreMultiplier() const;
 
+    // Incoming-damage modifier chain (Ability-Implementation-Spec §4.4). Keyed
+    // push/remove, composed multiplicatively into FBreakerDefenseState::
+    // IncomingDamageMultiplier at the top of ReceiveDamage, so it lands before
+    // armour, shields, and the passive rolls — the same stage gear-rolled
+    // physical reduction already occupies.
+    //   1.0 = no change, 1.15 = takes 15% more, 0.0 = immune.
+    // First consumer: Caster's Overcast penalty (Class-Kits §2.1).
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
+    void PushIncomingDamageModifier(FName Key, float Multiplier);
+
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Incoming")
+    void RemoveIncomingDamageModifier(FName Key);
+
+    UFUNCTION(BlueprintPure, Category="Combat|Incoming") float GetComposedIncomingDamageMultiplier() const;
+
     // Damage-Pipeline §4: at most three More multipliers, each capped at 1.30x.
     static constexpr float ComposedMoreCeiling = 2.20f;
 
@@ -79,6 +94,11 @@ private:
     void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result) const;
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;
+    // Keyed so a pusher removes exactly its own entry. No expiry: an incoming
+    // modifier reflects a state (Overcast, a defensive window) whose owner is
+    // responsible for removing it, and a silently expiring defence is worse
+    // than one that is visibly stuck.
+    TMap<FName, float> IncomingDamageModifiers;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     bool bDeathBroadcast = false;
     double LastDamageTime = -1000.0;
