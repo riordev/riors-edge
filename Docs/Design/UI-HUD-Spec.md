@@ -89,6 +89,27 @@ the final 3 seconds, so the ultimate ending is visible without a timer.
 `ABreakerPlaytestHUD` implements all five sections and the anchor table, at
 `ViewportHeight/1080` scale, using `BreakerUIStyle.h` tokens.
 
+**The class-resource row is generic (2026-08-13).** §2's slot no longer reads
+Swift's component: `ABreakerPlaytestHUD::ResolveResourceRow` returns a
+`BreakerHUD::FResourceRow` (label, signed fraction, state word, state colour,
+track treatment, track border) from `UI/BreakerHUDResourceRow.h`, and
+`DrawResourceTrack` paints that. Two classes are wired — Swift's Momentum
+(Settled/Running/Redline, unchanged) and Caster's Mana (BANKED/OVERCAST). A
+third class is one `Resolve*` function, not a new drawing path. The 12px track
+and the two notches at 33%/66% are fixed for every class.
+
+**Overcast is drawn as a signed channel.** Mana can go negative, which a
+left-anchored fill cannot express. Stealing track width for a debt zone would
+move the two notches the spec fixes, so the axis that inverts is the vertical
+one: a 1px grey zero baseline across the middle of the track, credit growing
+rightward in the upper half in `#4FD8F5`, debt growing rightward in the LOWER
+half in harm `#FF4040`, with the track border widening to 2px harm exactly as
+Redline widens to 2px orange. Length reads magnitude, side of the baseline
+reads sign. This is what the Overcast *icon* already does ("the same channel,
+half above zero and half beneath"), so the HUD and the icon set agree. Debt is
+measured against the Overcast floor, not against maximum Mana: while negative
+the bar answers "how much rope is left", and the rope is the floor.
+
 Deviations, all deliberate:
 
 - **Typeface** is the engine default; the canvas HUD has no Saira/Barlow/
@@ -100,6 +121,11 @@ Deviations, all deliberate:
   needs a known total duration; `UBreakerAbilityStateComponent` exposes only
   remaining time, so the step-down keys off the final 3 seconds directly, which
   is what the spec describes anyway.
+- **Overcast is not reachable in play yet.** `UBreakerAttributeSet::
+  PreAttributeChange` clamps ClassResource to `[0, Max]`, so nothing drives the
+  bank negative until the `ClassResourceFloor` attribute (spec D8) lands. The
+  debt half of the track is correct the moment it does; it is verified by the
+  `RiorsEdge.UI.ClassResourceRow` automation test, not by a playtest.
 - **Playtest chrome** (F1/F2/F3 key legend, diagnostics panel, report-copied
   confirmation) is not in the design canvas. It is kept, restyled onto the
   tokens, at `text/muted` in the top-left — it is instrumentation, not shipping
