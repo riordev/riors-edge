@@ -131,30 +131,21 @@ bool FBreakerDodgeBlockTest::RunTest(const FString& Parameters)
     FBreakerDefenseState Defense;
     Defense.Health = 1000.0f;
 
-    // Dodge invulnerability fully negates the hit.
-    Defense.bDodgeInvulnerable = true;
+    // A guaranteed dodge fully evades the hit.
+    Defense.DodgeChance = 1.0f;
     FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
-    TestTrue(TEXT("Dodge window negates"), Result.bDodged);
-    TestEqual(TEXT("No health damage while dodging"), Result.HealthDamage, 0.0f);
+    TestTrue(TEXT("Guaranteed dodge evades"), Result.bDodged);
+    TestEqual(TEXT("No health damage on a dodge"), Result.HealthDamage, 0.0f);
 
-    // A guaranteed frontal block halves the hit at default mitigation.
-    Defense.bDodgeInvulnerable = false;
-    Defense.bBlockingStance = true;
-    Defense.bAttackFromFront = true;
+    // A guaranteed block halves the hit at default mitigation.
+    Defense.DodgeChance = 0.0f;
     Defense.BlockChance = 1.0f;
     Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
-    TestTrue(TEXT("Frontal block triggers"), Result.bBlocked);
+    TestTrue(TEXT("Guaranteed block triggers"), Result.bBlocked);
     TestEqual(TEXT("Block mitigates half"), Result.HealthDamage, 50.0f);
 
-    // Blocking is frontal only.
-    Defense.bAttackFromFront = false;
-    Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
-    TestFalse(TEXT("Rear hits ignore block"), Result.bBlocked);
-    TestEqual(TEXT("Full damage from behind"), Result.HealthDamage, 100.0f);
-
     // Dodge and block never apply to damage over time.
-    Defense.bAttackFromFront = true;
-    Defense.bDodgeInvulnerable = true;
+    Defense.DodgeChance = 1.0f;
     Request.bIsDamageOverTime = true;
     Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
     TestFalse(TEXT("DoTs cannot be dodged"), Result.bDodged);

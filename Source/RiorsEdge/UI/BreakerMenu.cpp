@@ -644,9 +644,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     ];
     Body->AddSlot().FillHeight(1.0f)
     [
-        BackpackItems.IsEmpty()
-            ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("Empty. Enemy kills drop rolled items.")), 11, SoftText))
-            : StaticCastSharedRef<SWidget>(SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid])
+        SNew(SBox).MinDesiredHeight(280.0f)
+        [
+            BackpackItems.IsEmpty()
+                ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("Empty. Enemy kills drop rolled items.")), 11, SoftText))
+                : StaticCastSharedRef<SWidget>(SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid])
+        ]
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
     [
@@ -678,6 +681,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         { EBreakerClassId::Support,  TEXT("SUPPORT"),  TEXT("CHARGE"),   TEXT("Medic / Conductor / Warden"),           TEXT("Amplify, sustain, control — solo viable.") },
     };
 
+    bool bDevClassSwap = false;
+    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevClassSwap, GGameUserSettingsIni);
+
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     if (CurrentClass != EBreakerClassId::None)
     {
@@ -699,19 +705,22 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
     for (const FClassEntry& Entry : Classes)
     {
         const bool bIsCurrent = Entry.ClassId == CurrentClass;
-        const bool bSelectable = CurrentClass == EBreakerClassId::None;
+        const bool bSelectable = CurrentClass == EBreakerClassId::None || bDevClassSwap;
         const EBreakerClassId CapturedClass = Entry.ClassId;
+        const bool bCapturedDevSwap = bDevClassSwap;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
         [
             SNew(SButton)
             .ButtonColorAndOpacity(bIsCurrent ? Cyan : PanelRaised)
             .IsEnabled(bSelectable)
             .ContentPadding(FMargin(16.0f, 11.0f))
-            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass]()
+            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bCapturedDevSwap]()
             {
-                if (Character.IsValid() && Character->GetProgression() && Character->GetProgression()->ChoosePermanentClassById(CapturedClass))
+                if (Character.IsValid() && Character->GetProgression())
                 {
-                    Character->SaveGameState();
+                    UBreakerProgressionComponent* Progression = Character->GetProgression();
+                    if (bCapturedDevSwap) Progression->DevForceClass(CapturedClass);
+                    if (bCapturedDevSwap || Progression->ChoosePermanentClassById(CapturedClass)) Character->SaveGameState();
                 }
                 Rebuild(EBreakerMenuScreen::ClassSelect);
                 return FReply::Handled();
@@ -730,7 +739,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         ];
     }
 
-    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
+    Body->AddSlot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 10.0f)
+    [
+        SNew(SCheckBox)
+        .IsChecked(bDevClassSwap ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
+        .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
+        {
+            GConfig->SetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), State == ECheckBoxState::Checked, GGameUserSettingsIni);
+            GConfig->Flush(false, GGameUserSettingsIni);
+            Rebuild(EBreakerMenuScreen::ClassSelect);
+        })
+        [
+            MenuText(FText::FromString(TEXT("DEV MODE — allow class swap (playtest only)")), 11, SoftText, true)
+        ]
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     return BuildFrame(FText::FromString(TEXT("BREAKER CLASS")), FText::FromString(TEXT("PERMANENT SELECTION / FIVE DISCIPLINES")), Body, 860.0f);
 }
 

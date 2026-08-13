@@ -107,6 +107,13 @@ UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { 
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    // Fall-out-of-map recovery: the template level has no kill volume, so
+    // enforce our own floor relative to the spawn point.
+    if (HasAuthority() && GetActorLocation().Z < FallKillZ)
+    {
+        ResetPlaytest();
+        return;
+    }
     if (!bMantling) return;
 
     MantleElapsed += DeltaSeconds;
@@ -132,6 +139,7 @@ void ABreakerCharacter::BeginPlay()
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
     PlaytestSpawnTransform = GetActorTransform();
+    FallKillZ = PlaytestSpawnTransform.GetLocation().Z - 4000.0f;
     if (HasAuthority()) LoadGameState();
     float SavedFOV = 90.0f;
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);

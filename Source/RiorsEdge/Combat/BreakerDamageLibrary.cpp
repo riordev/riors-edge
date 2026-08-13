@@ -24,14 +24,11 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     }
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
 
-    // Dodge and block resolve before mitigation and never affect DoTs.
+    // Passive dodge and block resolve before mitigation and never affect
+    // DoTs. Dodge fully evades; block reduces.
     if (!Request.bIsDamageOverTime)
     {
-        if (Defense.bDodgeInvulnerable)
-        {
-            Result.bDodged = true;
-        }
-        else if (Defense.DodgeChance > 0.0f)
+        if (Defense.DodgeChance > 0.0f)
         {
             FRandomStream DodgeRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xD0D6Eu));
             Result.bDodged = DodgeRandom.FRand() < FMath::Clamp(Defense.DodgeChance, 0.0f, 1.0f);
@@ -42,7 +39,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
             Result.RemainingHealth = FMath::Max(0.0f, Defense.Health);
             return Result;
         }
-        if (Defense.bBlockingStance && Defense.bAttackFromFront && Defense.BlockChance > 0.0f)
+        if (Defense.BlockChance > 0.0f)
         {
             FRandomStream BlockRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xB10Cu));
             Result.bBlocked = BlockRandom.FRand() < FMath::Clamp(Defense.BlockChance, 0.0f, 1.0f);

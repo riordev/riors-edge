@@ -5,6 +5,7 @@
 #include "Combat/BreakerCombatTypes.h"
 #include "BreakerWeaponComponent.generated.h"
 
+class UBreakerAttributeSet;
 class UBreakerWeaponDefinition;
 
 UENUM(BlueprintType)
@@ -63,6 +64,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetMagazineAmmo() const { return MagazineAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }
     UFUNCTION(BlueprintPure, Category="Weapon") const UBreakerWeaponDefinition* GetDefinition() const { return WeaponDefinition; }
+    // The definition actually in use: the authored asset when one is set,
+    // otherwise the archetype's code-driven prototype.
+    UFUNCTION(BlueprintPure, Category="Weapon") const UBreakerWeaponDefinition* GetActiveDefinition() const { return ResolveDefinition(); }
     UFUNCTION(BlueprintPure, Category="Weapon") EBreakerWeaponArchetype GetArchetype() const { return CurrentArchetype; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetCurrentSlot() const { return CurrentSlot; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsSwapping() const { return bSwapping; }
@@ -121,6 +125,7 @@ private:
     void InitializeSlotAmmunition();
     void FireOnce();
     void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread);
+    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes);
     void FinishReload();
     void FinishSwap();
     bool CanFire() const;

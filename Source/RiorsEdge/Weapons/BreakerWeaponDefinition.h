@@ -40,6 +40,12 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Handling", meta=(ClampMin="0")) float SwapInDuration = 0.5f;
 
+    // Per-pellet chance to apply the snapshotting Bleed DoT on a damaging hit.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Status", meta=(ClampMin="0", ClampMax="1")) float BleedChance = 0.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Status", meta=(ClampMin="0")) float BleedDamagePerTick = 0.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Status", meta=(ClampMin="0")) float BleedDuration = 0.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Status", meta=(ClampMin="0.05")) float BleedTickInterval = 0.5f;
+
     // Projectile weapons spawn a rocket instead of tracing. Self-damage and
     // self-knockback rules are an open design question; rockets currently
     // ignore their instigator.

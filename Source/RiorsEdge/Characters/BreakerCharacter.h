@@ -122,6 +122,7 @@ private:
     void EndShotCosmetics();
 
     FTransform PlaytestSpawnTransform;
+    float FallKillZ = -100000.0f;
     float LookSensitivity = 1.0f;
     bool bInvertLookY = false;
     bool bShowingInitialMenu = false;

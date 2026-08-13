@@ -51,16 +51,12 @@ struct RIORSEDGE_API FBreakerDefenseState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Armor = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingDamageMultiplier = 1.0f;
 
-    // The three defensive layers have deliberately different failure modes:
-    // dodge is a full-negation roll, block is stance + frontal only, and DR
-    // is passive with the lowest ceiling. Dodge and block never apply to
-    // damage over time.
+    // Passive defensive layers — not inputs. Dodge is a chance to evade a
+    // hit entirely; block is a chance to reduce it. Classes and gear supply
+    // the chances. Neither applies to damage over time.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float DodgeChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bBlockingStance = false;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAttackFromFront = true;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDodgeInvulnerable = false;
 };
 
 USTRUCT(BlueprintType)

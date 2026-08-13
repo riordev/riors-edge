@@ -9,6 +9,7 @@
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 
@@ -24,6 +25,7 @@ void ABreakerPlaytestHUD::DrawHUD()
         DrawCrosshair(Center, FLinearColor::White, 8.0f, 1.5f);
         return;
     }
+    EnsureDamageBinding(Character);
     if (Character->IsMenuOpen()) return;
 
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
@@ -48,6 +50,8 @@ void ABreakerPlaytestHUD::DrawHUD()
         DrawBar(TEXT("SHIELD"), Attributes->GetShield(), Attributes->GetMaxShield(), LeftPanelX + 16.0f, PanelY + 68.0f, 205.0f, FLinearColor(0.08f, 0.65f, 1.0f));
         DrawLabel(FString::Printf(TEXT("ARMOR\n%.0f"), Attributes->GetArmor()), LeftPanelX + 258.0f, PanelY + 42.0f, FLinearColor(0.85f, 0.9f, 0.95f), 0.92f);
     }
+    DrawStatusReadout(Character, LeftPanelX + 16.0f, PanelY - 18.0f);
+    DrawDefenseFeedback(Center);
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
     {
         const FLinearColor DamageColor(1.0f, 0.12f, 0.05f, 0.85f);
@@ -84,6 +88,20 @@ void ABreakerPlaytestHUD::DrawHUD()
             ? FString::Printf(TEXT("WEAK POINT  %.0f"), AppliedDamage)
             : FString::Printf(TEXT("%.0f"), AppliedDamage);
         DrawLabel(DamageText, Center.X + 24.0f, Center.Y + 18.0f, CrosshairColor, 1.1f);
+    }
+
+    // Latch elite kills: the shot feedback window is far shorter than the
+    // time this callout should stay readable.
+    if (bRecentShot && Shot && Shot->bHit && Shot->DamageResult.bKilled)
+    {
+        if (const ABreakerEnemy* KilledEnemy = Cast<ABreakerEnemy>(Shot->HitActor.Get()); KilledEnemy && KilledEnemy->IsElite())
+            LastEliteKillTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    }
+    const double EliteKillAge = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - LastEliteKillTime;
+    if (EliteKillAge >= 0.0 && EliteKillAge < 1.2f)
+    {
+        const float Fade = 1.0f - static_cast<float>(EliteKillAge) / 1.2f;
+        DrawLabel(TEXT("ELITE DOWN"), Center.X - 62.0f, Center.Y - 118.0f, FLinearColor(1.0f, 0.75f, 0.05f, Fade), 1.3f);
     }
 
     if (Playtest && Playtest->AreDiagnosticsVisible())
@@ -124,6 +142,55 @@ void ABreakerPlaytestHUD::DrawHUD()
     }
     if (Playtest && Playtest->GetSecondsSinceReportCopy() < 2.0f)
         DrawLabel(TEXT("PLAYTEST REPORT COPIED"), Center.X - 100.0f, Center.Y + 72.0f, FLinearColor(0.5f, 1.0f, 0.65f), 1.0f);
+}
+
+void ABreakerPlaytestHUD::EnsureDamageBinding(const ABreakerCharacter* Character)
+{
+    UBreakerCombatComponent* Combat = Character ? Character->GetCombat() : nullptr;
+    if (!Combat || BoundCombat == Combat) return;
+    if (BoundCombat) BoundCombat->OnDamageReceived.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+    Combat->OnDamageReceived.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+    BoundCombat = Combat;
+}
+
+void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult& Result)
+{
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    if (Result.bDodged) LastDodgeTime = Now;
+    else if (Result.bBlocked) LastBlockTime = Now;
+}
+
+void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)
+{
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const double DodgeAge = Now - LastDodgeTime;
+    const double BlockAge = Now - LastBlockTime;
+    const bool bDodgeFresh = DodgeAge >= 0.0 && DodgeAge < 0.8;
+    const bool bBlockFresh = BlockAge >= 0.0 && BlockAge < 0.8;
+    if (!bDodgeFresh && !bBlockFresh) return;
+
+    const bool bShowDodge = bDodgeFresh && (!bBlockFresh || DodgeAge <= BlockAge);
+    const float Age = static_cast<float>(bShowDodge ? DodgeAge : BlockAge);
+    const float Fade = 1.0f - Age / 0.8f;
+    const FLinearColor Color = bShowDodge ? FLinearColor(0.35f, 0.95f, 1.0f, Fade) : FLinearColor(1.0f, 0.55f, 0.12f, Fade);
+    DrawLabel(bShowDodge ? TEXT("DODGED") : TEXT("BLOCKED"), Center.X - 44.0f, Center.Y - 108.0f, Color, 1.25f);
+}
+
+void ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character, float X, float Y)
+{
+    const UBreakerStatusComponent* Status = Character ? Character->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
+    if (!Status) return;
+
+    const TArray<FBreakerActiveStatus>& ActiveStatuses = Status->GetActiveStatuses();
+    float LineY = Y;
+    for (const FBreakerActiveStatus& Active : ActiveStatuses)
+    {
+        FString ShortName = Active.Spec.StatusTag.IsValid() ? Active.Spec.StatusTag.GetTagName().ToString() : TEXT("STATUS");
+        int32 SeparatorIndex = INDEX_NONE;
+        if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
+        DrawLabel(FString::Printf(TEXT("%s x%d %.1fs"), *ShortName.ToUpper(), Active.Stacks, FMath::Max(Active.RemainingDuration, 0.0f)), X, LineY, FLinearColor(1.0f, 0.45f, 0.55f), 0.72f);
+        LineY -= 14.0f;
+    }
 }
 
 void ABreakerPlaytestHUD::DrawCrosshair(const FVector2D& Center, const FLinearColor& Color, float Size, float Thickness)

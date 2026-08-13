@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
@@ -14,6 +15,10 @@
 
 namespace
 {
+    // Salts the shared shot seed so the bleed roll never correlates with the
+    // spread or critical rolls drawn from the same shot sequence.
+    constexpr uint32 BreakerBleedSalt = 0x51ED0000u;
+
     UBreakerWeaponDefinition* GetPrototypeDefinition(EBreakerWeaponArchetype Archetype)
     {
         static TObjectPtr<UBreakerWeaponDefinition> Prototypes[static_cast<int32>(EBreakerWeaponArchetype::Count)];
@@ -47,6 +52,10 @@ namespace
                 Definition->MinimumFalloffMultiplier = 0.4f;
                 Definition->MaximumRange = 6000.0f;
                 Definition->SwapInDuration = 0.35f;
+                Definition->BleedChance = 0.25f;
+                Definition->BleedDamagePerTick = 6.0f;
+                Definition->BleedDuration = 3.0f;
+                Definition->BleedTickInterval = 0.5f;
                 break;
             case EBreakerWeaponArchetype::Sniper:
                 Definition->WeaponId = TEXT("Sniper");
@@ -438,11 +447,39 @@ void UBreakerWeaponComponent::FireOnce()
             Shot.DamageResult.bWeakPoint |= PelletDamage.bWeakPoint;
             Shot.DamageResult.bShieldBroken |= PelletDamage.bShieldBroken;
             Shot.DamageResult.bKilled |= PelletDamage.bKilled;
+
+            ApplyBleedOnHit(Definition, Hit.GetActor(), SourceAttributes);
         }
     }
     MulticastShotCosmetics(Shot);
 
     if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
+}
+
+void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes)
+{
+    if (!Definition || !Target || Definition->BleedChance <= 0.0f || Definition->BleedDamagePerTick <= 0.0f || Definition->BleedDuration <= 0.0f) return;
+    UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>();
+    if (!Status) return;
+
+    // Same seed material as the pellet damage, salted so bleed and critical
+    // rolls stay independent while remaining reproducible on the server.
+    FRandomStream Stream(static_cast<int32>(HashCombine(HashCombine(GetTypeHash(GetOwner()), ShotSequence), BreakerBleedSalt)));
+    if (Stream.FRand() > Definition->BleedChance) return;
+
+    FBreakerStatusApplicationSpec Spec;
+    Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
+    Spec.BaseDamagePerTick = Definition->BleedDamagePerTick;
+    Spec.Duration = Definition->BleedDuration;
+    Spec.TickInterval = FMath::Max(0.05f, Definition->BleedTickInterval);
+    Spec.Snapshot.SourcePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
+    Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
+    // The critical result is rolled once at application; every tick of this
+    // application then crits or does not for its whole lifetime.
+    Spec.Snapshot.bRolledCritical = Stream.FRand() < Spec.Snapshot.CriticalChance;
+    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical);
 }
 
 void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread)

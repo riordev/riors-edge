@@ -21,6 +21,9 @@ public:
     // Selection framework path while class Data Assets do not exist yet:
     // locks the permanent class by id alone. Same one-way rule.
     UFUNCTION(BlueprintCallable, Category="Progression") bool ChoosePermanentClassById(EBreakerClassId ClassId);
+    // Dev-only escape hatch behind the menu's dev toggle: swaps the class
+    // regardless of the permanent-selection rule. Never ship a path to this.
+    UFUNCTION(BlueprintCallable, Category="Progression|Dev") void DevForceClass(EBreakerClassId ClassId) { State.PermanentClass = ClassId; }
     UFUNCTION(BlueprintCallable, Category="Progression") bool PurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason);
     UFUNCTION(BlueprintCallable, Category="Progression") bool EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason);
     UFUNCTION(BlueprintCallable, Category="Progression") bool RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason);
