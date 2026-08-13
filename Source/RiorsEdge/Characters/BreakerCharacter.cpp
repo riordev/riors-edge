@@ -24,6 +24,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Interaction/BreakerNPC.h"
+#include "Game/BreakerGameMode.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Game/BreakerGameMode.h"
@@ -211,6 +212,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ThisClass::TogglePauseMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
+    PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
 
     UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!InputConfig || !Input)
@@ -637,6 +639,14 @@ void ABreakerCharacter::ToggleInventoryMenu()
     }
     OpenMenu(false);
     if (MenuWidget.IsValid()) MenuWidget->ShowInventory();
+}
+
+void ABreakerCharacter::StartWave()
+{
+    if (ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr)
+    {
+        GameMode->StartNextWave();
+    }
 }
 
 ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const

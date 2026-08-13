@@ -21,8 +21,17 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest", meta=(ClampMin="0")) float SafeZoneRadius = 900.0f;
 
+    // Wave mode: the TTK measurement instrument. Escalating non-respawning
+    // waves in the elite arena; every third wave carries an elite.
+    UFUNCTION(BlueprintCallable, Category="Playtest|Waves") void StartNextWave();
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetCurrentWave() const { return CurrentWave; }
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
+
 private:
     bool bPlaytestTargetsSpawned = false;
+    int32 CurrentWave = 0;
+    UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
     FVector SafeZoneCenter = FVector::ZeroVector;
     bool bSafeZoneSet = false;
     void SpawnPlaytestTargets(const APawn* Pawn);

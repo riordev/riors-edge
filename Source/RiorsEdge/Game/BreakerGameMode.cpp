@@ -204,6 +204,52 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
     }
 }
 
+void ABreakerGameMode::StartNextWave()
+{
+    if (!GetWorld() || IsWaveActive()) return;
+    APawn* PlayerPawn = GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+    if (!PlayerPawn) return;
+
+    ++CurrentWave;
+    WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy); });
+
+    const FVector Origin = PlayerPawn->GetActorLocation();
+    const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
+    const FVector ArenaCenter = Origin + Forward * (SafeZoneRadius + 2400.0f);
+    // Dense packs by design: AoE, on-death chains, and multikill procs need
+    // crowds to feel like anything. Clusters of ~4 around the arena ring.
+    const int32 EnemyCount = FMath::Min(4 + CurrentWave * 3, 24);
+    const bool bEliteWave = CurrentWave % 3 == 0;
+
+    for (int32 Index = 0; Index < EnemyCount; ++Index)
+    {
+        const int32 Pack = Index / 4;
+        const float PackAngle = 360.0f * Pack / FMath::Max(1, (EnemyCount + 3) / 4);
+        const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * 700.0f;
+        const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
+        FActorSpawnParameters Params;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))
+        {
+            Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
+            // Later waves climb in level so drops and TTK data climb too.
+            Enemy->ConfigureWave(10 + CurrentWave * 2);
+            if (bEliteWave && Index == 0) Enemy->ConfigureElite();
+            WaveEnemies.Add(Enemy);
+        }
+    }
+}
+
+int32 ABreakerGameMode::GetWaveEnemiesAlive() const
+{
+    int32 Alive = 0;
+    for (const TObjectPtr<ABreakerEnemy>& Enemy : WaveEnemies)
+    {
+        if (IsValid(Enemy) && Enemy->GetEnemyStateLabel() != TEXT("DEAD")) ++Alive;
+    }
+    return Alive;
+}
+
 void ABreakerGameMode::ResetPlaytestTargets()
 {
     if (!GetWorld()) return;

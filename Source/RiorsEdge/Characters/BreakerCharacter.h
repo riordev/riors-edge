@@ -124,6 +124,7 @@ private:
     void TogglePauseMenu();
     void ToggleInventoryMenu();
     void InteractWithNearbyNPC();
+    void StartWave();
     void ShowInitialMenu();
     void OpenMenu(bool bInitialMenu);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);

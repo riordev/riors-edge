@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Pawn.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "BreakerEnemy.generated.h"
 
 class UAbilitySystemComponent;
@@ -27,12 +28,15 @@ public:
     // Elite modifier: bigger, tougher, hits harder, and its drops are never
     // below Exceptional.
     UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureElite();
+    // Wave spawns: no respawn, scaled level.
+    UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureWave(int32 NewEnemyLevel) { bRespawns = false; EnemyLevel = FMath::Clamp(NewEnemyLevel, 1, 50); }
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsElite() const { return bIsElite; }
     UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyStateLabel() const;
 
 protected:
     virtual void BeginPlay() override;
     UFUNCTION() void HandleDeath();
+    UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
     void GrantLoot();
     void RespawnEnemy();
     void PerformAttack(APawn* TargetPawn);
@@ -57,6 +61,13 @@ protected:
     // design question; enemy level is the gym's stand-in.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="1", ClampMax="50")) int32 EnemyLevel = 10;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bDropsLoot = true;
+    // Wave-mode enemies die for good instead of recycling.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bRespawns = true;
+    // Death chain: dying enemies detonate for a fraction of their max
+    // health, damaging nearby enemies (never the player). Dense packs pop.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bExplodesOnDeath = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0", ClampMax="1")) float DeathExplosionHealthFraction = 0.35f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float DeathExplosionRadius = 420.0f;
 
 private:
     FVector LeashOrigin = FVector::ZeroVector;
@@ -65,5 +76,6 @@ private:
     bool bDead = false;
     bool bIsElite = false;
     int32 KillCount = 0;
+    double FirstDamageTime = -1.0;
     FString StateLabel = TEXT("PATROL");
 };

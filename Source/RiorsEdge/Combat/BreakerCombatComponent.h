@@ -21,7 +21,6 @@ public:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") FBreakerDamageResult ReceiveDamage(const FBreakerDamageRequest& Request);
-    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendStamina(float Cost);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendClassResource(float Cost);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") void AddClassResource(float Amount);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") void RestoreVitals();
@@ -30,8 +29,6 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDamageReceived OnDamageReceived;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDeathEvent OnDeath;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Stamina", meta=(ClampMin="0")) float StaminaRegenerationPerSecond = 20.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Stamina", meta=(ClampMin="0")) float StaminaRegenerationDelay = 1.2f;
     // Passive defensive layers: classes and gear raise these; no inputs.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
@@ -40,7 +37,6 @@ public:
 
 private:
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
-    float TimeSinceStaminaSpend = 1000.0f;
     bool bDeathBroadcast = false;
     double LastDamageTime = -1000.0;
 };

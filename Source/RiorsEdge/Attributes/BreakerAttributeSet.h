@@ -33,10 +33,6 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Armor, Category="Defense") FGameplayAttributeData Armor;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, Armor)
 
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Stamina, Category="Resources") FGameplayAttributeData Stamina;
-    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, Stamina)
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxStamina, Category="Resources") FGameplayAttributeData MaxStamina;
-    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, MaxStamina)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ClassResource, Category="Resources") FGameplayAttributeData ClassResource;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ClassResource)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxClassResource, Category="Resources") FGameplayAttributeData MaxClassResource;
@@ -60,8 +56,6 @@ protected:
     UFUNCTION() void OnRep_Shield(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MaxShield(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_Armor(const FGameplayAttributeData& OldValue) const;
-    UFUNCTION() void OnRep_Stamina(const FGameplayAttributeData& OldValue) const;
-    UFUNCTION() void OnRep_MaxStamina(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_ClassResource(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MaxClassResource(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_CriticalChance(const FGameplayAttributeData& OldValue) const;

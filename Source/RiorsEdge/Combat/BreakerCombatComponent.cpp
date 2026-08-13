@@ -29,12 +29,6 @@ void UBreakerCombatComponent::BeginPlay()
 void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
-    TimeSinceStaminaSpend += DeltaTime;
-    if (TimeSinceStaminaSpend >= StaminaRegenerationDelay && Attributes->GetStamina() < Attributes->GetMaxStamina())
-    {
-        Attributes->SetStamina(FMath::Min(Attributes->GetMaxStamina(), Attributes->GetStamina() + StaminaRegenerationPerSecond * DeltaTime));
-    }
 }
 
 FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamageRequest& Request)
@@ -78,14 +72,6 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     return Result;
 }
 
-bool UBreakerCombatComponent::SpendStamina(float Cost)
-{
-    if (!Attributes || Cost < 0.0f || Attributes->GetStamina() < Cost) return false;
-    Attributes->SetStamina(Attributes->GetStamina() - Cost);
-    TimeSinceStaminaSpend = 0.0f;
-    return true;
-}
-
 bool UBreakerCombatComponent::SpendClassResource(float Cost)
 {
     if (!Attributes || Cost < 0.0f || Attributes->GetClassResource() < Cost) return false;
@@ -103,7 +89,6 @@ void UBreakerCombatComponent::RestoreVitals()
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
     Attributes->SetHealth(Attributes->GetMaxHealth());
     Attributes->SetShield(Attributes->GetMaxShield());
-    Attributes->SetStamina(Attributes->GetMaxStamina());
     bDeathBroadcast = false;
 }
 

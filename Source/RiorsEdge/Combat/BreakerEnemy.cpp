@@ -13,6 +13,7 @@
 #include "Game/BreakerGameMode.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerLootLibrary.h"
+#include "Playtest/BreakerPlaytestComponent.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -66,6 +67,7 @@ void ABreakerEnemy::BeginPlay()
     Super::BeginPlay();
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
+    Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
     if (LeashOrigin.IsNearlyZero()) LeashOrigin = GetActorLocation();
     Attributes->SetMaxHealth(220.0f);
     Combat->RestoreVitals();
@@ -173,7 +175,47 @@ void ABreakerEnemy::HandleDeath()
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyVisual->SetVisibility(false, true);
     if (HasAuthority() && bDropsLoot) GrantLoot();
-    GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
+
+    // On-death chain detonation: hurts other enemies only, so packed
+    // spawns cascade without turning the player's own kills against them.
+    if (HasAuthority() && bExplodesOnDeath && Attributes)
+    {
+        const float ExplosionDamage = Attributes->GetMaxHealth() * DeathExplosionHealthFraction;
+        for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+        {
+            if (*It == this || It->bDead) continue;
+            if (FVector::DistSquared(It->GetActorLocation(), GetActorLocation()) > FMath::Square(DeathExplosionRadius)) continue;
+            FBreakerDamageRequest ChainDamage;
+            ChainDamage.BaseDamage = ExplosionDamage;
+            ChainDamage.DamageFamily = EBreakerDamageFamily::Physical;
+            ChainDamage.bCanCritical = false;
+            ChainDamage.SourceLocation = GetActorLocation();
+            ChainDamage.bHasSourceLocation = true;
+            It->Combat->ReceiveDamage(ChainDamage);
+        }
+    }
+
+    // Feed the time-to-kill instrument (Decisions.md O2).
+    if (FirstDamageTime >= 0.0 && GetWorld())
+    {
+        APawn* PlayerPawn = GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+        if (UBreakerPlaytestComponent* Playtest = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerPlaytestComponent>() : nullptr)
+        {
+            Playtest->AddTimeToKillSample(static_cast<float>(GetWorld()->GetTimeSeconds() - FirstDamageTime), bIsElite);
+        }
+        FirstDamageTime = -1.0;
+    }
+
+    if (bRespawns) GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
+    else SetLifeSpan(2.0f);
+}
+
+void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
+{
+    if (FirstDamageTime < 0.0 && GetWorld() && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
+    {
+        FirstDamageTime = GetWorld()->GetTimeSeconds();
+    }
 }
 
 void ABreakerEnemy::GrantLoot()
@@ -202,6 +244,7 @@ void ABreakerEnemy::RespawnEnemy()
         WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         BodyVisual->SetVisibility(true, true);
         bDead = false;
+        FirstDamageTime = -1.0;
         Combat->RestoreVitals();
     }, RespawnDelay, false);
 }

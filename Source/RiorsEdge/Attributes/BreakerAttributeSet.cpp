@@ -9,8 +9,6 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitShield(0.0f);
     InitMaxShield(0.0f);
     InitArmor(0.0f);
-    InitStamina(100.0f);
-    InitMaxStamina(100.0f);
     InitClassResource(0.0f);
     InitMaxClassResource(100.0f);
     InitCriticalChance(0.05f);
@@ -29,8 +27,6 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(Shield);
     BREAKER_REPLICATE(MaxShield);
     BREAKER_REPLICATE(Armor);
-    BREAKER_REPLICATE(Stamina);
-    BREAKER_REPLICATE(MaxStamina);
     BREAKER_REPLICATE(ClassResource);
     BREAKER_REPLICATE(MaxClassResource);
     BREAKER_REPLICATE(CriticalChance);
@@ -49,8 +45,6 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     else if (Attribute == GetShieldAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxShield());
     else if (Attribute == GetMaxShieldAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetArmorAttribute()) NewValue = FMath::Max(0.0f, NewValue);
-    else if (Attribute == GetStaminaAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxStamina());
-    else if (Attribute == GetMaxStaminaAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetClassResourceAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxClassResource());
     else if (Attribute == GetMaxClassResourceAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetCriticalChanceAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
@@ -65,8 +59,6 @@ BREAKER_ON_REP(MaxHealth)
 BREAKER_ON_REP(Shield)
 BREAKER_ON_REP(MaxShield)
 BREAKER_ON_REP(Armor)
-BREAKER_ON_REP(Stamina)
-BREAKER_ON_REP(MaxStamina)
 BREAKER_ON_REP(ClassResource)
 BREAKER_ON_REP(MaxClassResource)
 BREAKER_ON_REP(CriticalChance)
