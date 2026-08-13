@@ -35,6 +35,10 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bUseSnapshotCritical = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSnapshotCriticalResult = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RandomSeed = 0;
+    // Where the hit came from, for frontal block checks. Optional so tests
+    // and hazards without a position keep working.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FVector SourceLocation = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceLocation = false;
 };
 
 USTRUCT(BlueprintType)
@@ -46,6 +50,17 @@ struct RIORSEDGE_API FBreakerDefenseState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Shield = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Armor = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingDamageMultiplier = 1.0f;
+
+    // The three defensive layers have deliberately different failure modes:
+    // dodge is a full-negation roll, block is stance + frontal only, and DR
+    // is passive with the lowest ceiling. Dodge and block never apply to
+    // damage over time.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float DodgeChance = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bBlockingStance = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAttackFromFront = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDodgeInvulnerable = false;
 };
 
 USTRUCT(BlueprintType)
@@ -60,6 +75,8 @@ struct RIORSEDGE_API FBreakerDamageResult
     UPROPERTY(BlueprintReadOnly) float RemainingShield = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RemainingHealth = 0.0f;
     UPROPERTY(BlueprintReadOnly) bool bCritical = false;
+    UPROPERTY(BlueprintReadOnly) bool bDodged = false;
+    UPROPERTY(BlueprintReadOnly) bool bBlocked = false;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) bool bShieldBroken = false;
     UPROPERTY(BlueprintReadOnly) bool bKilled = false;

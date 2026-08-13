@@ -95,6 +95,7 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(UBreakerWeaponComponent, bReloading);
     DOREPLIFETIME(UBreakerWeaponComponent, CurrentArchetype);
     DOREPLIFETIME(UBreakerWeaponComponent, CurrentSlot);
+    DOREPLIFETIME(UBreakerWeaponComponent, bSwapping);
 }
 
 const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() const
@@ -167,6 +168,34 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     bReloading = false;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+
+    // Swap tempo: the incoming weapon is unusable for its SwapInDuration.
+    // Swap speed affixes will scale this window; on-swap-in damage windows
+    // read GetSecondsSinceSwapIn once it closes.
+    const UBreakerWeaponDefinition* Incoming = ResolveDefinition();
+    const float SwapDuration = Incoming ? Incoming->SwapInDuration : 0.5f;
+    bSwapping = true;
+    OnSwapChanged.Broadcast(true, CurrentSlot);
+    if (SwapDuration > 0.0f && GetWorld())
+    {
+        GetWorld()->GetTimerManager().SetTimer(SwapTimer, this, &ThisClass::FinishSwap, SwapDuration, false);
+    }
+    else
+    {
+        FinishSwap();
+    }
+}
+
+void UBreakerWeaponComponent::FinishSwap()
+{
+    bSwapping = false;
+    LastSwapInTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    OnSwapChanged.Broadcast(false, CurrentSlot);
+}
+
+float UBreakerWeaponComponent::GetSecondsSinceSwapIn() const
+{
+    return GetWorld() ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastSwapInTime) : BIG_NUMBER;
 }
 
 void UBreakerWeaponComponent::ServerEquipSlot_Implementation(int32 SlotNumber)
@@ -223,7 +252,7 @@ void UBreakerWeaponComponent::StartReload()
         return;
     }
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition || bReloading || MagazineAmmo >= Definition->MagazineSize || ReserveAmmo <= 0) return;
+    if (!Definition || bReloading || bSwapping || MagazineAmmo >= Definition->MagazineSize || ReserveAmmo <= 0) return;
     StopFire();
     bReloading = true;
     OnReloadChanged.Broadcast(true);
@@ -247,7 +276,7 @@ void UBreakerWeaponComponent::ServerSetAiming_Implementation(bool bNewAiming) { 
 bool UBreakerWeaponComponent::CanFire() const
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition || bReloading || MagazineAmmo <= 0 || !GetWorld()) return false;
+    if (!Definition || bReloading || bSwapping || MagazineAmmo <= 0 || !GetWorld()) return false;
     return GetWorld()->GetTimeSeconds() - LastShotTime + UE_KINDA_SMALL_NUMBER >= FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute);
 }
 
@@ -302,6 +331,8 @@ void UBreakerWeaponComponent::FireOnce()
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
             Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
+            Damage.SourceLocation = GetOwner()->GetActorLocation();
+            Damage.bHasSourceLocation = true;
             const FBreakerDamageResult PelletDamage = TargetCombat->ReceiveDamage(Damage);
             Shot.DamageResult.RawDamage += PelletDamage.RawDamage;
             Shot.DamageResult.MitigatedDamage += PelletDamage.MitigatedDamage;
@@ -375,3 +406,8 @@ void UBreakerWeaponComponent::ResetAmmunition()
 
 void UBreakerWeaponComponent::OnRep_Ammo() { OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo); }
 void UBreakerWeaponComponent::OnRep_Reloading() { OnReloadChanged.Broadcast(bReloading); }
+void UBreakerWeaponComponent::OnRep_Swapping()
+{
+    if (!bSwapping) LastSwapInTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    OnSwapChanged.Broadcast(bSwapping, CurrentSlot);
+}

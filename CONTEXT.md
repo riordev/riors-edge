@@ -14,7 +14,7 @@ Locked progression decisions: class selection is permanent per character; charac
 
 ## Canonical project
 
-- Unreal project: `UnrealProject/riors_edge.uproject`
+- Unreal project: `riors_edge.uproject` (repository root)
 - Engine: Unreal Engine 5.8
 - Runtime module: `RiorsEdge`
 - Primary development branch: `main`
@@ -42,10 +42,14 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Gameplay Tags exist for initial movement, weapon, cooldown, damage, rarity, and state concepts.
 - `BP_BreakerCharacter` is the active pawn assembly and remains a child of the C++ `BreakerCharacter`; the C++ class is retained as the clean-clone fallback. `DA_PlayerInputConfig` and `IMC_Player` provide keyboard/mouse and controller mappings. Blockout first-person arms and weapon geometry remain intentionally replaceable presentation.
 - The canonical private GitHub remote is configured and `main` is the cross-machine integration branch.
+- The item foundation is implemented under `Source/RiorsEdge/Items` and documented in `Docs/Item-Foundation.md`: item instances with item level, the ten-tier affix value curve with the T0/T-1 spike, the deterministic five-step loot roll pipeline, the vertical-slice fallback affix pool, and a replicated eight-slot equipment component that folds affixes into the attribute set. Locked aggregation rule: flat sums first, all Increased percentages form one additive bucket per stat, More multipliers are reserved for trees/Anomalous.
+- Weapon slots now have a swap tempo layer (swap-in duration blocks fire/reload, swap events, seconds-since-swap-in query), which unblocks Secondary exclusive affix design.
+- Block and dodge are implemented on the shared stamina pool in `UBreakerCombatComponent` (frontal-only block stance, instant dodge negation window with resource refund; neither affects DoTs). Input actions are not bound yet — the API is BlueprintCallable.
+- `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 13-test project automation suite passes on Windows. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 19-test project automation suite passes on Windows. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -129,6 +133,7 @@ Recommended sequence:
 4. Move dash cooldown and activation into GAS after the base movement behavior is validated.
 5. Replace the current blockout first-person presentation in `BP_BreakerCharacter` with authored meshes, animation, VFX, and audio after baseline feel feedback.
 6. Use the Playtest Gym report to tune the existing movement and combat baseline, then begin the combat sandbox presentation pass.
+7. Wire the equipment movement multipliers (slide/air-control/dash) into `UBreakerCharacterMovementComponent`, add Block/Dodge input actions to `DA_PlayerInputConfig`, and surface backpack/equip in the loadout menu.
 
 After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot loop, progression, and encounter slice.
 
@@ -144,6 +149,7 @@ After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot 
 - `Docs/Combat-Foundation.md` — damage order, armour, shields, critical DoTs, attributes, and stamina
 - `Docs/Weapon-Foundation.md` — hitscan flow, prototype rifle, weak points, and target dummy
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done
+- `Docs/Item-Foundation.md` — item instances, item level, affix tiers, loot rolls, equipment, and the stat aggregation rule
 
 ## Handoff discipline
 

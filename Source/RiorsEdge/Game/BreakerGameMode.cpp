@@ -27,6 +27,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
     if (bPlaytestTargetsSpawned || !NewPlayer || !NewPlayer->GetPawn() || !GetWorld()) return;
+    SpawnSafeZone(NewPlayer->GetPawn());
     SpawnPlaytestTargets(NewPlayer->GetPawn());
     SpawnMovementCourse(NewPlayer->GetPawn());
     SpawnCombatEncounter(NewPlayer->GetPawn());
@@ -110,6 +111,31 @@ void ABreakerGameMode::SpawnMovementCourse(const APawn* Pawn)
     SpawnGymBlock(GetWorld(), Origin - Forward * 2100.0f + Right * 1200.0f + FVector(0, 0, 240), FVector(8.0f, 2.5f, 0.2f), FRotator(0, 0, -12.0f));
 }
 
+void ABreakerGameMode::SpawnSafeZone(const APawn* Pawn)
+{
+    if (!Pawn || !GetWorld()) return;
+    SafeZoneCenter = Pawn->GetActorLocation() - FVector(0.0f, 0.0f, 88.0f);
+    bSafeZoneSet = true;
+
+    // Visible pad so the boundary reads at a glance: wide flat cylinder with
+    // a thin rim ring at the zone radius.
+    AStaticMeshActor* Pad = GetWorld()->SpawnActor<AStaticMeshActor>(SafeZoneCenter + FVector(0, 0, 2.0f), FRotator::ZeroRotator);
+    if (Pad)
+    {
+        UStaticMeshComponent* Mesh = Pad->GetStaticMeshComponent();
+        Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
+        Mesh->SetWorldScale3D(FVector(SafeZoneRadius / 50.0f, SafeZoneRadius / 50.0f, 0.04f));
+        Mesh->SetMobility(EComponentMobility::Static);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Pad->SetActorLabel(TEXT("Runtime_SafeZone"));
+    }
+}
+
+bool ABreakerGameMode::IsInSafeZone(const FVector& Location) const
+{
+    return bSafeZoneSet && FVector::DistSquared2D(Location, SafeZoneCenter) <= FMath::Square(SafeZoneRadius);
+}
+
 void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
 {
     if (!Pawn || !GetWorld()) return;
@@ -119,7 +145,9 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
     const float LateralOffsets[] = { -450.0f, 0.0f, 450.0f };
     for (int32 Index = 0; Index < 3; ++Index)
     {
-        const FVector SpawnLocation = Origin + Forward * (350.0f + Index * 70.0f) + Right * LateralOffsets[Index];
+        // Spawn well outside the safe zone so the fight starts on the
+        // player's terms.
+        const FVector SpawnLocation = Origin + Forward * (SafeZoneRadius + 1200.0f + Index * 300.0f) + Right * LateralOffsets[Index];
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
         if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))

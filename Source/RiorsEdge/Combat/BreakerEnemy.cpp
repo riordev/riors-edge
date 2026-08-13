@@ -4,11 +4,15 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
+#include "Game/BreakerGameMode.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerLootLibrary.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -54,6 +58,7 @@ ABreakerEnemy::ABreakerEnemy()
     AbilitySystem->SetIsReplicated(true);
     Attributes = CreateDefaultSubobject<UBreakerAttributeSet>(TEXT("Attributes"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
+    Status = CreateDefaultSubobject<UBreakerStatusComponent>(TEXT("Status"));
 }
 
 void ABreakerEnemy::BeginPlay()
@@ -93,6 +98,14 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
         }
     }
 
+    // Players standing in the safe zone are off-limits, and enemies stop at
+    // its edge rather than following them in.
+    const ABreakerGameMode* GameMode = GetWorld()->GetAuthGameMode<ABreakerGameMode>();
+    if (NearestPlayer && GameMode && GameMode->IsInSafeZone(NearestPlayer->GetActorLocation()))
+    {
+        NearestPlayer = nullptr;
+    }
+
     const float Distance = FMath::Sqrt(NearestDistanceSq);
     FVector DesiredDirection = FVector::ZeroVector;
     if (NearestPlayer && Distance <= DetectionRange)
@@ -111,6 +124,12 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
 
     if (!DesiredDirection.IsNearlyZero())
     {
+        const FVector NextLocation = GetActorLocation() + DesiredDirection * MoveSpeed * DeltaSeconds;
+        if (GameMode && GameMode->IsInSafeZone(NextLocation))
+        {
+            StateLabel = TEXT("HELD");
+            return;
+        }
         FHitResult MoveHit;
         AddActorWorldOffset(DesiredDirection * MoveSpeed * DeltaSeconds, true, &MoveHit);
         SetActorRotation(DesiredDirection.Rotation());
@@ -138,7 +157,22 @@ void ABreakerEnemy::HandleDeath()
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyVisual->SetVisibility(false, true);
+    if (HasAuthority() && bDropsLoot) GrantLoot();
     GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
+}
+
+void ABreakerEnemy::GrantLoot()
+{
+    APawn* PlayerPawn = GetWorld() ? GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr : nullptr;
+    UBreakerEquipmentComponent* Equipment = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    if (!Equipment) return;
+
+    ++KillCount;
+    const int32 Seed = HashCombine(GetTypeHash(GetActorLocation()), KillCount);
+    const EBreakerItemRarity Rarity = UBreakerLootLibrary::RollRarity(Seed, Equipment->GetStats().DropChancePercent);
+    const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
+    const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
+    Equipment->AddToBackpack(Item);
 }
 
 void ABreakerEnemy::RespawnEnemy()

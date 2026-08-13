@@ -8,6 +8,7 @@
 class UAbilitySystemComponent;
 class UBreakerAttributeSet;
 class UBreakerCombatComponent;
+class UBreakerStatusComponent;
 class UCapsuleComponent;
 class UStaticMeshComponent;
 class USphereComponent;
@@ -28,6 +29,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     UFUNCTION() void HandleDeath();
+    void GrantLoot();
     void RespawnEnemy();
     void PerformAttack(APawn* TargetPawn);
 
@@ -39,6 +41,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerStatusComponent> Status;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float DetectionRange = 2200.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float AttackRange = 260.0f;
@@ -46,11 +49,16 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float AttackDamage = 14.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float AttackCooldown = 1.15f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float RespawnDelay = 3.0f;
+    // Item level source for drops. Zone-based sourcing is still an open
+    // design question; enemy level is the gym's stand-in.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="1", ClampMax="50")) int32 EnemyLevel = 10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bDropsLoot = true;
 
 private:
     FVector LeashOrigin = FVector::ZeroVector;
     float PatrolPhase = 0.0f;
     double LastAttackTime = -1000.0;
     bool bDead = false;
+    int32 KillCount = 0;
     FString StateLabel = TEXT("PATROL");
 };

@@ -37,4 +37,6 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo", meta=(ClampMin="1")) int32 MagazineSize = 30;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo", meta=(ClampMin="0")) int32 StartingReserveAmmo = 120;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo", meta=(ClampMin="0")) float ReloadDuration = 1.8f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Handling", meta=(ClampMin="0")) float SwapInDuration = 0.5f;
 };

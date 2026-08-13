@@ -11,7 +11,8 @@ enum class EBreakerMenuScreen : uint8
     Main,
     Pause,
     Settings,
-    Loadout
+    Loadout,
+    Inventory
 };
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
@@ -24,6 +25,7 @@ public:
     void Construct(const FArguments& InArgs);
     void ShowMainMenu();
     void ShowPauseMenu();
+    void ShowInventory();
     void HandleEscape();
 
 private:
@@ -32,7 +34,8 @@ private:
     TSharedRef<SWidget> BuildPauseScreen();
     TSharedRef<SWidget> BuildSettingsScreen();
     TSharedRef<SWidget> BuildLoadoutScreen();
-    TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body) const;
+    TSharedRef<SWidget> BuildInventoryScreen();
+    TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
     FReply GoBack();

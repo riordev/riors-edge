@@ -21,6 +21,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/GameModeBase.h"
 #include "Misc/ConfigCacheIni.h"
@@ -46,6 +47,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Weapon = CreateDefaultSubobject<UBreakerWeaponComponent>(TEXT("Weapon"));
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
+    Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
 
     PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));
     PrototypeWeaponVisual->SetupAttachment(FirstPersonCamera);
@@ -167,6 +169,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ThisClass::EquipPrimaryWeapon);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ThisClass::EquipSecondaryWeapon);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ThisClass::TogglePauseMenu).bExecuteWhenPaused = true;
+    PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
 
     UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!InputConfig || !Input)
@@ -572,6 +575,17 @@ void ABreakerCharacter::QuitFromMenu()
     {
         UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
     }
+}
+
+void ABreakerCharacter::ToggleInventoryMenu()
+{
+    if (MenuWidget.IsValid())
+    {
+        ResumeFromMenu();
+        return;
+    }
+    OpenMenu(false);
+    if (MenuWidget.IsValid()) MenuWidget->ShowInventory();
 }
 
 void ABreakerCharacter::TogglePauseMenu()

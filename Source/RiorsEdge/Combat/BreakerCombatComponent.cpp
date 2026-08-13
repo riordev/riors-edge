@@ -4,6 +4,9 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "GameFramework/Actor.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UBreakerCombatComponent::UBreakerCombatComponent()
 {
@@ -43,7 +46,36 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Defense.Health = Attributes->GetHealth();
     Defense.Shield = Attributes->GetShield();
     Defense.Armor = Attributes->GetArmor();
+    // Gear-rolled physical damage reduction folds into the incoming
+    // multiplier so the resolution order stays single-path.
+    if (Request.DamageFamily == EBreakerDamageFamily::Physical)
+    {
+        if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
+        {
+            Defense.IncomingDamageMultiplier *= 1.0f - Equipment->GetStats().PhysicalDamageReductionPercent / 100.0f;
+        }
+    }
+    Defense.DodgeChance = DodgeChance;
+    Defense.bDodgeInvulnerable = IsDodgeInvulnerable();
+    Defense.BlockMitigation = BlockMitigation;
+    // Blocking only counts when the stance is up, stamina can pay for the
+    // hit, and the hit comes from the front half-space.
+    Defense.bBlockingStance = bBlocking && Attributes->GetStamina() >= BlockStaminaCostPerHit;
+    Defense.BlockChance = BlockChance;
+    if (Request.bHasSourceLocation && GetOwner())
+    {
+        const FVector ToSource = (Request.SourceLocation - GetOwner()->GetActorLocation()).GetSafeNormal2D();
+        Defense.bAttackFromFront = FVector::DotProduct(GetOwner()->GetActorForwardVector().GetSafeNormal2D(), ToSource) > 0.0f;
+    }
+
     Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
+    if (Result.bDodged)
+    {
+        AddClassResource(DodgeResourceRefund);
+        OnDamageReceived.Broadcast(Result);
+        return Result;
+    }
+    if (Result.bBlocked) SpendStamina(BlockStaminaCostPerHit);
     Attributes->SetShield(Result.RemainingShield);
     Attributes->SetHealth(Result.RemainingHealth);
     LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
@@ -54,6 +86,49 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         OnDeath.Broadcast();
     }
     return Result;
+}
+
+void UBreakerCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(UBreakerCombatComponent, bBlocking);
+}
+
+void UBreakerCombatComponent::SetBlocking(bool bNewBlocking)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority())
+    {
+        ServerSetBlocking(bNewBlocking);
+        return;
+    }
+    bBlocking = bNewBlocking;
+}
+
+void UBreakerCombatComponent::ServerSetBlocking_Implementation(bool bNewBlocking)
+{
+    SetBlocking(bNewBlocking);
+}
+
+bool UBreakerCombatComponent::TryDodge()
+{
+    if (GetOwner() && !GetOwner()->HasAuthority())
+    {
+        ServerTryDodge();
+        return false;
+    }
+    if (IsDodgeInvulnerable() || !SpendStamina(DodgeStaminaCost)) return false;
+    DodgeWindowEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() + DodgeWindowSeconds : 0.0;
+    return true;
+}
+
+void UBreakerCombatComponent::ServerTryDodge_Implementation()
+{
+    TryDodge();
+}
+
+bool UBreakerCombatComponent::IsDodgeInvulnerable() const
+{
+    return GetWorld() && GetWorld()->GetTimeSeconds() < DodgeWindowEndTime;
 }
 
 bool UBreakerCombatComponent::SpendStamina(float Cost)

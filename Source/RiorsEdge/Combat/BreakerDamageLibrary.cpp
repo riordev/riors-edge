@@ -24,6 +24,31 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     }
     if (Result.bCritical) Result.RawDamage *= FMath::Max(1.0f, Request.CriticalMultiplier);
 
+    // Dodge and block resolve before mitigation and never affect DoTs.
+    if (!Request.bIsDamageOverTime)
+    {
+        if (Defense.bDodgeInvulnerable)
+        {
+            Result.bDodged = true;
+        }
+        else if (Defense.DodgeChance > 0.0f)
+        {
+            FRandomStream DodgeRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xD0D6Eu));
+            Result.bDodged = DodgeRandom.FRand() < FMath::Clamp(Defense.DodgeChance, 0.0f, 1.0f);
+        }
+        if (Result.bDodged)
+        {
+            Result.RemainingShield = FMath::Max(0.0f, Defense.Shield);
+            Result.RemainingHealth = FMath::Max(0.0f, Defense.Health);
+            return Result;
+        }
+        if (Defense.bBlockingStance && Defense.bAttackFromFront && Defense.BlockChance > 0.0f)
+        {
+            FRandomStream BlockRandom(HashCombine(static_cast<uint32>(Request.RandomSeed), 0xB10Cu));
+            Result.bBlocked = BlockRandom.FRand() < FMath::Clamp(Defense.BlockChance, 0.0f, 1.0f);
+        }
+    }
+
     float Mitigation = 0.0f;
     if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
@@ -37,6 +62,7 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     }
 
     Result.MitigatedDamage = Result.RawDamage * (1.0f - Mitigation) * FMath::Max(0.0f, Defense.IncomingDamageMultiplier);
+    if (Result.bBlocked) Result.MitigatedDamage *= 1.0f - FMath::Clamp(Defense.BlockMitigation, 0.0f, 1.0f);
     float RemainingDamage = Result.MitigatedDamage;
     Result.RemainingShield = FMath::Max(0.0f, Defense.Shield);
     Result.RemainingHealth = FMath::Max(0.0f, Defense.Health);

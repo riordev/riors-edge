@@ -16,6 +16,7 @@ class UBreakerCombatComponent;
 class UStaticMeshComponent;
 class UPointLightComponent;
 class UBreakerPlaytestComponent;
+class UBreakerEquipmentComponent;
 class SBreakerMenu;
 struct FInputActionValue;
 
@@ -38,6 +39,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerAttributeSet* GetAttributes() const { return Attributes; }
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerCombatComponent* GetCombat() const { return Combat; }
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
+    UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
@@ -61,6 +63,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Progression") TObjectPtr<UBreakerProgressionComponent> Progression;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat") TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponBarrel;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponSight;
@@ -108,6 +111,7 @@ private:
     void DecreaseSensitivity();
     void SavePlaytestSettings() const;
     void TogglePauseMenu();
+    void ToggleInventoryMenu();
     void ShowInitialMenu();
     void OpenMenu(bool bInitialMenu);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);

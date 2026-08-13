@@ -33,6 +33,7 @@ struct RIORSEDGE_API FBreakerShotResult
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerShotEvent, const FBreakerShotResult&, Shot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerAmmoEvent, int32, MagazineAmmo, int32, ReserveAmmo);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerReloadEvent, bool, bReloading);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerSwapEvent, bool, bSwapping, int32, SlotNumber);
 
 UCLASS(ClassGroup=Weapons, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerWeaponComponent : public UActorComponent
@@ -57,6 +58,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon") const UBreakerWeaponDefinition* GetDefinition() const { return WeaponDefinition; }
     UFUNCTION(BlueprintPure, Category="Weapon") EBreakerWeaponArchetype GetArchetype() const { return CurrentArchetype; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetCurrentSlot() const { return CurrentSlot; }
+    UFUNCTION(BlueprintPure, Category="Weapon") bool IsSwapping() const { return bSwapping; }
+    // Seconds since the last swap completed. Secondary "damage on swap-in"
+    // affixes read this to decide whether their window is open.
+    UFUNCTION(BlueprintPure, Category="Weapon") float GetSecondsSinceSwapIn() const;
     UFUNCTION(BlueprintPure, Category="Weapon") FString GetArchetypeName() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") const FBreakerShotResult& GetLastShot() const { return LastShot; }
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") float GetSecondsSinceLastShot() const;
@@ -66,6 +71,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerShotEvent OnShot;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerAmmoEvent OnAmmoChanged;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerReloadEvent OnReloadChanged;
+    UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerSwapEvent OnSwapChanged;
 
 protected:
     UFUNCTION(Server, Reliable) void ServerStartFire();
@@ -76,11 +82,13 @@ protected:
     UFUNCTION(NetMulticast, Unreliable) void MulticastShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void OnRep_Ammo();
     UFUNCTION() void OnRep_Reloading();
+    UFUNCTION() void OnRep_Swapping();
 
 private:
     UPROPERTY(ReplicatedUsing=OnRep_Ammo) int32 MagazineAmmo = 0;
     UPROPERTY(ReplicatedUsing=OnRep_Ammo) int32 ReserveAmmo = 0;
     UPROPERTY(ReplicatedUsing=OnRep_Reloading) bool bReloading = false;
+    UPROPERTY(ReplicatedUsing=OnRep_Swapping) bool bSwapping = false;
     UPROPERTY(Replicated) EBreakerWeaponArchetype CurrentArchetype = EBreakerWeaponArchetype::Rifle;
     UPROPERTY(Replicated) int32 CurrentSlot = 1;
     int32 SlotOneMagazineAmmo = -1;
@@ -93,6 +101,8 @@ private:
     double LastShotTime = -1000.0;
     FTimerHandle AutomaticFireTimer;
     FTimerHandle ReloadTimer;
+    FTimerHandle SwapTimer;
+    double LastSwapInTime = -1000.0;
     FBreakerShotResult LastShot;
     double LastCosmeticShotTime = -1000.0;
 
@@ -101,6 +111,7 @@ private:
     void InitializeSlotAmmunition();
     void FireOnce();
     void FinishReload();
+    void FinishSwap();
     bool CanFire() const;
     void GetViewPoint(FVector& OutLocation, FRotator& OutRotation) const;
 };
