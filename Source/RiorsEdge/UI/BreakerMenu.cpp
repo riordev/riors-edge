@@ -18,6 +18,7 @@
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SWrapBox.h"
+#include "Widgets/SCanvas.h"
 #include "UI/BreakerUIStyle.h"
 #include "Algo/Reverse.h"
 #include "Widgets/SBoxPanel.h"
@@ -114,6 +115,67 @@ namespace
             .Padding(FMargin(BreakerUI::BorderThin))
             [
                 Railed
+            ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Path-board primitives.
+    //
+    // The skill matrix board is drawn on an SCanvas at fixed pixel positions
+    // (FIELDPLATE authors at 1920x1080). Nothing on the board measures itself
+    // against its allotted size, so there is no layout feedback loop of the
+    // kind SWrapBox/UseAllottedSize produced inside a scroll box.
+    // ---------------------------------------------------------------------
+
+    // A dashed hairline. Slate has no dash pattern, so it is a fixed run of
+    // blocks — the count comes from the caller's pixel width, never from an
+    // allotted size.
+    TSharedRef<SWidget> DashedLine(float Width, const FLinearColor& Color, float Dash = 6.0f, float Gap = 6.0f)
+    {
+        TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+        const int32 Count = FMath::Clamp(FMath::CeilToInt(Width / (Dash + Gap)), 1, 240);
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            Row->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Gap, 0.0f)
+            [
+                SNew(SBox).WidthOverride(Dash)[SolidBlock(Color)]
+            ];
+        }
+        return Row;
+    }
+
+    // A straight 2px segment between two board points, drawn as a bar rotated
+    // about its own centre. Trunks pass A/B on the same X; diagonals do not.
+    void AddCanvasSegment(const TSharedRef<SCanvas>& Canvas, const FVector2D& A, const FVector2D& B,
+        const FLinearColor& Color, float Thickness = 2.0f)
+    {
+        const FVector2D Delta = B - A;
+        const float Length = FMath::Max(1.0f, static_cast<float>(Delta.Size()));
+        const float Angle = FMath::Atan2(static_cast<float>(Delta.Y), static_cast<float>(Delta.X));
+        const FVector2D Mid = (A + B) * 0.5;
+        Canvas->AddSlot()
+            .Position(FVector2D(Mid.X - Length * 0.5f, Mid.Y - Thickness * 0.5f))
+            .Size(FVector2D(Length, Thickness))
+            [
+                SNew(SBox)
+                .RenderTransform(TOptional<FSlateRenderTransform>(FSlateRenderTransform(FQuat2D(Angle))))
+                .RenderTransformPivot(FVector2D(0.5, 0.5))
+                [
+                    SolidBlock(Color)
+                ]
+            ];
+    }
+
+    // Diamond markers are square markers turned 45 degrees. The rotation is a
+    // render transform, so the layout box stays axis-aligned and the board
+    // geometry stays trivially predictable.
+    TSharedRef<SWidget> RotateFortyFive(const TSharedRef<SWidget>& Inner)
+    {
+        return SNew(SBox)
+            .RenderTransform(TOptional<FSlateRenderTransform>(FSlateRenderTransform(FQuat2D(FMath::DegreesToRadians(45.0f)))))
+            .RenderTransformPivot(FVector2D(0.5, 0.5))
+            [
+                Inner
             ];
     }
 }
@@ -266,6 +328,55 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
                 // The screen plate carries the cyan identity rail: the front
                 // end belongs to the player/system family.
                 MakePlate(PanelContent, Panel, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space24))
+            ]
+        ];
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
+    const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth) const
+{
+    // Header band, 88 tall at bg/raised on the cyan identity rail: h1 title
+    // with the meta caption beneath it, the screen's own controls pinned to
+    // the right of the same band. Zones are separated by the band, never by
+    // whitespace.
+    TSharedRef<SVerticalBox> Root = SNew(SVerticalBox);
+    Root->AddSlot().AutoHeight()
+    [
+        SNew(SBox).HeightOverride(88.0f)
+        [
+            MakePlate(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()[MenuText(Title, BreakerUI::TypeH1, Primary, true)]
+                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                    [
+                        MenuText(Meta, BreakerUI::TypeCaption, Muted, true)
+                    ]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space40, 0.0f, 0.0f, 0.0f)
+                [
+                    HeaderRight
+                ],
+                BreakerUI::BgRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space8))
+        ]
+    ];
+    Root->AddSlot().FillHeight(1.0f).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)[Body];
+    Root->AddSlot().AutoHeight()[Footer];
+
+    return SNew(SOverlay)
+        + SOverlay::Slot()
+        [
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(Background)
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
+        [
+            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(1000.0f)
+            [
+                Root
             ]
         ];
 }
@@ -630,6 +741,19 @@ namespace
         }
     }
 
+    FString ClassDisplayName(EBreakerClassId ClassId)
+    {
+        switch (ClassId)
+        {
+            case EBreakerClassId::Caster:   return TEXT("CASTER");
+            case EBreakerClassId::Swift:    return TEXT("SWIFT");
+            case EBreakerClassId::Gunsmith: return TEXT("GUNSMITH");
+            case EBreakerClassId::Tank:     return TEXT("TANK");
+            case EBreakerClassId::Support:  return TEXT("SUPPORT");
+            default:                        return TEXT("UNCLASSED");
+        }
+    }
+
     FString TierLabel(int32 Tier)
     {
         return Tier < 0 ? TEXT("T-1") : FString::Printf(TEXT("T%d"), Tier);
@@ -698,13 +822,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ];
     };
 
-    // Left column: the Breaker panel — silhouette placeholder plus the live
-    // totals the equipped gear currently grants.
-    TSharedRef<SVerticalBox> CharacterPanel = SNew(SVerticalBox);
-    CharacterPanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("BREAKER")), 12, Cyan, true)];
-    CharacterPanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)
+    // ---- Character column, 560 wide (UI-Inventory-Spec "Zones") -----------
+    // Render slot on top, gear totals pinned beneath it so the numbers are
+    // always on screen with the doll. The old single printf blob is gone:
+    // the spec wants aligned label/value rows with the value coloured by its
+    // function family.
+    TSharedRef<SVerticalBox> CharacterColumn = SNew(SVerticalBox);
+    CharacterColumn->AddSlot().FillHeight(1.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
-        SNew(SBox).HeightOverride(240.0f)
+        SNew(SBox).MinDesiredHeight(300.0f)
         [
             // The render slot keeps full geometry while empty: the doll never
             // looks broken, only unfinished.
@@ -716,26 +842,93 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 BreakerUI::BgRaised, BorderEmphasis, FMargin(BreakerUI::Space16))
         ]
     ];
-    if (Equipment)
     {
-        const FBreakerEquipmentStats& Stats = Equipment->GetStats();
-        const FString StatText = FString::Printf(
-            TEXT("HEALTH BONUS     +%.0f\nCRIT CHANCE      +%.1f%%\nCRIT DAMAGE      +%.1f%%\nMOVE SPEED       x%.2f\nSLIDE SPEED      x%.2f\nAIR CONTROL      x%.2f\nDASH COOLDOWN    x%.2f\nPHYS DR          %.1f%%\nDROP CHANCE      +%.1f%%\nMAX RESOURCE     +%.0f\nRESOURCE REGEN   +%.1f/s"),
-            Stats.BonusHealth, Stats.CriticalChanceBonus * 100.0f, Stats.CriticalMultiplierBonus * 100.0f,
-            Stats.MoveSpeedMultiplier, Stats.SlideSpeedMultiplier, Stats.AirControlMultiplier, Stats.DashCooldownMultiplier,
-            Stats.PhysicalDamageReductionPercent, Stats.DropChancePercent, Stats.BonusMaxResource, Stats.ResourceRegenPerSecond);
-        CharacterPanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("GEAR TOTALS")), 10, SoftText, true)];
-        CharacterPanel->AddSlot().AutoHeight()[MenuText(FText::FromString(StatText), 10, Primary)];
+        TSharedRef<SVerticalBox> Totals = SNew(SVerticalBox);
+        Totals->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(FText::FromString(TEXT("GEAR TOTALS")), BreakerUI::TypeCaption, Muted, true)
+        ];
+        auto AddTotalRow = [&Totals](const FString& Label, const FString& Value, const FLinearColor& ValueColor)
+        {
+            Totals->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    // Fixed value column so the numbers form a straight edge
+                    // and never reflow as they tick.
+                    SNew(SBox).WidthOverride(104.0f).HAlign(HAlign_Right)
+                    [
+                        MenuText(FText::FromString(Value), BreakerUI::TypeCaption, ValueColor, true)
+                    ]
+                ]
+            ];
+        };
+        if (Equipment)
+        {
+            const FBreakerEquipmentStats& Stats = Equipment->GetStats();
+            // Value colour is the FIELDPLATE function family: player/system
+            // survivability and movement cyan, weapon stats orange, reward
+            // gold. (There is no gear-granted shield stat yet — health is the
+            // cyan survivability row until one exists.)
+            AddTotalRow(TEXT("HEALTH"), FString::Printf(TEXT("+%.0f"), Stats.BonusHealth), Cyan);
+            AddTotalRow(TEXT("MAX RESOURCE"), FString::Printf(TEXT("+%.0f"), Stats.BonusMaxResource), Cyan);
+            AddTotalRow(TEXT("RESOURCE REGEN"), FString::Printf(TEXT("+%.1f/s"), Stats.ResourceRegenPerSecond), Cyan);
+            AddTotalRow(TEXT("PHYS DR"), FString::Printf(TEXT("%.1f%%"), Stats.PhysicalDamageReductionPercent), Cyan);
+            AddTotalRow(TEXT("MOVE SPEED"), FString::Printf(TEXT("x%.2f"), Stats.MoveSpeedMultiplier), Cyan);
+            AddTotalRow(TEXT("SLIDE SPEED"), FString::Printf(TEXT("x%.2f"), Stats.SlideSpeedMultiplier), Cyan);
+            AddTotalRow(TEXT("AIR CONTROL"), FString::Printf(TEXT("x%.2f"), Stats.AirControlMultiplier), Cyan);
+            AddTotalRow(TEXT("DASH COOLDOWN"), FString::Printf(TEXT("x%.2f"), Stats.DashCooldownMultiplier), Cyan);
+            AddTotalRow(TEXT("WEAPON DAMAGE"), FString::Printf(TEXT("x%.2f"), Stats.WeaponDamageMultiplier), BreakerUI::Orange);
+            AddTotalRow(TEXT("CRIT CHANCE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalChanceBonus * 100.0f), BreakerUI::Orange);
+            AddTotalRow(TEXT("CRIT DAMAGE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalMultiplierBonus * 100.0f), BreakerUI::Orange);
+            AddTotalRow(TEXT("DROP CHANCE"), FString::Printf(TEXT("+%.1f%%"), Stats.DropChancePercent), Amber);
+        }
+        else
+        {
+            Totals->AddSlot().AutoHeight()
+            [
+                MenuText(FText::FromString(TEXT("NO EQUIPMENT COMPONENT")), BreakerUI::TypeCaption, Disabled, true)
+            ];
+        }
+        CharacterColumn->AddSlot().AutoHeight()
+        [
+            MakePlate(Totals, PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space16))
+        ];
     }
 
-    // Right side: gear slots arranged top-down like the body — head to
-    // boots, weapons last.
-    TSharedRef<SVerticalBox> LeftSlots = SNew(SVerticalBox);
-    TSharedRef<SVerticalBox> RightSlots = SNew(SVerticalBox);
-    const EBreakerEquipSlot LeftColumn[] = { EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Primary };
-    const EBreakerEquipSlot RightColumn[] = { EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Secondary };
-    for (const EBreakerEquipSlot Slot : LeftColumn) LeftSlots->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
-    for (const EBreakerEquipSlot Slot : RightColumn) RightSlots->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
+    // ---- Equipment column, 400 wide ---------------------------------------
+    // Eight slots as full-width rows in wear order — head to foot, then
+    // trinkets, then weapons — rather than the old two-column split.
+    static const EBreakerEquipSlot WearOrder[] =
+    {
+        EBreakerEquipSlot::Helmet,
+        EBreakerEquipSlot::BodyArmour,
+        EBreakerEquipSlot::Gloves,
+        EBreakerEquipSlot::Waist,
+        EBreakerEquipSlot::Boots,
+        EBreakerEquipSlot::Necklace,
+        EBreakerEquipSlot::Primary,
+        EBreakerEquipSlot::Secondary,
+    };
+    TSharedRef<SVerticalBox> EquipRows = SNew(SVerticalBox);
+    for (const EBreakerEquipSlot Slot : WearOrder)
+    {
+        EquipRows->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
+    }
+    TSharedRef<SVerticalBox> EquipmentColumn = SNew(SVerticalBox);
+    EquipmentColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+    [
+        MenuText(FText::FromString(TEXT("EQUIPPED — CLICK TO UNEQUIP")), BreakerUI::TypeCaption, Muted, true)
+    ];
+    EquipmentColumn->AddSlot().FillHeight(1.0f)
+    [
+        SNew(SScrollBox) + SScrollBox::Slot()[EquipRows]
+    ];
 
     // Bottom: backpack grid — best rarity first, optional slot filter,
     // cards grow to fit their affix list so nothing truncates. Fixed rows of
@@ -782,7 +975,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             return FReply::Handled();
         });
 
-        if (BackpackCardIndex % 3 == 0)
+        // Fixed rows of two, never a wrap box: SWrapBox measured by allotted
+        // width inside a scroll box oscillates between two layouts every
+        // frame. Two because the backpack zone is what is left of the panel
+        // after the 560 character column and the 400 equipment column.
+        if (BackpackCardIndex % 2 == 0)
         {
             BackpackRow = SNew(SHorizontalBox);
             BackpackGrid->AddSlot().AutoHeight()[BackpackRow.ToSharedRef()];
@@ -965,69 +1162,143 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         AddDevChip(50);
     }
 
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[BuildScreenTabs(EBreakerMenuScreen::Inventory)];
-    Body->AddSlot().AutoHeight()
+    // ---- Backpack zone -----------------------------------------------------
+    // Filter bar 64 tall carrying the slot chips and the input hint, then the
+    // card grid. The spec puts the input hints here, which is why the screen
+    // has no footer.
+    TSharedRef<SVerticalBox> BackpackColumn = SNew(SVerticalBox);
+    BackpackColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()
+        SNew(SBox).HeightOverride(64.0f)
         [
-            SNew(SBox).WidthOverride(250.0f)[CharacterPanel]
+            MakePlate(
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+                    [
+                        MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK %d/%d"), BackpackItems.Num(), TotalBackpackCount)), BreakerUI::TypeCaption, Primary, true)
+                    ]
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[FilterRow]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                    [
+                        MenuText(FText::FromString(TEXT("RMB / X DISCARD · LMB EQUIP")), BreakerUI::TypeCaption, Muted, true)
+                    ]
+                ],
+                Panel, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space8))
         ]
-        + SHorizontalBox::Slot().FillWidth(1.0f).Padding(16.0f, 0.0f, 0.0f, 0.0f)
-        [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("EQUIPPED — click to unequip")), 10, SoftText, true)]
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().FillWidth(1.0f).Padding(0.0f, 0.0f, 6.0f, 0.0f)[LeftSlots]
-                + SHorizontalBox::Slot().FillWidth(1.0f)[RightSlots]
-            ]
-        ]
-    ];
-    // Header band: one fixed row carrying label + filters + cleanup so it
-    // stays put above the scrolling grid.
-    Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 6.0f)
-    [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
-        [
-            MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK (%d/%d) — click equip / right-click or X discard"), BackpackItems.Num(), TotalBackpackCount)), 10, SoftText, true)
-        ]
-        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[FilterRow]
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[CleanupRow]
     ];
     if (bDevTools)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[DevRow];
+        BackpackColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[DevRow];
     }
     if (!InventoryStatus.IsEmpty())
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[MenuText(InventoryStatus, 9, Amber, true)];
+        BackpackColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(InventoryStatus, BreakerUI::TypeCaption, Amber, true)
+        ];
     }
-    Body->AddSlot().FillHeight(1.0f)
+    BackpackColumn->AddSlot().FillHeight(1.0f)
     [
-        SNew(SBox).MinDesiredHeight(280.0f)
-        [
-            BackpackItems.IsEmpty()
-                ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("Empty. Enemy kills drop rolled items.")), 11, SoftText))
-                : StaticCastSharedRef<SWidget>(SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid])
-        ]
+        BackpackItems.IsEmpty()
+            ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("Empty. Enemy kills drop rolled items.\nLoot is found by colour.")), BreakerUI::TypeBody, SoftText))
+            : StaticCastSharedRef<SWidget>(SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid])
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
+
+    // ---- Header band -------------------------------------------------------
+    // The two equip-limit counters live here permanently, so the constraint is
+    // never a surprise at click time. Both counts are derived locally from the
+    // equipped list: UBreakerEquipmentComponent has no rarity-count accessor,
+    // and adding one would mean editing a file this pass does not own.
+    int32 AberrantEquipped = 0;
+    int32 AnomalousEquipped = 0;
+    if (Equipment)
+    {
+        for (const FBreakerItemInstance& EquippedItem : Equipment->GetEquipped())
+        {
+            if (!EquippedItem.IsValid()) continue;
+            if (EquippedItem.Rarity == EBreakerItemRarity::Aberrant) ++AberrantEquipped;
+            else if (EquippedItem.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousEquipped;
+        }
+    }
+
+    auto MakeLimitChip = [](const FString& Label, int32 Count, int32 Limit, const FLinearColor& Rail, bool bFullBorder) -> TSharedRef<SWidget>
+    {
+        return MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, true)]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("%d/%d"), Count, Limit)), BreakerUI::TypeH2,
+                    Count >= Limit ? Rail : Primary, true)
+            ],
+            PanelRaised, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space4), false,
+            bFullBorder ? Rail : BreakerUI::BorderRest);
+    };
+
+    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Inventory)];
+    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    // O11: up to three Aberrant equipped, one Anomalous. Aberrant takes the
+    // harm rail (it shares that hue by design); Anomalous is the one rarity
+    // that is also a world object class, so it takes the teal rail AND the
+    // full teal border — the single legal teal on this screen.
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
     [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            SNew(SBox).WidthOverride(180.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
-        ]
-        + SHorizontalBox::Slot().FillWidth(1.0f).Padding(14.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
-        [
-            MenuText(FText::FromString(TEXT("Stats apply immediately  |  I or ESC to close")), 9, SoftText)
-        ]
+        MakeLimitChip(TEXT("ABERRANT"), AberrantEquipped, 3, BreakerUI::RarityAberrant, false)
     ];
-    return BuildFrame(FText::FromString(TEXT("INVENTORY")), FText::FromString(TEXT("BREAKER / EQUIPMENT / BACKPACK")), Body, 1120.0f);
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+    [
+        MakeLimitChip(TEXT("ANOMALOUS"), AnomalousEquipped, 1, BreakerUI::RarityAnomalous, true)
+    ];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[CleanupRow];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+    ];
+
+    // Meta line. Gear score is the sum of equipped item levels — O2
+    // PLACEHOLDER, the shipping formula is not authored yet.
+    UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    int32 GearScore = 0;
+    if (Equipment)
+    {
+        for (const FBreakerItemInstance& EquippedItem : Equipment->GetEquipped())
+        {
+            if (EquippedItem.IsValid()) GearScore += EquippedItem.ItemLevel;
+        }
+    }
+    const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · LV %d · GEAR SCORE %s"),
+        *ClassDisplayName(Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None),
+        Progression ? Progression->GetProgressionState().CharacterLevel : 1,
+        *BreakerUI::FormatTicker(static_cast<float>(GearScore)));
+
+    // ---- Zones -------------------------------------------------------------
+    TSharedRef<SHorizontalBox> Body = SNew(SHorizontalBox);
+    Body->AddSlot().AutoWidth()
+    [
+        SNew(SBox).WidthOverride(560.0f)[CharacterColumn]
+    ];
+    Body->AddSlot().AutoWidth().Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(400.0f)[EquipmentColumn]
+    ];
+    Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        BackpackColumn
+    ];
+
+    // No footer by design (UI-Inventory-Spec "Zones"): the input hints live in
+    // the backpack filter bar and BACK sits in the header band.
+    return BuildZonedFrame(
+        FText::FromString(TEXT("LOADOUT")),
+        FText::FromString(MetaLine),
+        HeaderRight,
+        Body,
+        SNullWidget::NullWidget,
+        1760.0f);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
@@ -1364,6 +1635,208 @@ namespace
         }
         return true;
     }
+
+    // -----------------------------------------------------------------------
+    // Path-board node kinds (UI-Skill-Tree-Spec "Class <-> Core").
+    //
+    // INTEGRATION: UBreakerProgressionNode carries no node-kind field, so the
+    // kind is derived from rules the content already states. When a Kind enum
+    // lands on the node asset, delete this and read it directly.
+    //   Keystone    — the authored cornerstone flag
+    //   Minor       — anything multi-rank (the rank prints inside the marker)
+    //   Convergence — single-rank nodes costing 3+ points (the O21 promotion
+    //                 tier: Fixate/Necrosis/Reflex all sit here)
+    //   Notable     — everything else
+    // -----------------------------------------------------------------------
+    enum class ESkillMarkerKind : uint8 { Minor, Notable, Convergence, Keystone };
+
+    ESkillMarkerKind ClassifyNode(const UBreakerProgressionNode* Node)
+    {
+        if (!Node) return ESkillMarkerKind::Minor;
+        if (Node->bCornerstone) return ESkillMarkerKind::Keystone;
+        if (Node->MaxRank > 1) return ESkillMarkerKind::Minor;
+        if (Node->CostPerRank >= 3) return ESkillMarkerKind::Convergence;
+        return ESkillMarkerKind::Notable;
+    }
+
+    float MarkerSize(ESkillMarkerKind Kind)
+    {
+        switch (Kind)
+        {
+            case ESkillMarkerKind::Notable:     return 44.0f;
+            case ESkillMarkerKind::Convergence: return 64.0f;
+            case ESkillMarkerKind::Keystone:    return 60.0f;
+            default:                            return 48.0f;
+        }
+    }
+
+    bool MarkerIsDiamond(ESkillMarkerKind Kind)
+    {
+        return Kind == ESkillMarkerKind::Notable || Kind == ESkillMarkerKind::Keystone;
+    }
+
+    // Convergence and Keystone label to the RIGHT of the marker so the trunk
+    // never runs through their text.
+    bool MarkerLabelsRight(ESkillMarkerKind Kind)
+    {
+        return Kind == ESkillMarkerKind::Convergence || Kind == ESkillMarkerKind::Keystone;
+    }
+
+    FString MarkerKindLabel(ESkillMarkerKind Kind)
+    {
+        switch (Kind)
+        {
+            case ESkillMarkerKind::Notable:     return TEXT("NOTABLE");
+            case ESkillMarkerKind::Convergence: return TEXT("CONVERGENCE");
+            case ESkillMarkerKind::Keystone:    return TEXT("KEYSTONE");
+            default:                            return TEXT("MINOR");
+        }
+    }
+
+    // Everything the hover rail prints, captured by value at build time. The
+    // hover handler therefore touches no live widget tree and no attribute —
+    // the rail is event-driven, never polled.
+    struct FSkillNodeView
+    {
+        FString Name;
+        FString Kind;
+        FString RankLine;
+        FString CostLine;
+        FString Description;
+        FString ActionLine;
+        FString GateLine;
+        TArray<FString> EffectLines;
+        TArray<FString> PrereqLines;
+        bool bOwned = false;
+        bool bPurchasable = false;
+        bool bMaxed = false;
+    };
+
+    FSkillNodeView MakeSkillNodeView(const UBreakerProgressionNode* Node, int32 Rank, bool bPurchasable,
+        const FString& LockReason, int32 TreeSpent)
+    {
+        FSkillNodeView View;
+        if (!Node) return View;
+        const ESkillMarkerKind Kind = ClassifyNode(Node);
+        View.Name = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
+        View.Kind = MarkerKindLabel(Kind) + (Node->bCornerstone ? TEXT("  ·  CORNERSTONE") : TEXT(""));
+        View.bOwned = Rank > 0;
+        View.bMaxed = Rank >= Node->MaxRank;
+        View.bPurchasable = bPurchasable;
+        View.RankLine = View.bMaxed ? FString(TEXT("MAXED")) : RankLabel(Rank, Node->MaxRank);
+        View.CostLine = FString::Printf(TEXT("%d %s PER RANK"), Node->CostPerRank, *CurrencyLabel(Node->Currency));
+        View.Description = Node->Description.IsEmpty() ? TEXT("—") : Node->Description.ToString();
+        View.ActionLine = View.bMaxed
+            ? FString(TEXT("MAXED"))
+            : (bPurchasable ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1) : LockReason);
+        for (const FBreakerNodeEffect& Effect : Node->Effects) View.EffectLines.Add(FormatNodeEffect(Effect));
+        for (const FName AbilityId : Node->GrantedAbilityIds) View.EffectLines.Add(FString::Printf(TEXT("GRANTS %s"), *AbilityId.ToString().ToUpper()));
+        for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
+        {
+            View.PrereqLines.Add(FString::Printf(TEXT("%s RANK %d"), *Prereq.NodeId.ToString().ToUpper(), Prereq.RequiredRank));
+        }
+        if (Node->RequiredTreeInvestment > 0)
+        {
+            View.GateLine = FString::Printf(TEXT("TIER GATE %d / %d"), TreeSpent, Node->RequiredTreeInvestment);
+        }
+        return View;
+    }
+
+    // The 420px rail's card. Fixed width comes from the host box, so this can
+    // grow vertically without ever moving the board.
+    TSharedRef<SWidget> MakeSkillDetailCard(const FSkillNodeView& View)
+    {
+        const FLinearColor Rail = View.bOwned ? BreakerUI::Cyan
+            : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::BorderEmphasis);
+
+        TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+        Column->AddSlot().AutoHeight()
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(View.Name))
+            .ColorAndOpacity(BreakerUI::TextPrimary)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeH2))
+            .AutoWrapText(true)
+        ];
+        Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(FText::FromString(View.Kind), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+        ];
+        Column->AddSlot().AutoHeight()
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(View.RankLine), BreakerUI::TypeCaption, View.bOwned ? BreakerUI::Cyan : BreakerUI::TextMuted, true)]
+            + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(View.CostLine), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
+        ];
+        Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)
+        [
+            SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BreakerUI::BorderRest)]
+        ];
+        Column->AddSlot().AutoHeight()
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(View.Description))
+            .ColorAndOpacity(BreakerUI::TextSecondary)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
+            .AutoWrapText(true)
+        ];
+        if (View.EffectLines.Num() > 0)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+            [
+                MenuText(FText::FromString(TEXT("EFFECTS PER RANK")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+            for (const FString& Line : View.EffectLines)
+            {
+                Column->AddSlot().AutoHeight()[MenuText(FText::FromString(Line), BreakerUI::TypeCaption, BreakerUI::TextPrimary, true)];
+            }
+        }
+        if (View.PrereqLines.Num() > 0)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+            [
+                MenuText(FText::FromString(TEXT("PREREQUISITES")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+            for (const FString& Line : View.PrereqLines)
+            {
+                Column->AddSlot().AutoHeight()[MenuText(FText::FromString(Line), BreakerUI::TypeCaption, BreakerUI::TextSecondary, true)];
+            }
+        }
+        if (!View.GateLine.IsEmpty())
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(View.GateLine), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+        }
+        if (!View.ActionLine.IsEmpty())
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(View.ActionLine), BreakerUI::TypeCaption,
+                    View.bMaxed ? BreakerUI::Cyan : (View.bPurchasable ? BreakerUI::Gold : BreakerUI::Harm), true)
+            ];
+        }
+        return MakePlate(Column, BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space16));
+    }
+
+    // Rest state of the rail. It is the same plate geometry as a populated
+    // card, so the column never changes shape when a node is hovered.
+    TSharedRef<SWidget> MakeSkillDetailPlaceholder()
+    {
+        return MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("NODE DETAIL")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(TEXT("Hover a marker to read its full detail here. This column never changes width, so the board does not move when it fills.")))
+                .ColorAndOpacity(BreakerUI::TextSecondary)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
+                .AutoWrapText(true)
+            ],
+            BreakerUI::Panel00, BreakerUI::BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space16));
+    }
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
@@ -1371,50 +1844,693 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
     const TArray<const UBreakerProgressionTree*> Trees = ProgressionGatherTrees(Progression);
 
+    // One tab pair, not a mode toggle: the board swaps, the header and the
+    // detail rail persist.
+    TArray<const UBreakerProgressionTree*> ClassTrees;
+    TArray<const UBreakerProgressionTree*> CoreTrees;
+    for (const UBreakerProgressionTree* Tree : Trees)
+    {
+        if (!Tree) continue;
+        if (Tree->Currency == EBreakerPointCurrency::ClassPoints) ClassTrees.Add(Tree);
+        else CoreTrees.Add(Tree);
+    }
+    if (SkillBoardTab == 0 && ClassTrees.IsEmpty() && !CoreTrees.IsEmpty()) SkillBoardTab = 1;
+    if (SkillBoardTab == 1 && CoreTrees.IsEmpty() && !ClassTrees.IsEmpty()) SkillBoardTab = 0;
+    const bool bCoreBoard = SkillBoardTab == 1;
+
     const int32 UnspentClass = ProgressionGetUnspent(Progression, EBreakerPointCurrency::ClassPoints);
     const int32 UnspentCore = ProgressionGetUnspent(Progression, EBreakerPointCurrency::CorePoints);
 
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];
+    int32 ClassSpent = 0;
+    int32 CoreSpent = 0;
+    for (const UBreakerProgressionTree* Tree : ClassTrees)
+    {
+        int32 Spent = 0;
+        int32 Total = 0;
+        ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+        ClassSpent += Spent;
+    }
+    for (const UBreakerProgressionTree* Tree : CoreTrees)
+    {
+        int32 Spent = 0;
+        int32 Total = 0;
+        ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+        CoreSpent += Spent;
+    }
 
-    // Two point counters as separate railed chips — class points cyan, core
-    // points gold — so the two currencies are never read as one pool.
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+    // The fixed 420px detail rail, built before the board so hover handlers
+    // have a target. It is filled through SetContent on hover and never from
+    // a per-frame attribute, and its width never changes, so populating it
+    // cannot reflow the board.
+    SAssignNew(SkillDetailHost, SBox).WidthOverride(420.0f)
     [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-        [
-            MakePlate(
-                SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("CLASS POINTS")), BreakerUI::TypeCaption, Muted, true)]
-                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("%d UNSPENT"), UnspentClass)), BreakerUI::TypeH2, Cyan, true)],
-                PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space8))
-        ]
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            MakePlate(
-                SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("CORE POINTS")), BreakerUI::TypeCaption, Muted, true)]
-                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("%d UNSPENT"), UnspentCore)), BreakerUI::TypeH2, Amber, true)],
-                PanelRaised, Amber, FMargin(BreakerUI::Space16, BreakerUI::Space8))
-        ]
+        MakeSkillDetailPlaceholder()
     ];
+
+    // Live purchasable count for the footer, over the visible board only.
+    int32 PurchasableCount = 0;
+    {
+        const TArray<const UBreakerProgressionTree*>& VisibleTrees = bCoreBoard ? CoreTrees : ClassTrees;
+        for (const UBreakerProgressionTree* Tree : VisibleTrees)
+        {
+            int32 Spent = 0;
+            int32 Total = 0;
+            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                FString Ignored;
+                if (SkillNodeIsPurchasable(Progression, Tree, Node, Spent, Ignored)) ++PurchasableCount;
+            }
+        }
+    }
+
+    // Wires one marker. Markers are never disabled: a locked node still has to
+    // explain itself on hover, and a disabled SButton fires no hover events.
+    auto WireMarker = [this](const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node,
+        const FSkillNodeView& View, bool bPurchasable, const FString& LockReason,
+        const FLinearColor& Fill, const FLinearColor& Ring, float RingThickness,
+        const TSharedRef<SWidget>& Inner) -> TSharedRef<SWidget>
+    {
+        return BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(Fill)
+            .ContentPadding(FMargin(0.0f))
+            .HAlign(HAlign_Center)
+            .VAlign(VAlign_Center)
+            .OnHovered(FSimpleDelegate::CreateLambda([this, View]()
+            {
+                if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View));
+            }))
+            .OnClicked(FOnClicked::CreateLambda([this, Tree, Node, bPurchasable, LockReason]()
+            {
+                if (!Node) return FReply::Handled();
+                if (!bPurchasable)
+                {
+                    // The action is never silently swallowed: it is disclosed.
+                    SkillTreeStatus = FText::FromString(LockReason.IsEmpty() ? FString(TEXT("LOCKED")) : LockReason);
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    return FReply::Handled();
+                }
+                UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                // SHIFT buys to max. The modifier state is read once, here, on
+                // the click itself — never polled from a per-frame attribute,
+                // which is the pattern that made this screen jitter before.
+                const bool bToMax = FSlateApplication::IsInitialized() && FSlateApplication::Get().GetModifierKeys().IsShiftDown();
+                FText FailureReason;
+                int32 Bought = 0;
+                while (ProgressionPurchaseNode(Prog, Tree, Node->NodeId, FailureReason))
+                {
+                    ++Bought;
+                    if (!bToMax || Bought >= Node->MaxRank) break;
+                }
+                if (Bought > 0)
+                {
+                    const int32 NewRank = ProgressionGetNodeRank(Prog, Node->NodeId, Node->Currency);
+                    SkillTreeStatus = FText::FromString(PurchaseFeedback(Node, NewRank));
+                    if (Character.IsValid()) Character->SaveGameState();
+                }
+                else
+                {
+                    SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("PURCHASE FAILED")) : FailureReason;
+                }
+                Rebuild(EBreakerMenuScreen::SkillTrees);
+                return FReply::Handled();
+            }))
+            [
+                Inner
+            ],
+            Ring, RingThickness);
+    };
+
+    // Shared empty-board plate. Every one of these paths exists today and is
+    // reachable: no character, no class, no registered content.
+    auto MakeEmptyBoard = [](const FString& Message) -> TSharedRef<SWidget>
+    {
+        return MakePlate(
+            SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(Message), BreakerUI::TypeBody, BreakerUI::TextSecondary)
+            ],
+            BreakerUI::Panel00, BreakerUI::BorderEmphasis, FMargin(BreakerUI::Space24, BreakerUI::Space24));
+    };
+
+    // ---- Class board: PATHS, not a card grid -------------------------------
+    auto BuildClassBoard = [&]() -> TSharedRef<SWidget>
+    {
+        if (ClassTrees.IsEmpty())
+        {
+            return MakeEmptyBoard(TEXT("[ NO CLASS BRANCHES ]\n\nLock a Breaker class, or register class branch trees,\nand the path board draws here."));
+        }
+
+        const float GutterWidth = 76.0f;    // the dedicated tier-gate gutter
+        const float TierHeight = 190.0f;
+        const float TopPad = 28.0f;
+        const float NodeSpacing = 176.0f;
+        const float LabelWidth = 168.0f;
+
+        TArray<int32> Tiers;
+        for (const UBreakerProgressionTree* Tree : ClassTrees)
+        {
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                if (Node) Tiers.AddUnique(Node->Tier);
+            }
+        }
+        Tiers.Sort();
+        if (Tiers.Num() == 0)
+        {
+            return MakeEmptyBoard(TEXT("[ NO NODES AUTHORED ]\n\nThe class branches carry no nodes yet."));
+        }
+
+        TArray<int32> BranchSpent;
+        TArray<int32> BranchTotal;
+        TArray<float> ColumnWidth;
+        for (const UBreakerProgressionTree* Tree : ClassTrees)
+        {
+            int32 Spent = 0;
+            int32 Total = 0;
+            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+            BranchSpent.Add(Spent);
+            BranchTotal.Add(Total);
+
+            int32 Widest = 1;
+            for (const int32 Tier : Tiers)
+            {
+                int32 Count = 0;
+                for (const UBreakerProgressionNode* Node : Tree->Nodes)
+                {
+                    if (Node && Node->Tier == Tier) ++Count;
+                }
+                Widest = FMath::Max(Widest, Count);
+            }
+            // Column is sized to the widest tier row it must hold, so the
+            // labels of neighbouring nodes cannot collide.
+            ColumnWidth.Add(FMath::Max(360.0f, Widest * NodeSpacing));
+        }
+
+        float FieldWidth = GutterWidth;
+        for (const float Width : ColumnWidth) FieldWidth += Width;
+        // Convergence/Keystone labels sit to the right of their marker, so the
+        // board is a label wider than the field.
+        const float BoardWidth = FieldWidth + LabelWidth;
+        const float BoardHeight = TopPad + Tiers.Num() * TierHeight + 40.0f;
+
+        TSharedRef<SCanvas> Canvas = SNew(SCanvas);
+
+        // Tier gates: one dashed hairline across the field, labelled ONCE in
+        // the 76px gutter, so a gate label can never land on node copy.
+        for (int32 TierIndex = 0; TierIndex < Tiers.Num(); ++TierIndex)
+        {
+            const float TierTop = TopPad + TierIndex * TierHeight;
+            int32 Gate = 0;
+            for (const UBreakerProgressionTree* Tree : ClassTrees)
+            {
+                for (const UBreakerProgressionNode* Node : Tree->Nodes)
+                {
+                    if (Node && Node->Tier == Tiers[TierIndex]) Gate = FMath::Max(Gate, Node->RequiredTreeInvestment);
+                }
+            }
+
+            Canvas->AddSlot()
+                .Position(FVector2D(GutterWidth, TierTop))
+                .Size(FVector2D(FieldWidth - GutterWidth, 1.0f))
+                [
+                    DashedLine(FieldWidth - GutterWidth, BorderEmphasis)
+                ];
+            Canvas->AddSlot()
+                .Position(FVector2D(0.0f, TierTop + BreakerUI::Space8))
+                .Size(FVector2D(GutterWidth - BreakerUI::Space8, 40.0f))
+                [
+                    // Two short lines: tier, then gate cost.
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        MenuText(FText::FromString(FString::Printf(TEXT("TIER %d"), Tiers[TierIndex])), BreakerUI::TypeCaption, Muted, true)
+                    ]
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        MenuText(FText::FromString(FString::Printf(TEXT("GATE %d"), Gate)), BreakerUI::TypeCaption, Gate > 0 ? Amber : Muted, true)
+                    ]
+                ];
+        }
+
+        float ColumnX = GutterWidth;
+        for (int32 BranchIndex = 0; BranchIndex < ClassTrees.Num(); ++BranchIndex)
+        {
+            const UBreakerProgressionTree* Tree = ClassTrees[BranchIndex];
+            const float TrunkX = ColumnX + ColumnWidth[BranchIndex] * 0.5f;
+            const int32 Spent = BranchSpent[BranchIndex];
+
+            for (int32 TierIndex = 0; TierIndex < Tiers.Num(); ++TierIndex)
+            {
+                const float TierTop = TopPad + TierIndex * TierHeight;
+
+                TArray<const UBreakerProgressionNode*> TierNodes;
+                for (const UBreakerProgressionNode* Node : Tree->Nodes)
+                {
+                    if (Node && Node->Tier == Tiers[TierIndex]) TierNodes.Add(Node);
+                }
+
+                bool bRouteOwned = false;
+                for (const UBreakerProgressionNode* Node : TierNodes)
+                {
+                    if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) > 0) bRouteOwned = true;
+                }
+
+                // The trunk: one 2px line per branch running the full height,
+                // cyan where the route is owned and panel/20 where it is not.
+                AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop), FVector2D(TrunkX, TierTop + TierHeight),
+                    bRouteOwned ? Cyan : PanelHover);
+
+                for (int32 NodeIndex = 0; NodeIndex < TierNodes.Num(); ++NodeIndex)
+                {
+                    const UBreakerProgressionNode* Node = TierNodes[NodeIndex];
+                    const ESkillMarkerKind Kind = ClassifyNode(Node);
+                    const float Size = MarkerSize(Kind);
+                    const float NodeX = TrunkX + (NodeIndex - (TierNodes.Num() - 1) * 0.5f) * NodeSpacing;
+                    const float NodeY = TierTop + 76.0f;
+
+                    const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                    FString LockReason;
+                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason);
+                    const bool bOwned = Rank > 0;
+                    const bool bMaxed = Rank >= Node->MaxRank;
+
+                    // 2px diagonal dropping from the trunk to the marker.
+                    AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop + BreakerUI::Space8),
+                        FVector2D(NodeX, NodeY - Size * 0.5f), bOwned ? Cyan : PanelHover);
+
+                    const FLinearColor Fill = (bOwned || bPurchasable) ? PanelRaised : Panel;
+                    // Gold is the only border colour that means "spend now".
+                    const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderRest);
+                    const float RingThickness = (bOwned || bPurchasable) ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+
+                    // Multi-rank Minors carry their rank inside the marker;
+                    // every other kind is a bare shape with text beneath.
+                    TSharedRef<SWidget> Inner = (Kind == ESkillMarkerKind::Minor)
+                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::Printf(TEXT("%d/%d"), Rank, Node->MaxRank)),
+                            BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
+                        : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)));
+
+                    const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent);
+                    TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
+                    if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
+
+                    Canvas->AddSlot()
+                        .Position(FVector2D(NodeX - Size * 0.5f, NodeY - Size * 0.5f))
+                        .Size(FVector2D(Size, Size))
+                        [
+                            Marker
+                        ];
+
+                    // Name, number and state sit as plain text near the
+                    // marker — not inside a card.
+                    const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
+                    const FString StateLine = bMaxed
+                        ? FString(TEXT("MAXED"))
+                        : (bPurchasable
+                            ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
+                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : LockReason));
+                    const FLinearColor StateColor = bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted));
+
+                    TSharedRef<SVerticalBox> Label = SNew(SVerticalBox);
+                    Label->AddSlot().AutoHeight()
+                    [
+                        SNew(STextBlock)
+                        .Text(FText::FromString(NodeName))
+                        .ColorAndOpacity((bOwned || bPurchasable) ? Primary : Disabled)
+                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                        .AutoWrapText(true)
+                    ];
+                    Label->AddSlot().AutoHeight()
+                    [
+                        SNew(STextBlock)
+                        // The effect as a number, so the board is readable
+                        // without hovering anything.
+                        .Text(FText::FromString(PrimaryEffectLine(Node)))
+                        .ColorAndOpacity((bOwned || bPurchasable) ? SoftText : Disabled)
+                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+                        .AutoWrapText(true)
+                    ];
+                    if (!StateLine.IsEmpty())
+                    {
+                        Label->AddSlot().AutoHeight()
+                        [
+                            SNew(STextBlock)
+                            .Text(FText::FromString(StateLine))
+                            .ColorAndOpacity(StateColor)
+                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                            .AutoWrapText(true)
+                        ];
+                    }
+
+                    // Convergence and Keystone label to the RIGHT, so the
+                    // trunk never runs through their text.
+                    const bool bLabelRight = MarkerLabelsRight(Kind);
+                    Canvas->AddSlot()
+                        .Position(bLabelRight
+                            ? FVector2D(NodeX + Size * 0.5f + BreakerUI::Space16, NodeY - 34.0f)
+                            : FVector2D(NodeX - LabelWidth * 0.5f, NodeY + Size * 0.5f + BreakerUI::Space8))
+                        .Size(FVector2D(LabelWidth, 86.0f))
+                        [
+                            Label
+                        ];
+                }
+            }
+            ColumnX += ColumnWidth[BranchIndex];
+        }
+
+        // 60px branch header strip above the path field.
+        TSharedRef<SHorizontalBox> BranchStrip = SNew(SHorizontalBox);
+        BranchStrip->AddSlot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(GutterWidth)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+        ];
+        for (int32 BranchIndex = 0; BranchIndex < ClassTrees.Num(); ++BranchIndex)
+        {
+            const UBreakerProgressionTree* Tree = ClassTrees[BranchIndex];
+            const FString BranchName = TreeSelectorLabel(Tree);
+            BranchStrip->AddSlot().AutoWidth()
+            [
+                SNew(SBox).WidthOverride(ColumnWidth[BranchIndex]).Padding(FMargin(0.0f, 0.0f, BreakerUI::Space8, 0.0f))
+                [
+                    MakePlate(
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                        [
+                            MenuText(FText::FromString(BranchName), BreakerUI::TypeH2, BranchSpent[BranchIndex] > 0 ? Primary : SoftText, true)
+                        ]
+                        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                        [
+                            MenuText(FText::FromString(FString::Printf(TEXT("%d / %d INVESTED"), BranchSpent[BranchIndex], BranchTotal[BranchIndex])),
+                                BreakerUI::TypeCaption, Muted, true)
+                        ],
+                        BreakerUI::BgRaised, BranchSpent[BranchIndex] > 0 ? Cyan : BorderEmphasis,
+                        FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                ]
+            ];
+        }
+
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                SNew(SBox).HeightOverride(60.0f)[BranchStrip]
+            ]
+            + SVerticalBox::Slot().FillHeight(1.0f)
+            [
+                SNew(SScrollBox)
+                + SScrollBox::Slot()
+                [
+                    SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+                ]
+            ];
+    };
+
+    // ---- Core board: the spatial constellation map -------------------------
+    auto BuildCoreBoard = [&]() -> TSharedRef<SWidget>
+    {
+        if (CoreTrees.IsEmpty())
+        {
+            return MakeEmptyBoard(TEXT("[ NO CORE CONSTELLATIONS ]\n\nNo core-currency tree is registered yet."));
+        }
+
+        const UBreakerProgressionTree* CoreTree = CoreTrees[0];
+        int32 TreeSpent = 0;
+        int32 TreeTotal = 0;
+        ProgressionTreeInvestment(Progression, CoreTree, TreeSpent, TreeTotal);
+
+        struct FConstellationCluster
+        {
+            FString Name;
+            FString Prefix;
+            FVector2D Centre = FVector2D::ZeroVector;
+            bool bHub = false;
+            bool bSealed = false;
+            TArray<const UBreakerProgressionNode*> Nodes;
+        };
+
+        TArray<FConstellationCluster> Clusters;
+        auto AddCluster = [&Clusters](const TCHAR* Name, const TCHAR* Prefix, float X, float Y, bool bHub, bool bSealed)
+        {
+            FConstellationCluster Cluster;
+            Cluster.Name = FString(Name).ToUpper();
+            Cluster.Prefix = Prefix;
+            Cluster.Centre = FVector2D(X, Y);
+            Cluster.bHub = bHub;
+            Cluster.bSealed = bSealed;
+            Clusters.Add(MoveTemp(Cluster));
+        };
+        // Kinesis is the hub; the other clusters sit around it. Elements is
+        // sealed below centre.
+        AddCluster(TEXT("Kinesis"), TEXT("Core.Kinesis."), 520.0f, 350.0f, true, false);
+        AddCluster(TEXT("Precision"), TEXT("Core.Precision."), 190.0f, 130.0f, false, false);
+        AddCluster(TEXT("Volley"), TEXT("Core.Volley."), 850.0f, 130.0f, false, false);
+        AddCluster(TEXT("Affliction"), TEXT("Core.Affliction."), 190.0f, 570.0f, false, false);
+        AddCluster(TEXT("Bulwark"), TEXT("Core.Bulwark."), 850.0f, 570.0f, false, false);
+        AddCluster(TEXT("Elements"), TEXT("Core.Elements."), 520.0f, 660.0f, false, true);
+
+        // Constellation membership rides the NodeId prefix
+        // (Core.<Constellation>.<Node>) — the content library has no
+        // constellation field yet. When one lands, read it here instead.
+        TSet<FName> Claimed;
+        for (FConstellationCluster& Cluster : Clusters)
+        {
+            for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
+            {
+                if (!Node || !Node->NodeId.ToString().StartsWith(Cluster.Prefix)) continue;
+                Cluster.Nodes.Add(Node);
+                Claimed.Add(Node->NodeId);
+            }
+            Cluster.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
+        }
+        {
+            // A node authored outside the known prefixes must never silently
+            // vanish off the map.
+            FConstellationCluster Other;
+            Other.Name = TEXT("UNMAPPED");
+            Other.Centre = FVector2D(520.0f, 130.0f);
+            for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
+            {
+                if (Node && !Claimed.Contains(Node->NodeId)) Other.Nodes.Add(Node);
+            }
+            if (Other.Nodes.Num() > 0) Clusters.Add(MoveTemp(Other));
+        }
+
+        const float BoardWidth = 1060.0f;
+        const float BoardHeight = 800.0f;
+        const float PlateWidth = 300.0f;
+        const float PlateHeight = 156.0f;
+
+        TSharedRef<SCanvas> Canvas = SNew(SCanvas);
+
+        auto ClusterHasOwned = [Progression](const FConstellationCluster& Cluster)
+        {
+            for (const UBreakerProgressionNode* Node : Cluster.Nodes)
+            {
+                if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) > 0) return true;
+            }
+            return false;
+        };
+
+        // Convergence lines radiate from the hub. Drawn first so the plates
+        // paint over them.
+        const bool bHubOwned = ClusterHasOwned(Clusters[0]);
+        for (int32 Index = 1; Index < Clusters.Num(); ++Index)
+        {
+            const bool bLinked = bHubOwned && ClusterHasOwned(Clusters[Index]);
+            AddCanvasSegment(Canvas, Clusters[0].Centre, Clusters[Index].Centre, bLinked ? Cyan : PanelHover);
+        }
+
+        for (const FConstellationCluster& Cluster : Clusters)
+        {
+            int32 ClusterPurchasable = 0;
+            TSharedRef<SHorizontalBox> Grid = SNew(SHorizontalBox);
+            for (const UBreakerProgressionNode* Node : Cluster.Nodes)
+            {
+                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                FString LockReason;
+                const bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                if (bPurchasable) ++ClusterPurchasable;
+                const bool bOwned = Rank > 0;
+                const ESkillMarkerKind Kind = ClassifyNode(Node);
+
+                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelRaised : Panel;
+                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderRest);
+                const float RingThickness = (bOwned || bPurchasable) ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent);
+
+                // The cluster grid is a glance, not the path board: every kind
+                // draws at one compact size here, keeping its silhouette.
+                TSharedRef<SWidget> Chip = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness,
+                    Node->MaxRank > 1
+                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::FromInt(Rank)), BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
+                        : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))));
+                if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
+
+                Grid->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                [
+                    SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f)[Chip]
+                ];
+            }
+
+            // Elements is sealed, and reads in suppression teal: the one place
+            // teal is legal on this screen, because a rift is a world object,
+            // not chrome.
+            const FLinearColor Rail = Cluster.bSealed ? BreakerUI::TealHardware : (Cluster.bHub ? Cyan : BorderEmphasis);
+            const FLinearColor Border = Cluster.bSealed ? BreakerUI::TealHardware : BreakerUI::BorderRest;
+
+            TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
+            Inner->AddSlot().AutoHeight()
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(Cluster.Name), BreakerUI::TypeH2,
+                        Cluster.bSealed ? BreakerUI::TealHardware : Primary, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(Cluster.bHub ? TEXT("HUB") : TEXT("")), BreakerUI::TypeCaption, Cyan, true)
+                ]
+            ];
+            if (Cluster.Nodes.Num() == 0)
+            {
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(Cluster.bSealed ? TEXT("SEALED") : TEXT("NO NODES AUTHORED")),
+                        BreakerUI::TypeCaption, Cluster.bSealed ? BreakerUI::TealHardware : Muted, true)
+                ];
+                if (Cluster.bSealed)
+                {
+                    Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(TEXT("RIFT / ENTROPY / VOID")), BreakerUI::TypeCaption, Muted, true)
+                    ];
+                }
+            }
+            else
+            {
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)[Grid];
+                Inner->AddSlot().AutoHeight()
+                [
+                    MenuText(FText::FromString(FString::Printf(TEXT("%d NODES · %d PURCHASABLE"), Cluster.Nodes.Num(), ClusterPurchasable)),
+                        BreakerUI::TypeCaption, ClusterPurchasable > 0 ? Amber : Muted, true)
+                ];
+            }
+
+            Canvas->AddSlot()
+                .Position(FVector2D(Cluster.Centre.X - PlateWidth * 0.5f, Cluster.Centre.Y - PlateHeight * 0.5f))
+                .Size(FVector2D(PlateWidth, PlateHeight))
+                [
+                    MakePlate(Inner, PanelRaised, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space8), false, Border)
+                ];
+        }
+
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                SNew(SBox).HeightOverride(60.0f)
+                [
+                    MakePlate(
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                        [
+                            MenuText(FText::FromString(TEXT("CORE CONSTELLATIONS — KINESIS AT THE HUB")), BreakerUI::TypeH2, Primary, true)
+                        ]
+                        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                        [
+                            MenuText(FText::FromString(FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, TreeTotal)), BreakerUI::TypeCaption, Muted, true)
+                        ],
+                        BreakerUI::BgRaised, Amber, FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                ]
+            ]
+            + SVerticalBox::Slot().FillHeight(1.0f)
+            [
+                SNew(SScrollBox)
+                + SScrollBox::Slot()
+                [
+                    SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+                ]
+            ];
+    };
+
+    TSharedRef<SWidget> Board = Trees.IsEmpty()
+        ? MakeEmptyBoard(TEXT("[ NO TREE CONTENT ]\n\nThe progression component is not serving any trees yet.\nThe class branches and the core constellations appear\nhere once tree content is registered."))
+        : (bCoreBoard ? BuildCoreBoard() : BuildClassBoard());
+
+    // ---- Header zone -------------------------------------------------------
+    const EBreakerClassId PermanentClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · LV %d"),
+        *ClassDisplayName(PermanentClass),
+        Progression ? Progression->GetProgressionState().CharacterLevel : 1);
+
+    TSharedRef<SHorizontalBox> BoardTabs = SNew(SHorizontalBox);
+    auto AddBoardTab = [this, &BoardTabs, bCoreBoard](const FString& Label, int32 TabIndex)
+    {
+        const bool bActive = (bCoreBoard ? 1 : 0) == TabIndex;
+        BoardTabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bActive ? PanelHover : Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, TabIndex]()
+                {
+                    SkillBoardTab = TabIndex;
+                    SkillTreeStatus = FText::GetEmpty();
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bActive ? Primary : Muted, true)
+                ],
+                bActive ? Cyan : BorderEmphasis,
+                bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+        ];
+    };
+    AddBoardTab(FString::Printf(TEXT("CLASS · %s"), *ClassDisplayName(PermanentClass)), 0);
+    AddBoardTab(TEXT("CORE"), 1);
+
+    auto MakePointChip = [](const FString& Label, int32 Unspent, int32 Spent, const FLinearColor& Rail) -> TSharedRef<SWidget>
+    {
+        return MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::FromInt(Unspent)), BreakerUI::TypeH2, Rail, true)]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("/ %d SPENT"), Spent)), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)],
+            BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space4));
+    };
 
     // Dev-only recovery row: saves made before the slice seeding rule relaxed
     // can land here with a class chosen and zero points. Same
     // RiorsEdge.Playtest/DevClassSwap gate the class screen uses.
     bool bDevTools = false;
     GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevTools, GGameUserSettingsIni);
+
+    const EBreakerPointCurrency BoardCurrency = bCoreBoard ? EBreakerPointCurrency::CorePoints : EBreakerPointCurrency::ClassPoints;
+
+    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)[BoardTabs];
+    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    // Two counters as separate railed chips — class cyan, core gold — so the
+    // two currencies are never read as one pool.
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+    [
+        MakePointChip(TEXT("CLASS POINTS"), UnspentClass, ClassSpent, Cyan)
+    ];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+    [
+        MakePointChip(TEXT("CORE POINTS"), UnspentCore, CoreSpent, Amber)
+    ];
     if (bDevTools)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+        HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
         [
-            SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().AutoWidth()
-            [
+            BorderWrap(
                 SNew(SButton)
-                .ButtonColorAndOpacity(Amber)
-                .ContentPadding(FMargin(14.0f, 7.0f))
+                .ButtonColorAndOpacity(Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
                 .OnClicked(FOnClicked::CreateLambda([this]()
                 {
                     UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
@@ -1434,472 +2550,89 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     return FReply::Handled();
                 }))
                 [
-                    MenuText(FText::FromString(TEXT("DEV: GRANT SLICE POINTS")), 10, Background, true)
-                ]
-            ]
-            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(12.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
-            [
-                MenuText(FText::FromString(TEXT("Dev tools are on (Class screen toggle). Adds 10 CLASS / 12 CORE.")), 9, SoftText)
-            ]
+                    MenuText(FText::FromString(TEXT("DEV: GRANT POINTS")), BreakerUI::TypeCaption, Amber, true)
+                ],
+                Amber)
         ];
     }
-
-    if (Trees.IsEmpty())
-    {
-        // INTEGRATION: no tree content is reachable through the progression
-        // API available to this file. When GetAvailableTrees() (or the static
-        // fallback-content provider) lands, ProgressionGatherTrees() starts
-        // returning trees and this placeholder stops rendering — no other
-        // change is needed here.
-        Body->AddSlot().FillHeight(1.0f).Padding(0.0f, 20.0f, 0.0f, 20.0f)
-        [
-            SNew(SBorder)
-            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(PanelRaised)
-            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+    // Respec is per-tree and destructive: discard styling, and the label
+    // states which tree it will clear.
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(Panel)
+            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+            .OnClicked(FOnClicked::CreateLambda([this, BoardCurrency]()
+            {
+                UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                FText FailureReason;
+                if (ProgressionRespec(Prog, BoardCurrency, FailureReason))
+                {
+                    SkillTreeStatus = FText::FromString(FString::Printf(TEXT("%s POINTS REFUNDED"), *CurrencyLabel(BoardCurrency)));
+                    if (Character.IsValid()) Character->SaveGameState();
+                }
+                else
+                {
+                    SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("RESPEC FAILED")) : FailureReason;
+                }
+                Rebuild(EBreakerMenuScreen::SkillTrees);
+                return FReply::Handled();
+            }))
             [
-                MenuText(FText::FromString(TEXT("[ NO TREE CONTENT ]\n\nThe progression component is not serving any\ntrees yet. Class tree and the six core\nconstellations appear here once tree content\nis registered.")), 12, SoftText)
-            ]
+                MenuText(FText::FromString(FString::Printf(TEXT("RESPEC %s"), *CurrencyLabel(BoardCurrency))), BreakerUI::TypeCaption, Harm, true)
+            ],
+            HarmDeep)
+    ];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+    ];
+
+    // ---- Body: board plus the fixed 420px detail rail ----------------------
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    if (!SkillTreeStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(SkillTreeStatus, BreakerUI::TypeCaption, Cyan, true)
         ];
     }
-    else
-    {
-        SelectedTreeIndex = FMath::Clamp(SelectedTreeIndex, 0, Trees.Num() - 1);
-
-        // Left column: one selector button per tree, each showing its own
-        // spent/total plus the unspent pool that tree draws from.
-        TSharedRef<SVerticalBox> Selector = SNew(SVerticalBox);
-        Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+    Body->AddSlot().FillHeight(1.0f)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().FillWidth(1.0f)[Board]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
         [
-            MenuText(FText::FromString(TEXT("TREES")), 11, SoftText, true)
-        ];
-        for (int32 TreeIndex = 0; TreeIndex < Trees.Num(); ++TreeIndex)
-        {
-            const UBreakerProgressionTree* Tree = Trees[TreeIndex];
-            int32 Spent = 0;
-            int32 Total = 0;
-            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
-            const bool bSelected = TreeIndex == SelectedTreeIndex;
-            const int32 Unspent = ProgressionGetUnspent(Progression, Tree->Currency);
-            const FString TreeName = TreeSelectorLabel(Tree);
-            const int32 CapturedIndex = TreeIndex;
+            SkillDetailHost.ToSharedRef()
+        ]
+    ];
 
-            // Branch header strip: the selected branch carries the identity
-            // rail, the others sit on the neutral border.
-            Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-            [
-                MakePlate(
-                    SNew(SButton)
-                    .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
-                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                    .HAlign(HAlign_Left)
-                    .OnClicked(FOnClicked::CreateLambda([this, CapturedIndex]()
-                    {
-                        SelectedTreeIndex = CapturedIndex;
-                        SkillTreeStatus = FText::GetEmpty();
-                        Rebuild(EBreakerMenuScreen::SkillTrees);
-                        return FReply::Handled();
-                    }))
-                    [
-                        SNew(SVerticalBox)
-                        + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TreeName), BreakerUI::TypeH2, bSelected ? Primary : SoftText, true)]
-                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                        [
-                            MenuText(FText::FromString(FString::Printf(TEXT("%d INVESTED · %d %s UNSPENT"), Spent, Unspent, *CurrencyLabel(Tree->Currency))), BreakerUI::TypeCaption, Muted, true)
-                        ]
-                    ],
-                    bSelected ? PanelHover : Panel,
-                    bSelected ? Cyan : BorderEmphasis,
-                    FMargin(0.0f))
-            ];
-        }
-
-        // Right side: the selected tree's nodes, one row per investment gate.
-        const UBreakerProgressionTree* Selected = Trees[SelectedTreeIndex];
-        int32 SelectedSpent = 0;
-        int32 SelectedTotal = 0;
-        ProgressionTreeInvestment(Progression, Selected, SelectedSpent, SelectedTotal);
-
-        // One section per header bar. Class trees section by investment tier;
-        // the Core slice sections by constellation instead, because a flat
-        // tier list mixes five unrelated constellations into one row and the
-        // structure the content is actually built around disappears.
-        struct FTreeSection
-        {
-            FString Header;
-            bool bGated = false;
-            TArray<const UBreakerProgressionNode*> Nodes;
-        };
-        TArray<FTreeSection> Sections;
-
-        const bool bCoreSlice = Selected->TreeId == FName(TEXT("Core.Slice"));
-        if (bCoreSlice)
-        {
-            // Constellation membership is carried by the NodeId prefix
-            // (Core.<Constellation>.<Node>) — the content library has no
-            // constellation field yet. When one lands, read it here instead.
-            static const TCHAR* ConstellationOrder[] = {TEXT("Precision"), TEXT("Volley"), TEXT("Affliction"), TEXT("Bulwark"), TEXT("Kinesis")};
-            TSet<FName> Claimed;
-            for (const TCHAR* Constellation : ConstellationOrder)
-            {
-                FTreeSection Section;
-                Section.Header = FString(Constellation).ToUpper();
-                const FString Prefix = FString::Printf(TEXT("Core.%s."), Constellation);
-                for (const UBreakerProgressionNode* Node : Selected->Nodes)
-                {
-                    if (!Node || !Node->NodeId.ToString().StartsWith(Prefix)) continue;
-                    Section.Nodes.Add(Node);
-                    Claimed.Add(Node->NodeId);
-                }
-                Section.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
-                if (Section.Nodes.Num() > 0) Sections.Add(MoveTemp(Section));
-            }
-            // Anything authored outside the five known prefixes still has to
-            // render — an unlisted node must never silently vanish.
-            FTreeSection Other;
-            Other.Header = TEXT("OTHER");
-            for (const UBreakerProgressionNode* Node : Selected->Nodes)
-            {
-                if (Node && !Claimed.Contains(Node->NodeId)) Other.Nodes.Add(Node);
-            }
-            if (Other.Nodes.Num() > 0) Sections.Add(MoveTemp(Other));
-        }
-        else
-        {
-            TArray<int32> TierGates;
-            for (const UBreakerProgressionNode* Node : Selected->Nodes)
-            {
-                if (Node) TierGates.AddUnique(Node->RequiredTreeInvestment);
-            }
-            TierGates.Sort();
-
-            int32 TierNumber = 0;
-            for (const int32 Gate : TierGates)
-            {
-                ++TierNumber;
-                FTreeSection Section;
-                Section.bGated = Gate > SelectedSpent;
-                Section.Header = Gate > 0
-                    ? FString::Printf(TEXT("TIER %d — UNLOCKS AT %d POINTS IN TREE  (%d SPENT)"), TierNumber, Gate, SelectedSpent)
-                    : FString::Printf(TEXT("TIER %d — OPEN"), TierNumber);
-                for (const UBreakerProgressionNode* Node : Selected->Nodes)
-                {
-                    if (Node && Node->RequiredTreeInvestment == Gate) Section.Nodes.Add(Node);
-                }
-                if (Section.Nodes.Num() > 0) Sections.Add(MoveTemp(Section));
-            }
-        }
-
-        TSharedRef<SVerticalBox> NodeColumn = SNew(SVerticalBox);
-        int32 SectionNumber = 0;
-        for (const FTreeSection& Section : Sections)
-        {
-            ++SectionNumber;
-            // Section bar, not a caption: a filled strip so the eye can find
-            // where one group ends and the next begins while scrolling.
-            const FString HeaderText = Section.bGated
-                ? FString::Printf(TEXT("▮ %s"), *Section.Header)
-                : Section.Header;
-            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, SectionNumber == 1 ? 0.0f : BreakerUI::Space24, 0.0f, BreakerUI::Space8)
-            [
-                MakePlate(
-                    MenuText(FText::FromString(HeaderText), BreakerUI::TypeCaption, Section.bGated ? Muted : Primary, true),
-                    Section.bGated ? Panel : BreakerUI::BgRaised,
-                    Section.bGated ? BorderEmphasis : Cyan,
-                    FMargin(BreakerUI::Space16, BreakerUI::Space8))
-            ];
-
-            // Fixed rows of two, never a wrap box: SWrapBox sized by its
-            // allotted width inside a scroll box re-measures to a different
-            // answer every frame — the layout oscillation the owner saw as
-            // the screen "bouncing between two sizes". Two per row because
-            // the cards are now 300px wide.
-            TSharedRef<SVerticalBox> TierRow = SNew(SVerticalBox);
-            TSharedPtr<SHorizontalBox> CurrentRow;
-            int32 CardIndex = 0;
-            for (const UBreakerProgressionNode* Node : Section.Nodes)
-            {
-                if (!Node) continue;
-
-                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
-                FString LockReason;
-                const bool bPurchasable = SkillNodeIsPurchasable(Progression, Selected, Node, SelectedSpent, LockReason);
-                const bool bOwned = Rank > 0;
-                const bool bMaxed = Rank >= Node->MaxRank;
-
-                // UI-Skill-Tree-Spec node states. Owned: cyan rail. Purchasable:
-                // gold 2px border and a gold action line — gold is the only
-                // border colour that means "spend now", which is what makes
-                // scanning the tree work. Available: neutral 1px. Locked:
-                // muted, with the reason stated literally.
-                const FLinearColor CardColor = (bOwned || bPurchasable) ? PanelRaised : Panel;
-                const FLinearColor NameColor = (bPurchasable || bOwned) ? Primary : Disabled;
-                // "1 PT -> RANK 4" when it can be bought, the lock reason when
-                // it cannot. Never both, never neither.
-                const FString ActionLine = bMaxed
-                    ? FString(TEXT("MAXED"))
-                    : (bPurchasable
-                        ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                        : LockReason);
-                const FLinearColor ActionColor = bMaxed ? Cyan : (bPurchasable ? Amber : Harm);
-
-                const FName CapturedNodeId = Node->NodeId;
-                const UBreakerProgressionTree* CapturedTree = Selected;
-                const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
-                const FString Description = Node->Description.IsEmpty() ? TEXT("—") : Node->Description.ToString();
-                const FString CostChip = bMaxed
-                    ? FString(TEXT("MAXED"))
-                    : FString::Printf(TEXT("%d %s"), Node->CostPerRank, *CurrencyLabel(Node->Currency));
-
-                // Everything that used to crowd the card now lives in the
-                // hover tooltip; the card keeps name, rank, cost, one line.
-                FString TooltipText;
-                // Built once per Rebuild and shared by the wrapper box and the
-                // button below — never rebuilt from an attribute lambda.
-                {
-                    TArray<FString> TipLines;
-                    TipLines.Add(NodeName + (Node->bCornerstone ? TEXT("   [CORNERSTONE]") : TEXT("")));
-                    TipLines.Add(FString::Printf(TEXT("RANK %d / %d   COST %d %s PER RANK"), Rank, Node->MaxRank, Node->CostPerRank, *CurrencyLabel(Node->Currency)));
-                    TipLines.Add(TEXT(""));
-                    TipLines.Add(Description);
-                    if (Node->Effects.Num() > 0)
-                    {
-                        TipLines.Add(TEXT(""));
-                        TipLines.Add(TEXT("EFFECTS PER RANK"));
-                        for (const FBreakerNodeEffect& Effect : Node->Effects)
-                        {
-                            TipLines.Add(FString::Printf(TEXT("  %s"), *FormatNodeEffect(Effect)));
-                        }
-                    }
-                    if (Node->Prerequisites.Num() > 0)
-                    {
-                        TipLines.Add(TEXT(""));
-                        TipLines.Add(TEXT("PREREQUISITES"));
-                        for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
-                        {
-                            TipLines.Add(FString::Printf(TEXT("  %s RANK %d"), *Prereq.NodeId.ToString().ToUpper(), Prereq.RequiredRank));
-                        }
-                    }
-                    if (Node->RequiredTreeInvestment > 0)
-                    {
-                        TipLines.Add(TEXT(""));
-                        TipLines.Add(FString::Printf(TEXT("REQUIRES %d INVESTED IN THIS TREE (%d)"), Node->RequiredTreeInvestment, SelectedSpent));
-                    }
-                    if (!LockReason.IsEmpty())
-                    {
-                        TipLines.Add(TEXT(""));
-                        TipLines.Add(FString::Printf(TEXT("LOCKED: %s"), *LockReason));
-                    }
-                    TooltipText = FString::Join(TipLines, TEXT("\n"));
-                }
-                const FText TooltipTextValue = FText::FromString(TooltipText);
-
-                // Line 2 is the number the player is buying. The generic
-                // description drops to line 3 so a card never reads as flavour
-                // text with no stated effect.
-                const FString EffectLine = PrimaryEffectLine(Node);
-
-                TSharedRef<SVerticalBox> CardBody = SNew(SVerticalBox);
-                CardBody->AddSlot().AutoHeight()
-                [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(NodeName), BreakerUI::TypeH2, NameColor, true)]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-                    [
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(Background)
-                        .Padding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
-                        [
-                            MenuText(FText::FromString(CostChip), BreakerUI::TypeCaption, bMaxed ? Cyan : Muted, true)
-                        ]
-                    ]
-                ];
-                // Line two is the number the player is buying, in the numeric
-                // face, so the tree is readable without hovering anything.
-                CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                [
-                    MenuText(FText::FromString(EffectLine), BreakerUI::TypeCaption, bOwned || bPurchasable ? Primary : Muted, true)
-                ];
-                // Owned rank reads as a word next to the filled rail; the old
-                // pip row was too small to parse at a glance. Maxed reads
-                // MAXED rather than 5/5 alone.
-                if (bOwned)
-                {
-                    CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(bMaxed ? FString(TEXT("MAXED")) : RankLabel(Rank, Node->MaxRank)), BreakerUI::TypeCaption, Cyan, true)
-                    ];
-                }
-                CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                [
-                    SNew(STextBlock)
-                    // PERF: this line used to be a Text_Lambda that polled
-                    // FSlateApplication::GetModifierKeys() for Alt-expansion —
-                    // once per card (~46) per frame, which made the screen
-                    // jitter. The summary is now baked at build time and the
-                    // hover tooltip is the only path to full detail.
-                    .Text(FText::FromString(ShortSummary(Description)))
-                    .ColorAndOpacity(bOwned || bPurchasable ? SoftText : Disabled)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-                    .AutoWrapText(true)
-                ];
-                // The state line, stated literally: what it costs to advance,
-                // or exactly why it is locked.
-                if (!ActionLine.IsEmpty())
-                {
-                    CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(ActionLine), BreakerUI::TypeCaption, ActionColor, true)
-                    ];
-                }
-
-                // 3px owned rail: state readable from the edge of the card
-                // without reading any text at all.
-                TSharedRef<SHorizontalBox> Card = SNew(SHorizontalBox);
-                Card->AddSlot().AutoWidth()
-                [
-                    SNew(SBox).WidthOverride(BreakerUI::RailThickness)
-                    [
-                        SolidBlock(bOwned ? Cyan : Transparent)
-                    ]
-                ];
-                Card->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[CardBody];
-
-                if (CardIndex % 2 == 0)
-                {
-                    CurrentRow = SNew(SHorizontalBox);
-                    TierRow->AddSlot().AutoHeight()[CurrentRow.ToSharedRef()];
-                }
-                ++CardIndex;
-                const UBreakerProgressionNode* CapturedNode = Node;
-                CurrentRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 10.0f, 10.0f)
-                [
-                    // Tooltip lives on the wrapper too so locked (disabled)
-                    // cards still explain themselves on hover.
-                    SNew(SBox).WidthOverride(300.0f)
-                    .ToolTipText(TooltipTextValue)
-                    [
-                        // Purchasable-right-now cards carry the gold 2px ring,
-                        // so "what can I buy" is a scan and not a read.
-                        BorderWrap(
-                            SNew(SButton)
-                            .ButtonColorAndOpacity(CardColor)
-                            .IsEnabled(bPurchasable)
-                            .ToolTipText(TooltipTextValue)
-                            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
-                            .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId, CapturedNode]()
-                            {
-                                UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
-                                FText FailureReason;
-                                if (ProgressionPurchaseNode(Prog, CapturedTree, CapturedNodeId, FailureReason))
-                                {
-                                    // Say what changed, not just that something did.
-                                    const int32 NewRank = CapturedNode
-                                        ? ProgressionGetNodeRank(Prog, CapturedNodeId, CapturedNode->Currency)
-                                        : 0;
-                                    SkillTreeStatus = FText::FromString(PurchaseFeedback(CapturedNode, NewRank));
-                                    if (Character.IsValid()) Character->SaveGameState();
-                                }
-                                else
-                                {
-                                    SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("PURCHASE FAILED")) : FailureReason;
-                                }
-                                Rebuild(EBreakerMenuScreen::SkillTrees);
-                                return FReply::Handled();
-                            }))
-                            [
-                                Card
-                            ],
-                            bPurchasable ? Amber : BorderRest,
-                            bPurchasable ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
-                    ]
-                ];
-            }
-            NodeColumn->AddSlot().AutoHeight()[TierRow];
-        }
-
-        const FString SelectedName = Selected->DisplayName.IsEmpty() ? Selected->TreeId.ToString().ToUpper() : Selected->DisplayName.ToString().ToUpper();
-        const EBreakerPointCurrency SelectedCurrency = Selected->Currency;
-
-        TSharedRef<SVerticalBox> RightPane = SNew(SVerticalBox);
-        RightPane->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
-        [
+    // ---- Footer: input legend plus the live purchasable count --------------
+    TSharedRef<SBox> Footer = SNew(SBox).HeightOverride(56.0f)
+    [
+        MakePlate(
             SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%s — %d / %d POINTS"), *SelectedName, SelectedSpent, SelectedTotal)), BreakerUI::TypeH2, Primary, true)
+                // O2: node numbers are not balanced yet.
+                MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · HOVER FULL DETAIL · SHIFT+LMB BUY TO MAX · CLICK CLASS / CORE TO SWITCH BOARD · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
+                    BreakerUI::TypeCaption, Muted, true)
             ]
-            + SHorizontalBox::Slot().AutoWidth()
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
-                // Respec is per-tree and destructive: discard styling, and the
-                // label states which tree it will clear.
-                BorderWrap(
-                SNew(SButton)
-                .ButtonColorAndOpacity(Panel)
-                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                .OnClicked(FOnClicked::CreateLambda([this, SelectedCurrency]()
-                {
-                    UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
-                    FText FailureReason;
-                    if (ProgressionRespec(Prog, SelectedCurrency, FailureReason))
-                    {
-                        SkillTreeStatus = FText::FromString(FString::Printf(TEXT("%s POINTS REFUNDED"), *CurrencyLabel(SelectedCurrency)));
-                        if (Character.IsValid()) Character->SaveGameState();
-                    }
-                    else
-                    {
-                        SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("RESPEC FAILED")) : FailureReason;
-                    }
-                    Rebuild(EBreakerMenuScreen::SkillTrees);
-                    return FReply::Handled();
-                }))
-                [
-                    MenuText(FText::FromString(FString::Printf(TEXT("RESPEC %s"), *CurrencyLabel(SelectedCurrency))), BreakerUI::TypeCaption, Harm, true)
-                ],
-                HarmDeep)
-            ]
-        ];
-        RightPane->AddSlot().FillHeight(1.0f)
-        [
-            SNew(SScrollBox) + SScrollBox::Slot()[NodeColumn]
-        ];
-
-        Body->AddSlot().FillHeight(1.0f)
-        [
-            SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().AutoWidth()
-            [
-                SNew(SBox).WidthOverride(240.0f)[Selector]
-            ]
-            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(16.0f, 0.0f, 0.0f, 0.0f)
-            [
-                RightPane
-            ]
-        ];
-    }
-
-    if (!SkillTreeStatus.IsEmpty())
-    {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
-        [
-            MenuText(SkillTreeStatus, 10, Cyan, true)
-        ];
-    }
-    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
-    [
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth()
-        [
-            SNew(SBox).WidthOverride(180.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
-        ]
-        + SHorizontalBox::Slot().FillWidth(1.0f).Padding(14.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
-        [
-            // O2: node numbers are not balanced yet.
-            MenuText(FText::FromString(TEXT("Hover a node for full detail  |  [O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
-        ]
+                MenuText(FText::FromString(FString::Printf(TEXT("%d PURCHASABLE"), PurchasableCount)), BreakerUI::TypeH2, Amber, true)
+            ],
+            BreakerUI::BgRaised, Amber, FMargin(BreakerUI::Space24, BreakerUI::Space8))
     ];
-    return BuildFrame(FText::FromString(TEXT("SKILL TREES")), FText::FromString(TEXT("CLASS TREE / CORE CONSTELLATIONS")), Body, 1120.0f);
+
+    return BuildZonedFrame(
+        FText::FromString(TEXT("SKILL MATRIX")),
+        FText::FromString(MetaLine),
+        HeaderRight,
+        Body,
+        Footer,
+        1760.0f);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
