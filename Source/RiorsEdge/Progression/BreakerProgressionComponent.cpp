@@ -409,6 +409,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.SlideSpeedMultiplier = Increased(EBreakerNodeStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerNodeStatTarget::AirControl);
     Stats.DamageOverTimeMultiplier = Increased(EBreakerNodeStatTarget::DamageOverTime);
+    Stats.DamageMultiplier = Increased(EBreakerNodeStatTarget::Damage);
 
     if (OutContribution)
     {
@@ -423,8 +424,23 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
     }
     return Stats;
+}
+
+float UBreakerProgressionComponent::GetSpentPoints() const
+{
+    // Points actually committed to nodes, in both wallets. GetRefundValue is
+    // rank x CostPerRank, which is exactly what a respec hands back — so a
+    // 3-point Convergence node is worth three times a 1-point minor here, and
+    // the total can never disagree with what the player was charged.
+    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints) + GetRefundValue(EBreakerPointCurrency::CorePoints));
+}
+
+float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
+{
+    return GetSpentPoints() * FMath::Max(0.0f, IncreasedDamagePerSpentPoint);
 }
 
 void UBreakerProgressionComponent::RecalculateStats()
@@ -437,6 +453,21 @@ void UBreakerProgressionComponent::RecalculateStats()
     Ranks.Append(State.CoreNodeRanks);
 
     CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution);
+
+    // The owner's report: "no matter what I do damage still feels the same".
+    // Node Damage effects only pay out on the handful of nodes that author
+    // them, so on top of those every committed point pays a small Increased
+    // Damage baseline. It goes into the SAME additive bucket as gear and node
+    // damage — it is not a separate multiplier — and it is a property of
+    // SPENDING, not of level, which keeps it clear of the cap-50 no-post-cap-
+    // power ruling.
+    const float SpendPercent = GetPointSpendDamagePercent();
+    if (SpendPercent > 0.0f)
+    {
+        CachedContribution.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, SpendPercent);
+        CachedStats.DamageMultiplier += SpendPercent / 100.0f;
+    }
+
     ApplyStatsToAttributes();
 }
 

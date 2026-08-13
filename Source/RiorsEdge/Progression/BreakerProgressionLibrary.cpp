@@ -109,8 +109,9 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     // --- Precision ---------------------------------------------------------
     UBreakerProgressionNode* Sightline = MakeNode(TEXT("Core.Precision.Sightline"), TEXT("Sightline"),
-        TEXT("Precision gateway. Weak-point damage is easier to earn."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Precision gateway. Weak-point damage is easier to earn, and everything you fire lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
     AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 7.0f); // O2 PLACEHOLDER
+    AddEffect(Sightline, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Sightline);
 
     UBreakerProgressionNode* TunnelVision = MakeNode(TEXT("Core.Precision.TunnelVision"), TEXT("Tunnel Vision"),
@@ -136,8 +137,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Tree->Nodes.Add(TriggerDiscipline);
 
     UBreakerProgressionNode* Cyclic = MakeNode(TEXT("Core.Volley.Cyclic"), TEXT("Cyclic"),
-        TEXT("Sustained fire ramps rate of fire, then decays when you stop."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Sustained fire ramps rate of fire, then decays when you stop. Every rank increases damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
     AddPrerequisite(Cyclic, TEXT("Core.Volley.TriggerDiscipline"));
+    // The rate-of-fire ramp is still only a tag nothing consumes, so until the
+    // weapon layer reads it this node's three ranks were a purchase that did
+    // literally nothing. The Increased Damage per rank is real output now and
+    // stays when the ramp lands.
+    AddEffect(Cyclic, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Cyclic->GrantedTags.AddTag(BreakerNodeTags::Node_Cyclic.GetTag());
     Tree->Nodes.Add(Cyclic);
 
@@ -282,6 +288,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
         TEXT("Distant weak-point hits generate Momentum and land harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
     AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_LongLens.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -308,9 +315,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Tree->Nodes.Add(Node);
 
     Node = MakeNode(TEXT("Swift.Marksman.PierceDiscipline"), TEXT("Pierce Discipline"),
-        TEXT("Each target pierced by a shot generates Momentum, up to three."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Each target pierced by a shot generates Momentum, up to three. Shots also land harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
     AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
