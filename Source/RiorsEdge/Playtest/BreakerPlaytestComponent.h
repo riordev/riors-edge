@@ -20,6 +20,12 @@ struct RIORSEDGE_API FBreakerPlaytestStats
     // authoring pass waits on (Decisions.md O2).
     UPROPERTY(BlueprintReadOnly) TArray<float> TimeToKillSamples;
     UPROPERTY(BlueprintReadOnly) TArray<float> EliteTimeToKillSamples;
+    // Ranged trash is sampled separately. It subclasses ABreakerEnemy, so it
+    // would otherwise land in the trash bucket and drag that average up — it
+    // is fought across a 9-19 m band rather than in contact, so its kill time
+    // measures a different thing. Mixing them would corrupt the one number the
+    // O18 re-anchor is waiting on.
+    UPROPERTY(BlueprintReadOnly) TArray<float> RangedTimeToKillSamples;
 
     float Accuracy() const { return ShotsFired > 0 ? 100.0f * Hits / ShotsFired : 0.0f; }
     float WeakPointRate() const { return Hits > 0 ? 100.0f * WeakPointHits / Hits : 0.0f; }
@@ -46,7 +52,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest") FString BuildReport() const;
     UFUNCTION(BlueprintCallable, Category="Playtest") void CopyReportToClipboard() const;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetStats();
-    UFUNCTION(BlueprintCallable, Category="Playtest") void AddTimeToKillSample(float Seconds, bool bElite);
+    UFUNCTION(BlueprintCallable, Category="Playtest") void AddTimeToKillSample(float Seconds, bool bElite, bool bRanged = false);
     UFUNCTION(BlueprintCallable, Category="Playtest") void ToggleDiagnostics() { bDiagnosticsVisible = !bDiagnosticsVisible; }
     UFUNCTION(BlueprintPure, Category="Playtest") bool AreDiagnosticsVisible() const { return bDiagnosticsVisible; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetSecondsSinceReportCopy() const;

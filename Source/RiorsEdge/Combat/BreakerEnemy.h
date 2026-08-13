@@ -31,6 +31,12 @@ public:
     // Wave spawns: no respawn, scaled level.
     UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureWave(int32 NewEnemyLevel) { bRespawns = false; EnemyLevel = FMath::Clamp(NewEnemyLevel, 1, 50); }
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsElite() const { return bIsElite; }
+    // Telemetry bucket, not behaviour: a ranged archetype is fought across a
+    // band rather than in contact, so its kill time measures something else
+    // and must not be averaged into the melee trash sample the O18 re-anchor
+    // reads. Virtual so an archetype declares this rather than the playtest
+    // layer needing to know the class list.
+    virtual bool IsRangedForTelemetry() const { return false; }
     UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyStateLabel() const;
 
 protected:

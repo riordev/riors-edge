@@ -30,6 +30,8 @@ class RIORSEDGE_API ABreakerRangedEnemy : public ABreakerEnemy
     GENERATED_BODY()
 
 public:
+    virtual bool IsRangedForTelemetry() const override { return true; }
+
     ABreakerRangedEnemy();
 
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged") EBreakerRangedBand GetBand() const { return Band; }

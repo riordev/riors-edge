@@ -373,7 +373,7 @@ void ABreakerEnemy::HandleDeath()
             // Engagement-gapped TTK: idle stretches between damage events are
             // capped, so target-switching doesn't inflate the sample the way
             // wall-clock first-damage-to-death did (session 3 finding).
-            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite);
+            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite, IsRangedForTelemetry());
         }
         FirstDamageTime = -1.0;
         LastDamageEventTime = -1.0;
