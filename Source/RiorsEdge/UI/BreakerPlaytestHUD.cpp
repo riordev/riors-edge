@@ -11,6 +11,7 @@
 #include "Engine/Engine.h"
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerTracerMath.h"
+#include "UI/BreakerTracerRenderer.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Playtest/BreakerPlaytestComponent.h"
@@ -65,27 +66,31 @@ namespace BreakerHUD
     static const FLinearColor PlateFace = BreakerUI::Alpha(BreakerUI::BgBase, 0.96f);
 
     // --- Rounds in flight ---------------------------------------------------
-    // THE knob: TracerFlight.SpeedCms. Everything else about how a round reads
-    // follows from how long it is on screen. All O2 PLACEHOLDER.
+    // The HUD no longer DRAWS a round. It records one, decides whether this
+    // one gets a visible streak at all, and hands both facts to
+    // ABreakerTracerRenderer, which puts real primitives in the world where
+    // the depth buffer can occlude them. See BreakerTracerRenderer.h for why
+    // that move happened; the canvas version is gone, not disabled.
     static const FTracerFlight TracerFlight;
-    // World radius of the bright core, converted to pixels per frame at the
-    // round's own depth. 2 cm is a fat round, but a 0.9 cm one is sub-pixel
-    // past 30 m and the whole point is that it stays readable.
-    static constexpr float TracerRadiusCm = 2.2f;       // O2 PLACEHOLDER
-    static constexpr float ImpactLifetime = 0.18f;      // O2 PLACEHOLDER
-    // Impact star: outer radius in world centimetres, and the world radius of
-    // each spoke's stroke.
-    static constexpr float ImpactRadiusCm = 26.0f;      // O2 PLACEHOLDER
-    static constexpr float ImpactSparkRadiusCm = 1.4f;  // O2 PLACEHOLDER
-    static constexpr int32 ImpactSpokes = 6;
+
     // 40ms pop + 520ms rise, FIELDPLATE §04.
     static constexpr float DamageNumberLifetime =
         BreakerUI::MotionDamagePop + BreakerUI::MotionDamageRise;
 
     // §4: numbers within 60px of one another stack at 8px offsets, and a
     // fourth simultaneous number in the same cluster is dropped, not drawn.
-    static constexpr float DamageClusterRadius = 60.0f;
-    static constexpr float DamageClusterOffset = 8.0f;
+    //
+    // Both distances are expressed as RATIOS of the body-number size rather
+    // than as the spec's raw pixels. At the spec's 40px body they evaluate to
+    // exactly 60 and 8, so nothing about the authored look changes — but the
+    // damage sizes are being retuned in BreakerUIStyle.h, and a stack offset
+    // that stays at 8px while the glyphs shrink turns a tidy stack into a
+    // pile. A cluster rule that does not scale with its own type is a bug
+    // waiting for the next token edit.
+    static constexpr float DamageClusterRadiusRatio = 1.5f;   // 60 / 40
+    static constexpr float DamageClusterOffsetRatio = 0.2f;   // 8 / 40
+    static constexpr float DamageClusterRadius =
+        BreakerUI::DamageBodyPixels * DamageClusterRadiusRatio;
     static constexpr int32 DamageClusterMax = 3;
 
     // Enemy bar visibility rules.
@@ -216,7 +221,9 @@ void ABreakerPlaytestHUD::DrawHUD()
 
     // World-anchored layers first: they sit over the world but under every
     // screen-anchored plate, so the HUD frame always wins a collision.
-    DrawTracers();
+    // Rounds in flight are NOT in this list any more — they are world
+    // primitives now (ABreakerTracerRenderer) and the renderer draws them,
+    // correctly occluded, before the HUD gets the canvas at all.
     DrawEnemyHealthBars(Character);
     DrawMarkedTarget(Character);
     DrawDamageNumbers();
@@ -670,130 +677,6 @@ void ABreakerPlaytestHUD::DrawWaveBanner(const FVector2D& Center)
         bActive ? BreakerUI::Orange : BreakerUI::Cyan, 16.0f);
 }
 
-// --------------------------------------------------------------------------
-// Rounds in flight.
-//
-// The shot itself is hitscan and stays hitscan — the round has already landed
-// before this function runs. What is drawn is a SHORT segment travelling from
-// the visual muzzle to the impact over a handful of frames, with a screen
-// thickness derived from a world radius so a far round is thin, and an impact
-// burst that starts when the round arrives rather than when the trigger was
-// pulled.
-//
-// DEPTH TRADE-OFF, stated plainly: this stays on the HUD canvas, so it does
-// not depth-sort — a streak composites over whatever is in front of it. That
-// is acceptable here and only here, because every point on the streak lies on
-// a line from (almost) the camera to a point the camera's own trace reached
-// without hitting anything. The muzzle is ~20 cm off the camera, so the only
-// geometry that can wrongly occlude is within that sliver. The alternative,
-// pooled world primitives, buys correct sorting at the cost of a pool, a
-// material, and a per-frame transform update for a thing that lives 0.2 s.
-// If the owner ever sees a streak through a wall, that is the trade being
-// paid and the fix is approach (b), not a tweak here.
-// --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawTracers()
-{
-    if (Tracers.Num() == 0 || !Canvas) return;
-    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-
-    // Canvas FOV is horizontal; the pixel scale below is vertical.
-    float VerticalHalfFOV = FMath::DegreesToRadians(45.0f);
-    if (const APlayerController* PC = GetOwningPlayerController())
-    {
-        if (const APlayerCameraManager* Camera = PC->PlayerCameraManager)
-        {
-            const float HorizontalHalf = FMath::DegreesToRadians(FMath::Clamp(Camera->GetFOVAngle(), 20.0f, 170.0f) * 0.5f);
-            const float Aspect = Canvas->ClipX > 0.0f ? Canvas->ClipY / Canvas->ClipX : 0.5625f;
-            VerticalHalfFOV = FMath::Atan(FMath::Tan(HorizontalHalf) * Aspect);
-        }
-    }
-
-    for (const FBreakerHUDTracer& Tracer : Tracers)
-    {
-        const float Age = static_cast<float>(Now - Tracer.Time);
-        if (Age < 0.0f) continue;
-        if (Age > Tracer.FlightSeconds + BreakerHUD::ImpactLifetime) continue;
-
-        const BreakerHUD::FTracerSample Sample =
-            BreakerHUD::SampleTracer(BreakerHUD::TracerFlight, Tracer.Start, Tracer.End, Age);
-
-        if (Sample.bVisible)
-        {
-            // bClampToZeroPlane=false so a point behind the camera keeps its
-            // negative depth and can be rejected instead of folding forward.
-            const FVector TailProj = Project(Sample.Tail, false);
-            const FVector HeadProj = Project(Sample.Head, false);
-            if (TailProj.Z > 0.0f && HeadProj.Z > 0.0f)
-            {
-                // Thickness from the head's depth: a round 80 m out is a
-                // hairline, a round 3 m out has body. Clamped so it never
-                // disappears entirely and never becomes a bar across the
-                // screen at point-blank range.
-                const float Core = FMath::Clamp(
-                    BreakerHUD::WorldRadiusToPixels(BreakerHUD::TracerRadiusCm,
-                        static_cast<float>(HeadProj.Z), Canvas->ClipY, VerticalHalfFOV),
-                    S(0.9f), S(5.0f));
-
-                // Weapon/heat is the orange family (FIELDPLATE function
-                // accents). The old gold belongs to reward and weak points,
-                // which is exactly the read a plain body shot must not have.
-                const float Brightness = FMath::Lerp(1.0f, 0.72f, Sample.HeadFraction);
-                DrawLine(TailProj.X, TailProj.Y, HeadProj.X, HeadProj.Y,
-                    BreakerUI::Alpha(BreakerUI::OrangeDeep, 0.55f * Brightness), Core * 2.4f);
-                DrawLine(TailProj.X, TailProj.Y, HeadProj.X, HeadProj.Y,
-                    BreakerUI::Alpha(BreakerUI::Orange, Brightness), Core);
-            }
-        }
-
-        if (Tracer.bHit)
-        {
-            const float BurstAge = Age - Tracer.FlightSeconds;
-            if (BurstAge >= 0.0f && BurstAge < BreakerHUD::ImpactLifetime)
-            {
-                DrawImpactBurst(Tracer.Impact, Tracer.End - Tracer.Start,
-                    BurstAge / BreakerHUD::ImpactLifetime,
-                    Tracer.bWeakPoint ? BreakerUI::Gold : BreakerUI::Orange,
-                    VerticalHalfFOV);
-            }
-        }
-    }
-}
-
-// An expanding star drawn in the plane the round punched through, at a world
-// radius, so it sits on the surface and shrinks with distance. The old version
-// was a fixed-size screen-space X: it read as a HUD marker rather than as
-// something that happened in the world.
-void ABreakerPlaytestHUD::DrawImpactBurst(const FVector& Impact, const FVector& TravelDirection,
-    float Progress, const FLinearColor& Color, float VerticalHalfFOVRadians)
-{
-    if (!Canvas) return;
-    const FVector Center = Project(Impact, false);
-    if (Center.Z <= 0.0f) return;
-
-    FVector U, V;
-    BreakerHUD::ImpactBasis(TravelDirection, U, V);
-
-    // Fast out, slow stop: most of the growth is in the first third.
-    const float Eased = 1.0f - FMath::Square(1.0f - FMath::Clamp(Progress, 0.0f, 1.0f));
-    const float Radius = BreakerHUD::ImpactRadiusCm * Eased;
-    const float Inner = Radius * 0.35f;
-    const FLinearColor Faded = BreakerUI::Alpha(Color, 1.0f - Progress);
-
-    const float Thickness = FMath::Clamp(
-        BreakerHUD::WorldRadiusToPixels(BreakerHUD::ImpactSparkRadiusCm,
-            static_cast<float>(Center.Z), Canvas->ClipY, VerticalHalfFOVRadians),
-        S(0.9f), S(3.5f));
-
-    for (int32 Index = 0; Index < BreakerHUD::ImpactSpokes; ++Index)
-    {
-        const float Angle = (2.0f * PI * Index) / BreakerHUD::ImpactSpokes;
-        const FVector Axis = U * FMath::Cos(Angle) + V * FMath::Sin(Angle);
-        const FVector NearProj = Project(Impact + Axis * Inner, false);
-        const FVector FarProj = Project(Impact + Axis * Radius, false);
-        if (NearProj.Z <= 0.0f || FarProj.Z <= 0.0f) continue;
-        DrawLine(NearProj.X, NearProj.Y, FarProj.X, FarProj.Y, Faded, Thickness);
-    }
-}
 
 // --------------------------------------------------------------------------
 // §4 — floating damage numbers. Body 40, weak point 64 gold, crit 80 orange
@@ -859,11 +742,17 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
             Face = BreakerUI::Gold;
             SizePixels = BreakerUI::DamageWeakPointPixels;
         }
+        // Stack offset scales with the number's OWN size, so a 52px crit and a
+        // 26px body hit in the same cluster separate by proportionate amounts
+        // instead of both by a flat 8px. Taken before the pop, or a number
+        // would jump sideways in the stack as it settled.
+        const float StackOffset = S(SizePixels * BreakerHUD::DamageClusterOffsetRatio);
+
         // Spawn oversized, settle to 100%: the pop is the hit confirmation.
         if (Age < PopSeconds) SizePixels *= PopScale;
 
         DrawOutlinedNumber(BreakerUI::FormatTicker(Number->Value),
-            Screen.X, Screen.Y - Rise - Neighbours * S(BreakerHUD::DamageClusterOffset),
+            Screen.X, Screen.Y - Rise - Neighbours * StackOffset,
             Face, SizePixels, Fade);
     }
 }
@@ -1250,6 +1139,20 @@ void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
     DrawSpecTextCentered(TEXT("MARKED"), CX, CY - Radius - S(16.0f), Color, 11.0f);
 }
 
+ABreakerTracerRenderer* ABreakerPlaytestHUD::GetTracerRenderer()
+{
+    if (TracerRenderer) return TracerRenderer;
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    Params.ObjectFlags |= RF_Transient;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    TracerRenderer = World->SpawnActor<ABreakerTracerRenderer>(
+        ABreakerTracerRenderer::StaticClass(), FTransform::Identity, Params);
+    return TracerRenderer;
+}
+
 void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
@@ -1258,35 +1161,54 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     // top of it drew a second, faster, ghost round every time the rocket fired.
     const UBreakerWeaponDefinition* FiredDefinition = BoundWeapon ? BoundWeapon->GetActiveDefinition() : nullptr;
     const bool bProjectileShot = FiredDefinition && FiredDefinition->bProjectile;
+    // A shotgun's OnShot carries ONE impact point for a whole spread — the
+    // shot contract has no per-pellet record and that contract belongs to the
+    // weapon layer, not here. Drawing one streak for eight pellets is a lie
+    // about where the pellets went, and it was ALSO the inconsistency the
+    // owner would have been looking at: one lone round leaving a shotgun.
+    // Pellet weapons therefore get the impact flash and no streak. Doing it
+    // properly needs FBreakerShotResult to carry per-pellet impacts; noted in
+    // Docs/Weapon-Foundation.md rather than forced through from the HUD.
+    const bool bPelletShot = FiredDefinition && FiredDefinition->PelletsPerShot > 1;
 
     const double ShotTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 
     if (!bProjectileShot)
     {
-        FBreakerHUDTracer Entry;
         // VISUAL origin: the gun, not the camera. The trace still starts at
         // the camera and still lands on the crosshair — see
         // UBreakerWeaponComponent::GetVisualMuzzleLocation. The two converge
         // at the impact, which is the only place they have to agree.
-        Entry.Start = BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart;
-        // Draw to the impact when there is one, otherwise out to the trace end.
-        Entry.End = Shot.bHit ? Shot.ImpactPoint : Shot.TraceEnd;
-        Entry.Impact = Shot.ImpactPoint;
-        Entry.bHit = Shot.bHit;
-        Entry.bWeakPoint = Shot.bWeakPoint;
-        Entry.Time = ShotTime;
-        Entry.FlightSeconds = BreakerHUD::TracerFlightSeconds(BreakerHUD::TracerFlight,
-            static_cast<float>((Entry.End - Entry.Start).Size()));
+        const FVector Start = BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart;
+        const FVector End = Shot.bHit ? Shot.ImpactPoint : Shot.TraceEnd;
+        const float FlightSeconds = BreakerHUD::TracerFlightSeconds(BreakerHUD::TracerFlight,
+            static_cast<float>((End - Start).Size()));
 
-        if (Tracers.Num() < MaxTracers)
+        // Every round counts; only some of them are visible. See
+        // BreakerHUD::TracerRoundsPerTracer — fast weapons trace one round in
+        // three, slow ones trace all of them.
+        const int32 RoundsPerTracer = BreakerHUD::TracerRoundsPerTracer(
+            FiredDefinition ? FiredDefinition->RoundsPerMinute : 600.0f);
+        const bool bVisibleRound =
+            !bPelletShot && BreakerHUD::ShouldTraceRound(RoundsFired, RoundsPerTracer);
+        ++RoundsFired;
+
+        if (bVisibleRound)
         {
-            Tracers.Add(Entry);
-            NextTracerIndex = Tracers.Num() % MaxTracers;
+            if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
+            {
+                Renderer->AddTracer(Start, End);
+            }
         }
-        else
+        // The flash fires on every hit whether or not the round was traced:
+        // hit confirmation is feedback the player acts on, tracer density is
+        // decoration.
+        if (Shot.bHit)
         {
-            Tracers[NextTracerIndex] = Entry;
-            NextTracerIndex = (NextTracerIndex + 1) % MaxTracers;
+            if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
+            {
+                Renderer->AddImpact(Shot.ImpactPoint, Shot.bWeakPoint, FlightSeconds);
+            }
         }
     }
 
