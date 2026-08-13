@@ -19,7 +19,9 @@ bool FBreakerMovementStateTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Movement starts outside wall ride"), Movement->IsWallRiding());
     // Weight pass: the arc is deliberately heavier than the 1.35 it shipped
     // with. This assertion exists so the value cannot drift silently.
-    TestEqual(TEXT("Baseline gravity keeps jump arcs responsive"), Movement->GravityScale, 1.60f);
+    // O26: eased from the weight pass's 1.60 after the owner playtested it
+    // as too heavy. Still well above the 1.35 that read as floaty.
+    TestEqual(TEXT("Baseline gravity keeps jump arcs responsive"), Movement->GravityScale, 1.45f);
 
     Movement->SetSprinting(true);
     TestTrue(TEXT("Sprint request changes max speed state"), Movement->IsSprinting());

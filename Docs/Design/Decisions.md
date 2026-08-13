@@ -59,6 +59,19 @@ Art-And-Modelling-Plan.md, UI-UX-Spec.md, XP-And-Pacing.md,
 Master-Sheet-Import.txt, Game-Modes.md, Encounter-Design.md,
 Damage-Pipeline.md, and the wave-mode report (target seed lines).
 
+## 2026-08-13 — O25, O26 (jump kit, movement scope)
+
+| # | Decision |
+|---|----------|
+| O25 | **Two jumps are base kit for everyone. Swift innately unlocks a third jump later** — innate to the class, not a tree purchase. This SUPERSEDES the earlier locked line that air jump is one of only two tree-granted verbs: `JumpMaxCount = 2` in `ABreakerCharacter` is correct and stays, and the double jump is no longer a code/design contradiction. Swift's third jump is unimplemented; it is a class-innate unlock, so it belongs with the Swift kit and not in the Core tree. Parry remains tree-granted. |
+| O26 | **Movement drops in priority.** It is a big part of the game and a system worth messing with, but it is not the centre of the design and does not get further dedicated passes for now. The weight pass stands with gravity eased back; further movement work is opportunistic, not scheduled. |
+
+Implementation notes tied to these rulings:
+- O25: `JumpMaxCount = 2` retained; CONTEXT.md's locked-decisions line corrected.
+  Swift's third jump is NOT built.
+- O26: gravity eased 1.60 -> 1.45 the same day, per the owner's "feels too
+  heavy" playtest; the rest of the weight pass is unchanged.
+
 ## Owner choices currently pending (presented, not ruled)
 
 - **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now

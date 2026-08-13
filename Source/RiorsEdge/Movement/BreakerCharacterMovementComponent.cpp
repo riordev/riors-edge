@@ -29,10 +29,13 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // authored ledges and wall-ride approaches from being reachable, and that
     // cannot be verified without playing the level.
     JumpZVelocity = 700.0f;
-    // The single biggest weight lever. 1.35 -> 1.60 shortens the rise from
-    // 0.53 s to 0.45 s and drops the apex by ~16%; the fall curve below takes
-    // the descent the rest of the way.
-    GravityScale = 1.60f; // OLD: 1.35f
+    // The single biggest weight lever. The weight pass took 1.35 -> 1.60; the
+    // owner playtested that as too heavy, so it eases back to 1.45 (O26) —
+    // still meaningfully heavier than the floaty original, with the fall curve
+    // below doing most of the work instead of raw gravity.
+    // If it is STILL too heavy, the next step down is FallGravityMultiplier,
+    // then LandingMinimumSpeedScale to 1.0 to remove the landing cost outright.
+    GravityScale = 1.45f; // WEIGHT PASS: 1.60f  ORIGINAL: 1.35f
     // Explicit rather than inherited: JumpHoldWindow makes the engine's jump
     // force window non-zero, and gravity must keep applying inside it. False
     // here would be a zero-gravity hold — maximum floatiness.
