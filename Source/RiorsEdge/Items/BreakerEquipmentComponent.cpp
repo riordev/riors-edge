@@ -79,6 +79,15 @@ void UBreakerEquipmentComponent::AddToBackpack(const FBreakerItemInstance& Item)
     OnItemAcquired.Broadcast(Item);
 }
 
+void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    Equipped = NewEquipped;
+    Backpack = NewBackpack;
+    RecalculateStats();
+    OnEquipmentChanged.Broadcast();
+}
+
 bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority()) return false;

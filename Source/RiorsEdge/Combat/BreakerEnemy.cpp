@@ -79,6 +79,21 @@ void ABreakerEnemy::ConfigureEncounter(const FVector& NewLeashOrigin, float NewP
     PatrolPhase = NewPatrolPhase;
 }
 
+void ABreakerEnemy::ConfigureElite()
+{
+    bIsElite = true;
+    SetActorScale3D(GetActorScale3D() * 1.5f);
+    AttackDamage *= 2.0f;
+    MoveSpeed *= 0.85f;
+    EnemyLevel = FMath::Min(EnemyLevel + 5, 50);
+    if (Attributes)
+    {
+        Attributes->SetMaxHealth(660.0f);
+        if (Combat) Combat->RestoreVitals();
+    }
+    StateLabel = TEXT("ELITE PATROL");
+}
+
 FString ABreakerEnemy::GetEnemyStateLabel() const { return StateLabel; }
 
 void ABreakerEnemy::Tick(float DeltaSeconds)
@@ -169,7 +184,8 @@ void ABreakerEnemy::GrantLoot()
 
     ++KillCount;
     const int32 Seed = HashCombine(GetTypeHash(GetActorLocation()), KillCount);
-    const EBreakerItemRarity Rarity = UBreakerLootLibrary::RollRarity(Seed, Equipment->GetStats().DropChancePercent);
+    EBreakerItemRarity Rarity = UBreakerLootLibrary::RollRarity(Seed, Equipment->GetStats().DropChancePercent);
+    if (bIsElite && Rarity < EBreakerItemRarity::Exceptional) Rarity = EBreakerItemRarity::Exceptional;
     const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
     Equipment->AddToBackpack(Item);

@@ -46,6 +46,12 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Weapon slots now have a swap tempo layer (swap-in duration blocks fire/reload, swap events, seconds-since-swap-in query), which unblocks Secondary exclusive affix design.
 - Block and dodge are implemented on the shared stamina pool in `UBreakerCombatComponent` (frontal-only block stance, instant dodge negation window with resource refund; neither affects DoTs). Input actions are not bound yet — the API is BlueprintCallable.
 - `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.
+- Five weapon archetypes exist (Rifle, SMG, Sniper, Shotgun, Rocket); Rocket is a replicated projectile (`ABreakerRocketProjectile`) with radial falloff damage that ignores its instigator pending the self-damage design pass. Loadout slots carry assignable archetypes (`SetSlotArchetype`), picked from the loadout screen.
+- Gear multipliers are consumed by `UBreakerCharacterMovementComponent` (move/slide speed, air control via steer rate, dash cooldown) — affixes now change moment-to-moment movement.
+- Save/resume exists: `UBreakerSaveGame` (slot `BreakerSave0`) stores progression state, equipped items, backpack, and weapon slot archetypes; autoloaded in character BeginPlay, autosaved in EndPlay and on class lock.
+- Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
+- The gym encounter includes one elite (`ConfigureElite`): 1.5x scale, tripled health, doubled damage, drops never below Exceptional.
+- Inventory backpack sorts best-rarity-first with per-slot filter chips and auto-height cards.
 
 ## Verification status
 

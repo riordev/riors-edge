@@ -3,6 +3,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -64,7 +65,7 @@ void SBreakerMenu::ShowInventory()
 
 void SBreakerMenu::HandleEscape()
 {
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect)
     {
         Rebuild(RootScreen);
     }
@@ -84,6 +85,7 @@ void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Settings: ContentHost->SetContent(BuildSettingsScreen()); break;
         case EBreakerMenuScreen::Loadout: ContentHost->SetContent(BuildLoadoutScreen()); break;
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
+        case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 }
@@ -177,6 +179,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
         MakeButton(FText::FromString(TEXT("INVENTORY")), FOnClicked::CreateLambda([this]()
         {
             Rebuild(EBreakerMenuScreen::Inventory);
+            return FReply::Handled();
+        }))
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+    [
+        MakeButton(FText::FromString(TEXT("BREAKER CLASS")), FOnClicked::CreateLambda([this]()
+        {
+            Rebuild(EBreakerMenuScreen::ClassSelect);
             return FReply::Handled();
         }))
     ];
@@ -321,23 +331,66 @@ TSharedRef<SWidget> SBreakerMenu::MakeGearCard(const FText& Slot, const FText& N
 
 TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
 {
+    UBreakerWeaponComponent* Weapon = Character.IsValid() ? Character->GetWeapon() : nullptr;
+
+    struct FArchetypeEntry { EBreakerWeaponArchetype Archetype; const TCHAR* Name; const TCHAR* Details; };
+    static const FArchetypeEntry Archetypes[] =
+    {
+        { EBreakerWeaponArchetype::Rifle,   TEXT("RIFLE"),   TEXT("AUTOMATIC  |  30 ROUNDS  |  MID-RANGE") },
+        { EBreakerWeaponArchetype::SMG,     TEXT("SMG"),     TEXT("AUTOMATIC  |  35 ROUNDS  |  CLOSE-MID, HIGH CADENCE") },
+        { EBreakerWeaponArchetype::Sniper,  TEXT("SNIPER"),  TEXT("SEMI-AUTOMATIC  |  8 ROUNDS  |  LONG-RANGE") },
+        { EBreakerWeaponArchetype::Shotgun, TEXT("SHOTGUN"), TEXT("SEMI-AUTOMATIC  |  8 SHELLS  |  CLOSE-RANGE") },
+        { EBreakerWeaponArchetype::Rocket,  TEXT("ROCKET"),  TEXT("PROJECTILE  |  4 ROCKETS  |  AREA DAMAGE") },
+    };
+
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeGearCard(FText::FromString(TEXT("EQUIPPED / SLOT 1")), FText::FromString(TEXT("BREAKER RIFLE")), FText::FromString(TEXT("AUTOMATIC  |  30 ROUNDS  |  MID-RANGE")), Cyan)
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 18.0f)
-    [
-        MakeGearCard(FText::FromString(TEXT("EQUIPPED / SLOT 2")), FText::FromString(TEXT("SCATTERGUN")), FText::FromString(TEXT("SEMI-AUTOMATIC  |  8 SHELLS  |  CLOSE-RANGE")), FLinearColor(1.0f, 0.5f, 0.15f))
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("ARMORY")), 12, SoftText, true)];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 20.0f)
-    [
-        MakeGearCard(FText::FromString(TEXT("AVAILABLE / NOT EQUIPPED")), FText::FromString(TEXT("MARKSMAN")), FText::FromString(TEXT("SEMI-AUTOMATIC  |  8 ROUNDS  |  LONG-RANGE")), FLinearColor(0.7f, 0.5f, 1.0f))
-    ];
-    Body->AddSlot().AutoHeight()[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
+    for (int32 SlotNumber = 1; SlotNumber <= 2; ++SlotNumber)
+    {
+        const EBreakerWeaponArchetype Assigned = Weapon ? Weapon->GetSlotArchetype(SlotNumber) : EBreakerWeaponArchetype::Rifle;
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("SLOT %d — click an archetype to assign"), SlotNumber)), 11, Cyan, true)
+        ];
+        TSharedRef<SHorizontalBox> RowBox = SNew(SHorizontalBox);
+        for (const FArchetypeEntry& Entry : Archetypes)
+        {
+            const bool bAssigned = Entry.Archetype == Assigned;
+            const EBreakerWeaponArchetype CapturedArchetype = Entry.Archetype;
+            const int32 CapturedSlot = SlotNumber;
+            RowBox->AddSlot().FillWidth(1.0f).Padding(0.0f, 0.0f, 6.0f, 0.0f)
+            [
+                SNew(SBox).HeightOverride(64.0f)
+                [
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(bAssigned ? Cyan : PanelRaised)
+                    .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                    .OnClicked(FOnClicked::CreateLambda([this, CapturedSlot, CapturedArchetype]()
+                    {
+                        if (Character.IsValid() && Character->GetWeapon()) Character->GetWeapon()->SetSlotArchetype(CapturedSlot, CapturedArchetype);
+                        Rebuild(EBreakerMenuScreen::Loadout);
+                        return FReply::Handled();
+                    }))
+                    [
+                        MenuText(FText::FromString(Entry.Name), 12, FLinearColor::White, true)
+                    ]
+                ]
+            ];
+        }
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 16.0f)[RowBox];
+    }
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("ARMORY REFERENCE")), 12, SoftText, true)];
+    {
+        FString Reference;
+        for (const FArchetypeEntry& Entry : Archetypes)
+        {
+            Reference += FString::Printf(TEXT("%-8s  %s\n"), Entry.Name, Entry.Details);
+        }
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[MenuText(FText::FromString(Reference), 10, SoftText)];
+    }
+    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)[MenuText(FText::FromString(TEXT("Two equipped weapons maximum  |  ESC Back")), 9, SoftText)];
-    return BuildFrame(FText::FromString(TEXT("LOADOUT")), FText::FromString(TEXT("ACTIVE GEAR / PROTOTYPE ARMORY")), Body);
+    return BuildFrame(FText::FromString(TEXT("LOADOUT")), FText::FromString(TEXT("WEAPON SLOTS / ARMORY")), Body, 880.0f);
 }
 
 namespace
@@ -419,7 +472,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         const FString Name = bHasItem ? RarityName(Item.Rarity) : TEXT("EMPTY");
         const FString Details = bHasItem ? DescribeItem(Item) : TEXT("—");
 
-        return SNew(SBox).HeightOverride(96.0f).Padding(0.0f, 0.0f, 0.0f, 6.0f)
+        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, 6.0f)
         [
             SNew(SButton)
             .ButtonColorAndOpacity(PanelRaised)
@@ -440,7 +493,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 ]
                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(Details), 9, bHasItem ? FLinearColor::White : SoftText)
+                    MenuText(FText::FromString(Details), 10, bHasItem ? FLinearColor::White : SoftText)
                 ]
             ]
         ];
@@ -484,20 +537,33 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     for (const EBreakerEquipSlot Slot : LeftColumn) LeftSlots->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
     for (const EBreakerEquipSlot Slot : RightColumn) RightSlots->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
 
-    // Bottom: backpack grid, newest drops first, click to equip.
+    // Bottom: backpack grid — best rarity first, optional slot filter,
+    // cards grow to fit their affix list so nothing truncates.
     TSharedRef<SWrapBox> BackpackGrid = SNew(SWrapBox).UseAllottedSize(true);
     TArray<FBreakerItemInstance> BackpackItems = Equipment ? Equipment->GetBackpack() : TArray<FBreakerItemInstance>();
     Algo::Reverse(BackpackItems);
+    BackpackItems.StableSort([](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
+    {
+        return static_cast<uint8>(A.Rarity) > static_cast<uint8>(B.Rarity);
+    });
+    const int32 TotalBackpackCount = BackpackItems.Num();
+    if (BackpackSlotFilter >= 0)
+    {
+        BackpackItems.RemoveAll([this](const FBreakerItemInstance& Item)
+        {
+            return static_cast<int32>(Item.Slot) != BackpackSlotFilter;
+        });
+    }
     for (const FBreakerItemInstance& Item : BackpackItems)
     {
         const FGuid ItemId = Item.ItemId;
-        BackpackGrid->AddSlot().Padding(0.0f, 0.0f, 6.0f, 6.0f)
+        BackpackGrid->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
         [
-            SNew(SBox).WidthOverride(236.0f).HeightOverride(104.0f)
+            SNew(SBox).WidthOverride(300.0f)
             [
                 SNew(SButton)
                 .ButtonColorAndOpacity(PanelRaised)
-                .ContentPadding(FMargin(10.0f, 7.0f))
+                .ContentPadding(FMargin(12.0f, 9.0f))
                 .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
                 {
                     if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
@@ -509,16 +575,42 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     + SVerticalBox::Slot().AutoHeight()
                     [
                         SNew(SHorizontalBox)
-                        + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Item.Slot)), 9, Cyan, true)]
-                        + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(RarityName(Item.Rarity)), 9, RarityColor(Item.Rarity), true)]
+                        + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Item.Slot)), 11, Cyan, true)]
+                        + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(RarityName(Item.Rarity)), 11, RarityColor(Item.Rarity), true)]
                     ]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)
+                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
                     [
-                        MenuText(FText::FromString(DescribeItem(Item)), 8, FLinearColor::White)
+                        MenuText(FText::FromString(DescribeItem(Item)), 10, FLinearColor::White)
                     ]
                 ]
             ]
         ];
+    }
+
+    // Slot filter row: ALL plus one chip per equipment slot.
+    TSharedRef<SHorizontalBox> FilterRow = SNew(SHorizontalBox);
+    auto AddFilterChip = [this, &FilterRow](const FString& Label, int32 FilterValue)
+    {
+        FilterRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 4.0f, 0.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(BackpackSlotFilter == FilterValue ? Cyan : PanelRaised)
+            .ContentPadding(FMargin(9.0f, 4.0f))
+            .OnClicked(FOnClicked::CreateLambda([this, FilterValue]()
+            {
+                BackpackSlotFilter = FilterValue;
+                Rebuild(EBreakerMenuScreen::Inventory);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(Label), 9, FLinearColor::White, true)
+            ]
+        ];
+    };
+    AddFilterChip(TEXT("ALL"), -1);
+    for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
+    {
+        AddFilterChip(SlotName(static_cast<EBreakerEquipSlot>(SlotIndex)), SlotIndex);
     }
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
@@ -541,9 +633,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             ]
         ]
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 8.0f)
+    Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 6.0f)
     [
-        MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK (%d) — click to equip"), BackpackItems.Num())), 10, SoftText, true)
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 12.0f, 0.0f)
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK (%d/%d) — click to equip"), BackpackItems.Num(), TotalBackpackCount)), 10, SoftText, true)
+        ]
+        + SHorizontalBox::Slot().FillWidth(1.0f)[FilterRow]
     ];
     Body->AddSlot().FillHeight(1.0f)
     [
@@ -564,6 +661,77 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ]
     ];
     return BuildFrame(FText::FromString(TEXT("INVENTORY")), FText::FromString(TEXT("BREAKER / EQUIPMENT / BACKPACK")), Body, 1120.0f);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
+{
+    UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const EBreakerClassId CurrentClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+
+    struct FClassEntry { EBreakerClassId ClassId; const TCHAR* Name; const TCHAR* Resource; const TCHAR* Branches; const TCHAR* Pitch; };
+    static const FClassEntry Classes[] =
+    {
+        { EBreakerClassId::Swift,    TEXT("SWIFT"),    TEXT("MOMENTUM"), TEXT("Frenzy / Kinetic / Marksman"),          TEXT("Speed is the build. Movement generates power.") },
+        { EBreakerClassId::Caster,   TEXT("CASTER"),   TEXT("MANA"),     TEXT("Spellblade / Void Whisperer / Multispell"), TEXT("Statuses, reactions, and ability-driven combat.") },
+        { EBreakerClassId::Gunsmith, TEXT("GUNSMITH"), TEXT("SCRAP"),    TEXT("Armory / Field Tech / Tinkerer"),       TEXT("Deployables and weapon mastery.") },
+        { EBreakerClassId::Tank,     TEXT("TANK"),     TEXT("GRIT"),     TEXT("Leech / Bastion / Demolitionist"),      TEXT("Mitigation becomes fuel. Hold the line.") },
+        { EBreakerClassId::Support,  TEXT("SUPPORT"),  TEXT("CHARGE"),   TEXT("Medic / Conductor / Warden"),           TEXT("Amplify, sustain, control — solo viable.") },
+    };
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    if (CurrentClass != EBreakerClassId::None)
+    {
+        const FClassEntry* Locked = nullptr;
+        for (const FClassEntry& Entry : Classes) if (Entry.ClassId == CurrentClass) Locked = &Entry;
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 14.0f)
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("CLASS LOCKED: %s — class selection is permanent per character."), Locked ? Locked->Name : TEXT("UNKNOWN"))), 13, Cyan, true)
+        ];
+    }
+    else
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)
+        [
+            MenuText(FText::FromString(TEXT("Selection is PERMANENT for this character. Branches and abilities arrive with the class kits.")), 11, SoftText)
+        ];
+    }
+
+    for (const FClassEntry& Entry : Classes)
+    {
+        const bool bIsCurrent = Entry.ClassId == CurrentClass;
+        const bool bSelectable = CurrentClass == EBreakerClassId::None;
+        const EBreakerClassId CapturedClass = Entry.ClassId;
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(bIsCurrent ? Cyan : PanelRaised)
+            .IsEnabled(bSelectable)
+            .ContentPadding(FMargin(16.0f, 11.0f))
+            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass]()
+            {
+                if (Character.IsValid() && Character->GetProgression() && Character->GetProgression()->ChoosePermanentClassById(CapturedClass))
+                {
+                    Character->SaveGameState();
+                }
+                Rebuild(EBreakerMenuScreen::ClassSelect);
+                return FReply::Handled();
+            }))
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), 16, FLinearColor::White, true)]
+                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Entry.Resource), 11, Cyan, true)]
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), 10, SoftText, true)]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), 10, SoftText)]
+            ]
+        ];
+    }
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
+    return BuildFrame(FText::FromString(TEXT("BREAKER CLASS")), FText::FromString(TEXT("PERMANENT SELECTION / FIVE DISCIPLINES")), Body, 860.0f);
 }
 
 FReply SBreakerMenu::GoBack()

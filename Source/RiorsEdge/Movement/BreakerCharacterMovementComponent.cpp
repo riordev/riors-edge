@@ -1,5 +1,7 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 
+#include "Items/BreakerEquipmentComponent.h"
+
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 
@@ -21,13 +23,46 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     NavAgentProps.bCanCrouch = true;
 }
 
+UBreakerEquipmentComponent* UBreakerCharacterMovementComponent::GetEquipment() const
+{
+    if (!CachedEquipment.IsValid() && GetOwner())
+    {
+        CachedEquipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>();
+    }
+    return CachedEquipment.Get();
+}
+
+float UBreakerCharacterMovementComponent::GearMoveSpeedMultiplier() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    return Equipment ? Equipment->GetStats().MoveSpeedMultiplier : 1.0f;
+}
+
+float UBreakerCharacterMovementComponent::GearSlideSpeedMultiplier() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    return Equipment ? Equipment->GetStats().SlideSpeedMultiplier : 1.0f;
+}
+
+float UBreakerCharacterMovementComponent::GearAirControlMultiplier() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    return Equipment ? Equipment->GetStats().AirControlMultiplier : 1.0f;
+}
+
+float UBreakerCharacterMovementComponent::GearDashCooldownMultiplier() const
+{
+    const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    return Equipment ? Equipment->GetStats().DashCooldownMultiplier : 1.0f;
+}
+
 float UBreakerCharacterMovementComponent::GetMaxSpeed() const
 {
     if (bSliding)
     {
-        return FMath::Max(SprintSpeed, Velocity.Size2D());
+        return FMath::Max(SprintSpeed * GearSlideSpeedMultiplier(), Velocity.Size2D());
     }
-    const float GroundedCap = bWantsToSprint ? SprintSpeed : WalkSpeed;
+    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GearMoveSpeedMultiplier();
     return FMath::Max(GroundedCap, BoostedSpeedCeiling);
 }
 
@@ -53,7 +88,7 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)
 {
     const UWorld* World = GetWorld();
-    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown)
+    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown * GearDashCooldownMultiplier())
     {
         return false;
     }
@@ -216,7 +251,7 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
     const FVector FloorNormal = CurrentFloor.HitResult.ImpactNormal.GetSafeNormal();
     if (SlideEntryBoostRemaining > 0.0f && SlideEntryBoostDuration > UE_SMALL_NUMBER)
     {
-        const float BoostRoom = FMath::Max(0.0f, SprintSpeed + SlideEntryBoost - Velocity.Size2D());
+        const float BoostRoom = FMath::Max(0.0f, (SprintSpeed + SlideEntryBoost) * GearSlideSpeedMultiplier() - Velocity.Size2D());
         const float AppliedBoost = FMath::Min3(SlideEntryBoostRemaining, SlideEntryBoost / SlideEntryBoostDuration * DeltaTime, BoostRoom);
         Velocity += Velocity.GetSafeNormal2D() * AppliedBoost;
         SlideEntryBoostRemaining -= AppliedBoost;
@@ -247,7 +282,7 @@ void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
         return;
     }
 
-    const float SteerRate = AirSteerRate * (0.35f + 0.65f * FMath::Max(Alignment, 0.0f));
+    const float SteerRate = AirSteerRate * GearAirControlMultiplier() * (0.35f + 0.65f * FMath::Max(Alignment, 0.0f));
     const float Alpha = FMath::Clamp(SteerRate * DeltaTime, 0.0f, 1.0f);
     const FVector SteeredDirection = FMath::Lerp(HorizontalDirection, WishDirection, Alpha).GetSafeNormal2D();
     Velocity.X = SteeredDirection.X * HorizontalSpeed;

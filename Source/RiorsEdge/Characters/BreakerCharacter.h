@@ -40,6 +40,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerCombatComponent* GetCombat() const { return Combat; }
     UFUNCTION(BlueprintPure, Category="Weapon") UBreakerWeaponComponent* GetWeapon() const { return Weapon; }
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
+    UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
+    UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
+    UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;

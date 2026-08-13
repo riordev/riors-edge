@@ -33,6 +33,9 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpack(const FGuid& ItemId);
     UFUNCTION(BlueprintPure, Category="Equipment") bool GetEquippedItem(EBreakerEquipSlot Slot, FBreakerItemInstance& OutItem) const;
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetBackpack() const { return Backpack; }
+    UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetEquipped() const { return Equipped; }
+    // Save/load path: replaces both containers wholesale and recalculates.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack);
     UFUNCTION(BlueprintPure, Category="Equipment") const FBreakerEquipmentStats& GetStats() const { return CachedStats; }
 
     // Pure aggregation over any item set; the component wraps this for its

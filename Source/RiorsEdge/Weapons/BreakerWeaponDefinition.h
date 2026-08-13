@@ -39,4 +39,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo", meta=(ClampMin="0")) float ReloadDuration = 1.8f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Handling", meta=(ClampMin="0")) float SwapInDuration = 0.5f;
+
+    // Projectile weapons spawn a rocket instead of tracing. Self-damage and
+    // self-knockback rules are an open design question; rockets currently
+    // ignore their instigator.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Projectile") bool bProjectile = false;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Projectile", meta=(ClampMin="100")) float ProjectileSpeed = 3000.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Projectile", meta=(ClampMin="0")) float ExplosionRadius = 350.0f;
 };

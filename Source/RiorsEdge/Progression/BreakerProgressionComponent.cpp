@@ -11,6 +11,13 @@ UBreakerProgressionComponent::UBreakerProgressionComponent()
     PrimaryComponentTick.bCanEverTick = false;
 }
 
+bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId ClassId)
+{
+    if (ClassId == EBreakerClassId::None || State.PermanentClass != EBreakerClassId::None) return false;
+    State.PermanentClass = ClassId;
+    return true;
+}
+
 bool UBreakerProgressionComponent::ChoosePermanentClass(const UBreakerClassDefinition* NewClassDefinition)
 {
     if (!NewClassDefinition || NewClassDefinition->ClassId == EBreakerClassId::None || State.PermanentClass != EBreakerClassId::None)

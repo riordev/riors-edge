@@ -11,8 +11,11 @@ UENUM(BlueprintType)
 enum class EBreakerWeaponArchetype : uint8
 {
     Rifle,
-    Scattergun,
-    Marksman
+    SMG,
+    Sniper,
+    Shotgun,
+    Rocket,
+    Count UMETA(Hidden)
 };
 
 USTRUCT(BlueprintType)
@@ -51,6 +54,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon") void SetAiming(bool bNewAiming);
     UFUNCTION(BlueprintCallable, Category="Weapon") void EquipArchetype(EBreakerWeaponArchetype NewArchetype);
     UFUNCTION(BlueprintCallable, Category="Weapon") void EquipSlot(int32 SlotNumber);
+    // Assigns which archetype a loadout slot carries; resets that slot's
+    // stored ammunition to the new weapon's defaults.
+    UFUNCTION(BlueprintCallable, Category="Weapon") void SetSlotArchetype(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype);
+    UFUNCTION(BlueprintPure, Category="Weapon") EBreakerWeaponArchetype GetSlotArchetype(int32 SlotNumber) const { return SlotNumber == 1 ? SlotOneArchetype : SlotTwoArchetype; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsReloading() const { return bReloading; }
     UFUNCTION(BlueprintPure, Category="Weapon") bool IsAiming() const { return bAiming; }
     UFUNCTION(BlueprintPure, Category="Weapon") int32 GetMagazineAmmo() const { return MagazineAmmo; }
@@ -79,6 +86,7 @@ protected:
     UFUNCTION(Server, Reliable) void ServerStartReload();
     UFUNCTION(Server, Reliable) void ServerSetAiming(bool bNewAiming);
     UFUNCTION(Server, Reliable) void ServerEquipSlot(int32 SlotNumber);
+    UFUNCTION(Server, Reliable) void ServerSetSlotArchetype(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype);
     UFUNCTION(NetMulticast, Unreliable) void MulticastShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void OnRep_Ammo();
     UFUNCTION() void OnRep_Reloading();
@@ -91,6 +99,8 @@ private:
     UPROPERTY(ReplicatedUsing=OnRep_Swapping) bool bSwapping = false;
     UPROPERTY(Replicated) EBreakerWeaponArchetype CurrentArchetype = EBreakerWeaponArchetype::Rifle;
     UPROPERTY(Replicated) int32 CurrentSlot = 1;
+    UPROPERTY(Replicated) EBreakerWeaponArchetype SlotOneArchetype = EBreakerWeaponArchetype::Rifle;
+    UPROPERTY(Replicated) EBreakerWeaponArchetype SlotTwoArchetype = EBreakerWeaponArchetype::Shotgun;
     int32 SlotOneMagazineAmmo = -1;
     int32 SlotOneReserveAmmo = -1;
     int32 SlotTwoMagazineAmmo = -1;
@@ -110,6 +120,7 @@ private:
     void StoreActiveSlotAmmunition();
     void InitializeSlotAmmunition();
     void FireOnce();
+    void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread);
     void FinishReload();
     void FinishSwap();
     bool CanFire() const;

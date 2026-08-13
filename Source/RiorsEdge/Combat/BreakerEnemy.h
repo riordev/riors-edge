@@ -24,6 +24,10 @@ public:
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
     virtual void Tick(float DeltaSeconds) override;
     UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureEncounter(const FVector& NewLeashOrigin, float NewPatrolPhase);
+    // Elite modifier: bigger, tougher, hits harder, and its drops are never
+    // below Exceptional.
+    UFUNCTION(BlueprintCallable, Category="Enemy") void ConfigureElite();
+    UFUNCTION(BlueprintPure, Category="Enemy") bool IsElite() const { return bIsElite; }
     UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyStateLabel() const;
 
 protected:
@@ -59,6 +63,7 @@ private:
     float PatrolPhase = 0.0f;
     double LastAttackTime = -1000.0;
     bool bDead = false;
+    bool bIsElite = false;
     int32 KillCount = 0;
     FString StateLabel = TEXT("PATROL");
 };

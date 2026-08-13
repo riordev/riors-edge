@@ -68,6 +68,15 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Movement|Wall Ride") FWallRideStateChanged OnWallRideStateChanged;
 
 private:
+    // Gear-rolled movement multipliers, read from the owner's equipment
+    // component: move/slide speed, air control, dash cooldown.
+    class UBreakerEquipmentComponent* GetEquipment() const;
+    float GearMoveSpeedMultiplier() const;
+    float GearSlideSpeedMultiplier() const;
+    float GearAirControlMultiplier() const;
+    float GearDashCooldownMultiplier() const;
+    mutable TWeakObjectPtr<class UBreakerEquipmentComponent> CachedEquipment;
+
     bool bWantsToSprint = false;
     bool bSlideRequested = false;
     bool bSlideRequestConsumed = false;

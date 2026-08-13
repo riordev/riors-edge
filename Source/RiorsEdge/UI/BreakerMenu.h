@@ -12,7 +12,8 @@ enum class EBreakerMenuScreen : uint8
     Pause,
     Settings,
     Loadout,
-    Inventory
+    Inventory,
+    ClassSelect
 };
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
@@ -35,6 +36,7 @@ private:
     TSharedRef<SWidget> BuildSettingsScreen();
     TSharedRef<SWidget> BuildLoadoutScreen();
     TSharedRef<SWidget> BuildInventoryScreen();
+    TSharedRef<SWidget> BuildClassSelectScreen();
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
@@ -43,5 +45,7 @@ private:
     TWeakObjectPtr<ABreakerCharacter> Character;
     TSharedPtr<SBox> ContentHost;
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
+    // -1 shows every slot; otherwise an EBreakerEquipSlot index.
+    int32 BackpackSlotFilter = -1;
     EBreakerMenuScreen RootScreen = EBreakerMenuScreen::Main;
 };

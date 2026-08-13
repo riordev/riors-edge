@@ -155,6 +155,17 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.7f);
         }
     }
+
+    // One elite anchors the back of the pack: tougher, harder-hitting, and
+    // guaranteed Exceptional-or-better drops.
+    const FVector EliteLocation = Origin + Forward * (SafeZoneRadius + 2400.0f);
+    FActorSpawnParameters EliteParams;
+    EliteParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    if (ABreakerEnemy* Elite = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), EliteLocation, FRotator::ZeroRotator, EliteParams))
+    {
+        Elite->ConfigureEncounter(EliteLocation, 0.9f);
+        Elite->ConfigureElite();
+    }
 }
 
 void ABreakerGameMode::ResetPlaytestTargets()

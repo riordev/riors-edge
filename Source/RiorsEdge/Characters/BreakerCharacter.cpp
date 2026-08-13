@@ -22,6 +22,8 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Save/BreakerSaveGame.h"
+#include "Kismet/GameplayStatics.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/GameModeBase.h"
 #include "Misc/ConfigCacheIni.h"
@@ -130,6 +132,7 @@ void ABreakerCharacter::BeginPlay()
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
     PlaytestSpawnTransform = GetActorTransform();
+    if (HasAuthority()) LoadGameState();
     float SavedFOV = 90.0f;
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
@@ -153,8 +156,33 @@ void ABreakerCharacter::BeginPlay()
     }
 }
 
+void ABreakerCharacter::SaveGameState()
+{
+    if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
+    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Save) return;
+    Save->Progression = Progression->GetProgressionState();
+    Save->EquippedItems = Equipment->GetEquipped();
+    Save->BackpackItems = Equipment->GetBackpack();
+    Save->SlotOneArchetype = Weapon->GetSlotArchetype(1);
+    Save->SlotTwoArchetype = Weapon->GetSlotArchetype(2);
+    UGameplayStatics::SaveGameToSlot(Save, UBreakerSaveGame::DefaultSlotName(), 0);
+}
+
+void ABreakerCharacter::LoadGameState()
+{
+    if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
+    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(UBreakerSaveGame::DefaultSlotName(), 0));
+    if (!Save) return;
+    Progression->LoadProgressionState(Save->Progression);
+    Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
+    Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
+    Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
+}
+
 void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    SaveGameState();
     if (MenuWidget.IsValid() && GEngine && GEngine->GameViewport)
     {
         GEngine->GameViewport->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
@@ -429,15 +457,25 @@ void ABreakerCharacter::ApplyWeaponPresentation()
     if (!Weapon || !PrototypeWeaponVisual || !PrototypeWeaponBarrel || !PrototypeWeaponSight) return;
     switch (Weapon->GetArchetype())
     {
-        case EBreakerWeaponArchetype::Scattergun:
+        case EBreakerWeaponArchetype::Shotgun:
             PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.34f, 0.12f, 0.11f));
             PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.55f, 0.48f, 0.48f));
             PrototypeWeaponSight->SetRelativeScale3D(FVector(0.08f, 0.22f, 0.22f));
             break;
-        case EBreakerWeaponArchetype::Marksman:
+        case EBreakerWeaponArchetype::Sniper:
             PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.52f, 0.065f, 0.065f));
             PrototypeWeaponBarrel->SetRelativeScale3D(FVector(1.05f, 0.22f, 0.22f));
             PrototypeWeaponSight->SetRelativeScale3D(FVector(0.22f, 0.45f, 0.45f));
+            break;
+        case EBreakerWeaponArchetype::SMG:
+            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.28f, 0.09f, 0.09f));
+            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.45f, 0.28f, 0.28f));
+            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.09f, 0.24f, 0.24f));
+            break;
+        case EBreakerWeaponArchetype::Rocket:
+            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.4f, 0.16f, 0.16f));
+            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.9f, 0.6f, 0.6f));
+            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.14f, 0.34f, 0.34f));
             break;
         default:
             PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.42f, 0.08f, 0.08f));

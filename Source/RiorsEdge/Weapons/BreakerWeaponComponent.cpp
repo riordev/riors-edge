@@ -8,6 +8,7 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "Weapons/BreakerRocketProjectile.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Weapons/BreakerWeaponMath.h"
 
@@ -15,18 +16,59 @@ namespace
 {
     UBreakerWeaponDefinition* GetPrototypeDefinition(EBreakerWeaponArchetype Archetype)
     {
-        static TObjectPtr<UBreakerWeaponDefinition> Prototypes[3];
+        static TObjectPtr<UBreakerWeaponDefinition> Prototypes[static_cast<int32>(EBreakerWeaponArchetype::Count)];
         const int32 Index = static_cast<int32>(Archetype);
         if (!Prototypes[Index])
         {
-            const FName Names[] = { TEXT("PrototypeRifleDefinition"), TEXT("PrototypeScattergunDefinition"), TEXT("PrototypeMarksmanDefinition") };
+            const FName Names[] =
+            {
+                TEXT("PrototypeRifleDefinition"), TEXT("PrototypeSMGDefinition"), TEXT("PrototypeSniperDefinition"),
+                TEXT("PrototypeShotgunDefinition"), TEXT("PrototypeRocketDefinition")
+            };
             Prototypes[Index] = NewObject<UBreakerWeaponDefinition>(GetTransientPackage(), Names[Index]);
             Prototypes[Index]->AddToRoot();
             UBreakerWeaponDefinition* Definition = Prototypes[Index];
-            if (Archetype == EBreakerWeaponArchetype::Scattergun)
+            switch (Archetype)
             {
-                Definition->WeaponId = TEXT("Scattergun");
-                Definition->DisplayName = FText::FromString(TEXT("Scattergun"));
+            case EBreakerWeaponArchetype::SMG:
+                Definition->WeaponId = TEXT("SMG");
+                Definition->DisplayName = FText::FromString(TEXT("SMG"));
+                Definition->Damage = 13.0f;
+                Definition->WeakPointMultiplier = 1.5f;
+                Definition->RoundsPerMinute = 900.0f;
+                Definition->bAutomatic = true;
+                Definition->HipSpreadDegrees = 2.0f;
+                Definition->AimSpreadDegrees = 0.9f;
+                Definition->MagazineSize = 35;
+                Definition->StartingReserveAmmo = 175;
+                Definition->ReloadDuration = 1.5f;
+                Definition->FalloffStart = 1200.0f;
+                Definition->FalloffEnd = 3500.0f;
+                Definition->MinimumFalloffMultiplier = 0.4f;
+                Definition->MaximumRange = 6000.0f;
+                Definition->SwapInDuration = 0.35f;
+                break;
+            case EBreakerWeaponArchetype::Sniper:
+                Definition->WeaponId = TEXT("Sniper");
+                Definition->DisplayName = FText::FromString(TEXT("Sniper"));
+                Definition->Damage = 72.0f;
+                Definition->WeakPointMultiplier = 2.0f;
+                Definition->RoundsPerMinute = 150.0f;
+                Definition->bAutomatic = false;
+                Definition->HipSpreadDegrees = 2.0f;
+                Definition->AimSpreadDegrees = 0.05f;
+                Definition->MagazineSize = 8;
+                Definition->StartingReserveAmmo = 40;
+                Definition->ReloadDuration = 2.3f;
+                Definition->FalloffStart = 3500.0f;
+                Definition->FalloffEnd = 9000.0f;
+                Definition->MinimumFalloffMultiplier = 0.7f;
+                Definition->MaximumRange = 15000.0f;
+                Definition->SwapInDuration = 0.7f;
+                break;
+            case EBreakerWeaponArchetype::Shotgun:
+                Definition->WeaponId = TEXT("Shotgun");
+                Definition->DisplayName = FText::FromString(TEXT("Shotgun"));
                 Definition->Damage = 10.0f;
                 Definition->WeakPointMultiplier = 1.35f;
                 Definition->RoundsPerMinute = 85.0f;
@@ -41,29 +83,28 @@ namespace
                 Definition->FalloffEnd = 2500.0f;
                 Definition->MinimumFalloffMultiplier = 0.25f;
                 Definition->MaximumRange = 4000.0f;
-            }
-            else if (Archetype == EBreakerWeaponArchetype::Marksman)
-            {
-                Definition->WeaponId = TEXT("Marksman");
-                Definition->DisplayName = FText::FromString(TEXT("Marksman"));
-                Definition->Damage = 72.0f;
-                Definition->WeakPointMultiplier = 2.0f;
-                Definition->RoundsPerMinute = 150.0f;
+                break;
+            case EBreakerWeaponArchetype::Rocket:
+                Definition->WeaponId = TEXT("Rocket");
+                Definition->DisplayName = FText::FromString(TEXT("Rocket Launcher"));
+                Definition->Damage = 90.0f;
+                Definition->WeakPointMultiplier = 1.0f;
+                Definition->RoundsPerMinute = 55.0f;
                 Definition->bAutomatic = false;
-                Definition->PelletsPerShot = 1;
-                Definition->HipSpreadDegrees = 2.0f;
-                Definition->AimSpreadDegrees = 0.05f;
-                Definition->MagazineSize = 8;
-                Definition->StartingReserveAmmo = 40;
-                Definition->ReloadDuration = 2.3f;
-                Definition->FalloffStart = 3500.0f;
-                Definition->FalloffEnd = 9000.0f;
-                Definition->MinimumFalloffMultiplier = 0.7f;
-                Definition->MaximumRange = 15000.0f;
-            }
-            else
-            {
+                Definition->HipSpreadDegrees = 0.6f;
+                Definition->AimSpreadDegrees = 0.2f;
+                Definition->MagazineSize = 4;
+                Definition->StartingReserveAmmo = 16;
+                Definition->ReloadDuration = 2.8f;
+                Definition->MaximumRange = 12000.0f;
+                Definition->SwapInDuration = 0.8f;
+                Definition->bProjectile = true;
+                Definition->ProjectileSpeed = 3200.0f;
+                Definition->ExplosionRadius = 350.0f;
+                break;
+            default:
                 Definition->DisplayName = FText::FromString(TEXT("Rifle"));
+                break;
             }
         }
         return Prototypes[Index];
@@ -96,6 +137,8 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(UBreakerWeaponComponent, CurrentArchetype);
     DOREPLIFETIME(UBreakerWeaponComponent, CurrentSlot);
     DOREPLIFETIME(UBreakerWeaponComponent, bSwapping);
+    DOREPLIFETIME(UBreakerWeaponComponent, SlotOneArchetype);
+    DOREPLIFETIME(UBreakerWeaponComponent, SlotTwoArchetype);
 }
 
 const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() const
@@ -121,15 +164,15 @@ void UBreakerWeaponComponent::InitializeSlotAmmunition()
 {
     if (SlotOneMagazineAmmo < 0)
     {
-        const UBreakerWeaponDefinition* Rifle = GetPrototypeDefinition(EBreakerWeaponArchetype::Rifle);
-        SlotOneMagazineAmmo = Rifle->MagazineSize;
-        SlotOneReserveAmmo = Rifle->StartingReserveAmmo;
+        const UBreakerWeaponDefinition* SlotOne = GetPrototypeDefinition(SlotOneArchetype);
+        SlotOneMagazineAmmo = SlotOne->MagazineSize;
+        SlotOneReserveAmmo = SlotOne->StartingReserveAmmo;
     }
     if (SlotTwoMagazineAmmo < 0)
     {
-        const UBreakerWeaponDefinition* Scattergun = GetPrototypeDefinition(EBreakerWeaponArchetype::Scattergun);
-        SlotTwoMagazineAmmo = Scattergun->MagazineSize;
-        SlotTwoReserveAmmo = Scattergun->StartingReserveAmmo;
+        const UBreakerWeaponDefinition* SlotTwo = GetPrototypeDefinition(SlotTwoArchetype);
+        SlotTwoMagazineAmmo = SlotTwo->MagazineSize;
+        SlotTwoReserveAmmo = SlotTwo->StartingReserveAmmo;
     }
 }
 
@@ -162,7 +205,7 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     InitializeSlotAmmunition();
     StoreActiveSlotAmmunition();
     CurrentSlot = SlotNumber;
-    CurrentArchetype = CurrentSlot == 1 ? EBreakerWeaponArchetype::Rifle : EBreakerWeaponArchetype::Scattergun;
+    CurrentArchetype = CurrentSlot == 1 ? SlotOneArchetype : SlotTwoArchetype;
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
     bReloading = false;
@@ -203,12 +246,55 @@ void UBreakerWeaponComponent::ServerEquipSlot_Implementation(int32 SlotNumber)
     EquipSlot(SlotNumber);
 }
 
+void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype)
+{
+    SlotNumber = FMath::Clamp(SlotNumber, 1, 2);
+    if (GetOwner() && !GetOwner()->HasAuthority())
+    {
+        ServerSetSlotArchetype(SlotNumber, NewArchetype);
+        return;
+    }
+    if (GetSlotArchetype(SlotNumber) == NewArchetype) return;
+
+    const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(NewArchetype);
+    if (SlotNumber == 1)
+    {
+        SlotOneArchetype = NewArchetype;
+        SlotOneMagazineAmmo = Definition->MagazineSize;
+        SlotOneReserveAmmo = Definition->StartingReserveAmmo;
+    }
+    else
+    {
+        SlotTwoArchetype = NewArchetype;
+        SlotTwoMagazineAmmo = Definition->MagazineSize;
+        SlotTwoReserveAmmo = Definition->StartingReserveAmmo;
+    }
+    if (CurrentSlot == SlotNumber)
+    {
+        StopFire();
+        if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
+        bReloading = false;
+        CurrentArchetype = NewArchetype;
+        MagazineAmmo = Definition->MagazineSize;
+        ReserveAmmo = Definition->StartingReserveAmmo;
+        OnReloadChanged.Broadcast(false);
+        OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+    }
+}
+
+void UBreakerWeaponComponent::ServerSetSlotArchetype_Implementation(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype)
+{
+    SetSlotArchetype(SlotNumber, NewArchetype);
+}
+
 FString UBreakerWeaponComponent::GetArchetypeName() const
 {
     switch (CurrentArchetype)
     {
-        case EBreakerWeaponArchetype::Scattergun: return TEXT("SCATTERGUN");
-        case EBreakerWeaponArchetype::Marksman: return TEXT("MARKSMAN");
+        case EBreakerWeaponArchetype::SMG: return TEXT("SMG");
+        case EBreakerWeaponArchetype::Sniper: return TEXT("SNIPER");
+        case EBreakerWeaponArchetype::Shotgun: return TEXT("SHOTGUN");
+        case EBreakerWeaponArchetype::Rocket: return TEXT("ROCKET");
         default: return TEXT("RIFLE");
     }
 }
@@ -294,6 +380,14 @@ void UBreakerWeaponComponent::FireOnce()
     FRotator ViewRotation;
     GetViewPoint(ViewLocation, ViewRotation);
     const float Spread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
+
+    if (Definition->bProjectile)
+    {
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread);
+        if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
+        return;
+    }
+
     FBreakerShotResult Shot;
     Shot.bFired = true;
     Shot.TraceStart = ViewLocation;
@@ -349,6 +443,43 @@ void UBreakerWeaponComponent::FireOnce()
     MulticastShotCosmetics(Shot);
 
     if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
+}
+
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread)
+{
+    const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
+
+    const UBreakerAttributeSet* SourceAttributes = nullptr;
+    if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
+    {
+        if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
+    }
+    FBreakerDamageRequest Damage;
+    Damage.BaseDamage = Definition->Damage;
+    Damage.DamageFamily = EBreakerDamageFamily::Physical;
+    Damage.WeakPointMultiplier = 1.0f;
+    Damage.ArmorPenetration = Definition->ArmorPenetration;
+    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
+    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    Params.Owner = GetOwner();
+    Params.Instigator = Cast<APawn>(GetOwner());
+    // Spawn ahead of the view so the rocket clears the shooter's capsule.
+    const FVector SpawnLocation = ViewLocation + Direction * 80.0f;
+    if (ABreakerRocketProjectile* Rocket = GetWorld()->SpawnActor<ABreakerRocketProjectile>(ABreakerRocketProjectile::StaticClass(), SpawnLocation, Direction.Rotation(), Params))
+    {
+        Rocket->InitializeRocket(Damage, Definition->ProjectileSpeed, Definition->ExplosionRadius);
+    }
+
+    FBreakerShotResult Shot;
+    Shot.bFired = true;
+    Shot.TraceStart = ViewLocation;
+    Shot.TraceEnd = SpawnLocation + Direction * 400.0f;
+    MulticastShotCosmetics(Shot);
 }
 
 void UBreakerWeaponComponent::FinishReload()

@@ -18,6 +18,9 @@ public:
     UBreakerProgressionComponent();
 
     UFUNCTION(BlueprintCallable, Category="Progression") bool ChoosePermanentClass(const UBreakerClassDefinition* ClassDefinition);
+    // Selection framework path while class Data Assets do not exist yet:
+    // locks the permanent class by id alone. Same one-way rule.
+    UFUNCTION(BlueprintCallable, Category="Progression") bool ChoosePermanentClassById(EBreakerClassId ClassId);
     UFUNCTION(BlueprintCallable, Category="Progression") bool PurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason);
     UFUNCTION(BlueprintCallable, Category="Progression") bool EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason);
     UFUNCTION(BlueprintCallable, Category="Progression") bool RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason);
