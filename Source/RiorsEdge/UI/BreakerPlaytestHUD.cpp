@@ -5,6 +5,7 @@
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -457,72 +458,21 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
     const float InnerW = InnerRight - InnerX;
 
     // --- Row 1: class resource (§2) ---------------------------------------
+    // Generic by construction: the row asks for a resolved description and
+    // paints that. It does not know which classes exist.
     {
-        FString StateName = TEXT("NO RESOURCE");
-        FString ResourceLabel = TEXT("RESOURCE");
-        float Fraction = 0.0f;
-        FLinearColor ResourceColor = BreakerUI::TextDisabled;
-        EBreakerMomentumState State = EBreakerMomentumState::Settled;
-        bool bActive = false;
-        if (const UBreakerMomentumComponent* Momentum = Character->GetMomentum(); Momentum && Momentum->IsActiveForOwner())
-        {
-            bActive = true;
-            ResourceLabel = TEXT("MOMENTUM");
-            Fraction = FMath::Clamp(Momentum->GetMomentumFraction(), 0.0f, 1.0f);
-            State = Momentum->GetMomentumState();
-            switch (State)
-            {
-            case EBreakerMomentumState::Redline: StateName = TEXT("REDLINE"); ResourceColor = BreakerUI::Orange; break;
-            case EBreakerMomentumState::Running: StateName = TEXT("RUNNING"); ResourceColor = BreakerUI::Gold; break;
-            default:                             StateName = TEXT("SETTLED"); ResourceColor = BreakerUI::Cyan; break;
-            }
-        }
+        const BreakerHUD::FResourceRow Row = ResolveResourceRow(Character);
 
-        DrawSpecText(ResourceLabel, InnerX, Y + Pad, ResourceColor, 11.0f);
+        DrawSpecText(Row.Label, InnerX, Y + Pad, Row.StateColor, 11.0f);
         // The state word is a confirmation, never the carrier: colour, fill
         // height and block texture do the work below.
-        DrawSpecText(StateName, InnerX + S(84.0f), Y + Pad - S(3.0f), ResourceColor, 17.0f);
+        DrawSpecText(Row.StateWord, InnerX + S(84.0f), Y + Pad - S(3.0f), Row.StateColor, 17.0f);
         DrawSpecTextRight(FString::Printf(TEXT("%.0f M/S"), Character->GetHorizontalSpeed() / 100.0f),
             InnerRight, Y + Pad, BreakerUI::TextMuted, 11.0f);
 
         const float TrackY = Y + Pad + S(20.0f);
         const float TrackH = S(BreakerUI::HudMomentumTrackHeight);
-        DrawRect(BreakerUI::Panel10, InnerX, TrackY, InnerW, TrackH);
-
-        if (bActive && Fraction > 0.0f)
-        {
-            const float FillW = InnerW * Fraction;
-            if (State == EBreakerMomentumState::Settled)
-            {
-                // Single continuous bar, low fill.
-                DrawRect(ResourceColor, InnerX, TrackY + TrackH * 0.25f, FillW, TrackH * 0.5f);
-            }
-            else
-            {
-                // Chevron-cut blocks: the texture itself changes with state,
-                // so peripheral vision reads the tier without the word.
-                const float BlockW = S(State == EBreakerMomentumState::Redline ? 14.0f : 8.0f);
-                const float BlockGap = S(3.0f);
-                const float Shear = S(3.0f);
-                const float BlockH = State == EBreakerMomentumState::Redline ? TrackH : TrackH * 0.75f;
-                const float BlockY = TrackY + (TrackH - BlockH);
-                for (float BX = InnerX; BX < InnerX + FillW - BlockW * 0.5f; BX += BlockW + BlockGap)
-                {
-                    const float ClippedW = FMath::Min(BlockW, InnerX + FillW - BX);
-                    DrawShearedBlock(BX, BlockY, ClippedW, BlockH, Shear, ResourceColor);
-                }
-            }
-        }
-
-        // Two 2px notches at 33% and 66%: the state thresholds, cut into the
-        // track rather than painted on it.
-        const float NotchW = S(2.0f);
-        DrawRect(BreakerUI::BgVoid, InnerX + InnerW * 0.33f, TrackY, NotchW, TrackH);
-        DrawRect(BreakerUI::BgVoid, InnerX + InnerW * 0.66f, TrackY, NotchW, TrackH);
-        // Redline widens the track border to 2px orange.
-        DrawBorder(InnerX, TrackY, InnerW, TrackH,
-            State == EBreakerMomentumState::Redline && bActive ? BreakerUI::Orange : BreakerUI::BorderEmphasis,
-            S(State == EBreakerMomentumState::Redline && bActive ? 2.0f : 1.0f));
+        DrawResourceTrack(Row, InnerX, TrackY, InnerW, TrackH);
     }
 
     // --- Row 2: weapon name and magazine on one baseline ------------------
@@ -560,13 +510,117 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"), SlotsX + SlotSize + SlotGap, SlotY, SlotSize, BreakerUI::Cyan);
     DrawAbilitySlot(Character, Abilities, EBreakerAbilitySlot::Ultimate, TEXT("G"), SlotsX + (SlotSize + SlotGap) * 2.0f, SlotY, SlotSize, BreakerUI::Violet);
 
-    // Silent-dead-keys guard: only Swift has an implemented kit. If nothing is
-    // granted, say so instead of letting E/T/G feel broken.
+    // Silent-dead-keys guard: not every class has an implemented kit yet
+    // (Swift and Caster do). If nothing is granted, say so instead of letting
+    // E/T/G feel broken.
     if (Abilities && Abilities->GetGrantedCount() == 0)
     {
-        DrawSpecTextRight(TEXT("NO ABILITY KIT — ONLY SWIFT IS IMPLEMENTED"),
+        DrawSpecTextRight(TEXT("NO ABILITY KIT FOR THIS CLASS YET"),
             InnerRight, SlotY - S(14.0f), BreakerUI::Orange, 11.0f);
     }
+}
+
+// --------------------------------------------------------------------------
+// §2 — which resource this character carries. One member-pointer read per
+// class component, in the order the classes were implemented; no component
+// lookup, no actor iteration, nothing that was not already on this path.
+//
+// Only one of these can ever be active: the permanent class is one value, and
+// each loop gates itself on it.
+// --------------------------------------------------------------------------
+BreakerHUD::FResourceRow ABreakerPlaytestHUD::ResolveResourceRow(const ABreakerCharacter* Character)
+{
+    if (!Character) return BreakerHUD::ResolveEmptyResourceRow();
+
+    if (const UBreakerMomentumComponent* Momentum = Character->GetMomentum(); Momentum && Momentum->IsActiveForOwner())
+    {
+        return BreakerHUD::ResolveMomentumRow(Momentum->GetMomentumFraction(), Momentum->GetMomentumState());
+    }
+    if (const UBreakerManaComponent* Mana = Character->GetMana(); Mana && Mana->IsActiveForOwner())
+    {
+        // GetManaFraction() clamps to [0,1] and so cannot express the debt;
+        // the raw bank and the floor can, and both are already public.
+        const UBreakerAttributeSet* Attributes = Character->GetAttributes();
+        const float MaxMana = Attributes ? Attributes->GetMaxClassResource() : 0.0f;
+        return BreakerHUD::ResolveManaRow(Mana->GetMana(), MaxMana, Mana->GetOvercastFloor());
+    }
+    return BreakerHUD::ResolveEmptyResourceRow();
+}
+
+// --------------------------------------------------------------------------
+// §2 — the track itself. 12px tall with two 2px notches at 33% and 66%, fixed
+// by the spec and identical for every class; only the fill's texture changes.
+//
+// The Signed treatment is the one that needed designing. Overcast is a
+// NEGATIVE bank, and a left-anchored horizontal fill has no room to the left
+// of zero — stealing track width for a debt zone would move the two notches,
+// which the spec fixes. So the axis that inverts is the vertical one: a zero
+// baseline across the middle of the track, credit growing rightward in the
+// upper half, debt growing rightward in the LOWER half in the harm colour.
+// Length still reads magnitude, direction now reads sign, and it is exactly
+// what the Overcast icon does ("the same channel, half above zero and half
+// beneath"). The baseline is drawn last and always, credit or debt: without
+// it the bar is a short fill, not a deficit.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height)
+{
+    DrawRect(BreakerUI::Panel10, X, Y, Width, Height);
+
+    const float Magnitude = FMath::Clamp(FMath::Abs(Row.Fraction), 0.0f, 1.0f);
+    const float FillW = Width * Magnitude;
+
+    switch (Row.Track)
+    {
+    case BreakerHUD::EResourceTrack::Continuous:
+        if (FillW > 0.0f) DrawRect(Row.StateColor, X, Y + Height * 0.25f, FillW, Height * 0.5f);
+        break;
+
+    case BreakerHUD::EResourceTrack::Blocks:
+    case BreakerHUD::EResourceTrack::WideBlocks:
+        if (FillW > 0.0f)
+        {
+            // Chevron-cut blocks: the texture itself changes with state, so
+            // peripheral vision reads the tier without the word.
+            const bool bWide = Row.Track == BreakerHUD::EResourceTrack::WideBlocks;
+            const float BlockW = S(bWide ? 14.0f : 8.0f);
+            const float BlockGap = S(3.0f);
+            const float Shear = S(3.0f);
+            const float BlockH = bWide ? Height : Height * 0.75f;
+            const float BlockY = Y + (Height - BlockH);
+            for (float BX = X; BX < X + FillW - BlockW * 0.5f; BX += BlockW + BlockGap)
+            {
+                DrawShearedBlock(BX, BlockY, FMath::Min(BlockW, X + FillW - BX), BlockH, Shear, Row.StateColor);
+            }
+        }
+        break;
+
+    case BreakerHUD::EResourceTrack::Signed:
+    {
+        const float LineT = FMath::Max(S(1.0f), 1.0f);
+        const float BaseY = Y + Height * 0.5f;
+        const float HalfFill = Height * 0.5f - LineT;
+        if (FillW > 0.0f && HalfFill > 0.0f)
+        {
+            if (Row.Fraction < 0.0f) DrawRect(Row.StateColor, X, BaseY + LineT, FillW, HalfFill);
+            else                     DrawRect(Row.StateColor, X, BaseY - LineT - HalfFill, FillW, HalfFill);
+        }
+        // Zero, stated: the reference line survives at 1px whatever the fill
+        // is doing, and is never coloured by the state.
+        DrawRect(BreakerUI::TextMuted, X, BaseY - LineT * 0.5f, Width, LineT);
+        break;
+    }
+
+    case BreakerHUD::EResourceTrack::Empty:
+    default:
+        break;
+    }
+
+    // Two 2px notches at 33% and 66%: the state thresholds, cut into the track
+    // rather than painted on it. Fixed by the spec for every class.
+    const float NotchW = S(2.0f);
+    DrawRect(BreakerUI::BgVoid, X + Width * 0.33f, Y, NotchW, Height);
+    DrawRect(BreakerUI::BgVoid, X + Width * 0.66f, Y, NotchW, Height);
+    DrawBorder(X, Y, Width, Height, Row.BorderColor, S(Row.BorderPixels));
 }
 
 // --------------------------------------------------------------------------
@@ -1416,6 +1470,108 @@ void ABreakerPlaytestHUD::DrawAbilityGlyph(const UBreakerAbilityDefinition* Defi
         // The chevron lifting out of the bar.
         Stroke2(0.40f, 0.32f, 0.58f, 0.10f);
         Stroke2(0.58f, 0.10f, 0.76f, 0.32f);
+        return;
+    }
+
+    if (Leaf.Equals(TEXT("Cleave"), ESearchCase::IgnoreCase))
+    {
+        // SPELLBLADE STRIKE. A narrow blade angled up to the right, its cutting
+        // edge doubled by a second parallel line — the mana edge sitting a hair
+        // off the steel — with one clean arc across the lower half as the swing
+        // path, cut off before it closes so it reads as a slash, not a ring.
+        // Min size is "blade angle + arc": the two are held ~0.15 of the box
+        // apart at their closest, so the arc never merges into the blade even
+        // when the doubled edge does.
+        Stroke2(0.34f, 0.72f, 0.92f, 0.14f);
+        // The mana edge, offset perpendicular to the blade. Allowed to merge
+        // with the steel below 40px; it is the first thing to go.
+        Stroke2(0.42f, 0.79f, 1.00f, 0.21f);
+        // Swing path: an arc under the blade, open at both ends.
+        {
+            const float CU = 0.50f;
+            const float CV = 0.46f;
+            const float R = 0.44f;
+            constexpr int32 Segments = 6;
+            const float Start = FMath::DegreesToRadians(30.0f);
+            const float End = FMath::DegreesToRadians(150.0f);
+            float PrevU = CU + R * FMath::Cos(Start);
+            float PrevV = CV + R * FMath::Sin(Start);
+            for (int32 Index = 1; Index <= Segments; ++Index)
+            {
+                const float Angle = FMath::Lerp(Start, End, static_cast<float>(Index) / Segments);
+                const float U = CU + R * FMath::Cos(Angle);
+                const float V = CV + R * FMath::Sin(Angle);
+                Stroke2(PrevU, PrevV, U, V);
+                PrevU = U;
+                PrevV = V;
+            }
+        }
+        return;
+    }
+    if (Leaf.Equals(TEXT("Closequarter"), ESearchCase::IgnoreCase))
+    {
+        // VOID LASH. A single S-curve whipping from the lower-left corner to a
+        // two-pronged barb at the far upper right, drawn at full stroke the
+        // whole way, with two small dots falling off the underside — the tail
+        // coming apart as it travels. Min size is reach: the curve touches two
+        // opposite corners of the box, so it is the last thing to shrink.
+        {
+            const FVector2D P0(0.03f, 0.95f);
+            const FVector2D P1(0.58f, 0.86f);
+            const FVector2D P2(0.34f, 0.20f);
+            const FVector2D P3(0.90f, 0.10f);
+            constexpr int32 Segments = 8;
+            FVector2D Prev = P0;
+            for (int32 Index = 1; Index <= Segments; ++Index)
+            {
+                const float T = static_cast<float>(Index) / Segments;
+                const float IT = 1.0f - T;
+                const FVector2D Point =
+                    P0 * (IT * IT * IT) + P1 * (3.0f * IT * IT * T) + P2 * (3.0f * IT * T * T) + P3 * (T * T * T);
+                Stroke2(Prev.X, Prev.Y, Point.X, Point.Y);
+                Prev = Point;
+            }
+            // The barb: two prongs off the tip, never dropped.
+            Stroke2(P3.X, P3.Y, 0.70f, 0.06f);
+            Stroke2(P3.X, P3.Y, 0.82f, 0.30f);
+        }
+        // Two dots off the underside. These go first at small sizes.
+        DrawRect(Color, PX(0.24f) - Stroke * 0.5f, PY(0.92f) - Stroke * 0.5f, Stroke, Stroke);
+        DrawRect(Color, PX(0.44f) - Stroke * 0.5f, PY(0.78f) - Stroke * 0.5f, Stroke, Stroke);
+        return;
+    }
+    if (Leaf.Equals(TEXT("Unmake"), ESearchCase::IgnoreCase))
+    {
+        // OVERCAST. A muted baseline across the middle with the bar's outline
+        // continuing below it: one channel, half above zero and half beneath,
+        // because the cost is the same resource and not a second one. A small
+        // cross sits under the dipped section as the debt mark.
+        //
+        // Unmake carries this mark because Unmake is the ability that rewrites
+        // the price of every Caster cast — the set's one statement about the
+        // cost channel itself. It is the ultimate, so the caller hands it
+        // violet; the baseline stays grey, which is the one place the icon
+        // system allows a second value, and the spec names it explicitly.
+        const FLinearColor BaselineColor = Color.Equals(BreakerUI::TextDisabled)
+            ? BreakerUI::TextDisabled : BreakerUI::TextMuted;
+        const float BaselineT = FMath::Max(Stroke * 0.5f, 1.0f);
+        DrawRect(BaselineColor, PX(0.02f), PY(0.50f) - BaselineT * 0.5f, BoxSize * 0.96f, BaselineT);
+
+        // The channel: constant height, stepping down across the baseline at
+        // the midpoint. Min size is the baseline crossing — keep both.
+        const float StepU = 0.52f;
+        Stroke2(0.10f, 0.26f, StepU, 0.26f);   // upper channel, top edge
+        Stroke2(0.10f, 0.50f, StepU, 0.50f);   // upper channel, bottom edge
+        Stroke2(0.10f, 0.26f, 0.10f, 0.50f);   // left cap
+        Stroke2(StepU, 0.26f, StepU, 0.52f);   // the step down, top edge
+        Stroke2(StepU, 0.50f, StepU, 0.76f);   // the step down, bottom edge
+        Stroke2(StepU, 0.52f, 0.90f, 0.52f);   // dipped channel, top edge
+        Stroke2(StepU, 0.76f, 0.90f, 0.76f);   // dipped channel, bottom edge
+        Stroke2(0.90f, 0.52f, 0.90f, 0.76f);   // right cap
+
+        // The debt mark, under the dipped section.
+        Stroke2(0.65f, 0.90f, 0.79f, 0.90f);
+        Stroke2(0.72f, 0.83f, 0.72f, 0.97f);
         return;
     }
 

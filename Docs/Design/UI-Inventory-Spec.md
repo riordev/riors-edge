@@ -66,10 +66,11 @@ Landed in `SBreakerMenu::BuildInventoryScreen`:
   arm and `BACK`; the body is a three-column row beneath it; there is no
   footer, per the spec.
 - **Equip-limit counters, live.** Aberrant `N/3` on the harm rail, Anomalous
-  `N/1` on the teal rail *and* a full teal border. Both counts are derived in
-  the UI by walking `UBreakerEquipmentComponent::GetEquipped()` —
-  the component exposes no rarity-count accessor, and adding one was out of
-  scope for this pass. The count turns to its rail colour at the limit.
+  `N/1` on the teal rail *and* a full teal border. The count turns to its rail
+  colour at the limit. Both the counts and the caps now come from
+  `UBreakerEquipmentComponent` (`CountEquippedOfRarity` /
+  `EquipLimitForRarity`); the screen holds no second opinion about a rule that
+  decides which of the player's items gets ejected.
 - **Character column, 560 wide**: the render-slot placeholder fills the top,
   gear totals pinned beneath it as aligned label/value rows in a fixed 104px
   value column. The value carries its function family's colour — player/system
@@ -83,13 +84,73 @@ Landed in `SBreakerMenu::BuildInventoryScreen`:
   the slot chips and the `RMB / X DISCARD · LMB EQUIP` hint, then the card
   grid beneath it.
 
-Not landed:
+## Implementation status (2026-08-13, disclosure pass)
 
-- Per-affix deltas against the equipped piece (▲/▼/=) and the equip-limit
-  disclosure footer (`LIMIT FULL 3/3` + hover outline on the ejected piece).
-  Both need equipment-side queries that do not exist yet.
-- The bulk-discard modal; the arm still commits on the second click.
-- The empty backpack shows its line of copy but not the five rarity beams.
+The queries the previous pass was missing now exist on
+`UBreakerEquipmentComponent`, and the four disclosure features are built on
+them. **Comparison and cap arithmetic are game rules and live in C++ with
+tests; the screen states their answers and works nothing out itself.**
+
+- **Per-affix deltas.** Every affix line on a backpack card carries its delta
+  against the equipped piece in that slot: cyan ▲ better, harm-red ▼ worse,
+  muted `=` parity, in a fixed 14px glyph column so the affix names keep a
+  straight left edge. Matching is by **(stat target, bucket)**, not affix id —
+  two affixes feeding the same stat are one number to the player, and a flat
+  +Health is not comparable against an Increased Health percentage. An empty
+  slot makes every line an improvement. Polarity note: every stat target in the
+  slice pool is "higher is better" (Dash Cooldown *Reduction* included); a
+  target where lower is better would need a polarity flag on
+  `FBreakerAffixDefinition` before it could be compared.
+- **The equip-limit disclosure.** A backpack card that would break the cap
+  carries a second footer line, `LIMIT FULL N/N · EJECTS <RARITY> <SLOT> iN`,
+  in harm red, and hovering it outlines that equipment row in harm red. **The
+  action is not blocked** — `EquipItem` performs the equip and ejects the named
+  piece to the backpack. The displacement rule: the **weakest** equipped piece
+  of that rarity leaves — lowest item level, ties broken by wear order — and
+  the piece already in the candidate's own slot is excluded, because it is
+  leaving regardless. So an Aberrant-for-Aberrant swap in the same slot ejects
+  nothing extra even at 3/3. Items carry no display name field yet, so the
+  doomed piece is named by rarity and slot, which is how its own card is
+  titled. The hover is `OnHovered`/`OnUnhovered` painting one border
+  imperatively — never a per-frame attribute, per the historical jitter bug.
+  (`RestoreState` deliberately does *not* enforce the cap: loading a save must
+  not reshuffle the player's loadout.)
+- **The bulk-discard modal.** The header arm still turns gold and reads
+  `CONFIRM`; the second click now opens a modal instead of committing. It
+  states the count, the exclusions (equipped gear, Aberrant, Anomalous), and
+  offers `Cancel` beside `DESTROY N` in harm red on the destructive face
+  (`#2A1414`, new `BreakerUI::DestructiveFace` token) with a 2px harm ring.
+  The scrim swallows clicks so the screen behind cannot be operated through it.
+  The count comes from `CountBackpackBelowRarity`, which shares its predicate
+  with `DiscardBackpackBelowRarity` — the number stated and the number
+  destroyed cannot drift.
+- **The empty backpack** now draws the five rarity beams as vertical bars in
+  the ground-drop ramp, under `LOOT IS FOUND BY COLOUR`.
+
+New component API (all usable from a ground-loot popup or a vendor screen, not
+just this one screen), covered by four new automation tests
+(`RiorsEdge.Items.Equipment.{RarityLimits,LimitDisplacement,AffixDeltas,BulkDiscardCount}`):
+
+- `EquipLimitForRarity(Rarity)` — static; `INDEX_NONE` means uncapped.
+- `CountEquippedOfRarity(Rarity)` / `CountBackpackBelowRarity(MinimumKept)`.
+- `PreviewEquip(Candidate)` → `FBreakerEquipPreview`: the slot swap, the limit
+  displacement, the rarity count and cap, and the affix deltas — the complete
+  consequence of one click, answered before it. `PreviewEquipAgainst` is the
+  pure form over any equipped set, so the cap rule is testable with no
+  component, actor or world.
+- `CompareAffixes(Candidate, Reference)` → `TArray<FBreakerAffixComparison>`,
+  one row per candidate affix in order.
+
+Still not landed:
+
+- **Nothing in this pass is visually verified either.** Build clean, 70/70
+  automation tests pass; no one has looked at the screen. Layout and hover
+  behaviour are unverified by definition.
+- The ▲/▼ glyphs are `BreakerUI::DeltaBetterGlyph` / `DeltaWorseGlyph`
+  tokens. The shipping faces are not imported, and the fallback face's
+  Geometric Shapes coverage is unverified — if they render as tofu, those two
+  lines are the fix.
+- The equipped card does not repeat its rarity tag under the item level.
 - Exact zone arithmetic. The spec's 560 + 400 + 960 sums to a full-bleed 1920,
   which the 64px screen margin makes impossible; the panel is 1760 wide, the
   two fixed columns keep their spec widths and the backpack takes what is left
@@ -98,5 +159,3 @@ Not landed:
   size is what caused the historical layout oscillation.
 - Gear score in the meta line is the sum of equipped item levels — `O2
   PLACEHOLDER`, no shipping formula is authored.
-- **Nothing here is visually verified.** The build compiles and the automation
-  suite passes; no one has looked at the screen.

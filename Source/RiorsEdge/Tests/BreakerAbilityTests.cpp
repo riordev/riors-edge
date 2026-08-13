@@ -14,6 +14,7 @@
 #include "Abilities/BreakerCasterAbility.h"
 #include "Abilities/BreakerGameplayAbility.h"
 #include "Abilities/BreakerMeleeSweep.h"
+#include "Classes/BreakerManaComponent.h"
 #include "GameFramework/Actor.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -568,12 +569,47 @@ bool FBreakerCasterCostWindowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Long Dark halves a cast"), UBreakerCasterAbility::CostUnderWindow(35.0f, 0.5f), 17.5f);
     TestEqual(TEXT("A negative scalar never refunds"), UBreakerCasterAbility::CostUnderWindow(35.0f, -2.0f), 0.0f);
 
-    // The affordability rule. Strict until the ClassResourceFloor attribute
-    // exists (Ability-Implementation-Spec D8) — see UBreakerCasterAbility.h.
+    // The affordability rule with a CLOSED floor: identical to the strict rule
+    // it replaced, which is what guarantees no other class changed.
     TestTrue(TEXT("Exactly enough Mana affords the cast"), UBreakerCasterAbility::CanCastAt(20.0f, 20.0f));
     TestFalse(TEXT("One short is refused"), UBreakerCasterAbility::CanCastAt(19.99f, 20.0f));
     TestTrue(TEXT("A free cast is always allowed"), UBreakerCasterAbility::CanCastAt(0.0f, 0.0f));
     TestTrue(TEXT("An empty bank still casts a freed ability"), UBreakerCasterAbility::CanCastAt(0.0f, UBreakerCasterAbility::CostUnderWindow(80.0f, 0.0f)));
+
+    // ...and with the floor OPEN (spec D8, Class-Kits §2.1). Overcast is a
+    // debt, not a spiral, and a cast that would breach the floor is REFUSED
+    // rather than truncated — a partial spend would be a silent discount.
+    TestTrue(TEXT("A cast may drive the bank into Overcast"), UBreakerCasterAbility::CanCastAt(10.0f, 30.0f, -20.0f));
+    TestTrue(TEXT("A cast may land exactly on the floor"), UBreakerCasterAbility::CanCastAt(10.0f, 30.0f, -20.0f));
+    TestFalse(TEXT("A cast that would breach the floor is refused, not truncated"), UBreakerCasterAbility::CanCastAt(10.0f, 31.0f, -20.0f));
+    TestFalse(TEXT("Nothing may be cast while already Overcast"), UBreakerCasterAbility::CanCastAt(-0.5f, 5.0f, -20.0f));
+    TestTrue(TEXT("A freed cast still works in debt: Overcast into Unmake"), UBreakerCasterAbility::CanCastAt(-15.0f, 0.0f, -20.0f));
+    TestTrue(TEXT("A deeper SB4 floor allows a deeper overdraft"), UBreakerCasterAbility::CanCastAt(10.0f, 44.0f, -35.0f));
+    TestFalse(TEXT("A positive floor is treated as closed"), UBreakerCasterAbility::CanCastAt(10.0f, 30.0f, 10.0f));
+
+    // The ability layer's rule and the Mana component's rule must not drift:
+    // one refuses the activation, the other refuses the spend, and a
+    // disagreement is either a free cast or a dead button.
+    const float Banks[] = {-30.0f, -0.01f, 0.0f, 10.0f, 20.0f, 100.0f};
+    const float Costs[] = {0.0f, 5.0f, 20.0f, 35.0f, 80.0f};
+    const float Floors[] = {0.0f, -20.0f, -35.0f};
+    for (const float Bank : Banks)
+    {
+        for (const float Cost : Costs)
+        {
+            for (const float Floor : Floors)
+            {
+                TestEqual(*FString::Printf(TEXT("Ability and Mana rules agree at bank %.2f cost %.2f floor %.2f"), Bank, Cost, Floor),
+                    UBreakerCasterAbility::CanCastAt(Bank, Cost, Floor),
+                    UBreakerManaComponent::CanSpendFrom(Bank, Cost, Floor));
+            }
+        }
+    }
+
+    // The generic rule underneath, which the HUD's CanAffordSlot also uses.
+    TestTrue(TEXT("A closed floor leaves the base affordability rule untouched"), UBreakerGameplayAbility::IsAffordable(15.0f, 15.0f));
+    TestEqual(TEXT("IsAffordable is IsAffordableWithFloor at zero"),
+        UBreakerGameplayAbility::IsAffordable(14.99f, 15.0f), UBreakerGameplayAbility::IsAffordableWithFloor(14.99f, 15.0f, 0.0f));
 
     // The window carries the scalar, so the ultimate and the abilities it
     // discounts cannot drift apart.

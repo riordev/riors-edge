@@ -104,7 +104,29 @@ The **plate and the four state overlays are implemented** in
 red border plus struck cost chip when unaffordable. Key hints inherit the state
 colour.
 
-**No glyphs exist.** Each square falls back to the ability's short name in the
-state colour where the 36×36 optical box would go. Dropping authored SVG/texture
-glyphs in later replaces that fallback without touching any state code, which
-is what the handoff note asks for.
+**Six code-drawn stand-in marks exist**, in `ABreakerPlaytestHUD::
+DrawAbilityGlyph`, built to the construction rules above — one stroke weight
+(2px at 52, scaled with the box), one hue (the slot's accent, never teal),
+side-on, motion rising toward the upper right, inside the 36×36 optical box.
+They are not the commissioned art; they are silhouettes rather than letters.
+
+- Swift: **Skim** (elbow + arrowhead + trailing ticks), **Lead** (lengthening
+  dashes + perspective diamond with stub ticks), **Overdrive** (overrun meter,
+  detached blocks, rising chevron).
+- Caster: **Cleave** = Spellblade strike (blade angled up-right, doubled mana
+  edge, open swing arc held clear of the blade so the two never merge),
+  **Closequarter** = Void lash (S-curve corner to corner, two-pronged barb,
+  two dots off the underside), **Unmake** = Overcast (grey 1px baseline, one
+  channel stepping from above zero to below it, debt cross under the dip).
+  Unmake carries the Overcast mark because it is the ability that rewrites the
+  price of every Caster cast.
+- Anything else still falls back to the hollow diamond.
+
+Caster's class slots are drawn in `#4FD8F5` and the ultimate in violet, from
+the slot, not the glyph — so dropping in authored SVG/texture glyphs later
+replaces the marks without touching any state or colour code, which is what the
+handoff note asks for.
+
+**Unverified:** nobody has looked at these on a screen. They compile and they
+are dimensioned to the spec; whether each one *reads* at 56px in motion is an
+open question for the next playtest.

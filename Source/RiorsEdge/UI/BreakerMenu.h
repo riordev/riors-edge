@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
 
+#include "Items/BreakerItemTypes.h"
+
 class ABreakerCharacter;
+class SBorder;
 class SBox;
 
 enum class EBreakerMenuScreen : uint8
@@ -53,6 +56,14 @@ private:
     // BuildFrame's centred plate is kept for the narrow screens.
     TSharedRef<SWidget> BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
         const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth) const;
+    // Event-driven limit tell: paints (or clears) the harm-red outline on the
+    // equipment-column row a hovered backpack card would eject. Called from
+    // OnHovered/OnUnhovered only — never from a tick or a paint attribute.
+    void SetEquipSlotOutline(EBreakerEquipSlot Slot, bool bDoomed);
+    // The bulk-discard confirmation modal: count, exclusions, destructive
+    // label. Returns the scrim plus the plate, meant to sit in an SOverlay
+    // above the whole screen.
+    TSharedRef<SWidget> BuildDiscardModal(int32 ArmIndex, EBreakerItemRarity MinimumKept, int32 Count);
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
     FReply GoBack();
@@ -69,8 +80,21 @@ private:
     // -1 none, 0 = discard below Uncommon, 1 = discard below Exceptional.
     int32 CleanupArmedIndex = -1;
     int32 PendingCleanupArm = -1;
+    // Second click on an armed cleanup chip opens the confirmation modal
+    // instead of committing. -1 none, otherwise the arm index, which is what
+    // the modal's Destroy button acts on. Unlike CleanupArmedIndex this is
+    // sticky across rebuilds: a modal that vanished when the screen refreshed
+    // would be worse than no modal.
+    int32 DiscardModalIndex = -1;
     // Result line echoed under the cleanup row after a discard.
     FText InventoryStatus;
+    // Hover disclosure for the equip-limit tell. A backpack card whose equip
+    // would eject an equipped piece outlines that piece here on OnHovered and
+    // restores it on OnUnhovered. Weak, because the widget tree owns these and
+    // is rebuilt out from under the map on every screen change; imperative,
+    // because a per-frame attribute driving widget state is the exact pattern
+    // that produced the historical screen jitter.
+    TMap<EBreakerEquipSlot, TWeakPtr<SBorder>> EquipSlotOutlines;
     // Skill trees: which tree the left selector has focused, and the last
     // purchase/respec message echoed under the node grid.
     int32 SelectedTreeIndex = 0;

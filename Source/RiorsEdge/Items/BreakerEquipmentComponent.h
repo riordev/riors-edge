@@ -49,6 +49,40 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack);
     UFUNCTION(BlueprintPure, Category="Equipment") const FBreakerEquipmentStats& GetStats() const { return CachedStats; }
 
+    // ---- Disclosure queries -----------------------------------------------
+    // These answer "what happens if I equip this" BEFORE the click, so the
+    // loadout screen can state consequences instead of the player discovering
+    // them. Comparison and cap arithmetic are game rules and live here, not in
+    // Slate; every one of them is usable from a ground-loot popup or a vendor
+    // screen without touching the loadout widget.
+
+    // Equipped cap for a rarity. INDEX_NONE means uncapped. O11 / master sheet
+    // 4.1: Aberrant 3, Anomalous 1; everything below them is unlimited.
+    static int32 EquipLimitForRarity(EBreakerItemRarity Rarity);
+
+    // How many equipped pieces are of this rarity. The header limit counters
+    // read this instead of walking GetEquipped() themselves.
+    UFUNCTION(BlueprintPure, Category="Equipment") int32 CountEquippedOfRarity(EBreakerItemRarity Rarity) const;
+
+    // How many backpack items DiscardBackpackBelowRarity would destroy. Shares
+    // its predicate with the discard itself, so the number the confirmation
+    // modal states and the number destroyed cannot drift apart.
+    UFUNCTION(BlueprintPure, Category="Equipment") int32 CountBackpackBelowRarity(EBreakerItemRarity MinimumKept) const;
+
+    // The full consequence of equipping this item against the current loadout.
+    UFUNCTION(BlueprintPure, Category="Equipment") FBreakerEquipPreview PreviewEquip(const FBreakerItemInstance& Candidate) const;
+
+    // Pure form of the same rule over any equipped set, so the cap and the
+    // displacement choice are testable with no component, actor, or world.
+    static FBreakerEquipPreview PreviewEquipAgainst(const TArray<FBreakerItemInstance>& EquippedItems, const FBreakerItemInstance& Candidate);
+
+    // Per-affix comparison of Candidate against Reference. Matching is by
+    // (stat target, bucket), not by affix id: two affixes that raise the same
+    // stat the same way are one number to the player, and a flat +Health is
+    // not comparable against an Increased Health percentage. An invalid
+    // Reference (empty slot) makes every line an improvement.
+    static TArray<FBreakerAffixComparison> CompareAffixes(const FBreakerItemInstance& Candidate, const FBreakerItemInstance& Reference);
+
     // Pure aggregation over any item set; the component wraps this for its
     // own equipped list so tests can exercise the math directly. The optional
     // out-contribution is this layer's offer to the unified application path

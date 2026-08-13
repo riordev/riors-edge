@@ -4,6 +4,9 @@
 #include "Combat/BreakerCombatTypes.h"
 #include "GameFramework/HUD.h"
 #include "Progression/BreakerProgressionTypes.h"
+// The class-resource row's resolved description. Pure, header-only, and the
+// only part of the cluster that is testable without a viewport.
+#include "UI/BreakerHUDResourceRow.h"
 // Full include, not a forward declaration: FBreakerShotResult is a UFUNCTION
 // parameter, so UHT needs the complete type (same reason
 // BreakerMomentumComponent.h includes it).
@@ -78,6 +81,11 @@ private:
     void DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY);
     void DrawVitalsPlate(const ABreakerCharacter* Character, float X, float BottomY);
     void DrawCombatCluster(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
+    // §2's class-resource slot, in two halves: which resource this character
+    // has (one component read, no lookup, no iteration) and how the resolved
+    // row is painted into the fixed 12px track.
+    static BreakerHUD::FResourceRow ResolveResourceRow(const ABreakerCharacter* Character);
+    void DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height);
     void DrawWaveBanner(const FVector2D& Center);
     void DrawTracers();
     void DrawDamageNumbers();

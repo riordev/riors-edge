@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -281,9 +282,16 @@ bool UBreakerAbilityComponent::CanAffordSlot(EBreakerAbilitySlot Slot) const
     {
         return false;
     }
-    bool bFound = false;
-    const float Current = ASC->GetGameplayAttributeValue(UBreakerAttributeSet::GetClassResourceAttribute(), bFound);
-    return bFound && Current >= Cost;
+    bool bFoundResource = false;
+    const float Current = ASC->GetGameplayAttributeValue(UBreakerAttributeSet::GetClassResourceAttribute(), bFoundResource);
+    bool bFoundFloor = false;
+    const float Floor = ASC->GetGameplayAttributeValue(UBreakerAttributeSet::GetClassResourceFloorAttribute(), bFoundFloor);
+    // Spec D8. The HUD reads this to grey a slot out, so it must agree with the
+    // rule GAS actually enforces in CheckCost: with a closed floor (every class
+    // but an Overcasting Caster) this is the identical comparison, and with an
+    // open one a slot the player can genuinely overdraft into stays lit while
+    // everything is unaffordable during the debt.
+    return bFoundResource && UBreakerGameplayAbility::IsAffordableWithFloor(Current, Cost, bFoundFloor ? Floor : 0.0f);
 }
 
 int32 UBreakerAbilityComponent::GetActiveCooldownCount() const
