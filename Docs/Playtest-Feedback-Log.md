@@ -1,5 +1,16 @@
 # Playtest Feedback Log
 
+## 2026-08-13 — Session 4 (first ENGAGED-TTK report)
+
+**Report:** 1.6 min, 352 shots, 56.5% acc, **71.9% weak-point rate** (Lead
+mark-consumption working), 29 kills avg TTK **2.61s** vs <1s target,
+2 elite kills avg **6.18s** vs ~3s target (n=2, low confidence).
+
+**Reading:** first legitimate divergence measurement — trash and elites
+both ~2-2.5x slower than the O18 targets. Chassis correction owed:
+trash health ~220 -> ~90-100 (or equivalent damage raise), elite scaled
+accordingly. Awaiting owner tuning ruling (O2).
+
 ## 2026-08-13 — Session 3 (first TTK report)
 
 **Report:** 1.8 min, 279 shots, 59.1% accuracy, 51.5% weak-point rate,
