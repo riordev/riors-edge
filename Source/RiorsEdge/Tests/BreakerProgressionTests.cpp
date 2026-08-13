@@ -1,8 +1,11 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "GameFramework/Actor.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 
@@ -53,6 +56,44 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
     TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::ClassPoints), 0);
     TestEqual(TEXT("Forge respec refunds ranks when definitions are unavailable"), Progression->GetProgressionState().UnspentClassPoints, 5);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRespecRestoresAttributesTest,
+    "RiorsEdge.Progression.RespecRestoresAttributes",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRespecRestoresAttributesTest::RunTest(const FString& Parameters)
+{
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(NewObject<AActor>());
+    Progression->BindAttributes(Attributes);
+    Progression->ApplySliceDefaultsIfFresh();
+
+    const float BaseCritChance = Attributes->GetCriticalChance();
+    const float BaseHealth = Attributes->GetMaxHealth();
+
+    // Buying through the real purchase path, not a hand-written rank list.
+    UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
+    FText Failure;
+    TestTrue(TEXT("Gateway node purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+    TestEqual(TEXT("A purchased node reaches the attribute"), Attributes->GetCriticalChance(), BaseCritChance + 0.07f, 0.0001f);
+
+    TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("Respec restores the pre-purchase crit chance exactly"), Attributes->GetCriticalChance(), BaseCritChance);
+    TestEqual(TEXT("Respec leaves unrelated attributes at their base"), Attributes->GetMaxHealth(), BaseHealth);
+    TestEqual(TEXT("The base value is never overwritten"), Attributes->GetAttributeBase(EBreakerAggregatedAttribute::CriticalChance), BaseCritChance);
+
+    // Buy/respec cycles must not drift.
+    for (int32 Cycle = 0; Cycle < 25; ++Cycle)
+    {
+        Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure);
+        Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
+    }
+    TestEqual(TEXT("Twenty-five buy/respec cycles do not drift crit chance"), Attributes->GetCriticalChance(), BaseCritChance);
+    TestEqual(TEXT("Twenty-five buy/respec cycles do not drift the point pool"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), UBreakerProgressionLibrary::SliceCorePointGrant);
     return true;
 }
 

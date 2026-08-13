@@ -95,6 +95,60 @@ exposed on `GetStats()` for the movement component to consume — that wiring
 is not connected yet. Physical DR from gear folds into the incoming damage
 multiplier inside `UBreakerCombatComponent::ReceiveDamage`.
 
+## Unified attribute application
+
+Gear affixes and skill nodes both move the same attributes, so they share one
+application path. It lives in `Source/RiorsEdge/Attributes/` —
+`BreakerAttributeAggregation.h` for the types, `UBreakerAttributeSet` for the
+state and the writes.
+
+The bug it replaced: `UBreakerEquipmentComponent` and
+`UBreakerProgressionComponent` each cached its own "base" value at BeginPlay
+and then wrote an absolute result (`Base + bonus`, `Base * multiplier`).
+Whichever recalculated last erased the other, so gear and nodes never stacked
+— a real, player-visible correctness bug.
+
+The rules the new path enforces:
+
+- **One owner of the base.** The attribute set captures the authored values
+  once, via `CaptureAttributeBases()`, which is idempotent — the first caller
+  wins. No contributor can snapshot a base that already contains another
+  contributor's work.
+- **Contributions, never writes.** Each layer rebuilds a complete
+  `FBreakerAttributeContribution` (flat / increased-percent / More, per
+  attribute) from scratch whenever anything it owns changes, and submits it
+  with `ApplyAttributeContribution`. Contributors are a closed enum
+  (`EBreakerAttributeContributor`), so the fold runs in a fixed order and the
+  result never depends on who recalculated last.
+- **The locked rule, once.** Every submission re-derives every shared
+  attribute as
+  `(Base + sum(Flat)) * (1 + sum(IncreasedPercent) / 100) * prod(More)`.
+  All Increased percentages from every layer share ONE additive bucket per
+  stat. Nodes cannot author More multipliers yet; when keystones gain them
+  under O3 they compose through `ComposeMore` with no other change.
+- **Exact removal.** Unequipping or respeccing submits a smaller (or empty)
+  contribution and everything is recomputed from the bases, so there is no
+  incremental subtraction to drift. Health and class resource ride their
+  maximum by fraction/clamp.
+- **Convergence.** Equipping, buying a node, respeccing and loading a save all
+  end in the same numbers regardless of sequence.
+
+The attributes on this path are MaxHealth, MaxClassResource, CriticalChance,
+CriticalMultiplier, MoveSpeed and DamageOverTimeMultiplier. Attributes a
+single system owns outright (Shield, Armor, DamageMultiplier) stay off it.
+`FBreakerEquipmentStats` and `FBreakerNodeStats` are unchanged: the movement,
+combat, weapon and loot consumers still read the composed multipliers from
+`GetStats()` / `GetNodeStats()`.
+
+Coverage: `Source/RiorsEdge/Tests/BreakerAttributeAggregationTests.cpp` plus
+`RiorsEdge.Items.Equipment.AttributeContribution` and
+`RiorsEdge.Progression.RespecRestoresAttributes`.
+
+OPEN: `UBreakerCharacterMovementComponent` still multiplies the gear and tree
+movement multipliers together (`GearMoveSpeedMultiplier()` and friends) rather
+than adding their Increased percentages, which contradicts the rule above.
+That is a movement-layer change and needs an owner ruling.
+
 ## Gym drops
 
 `ABreakerEnemy` grants a rolled item to the first player's backpack on death

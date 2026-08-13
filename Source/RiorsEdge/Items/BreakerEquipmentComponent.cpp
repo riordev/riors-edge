@@ -16,22 +16,31 @@ UBreakerEquipmentComponent::UBreakerEquipmentComponent()
 void UBreakerEquipmentComponent::BeginPlay()
 {
     Super::BeginPlay();
+    UBreakerAttributeSet* FoundAttributes = nullptr;
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
     {
         if (UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
         {
-            Attributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
+            FoundAttributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
         }
     }
-    if (Attributes)
-    {
-        BaseMaxHealth = Attributes->GetMaxHealth();
-        BaseMaxClassResource = Attributes->GetMaxClassResource();
-        BaseCriticalChance = Attributes->GetCriticalChance();
-        BaseCriticalMultiplier = Attributes->GetCriticalMultiplier();
-        BaseMoveSpeed = Attributes->GetMoveSpeed();
-    }
+    BindAttributes(FoundAttributes);
+}
+
+void UBreakerEquipmentComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
+{
+    Attributes = InAttributes;
+    // The attribute set owns the true bases; capturing is idempotent, so it
+    // does not matter whether equipment or progression gets here first.
+    if (Attributes) Attributes->CaptureAttributeBases();
     RecalculateStats();
+}
+
+bool UBreakerEquipmentComponent::HasAttributeAuthority() const
+{
+    // Unchanged rule, named once instead of repeated nine times: an ownerless
+    // component has no server to be, and a client never mutates equipment.
+    return GetOwner() && GetOwner()->HasAuthority();
 }
 
 void UBreakerEquipmentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -53,7 +62,7 @@ void UBreakerEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 
 bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
 {
-    if (!Item.IsValid() || !GetOwner() || !GetOwner()->HasAuthority()) return false;
+    if (!Item.IsValid() || !HasAttributeAuthority()) return false;
     UnequipSlot(Item.Slot);
     Equipped.Add(Item);
     RecalculateStats();
@@ -63,7 +72,7 @@ bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
 
 bool UBreakerEquipmentComponent::UnequipSlot(EBreakerEquipSlot Slot)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+    if (!HasAttributeAuthority()) return false;
     const int32 Index = Equipped.IndexOfByPredicate([Slot](const FBreakerItemInstance& Existing) { return Existing.Slot == Slot; });
     if (Index == INDEX_NONE) return false;
     Backpack.Add(Equipped[Index]);
@@ -75,14 +84,14 @@ bool UBreakerEquipmentComponent::UnequipSlot(EBreakerEquipSlot Slot)
 
 void UBreakerEquipmentComponent::AddToBackpack(const FBreakerItemInstance& Item)
 {
-    if (!Item.IsValid() || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    if (!Item.IsValid() || !HasAttributeAuthority()) return;
     Backpack.Add(Item);
     OnItemAcquired.Broadcast(Item);
 }
 
 void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    if (!HasAttributeAuthority()) return;
     Equipped = NewEquipped;
     Backpack = NewBackpack;
     RecalculateStats();
@@ -91,7 +100,7 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
 
 bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+    if (!HasAttributeAuthority()) return false;
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
     if (Index == INDEX_NONE) return false;
     const FBreakerItemInstance Item = Backpack[Index];
@@ -101,7 +110,7 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
 
 bool UBreakerEquipmentComponent::DiscardFromBackpack(const FGuid& ItemId)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return false;
+    if (!HasAttributeAuthority()) return false;
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
     if (Index == INDEX_NONE) return false;
     Backpack.RemoveAt(Index);
@@ -111,7 +120,7 @@ bool UBreakerEquipmentComponent::DiscardFromBackpack(const FGuid& ItemId)
 
 int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity MinimumKept)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return 0;
+    if (!HasAttributeAuthority()) return 0;
     const uint8 Threshold = static_cast<uint8>(MinimumKept);
     const int32 Removed = Backpack.RemoveAll([Threshold](const FBreakerItemInstance& Existing)
     {
@@ -123,7 +132,7 @@ int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity 
 
 void UBreakerEquipmentComponent::DevGrantTestGear(int32 ItemLevel)
 {
-    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    if (!HasAttributeAuthority()) return;
     const int32 SafeLevel = FMath::Max(1, ItemLevel);
     // Distinct seed per slot per grant: the slot index spreads the affix roll,
     // the counter keeps repeat presses from producing the same eight items.
@@ -150,7 +159,7 @@ bool UBreakerEquipmentComponent::GetEquippedItem(EBreakerEquipSlot Slot, FBreake
     return false;
 }
 
-FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<FBreakerItemInstance>& Items)
+FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution)
 {
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
 
@@ -188,31 +197,41 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.AirControlMultiplier = Increased(EBreakerStatTarget::AirControl);
     Stats.DashCooldownMultiplier = 1.0f / Increased(EBreakerStatTarget::DashCooldownReduction);
     Stats.WeaponDamageMultiplier = Increased(EBreakerStatTarget::WeaponDamage);
+
+    if (OutContribution)
+    {
+        // Built from the raw buckets, not from the composed multipliers above:
+        // the Increased percentages have to reach the attribute set unmerged so
+        // they can join the tree's percentages in ONE additive bucket per stat.
+        // Gear authors no More multipliers — those are reserved for trees and
+        // Anomalous items (O3).
+        OutContribution->Reset();
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxClassResource, Stats.BonusMaxResource);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)]);
+    }
     return Stats;
 }
 
 void UBreakerEquipmentComponent::RecalculateStats()
 {
-    CachedStats = AggregateStats(Equipped);
+    CachedStats = AggregateStats(Equipped, &CachedContribution);
     ApplyStatsToAttributes();
 }
 
 void UBreakerEquipmentComponent::ApplyStatsToAttributes()
 {
-    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || BaseMaxHealth < 0.0f) return;
-
-    const float HealthFraction = Attributes->GetMaxHealth() > 0.0f ? Attributes->GetHealth() / Attributes->GetMaxHealth() : 1.0f;
-    Attributes->SetMaxHealth(BaseMaxHealth + CachedStats.BonusHealth);
-    Attributes->SetHealth(Attributes->GetMaxHealth() * HealthFraction);
-    Attributes->SetMaxClassResource(BaseMaxClassResource + CachedStats.BonusMaxResource);
-    Attributes->SetClassResource(FMath::Min(Attributes->GetClassResource(), Attributes->GetMaxClassResource()));
-    Attributes->SetCriticalChance(BaseCriticalChance + CachedStats.CriticalChanceBonus);
-    Attributes->SetCriticalMultiplier(BaseCriticalMultiplier + CachedStats.CriticalMultiplierBonus);
-    Attributes->SetMoveSpeed(BaseMoveSpeed * CachedStats.MoveSpeedMultiplier);
+    // One submission, no absolute writes: the attribute set folds this against
+    // the true bases and every other contributor. Recalculating in any order,
+    // any number of times, converges to the same numbers.
+    if (!Attributes || !HasAttributeAuthority()) return;
+    Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, CachedContribution);
 }
 
 void UBreakerEquipmentComponent::OnRep_Equipped()
 {
-    CachedStats = AggregateStats(Equipped);
+    CachedStats = AggregateStats(Equipped, &CachedContribution);
     OnEquipmentChanged.Broadcast();
 }

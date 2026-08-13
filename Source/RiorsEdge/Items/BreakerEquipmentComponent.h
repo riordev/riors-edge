@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Items/BreakerItemTypes.h"
 #include "BreakerEquipmentComponent.generated.h"
 
@@ -49,8 +50,19 @@ public:
     UFUNCTION(BlueprintPure, Category="Equipment") const FBreakerEquipmentStats& GetStats() const { return CachedStats; }
 
     // Pure aggregation over any item set; the component wraps this for its
-    // own equipped list so tests can exercise the math directly.
-    static FBreakerEquipmentStats AggregateStats(const TArray<FBreakerItemInstance>& Items);
+    // own equipped list so tests can exercise the math directly. The optional
+    // out-contribution is this layer's offer to the unified application path
+    // in UBreakerAttributeSet, built from the same raw buckets so nothing has
+    // to be reverse-engineered out of the composed multipliers.
+    static FBreakerEquipmentStats AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution = nullptr);
+
+    // Binds the attribute set this component contributes to. BeginPlay calls
+    // it with the set found on the owner's ability system; tests call it with
+    // a standalone set. Capturing the bases is the attribute set's job.
+    void BindAttributes(UBreakerAttributeSet* InAttributes);
+
+    // This layer's current offer, exactly as submitted.
+    const FBreakerAttributeContribution& GetAttributeContribution() const { return CachedContribution; }
 
     UPROPERTY(BlueprintAssignable, Category="Equipment") FBreakerEquipmentChanged OnEquipmentChanged;
     UPROPERTY(BlueprintAssignable, Category="Equipment") FBreakerItemAcquired OnItemAcquired;
@@ -63,12 +75,12 @@ private:
     UPROPERTY(Replicated) TArray<FBreakerItemInstance> Backpack;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     FBreakerEquipmentStats CachedStats;
-    float BaseMaxHealth = -1.0f;
-    float BaseMaxClassResource = -1.0f;
-    float BaseCriticalChance = -1.0f;
-    float BaseCriticalMultiplier = -1.0f;
-    float BaseMoveSpeed = -1.0f;
+    // No base-value cache lives here any more. The attribute set owns the one
+    // true base; this component only ever submits a contribution, which is why
+    // gear and skill nodes now stack instead of overwriting each other.
+    FBreakerAttributeContribution CachedContribution;
 
     void RecalculateStats();
     void ApplyStatsToAttributes();
+    bool HasAttributeAuthority() const;
 };
