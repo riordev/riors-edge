@@ -20,7 +20,10 @@
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SCanvas.h"
+#include "UI/BreakerSkillProjection.h"
 #include "UI/BreakerUIStyle.h"
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Algo/Reverse.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
@@ -165,6 +168,53 @@ namespace
                     SolidBlock(Color)
                 ]
             ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Screen metrics.
+    //
+    // The skill matrix used to be authored at a hard 1760x1000 and simply
+    // fell off the edge of anything smaller — which is a PIE window at its
+    // default size, i.e. the way the owner actually sees it. The panel now
+    // sizes itself from the VIEWPORT, read once here.
+    //
+    // This is NOT the banned "size off my allotted width" pattern: nothing
+    // measures its own arrangement, so there is no layout feedback loop. It is
+    // the same rule ABreakerPlaytestHUD already follows (spec pixels scaled by
+    // the viewport), and it is sampled once per Rebuild — an event — never
+    // from a paint attribute or a tick.
+    // ---------------------------------------------------------------------
+    struct FSkillScreenMetrics
+    {
+        float PanelWidth = 1760.0f;
+        float PanelHeight = 1000.0f;
+        // The fixed detail rail. Two steps only, so it is a layout constant on
+        // any given screen and the board can never reflow when the rail fills.
+        float RailWidth = 420.0f;
+        // Usable width of the board viewport, scrollbar allowance removed.
+        float BoardViewWidth = 1300.0f;
+    };
+
+    FSkillScreenMetrics MeasureSkillScreen()
+    {
+        FSkillScreenMetrics Metrics;
+
+        FVector2D Viewport(1920.0f, 1080.0f);
+        if (GEngine && GEngine->GameViewport)
+        {
+            GEngine->GameViewport->GetViewportSize(Viewport);
+        }
+        if (Viewport.X < 640.0f || Viewport.Y < 360.0f) Viewport = FVector2D(1920.0f, 1080.0f);
+
+        // Space40 screen margin on each side, as the style guide asks, and the
+        // 1760 authored width as the ceiling.
+        Metrics.PanelWidth = FMath::Clamp(static_cast<float>(Viewport.X) - 2.0f * BreakerUI::Space40, 720.0f, 1760.0f);
+        Metrics.PanelHeight = FMath::Clamp(static_cast<float>(Viewport.Y) - 2.0f * BreakerUI::Space40, 420.0f, 1000.0f);
+        Metrics.RailWidth = Metrics.PanelWidth >= 1360.0f ? 420.0f : 320.0f;
+        // Panel minus the rail, the gutter between them, and the scroll bar.
+        Metrics.BoardViewWidth = FMath::Max(320.0f,
+            Metrics.PanelWidth - Metrics.RailWidth - BreakerUI::Space24 - 20.0f);
+        return Metrics;
     }
 
     // Diamond markers are square markers turned 45 degrees. The rotation is a
@@ -337,7 +387,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
-    const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth) const
+    const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight) const
 {
     // Header band, 88 tall at bg/raised on the cyan identity rail: h1 title
     // with the meta caption beneath it, the screen's own controls pinned to
@@ -378,7 +428,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
-            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(1000.0f)
+            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(PanelHeight)
             [
                 Root
             ]
@@ -1709,19 +1759,13 @@ namespace
     {
         TArray<const UBreakerProgressionTree*> Trees;
         if (!Progression) return Trees;
-        // INTEGRATION: expected enumerator is
-        //   TArray<const UBreakerProgressionTree*> UBreakerProgressionComponent::GetAvailableTrees() const
-        // (with a static fallback-content variant supplying the class tree and
-        // the six core constellations). No such method exists on the header
-        // this file was written against, so we walk the only reachable source
-        // today: the class definition's branch trees. When the enumerator
-        // lands, replace this whole body with the single call.
-        if (const UBreakerClassDefinition* ClassDef = Progression->ClassDefinition)
+        // The enumerator landed, so this is now the single call it was always
+        // meant to be. It matters: the old body walked ClassDefinition->
+        // BranchTrees alone, so a character with no class Data Asset saw an
+        // empty screen even though the fallback content had trees for them.
+        for (const UBreakerProgressionTree* Tree : Progression->GetAvailableTrees())
         {
-            for (const UBreakerProgressionTree* Tree : ClassDef->BranchTrees)
-            {
-                if (Tree) Trees.Add(Tree);
-            }
+            if (Tree) Trees.AddUnique(Tree);
         }
         return Trees;
     }
@@ -1807,6 +1851,31 @@ namespace
         case EBreakerNodeStatTarget::BlockChance:    return TEXT("BLOCK CHANCE");
         case EBreakerNodeStatTarget::Health:         return TEXT("HEALTH");
         case EBreakerNodeStatTarget::DamageOverTime: return TEXT("DOT DAMAGE");
+        // Damage was missing from this switch, so every damage node on the
+        // board printed "+4% STAT" — the one stat the owner most wanted to see
+        // was the one with no name.
+        case EBreakerNodeStatTarget::Damage:         return TEXT("DAMAGE");
+        default:                                     return TEXT("STAT");
+        }
+    }
+
+    // Board copy only. The marker label has one line for the effect and a
+    // fixed pixel width; the full names live on the detail rail, which has
+    // room for them.
+    FString ShortStatLabel(EBreakerNodeStatTarget Target)
+    {
+        switch (Target)
+        {
+        case EBreakerNodeStatTarget::CriticalChance: return TEXT("CRIT");
+        case EBreakerNodeStatTarget::CriticalDamage: return TEXT("CRIT DMG");
+        case EBreakerNodeStatTarget::MoveSpeed:      return TEXT("MOVE");
+        case EBreakerNodeStatTarget::SlideSpeed:     return TEXT("SLIDE");
+        case EBreakerNodeStatTarget::AirControl:     return TEXT("AIR");
+        case EBreakerNodeStatTarget::DodgeChance:    return TEXT("DODGE");
+        case EBreakerNodeStatTarget::BlockChance:    return TEXT("BLOCK");
+        case EBreakerNodeStatTarget::Health:         return TEXT("HP");
+        case EBreakerNodeStatTarget::DamageOverTime: return TEXT("DOT");
+        case EBreakerNodeStatTarget::Damage:         return TEXT("DMG");
         default:                                     return TEXT("STAT");
         }
     }
@@ -1821,23 +1890,34 @@ namespace
         return FString::Printf(TEXT("%s%s %s"), *Number, bPercent ? TEXT("%") : TEXT(""), *StatTargetLabel(Effect.StatTarget));
     }
 
-    // The one line that tells a player what they are buying. Stat nodes show
-    // their strongest-reading first effect; rule and verb nodes have no
-    // number to show, so they name what they grant instead.
-    FString PrimaryEffectLine(const UBreakerProgressionNode* Node)
+    // The one line on the BOARD that tells a player what they are buying.
+    //
+    // This used to read "+18 CRIT DAMAGE / RANK  (+1 MORE)" — 33 characters in
+    // a 168px box, which wrapped to three lines and pushed the state line down
+    // through the tier hairline beneath it. Every effect now fits on one line
+    // as "+18 CRIT DMG · +3% DMG"; the unabbreviated version is on the rail.
+    FString CompactEffectLine(const UBreakerProgressionNode* Node)
     {
         if (!Node) return FString();
         if (Node->Effects.Num() > 0)
         {
-            FString Line = FormatNodeEffect(Node->Effects[0]) + TEXT(" / RANK");
-            if (Node->Effects.Num() > 1) Line += FString::Printf(TEXT("  (+%d MORE)"), Node->Effects.Num() - 1);
+            TArray<FString> Parts;
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                const bool bPercent = Effect.StatBucket != EBreakerNodeStatBucket::Flat;
+                Parts.Add(FString::Printf(TEXT("%+g%s %s"), Effect.ValuePerRank,
+                    bPercent ? TEXT("%") : TEXT(""), *ShortStatLabel(Effect.StatTarget)));
+                if (Parts.Num() == 2) break;
+            }
+            FString Line = FString::Join(Parts, TEXT(" · "));
+            if (Node->Effects.Num() > 2) Line += TEXT(" +");
             return Line;
         }
         if (Node->GrantedAbilityIds.Num() > 0)
         {
             return FString::Printf(TEXT("GRANTS %s"), *Node->GrantedAbilityIds[0].ToString().ToUpper());
         }
-        return TEXT("CHANGES A RULE");
+        return TEXT("RULE CHANGE");
     }
 
     // Post-purchase status line: name, every effect at its per-rank value,
@@ -1883,23 +1963,35 @@ namespace
     // cards can render a lock reason without attempting a purchase. Delete
     // this function and forward to CanPurchase when it lands — the returned
     // reason text is already shaped for direct display.
-    bool SkillNodeIsPurchasable(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node, int32 TreeSpent, FString& OutLockReason)
+    //
+    // OutShortReason is the same failure in board-label width: the fixed
+    // marker label has one line for it, and a wrapped four-line lock reason is
+    // what used to run into the node beneath. The full sentence still reaches
+    // the player on the detail rail and in the status line.
+    bool SkillNodeIsPurchasable(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node, int32 TreeSpent, FString& OutLockReason, FString* OutShortReason = nullptr)
     {
         OutLockReason.Reset();
+        if (OutShortReason) OutShortReason->Reset();
+        auto Fail = [&OutLockReason, OutShortReason](const FString& Full, const FString& Short)
+        {
+            OutLockReason = Full;
+            if (OutShortReason) *OutShortReason = Short;
+            return false;
+        };
+
         if (!Progression || !Tree || !Node)
         {
-            OutLockReason = TEXT("NO DATA");
-            return false;
+            return Fail(TEXT("NO DATA"), TEXT("NO DATA"));
         }
         if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) >= Node->MaxRank)
         {
-            OutLockReason = TEXT("MAX RANK");
-            return false;
+            return Fail(TEXT("MAX RANK"), TEXT("MAXED"));
         }
         if (Node->RequiredTreeInvestment > TreeSpent)
         {
-            OutLockReason = FString::Printf(TEXT("REQUIRES %d INVESTED (%d)"), Node->RequiredTreeInvestment, TreeSpent);
-            return false;
+            return Fail(
+                FString::Printf(TEXT("REQUIRES %d INVESTED (%d)"), Node->RequiredTreeInvestment, TreeSpent),
+                FString::Printf(TEXT("GATE %d/%d"), TreeSpent, Node->RequiredTreeInvestment));
         }
         for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
         {
@@ -1912,22 +2004,25 @@ namespace
                     if (Candidate && Candidate->NodeId == Prereq.NodeId) PrereqNode = Candidate;
                 }
                 const FString PrereqName = PrereqNode ? PrereqNode->DisplayName.ToString() : Prereq.NodeId.ToString();
-                OutLockReason = FString::Printf(TEXT("NEEDS %s RANK %d"), *PrereqName.ToUpper(), Prereq.RequiredRank);
-                return false;
+                return Fail(
+                    FString::Printf(TEXT("NEEDS %s RANK %d"), *PrereqName.ToUpper(), Prereq.RequiredRank),
+                    FString::Printf(TEXT("NEEDS %s"), *PrereqName.ToUpper()));
             }
         }
         for (const FName ExclusiveId : Node->MutuallyExclusiveNodeIds)
         {
             if (ProgressionGetNodeRank(Progression, ExclusiveId, Node->Currency) > 0)
             {
-                OutLockReason = FString::Printf(TEXT("LOCKED OUT BY %s"), *ExclusiveId.ToString().ToUpper());
-                return false;
+                return Fail(
+                    FString::Printf(TEXT("LOCKED OUT BY %s"), *ExclusiveId.ToString().ToUpper()),
+                    TEXT("LOCKED OUT"));
             }
         }
         if (ProgressionGetUnspent(Progression, Node->Currency) < Node->CostPerRank)
         {
-            OutLockReason = FString::Printf(TEXT("NEEDS %d %s POINTS"), Node->CostPerRank, *CurrencyLabel(Node->Currency));
-            return false;
+            return Fail(
+                FString::Printf(TEXT("NEEDS %d %s POINTS"), Node->CostPerRank, *CurrencyLabel(Node->Currency)),
+                FString::Printf(TEXT("NEED %d PT"), Node->CostPerRank));
         }
         return true;
     }
@@ -2003,13 +2098,35 @@ namespace
         FString GateLine;
         TArray<FString> EffectLines;
         TArray<FString> PrereqLines;
+        // The answer to "what does this point actually BUY": composed totals
+        // before and after, computed through the character's real aggregator.
+        FString BuyHeadline;
+        TArray<FString> BuyLines;
+        FString MaxHeadline;
+        TArray<FString> MaxLines;
         bool bOwned = false;
         bool bPurchasable = false;
         bool bMaxed = false;
     };
 
+    // "DAMAGE   1.06x -> 1.10x   +4%", one per stat the purchase moves.
+    TArray<FString> ProjectionLines(const FBreakerSkillSnapshot& Snapshot, const UBreakerProgressionNode* Node, int32 RankDelta)
+    {
+        TArray<FString> Lines;
+        if (!Node || RankDelta <= 0) return Lines;
+        for (const FBreakerStatLine& Line : BreakerSkillProjection::ProjectPurchase(Snapshot, Node->NodeId, RankDelta))
+        {
+            if (!Line.Changed()) continue;
+            Lines.Add(FString::Printf(TEXT("%s  %s  %s"),
+                *Line.Label,
+                *BreakerSkillProjection::FormatTransition(Line),
+                *BreakerSkillProjection::FormatDelta(Line)));
+        }
+        return Lines;
+    }
+
     FSkillNodeView MakeSkillNodeView(const UBreakerProgressionNode* Node, int32 Rank, bool bPurchasable,
-        const FString& LockReason, int32 TreeSpent)
+        const FString& LockReason, int32 TreeSpent, const FBreakerSkillSnapshot& Snapshot)
     {
         FSkillNodeView View;
         if (!Node) return View;
@@ -2034,6 +2151,28 @@ namespace
         if (Node->RequiredTreeInvestment > 0)
         {
             View.GateLine = FString::Printf(TEXT("TIER GATE %d / %d"), TreeSpent, Node->RequiredTreeInvestment);
+        }
+
+        // The projection is offered whenever there is a rank left to buy, even
+        // when the node is currently locked: seeing what a node is WORTH is
+        // most of the reason to work toward it.
+        const int32 RemainingRanks = FMath::Max(0, Node->MaxRank - Rank);
+        if (RemainingRanks > 0)
+        {
+            View.BuyHeadline = FString::Printf(TEXT("ONE POINT (%d PT) BUYS"), Node->CostPerRank);
+            View.BuyLines = ProjectionLines(Snapshot, Node, 1);
+            if (View.BuyLines.Num() == 0)
+            {
+                // Honest: some nodes are pure rule rewrites. The point-spend
+                // baseline still pays, so an empty list here means the baseline
+                // is switched off, not that the node is a trap.
+                View.BuyLines.Add(TEXT("NO STAT CHANGE — THIS NODE REWRITES A RULE"));
+            }
+            if (RemainingRanks > 1)
+            {
+                View.MaxHeadline = FString::Printf(TEXT("TO MAX (%d PT) BUYS"), RemainingRanks * Node->CostPerRank);
+                View.MaxLines = ProjectionLines(Snapshot, Node, RemainingRanks);
+            }
         }
         return View;
     }
@@ -2076,6 +2215,31 @@ namespace
             .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
             .AutoWrapText(true)
         ];
+        // The before/after block sits ABOVE the per-rank effects on purpose.
+        // "+3% damage per rank" is the authoring value; "1.06x -> 1.10x" is
+        // the thing the player is actually deciding about, so it reads first.
+        auto AddProjectionBlock = [&Column](const FString& Headline, const TArray<FString>& Lines, const FLinearColor& Accent)
+        {
+            if (Headline.IsEmpty() || Lines.Num() == 0) return;
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+            [
+                MenuText(FText::FromString(Headline), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+            for (const FString& Line : Lines)
+            {
+                Column->AddSlot().AutoHeight()
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(Line))
+                    .ColorAndOpacity(Accent)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                    .AutoWrapText(true)
+                ];
+            }
+        };
+        AddProjectionBlock(View.BuyHeadline, View.BuyLines, BreakerUI::Gold);
+        AddProjectionBlock(View.MaxHeadline, View.MaxLines, BreakerUI::TextSecondary);
+
         if (View.EffectLines.Num() > 0)
         {
             Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
@@ -2116,6 +2280,102 @@ namespace
         return MakePlate(Column, BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space16));
     }
 
+    // -----------------------------------------------------------------------
+    // BUILD TOTALS — "what has my spending added up to".
+    //
+    // Every number here is READ from the character's live aggregation, not
+    // recomputed beside it: the composed rows are the same attributes combat
+    // rolls against, and the tree rows are the same FBreakerNodeStats the
+    // movement and combat components consume. The DAMAGE row additionally
+    // splits its additive Increased bucket by layer, because "my tree gave me
+    // +14% of this" is the sentence the owner said was missing.
+    // -----------------------------------------------------------------------
+    TSharedRef<SWidget> MakeBuildTotalsPlate(const FBreakerSkillSnapshot& Snapshot, int32 ClassSpent, int32 CoreSpent)
+    {
+        TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+        Column->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(TEXT("BUILD TOTALS")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+        ];
+
+        auto AddRow = [&Column](const FString& Label, const FString& Value, const FLinearColor& ValueColor, const FLinearColor& LabelColor)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, LabelColor, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    // Fixed value column, so the numbers form a straight edge
+                    // and a longer label can never push a value off the plate.
+                    SNew(SBox).WidthOverride(96.0f).HAlign(HAlign_Right)
+                    [
+                        MenuText(FText::FromString(Value), BreakerUI::TypeCaption, ValueColor, true)
+                    ]
+                ]
+            ];
+        };
+
+        const int32 Committed = ClassSpent + CoreSpent;
+        Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("%d POINTS COMMITTED  ·  CLASS %d · CORE %d"), Committed, ClassSpent, CoreSpent)),
+                BreakerUI::TypeCaption, BreakerUI::Gold, true)
+        ];
+
+        const TArray<FBreakerStatLine> Totals = BreakerSkillProjection::CurrentTotals(Snapshot);
+        for (int32 Index = 0; Index < Totals.Num(); ++Index)
+        {
+            const FBreakerStatLine& Line = Totals[Index];
+            // The five composed rows always show — a player checking their
+            // damage wants to see it whether or not the tree moved it. The
+            // tree-only rows show when the tree has actually moved them, so
+            // the plate does not become a wall of 1.00x.
+            const bool bAlwaysShow = Index < 5;
+            const bool bAtIdentity = Line.Format == EBreakerStatFormat::Multiplier
+                ? FMath::IsNearlyEqual(Line.Before, 1.0f, 0.0005f)
+                : FMath::IsNearlyZero(Line.Before, 0.0005f);
+            if (!bAlwaysShow && bAtIdentity) continue;
+
+            const FLinearColor ValueColor = Index == 0 ? BreakerUI::Orange
+                : (Index < 5 ? BreakerUI::TextPrimary : BreakerUI::Cyan);
+            AddRow(Line.bTreeOnly ? Line.Label + TEXT(" (TREE)") : Line.Label,
+                BreakerSkillProjection::FormatStat(Line.Before, Line.Format),
+                ValueColor, BreakerUI::TextMuted);
+
+            if (Index == 0 && Snapshot.bHasComposedAttributes)
+            {
+                // The whole point of the one-additive-bucket rule made visible.
+                const float FromTree = BreakerSkillProjection::LayerIncreasedPercent(
+                    Snapshot, EBreakerAttributeContributor::Progression, EBreakerAggregatedAttribute::DamageMultiplier);
+                const float FromGear = BreakerSkillProjection::LayerIncreasedPercent(
+                    Snapshot, EBreakerAttributeContributor::Equipment, EBreakerAggregatedAttribute::DamageMultiplier);
+                Column->AddSlot().AutoHeight()
+                [
+                    MenuText(FText::FromString(FString::Printf(TEXT("    TREE +%.0f%%  ·  GEAR +%.0f%%"), FromTree, FromGear)),
+                        BreakerUI::TypeCaption, BreakerUI::TextMuted, false)
+                ];
+            }
+        }
+
+        if (!Snapshot.bHasComposedAttributes)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(TEXT("No attribute set is bound, so these are the tree layer alone — gear is not folded in.")))
+                .ColorAndOpacity(BreakerUI::TextMuted)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+                .AutoWrapText(true)
+            ];
+        }
+
+        return MakePlate(Column, BreakerUI::Panel10, BreakerUI::Gold, FMargin(BreakerUI::Space16, BreakerUI::Space16));
+    }
+
     // Rest state of the rail. It is the same plate geometry as a populated
     // card, so the column never changes shape when a node is hovered.
     TSharedRef<SWidget> MakeSkillDetailPlaceholder()
@@ -2138,7 +2398,18 @@ namespace
 TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 {
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const UBreakerAttributeSet* SkillAttributes = Character.IsValid() ? Character->GetAttributes() : nullptr;
     const TArray<const UBreakerProgressionTree*> Trees = ProgressionGatherTrees(Progression);
+
+    // Read the viewport once. Everything below is laid out against these
+    // numbers rather than against 1920x1080, which is why the screen no longer
+    // walks off the edge of a smaller window.
+    const FSkillScreenMetrics Metrics = MeasureSkillScreen();
+
+    // The character's real aggregation, captured once. Every before/after
+    // number on this screen is composed from this snapshot, so the screen can
+    // never disagree with the attributes combat actually reads.
+    const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Progression, SkillAttributes);
 
     // One tab pair, not a mode toggle: the board swaps, the header and the
     // detail rail persist.
@@ -2174,11 +2445,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         CoreSpent += Spent;
     }
 
-    // The fixed 420px detail rail, built before the board so hover handlers
-    // have a target. It is filled through SetContent on hover and never from
-    // a per-frame attribute, and its width never changes, so populating it
+    // Which branch the class board draws. Clamped here rather than trusted,
+    // because the branch list changes with the class and with content.
+    if (SkillBranchIndex >= ClassTrees.Num()) SkillBranchIndex = ClassTrees.Num() > 0 ? 0 : -1;
+    if (SkillBranchIndex < -1) SkillBranchIndex = -1;
+
+    // The fixed detail rail, built before the board so hover handlers have a
+    // target. It is filled through SetContent on hover and never from a
+    // per-frame attribute, and its width never changes, so populating it
     // cannot reflow the board.
-    SAssignNew(SkillDetailHost, SBox).WidthOverride(420.0f)
+    SAssignNew(SkillDetailHost, SBox)
     [
         MakeSkillDetailPlaceholder()
     ];
@@ -2278,14 +2554,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             return MakeEmptyBoard(TEXT("[ NO CLASS BRANCHES ]\n\nLock a Breaker class, or register class branch trees,\nand the path board draws here."));
         }
 
+        // Only the SELECTED branch is drawn (SkillBranchIndex == -1 draws them
+        // all side by side to compare). One branch at a time is what buys the
+        // board the width it needs to be readable — the whole reason it felt
+        // cramped was three columns of full-detail nodes fighting for 1200px.
+        TArray<const UBreakerProgressionTree*> Drawn;
+        if (SkillBranchIndex >= 0 && SkillBranchIndex < ClassTrees.Num()) Drawn.Add(ClassTrees[SkillBranchIndex]);
+        else Drawn = ClassTrees;
+
         const float GutterWidth = 76.0f;    // the dedicated tier-gate gutter
-        const float TierHeight = 190.0f;
         const float TopPad = 28.0f;
-        const float NodeSpacing = 176.0f;
-        const float LabelWidth = 168.0f;
 
         TArray<int32> Tiers;
-        for (const UBreakerProgressionTree* Tree : ClassTrees)
+        for (const UBreakerProgressionTree* Tree : Drawn)
         {
             for (const UBreakerProgressionNode* Node : Tree->Nodes)
             {
@@ -2295,13 +2576,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         Tiers.Sort();
         if (Tiers.Num() == 0)
         {
-            return MakeEmptyBoard(TEXT("[ NO NODES AUTHORED ]\n\nThe class branches carry no nodes yet."));
+            return MakeEmptyBoard(TEXT("[ NO NODES AUTHORED ]\n\nThis branch carries no nodes yet."));
         }
 
         TArray<int32> BranchSpent;
         TArray<int32> BranchTotal;
-        TArray<float> ColumnWidth;
-        for (const UBreakerProgressionTree* Tree : ClassTrees)
+        TArray<int32> BranchWidest;
+        int32 WidestTierRow = 1;
+        bool bAnyRightLabel = false;
+        for (const UBreakerProgressionTree* Tree : Drawn)
         {
             int32 Spent = 0;
             int32 Total = 0;
@@ -2315,20 +2598,45 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 int32 Count = 0;
                 for (const UBreakerProgressionNode* Node : Tree->Nodes)
                 {
-                    if (Node && Node->Tier == Tier) ++Count;
+                    if (!Node || Node->Tier != Tier) continue;
+                    ++Count;
+                    if (MarkerLabelsRight(ClassifyNode(Node))) bAnyRightLabel = true;
                 }
                 Widest = FMath::Max(Widest, Count);
             }
+            BranchWidest.Add(Widest);
+            WidestTierRow = FMath::Max(WidestTierRow, Widest);
+        }
+
+        // Node pitch is derived from the KNOWN board viewport (the viewport
+        // read at the top of this function), never from an allotted size, so
+        // there is no layout feedback loop. The clamp is what keeps the label
+        // block from ever being narrower than the copy it must hold.
+        const float AvailableField = FMath::Max(320.0f, Metrics.BoardViewWidth - GutterWidth);
+        const float NodeSpacing = FMath::Clamp(AvailableField / FMath::Max(1, Drawn.Num() * WidestTierRow), 168.0f, 320.0f);
+        const float LabelWidth = FMath::Max(150.0f, NodeSpacing - BreakerUI::Space24);
+        // 96 of label under a 64px marker plus breathing room, so a label can
+        // no longer run down through the tier hairline beneath it — which is
+        // exactly what "numbers clip" looked like on the board.
+        const float LabelHeight = 96.0f;
+        const float TierHeight = 216.0f;
+
+        TArray<float> ColumnWidth;
+        for (int32 Index = 0; Index < Drawn.Num(); ++Index)
+        {
             // Column is sized to the widest tier row it must hold, so the
             // labels of neighbouring nodes cannot collide.
-            ColumnWidth.Add(FMath::Max(360.0f, Widest * NodeSpacing));
+            ColumnWidth.Add(FMath::Max(NodeSpacing + LabelWidth, BranchWidest[Index] * NodeSpacing));
         }
 
         float FieldWidth = GutterWidth;
         for (const float Width : ColumnWidth) FieldWidth += Width;
         // Convergence/Keystone labels sit to the right of their marker, so the
-        // board is a label wider than the field.
-        const float BoardWidth = FieldWidth + LabelWidth;
+        // board is a label wider than the field — but only when a node on this
+        // board actually labels right. It used to reserve the margin
+        // unconditionally, which pushed the board wider than the panel and
+        // clipped it against the scroll box for no reason at all.
+        const float BoardWidth = FieldWidth + (bAnyRightLabel ? LabelWidth + BreakerUI::Space16 : 0.0f);
         const float BoardHeight = TopPad + Tiers.Num() * TierHeight + 40.0f;
 
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
@@ -2339,7 +2647,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         {
             const float TierTop = TopPad + TierIndex * TierHeight;
             int32 Gate = 0;
-            for (const UBreakerProgressionTree* Tree : ClassTrees)
+            for (const UBreakerProgressionTree* Tree : Drawn)
             {
                 for (const UBreakerProgressionNode* Node : Tree->Nodes)
                 {
@@ -2371,9 +2679,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         }
 
         float ColumnX = GutterWidth;
-        for (int32 BranchIndex = 0; BranchIndex < ClassTrees.Num(); ++BranchIndex)
+        for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
         {
-            const UBreakerProgressionTree* Tree = ClassTrees[BranchIndex];
+            const UBreakerProgressionTree* Tree = Drawn[BranchIndex];
             const float TrunkX = ColumnX + ColumnWidth[BranchIndex] * 0.5f;
             const int32 Spent = BranchSpent[BranchIndex];
 
@@ -2408,7 +2716,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 
                     const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                     FString LockReason;
-                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason);
+                    FString ShortReason;
+                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason, &ShortReason);
                     const bool bOwned = Rank > 0;
                     const bool bMaxed = Rank >= Node->MaxRank;
 
@@ -2428,7 +2737,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                             BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
                         : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)));
 
-                    const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent);
+                    const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
                     TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
                     if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
 
@@ -2442,11 +2751,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // Name, number and state sit as plain text near the
                     // marker — not inside a card.
                     const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
+                    // The SHORT reason on the board; the full sentence is on
+                    // the rail. A wrapped four-line lock reason in a fixed
+                    // label box is what used to overrun into the tier beneath.
                     const FString StateLine = bMaxed
                         ? FString(TEXT("MAXED"))
                         : (bPurchasable
                             ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : LockReason));
+                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : ShortReason));
                     const FLinearColor StateColor = bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted));
 
                     TSharedRef<SVerticalBox> Label = SNew(SVerticalBox);
@@ -2463,7 +2775,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         SNew(STextBlock)
                         // The effect as a number, so the board is readable
                         // without hovering anything.
-                        .Text(FText::FromString(PrimaryEffectLine(Node)))
+                        .Text(FText::FromString(CompactEffectLine(Node)))
                         .ColorAndOpacity((bOwned || bPurchasable) ? SoftText : Disabled)
                         .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
                         .AutoWrapText(true)
@@ -2485,9 +2797,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     const bool bLabelRight = MarkerLabelsRight(Kind);
                     Canvas->AddSlot()
                         .Position(bLabelRight
-                            ? FVector2D(NodeX + Size * 0.5f + BreakerUI::Space16, NodeY - 34.0f)
+                            ? FVector2D(NodeX + Size * 0.5f + BreakerUI::Space16, NodeY - LabelHeight * 0.5f)
                             : FVector2D(NodeX - LabelWidth * 0.5f, NodeY + Size * 0.5f + BreakerUI::Space8))
-                        .Size(FVector2D(LabelWidth, 86.0f))
+                        .Size(FVector2D(LabelWidth, LabelHeight))
                         [
                             Label
                         ];
@@ -2496,15 +2808,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ColumnX += ColumnWidth[BranchIndex];
         }
 
-        // 60px branch header strip above the path field.
+        // 60px branch header strip above the path field. It rides INSIDE the
+        // horizontal scroll with the board, so a scrolled column still knows
+        // which branch it belongs to.
         TSharedRef<SHorizontalBox> BranchStrip = SNew(SHorizontalBox);
         BranchStrip->AddSlot().AutoWidth()
         [
             SNew(SBox).WidthOverride(GutterWidth)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
         ];
-        for (int32 BranchIndex = 0; BranchIndex < ClassTrees.Num(); ++BranchIndex)
+        for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
         {
-            const UBreakerProgressionTree* Tree = ClassTrees[BranchIndex];
+            const UBreakerProgressionTree* Tree = Drawn[BranchIndex];
             const FString BranchName = TreeSelectorLabel(Tree);
             BranchStrip->AddSlot().AutoWidth()
             [
@@ -2527,17 +2841,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ];
         }
 
-        return SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-            [
-                SNew(SBox).HeightOverride(60.0f)[BranchStrip]
-            ]
-            + SVerticalBox::Slot().FillHeight(1.0f)
+        // The board SCROLLS in both axes now. It used to sit in a vertical
+        // scroll box at a fixed pixel width, so a board wider than the panel
+        // was simply cut off at the right edge with no way to reach it — the
+        // known compromise in UI-Skill-Tree-Spec, and half of what "clunky"
+        // meant. Nesting a horizontal scroll box inside the vertical one is
+        // safe: neither measures its own arrangement, so this is nothing like
+        // the SWrapBox/UseAllottedSize oscillation.
+        return SNew(SScrollBox)
+            + SScrollBox::Slot()
             [
                 SNew(SScrollBox)
+                .Orientation(Orient_Horizontal)
                 + SScrollBox::Slot()
                 [
-                    SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+                    SNew(SBox).WidthOverride(BoardWidth)
+                    [
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                        [
+                            SNew(SBox).HeightOverride(60.0f)[BranchStrip]
+                        ]
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            SNew(SBox).HeightOverride(BoardHeight)[Canvas]
+                        ]
+                    ]
                 ]
             ];
     };
@@ -2615,7 +2944,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         const float BoardWidth = 1060.0f;
         const float BoardHeight = 800.0f;
         const float PlateWidth = 300.0f;
-        const float PlateHeight = 156.0f;
+        // A cluster's chips wrap at six per row inside a 300px plate, so the
+        // plate has to be tall enough for however many rows that makes. The
+        // old flat 156 assumed one row and a wide cluster's chips ran straight
+        // out through the plate's right edge.
+        const int32 ChipsPerRow = 6;
+        const float ChipSize = 30.0f;
+        int32 WidestClusterRows = 1;
+        for (const FConstellationCluster& Cluster : Clusters)
+        {
+            WidestClusterRows = FMath::Max(WidestClusterRows,
+                FMath::DivideAndRoundUp(FMath::Max(1, Cluster.Nodes.Num()), ChipsPerRow));
+        }
+        const float PlateHeight = 108.0f + WidestClusterRows * (ChipSize + BreakerUI::Space8);
 
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
 
@@ -2640,9 +2981,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         for (const FConstellationCluster& Cluster : Clusters)
         {
             int32 ClusterPurchasable = 0;
-            TSharedRef<SHorizontalBox> Grid = SNew(SHorizontalBox);
+            // Fixed six-per-row grid, built as rows of an SHorizontalBox. NOT
+            // an SWrapBox: a wrap box sized off its allotted width is the
+            // pattern that caused the historical layout oscillation, and the
+            // row count here is arithmetic on a known chip count instead.
+            TSharedRef<SVerticalBox> Grid = SNew(SVerticalBox);
+            TSharedPtr<SHorizontalBox> ChipRow;
+            int32 ChipIndex = 0;
             for (const UBreakerProgressionNode* Node : Cluster.Nodes)
             {
+                if (ChipIndex % ChipsPerRow == 0)
+                {
+                    ChipRow = SNew(SHorizontalBox);
+                    Grid->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)[ChipRow.ToSharedRef()];
+                }
+                ++ChipIndex;
                 const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                 FString LockReason;
                 const bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
@@ -2653,7 +3006,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const FLinearColor Fill = (bOwned || bPurchasable) ? PanelRaised : Panel;
                 const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderRest);
                 const float RingThickness = (bOwned || bPurchasable) ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
-                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent);
+                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
 
                 // The cluster grid is a glance, not the path board: every kind
                 // draws at one compact size here, keeping its silhouette.
@@ -2663,9 +3016,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))));
                 if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
 
-                Grid->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                ChipRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
                 [
-                    SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f)[Chip]
+                    SNew(SBox).WidthOverride(ChipSize).HeightOverride(ChipSize)[Chip]
                 ];
             }
 
@@ -2742,10 +3095,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ]
             + SVerticalBox::Slot().FillHeight(1.0f)
             [
+                // Same two-axis scroll as the class board: the constellation
+                // map is 1060 wide and the panel is not, on most windows.
                 SNew(SScrollBox)
                 + SScrollBox::Slot()
                 [
-                    SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+                    SNew(SScrollBox)
+                    .Orientation(Orient_Horizontal)
+                    + SScrollBox::Slot()
+                    [
+                        SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+                    ]
                 ]
             ];
     };
@@ -2754,11 +3114,88 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         ? MakeEmptyBoard(TEXT("[ NO TREE CONTENT ]\n\nThe progression component is not serving any trees yet.\nThe class branches and the core constellations appear\nhere once tree content is registered."))
         : (bCoreBoard ? BuildCoreBoard() : BuildClassBoard());
 
+    // ---- Branch selector ---------------------------------------------------
+    //
+    // "There should be a button to select your subclass and swap between to
+    // the others which shows the different trees and what they do."
+    //
+    // SUBCLASS COMMITMENT DOES NOT EXIST IN THE DATA MODEL, and this screen
+    // does not invent one. FBreakerProgressionState records a permanent class,
+    // points and node ranks — there is no chosen-branch field — and
+    // UBreakerClassDefinition::BranchTrees is a flat list with no selected
+    // member. Nothing in Decisions.md rules on whether a branch is ever
+    // chosen, so committing one here would be authoring a progression rule
+    // from the UI layer.
+    //
+    // What IS built is the browsing half the owner asked for: one branch is
+    // focused at a time at full board width, every other branch is one click
+    // away with its identity and its investment on the chip, and COMPARE ALL
+    // puts them side by side. The strip says plainly that it is a view.
+    //
+    // A real commitment would need, at minimum: a branch id on
+    // UBreakerProgressionTree or a selected index on FBreakerProgressionState;
+    // a one-way setter next to ChoosePermanentClassById with the same
+    // permanence rule (or an explicit Forge-respec rule); save-version
+    // handling in UBreakerSaveGame; and a ruling on whether unselected
+    // branches become unpurchasable — which is a balance decision, not a UI
+    // one, and would collide with O15 (branch nodes freely mixed, no mutually
+    // exclusive tiers).
+    TSharedRef<SHorizontalBox> BranchChips = SNew(SHorizontalBox);
+    if (!bCoreBoard && ClassTrees.Num() > 0)
+    {
+        auto AddBranchChip = [this, &BranchChips](const FString& Label, const FString& Sub, int32 Index, bool bActive)
+        {
+            BranchChips->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                BorderWrap(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(bActive ? PanelHover : Panel)
+                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                    .OnClicked(FOnClicked::CreateLambda([this, Index]()
+                    {
+                        SkillBranchIndex = Index;
+                        SkillTreeStatus = FText::GetEmpty();
+                        Rebuild(EBreakerMenuScreen::SkillTrees);
+                        return FReply::Handled();
+                    }))
+                    [
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bActive ? Primary : SoftText, true)
+                        ]
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(Sub), BreakerUI::TypeCaption, bActive ? Cyan : Muted, false)
+                        ]
+                    ],
+                    bActive ? Cyan : BorderEmphasis,
+                    bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+            ];
+        };
+
+        for (int32 Index = 0; Index < ClassTrees.Num(); ++Index)
+        {
+            int32 Spent = 0;
+            int32 Total = 0;
+            ProgressionTreeInvestment(Progression, ClassTrees[Index], Spent, Total);
+            AddBranchChip(TreeSelectorLabel(ClassTrees[Index]),
+                FString::Printf(TEXT("%d / %d INVESTED"), Spent, Total),
+                Index, SkillBranchIndex == Index);
+        }
+        AddBranchChip(TEXT("COMPARE ALL"), FString::Printf(TEXT("%d BRANCHES"), ClassTrees.Num()), -1, SkillBranchIndex == -1);
+    }
+
     // ---- Header zone -------------------------------------------------------
     const EBreakerClassId PermanentClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · LV %d"),
         *ClassDisplayName(PermanentClass),
         Progression ? Progression->GetProgressionState().CharacterLevel : 1);
+
+    // Below this width the header band's controls stop fitting on one 88px
+    // row, so the labels compact rather than running off the plate. Sampled
+    // from the viewport, once, like every other number on this screen.
+    const bool bCompactHeader = Metrics.PanelWidth < 1500.0f;
 
     TSharedRef<SHorizontalBox> BoardTabs = SNew(SHorizontalBox);
     auto AddBoardTab = [this, &BoardTabs, bCoreBoard](const FString& Label, int32 TabIndex)
@@ -2784,11 +3221,27 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
-    AddBoardTab(FString::Printf(TEXT("CLASS · %s"), *ClassDisplayName(PermanentClass)), 0);
+    AddBoardTab(bCompactHeader ? TEXT("CLASS") : FString::Printf(TEXT("CLASS · %s"), *ClassDisplayName(PermanentClass)), 0);
     AddBoardTab(TEXT("CORE"), 1);
 
-    auto MakePointChip = [](const FString& Label, int32 Unspent, int32 Spent, const FLinearColor& Rail) -> TSharedRef<SWidget>
+    auto MakePointChip = [bCompactHeader](const FString& Label, int32 Unspent, int32 Spent, const FLinearColor& Rail) -> TSharedRef<SWidget>
     {
+        if (bCompactHeader)
+        {
+            // One line instead of three. The counter still says both numbers;
+            // it just stops claiming 115px of a header row that has none left.
+            return MakePlate(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(FString::FromInt(Unspent)), BreakerUI::TypeH2, Rail, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(FString::Printf(TEXT("%s / %d"), *Label.Left(5).TrimEnd(), Spent)), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+                ],
+                BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space8, BreakerUI::Space4));
+        }
         return MakePlate(
             SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
@@ -2876,13 +3329,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 return FReply::Handled();
             }))
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("RESPEC %s"), *CurrencyLabel(BoardCurrency))), BreakerUI::TypeCaption, Harm, true)
+                MenuText(FText::FromString(bCompactHeader
+                    ? FString(TEXT("RESPEC"))
+                    : FString::Printf(TEXT("RESPEC %s"), *CurrencyLabel(BoardCurrency))), BreakerUI::TypeCaption, Harm, true)
             ],
             HarmDeep)
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
     [
-        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+        SNew(SBox).WidthOverride(bCompactHeader ? 88.0f : 120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
     ];
 
     // ---- Body: board plus the fixed 420px detail rail ----------------------
@@ -2894,13 +3349,62 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             MenuText(SkillTreeStatus, BreakerUI::TypeCaption, Cyan, true)
         ];
     }
+    // Board column: the branch selector sits above the board, outside its
+    // scroll, so swapping branches never requires scrolling to find the chips.
+    TSharedRef<SVerticalBox> BoardColumn = SNew(SVerticalBox);
+    if (!bCoreBoard && ClassTrees.Num() > 0)
+    {
+        BoardColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MakePlate(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(TEXT("BRANCH")), BreakerUI::TypeCaption, Muted, true)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    BranchChips
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+                [
+                    // Said out loud, because the screen must not imply a
+                    // commitment the save has no field for.
+                    MenuText(FText::FromString(TEXT("BROWSING — NO SUBCLASS IS COMMITTED")), BreakerUI::TypeCaption, Muted, true)
+                ],
+                BreakerUI::BgRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space8))
+        ];
+    }
+    BoardColumn->AddSlot().FillHeight(1.0f)[Board];
+
+    // Rail column: the build summary pinned at the top, the hover detail
+    // beneath it in its own scroll so a long node card can never push the
+    // totals off the plate. The column's width is fixed by this box, so
+    // populating the detail cannot reflow the board.
+    TSharedRef<SWidget> RailColumn = SNew(SBox).WidthOverride(Metrics.RailWidth)
+    [
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MakeBuildTotalsPlate(Snapshot, ClassSpent, CoreSpent)
+        ]
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot()
+            [
+                SkillDetailHost.ToSharedRef()
+            ]
+        ]
+    ];
+
     Body->AddSlot().FillHeight(1.0f)
     [
         SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().FillWidth(1.0f)[Board]
+        + SHorizontalBox::Slot().FillWidth(1.0f)[BoardColumn]
         + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
         [
-            SkillDetailHost.ToSharedRef()
+            RailColumn
         ]
     ];
 
@@ -2912,7 +3416,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
             [
                 // O2: node numbers are not balanced yet.
-                MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · HOVER FULL DETAIL · SHIFT+LMB BUY TO MAX · CLICK CLASS / CORE TO SWITCH BOARD · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
+                MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · BRANCH CHIPS SWAP THE TREE · CLASS / CORE SWITCHES BOARD · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
                     BreakerUI::TypeCaption, Muted, true)
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
@@ -2928,7 +3432,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         HeaderRight,
         Body,
         Footer,
-        1760.0f);
+        Metrics.PanelWidth,
+        Metrics.PanelHeight);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
