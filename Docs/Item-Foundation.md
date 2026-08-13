@@ -27,8 +27,25 @@ bucket without a design pass.
 and a save version. Definitions stay immutable content; instances are save
 data.
 
-Item level source in the gym is enemy level (`ABreakerEnemy::EnemyLevel`).
-Zone-based sourcing remains an open design question.
+### Item level — RATIFIED [O6 2026-08-12]
+
+Item level is **hybrid**:
+
+    ItemLevel = ZoneLevel + TierBonus + Variance
+
+- **ZoneLevel** is authored on the rift/zone Data Asset — the zone, not the
+  individual enemy, is the authority for how good its drops are.
+- **TierBonus** is a content-difficulty step in the range 0..+5.
+- **Variance** is ±1, so two drops from the same zone are not identical.
+
+Zone-based sourcing is no longer an open question. The gym keeps the
+**enemy-level fallback** (`ABreakerEnemy::EnemyLevel`) for when no zone Data
+Asset is in play, so the zero-setup gym continues to work unchanged.
+
+GAP [O6]: the ZoneLevel-per-zone table, the mapping from content difficulty
+to a specific TierBonus, and the final clamp against the 1-50 item level
+range are not authored here. Value authoring is frozen under O2 — owner to
+backfill after the wave-mode instrumentation reports.
 
 ## Tier scale
 
@@ -89,12 +106,18 @@ inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
 - **Weapon swap tempo layer** — `SwapInDuration` on the weapon definition,
   `bSwapping` state blocking fire/reload, `OnSwapChanged`, and
   `GetSecondsSinceSwapIn()`. This unblocks the Secondary exclusive affixes.
-- **Block/dodge on shared stamina** — block is a stance (frontal-only chance,
-  stamina per blocked hit), dodge is an instant full-negation window costing
-  stamina and refunding a little class resource on a dodged hit. Both live in
-  `UBreakerCombatComponent`; the resolution order is in the damage library
-  and covered by tests. Neither applies to DoTs. Input bindings are not
-  wired — `SetBlocking`/`TryDodge` are BlueprintCallable.
+- **Block/dodge as passive chance layers** [RULED O1 2026-08-12] — block is
+  a passive chance to *reduce* an incoming hit; dodge is a passive chance to
+  *fully evade* one. No input, no stance, no shield requirement, no facing
+  requirement, and no cost — the shared stamina pool is deleted, along with
+  `Stamina`/`MaxStamina`. Both live in `UBreakerCombatComponent`; the
+  resolution order is in the damage library and covered by tests. Neither
+  applies to DoTs. Nothing to bind: the previous `SetBlocking`/`TryDodge`
+  input-facing entry points are superseded by the passive roll. Parry, when
+  built, is the only defensive input and uses its own short cooldown.
+  GAP [O1]: the old dodge refunded a little class resource on a dodged hit.
+  Whether that refund survives as a passive-proc effect — and if so whether
+  it is base kit or a tree rule rewrite — is unresolved. Owner to decide.
 - **Status runtime** — `UBreakerStatusComponent` runs snapshot DoTs (Bleed,
   Poison): stack-capped reapplication keeps the original snapshot, physical
   DoTs bypass shields and take half armour via the existing global rule.

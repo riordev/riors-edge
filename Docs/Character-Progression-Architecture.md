@@ -131,25 +131,27 @@ Owns status buildup and cross-element reactions. Reactions need an explicit matr
 
 ### Bulwark
 
-Owns armour, mitigation, stamina efficiency, and parry, and deepens the universal Block action. Block itself is base kit and is not granted by this tree. Guard should therefore improve block quality — reduced stamina cost, wider effective arc, reflect behavior — rather than unlocking the verb. Parry remains a genuine ability grant and is the constellation's one verb unlock.
+Owns armour, mitigation, and Parry, and deepens the universal Block layer. Block itself is base kit and is not granted by this tree.
+
+**[RULED O1 2026-08-12]:** Block is a *passive chance layer* (a chance to reduce an incoming hit), not an action or stance, and there is no stamina efficiency to own — the shared stamina pool is deleted. Guard should therefore improve block *quality* — reflect behavior, mitigation on a successful block proc, proc-triggered effects — rather than reducing a cost that no longer exists or widening an arc that no longer applies. Parry remains a genuine ability grant, is the constellation's one verb unlock, and is the only defensive input; it runs on its own short cooldown.
 
 ### Kinesis
 
-Owns dodge quality, modest movement efficiency, slide handling, and optional aerial investment. Dodge, slide, dash, and wall ride are all base kit; Kinesis improves them rather than unlocking them. Air jump remains a verb unlock and is this tree's one genuine grant. Kinesis should not turn advanced traversal into a universal requirement.
+Owns dodge quality, modest movement efficiency, slide handling, and optional aerial investment. Dodge, slide, dash, and wall ride are all base kit; Kinesis improves them rather than unlocking them. **[RULED O1 2026-08-12]:** dodge is a *passive chance layer* (a chance to fully evade an incoming hit), so "dodge quality" means rule rewrites and i-frame behavior hung off the evade proc, not improvements to an input. Air jump remains a verb unlock and is this tree's one genuine grant. Kinesis should not turn advanced traversal into a universal requirement.
 
 Recommended revisions:
 
-- Dodge uses a dedicated input action; avoid double-tap detection as the only control because it conflicts with precise strafing and accessibility.
+- ~~Dodge uses a dedicated input action; avoid double-tap detection as the only control.~~ **[RULED O1 2026-08-12]:** superseded — dodge takes no input at all. Parry is the only defensive input and is the only one needing an input slot.
 - Fleetfoot should use restrained additive or diminishing-return scaling. Five ranks at 3% each is already significant in a grounded shooter.
 - Aerial should not grant one air jump per rank. Consider one verb-unlock node plus later quality upgrades.
 - Slipstream may improve slide control/recovery without eliminating every combat tradeoff while sliding.
 - Phantom Step should reward a narrowly defined successful evade event with an internal cooldown.
 
-## Shared stamina
+## Shared stamina — SUPERSEDED [RULED O1 2026-08-12]
 
-Block and dodge can share a 100-point stamina pool, regenerating at 20 per second after 1.2 seconds without spending. Implement stamina as a replicated GAS attribute with Gameplay Effects for costs and regeneration delay.
+Superseded in full. There is no stamina pool; `Stamina`/`MaxStamina` are removed from the attribute set and the combat component. Block and dodge are passive chance layers that cost nothing, and Parry is the only defensive input, on its own short cooldown. The prior design (a 100-point pool shared by block and dodge, implemented as a replicated GAS attribute, intended to create a Bulwark/Kinesis hybrid tradeoff and requiring a cap on gear scaling) is retained here only as a record and must not be implemented.
 
-This shared pool is valuable because it creates a real Bulwark/Kinesis hybrid tradeoff. Avoid letting gear scale the pool and regeneration without caps or diminishing returns; otherwise equipment can erase the intended constraint.
+GAP [O1]: the shared pool carried the whole Bulwark/Kinesis hybrid tradeoff. Nothing replaces it. Owner to decide.
 
 ## Status architecture
 
@@ -215,7 +217,7 @@ The saved build stores stable IDs and ranks, not direct UObject pointers or calc
 
 Use GAS for:
 
-- class resources, stamina, health, shields, and combat attributes;
+- class resources, health, shields, and combat attributes (stamina removed, [RULED O1 2026-08-12]);
 - active/passive abilities and ultimate activation;
 - costs, cooldowns, buffs, debuffs, immunity, and crowd-control tags;
 - node-granted passive Gameplay Effects;
@@ -239,12 +241,13 @@ Use ordinary C++ systems for:
 5. **Boss invalidation.** DoT stacking and percent mitigation/armour reduction need boss caps without making status builds feel disabled.
 6. **Solo support viability.** Charge generation and abilities cannot depend entirely on allies.
 7. **Movement tax.** Do not balance ordinary encounters around Kinetic/Kinesis traversal mastery.
+8. **Resource generation now rides on RNG [O1].** With block and dodge as passive chance layers, Tank's Grit (mitigation → Grit) and Swift's Momentum (evasion → Momentum) generate on random procs rather than on player-initiated actions. That makes both resource loops variance-driven: generation rate is no longer under player control, and streaks in either direction change how a fight plays. Recorded as a **tuning risk to be measured by the wave-mode instrumentation (O2)** — not solved here, and no rates or smoothing rules may be authored until that instrumentation reports.
 
 ## Recommended prototyping order
 
 Do not build all five classes first.
 
-1. Implement the shared attribute, damage, stamina, and status foundations.
+1. Implement the shared attribute, damage, and status foundations. (Stamina struck — [RULED O1 2026-08-12].)
 2. Prototype one class with two contrasting branches.
 3. Implement three small Core Tree paths: one offensive, one defensive, one mobility.
 4. Validate point allocation, ability/effect grants, respec, and save/load.
@@ -269,13 +272,15 @@ Gunsmith, Tank, and Support depend on deployables, threat/AI, shielding, healing
   character power comes from gear.
 - Dash is part of the base movement kit. Swift and Kinesis improve it;
   neither unlocks it.
-- Block and Dodge are universal actions available to every character.
-  Certain classes and constellations use them better, but no tree grants
-  them.
+- Block and Dodge are universal **passive chance layers** available to
+  every character — no input, no stance, no shield requirement, no cost
+  [RULED O1 2026-08-12]. Certain classes and constellations use them
+  better, but no tree grants them. Parry is the only defensive input and
+  runs on its own short cooldown.
 
 ## Decisions still open
 
 - Are branch nodes freely mixed with investment gates, or mutually exclusive at major tiers?
-- What dedicated input slots do Block and Dodge use? Dodge should use a dedicated action rather than double-tap detection, which conflicts with precise strafing and accessibility.
+- ~~What dedicated input slots do Block and Dodge use?~~ RESOLVED [O1 2026-08-12]: none — both are passive. Only Parry needs an input slot.
 - Can snapshot DoTs trigger ordinary on-hit effects on each tick, or only explicitly DoT-compatible effects?
 - Does multiplayer scale enemy count, enemy health, elite density, or a mixture? Initial policy values are placeholders.

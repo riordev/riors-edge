@@ -812,9 +812,11 @@ THE TEST
 
 DIVIDING THE DEFENSIVE SPACE
 
-  Affixes own raw percentages and stamina economy.
+  Affixes own raw percentages — including block chance and dodge chance.
 
-  Trees own rule changes and quality — i-frames, parry, dodge refunds.
+  There is no stamina economy \[RULED O1 2026-08-12\].
+
+  Trees own rule changes and quality — i-frames, Parry, dodge refunds.
 
   Classes own the fantasy — Tank converts mitigation to Grit, Swift
 
@@ -826,7 +828,9 @@ FORBIDDEN
 
   Affixes must not grant air jump, parry, or any future verb.
 
-  Affixes must not scale the shared stamina pool without a cap.
+  \[RULED O1 2026-08-12\]: the shared-stamina-pool clause is deleted — the
+
+  pool no longer exists, so there is nothing for affixes to scale.
 
   Core Tree nodes must not outperform the class branch they overlap.
 
@@ -1198,10 +1202,13 @@ All PREFIX.
   Bleed Damage %                   GLOV, NECK, P1,P2  6% -\> 28% -\> 50%
 
   Ignite Chance %                  NECK, P1, P2       4% -\> 18% -\> 30%
+                                   \[PLACEHOLDER NAMES — O5\]
 
   Chill / Slow Potency %           NECK, BOOT         5% -\> 22% -\> 38%
+                                   \[PLACEHOLDER NAMES — O5\]
 
   Shock Chance %                   NECK, P1, P2       4% -\> 18% -\> 30%
+                                   \[PLACEHOLDER NAMES — O5\]
 
   Poison Stacks                    NECK, P1, P2       +1 -\> +4 -\> +7
 
@@ -1214,6 +1221,16 @@ All PREFIX.
 BLOCKED: every elemental line (Ignite, Chill, Shock) waits on a resistance
 
 model. Bleed and Poison are physical and can ship earlier.
+
+
+
+\[PLACEHOLDER NAMES — O5\]: the elements are RIFT, TIME, and VOID — not
+
+fire/ice/lightning. Ignite/Chill/Shock above are placeholder names and
+
+will be re-flavored onto Rift/Time/Void when the resistance model lands.
+
+Do not rename them here; the mapping is an owner choice.
 
  
 
@@ -1297,11 +1314,35 @@ DESIGN NOTE — Separating DR / Block / Dodge
 
     DR     — passive, always on, no counterplay, lowest ceiling
 
-    BLOCK  — requires a shield or stance, works FRONTALLY only
+    BLOCK  — passive CHANCE to REDUCE an incoming hit. No shield, no
 
-    DODGE  — full negation roll, also refunds a small amount of resource
+             stance, no input, no stamina, no facing requirement. \[O1\]
+
+    DODGE  — passive CHANCE to FULLY EVADE an incoming hit. No input,
+
+             no stamina. \[O1\]
+
+    PARRY  — the only defensive INPUT. Tree grant (Bulwark), own short
+
+             cooldown. \[O1\]
 
   Without differentiation players stack whichever has the best numbers.
+
+
+
+\[RULED O1 2026-08-12\]: the earlier "shield or stance" and "frontal only"
+
+framing for BLOCK is superseded, as is dodge's resource refund being a
+
+property of an active input. Any refund-on-evade behavior is now a TREE
+
+rule rewrite firing off the passive proc, not a base-kit property.
+
+GAP \[O1\]: Block and Dodge are now RNG procs rather than spent actions,
+
+so the Block %/Dodge % rows above were sized against a spend-limited
+
+action. Owner to confirm or re-cost. NEEDS-RECOST \[O1\].
 
  
 
@@ -1339,13 +1380,17 @@ All SUFFIX.
 
  
 
-BLOCKED: any affix touching the shared stamina pool or its regeneration
+\[RULED O1 2026-08-12\]: the shared stamina pool is DELETED. The stamina
 
-needs a cap defined first. Universal block and dodge mean every character
+affix lines (stamina cost, stamina regeneration, pool scaling) and the
 
-spends from the pool, so uncapped gear scaling erases the intended
+cap-required BLOCKER above are DEAD — no stamina affixes exist and none
 
-Bulwark/Kinesis tradeoff.
+may be authored.
+
+GAP \[O1\]: stamina affix line removed; table was sized with it present;
+
+owner to backfill.
 
  
 
@@ -1477,9 +1522,15 @@ All PREFIX. None of these can ship until a weapon swap system exists.
 
   Reload Speed %           Strafe Speed %           Ammo Reserve %
 
- 
 
- 
+
+\[PLACEHOLDER NAMES — O5\]: Ignite Chance % and Shock Chance % above are
+
+placeholder element names; the elements are Rift/Time/Void. See §3.7.
+
+
+
+
 
 \--------------------------------------------------------------------------------
 
@@ -1531,9 +1582,15 @@ Do not author the full pool before the pipeline runs.
 
 \[ \] Slide Momentum Retention threshold, and whether Anomalous may cross it
 
-\[ \] Whether Block requires a shield item or is a stance
+\[x\] RESOLVED \[O1 2026-08-12\] — Whether Block requires a shield item or is
 
-\[ \] Stamina pool scaling cap
+    a stance: NEITHER. Block is a passive chance layer with no item
+
+    requirement, no stance, and no input.
+
+\[x\] RESOLVED \[O1 2026-08-12\] — Stamina pool scaling cap: MOOT. The pool
+
+    is deleted.
 
 \[ \] Whether Necklace's one-tier penalty applies to universal core affixes
 
@@ -1940,25 +1997,41 @@ them.
 
  
 
-Trees and affixes scale these actions. Affixes own raw percentages and
+\[RULED O1 2026-08-12\]: Block and Dodge are PASSIVE CHANCE LAYERS, not
 
-stamina economy; trees own rule changes and quality such as i-frame
+actions. They take no input, have no stance, and require no shield. Dodge
 
-duration and parry.
+is a chance to fully evade an incoming hit; Block is a chance to reduce
 
- 
+one. There is no stamina cost and no stamina pool — the shared stamina
+
+pool is DELETED. Parry, when built, is the only defensive INPUT and runs
+
+on its own short cooldown.
+
+
+
+Trees and affixes scale these layers. Affixes own the raw chance
+
+percentages; trees own rule changes and quality such as i-frame duration
+
+and Parry.
+
+
 
 TREE-GRANTED VERBS — the complete list:
 
   Air jump (Kinesis)
 
-  Parry (Bulwark)
+  Parry (Bulwark) — the only defensive input; own short cooldown \[O1\]
 
- 
+
 
 Dash is base kit. Swift and Kinesis improve it; neither unlocks it.
 
-Block and Dodge are universal. Certain classes use them better.
+Block and Dodge are universal passive layers. Certain classes and trees
+
+improve their quality.
 
  
 
@@ -2548,7 +2621,8 @@ PROTOTYPING ORDER — do not build all five first.
 
   ELEMENTS    Status buildup and cross-element reactions
 
-  BULWARK     Armour, mitigation, stamina efficiency, parry
+  BULWARK     Armour, mitigation, block quality, Parry
+              \[RULED O1 2026-08-12\]: "stamina efficiency" struck — no pool
 
   KINESIS     Dodge quality, movement efficiency, slide handling, aerial
 
@@ -2580,31 +2654,43 @@ CONSEQUENCE
 
 \--------------------------------------------------------------------------------
 
-7.7  SHARED STAMINA
+7.7  SHARED STAMINA — SUPERSEDED \[RULED O1 2026-08-12\]
 
 \--------------------------------------------------------------------------------
 
- 
 
-Block and dodge share a 100-point stamina pool, regenerating at 20 per
 
-second after 1.2 seconds without spending. Implemented as a replicated GAS
+SUPERSEDED IN FULL. There is no stamina pool. `Stamina`/`MaxStamina` are
 
-attribute with Gameplay Effects for costs and regeneration delay.
+removed from the attribute set and the combat component. Block and dodge
 
- 
+are passive chance layers that cost nothing; Parry is the only defensive
 
-This creates a real Bulwark/Kinesis hybrid tradeoff.
+input and uses its own short cooldown.
 
- 
 
-CAP REQUIRED: gear must not scale the pool and regeneration without caps or
 
-diminishing returns, or equipment erases the constraint. This risk is
+The section below is retained only as a record of the pre-ruling design.
 
-larger now that block and dodge are universal, because every character
+It is NOT current and must not be implemented.
 
-spends from the pool.
+
+
+    (was) Block and dodge share a 100-point stamina pool, regenerating at
+
+    20 per second after 1.2 seconds without spending, as a replicated GAS
+
+    attribute. This was intended to create a Bulwark/Kinesis hybrid
+
+    tradeoff, and required a cap on gear scaling of pool and regeneration.
+
+
+
+GAP \[O1\]: the Bulwark/Kinesis hybrid tradeoff was carried entirely by the
+
+shared pool. With the pool deleted there is no tension mechanism between
+
+the two defensive constellations. Owner to decide what replaces it.
 
  
 
@@ -2724,11 +2810,11 @@ VERTICAL SLICE OVERRIDE
 
     exclusive at major tiers?
 
-\[ \] What dedicated input slots do Block and Dodge use? Dodge should use a
+\[x\] RESOLVED \[O1 2026-08-12\] — What dedicated input slots do Block and
 
-    dedicated action rather than double-tap detection, which conflicts with
+    Dodge use? NONE. Block and dodge are passive chance layers and take no
 
-    precise strafing and accessibility.
+    input at all. Parry is the only defensive input and needs one slot.
 
 \[ \] Can snapshot DoTs trigger ordinary on-hit effects per tick, or only
 
@@ -3301,7 +3387,8 @@ Slice boss: an Act II Altered commander. See the Generic Story tab.
 
 # Types of content  
 
-Anomalies - think tilesets of maps (different modded versions from the base game)   
+Frontier - think tilesets of maps (different modded versions from the base game)
+\[RULED O8 2026-08-12\]: this content type was called "Anomalies"; the endgame farm content type is named **Frontier**. The Anomalous RARITY tier keeps its name and is unaffected.
 This will be the primary end game farm   
 Relatively open map to go through and kill lots of packs of mobs with different rarities that drop gear with a map boss at the end   
   

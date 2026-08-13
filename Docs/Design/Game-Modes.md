@@ -1,7 +1,7 @@
 # Game Modes — Content Type Design
 
-Domain: Local Rifts, Anomalies, Dungeons (4), Raids (7), Conquest (9).
-Status: Local Rifts and Anomalies are full designs. Dungeon/Raid/Conquest are one-page treatments.
+Domain: Local Rifts, Frontiers, Dungeons (4), Raids (7), Conquest (9).
+Status: Local Rifts and Frontiers are full designs. Dungeon/Raid/Conquest are one-page treatments.
 Authority: subordinate to `Docs/Design/Master-Sheet-Import.txt`. Every LOCKED decision there is law here.
 
 All numbers in this document are PLACEHOLDER until the Playtest Gym establishes a real time-to-kill, per master sheet 3.0.
@@ -24,19 +24,21 @@ Inherited and non-negotiable:
 
 ---
 
-## 1. NAMING — CONFLICT (must resolve before any content is authored)
+## 1. NAMING — RESOLVED (O8)
 
-**CONFLICT.** Master sheet 1.2 NAMING CONSTRAINTS states: *do not use "Aberrant" or "Anomalous" for enemies — they are rarity tier names and players will conflate them.* The content-type note in section 10 names the endgame farm **"Anomalies."** That is the same word family as the top rarity tier, applied to a content type rather than an enemy, but the conflation risk is identical and worse: players will say "I got an Anomalous from an Anomaly" and mean two unrelated systems.
+**RESOLVED by owner ruling O8** (`Docs/Design/Decisions.md`): *the endgame farm content type is named "Frontier."* The prior working name "Anomaly" collided with the **Anomalous** rarity tier and violated the intent of master sheet 1.2 NAMING CONSTRAINTS. That collision is now closed.
 
-Recommendation: keep **Anomaly** as the internal working name, ship a different player-facing name. Candidates that fit the fiction (rifts into timelines Rior is currently working on — 8.3 "Rior's frontier"):
+Vocabulary after O8:
 
-| Candidate | Reads as | Notes |
+| Term | Refers to | Status |
 |---|---|---|
-| **Frontier** / "running a Frontier" | Endgame map | Already the master sheet's own term for the endgame region (8.3, 10.1). Strongest option — zero new vocabulary. |
-| **Incursion** | Endgame map | Clean, genre-legible, no collision. |
-| **Deviation** | Modded tileset | Describes the modifier fantasy well; slightly abstract. |
+| **Frontier** | The endgame farm content type ("running a Frontier") | Ruling O8. Already the master sheet's own term for the endgame region (8.3, 10.1) — zero new vocabulary. |
+| **Anomalous** | The top item rarity tier | Unchanged. Not renamed, not affected by O8. |
+| **Aberrant** | The chase item rarity tier below Anomalous | Unchanged. |
 
-**This doc uses "Anomaly" throughout for continuity with the master sheet. Treat every instance as a rename target.** My recommendation is **Frontier**, because "Rior's frontier" is already LOCKED-adjacent vocabulary and the mode is literally that content.
+**"Anomaly"/"Anomalies" no longer appear in this document as a content type.** Every remaining use of "Anomalous" in this document is a *rarity* reference and is correct as written.
+
+**GAP [O8]:** §4.3 already uses **"Frontier pack"** as the name of the top pack-rarity tier inside a Frontier. Post-rename that reads as "the Frontier pack in a Frontier." O8 renames the content type only and does not rule on the pack tier name, so it is left as written. This needs an owner naming decision for the pack tier; do not resolve it in propagation.
 
 ---
 
@@ -48,17 +50,17 @@ Recommendation: keep **Anomaly** as the internal working name, ship a different 
 | Local Rift | 1-5 | Yes | Yes | Progression loot, Core Points (one-time) | **Build first** |
 | The Breach | 1-5 | Yes, gated | One-time | Act II gate, capability unlock | Campaign |
 | Erased Earths | shared semi-open | No | Partly | World events, materials | Campaign |
-| **Anomaly** | 1-5 | Yes | Yes, infinite | T0 bases, Aberrant, Anomalous, T-1 materials | **Build second** |
+| **Frontier** | 1-5 | Yes | Yes, infinite | T0 bases, Aberrant, Anomalous, T-1 materials | **Build second** |
 | Dungeon | 4 | Yes | Yes, lockout-lite | Targeted Aberrant signatures | Post-slice |
 | Raid | 7 | Yes | Yes, weekly-ish | Guaranteed T-1, unique Anomalous | Post-slice |
-| Conquest | 9 matchmade | Yes | Yes | Volume + Anomaly access currency | Post-slice |
+| Conquest | 9 matchmade | Yes | Yes | Volume + Frontier access currency | Post-slice |
 
 ### Repeatable vs one-time ratio — RECOMMENDATION
 
 Target **roughly 20% one-time, 80% repeatable, measured in first-playthrough hours.**
 
 - The campaign (levels 1-50, Acts I-III) is the one-time content. It must be good enough to sell the game and short enough that the endgame is where players live.
-- Every one-time piece must hand over a *permanent capability or currency*, never a stat: a fragment capability (1.7), a Core Point (7.2 — the ~15 world-content points), or an Anomaly modifier unlock.
+- Every one-time piece must hand over a *permanent capability or currency*, never a stat: a fragment capability (1.7), a Core Point (7.2 — the ~15 world-content points), or an Frontier modifier unlock.
 - Every repeatable piece must be runnable in under 12 minutes solo at a competent skill level, or it will not survive a hundred repetitions.
 - **Do not build a second one-time campaign as an expansion model.** The Erased Earths content engine (8.4) is the correct expansion vector: new tilesets and modifier pools feed the repeatable layer.
 
@@ -69,7 +71,7 @@ Target **roughly 20% one-time, 80% repeatable, measured in first-playthrough hou
 | First-clear of each Local Rift archetype (8 archetypes) | 8 | One-time per archetype, not per instance |
 | The Breach completion | 1 | Act II gate |
 | Erased Earth zone discovery (3 zones) | 3 | One per zone |
-| First Anomaly tier 5 / 10 / 15 clear | 3 | Bridges campaign into endgame |
+| First Frontier tier 5 / 10 / 15 clear | 3 | Bridges campaign into endgame |
 | **Total** | **15** | Matches the 7.2 schedule exactly |
 
 This is deliberately front-loadable but not endgame-gated: a solo player who never touches a Dungeon or Raid can reach the full ~65 Core Points. **Group content must never gate Core Points.** (11.1 solo balance target.)
@@ -81,7 +83,7 @@ This is deliberately front-loadable but not endgame-gated: a solo player who nev
 | Mode | Approach | Reason |
 |---|---|---|
 | Local Rift | **Handcrafted layouts, ~3 layouts per archetype, procedural objective/spawn/modifier placement** | The campaign is seen once. Layout quality matters more than variety. Cheap to author because rift interiors are small. |
-| Anomaly | **Procedural assembly from handcrafted room modules ("tiles"), handcrafted boss arena** | Infinitely repeatable. Needs novelty. But a movement shooter dies on procedural geometry that does not read for wall-ride and slide lines. |
+| Frontier | **Procedural assembly from handcrafted room modules ("tiles"), handcrafted boss arena** | Infinitely repeatable. Needs novelty. But a movement shooter dies on procedural geometry that does not read for wall-ride and slide lines. |
 | Dungeon | **Fully handcrafted** | 4-player coordination requires known geometry. |
 | Raid | **Fully handcrafted** | Same, more so. |
 | Conquest | **Handcrafted warzone maps, procedural front-line state** | The map is a persistent stage; the fight over it is the variable. |
@@ -141,7 +143,7 @@ Eight archetypes. Each is a room-scale objective; the rift picks 2-3 without rep
 | 5 | **Carry** | Move charges from spawn to a socket, N times | **High** | Carrying disables the Secondary slot (EXTENDS: requires the swap system, already implemented). Movement speed is the whole objective. |
 | 6 | **Collapse** | Survive while the room degrades — floor sections erase | **High** | Best expression of the erasure fiction as a mechanic. |
 | 7 | **Hunt** | Kill 3 marked elites that flee between rooms | Medium | Uses the elite modifier system as content rather than as difficulty. |
-| 8 | **Silence** | Kill a broadcasting Vestige that continuously buffs the room | Low-medium | Priority-target training. Teaches the skill the Anomaly boss will demand. |
+| 8 | **Silence** | Kill a broadcasting Vestige that continuously buffs the room | Low-medium | Priority-target training. Teaches the skill the Frontier boss will demand. |
 
 Distribution rule: a rift may contain at most one high-movement-pressure objective (3, 5, 6). This is a direct implementation of 7.10 risk 7 (movement tax) — no rift may be gated end-to-end on traversal mastery.
 
@@ -165,7 +167,7 @@ Locked sequence:
 
 - Solo: death returns the player to the Threshold with the rift's progress intact, on a 20 s respawn timer. **No run loss on Local Rifts.** This is the campaign loop; it must not be punishing.
 - Party: bleedout with ally revive (Interaction & Revive Speed %, 3.10, becomes relevant); full-party wipe returns everyone to Threshold.
-- **Anomalies use a different, harsher rule.** See 4.7.
+- **Frontiers use a different, harsher rule.** See 4.7.
 
 ### 3.7 Rift tiering
 
@@ -179,7 +181,7 @@ Tier is a single integer on the rift instance. It drives three things and nothin
 
 **Tier 1-15 is campaign.** The rift tier available to a player is capped at their level, so tiering is invisible during levelling.
 
-**Tier 16-30 is the endgame band.** Available at 50. This is where Anomalies take over — Local Rifts above T15 exist as a lower-intensity alternative for players who do not want the Anomaly modifier stack, with a corresponding reward penalty (see 4.6).
+**Tier 16-30 is the endgame band.** Available at 50. This is where Frontiers take over — Local Rifts above T15 exist as a lower-intensity alternative for players who do not want the Frontier modifier stack, with a corresponding reward penalty (see 4.6).
 
 **Reward scaling per tier — the shape that matters:**
 
@@ -217,17 +219,17 @@ Note that **Exceptional is the tier that grows most**, per 9.2 — it is the rea
 
 ---
 
-## 4. ANOMALIES — full design
+## 4. FRONTIERS — full design
 
 ### 4.1 Fantasy and function
 
-*(Working name. See §1 CONFLICT.)*
+*(Name ratified by O8. See §1.)*
 
-An Anomaly is a timeline Rior is currently working on. It is a recognisable Earth tileset, modded — the same rooms the player knows, running wrong. It is relatively open, densely populated with packs of varying rarity, and it ends with a map boss.
+An Frontier is a timeline Rior is currently working on. It is a recognisable Earth tileset, modded — the same rooms the player knows, running wrong. It is relatively open, densely populated with packs of varying rarity, and it ends with a map boss.
 
 This is the endgame. It is where a level-50 player spends the next several hundred hours. Everything about it is built for repetition.
 
-**Structural difference from a Local Rift:** a Local Rift is a corridor with objectives. An Anomaly is **an open field with a boss at the end of it**. The player chooses their own route, their own pack order, and their own risk. There is no objective list. The objective is loot.
+**Structural difference from a Local Rift:** a Local Rift is a corridor with objectives. An Frontier is **an open field with a boss at the end of it**. The player chooses their own route, their own pack order, and their own risk. There is no objective list. The objective is loot.
 
 ### 4.2 Structure
 
@@ -245,14 +247,42 @@ This is the endgame. It is where a level-50 player spends the next several hundr
 
 Master sheet: *"kill lots of packs of mobs with different rarities that drop gear."* Formalised:
 
-| Pack rarity | Visual | Composition | Drop behaviour | Frequency at T20 |
-|---|---|---|---|---|
-| **Common pack** | none | 4-7 normals | Standard loot roll, low quantity | ~60% of packs |
-| **Marked pack** | pack-wide aura | 6-9 normals + 1 elite modifier | +1 guaranteed item, rarity floor Uncommon | ~28% |
-| **Severed pack** | heavy aura, audible | 8-12 normals + 2 elites, one carries a pack modifier | +2 items, rarity floor Exceptional, guaranteed material | ~10% |
-| **Frontier pack** | unmissable, visible across the map | 1 named elite + retinue | Rarity floor Exceptional, elevated Aberrant chance, always drops a boss-table token | ~2% |
+**Taxonomy (O9).** Pack composition is expressed in the three orthogonal enemy
+fields, not in the old "normals + elites" vocabulary:
 
-Existing gym elite behaviour (`ConfigureElite`: 1.5x scale, 3x health, 2x damage, drop floor Exceptional) is the correct baseline for the elite inside a Marked pack. Severed and Frontier elites need distinct authored behaviour, not stat multiples.
+- **Archetype** — behavior (Skitter / Lattice / Warden / …). Owned by `Encounter-Design.md`.
+- **Rank** — Standard / Veteran / Champion / Boss. Owned by `XP-And-Pacing.md`.
+- **Modifiers** — 0-3 per enemy. Owned by `Encounter-Design.md`.
+
+**Modifier count drives Rank** (adopted from XP §5.1, not re-authored here):
+0 modifiers = Standard, 1 = Veteran, 2-3 = Champion. Boss is authored, not
+modifier-derived. There is no separate "elite" field — what this document
+previously called an *elite* is any enemy at Rank Veteran or above.
+
+| Pack rarity | Visual | Composition (Archetype / Rank / Modifiers) | Drop behaviour | Frequency at T20 |
+|---|---|---|---|---|
+| **Common pack** | none | 4-7 Standards (0 modifiers), archetype mix | Standard loot roll, low quantity | ~60% of packs |
+| **Marked pack** | pack-wide aura | 6-9 Standards + 1 Veteran (1 modifier) | +1 guaranteed item, rarity floor Uncommon | ~28% |
+| **Severed pack** | heavy aura, audible | 8-12 Standards + 2 above-Standard, at least one Champion (2-3 modifiers) carrying the pack modifier | +2 items, rarity floor Exceptional, guaranteed material | ~10% |
+| **Frontier pack** | unmissable, visible across the map | 1 named Champion + retinue | Rarity floor Exceptional, elevated Aberrant chance, always drops a boss-table token | ~2% |
+
+**Elite (Veteran+) stat chassis — reconciled to Encounter-Design §1.1.** The old
+gym `ConfigureElite` values (1.5x scale, 3x health, 2x damage) are superseded.
+The canonical chassis is Encounter-Design §1.1, adopted here verbatim:
+
+| Property | Value |
+|---|---|
+| Visual scale | 1.25x |
+| Health | 2.0x base, +0.35x per modifier beyond the first |
+| Damage | 1.5x |
+| Stagger resistance | 2.0x |
+| Loot floor | Exceptional |
+
+Health therefore reads 2.0x at Veteran (1 modifier) and 2.35x / 2.70x at
+Champion (2 / 3 modifiers). No values are authored here — these are
+Encounter-Design §1.1's numbers, referenced. Named Champions in Severed and
+Frontier packs still need distinct authored *behaviour* on top of the chassis,
+not further stat multiples.
 
 **Rule: pack rarity is visible from a distance.** The player must be able to route-plan on sight. A player who chooses to run past every Common pack and only fight Severed and Frontier packs is playing the mode correctly and should be rewarded for it — that is a build decision (movement speed, burst, survivability) expressing itself as a farming strategy.
 
@@ -260,7 +290,7 @@ Existing gym elite behaviour (`ConfigureElite`: 1.5x scale, 3x health, 2x damage
 
 This is the mode's replayability engine and its largest balance risk. Structure:
 
-**Modifiers are rolled onto the Anomaly instance before entry, visible before entry, and the player may re-roll at a material cost.** Count = `floor(tier / 4)`, cap 4.
+**Modifiers are rolled onto the Frontier instance before entry, visible before entry, and the player may re-roll at a material cost.** Count = `floor(tier / 4)`, cap 4.
 
 Three modifier classes:
 
@@ -290,11 +320,52 @@ Three modifier classes:
 
 | Modifier | Effect | Reward mult |
 |---|---|---|
-| Sealed | Shields do not recharge inside the Anomaly | +20% |
+| Sealed | Shields do not recharge inside the Frontier | +20% |
 | Dry | Ammo Returned on Kill does not function | +14% |
-| Exposed | Dodge and Block do not function | +22% |
+| Exposed | Block and Dodge do not reduce or evade damage, but still generate class resource | +22% |
 | Grounded | Air jump does not function | +18% |
 | Bare | No healing from Life on Hit or Life on Kill; regeneration only | +20% |
+
+**Class C audit against class resource generation (O1).** Every Class C modifier
+checked against the generation tables in `Docs/Design/Class-Kits.md`:
+
+- **Exposed — RESOLVED, re-scoped above.** Under O1's passive block/dodge, the
+  original "Dodge and Block do not function" deleted Swift's *Successful dodge
+  (+15 flat)* source and Tank's *Passive Block roll firing (+6)* source outright,
+  while costing the other three classes nothing. It also disabled Caster's SB9
+  (Reprisal) trigger. The re-scope keeps the defensive subtraction — the roll
+  still fires, it just no longer mitigates — so the modifier remains a real
+  difficulty increase without being a class-selective resource deletion.
+- **Dry — AUDIT [O1]: does not collide with Gunsmith.** Checked first per
+  instruction. Gunsmith's Scrap sources are Kill, Reload completed, Emptying a
+  magazine, Deployable destroyed, and Deployable damage. **None of them read
+  Ammo Returned on Kill**, so Dry does not touch the Gunsmith economy; if
+  anything it raises reload frequency and therefore Scrap. The actual collision
+  is **Swift**: node F8 (Ammunition Economy) generates 5 Momentum per Ammo
+  Returned on Kill trigger, and Dry zeroes that node's entire output. F8 is one
+  node of a twelve-node branch and Swift's other seven generation sources are
+  untouched, so this is a node-level dead-pick, not a loop kill. Flagged, not
+  redesigned.
+- **Sealed — AUDIT [O1]: collides with Support, scope ambiguous.** Support's
+  Charge source *"Healing or shielding done to self, +1 per 3% of own maximum
+  health"* is the explicit anti-7.10.6 solo clause and is non-negotiable per
+  Class-Kits §5. If "shields do not recharge" is read as *shield regeneration
+  only*, Support is unaffected. If it is read as *no shield may be applied*, it
+  deletes a named-mandatory Support generation source and also disables Tank's
+  Leech overheal-to-shield conversion. **The scope of "recharge" is undefined and
+  must be pinned to regeneration-only.** Owner call; not resolved here.
+- **Bare — AUDIT [O1]: collides with Support if read broadly.** As written it
+  subtracts only the *Life on Hit / Life on Kill affixes*, which are gear, not a
+  class loop — safe. But the trailing clause "regeneration only" invites the
+  broader reading "no healing except regeneration," which would zero Support's
+  two largest Charge sources (healing done to allies, healing or shielding done
+  to self) and gut Medic. **The narrow affix-only reading must be the normative
+  one.** Owner call; not resolved here.
+- **Grounded — no generation collision.** Swift's *Airborne (+8/s)* source is
+  credited from any airborne state, and the base kit's jump, dash, and slide
+  remain. Air jump is a tree verb; per the fourth FORBIDDEN line, disabling a
+  verb some players never bought is acceptable and intentional. Reduces Swift's
+  air-time ceiling; does not remove the source.
 
 **FORBIDDEN in the modifier system — these lines must never be crossed:**
 
@@ -302,7 +373,13 @@ Three modifier classes:
 - **No modifier may create a damage multiplier of any kind on the player side.** Crit is the only multiplier of its kind (6.3). "Enemies take double damage from behind" is a second multiplier wearing a costume. Rejected.
 - **No modifier may add a percentage to a player stat.** Class C is subtractive/rule-based only. This is what keeps the modifier system entirely outside the flat/Increased/More pipeline.
 - **No modifier may require a verb the player might not own.** "Grounded" disables air jump for everyone including players who never bought it — that is a flat reward bonus for Bulwark players and that is acceptable and intentional. But no modifier may *require* air jump or parry to complete.
-- **Exposed is the only modifier touching the defensive layer, and it removes it entirely rather than reducing it.** Percentage reductions to Dodge % and Block % would interact with the additive bucket. Binary off does not.
+- **No modifier may disable a class resource generation source.** (O1.) Class
+  resource loops are the class layer, not the affix layer, and a modifier that
+  switches one off is not a difficulty knob — it is a class ban wearing a
+  costume. This line is why Exposed is scoped to the *mitigation* half of
+  block/dodge and leaves the *generation* half intact, and it is the test every
+  future Class C modifier must pass.
+- **Exposed is the only modifier touching the defensive layer, and it removes the mitigation entirely rather than reducing it.** Percentage reductions to Dodge % and Block % would interact with the additive bucket. Binary off does not. Under O1 the block/dodge rolls still *fire* — they simply do not reduce or evade damage — so Swift's dodge-to-Momentum and Tank's block-to-Grit conversions continue to pay out.
 
 **Stacking rule:** reward multipliers are **additive with each other**, applied to quantity and rarity weight separately (see 4.6). Four modifiers at +20% each yields +80%, not +107%. This is a deliberate refusal of multiplicative reward scaling; it is the same discipline as the stat pipeline and for the same reason.
 
@@ -310,7 +387,7 @@ Three modifier classes:
 
 ### 4.5 The map boss
 
-Every Anomaly ends with a map boss. Requirements:
+Every Frontier ends with a map boss. Requirements:
 
 - **3-4 bosses per tileset**, rolled per instance. The player should not know which one they are running until Ingress.
 - **2-4 minutes at appropriate gear.** Longer than this and it becomes the run's bottleneck; players will optimise by re-rolling for the fast boss, which is a failure state.
@@ -321,31 +398,31 @@ Every Anomaly ends with a map boss. Requirements:
 
 ### 4.6 Reward structure
 
-The Anomaly reward package, per completed run:
+The Frontier reward package, per completed run:
 
 | Source | Yield |
 |---|---|
 | Packs | Per-pack rolls per 4.3. The bulk of item volume. |
 | Map boss | 3-5 guaranteed items at the rift's rarity weights with a +2 item level bonus, plus a roll on the boss's T-1 table |
-| Completion cache | 1 item at rarity floor Exceptional, 1 re-roll material, 1 Anomaly access token |
+| Completion cache | 1 item at rarity floor Exceptional, 1 re-roll material, 1 Frontier access token |
 | Frontier pack tokens | Consumable, spends at the boss arena to add one extra boss-table roll |
 
 **Modifier reward multipliers apply to:** item *quantity* from packs, and the Aberrant/Anomalous *rarity weights*. They do **not** apply to the boss's guaranteed drops or the completion cache — those are the floor that makes a low-modifier run still worth doing.
 
-**Anomalies out-reward equivalent-tier Local Rifts by ~35% in items per minute.** That gap is the mode's reason to exist. Local Rifts above T15 remain viable for players who prefer them but are explicitly the lower-yield option.
+**Frontiers out-reward equivalent-tier Local Rifts by ~35% in items per minute.** That gap is the mode's reason to exist. Local Rifts above T15 remain viable for players who prefer them but are explicitly the lower-yield option.
 
-**Access:** Anomalies are entered with an access token, dropped from Anomaly completion caches and from Local Rifts at T10+. A completed Anomaly yields slightly more than one token on average (~1.15), so the mode is self-sustaining with a small surplus and a bad run streak cannot lock a player out. **Do not make tokens tradeable or the surplus large enough to hoard.**
+**Access:** Frontiers are entered with an access token, dropped from Frontier completion caches and from Local Rifts at T10+. A completed Frontier yields slightly more than one token on average (~1.15), so the mode is self-sustaining with a small surplus and a bad run streak cannot lock a player out. **Do not make tokens tradeable or the surplus large enough to hoard.**
 
-**Tier progression:** completing an Anomaly at tier N drops tokens for tier N+1 at ~40%, N at ~50%, N-1 at ~10%. Players climb by playing, not by grinding a currency.
+**Tier progression:** completing an Frontier at tier N drops tokens for tier N+1 at ~40%, N at ~50%, N-1 at ~10%. Players climb by playing, not by grinding a currency.
 
 ### 4.7 Death and retry — HARSHER THAN LOCAL RIFTS
 
-- **One death per Anomaly instance.** The second death ends the run; the player keeps everything looted so far and is returned to the Anchor. The access token is consumed.
-- Rationale: the mode's core decision is *which packs to fight*, and that decision is meaningless without a real cost to being wrong. A free-respawn Anomaly is a mode where the correct play is always to fight everything.
+- **One death per Frontier instance.** The second death ends the run; the player keeps everything looted so far and is returned to the Anchor. The access token is consumed.
+- Rationale: the mode's core decision is *which packs to fight*, and that decision is meaningless without a real cost to being wrong. A free-respawn Frontier is a mode where the correct play is always to fight everything.
 - **Party:** the death budget is per-party, not per-player: 1 + floor(party_size / 2). A 5-player party gets 3. Full wipe ends the run regardless of budget.
 - **CONFLICT flag with 11.1 (solo primary):** a solo player gets 1 death; a 5-player party gets 3 for 5 players, i.e. fewer per capita. This is intentional and worth stating: group play is more forgiving in aggregate and less forgiving individually. If playtest shows solo runs failing at a materially higher rate than group runs at equivalent gear, **raise the solo budget to 2 rather than lowering the group budget** — solo is the balance target.
 
-### 4.8 Acceptance criteria — Anomalies
+### 4.8 Acceptance criteria — Frontiers
 
 - [ ] Median solo run time at appropriate gear is 12-18 minutes including boss.
 - [ ] A player can identify every pack's rarity from across the open field without aiming at it.
@@ -354,11 +431,12 @@ The Anomaly reward package, per completed run:
 - [ ] Every generated layout has a spanning route from Ingress to Boss Arena with no unreachable exits, verified by the assembler, not by playtest.
 - [ ] No modifier grants the player anything.
 - [ ] No modifier adds or subtracts a percentage from a player stat.
+- [ ] No modifier disables a class resource generation source. (O1.) Verified by running each Class C modifier against all five generation tables in `Docs/Design/Class-Kits.md`, not by playtest.
 - [ ] No modifier combination produces an unwinnable run at intended gear. Verified against the conflict matrix.
 - [ ] The map boss is beatable using only walk/sprint/jump/crouch/dash/slide and a weapon.
 - [ ] Token economy sustains: 200 simulated runs at a 60% success rate never produce a token count of zero.
 - [ ] Tier, modifier count, enemy level, and item level all derive from one integer plus one Data Asset curve. No hand-authored tier tables in C++. (7.9)
-- [ ] A player who runs 50 Anomalies and never sees an Anomalous item has still made measurable build progress via Exceptional bases and materials.
+- [ ] A player who runs 50 Frontiers and never sees an Anomalous item has still made measurable build progress via Exceptional bases and materials.
 
 ---
 
@@ -366,7 +444,7 @@ The Anomaly reward package, per completed run:
 
 **4 players. Handcrafted. Instanced. Repeatable.**
 
-**Function:** the targeted-farm mode. Where an Anomaly gives volume and variety, a Dungeon gives *specificity*. Each Dungeon owns a small pool of Aberrant signature affixes (4.5) that drop nowhere else. A player who wants "sliding applies Bleed to enemies you pass through" knows exactly which Dungeon to run.
+**Function:** the targeted-farm mode. Where an Frontier gives volume and variety, a Dungeon gives *specificity*. Each Dungeon owns a small pool of Aberrant signature affixes (4.5) that drop nowhere else. A player who wants "sliding applies Bleed to enemies you pass through" knows exactly which Dungeon to run.
 
 **Structure:** 3 encounters, ~20-25 minutes.
 1. **Opener** — a fight that teaches the Dungeon's mechanic in a low-stakes form.
@@ -377,11 +455,11 @@ The Anomaly reward package, per completed run:
 
 **Scaling:** enemy count and elite density scale with party size; health scales only mildly. (11.2 — do not scale only health.) A Dungeon should be soloable at significantly over-tuned gear, as an aspirational flex, but never as the efficient path.
 
-**Lockout:** none, but the Aberrant signature drop is once-per-week-per-signature per character, with the remaining loot uncapped. Farming for volume happens in Anomalies; Dungeons are visited with a purpose.
+**Lockout:** none, but the Aberrant signature drop is once-per-week-per-signature per character, with the remaining loot uncapped. Farming for volume happens in Frontiers; Dungeons are visited with a purpose.
 
 **Reward:** Dungeon-exclusive Aberrant signatures, Exceptional bases at good item level, and crafting materials weighted toward tier upgrades.
 
-**Recommend 6 Dungeons at launch**, one per Anomaly tileset plus two.
+**Recommend 6 Dungeons at launch**, one per Frontier tileset plus two.
 
 ---
 
@@ -431,7 +509,7 @@ The Anomaly reward package, per completed run:
 
 **Mini-bosses:** spawn per sector on capture-contest. Roughly Frontier-pack strength. They are events, not walls.
 
-**Rewards:** high item *quantity* at moderate rarity, and — importantly — **Anomaly access tokens at the highest rate in the game.** Conquest's economic role is to feed the Anomaly loop. A player who prefers chaos to precision can play Conquest exclusively and still fund an Anomaly-tier gear chase, they just do it more slowly.
+**Rewards:** high item *quantity* at moderate rarity, and — importantly — **Frontier access tokens at the highest rate in the game.** Conquest's economic role is to feed the Frontier loop. A player who prefers chaos to precision can play Conquest exclusively and still fund an Frontier-tier gear chase, they just do it more slowly.
 
 **Risk to watch:** with 9 matchmade players and no failure state, Conquest can become the AFK-optimal mode. Mitigation: reward scales with *personal contribution weighted by sector participation*, and the completion cache requires having been present for at least one sector capture.
 
@@ -442,9 +520,9 @@ The Anomaly reward package, per completed run:
 1. **Local Rift, Short class, objectives 1 and 2 only, tier 1-5.** Wraps the existing gym in a real loop. Proves the threshold/body/anchor/ritual skeleton.
 2. **The closing ritual.** Cheap, high narrative leverage, and it should exist before there are four hundred rifts to retrofit.
 3. **Remaining six objective types + Standard class + tiering to T15.**
-4. **Anomaly: tile assembler and the movement contract check.** The riskiest technical piece; validate it before content depends on it.
-5. **Anomaly: pack rarity, modifiers Class A only.** Class A is aggregation-safe and proves the reward multiplier maths.
-6. **Anomaly: map boss + T-1 tables + token economy.**
+4. **Frontier: tile assembler and the movement contract check.** The riskiest technical piece; validate it before content depends on it.
+5. **Frontier: pack rarity, modifiers Class A only.** Class A is aggregation-safe and proves the reward multiplier maths.
+6. **Frontier: map boss + T-1 tables + token economy.**
 7. **Modifiers Class B and C.**
 8. Dungeon → Raid → Conquest, in that order. Each depends on the prior mode's encounter tooling.
 
@@ -454,13 +532,13 @@ Blocking prerequisites from the master sheet that this document depends on: item
 
 ## 9. OPEN QUESTIONS
 
-1. **Naming.** "Anomalies" collides with the Anomalous rarity tier and violates the 1.2 naming constraint's intent. Rename before content authoring. Recommendation: **Frontier**. Needs a decision, not a discussion.
+1. ~~**Naming.**~~ **CLOSED by O8** — the content type is **Frontier**. See §1. One residual gap remains: the §4.3 "Frontier pack" rarity tier now shares the content type's name and needs its own owner naming decision (flagged in §1).
 2. **Intended time from level 50 to a finished build** (9.4, unresolved upstream). Every drop rate, token rate, and reward multiplier in §3.7 and §4.6 is unanchorable until this number exists. This is the single largest blocker on this document.
-3. **Solo death budget in Anomalies.** §4.7 gives solo 1 death and a 5-player party 3. Per capita this is harsher on groups but in aggregate harsher on solo. Does this survive the solo-primary balance target, or does solo need 2?
+3. **Solo death budget in Frontiers.** §4.7 gives solo 1 death and a 5-player party 3. Per capita this is harsher on groups but in aggregate harsher on solo. Does this survive the solo-primary balance target, or does solo need 2?
 4. **Does Conquest's contribution-weighted reward create a griefing or kill-stealing dynamic** at 9 matchmade players? Needs a scoring model before implementation.
-5. **Are Anomaly tiers infinite or capped at 30?** (9.4 open item, restated for this mode.) Infinite tiers are a soft paragon track and arguably contradict the 7.1 hard stop in spirit even though they grant no power. Recommendation: **cap at 30**, then let modifier count and pack density be the ceiling.
+5. **Are Frontier tiers infinite or capped at 30?** (9.4 open item, restated for this mode.) Infinite tiers are a soft paragon track and arguably contradict the 7.1 hard stop in spirit even though they grant no power. Recommendation: **cap at 30**, then let modifier count and pack density be the ceiling.
 6. **Do Raid-exclusive Anomalous items have a slower non-Raid path?** §6 asserts they must, for 11.1. If they do not, group content gates build completion and the solo balance target is violated. Needs an explicit yes.
-7. **How many tile modules does the Anomaly assembler need before layouts stop feeling repetitive?** Estimate 25-35 per tileset. This is a content-cost question with a large budget implication and it should be answered with a prototype, not an estimate.
+7. **How many tile modules does the Frontier assembler need before layouts stop feeling repetitive?** Estimate 25-35 per tileset. This is a content-cost question with a large budget implication and it should be answered with a prototype, not an estimate.
 8. **Loot distribution in party content** (11.3, unresolved upstream). This document assumes instanced-per-player throughout. If that assumption is wrong, every party mode's reward section changes.
 9. **Does Anchor defense exist as a content type?** (10.3 open.) Not designed here. It would most naturally be a Conquest variant with an inverted objective, which is cheap — but it competes with Conquest for the same player time.
 10. **Do modifiers persist per-account as unlocks, or roll from a global pool?** §4.4 assumes global pool. Unlockable modifiers would give the endgame a progression texture without granting power, which is attractive — but it is close to a horizontal post-cap unlock, which 9.3 explicitly holds in reserve and says not to build.

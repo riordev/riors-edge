@@ -1,7 +1,21 @@
-# Owner Decisions — 2026-08-12
+# Decisions Ledger — append-only
 
-Rulings on the Design-Overview §7 owner-decision list. These supersede
-conflicting text anywhere else in Docs/ and the master sheet import.
+THE canonical decisions log. O-numbers are permanent IDs. Every entry gets
+a date, a ruling, and the files it was propagated to. Design docs reference
+O-numbers instead of restating rulings; a reversal touches this file first,
+then its propagation list. These rulings supersede conflicting text
+anywhere else in Docs/ and the master sheet import. Never rewrite an entry;
+append a superseding one.
+
+## 2026-08-12 — O1..O17 (Design-Overview §7 list)
+
+Propagated 2026-08-12 (same-day directive pass) to: Master-Sheet-Import.txt,
+Layer-Ownership.md, Character-Progression-Architecture.md,
+Item-Foundation.md, Core-Constellations.md, Game-Modes.md,
+Encounter-Design.md, XP-And-Pacing.md, UI-UX-Spec.md, Save-Architecture.md,
+Art-And-Modelling-Plan.md, Damage-Pipeline.md (new), and code (stamina
+removal, wave-mode instrument, passive block/dodge — commits c86cbe2,
+7766649).
 
 | # | Decision |
 |---|----------|
@@ -22,6 +36,31 @@ conflicting text anywhere else in Docs/ and the master sheet import.
 | O15 | **Branch nodes freely mixed with investment gates.** No mutually exclusive tiers. |
 | O16 | **No hardcore/permadeath.** |
 | O17 | **Account-wide stash: characters are builds, gear is an account asset.** Deliberate product position. |
+
+## Owner choices currently pending (presented, not ruled)
+
+- **2b-1 Void vs Void Whisperer** — rename the Caster subclass, or make it
+  explicitly the Void-element specialist (accepting the coupling).
+- **2b-2 Rift element vs reserved teal** — distinct stated shade for Rift
+  damage VFX, or narrow the teal reservation to rift phenomena only.
+  ([OWNER-CHOICE] block lives in Art-And-Modelling-Plan.md Pillar 3.)
+- **2b-3 Time element vs Swift** — declare them unrelated systems, or
+  rename the element.
+- **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
+  collides with the Frontier content type (GAP [O8]).
+- **Sealed / Bare modifier scope** vs Support and Leech generation
+  (Game-Modes Class C audit).
+- **SLIPSTREAM's dodge→air-jump refund clause** — not cleanly expressible
+  under passive dodge (Core-Constellations K10).
+- **Dodge resource refund** — survives as base kit, tree rewrite, or dies
+  (Item-Foundation GAP [O1]).
+- **Rift-archetype first-clear point budget** — 8 (Game-Modes) vs 2 (XP §7)
+  within the 15-point canon list.
+- **XP band-to-Rank collapse** — two bands each under Champion and Boss.
+- **Networking/replication position** (raised by the directive §3): one
+  page ruling on server authority before any Tier 1 code.
+- **Target TTK/TTD seed figures** for wave mode (directive §4): the
+  instrument reports divergence from a target only the owner can set.
 
 Implementation notes tied to these rulings:
 - O1: `Stamina`/`MaxStamina` removed from the attribute set and combat

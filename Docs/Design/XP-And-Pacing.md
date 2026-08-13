@@ -5,6 +5,10 @@ act breakpoints, XP sources, catch-up mechanics, the ~15 world-content Core
 Points, the vertical slice's compressed level-10 curve, and the enemy-level /
 item-level relationship.
 
+**Authority.** `Docs/Design/Decisions.md` is law and supersedes anything here.
+This pass propagates O4 (§10.1), O6 (§8), O7 (§7), O8 (Frontier naming), and
+O9 (§5.1 Rank vocabulary). No new numeric values were authored — O2 freeze.
+
 This document resolves four items marked OPEN in the master sheet:
 
 - Progression 7.11 — "Experience curve shape — flat, accelerating, or plateauing near 30"
@@ -176,7 +180,8 @@ Throughput ramps with level because player capability compounds: kit
 completeness, movement mastery, gear affixes, and denser enemy placement in
 later zones all push it. At level 1 the player clears ~7 equivalents/minute;
 at level 50, ~20. A representative Act III rift run (~9 min) is roughly 55
-Standard + 14 Veteran + 4 Elite + 1 Champion + 1 boss + completion bonus,
+Standard + 14 Veteran + 4 Champion (pack-leader band) + 1 Champion (mini-boss
+band) + 1 Boss + completion bonus,
 which lands inside this model.
 
 **This model is the single largest source of error in this document.** It is a
@@ -260,7 +265,7 @@ design intends, and costs no new systems.
 
 ## 5. XP sources
 
-### 5.1 Kill XP by enemy tier
+### 5.1 Kill XP by enemy Rank — RANK VOCABULARY [O9]
 
 All kill XP derives from one unit so a single knob retunes the whole game.
 
@@ -268,19 +273,43 @@ All kill XP derives from one unit so a single knob retunes the whole game.
 B(L) = 10 + 4*L        -- L is the ENEMY's level, not the player's
 ```
 
-| Tier | Multiplier | XP at enemy L15 | XP at enemy L30 | XP at enemy L49 | Notes |
-|---|---|---|---|---|---|
-| Trash | 0.35 | 25 | 46 | 72 | Swarm filler, dies to one burst. Use sparingly — trash exists for feel, not reward |
-| **Standard** | **1.00** | **70** | **130** | **206** | The unit. Three normal enemies of the slice sit here |
-| Veteran | 3.0 | 210 | 390 | 618 | Elite modifier applied to a Standard |
-| Elite | 8.0 | 560 | 1,040 | 1,648 | Named pack leader, multiple modifiers |
-| Champion | 25.0 | 1,750 | 3,250 | 5,150 | Mini-boss, guaranteed rare drop |
-| Rift boss | 120.0 | 8,400 | 15,600 | 24,720 | End of an instanced rift |
-| Act boss | 400.0 | 28,000 | 52,000 | 82,400 | One per act. ~one-third of a level |
+**Taxonomy ownership.** O9 fixes the enemy taxonomy at three fields:
+**Archetype** (behavior), **Rank** (Standard / Veteran / Champion / Boss), and
+**Modifiers** (0–3). **Rank is owned by this document** — it is the XP and
+reward axis. **Archetype and Modifiers are owned by `Encounter-Design.md`.**
+**Modifier count drives Rank:** 0 modifiers = Standard, 1 = Veteran, 2–3 =
+Champion. Boss is authored, not modifier-derived.
 
-The gym's existing elite (`ConfigureElite`: 1.5x scale, 3x health, 2x damage)
-maps to **Veteran**, not Elite. Rename or add tiers accordingly — the current
-single "elite" flag is not enough granularity for this table.
+| Rank | XP band | Multiplier | XP at enemy L15 | XP at enemy L30 | XP at enemy L49 | Notes |
+|---|---|---|---|---|---|---|
+| Standard | Trash | 0.35 | 25 | 46 | 72 | Swarm filler, dies to one burst. Use sparingly — trash exists for feel, not reward |
+| **Standard** | **Standard** | **1.00** | **70** | **130** | **206** | The unit. Three normal enemies of the slice sit here. 0 modifiers |
+| Veteran | Veteran | 3.0 | 210 | 390 | 618 | Exactly 1 modifier applied to a Standard |
+| Champion | Pack leader | 8.0 | 560 | 1,040 | 1,648 | Named pack leader, 2 modifiers |
+| Champion | Mini-boss | 25.0 | 1,750 | 3,250 | 5,150 | 3 modifiers, guaranteed rare drop |
+| Boss | Rift boss | 120.0 | 8,400 | 15,600 | 24,720 | End of an instanced rift |
+| Boss | Act boss | 400.0 | 28,000 | 52,000 | 82,400 | One per act. ~one-third of a level |
+
+The four Ranks are coarser than the seven XP bands; the bands are a payout
+curve *inside* a Rank, not a fifth and sixth Rank. The former tier names
+"Trash" and "Elite" are retired as taxonomy terms per O9 — "Trash" survives
+only as the label of the sub-Standard XP band, and everything previously
+called "Elite" is a Champion.
+
+**FLAG — band-to-Rank granularity.** Two XP bands sit under Champion (8.0 and
+25.0) and two under Boss (120.0 and 400.0). Which band a given 2-modifier or
+3-modifier encounter pays is an encounter-authoring choice, not a taxonomy
+one; if the owner wants one payout per Rank, bands must be collapsed and that
+is a value decision this pass does not make.
+
+**Veteran anchor — reconciled to `Encounter-Design.md` §1.1.** The gym's
+existing `ConfigureElite` maps to **Veteran** (one modifier). Its stat chassis
+is the Encounter §1.1 elite chassis, not the gym's current values: **1.25x
+scale, 2.0x health (+0.35x per modifier beyond the first), 1.5x damage**,
+loot floor Exceptional. The gym's shipped `1.5x / 3.0x / 2.0x` is superseded.
+Because health scales with modifier count, the same chassis carries a Champion
+at 2 or 3 modifiers without a second stat block — which is exactly why
+modifier count is allowed to drive Rank.
 
 ### 5.2 Level-difference falloff
 
@@ -432,7 +461,26 @@ generous, or party play becomes the fast lane and solo becomes the punishment.
 
 ---
 
-## 7. The ~15 world-content Core Points
+## 7. The ~15 world-content Core Points — CANON [O7]
+
+**CANON [O7].** This list is the ratified source of the 15 world-content Core
+Points. It supersedes any other enumeration in Docs/. Two changes were made in
+ratifying it:
+
+1. The three cumulative "close N local rifts (lifetime)" counters are replaced
+   by **rift-archetype first-clears**, per `Game-Modes.md` §2 and §3.4 (the
+   eight archetypes: Clear, Hold, Sever, Escort, Carry, Collapse, Hunt,
+   Silence). First-clear is one-time per archetype, not per instance, so it
+   satisfies design rule 1 below in a way a lifetime counter never did.
+2. **Nothing is endgame-gated.** The old overflow entry (#16, "close 75 rifts
+   lifetime", explicitly completable after level 50) is cut. The list is
+   exactly 15 and every entry is reachable inside the campaign.
+
+**FLAG — archetype point budget.** `Game-Modes.md` §2 budgets the
+archetype first-clears at **8 points** (one per archetype). This list allots
+them **2 slots**. Both cannot be true at 15 total. This document's slot count
+is canon per O7; the reconciliation — 8 one-point grants versus 2 grouped
+grants — is an owner choice and is **not resolved here**.
 
 Master sheet 7.2 budgets ~15 Core Points from world content, on top of the 50
 from levels, for ~65 total — the number validated against "two constellations
@@ -453,11 +501,11 @@ Design rules applied to this list:
 |---|---|---|---|---|---|
 | 1 | Complete the tutorial rift | I | 3 | Main path | Teaches that the Core Tree exists at all, before level 5 |
 | 2 | First Forge interaction (Kess) | I | 5 | Main path | Front-loads the respec NPC the player will use constantly |
-| 3 | Close 10 local rifts (lifetime) | I | 8-12 | Cumulative | Rewards the core loop directly; counter is visible |
+| 3 | First-clear of each rift archetype available in Act I | I | 8-12 | Archetype | Rewards the core loop directly and teaches the objective vocabulary; progress is visible per archetype |
 | 4 | Act I boss | I | 15 | Main path | Act completion |
 | 5 | Rior fragment #1 reconstructed | I/II | 15 | Fragment | Fragments unlock real capability (1.7); one is Core |
 | 6 | The Breach — first entry | II | 16 | Main path | Marks the act transition mechanically |
-| 7 | Close 30 local rifts (lifetime) | II | 20-24 | Cumulative | Second tier of the same counter |
+| 7 | First-clear of the remaining rift archetypes | II | 20-24 | Archetype | Completes the archetype set; the later archetypes are the ones Act II introduces |
 | 8 | Rior fragment #2 reconstructed | II | 22 | Fragment | Paces Vosk's thread |
 | 9 | Defeat the Altered commander | II | 26 | Main path | The slice boss; the "rifts are directed" beat |
 | 10 | Act II boss | II | 30 | Main path | Lands on the Class Point exhaustion beat — the player gets a *Core* Point at the exact level their class stops growing |
@@ -466,18 +514,16 @@ Design rules applied to this list:
 | 13 | Rior fragment #3 reconstructed | III | 42 | Fragment | Third and last Core-bearing fragment |
 | 14 | Meet the Survivor / bring them to an Anchor | III | 44 | Main path | Ties the emotional load-bearing NPC to a mechanical reward |
 | 15 | Erased Earth 3 — the Earth where Rior lost | III | 48 | Zone | Act III climax location |
-| 16 | Close 75 local rifts (lifetime) | III | any | Cumulative | The third counter tier; the only one a player might finish after 50 |
 
-**Sixteen listed, ~15 budgeted.** #16 is deliberately the overflow: it is the
-only entry a player can plausibly complete after reaching level 50, which
-gives the "~" in "~15" somewhere to live and gives a capped player exactly one
-remaining non-gear progression thread to close out. If the budget must be
-exactly 15, cut #16 rather than any other entry — every other entry is
-load-bearing on a story beat.
+**Exactly fifteen, none endgame-gated [O7].** The former #16 overflow entry is
+cut. The "~" in "~15" now describes uncertainty in the budget, not a
+sixteenth entry a capped player is still chasing — O7 requires every world
+Core Point to be obtainable inside the campaign. Every remaining entry is
+load-bearing on a story beat or on the rift-archetype set.
 
-**Distribution: 5 in Act I, 5 in Act II, 6 in Act III.** Act III gets the extra
-because it is 20 levels long and is the act where Core Points are the *only*
-currency being earned.
+**Distribution: 5 in Act I, 5 in Act II, 5 in Act III.** The list stays
+act-distributed by rule 2 above, and §10.1 gives a second, independent reason
+the distribution cannot be back-loaded.
 
 **Validation against 7.4.** 50 + 15 = 65. If constellation node costs change,
 re-run the "two full plus one partial" check. If that check fails, move the
@@ -500,7 +546,7 @@ sourcing noted as still open.
 - Pro: intuitive, already implemented, naturally rewards fighting harder things.
 - Con: creates a farming incentive to seek out the highest-level enemy in a
   zone and ignore everything else. Chest and world drops have no source level
-  at all and need a fallback anyway. Elite/boss item level becomes a balance
+  at all and need a fallback anyway. Champion/Boss item level becomes a balance
   lever by accident rather than by design.
 
 **Zone level only.** Item level = the zone's authored level.
@@ -508,24 +554,30 @@ sourcing noted as still open.
   trivially controllable for designers, and every drop source — enemy, chest,
   container, quest reward — resolves identically.
 - Con: makes the boss's drop no better than a trash mob's, which removes the
-  reason to fight anything difficult. Kills the entire elite/champion fantasy.
+  reason to fight anything difficult. Kills the entire Veteran/Champion fantasy.
 
 **Hybrid.** Zone establishes the floor; enemy tier adds a bounded bonus.
 
-### RECOMMENDATION — HYBRID, zone-anchored with a bounded enemy-tier bonus
+### RATIFIED [O6] — HYBRID, zone-anchored with a bounded enemy-tier bonus
+
+**RATIFIED [O6].** This is no longer a recommendation. O6 ratifies the hybrid:
+`ZoneLevel` lives on the **rift/zone Data Asset**, the tier bonus and ±1
+variance apply as written below, and the **enemy-level fallback is sanctioned**
+so the gym keeps working before zones exist. The open item at master sheet 4.9
+/ 6.5 is closed.
 
 ```
 ItemLevel = clamp( ZoneLevel + TierBonus + VarianceRoll, 1, 50 )
 ```
 
-| Enemy tier | TierBonus |
+| Enemy Rank / band [O9] | TierBonus |
 |---|---|
-| Trash / Standard | 0 |
+| Standard (trash and standard bands) | 0 |
 | Veteran | +1 |
-| Elite | +2 |
-| Champion | +3 |
-| Rift boss | +4 |
-| Act boss | +5 |
+| Champion — pack-leader band | +2 |
+| Champion — mini-boss band | +3 |
+| Boss — rift boss | +4 |
+| Boss — act boss | +5 |
 
 ```
 VarianceRoll: -1 (25%), 0 (50%), +1 (25%)
@@ -547,7 +599,8 @@ Named/guaranteed chests: TierBonus = +2
 - **The bonus is bounded and small on purpose.** The big reward for killing a
   boss should be **rarity and drop count**, not item level. Rarity gates affix
   *count*; item level gates affix *tier* (4.2). Bosses should push the rarity
-  knob hard (the gym elite's "never below Exceptional" is the right instinct)
+  knob hard (the gym Veteran's "never below Exceptional" loot floor is the
+  right instinct)
   and the item-level knob barely at all. This keeps the two knobs doing
   genuinely different jobs, which is the whole point of separating them.
 - **It resolves the "do enemies scale to player level in open zones" open
@@ -563,25 +616,31 @@ Named/guaranteed chests: TierBonus = +2
 |---|---|---|
 | Standard enemy | 29-31 | T5 |
 | Veteran | 30-32 | T5 |
-| Elite | 31-33 | T4 |
-| Champion | 32-34 | T4 |
-| Rift boss | 33-35 | T4 |
+| Champion (pack leader) | 31-33 | T4 |
+| Champion (mini-boss) | 32-34 | T4 |
+| Boss (rift boss) | 33-35 | T4 |
 | World chest | 29-31 | T5 |
 
 The boss's advantage over trash is one tier band plus a far better rarity roll.
 That is the correct ratio.
 
-**Endgame note.** In Rior's frontier, `ZoneLevel` is pinned at 50 for all
+**Endgame note.** In Rior's Frontier, `ZoneLevel` is pinned at 50 for all
 content and the entire progression axis moves to rarity, affix tier via
 crafting, and the T-1 / Anomalous chase. Item level stops being a progression
 axis at cap, by design — 9.1 says gear is the endgame and the master sheet's
 `BestTierForItemLevel` already caps natural rolls at T1 for level 50.
 
-**CONFLICT — with `Docs/Item-Foundation.md`.** That document records item level
-source as enemy level. It must be updated to hybrid, and
-`UBreakerLootLibrary` needs a `ZoneLevel` input (a level/zone Data Asset value,
-defaulting to the enemy's level when unset so the gym keeps working). This is
-a small change now and an expensive one later, consistent with 4.8's warning.
+**RESOLVED [O6] — was CONFLICT with `Docs/Item-Foundation.md` and
+`Game-Modes.md` §3.7.** `Item-Foundation.md` records item level source as
+enemy level; Game-Modes §3.7 tiers rifts on its own terms. O6 settles the
+model — hybrid, `ZoneLevel` on the rift/zone Data Asset, enemy-level fallback
+— so there is nothing left to arbitrate at the design layer. **The
+implementation home is the damage/loot pipeline docs, not this document nor
+Game-Modes:** `Docs/Item-Foundation.md` (loot roll and `UBreakerLootLibrary`,
+which needs a `ZoneLevel` input defaulting to the enemy's level when unset) and
+`Docs/Combat-Foundation.md` (the pipeline the roll hangs off). Rift tiering in
+Game-Modes §3.7 consumes `ZoneLevel`; it does not define it. This is a small
+change now and an expensive one later, consistent with 4.8's warning.
 
 ### Enemy level scaling curve — EXTENDS
 
@@ -596,7 +655,7 @@ EnemyLevel = ZoneLevel + PackModifier, where PackModifier is in [-1, +3].
 Enemies never scale to player level in campaign zones. Combined with the level
 difference falloff in §5.2, this means an over-levelled player gets reduced XP
 but keeps a real power fantasy, and an under-levelled player gets a bonus and
-a real threat. In endgame frontier content, everything is level 50 and
+a real threat. In endgame Frontier content, everything is level 50 and
 difficulty is expressed through modifiers, not levels.
 
 ---
@@ -634,14 +693,14 @@ actually tests whether the choice is interesting.
 
 ### Slice XP sources
 
-Slice enemy levels: normal enemies L4, elite L6, boss L8. Using `B(L) = 10+4L`:
+Slice enemy levels: Standard L4, Veteran L6, Boss L8. Using `B(L) = 10+4L`:
 
 | Source | Level | Value | XP |
 |---|---|---|---|
-| Normal enemy (three types) | 4 | ×1.0 | 26 |
-| Elite (`ConfigureElite`) | 6 | ×3.0 | 102 |
-| Champion / mini-boss | 6 | ×8.0 | 272 |
-| Slice boss (Altered commander) | 8 | ×120 | 5,040 |
+| Standard enemy (three archetypes) | 4 | ×1.0 | 26 |
+| Veteran (`ConfigureElite`, 1 modifier) | 6 | ×3.0 | 102 |
+| Champion, pack-leader band | 6 | ×8.0 | 272 |
+| Boss — slice boss (Altered commander) | 8 | ×120 | 5,040 |
 | Arena clear | 6 | 45 × B | 1,530 |
 | First-clear bonus | — | +100% | +1,530 |
 | Region discovered (×3) | 6 | 20 × B | 680 each |
@@ -649,8 +708,8 @@ Slice enemy levels: normal enemies L4, elite L6, boss L8. Using `B(L) = 10+4L`:
 
 **Slice pacing target: 45-70 minutes to slice cap 10.**
 
-A representative slice loop: clear the arena (~35 normals, 4 elites, 1
-champion, 1 arena clear) ≈ 910 + 408 + 272 + 1,530 = **3,120 XP** in roughly
+A representative slice loop: clear the arena (~35 Standards, 4 Veterans, 1
+Champion, 1 arena clear) ≈ 910 + 408 + 272 + 1,530 = **3,120 XP** in roughly
 6-8 minutes. Seven such loops plus the boss, discovery, and traversal reaches
 20,950. That is the right length for a slice: long enough to feel the
 progression system, short enough to replay in an evening while tuning.
@@ -699,6 +758,71 @@ levels. It passes if:
 
 ## 10. Acceptance criteria — full game
 
+### 10.1 Halfway-viability criterion — TESTABLE [O4]
+
+O4 rules that a build must **feel viable and playable by mid-campaign (~level
+25)**, and that the 300–400 hour figure describes *optimization*, not
+*viability*. That is a product claim; this is its test.
+
+> **By level 25, a player must hold one Core keystone, one class keystone, and
+> at least one equipped Aberrant.**
+
+**Supporting arithmetic CHECK** (over values already written elsewhere; no new
+values authored here):
+
+```
+Core Points from levels, 1→50 ...................... ~50
+Core Points from world content (§7) ................ 15
+Core Point total ................................... ~65
+Keystone investment gate ........................... 18
+Core Points held by a level-25 player .............. ~32
+    = 25 from levels
+    + 7 world points earned at or before ~L25
+      (§7 entries #1,2,3,4,5,6,7 — the #8 fragment at L22
+       makes it 8 if taken on schedule)
+```
+
+**CHECK PASSES.** 32 ≥ 18 with 14 points of headroom, so a level-25 player
+reaches **one Core keystone comfortably** — not marginally, and not only on an
+optimal route. The **class keystone comes out of the separate Class Point
+budget** (Class Points 1–30; a level-25 player holds ~25 of them), so the two
+keystones do not compete for the same currency. The Aberrant requirement is
+satisfied by drops: O11 allows up to 3 equipped and the criterion asks for 1.
+
+**Second independent reason the §7 list must stay act-distributed.** The first
+reason is design rule 2 in §7 (the Core Tree must never be entirely gated
+behind level pace). The second is this criterion: the ~32-point figure is only
+reachable at level 25 because roughly half the world points land in Acts I–II.
+Back-load the §7 list into Act III and the level-25 player holds ~27 points
+instead — still over the gate, but the headroom that makes the keystone
+*comfortable* rather than *forced* evaporates, and with it the O4 claim. Any
+future reshuffle of §7 must re-run this check.
+
+**Identity versus optimization — the O4 framing.**
+
+| | Build **identity** — earned by ~level 25 | Build **optimization** — the 300–400 hours |
+|---|---|---|
+| Core Tree | First Core keystone | Second keystone; a third-constellation dip |
+| Class Tree | First class keystone | — (Class Points exhaust at 30) |
+| Gear | One equipped Aberrant | Affix tiers, T-1, the Anomalous slot, 2nd and 3rd Aberrant |
+
+Identity is what the build *is* and it must be complete by mid-campaign.
+Optimization is how far the same build can be pushed, and it is the entire
+endgame. A player who cannot name their build at level 25 is a failure of this
+criterion; a player whose level-25 build is still improving at hour 300 is the
+design working.
+
+**FLAG — engineering, not design.** Wiring this criterion into the wave-mode
+report (so a gym run asserts keystone and Aberrant state at the level-25
+equivalent) is a **Tier 1 engineering item** and is **not done in this pass**.
+Until it is instrumented, the criterion is a design commitment, not a measured
+gate.
+
+### 10.2 Checklist
+
+- [ ] By level 25, a player holds one Core keystone, one class keystone, and
+      at least one equipped Aberrant (see §10.1). Measured in the wave-mode
+      report once instrumented.
 - [ ] `XPToNext` is a baked table in a Data Asset, not a runtime `pow()`.
 - [ ] Total XP 1→50 equals 4,770,050 with the shipped table.
 - [ ] Median solo time to 50, measured by telemetry, falls in 34-46 hours.
@@ -710,8 +834,9 @@ levels. It passes if:
 - [ ] Rift completion + rift bosses account for 55-65% of lifetime XP.
 - [ ] Discovery XP accounts for ≤8% of lifetime XP.
 - [ ] All ~15 world Core Points are obtainable solo and none are missable.
-- [ ] Sum of level Core Points and world Core Points is 65 (or 64 if #16 is
-      cut) and still satisfies "two constellations full plus one partial."
+- [ ] Sum of level Core Points and world Core Points is 65 (50 + the 15 of
+      §7, which is now exactly 15 per O7) and still satisfies "two
+      constellations full plus one partial."
 - [ ] Veteran's Path reduces a second character's time to 50 to 22-30 hours.
 - [ ] No rested XP system ships.
 - [ ] Party members do not level faster per-hour than a solo player of equal
@@ -756,14 +881,12 @@ Recorded here only because this document's numbers assume them:
   passive chance to fully evade and block as a passive chance to reduce damage
   — defensive layers certain classes lean into, not player inputs. The
   throughput model in §3 assumes passive defensive layers with no
-  input-skill variance. **CONFLICT** — `Docs/Item-Foundation.md` and
-  `CONTEXT.md` describe an implemented `UBreakerCombatComponent` where block
-  is a held frontal stance and dodge is an instant negation window on player
-  input, both spending shared stamina. These are different systems and the
-  discrepancy is outside this document's domain to resolve, but it must be
-  resolved: if defence is passive, the shared 100-point stamina pool and the
-  Bulwark/Kinesis tradeoff built on it need a new justification, and the
-  "stamina cost" affixes in master sheet 3.8/3.9 have nothing to attach to.
+  input-skill variance. **RESOLVED [O1]** — passive block/dodge are ratified
+  and the stamina pool is removed entirely, so the previously recorded
+  conflict with the implemented `UBreakerCombatComponent` (held frontal block
+  stance, input dodge window, shared stamina) is closed in favour of this
+  document's assumption. The throughput model in §3 therefore stands as
+  written. Parry, when built, uses its own short cooldown rather than stamina.
 - **Crit as the only multiplier of its kind.** Nothing in this document adds a
   damage multiplier. `Experience Gain %` is an Increased bucket on a
   non-combat stat.
@@ -789,12 +912,10 @@ Recorded here only because this document's numbers assume them:
    explicitly carry ~40% of Act III's XP — which is a content-plan decision,
    not a curve decision.
 
-3. **Is the hybrid item level accepted, and who owns `ZoneLevel`?** §8
-   recommends zone-anchored ilvl with a bounded tier bonus, which requires a
-   zone/level Data Asset that does not exist. Does that live in the level
-   Data Asset, a separate zone registry, or on the rift definition? Until it
-   has an owner, the gym's `EnemyLevel` fallback will quietly become the
-   shipping behaviour.
+3. ~~**Is the hybrid item level accepted, and who owns `ZoneLevel`?**~~
+   **CLOSED [O6].** Hybrid is ratified; `ZoneLevel` lives on the rift/zone
+   Data Asset; the enemy-level fallback is sanctioned for the gym. Risk 3
+   below still stands: the fallback must not become permanent by neglect.
 
 4. **Should the level 28-31 seam relief exist at all, or should Act III simply
    start cheaper?** The relief is the only discontinuity in the design and it
@@ -805,15 +926,18 @@ Recorded here only because this document's numbers assume them:
 
 5. **Is 65 Core Points still "two full plus one partial"?** 7.4 makes this the
    validating ratio, but constellation node costs are not authored. If they
-   land differently, §7's list is now pinned to story beats and should not be
-   the thing that moves.
+   land differently, §7's list is CANON per O7, pinned to story beats and to
+   the rift-archetype set, and should not be the thing that moves. Note that
+   §10.1's keystone gate arithmetic also depends on node costs holding.
 
-6. **Does the elite/veteran/champion tier vocabulary in §5.1 match the enemy
-   design plan?** The gym currently has one binary elite flag. This document
-   assumes six tiers. Someone owns enemy taxonomy and it is not this document.
+6. ~~**Does the elite/veteran/champion tier vocabulary in §5.1 match the enemy
+   design plan?**~~ **CLOSED [O9].** Rank is Standard / Veteran / Champion /
+   Boss, owned by this document; Archetype and Modifiers are owned by
+   `Encounter-Design.md`; modifier count drives Rank. The remaining
+   band-to-Rank granularity question is FLAGged in §5.1.
 
 7. **Does XP exist at all in endgame content?** At 50 there is no XP bar. Do
-   Rior's frontier runs award nothing, or does XP convert into a crafting
+   Rior's Frontier runs award nothing, or does XP convert into a crafting
    currency at a fixed rate? A conversion would be a clean sink and would keep
    the kill-value tables meaningful at cap, but it edges toward a post-cap
    progression track and needs an explicit ruling against 7.1.

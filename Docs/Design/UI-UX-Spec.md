@@ -4,6 +4,10 @@ Status: design pass 1. Authored against the Master Sheet (LOCKED decisions treat
 
 Everything marked **EXTENDS** adds detail the master sheet does not contain and does not contradict. Everything marked **CONFLICT** contradicts or pressures an existing decision and needs a ruling before implementation.
 
+**Rulings applied to this document** (see `Docs/Design/Decisions.md` — those rulings are law and supersede any conflicting text here): **O1** (stamina pool removed; block/dodge passive; Parry the only defensive input), **O5** (three elements: Rift/Time/Void), **O8** (the endgame farm content type is named **Frontier**), **O11** (Aberrant: up to 3 equipped, global), **O12** (scalar tiered crafting currencies).
+
+**O8 sweep result for this document:** the content-type word "Anomaly" does not appear anywhere in this spec, so no rename was required. Every occurrence of **Anomalous** in this document is the **rarity tier**, which *keeps its name* under O8 and must not be renamed. Any future UI string naming the endgame farm content type uses **Frontier**.
+
 ---
 
 ## 0. Product position
@@ -97,7 +101,7 @@ These must not reuse rarity hues at high saturation, or the player will misread 
 | Health | `#E62E24` | Matches current HUD `(0.9, 0.18, 0.14)` |
 | Shield | `#14A6FF` | Matches current HUD `(0.08, 0.65, 1.0)` |
 | Armour | `#D9E5F2` | Neutral, deliberately not a bar |
-| Stamina (block/dodge pool) | `#F0C24A` | New; pool is shared and universal |
+| ~~Stamina (block/dodge pool)~~ | ~~`#F0C24A`~~ | **RULED [O1] — REMOVED.** The stamina pool is deleted entirely; block/dodge are passive chance layers. This functional colour has no referent and must not be used. |
 | Class resource | per class (see 2.3) | The one element that changes per character |
 | Ability ready | `#2EB3FF` | |
 | Ultimate ready | `#BF59FF` | Matches current `(0.75, 0.35, 1.0)` |
@@ -109,7 +113,9 @@ These must not reuse rarity hues at high saturation, or the player will misread 
 | Negative delta (comparison) | `#E0555A` | Deliberately distinct from Aberrant red |
 | Locked / unaffordable | `#5A6675` | |
 
-**Stamina is currently unrepresented on the HUD.** Block and dodge are LOCKED base kit spending from a shared 100-point pool regenerating 20/s after 1.2s. The player has no way to see it. This is a gap, not a decision — see §4.2.
+**RULED [O1] — the stamina pool is removed entirely.** Block and dodge are passive chance layers, not spends; there is no shared pool, no regeneration rule, and no HUD element for it. The previous text here (a shared 100-point pool regenerating after a delay, flagged as an unrepresented gap) is void. `Stamina`/`MaxStamina` are removed from the attribute set and combat component.
+
+**The surviving UI trace of block/dodge is the DODGED / BLOCKED feedback popup**, which already ships. It is a transient, world-anchored proc readout in place of the absent damage number — not a resource display. See §4.2 and §4.4.
 
 ### 2.3 Class resource colours (EXTENDS)
 
@@ -171,14 +177,14 @@ The visual jump between T1 and T0 must be larger than the jump between T3 and T2
 
 Progression 7.11 leaves open: *"What dedicated input slots do Block and Dodge use? Dodge should use a dedicated action rather than double-tap detection."* CONTEXT.md confirms block/dodge input actions are not yet bound.
 
-**CONFLICT — resolution needed, and it is a UI problem as much as an input problem.** The design elsewhere states dodge and block are **passive** — dodge is a passive chance to fully evade and block is a passive chance to reduce damage, defensive layers that certain classes lean into rather than player inputs. If that is the ruling, then:
+**RULED [O1] — resolved. Block and dodge are passive; there is no stamina pool.** The former CONFLICT is closed. Consequences, now binding:
 
 - Block % and Dodge % are **stat lines**, not HUD elements with cooldowns.
-- The shared stamina pool has no player-facing spend action and its HUD presence becomes questionable.
-- Progression 7.11's open question about input slots is moot and should be struck.
-- `UBreakerCombatComponent`'s BlueprintCallable block stance / dodge window API is then a *system-internal* proc, not a bound input.
-
-This document assumes the passive reading, and specifies stamina as a **passive readout** (§4.2) rather than a spend meter. If the input reading wins instead, §4.2 must be re-specified. **This is open question #1.**
+- There is no stamina pool and therefore no stamina HUD element of any kind.
+- Progression 7.11's open question about block/dodge input slots is **struck**.
+- `UBreakerCombatComponent`'s block stance / dodge window API is a *system-internal* proc, not a bound input.
+- **Parry is the only defensive player input**, and it runs on its own short cooldown (tree-granted, Bulwark). It is the sole defensive element permitted a cooldown-like HUD treatment.
+- The only defensive UI that ships is the **DODGED / BLOCKED feedback popup** already implemented.
 
 ### 3.4 What the UI must never do
 
@@ -217,10 +223,12 @@ This document assumes the passive reading, and specifies stamina as a **passive 
 │ │ MOVE STATE  SPEED   │ │ SLOT 1 RIFLE │ │ [ Q ] [ E ]        [ X ]    │ │
 │ │ ███████ HEALTH      │ │              │ │  ABIL1  ABIL2       ULT     │ │
 │ │ ███████ SHIELD      │ │   24 / 108   │ │                             │ │
-│ │ ▓▓▓ ARMOUR   STAM ▬ │ │  1 P   2 S   │ │  [resource bar ▬▬▬▬▬▬▬▬ ]   │ │
+│ │ ▓▓▓ ARMOUR          │ │  1 P   2 S   │ │  [resource bar ▬▬▬▬▬▬▬▬ ]   │ │
 │ └─────────────────────┘ └──────────────┘ └─────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
+
+**RULED [O1]** — the `STAM ▬` element previously drawn on the armour row has been removed from this wireframe. No stamina element exists on the HUD.
 
 The bottom band matches the shipped `ABreakerPlaytestHUD` layout (left vitals panel at x=24, weapon panel at +352, ability panel at +634). This spec keeps that geometry and adds content, rather than proposing a relayout — the existing positions are already validated in play.
 
@@ -232,7 +240,9 @@ The bottom band matches the shipped `ABreakerPlaytestHUD` layout (left vitals pa
 2. **Health bar** — 205px wide, red, with numeric `current / max`.
 3. **Shield bar** — 205px, blue, directly beneath health, same width. Shields route before health (Scaling 6.1), so the visual stack must read bottom-up: shield depletes, then health. **Draw shield above health** so the depletion order reads downward on screen, matching the mitigation order. *(Note: this inverts the current shipped order, which draws health above shield. Intentional change.)*
 4. **Armour** — numeric only, no bar. Armour is a mitigation *coefficient* (`EffectiveArmor / (EffectiveArmor + 100)`, capped 80%), not a pool. A bar would lie about what it is. Display as `ARMOUR 140 · 58%` — the raw value and the resulting mitigation percentage. **EXTENDS** — showing the derived percentage is the single most useful stat-literacy affordance in the whole HUD and costs one string format.
-5. **Stamina** — a thin (4px) amber underline beneath the armour row. Under the passive reading (§3.3) it is a slow-moving readout that only becomes salient when depleted; it should be nearly invisible at full and pulse at <25%.
+5. ~~**Stamina** — a thin amber underline beneath the armour row.~~ **RULED [O1] — DELETED.** There is no stamina pool and no stamina readout. Nothing replaces it in this panel; the armour row is the last line of the vitals panel.
+
+**Passive-defence feedback (the surviving trace of block/dodge).** Because there is no resource to read, the only block/dodge UI is the **DODGED / BLOCKED popup** already shipped: a short-lived text proc readout at the impact point, in place of the damage number for a full evade, and alongside the reduced number for a block. It is feedback that a passive layer fired, never a state the player manages. Presentation rules live in §3.5's prohibitions and §4.4's damage-number typing; no new element is added to the vitals panel.
 
 **Damage direction:** the existing full-screen border flash on damage is a *presence* indicator, not a *direction* indicator. Add a directional arc: a 60°-wide arc segment on a ring at 22% screen radius, pointing at the damage source, fading over 1.2s, stacking up to four sources. This is the one exception to the "nothing near centre" rule, and it is transient.
 
@@ -329,7 +339,11 @@ Each entry: `[glyph] NAME  4.2s` with a thin depletion underline. Buffs sort abo
 | Chill / Slow | crystal | `#5FD8FF` | no, shows potency ring |
 | Shock | bolt | `#E0D64A` | no |
 
-Ignite, Chill, and Shock are **BLOCKED** — Affixes 3.7 and Scaling 6.1 both state elemental lines cannot ship until a resistance model exists. Their glyphs are specified here so the layout budget is reserved, but they must not be implemented before the resistance step exists in the damage pipeline. Bleed and Poison are physical and can ship now; `UBreakerStatusComponent` already runs them.
+**RULED [O5] — the elements are RIFT, TIME, and VOID. There are exactly THREE element glyphs, not four.** The `Ignite / Chill / Shock` rows above are **placeholder naming** and will be re-flavoured onto Rift/Time/Void when the per-element resistance model is implemented (resistances apply after armour, before shields). Reserve three element glyph slots in the layout budget, not four, and do not author a fourth.
+
+**GAP — glyph names and colours for Rift/Time/Void are not authored here.** Their visual identity is **awaiting the 2b collision resolutions** in `Art-And-Modelling-Plan.md` (Pillar 3 reserves teal for rift phenomena / Anomalous / suppression, and the new Rift *element* wants teal for routine damage VFX). Do not assign an element colour in this document until that owner choice is made. The existing hex values above are placeholder and carry no ruling.
+
+Ignite, Chill, and Shock — i.e. the three element slots under their placeholder names — remain **BLOCKED** — Affixes 3.7 and Scaling 6.1 both state elemental lines cannot ship until a resistance model exists. Their glyphs are specified here so the layout budget is reserved, but they must not be implemented before the resistance step exists in the damage pipeline. Bleed and Poison are physical and can ship now; `UBreakerStatusComponent` already runs them.
 
 **Poison stack cap must be visible.** Poison Stacks is a discrete affix (+1 → +7). A player who has invested in stacks needs to see `☠ 7/9`, or the investment is invisible.
 
@@ -400,7 +414,9 @@ The current Slate paper-doll (`BuildInventoryScreen`, `MakeGearCard`) is the see
 
 When the player hovers an item that would exceed a limit, the counter turns red and the equip button becomes a **swap picker** — a small inline list of the currently-equipped items of that rarity, each clickable to designate as the one being replaced. Equipping is never silently blocked and never silently un-equips something the player did not choose.
 
-**OPEN (from Loot 4.9):** whether the 3-Aberrant limit is global or per-slot-chosen. The UI above assumes **global**. If per-slot, the counter becomes a per-slot marker instead and this wireframe changes.
+**RULED [O11] — the Aberrant limit is up to 3 equipped, GLOBAL.** The former OPEN (Loot 4.9) is closed and the wireframe above is correct as drawn: a single `◆ ABERRANT 2/3` counter, not per-slot markers. **The equip-limit UI is unblocked and may be built.**
+
+Note: each Aberrant carries 1–2 unique modifier affixes intended to help define builds. The specific modifiers are owner-authored later — the tooltip's signature-first ordering law (§5.3) already accommodates 1–2 signature lines, and no further UI ruling is needed. **GAP — the modifier list itself does not exist yet;** do not author placeholder signature text in the UI.
 
 ### 5.3 Item tooltip — the most important screen in the game
 
@@ -479,7 +495,7 @@ Prefix and suffix are never interleaved. The 4-prefix / 4-suffix cap (Affixes 2.
 
 **Locked and auto-locked items are never salvageable by any bulk action**, only by individually unlocking them first.
 
-**OPEN (Loot 4.9):** whether crafting materials are a separate currency or item-derived. The salvage modal's yield line depends on this ruling.
+**RULED [O12] — crafting materials are 3–4 tiered SCALAR currencies, not item-derived.** The salvage modal's yield line is therefore a short list of scalar currency gains, not an item list, and no material occupies an inventory or stash slot. **GAP — the currencies themselves (count, names, tiers, yields) are owner-authored and not designed here.** Do not author counts or names in this document.
 
 ---
 
@@ -569,7 +585,7 @@ Clicking a constellation zooms into its node list. Returning is one Escape press
 
 1. **Show the budget consequence, not just the balance.** The `▸` line is the whole design of this screen. The intended shape is two full plus one partial; the UI should state what the remaining points can actually buy so the player converges on that shape by understanding rather than by regret.
 2. **Mark verb-granting nodes distinctly.** Air jump (Kinesis) and parry (Bulwark) are the **only** tree-granted verbs in the entire game (LOCKED). They get a `✦` marker at the constellation level and a full-width highlighted card at the node level. Everything else in every tree is a modification of something the player already has; these two are new capabilities and must not be mistaken for percentages.
-3. **Mark BLOCKED constellations honestly.** Elements is blocked until an elemental resistance model exists in the damage pipeline. In a dev/slice build it shows as `BLOCKED — no resistance model`. In shipping it simply does not appear. Do not ship a constellation that grants nothing.
+3. **Mark BLOCKED constellations honestly.** Elements is blocked until an elemental resistance model exists in the damage pipeline. **[O5]** — when it unblocks, the constellation covers exactly three elements (Rift/Time/Void); its current Ignite/Chill/Shock node naming is placeholder and is a rename target, not new content. In a dev/slice build it shows as `BLOCKED — no resistance model`. In shipping it simply does not appear. Do not ship a constellation that grants nothing.
 
 **Tier B (later) — the constellation map.** Star-field background, nodes as stars, connective lines as constellation edges, camera pan/zoom, each of the six occupying a region. This is the presentation payoff and it is genuinely a good fit for the fiction (timelines, erased worlds, star maps). It is also the single most expensive UI in the game and must not be built before the node list is final. **Building the map first would lock node counts and adjacency into art.**
 
@@ -799,11 +815,11 @@ ANCHOR-ONLY (interaction, not menu)
 
 | Phase | Deliverable | Gate |
 |---|---|---|
-| 1 | Stamina readout + armour-percentage display on existing HUD | Ruling on §3.3 passive-vs-input |
+| 1 | Armour-percentage display on existing HUD (stamina readout **cut — RULED [O1]**) | **UNBLOCKED [O1]** |
 | 2 | Item tooltip with prefix/suffix split and tier badges | Item model stable (it is) |
 | 3 | Automatic comparison + NET EFFECT block | Phase 2 |
-| 4 | Equip-limit counters + swap picker | Ruling on Aberrant limit scope |
-| 5 | Salvage flow with lock/auto-lock | Material model ruling |
+| 4 | Equip-limit counters + swap picker | **UNBLOCKED [O11]** — global, max 3 |
+| 5 | Salvage flow with lock/auto-lock | **UNBLOCKED [O12]** — scalar tiered currencies |
 | 6 | Death / respawn screen | Encounter slice |
 | 7 | Damage number policy (aggregation, typing, cap) | Phase 1 |
 | 8 | Ability slot states incl. ultimate charge differentiation | Class kits exist |
@@ -823,7 +839,7 @@ ANCHOR-ONLY (interaction, not menu)
 - [ ] No persistent HUD element intersects the centre 40% × 40% box.
 - [ ] Shield renders above health and depletes downward, matching damage resolution order.
 - [ ] Armour shows both raw value and derived mitigation percentage.
-- [ ] Stamina is visible and pulses below 25%.
+- [ ] ~~Stamina is visible and pulses below 25%.~~ **RULED [O1] — struck.** Replaced by: no stamina element appears anywhere in the HUD, and a dodge proc renders a `DODGED` popup in place of a damage number.
 - [ ] The ultimate is the only pulsing element when ready, and is distinguishable from an ability at a glance in peripheral vision.
 - [ ] A cooldown reduced by an external proc visibly jumps backward rather than interpolating.
 - [ ] Damage numbers aggregate within 120ms per target; a 3-Multishot shotgun burst on one enemy produces exactly one number.
@@ -880,17 +896,19 @@ ANCHOR-ONLY (interaction, not menu)
 
 ## OPEN QUESTIONS
 
-1. **Are block and dodge passive procs or bound player inputs?** This document assumes passive (a chance to fully evade / a chance to reduce damage). If so, Progression 7.11's open question about dedicated input slots should be struck, the stamina pool has no player-facing spend action, and §4.2's stamina readout should probably shrink further or disappear. If they are inputs instead, §4.2 and §3.3 both need rewriting and the HUD needs two more cooldown-like elements. **Blocking for HUD phase 1.**
+1. ~~**Are block and dodge passive procs or bound player inputs?**~~ **CLOSED — RULED [O1].** Passive chance layers. The stamina pool is removed entirely, §4.2's stamina readout is deleted, Progression 7.11's input-slot question is struck, and Parry is the only defensive player input (its own short cooldown). HUD phase 1 is unblocked.
 
 2. **Are class branch nodes freely mixed with investment gates, or mutually exclusive at major tiers?** (Progression 7.11, unresolved.) Freely-mixed gives the three-column view in §6.3. Mutually-exclusive requires a lockout confirmation modal and a visibly different tree shape. **Blocking for progression UI.**
 
-3. **Is the Aberrant 3-equipped limit global or per-slot-chosen?** (Loot 4.9, unresolved.) §5.2 assumes global with a single `2/3` counter. Per-slot needs per-slot markers and a different swap-picker behaviour. **Blocking for the equip-limit UI.**
+3. ~~**Is the Aberrant 3-equipped limit global or per-slot-chosen?**~~ **CLOSED — RULED [O11].** Global, up to 3 equipped. §5.2 as drawn is correct. **The equip-limit UI is no longer blocking.**
 
-4. **Are crafting materials a separate currency or item-derived?** (Loot 4.9.) Determines the salvage modal's yield line and whether the Forge screen needs a materials header, a currency header, or both.
+4. ~~**Are crafting materials a separate currency or item-derived?**~~ **CLOSED — RULED [O12].** 3–4 tiered scalar currencies. The Forge and salvage screens need a currency header, not a materials container. **GAP — the currencies are not yet designed.**
 
 5. **Does death carry a penalty?** Nothing in the master sheet specifies one. §9 assumes none. If one is added it must be stated on the death screen before the respawn buttons.
 
-6. **What is the exact stamina cap and its gear-scaling rule?** Progression 7.7 and Affixes 3.9 both flag it as BLOCKED pending a cap. The UI cannot draw a meaningful stamina bar without knowing its maximum range.
+6. ~~**What is the exact stamina cap and its gear-scaling rule?**~~ **CLOSED — RULED [O1].** Moot: there is no stamina pool, no cap, and no stamina bar to draw.
+
+6b. **NEW GAP [O5] — what are the glyphs and colours for the Rift, Time, and Void elements?** Exactly three, not four. The colour question is entangled with the teal reservation and is presented as an owner choice in `Art-And-Modelling-Plan.md` §2b; this document must not assign element colours until that is answered.
 
 7. **Does the player character have a voice/identity, or are they a cipher?** (Fundamentals 1.8.) Affects whether the class select screen and death screen carry any character framing at all, and whether the Anchor UI ever addresses the player by name.
 

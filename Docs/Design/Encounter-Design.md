@@ -21,25 +21,46 @@ Locked, not negotiable here:
 - Naming: no "Bastion", no "Aberrant", no "Anomalous" as enemy or modifier names. Elite modifier names below deliberately avoid all three.
 - Master sheet 8.2: **no Altered enemy may appear anywhere before the Act II turn beat.** The slice contains that beat, so the slice's Altered content is gated behind it.
 
-### CONFLICT — dodge and block as inputs vs passive layers
+### RESOLVED (O1) — dodge and block are passive layers
 
-My brief specifies: **dodge is a passive chance to fully evade; block is a passive chance to reduce damage.** Neither is a player input; they are defensive layers certain classes lean into.
+**Ruling O1** (`Docs/Design/Decisions.md`): *the Stamina pool is removed entirely; block and dodge are passive chance layers (ratified). Parry, when built, uses its own short cooldown.*
 
-Master sheet 5.2 and `Docs/Layer-Ownership.md` list Block and Dodge in the base *verb* kit, and `UBreakerCombatComponent` already implements a frontal block **stance** and an instant dodge **negation window** as BlueprintCallable actions (CONTEXT.md, "Input actions are not bound yet").
+The former CONFLICT is closed in favour of **passive**. Consequences this document is now bound by:
 
-Resolution I have designed against: **passive**. Everything below assumes the player's only active defensive tools are movement (dash, slide, wall ride, jump) and cover, with dodge/block resolving as rolls inside the damage pipeline. This matters enormously for telegraph design — a passive-defence game must telegraph in *space and time*, not in reaction-window frames, because the player answers with position rather than a button. If the project later restores dodge/block as inputs, every "counterplay" line below gets an extra answer and the telegraph windows in §2 can shorten by roughly 20%.
+- **Movement is the player's only active defensive input** — dash, slide, wall ride, jump, and cover. Block and dodge resolve as rolls inside the damage pipeline and are never a reaction the player performs.
+- **Telegraphs must be spatial and temporal, never reaction-window frames.** A passive-defence game telegraphs where and when, because the player answers with position rather than a button. Every telegraph and counterplay line below is written against that.
+- **No mechanic may reference stamina.** The pool no longer exists.
+- Parry remains a tree verb on its own cooldown, and per §0 no encounter may require it.
 
-Flagging rather than silently picking: this needs an explicit ruling, and the code currently disagrees with the brief.
+Telegraph windows below are tuned for passive defence and are not to be shortened.
 
 ---
 
 ## 1. Elite modifiers
 
-### 1.1 What an elite is
+### 1.0 Enemy taxonomy — three orthogonal fields (O9)
 
-An elite is a normal-archetype enemy carrying 1-3 modifiers, at elevated stats, that drops at a raised rarity floor. The modifier is the interesting part; the stat bump is the smallest part.
+**Ruling O9** fixes the enemy taxonomy at three fields. There is no fourth field, and "elite" is not one of them:
 
-The existing `ConfigureElite()` (1.5x scale, 3x health, 2x damage, drops never below Exceptional) is the **stat chassis**. Keep the scale and the loot floor. **EXTENDS:** reduce the health multiplier and let modifiers carry the difficulty.
+| Field | Values | Owner |
+|---|---|---|
+| **Archetype** | Behavior identity — Skitter, Lattice, Severed Warden, … (§2) | **This document** |
+| **Rank** | Standard / Veteran / Champion / Boss | `Docs/Design/XP-And-Pacing.md` §5.1 |
+| **Modifiers** | 0-3 per enemy, drawn from the list in §1.2 | **This document** |
+
+**Modifier count drives Rank** (adopted from XP §5.1, not authored here): 0 modifiers = Standard, 1 = Veteran, 2-3 = Champion. Boss is authored, not modifier-derived.
+
+**Ownership statement.** Archetype and Modifiers are owned here — the archetype roster in §2, the modifier list in §1.2, the combination rules in §1.3, and the selection weights in §1.4 are this document's to author. **Rank is owned by XP-And-Pacing** because it is the XP and reward axis; this document consumes it and must not author Rank bands or payouts.
+
+**Vocabulary.** "Elite" survives in this document only as shorthand for *any enemy at Rank Veteran or above*. Where a number or rule below says "elite," read "Veteran or Champion." The three fields are the normative names in data and UI.
+
+### 1.1 The elite (Veteran+) stat chassis — CANONICAL
+
+An enemy at Rank Veteran or above is a normal-archetype enemy carrying 1-3 modifiers, at elevated stats, that drops at a raised rarity floor. The modifier is the interesting part; the stat bump is the smallest part.
+
+The existing `ConfigureElite()` (1.5x scale, 3x health, 2x damage, drops never below Exceptional) is the legacy **stat chassis**. Keep the loot floor. **EXTENDS:** reduce the scale and health multipliers and let modifiers carry the difficulty.
+
+**This table is the canonical elite stat chassis for the project.** `Docs/Design/Game-Modes.md` §4.3 and `Docs/Design/XP-And-Pacing.md` §5.1 both reference it rather than restating their own; the legacy 1.5x/3x/2x values are superseded everywhere. Changes to these numbers are made here and propagate outward.
 
 | Property | Current code | Proposed |
 |---|---|---|
@@ -49,6 +70,7 @@ The existing `ConfigureElite()` (1.5x scale, 3x health, 2x damage, drops never b
 | Stagger resistance | — | 2.0x (elites should not be perma-flinched) |
 | Loot floor | Exceptional | Exceptional (unchanged) |
 | Modifier count | — | 1 (common), 2 (uncommon), 3 (rare) — see §1.4 |
+| Resulting Rank | — | 1 modifier = Veteran; 2-3 = Champion (per O9 / XP §5.1) |
 
 Rationale for cutting health: a 3x-health 2x-damage elite with no modifier is a sponge, which is the exact failure mode the master sheet names in 11.2. Difficulty should come from *what it does*.
 
@@ -66,12 +88,18 @@ Each modifier must satisfy three tests:
 | 2 | **Volatile** | On death, detonates after a 1.2s fuse for 45% of player max health inside 500cm, linear falloff to 0 at 900cm. | Body inflates and strobes; audible rising tone | Kill it at range, or dash/slide out — 1.2s at sprint clears the radius comfortably | Common |
 | 3 | **Fleetfoot** | +55% move speed, gains the ability to strafe-circle at attack range instead of standing. | Trail ribbon, faster limb cadence | Fight it in a corridor; it cannot circle where there is no room. Rewards route choice, not aim | Common |
 | 4 | **Anchored** | Immune to knockback and stagger. Attacks apply a 40% slow for 2s on hit. | Squat, wider stance; ground decal ring under it | Do not get hit. The slow is the punish, not the damage — it converts a movement player into a stationary one | Common |
-| 5 | **Suppressing** | Fires a persistent cone that applies a 3s zone denial field where it lands; standing in the field drains stamina and applies -25% air control. | Visible cone projection and a ground polygon where it sweeps | Break line of sight, go vertical, or flank — the cone is slow to traverse | Uncommon |
+| 5 | **Suppressing** | Fires a persistent cone that applies a 3s zone denial field where it lands; standing in the field applies -25% air control. **NEEDS-RECOST [O1/O2]:** the original effect also drained stamina; O1 removed the stamina pool entirely, so half this modifier's pressure has no referent. Air-control reduction alone may not carry an Uncommon weight class. A replacement second effect is a new authoring decision and is frozen by O2 until instrumentation reports. | Visible cone projection and a ground polygon where it sweeps | Break line of sight, go vertical, or flank — the cone is slow to traverse | Uncommon |
 | 6 | **Splitting** | On death, spawns two copies at 25% health with no modifiers and no loot. | Segmented body with visible seams | Positioning: kill it away from the pack so the splits do not merge into a wall | Uncommon |
 | 7 | **Warding Aura** | Nearby allies within 900cm take 35% reduced damage. Does not stack with another Warding Aura. | Tether lines drawn to every buffed ally | It is a priority-target puzzle. Rewards target selection over raw DPS | Uncommon |
 | 8 | **Reflective** | Returns 12% of damage dealt to it back to the attacker as unmitigated-by-armour damage, capped at 6% of player max health per instance. | Faceted shell, hit flashes read as outward rather than inward | Reduces the "hold the trigger" answer. Cap is essential — an uncapped reflect punishes high-DPS builds for existing | Uncommon |
 | 9 | **Phasing** | Every 6s, blinks 800cm toward the player and is briefly untargetable during the blink (0.35s). | Body desaturates and streaks before the blink | Never fight it with your back to geometry. It closes distance you thought was safe | Rare |
 | 10 | **Cascading** | Its attacks leave a lingering hazard at the impact point for 5s. Hazards stack and never expire early. | Ground polygons that persist and darken | The arena degrades over time — it converts a fight into an eviction. Pure movement counterplay | Rare |
+
+**Rocket interaction with Volatile and Cascading — O13.** Both modifiers are space-denial: Volatile's death detonation and Cascading's accumulating hazards both ask the player to vacate ground. A Rocket player carries their own splash, so the fair-costing question is whether they have enough answers. **Ruling O13** settles the inputs: *Rocket gets strong self-damage reduction and full self-knockback control, never immunity; rocket-jumping is tolerated, never required.* Design consequences here:
+
+- **Never required.** No Volatile radius and no Cascading hazard spread may be escapable only by rocket-jumping. Both must remain answerable by the base kit — dash, slide, sprint — for every archetype and weapon. Volatile's counterplay line ("kill it at range, or dash/slide out") is the normative answer and stays that way.
+- **Never immune.** A Rocket player clearing a Volatile radius by rocket-jumping still pays reduced self-damage for it. That cost is deliberate and neither modifier may waive it.
+- **Tolerated.** Full self-knockback control means the rocket-jump escape is *reliable* when a player chooses it, so these modifiers must not be tuned on the assumption that Rocket players are pinned.
 
 **Optional 11-12 if the list needs breadth later (designed, not slice-scoped):**
 
@@ -216,7 +244,7 @@ A pack containing all three has no single correct answer, which is the point. Pa
 
 | Template | Composition | Intent |
 |---|---|---|
-| Probe | 4 Skitter | Teach the lunge dodge |
+| Probe | 4 Skitter | Teach the lunge sidestep — the leap is answered by lateral *movement*, never by a defensive input (O1) |
 | Emplacement | 1 Lattice + 3 Skitter | Skitters push you into the Lattice line |
 | Wall | 1 Warden + 2 Lattice | Warden holds the ground route; go around or over |
 | Full | 1 Warden + 1 Lattice + 4 Skitter | The standard slice pack |
@@ -491,7 +519,7 @@ A downed player should not remove a lane permanently. Recommend: downed state wi
 
 ## OPEN QUESTIONS
 
-1. **Are dodge and block passive rolls or player inputs?** My brief says passive; master sheet 5.2, `Docs/Layer-Ownership.md`, and shipped code in `UBreakerCombatComponent` all say active. Every telegraph window in §2 and §3 was tuned for passive. This needs a ruling before any enemy is tuned, and it is the highest-priority item in this document.
+1. ~~**Are dodge and block passive rolls or player inputs?**~~ **CLOSED by O1** — passive, and the stamina pool is removed. See §0. Every telegraph window in §2 and §3 was already tuned for passive and stands unchanged. One residual item: the Suppressing modifier's stamina-drain half is now unreferenced and carries a NEEDS-RECOST [O1/O2] tag in §1.2.
 2. **Does facing-dependent armour get built?** The Warden and the boss are both designed around "flank it and its defence disappears," which is my main answer to "make encounters about position, not health." Without it, both fall back to being ordinary armoured enemies and lose most of their teaching value.
 3. **What is the real TTK baseline?** Every health number here (Skitter 100, boss 2400) is anchored to a placeholder, exactly as the master sheet warns in 3.0. These must be re-derived from the wave-mode instrumentation in §4 before anything is called balanced.
 4. Does the boss's T-1 drop use the boss-specific reward table, a guaranteed exalt/corrupt consumable, or both? Master sheet 3.1 allows all three and 9.4 leaves the gating open.
@@ -500,4 +528,4 @@ A downed player should not remove a lane permanently. Recommend: downed state wi
 7. Loot distribution in parties (instanced / shared / need-greed) is open per 11.3, and it changes whether elites should drop more or better at higher party sizes.
 8. Does the elite loot floor of Exceptional scale with modifier count? A 3-modifier elite is meaningfully harder than a 1-modifier one and currently pays identically.
 9. Do enemies get stagger/flinch as a system at all? §1.1 assigns elites stagger resistance, which presupposes a stagger model that does not currently exist.
-10. Self-damage from the Rocket archetype (master sheet 12.5, open) directly affects whether Volatile and Cascading are fair — a rocket player forced to fight at range by their own splash has fewer answers to space denial.
+10. ~~Self-damage from the Rocket archetype~~ **CLOSED by O13** — strong self-damage reduction, full self-knockback control, never immunity; rocket-jumping tolerated, never required. Volatile and Cascading are costed against that in §1.2. The general weapon self-damage *rate* remains unauthored and is frozen by O2.

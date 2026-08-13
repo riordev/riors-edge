@@ -16,8 +16,15 @@ Every locked master-sheet decision that constrains this design:
 - Solo is the primary balance target. The save format must work fully offline.
 - Respec is Forge-gated; class/core points store stable IDs and ranks, never
   pointers or calculated totals (`7.9 Implementation Rules`).
-- Aberrant max 3 equipped / Anomalous max 1 equipped — equip limits are the
-  endgame decision, so they must be re-validated on load, not trusted.
+- Aberrant max 3 equipped **(RULED [O11] — global, not per-slot)** / Anomalous max
+  1 equipped — equip limits are the endgame decision, so they must be
+  re-validated on load, not trusted.
+- **RULED [O16] — no hardcore / permadeath.** See §4.6.
+- **RULED [O17] — account-wide stash.** See §2.1a.
+- **RULED [O12] — crafting materials are 3–4 tiered scalar currencies.** See §2.1
+  and §4.5.
+- **RULED [O8] — the endgame farm content type is named "Frontier."** The
+  *Anomalous* rarity tier keeps its name; only the content type renames.
 
 ---
 
@@ -63,12 +70,30 @@ ACCOUNT  (one per player)         → BreakerAccount.sav
           +-- SESSION (volatile)  → BreakerRun_<Guid>.sav  (crash journal only)
 ```
 
+### 2.1a Product position — the stash is account-wide (RULED [O17])
+
+> **Account-wide stash is accepted as a deliberate product position: characters
+> are builds, gear is an account asset.**
+
+This is a ruling, not a recommendation, and it settles §10 OQ1. Consequences the
+save layer must now treat as fixed rather than provisional:
+
+- The stash is a single account container. There is **no** class-restricted
+  partition and no per-character stash tier.
+- "Alts are instantly geared" is the intended outcome, not a side effect to be
+  mitigated. A second character is a second *build*, and the chase it inherits
+  is build-specific gear, not a fresh floor.
+- §2.3's Anchor-gated transfer rule and §4.5's two-phase transaction stand
+  unchanged — they are exactly what an account-level asset store requires.
+- The server target in §7 is unaffected: `account_items` was already the
+  modelled shape.
+
 ### 2.1 ACCOUNT-WIDE
 
 | Data | Rationale |
 |---|---|
-| Stash (shared item vault) | The whole point of a second character is gearing it. A per-character stash makes alts a fresh grind, which contradicts "gear is the endgame" — gear should be an account asset, characters are builds. |
-| Crafting materials / currencies | Same reason. Also removes the "which character is my crafting mule" anti-pattern. |
+| Stash (shared item vault) | **RULED [O17].** The whole point of a second character is gearing it. A per-character stash makes alts a fresh grind, which contradicts "gear is the endgame" — gear is an account asset, characters are builds. |
+| Crafting currencies | **RULED [O12] — 3–4 tiered scalar currencies, not item-derived materials.** Account-wide; removes the "which character is my crafting mule" anti-pattern. Being scalars, they are `int64`-style counters in the account record, **not** container entries — no slot cost, no item identity, no transfer transaction. **GAP — the currencies' count, names, and tiers are owner-authored and are not designed here.** |
 | Character slot roster (id, name, class, level, playtime, last-played) | Needed to draw the select screen without deserializing every character file. |
 | Fragment / story-collectible unlocks (`1.7`) | Fragments unlock *capabilities* (deeper rift access, Forge capability). Re-earning them on every alt is pure repetition with no build expression. EXTENDS: master sheet does not state fragment scope. |
 | Anchor / vendor / NPC standing, final-choice epilogue flag | Narrative epilogue only, does not gate content (`8.6`), so account-wide is free. |
@@ -197,7 +222,7 @@ mode a looter can have. Never do it.
 |---|---|---|
 | Level up | Character | Cheap, high emotional value |
 | Item equipped / unequipped | Character | Debounced 5s |
-| Forge transaction (craft, respec, exalt/corrupt) | Character + Account | Consumes materials; must never be lost or duplicated |
+| Forge transaction (craft, respec, exalt/corrupt) | Character + Account | Consumes currency; must never be lost or duplicated. **Simplified by RULED [O12]** — the account-side effect is a scalar decrement, not an item removal. |
 | Stash transfer | Character + Account | **Must be a single transaction** — see 4.5 |
 | Class lock | Character | Irreversible |
 | Rift entered | Character (+ open journal) | Establishes the rollback point |
@@ -218,7 +243,7 @@ A rift run is a transaction. What must survive a crash mid-rift:
 |---|---|
 | XP earned, level-ups | Journal append |
 | Items dropped and picked up | Journal append (full `FBreakerItemInstance`, not a seed — the roll already happened and re-rolling it would change the item) |
-| Materials/currency earned | Journal append, **applied to account only on commit** |
+| Currency earned | Journal append, **applied to account only on commit**. **Simplified by RULED [O12]:** currencies are scalars, so a journal record is a delta on a counter — commutative, idempotent-safe to replay by amount, and with no item identity to reconcile. |
 | Rift progress (rooms cleared, boss state) | Journal checkpoint record |
 | Points spent (cannot happen mid-rift — Forge-gated) | N/A, by design |
 
@@ -241,6 +266,14 @@ drop is unacceptable.
 Stash transfers and Forge crafting touch both the account and character files.
 Naive ordering duplicates or destroys items.
 
+**Simplified by RULED [O12].** With crafting materials as scalar currencies
+rather than item-derived stacks, the two-phase protocol below is needed **only
+for items**. A Forge spend is a decrement of an account-side counter plus an
+item mutation on the character side — there is no material *item* in transit,
+no stack split, no per-material `InTransitFrom`, and no material entry in the
+stash's slot budget. The hard case reduces to one: moving an item between the
+backpack and the stash.
+
 Rule: **the account file is the ledger of record for any item in transit.**
 
 ```
@@ -258,6 +291,29 @@ does not hold it -> clear the flag, keep it. No loss.
 The invariant: a crash can never produce two live copies, and can never produce
 zero. Item duplication is the one bug that destroys a loot game's economy, and
 it must be designed against before there is an economy to destroy.
+
+---
+
+### 4.6 The backup story is settled — no hardcore / permadeath (RULED [O16])
+
+**RULED [O16] — there is no hardcore or permadeath mode.** This closes the only
+open threat to the backup design in §3, §4.1, and §4.2, and it should be read
+as an unblocking, not a caveat:
+
+- The rotating `.bak1/.bak2/.bak3` scheme in §4.1 is **not a cheat vector**. A
+  rollback cannot restore a permanently-dead character, because no character
+  can permanently die. Backups may therefore be as generous as data safety
+  wants them to be.
+- §4.2's load order may fall through to backups freely, and the §4.4 **Recover
+  Run** flow may restore a crashed run's rewards without any anti-exploit
+  argument against it. Recovery is purely a data-loss mitigation.
+- No integrity signing, server-side death ledger, or backup-count restriction is
+  required for save integrity. The remaining reason to validate on load is the
+  hostile-file case in §6 and §7.3.4, which is unchanged.
+- OQ3 in §10 is closed and no longer gates Step 2 of the migration path.
+
+Death penalty, if one is ever specified, is a per-run cost only and does not
+change the save format.
 
 ---
 
@@ -332,7 +388,7 @@ quarantines rather than rejecting the character:
 | Ability loadout ids belong to the permanent class | Clear invalid entries |
 | Item slot matches its definition's slot | Unequip to backpack |
 | ≤ 4 prefixes and ≤ 4 suffixes, ≤ 7 affixes per item | Quarantine the excess |
-| **≤ 3 Aberrant equipped, ≤ 1 Anomalous equipped** | Unequip the excess to backpack |
+| **≤ 3 Aberrant equipped (GLOBAL — RULED [O11]), ≤ 1 Anomalous equipped** | Unequip the excess to backpack |
 | Affix tier within [-1, 8] and value within the tier band | Clamp to band |
 | Rarity tier-cap respected (Standard ≤ T3, Uncommon ≤ T1) | Clamp |
 | Item count ≤ container capacity | Overflow to a locked recovery tab |
@@ -353,7 +409,9 @@ not a change of *shape*.
   the rule; already followed.
 - The three-tier account/character/session split maps directly onto a schema:
   `accounts`, `characters`, `character_items`, `account_items` (stash),
-  `currencies`.
+  `currencies`. **Simplified by RULED [O12]:** `currencies` is a narrow scalar
+  table (3–4 counters per account), not a materials-as-items table, so no
+  material rows join `account_items`.
 - Guid item identity (`FBreakerItemInstance::ItemId`) is already the primary key
   a server needs for trade, mail, and audit.
 - Two-phase item transfer (§4.5) is the same protocol a server uses; it just
@@ -424,7 +482,9 @@ confirmation and a 24h soft-delete window) / choose class at creation, which is
 where `ChoosePermanentClassById` should live rather than in an in-game menu.
 Acceptance: create one of each class, all five persist independently.
 
-**Step 5 — Stash and currencies.**
+**Step 5 — Stash and currencies.** *(Unblocked: **RULED [O17]** settles stash
+scope; **RULED [O12]** makes currencies scalar counters rather than containers,
+so only items need the two-phase transfer.)*
 Account containers plus the two-phase transfer. Anchor-gated.
 Acceptance: a scripted crash injected between phases never duplicates or
 destroys an item, across all three injection points.
@@ -476,30 +536,31 @@ local-only step and the first server step simultaneously.
 
 ## 10. OPEN QUESTIONS
 
-1. **Stash scope.** Account-wide stash is recommended above, but it makes alts
-   instantly geared, which softens the "gear is the entire endgame" chase for
-   every character after the first. Is that acceptable, or does the stash need a
-   class-restricted partition? This is a product decision, not a technical one,
-   and it should be answered before Step 5.
+1. ~~**Stash scope.**~~ **CLOSED — RULED [O17].** Account-wide stash is accepted
+   as a deliberate product position: characters are builds, gear is an account
+   asset. No class-restricted partition. See §2.1a. Step 5 is unblocked.
 2. **Are fragments (`1.7`) account-wide or per-character?** They unlock real
    capabilities, so account-wide means alts skip a campaign gate; per-character
    means replaying the collectible hunt five times. The master sheet does not
    say. EXTENDS.
-3. **Is there hardcore / permadeath?** It changes the entire backup story — a
-   rotating-backup scheme is a cheat vector if a character can die permanently.
-   Decide before Step 2, not after.
+3. ~~**Is there hardcore / permadeath?**~~ **CLOSED — RULED [O16]: NO.** The
+   backup story is therefore settled: the rotating-backup scheme is not a cheat
+   vector and Recover Run needs no anti-exploit constraint. See §4.6. Step 2 is
+   unblocked.
 4. Does the account file need a stash-lock for a second concurrent local
    session, or is single-instance enforcement sufficient until the server exists?
 5. What is the retention policy for a deleted character — the 24h soft delete
    proposed above, or immediate and irreversible?
 6. Do rift runs need mid-run *position* recovery, or is entrance/checkpoint
    recovery sufficient? Entrance recovery is assumed above and is much cheaper.
-7. Are crafting materials a separate currency or item-derived? (Open in `4.9`.)
-   Item-derived materials live in the stash and inherit its transaction cost;
-   a scalar currency does not.
+7. ~~Are crafting materials a separate currency or item-derived?~~ **CLOSED —
+   RULED [O12]: 3–4 tiered scalar currencies.** They do not live in the stash and
+   do not inherit its transaction cost. **GAP — the currencies themselves are
+   owner-authored and undesigned; nothing in this document defines their count,
+   names, tiers, or values.**
 8. Does the Anchor-only stash rule survive contact with the endgame loop? If
-   Anomaly runs are long, players will want a mid-run stash and that reintroduces
-   cross-transaction risk.
+   **Frontier** runs (**RULED [O8]** — formerly "Anomaly") are long, players will
+   want a mid-run stash and that reintroduces cross-transaction risk.
 9. Should item-generation seeds be stored alongside rolled results for audit and
    dupe detection? Cheap now, impossible to backfill later.
 10. Cloud save for the pre-server period — Steam Cloud, or none? Steam Cloud plus

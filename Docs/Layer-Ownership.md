@@ -20,10 +20,12 @@ The following are available to every character from level one, with no tree inve
 - Dash
 - Slide
 - Wall ride and wall jump
-- Block
-- Dodge
+- Block (passive chance layer, not an action — see below)
+- Dodge (passive chance layer, not an action — see below)
 
-Classes and constellations do not unlock these. They make them better. Swift/Kinetic is the specialist home for dash and velocity interactions; Bulwark and Kinesis deepen block and dodge; but a character who invests in none of them can still perform every one of these actions.
+**[RULED O1 2026-08-12]:** Block and dodge are **passive chance layers**, not actions. Dodge is a chance to fully evade an incoming hit; block is a chance to reduce one. They take no input, use no stance, require no shield, and cost nothing. The shared stamina pool is **deleted**. **Parry** is the only defensive *input*, and it runs on its own short cooldown.
+
+Classes and constellations do not unlock these. They make them better. Swift/Kinetic is the specialist home for dash and velocity interactions; Bulwark and Kinesis deepen block and dodge; but a character who invests in none of them still has every one of these capabilities.
 
 This follows the movement guardrail that a player using ordinary run, sprint, jump, and cover remains viable, and it means no defensive or mobility affix can roll as a dead stat.
 
@@ -42,17 +44,17 @@ If an affix would grant a capability rather than scale one, it belongs in a tree
 | Dash | Base kit | Cooldown, distance, charges |
 | Slide | Base kit | Speed, duration, momentum retention |
 | Wall ride | Base kit | Duration, wall jump control |
-| Block | Base kit | Block %, stamina cost |
-| Dodge | Base kit | Dodge %, stamina cost |
+| Block | Base kit (passive layer) | Block % |
+| Dodge | Base kit (passive layer) | Dodge % |
 | Air jump | Tree grant | Preserved horizontal speed, height |
 | Parry | Tree grant (Bulwark) | Window, reward magnitude |
 
 ## Dividing the defensive space
 
-Block and dodge being universal creates a new version of the original problem: baseline, affixes, and two constellations can all improve the same two actions. Differentiate by *kind* of improvement, not magnitude.
+Block and dodge being universal creates a new version of the original problem: baseline, affixes, and two constellations can all improve the same two layers. Differentiate by *kind* of improvement, not magnitude.
 
-- **Affixes** own raw percentages and stamina economy — block chance, dodge chance, stamina cost, stamina regeneration.
-- **Trees** own rule changes and quality — i-frame duration, parry, dodge refunds, block reflects, evade-triggered effects.
+- **Affixes** own the raw chances — block chance and dodge chance. There is no stamina economy to own [RULED O1 2026-08-12].
+- **Trees** own rule changes and quality — i-frame duration, Parry (the only defensive input, on its own short cooldown), refunds on a successful evade proc, block reflects, evade-triggered effects.
 - **Classes** own the fantasy — Tank converts mitigation into Grit; Swift converts evasion into Momentum.
 
 I-frame duration in particular should stay tree-only. It is the highest-leverage defensive quantity in the game and putting it on a random roll makes survivability unpredictable for encounter design.
@@ -61,7 +63,9 @@ I-frame duration in particular should stay tree-only. It is the highest-leverage
 
 Affixes must not grant air jump, parry, or any future verb. Doing so hands a tree unlock to anyone with a lucky drop and steals the payoff from the constellation that owns it.
 
-Affixes must not scale the shared stamina pool or its regeneration without a cap. The pool exists to create a Bulwark/Kinesis tradeoff; uncapped gear scaling erases the constraint. This risk is larger now that block and dodge are universal, because every character spends from the pool.
+**[RULED O1 2026-08-12]:** the former prohibition on affixes scaling the shared stamina pool and its regeneration is deleted along with the pool itself. No stamina affixes exist and none may be authored.
+
+GAP [O1]: the shared pool was the entire Bulwark/Kinesis hybrid tradeoff. With it gone there is no tension mechanism between the two defensive constellations, and no cap-shaped constraint on stacking defensive affixes. Owner to decide what replaces it.
 
 Core Tree nodes must not outperform the class branch whose fantasy they overlap. Kinesis must not make non-Swift characters the best movers; Elements must not make non-Casters the best reaction specialists.
 

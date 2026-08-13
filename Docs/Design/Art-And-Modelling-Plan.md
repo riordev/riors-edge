@@ -5,6 +5,8 @@ Status: Design pass. No assets authored yet.
 Scope: Vertical slice only, with production hooks for Act I–II.
 Reads from: `Docs/Design/Master-Sheet-Import.txt` (LOCKED decisions are law), `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`.
 
+**Rulings applied to this document** (`Docs/Design/Decisions.md` is law and supersedes any conflicting text here): **O1** (§0, §3.5, §7.4 Phase A — block/dodge passive, no stamina, Parry the only defensive input), **O5** (§2b — three elements, and the teal collision it creates), **O9** (§2.1 — elites carry Modifiers), **O14** (§3.1 and the note before Phase A — two player models, shared rig). **O8** sweep: the content-type word "Anomaly" does not occur in this document, so no rename was needed; every "Anomalous" here is the **rarity tier**, which keeps its name.
+
 This document decides what the game looks like and, more importantly, what gets built in what order by one developer with AI tooling. Every section ends with acceptance criteria that can be checked in Play In Editor, not argued about.
 
 ---
@@ -24,7 +26,7 @@ The master sheet already fixes most of the art brief. Restated as production law
 | Accuracy While Airborne is the marquee affix ("make it visually obvious on the item") | Boots and gloves need a dedicated visual tell for airborne-build gear. |
 | Crit is the only multiplier of its kind | One hit-feedback vocabulary for crit. Do not invent a second gold-numbers effect for anything else. |
 | No grapple | No hardpoint, hook, or launcher geometry anywhere on the arms, gear, or level kit. Do not tease a verb that does not exist. |
-| Dodge/block are passive chance layers, not inputs | **They must not have a triggered player animation that reads as a dodge roll.** See §3.5. This is the single most likely art mistake in the project. |
+| Dodge/block are passive chance layers, not inputs (**RULED [O1]**; stamina pool removed; Parry is the only defensive input, on its own cooldown) | **They must not have a triggered player animation that reads as a dodge roll.** See §3.5. This is the single most likely art mistake in the project. |
 
 CONFLICT — the vertical slice as scoped in `CONTEXT.md` names three weapon archetypes, while five archetypes now exist in code (Rifle, SMG, Sniper, Shotgun, Rocket). This document plans art for all five because the code shipped them, but marks two as **P2 art** so the slice can close on three finished weapons. See §5.
 
@@ -54,6 +56,29 @@ Proposed reservation:
 
 EXTENDS — the master sheet fixes Anomalous as Teal in the rarity table but does not reserve the colour globally. This document reserves it. If that is rejected, Vestige emissive must move to a different band and the rest of this plan is unaffected.
 
+#### 2b collision — the Rift element wants the reserved teal
+
+**RULED [O5] — the elements are RIFT, TIME, and VOID** (three, not four), with per-element resistances applied after armour and before shields. That ruling creates a collision with Pillar 3 that this document cannot resolve on its own:
+
+- **Pillar 3 reserves teal** (`#3FD8C8` → `#0E5F5C`) for **rift phenomena** — rift portals, Vestige emissive, severance progression, Anomalous rarity, suppression hardware. The reservation's entire value is that it is *narrow and rare*: teal means "foreign, rift-origin, uncommon."
+- **The new Rift ELEMENT wants teal for routine damage VFX** — hits, ailment glyphs, DoT ticks, resistance feedback. That is high-frequency, high-area, and constant.
+
+If both hold, teal appears on every Rift-element trigger pull and stops meaning anything. The rarest colour in the game becomes the most common one, and Pillar 3's "the rift is a colour, and only the rift gets it" is dead on contact with a Rift-damage build.
+
+[OWNER-CHOICE]
+
+> **Option 1 — Give Rift damage a distinct stated shade.**
+> Keep Pillar 3's reservation exactly as written (rift phenomena, Vestige emissive, severance, Anomalous, suppression hardware). The Rift *element*'s routine damage VFX uses a separate, explicitly stated shade that is not the reserved teal band, so element damage and rift-origin phenomena never read as the same thing.
+>
+> **Option 2 — Narrow the reservation to rift phenomena rather than rift damage.**
+> Restate Pillar 3's reservation so it covers rift *phenomena* only — portals, Vestige emissive, severance, Anomalous, suppression hardware — and explicitly does not cover routine Rift-element damage VFX, which may then use the teal band freely.
+
+**Not resolved here.** No shade, hex value, or band is authored for either option — under the O2 value freeze, if Option 1 is chosen the specific shade is a separate authoring step. Until this is answered:
+
+- Do not author Rift-element damage VFX.
+- Do not assign an element colour in `UI-UX-Spec.md` §4.5 (its Rift/Time/Void glyph colours are flagged as awaiting this resolution).
+- The Vestige "zero rift-chroma on outward surfaces" rule and the Anomalous-only rift-chroma gear rule (§3.3) are unaffected by either option.
+
 ### Pillar 4 — Wrongness is compositional, not gory
 Vestiges are not monsters with too many teeth. They are objects assembled by something that did not know what a body is for. Wrongness comes from symmetry violations, repeated modules at the wrong scale, and motion that does not match mass. Gore, viscera, and body-horror flesh are **out of direction** — they read as Earth biology and Vestiges are not from an Earth.
 
@@ -82,9 +107,29 @@ Design brief: *no design intent, no readable anatomy, no tactics that resemble a
 | VES_Crawler | Low, wide, dragging mass; wider than tall | Melee pressure, closes distance, punishes standing still | 5 uneven limbs | Dorsal junction, exposed on lunge windup | 12k |
 | VES_Spitter | Tall, thin, top-heavy, leans wrong | Ranged arcing projectile, forces movement | 3 limbs, one vestigial | Base node at the ground contact | 10k |
 | VES_Bulwark-mass | Blocky, near-cubic, near-immobile | Area denial / cover-destroyer, rewards flanking | Continuous, no discernible limbs | Rear seam, only visible from behind | 16k |
-| Elite modifier | +50% scale, additional module repetition, rift-chroma bloom in the interior gaps | Existing `ConfigureElite` (1.5x scale, 3x health, 2x damage) | inherits | inherits | Material + scalar only, **no new mesh** |
+| Elite modifier | +50% scale, additional module repetition, rift-chroma bloom in the interior gaps | Existing `ConfigureElite` (1.5x scale, 3x health, 2x damage) | inherits | inherits | Material + scalar + **the shared modifier-VFX library** (see below), **no new mesh** |
 
-The elite modifier deliberately costs zero mesh authoring. It is a scale multiplier plus a material parameter and one extra emissive mask. This is the correct pattern for a solo dev: elites are a *shader and scale* feature.
+**REVISED — elites are not free.** The elite modifier still costs **zero mesh authoring**, and that part holds: it is a scale multiplier plus a material parameter and one extra emissive mask, and no elite gets bespoke geometry. But the previous claim that elites cost *nothing* was wrong. Per the enemy taxonomy (Archetype / Rank / Modifiers), a Champion or Veteran carries modifiers that must be **read before the player is in trouble**, and a scale-and-tint pass cannot carry that read on its own.
+
+**The real cost is ONE shared modifier-VFX library**, authored once and reused across every modifier that will ever exist. Roughly **six reusable effects**, each a parameterised Niagara/material asset, not a per-modifier bespoke effect:
+
+| Reusable effect | Typical read |
+|---|---|
+| Capsule | A volume around the enemy body |
+| Decal ring | A footprint on the ground at a stated radius |
+| Tether | A line between two actors |
+| Trail | A path the enemy has taken or will take |
+| Polygon | An area boundary that is not a circle |
+| Streak | A fast directional event |
+
+Rules for the library:
+
+- **One library, N modifiers.** Every modifier composes from these primitives plus colour and scale parameters. A modifier that cannot be expressed as a composition of them is a design problem to send back, not a licence to author a seventh effect.
+- **No per-modifier meshes.** This is unchanged and remains binding.
+- The library is authored **once**, in Phase C, and its cost is real and must be scheduled. Treat it as a first-class asset, not as polish.
+- The library is not Vestige-specific — Altered elites reuse it identically.
+
+**GAP — the modifier list itself is still undesigned**, so the mapping from modifier to effect composition cannot be written here. What is fixed is the budget shape: one shared library, ~six primitives, zero new meshes.
 
 **Naming constraint honoured:** these are Vestiges (formal) / Spill (field slang). Do not name any of these "Aberrant" or "Anomalous" — those are rarity tiers (master sheet 1.2).
 
@@ -161,7 +206,7 @@ Militia, not military. Equipped by an organisation that has money for the things
 - Every hard surface is scuffed at the edges and clean in the recesses. Wear is where a body touches things.
 - One personal item per character, always visible in first person: a wrist wrap, a taped ring, a charm on the sling. This is the single cheapest humanising detail available and it costs one 200-tri asset.
 
-**Effigy variant (machine Breaker).** The master sheet establishes Effigies as machine Breakers, originally caretakers, repurposed. **DEFER for the slice** — an Effigy player option doubles every arms asset and every gear-fit problem. Record the direction now, build nothing:
+**Effigy variant (machine Breaker).** The master sheet establishes Effigies as machine Breakers, originally caretakers, repurposed. **RULED [O14] — the Effigy is a real second player model, not a cosmetic afterthought; Human ships first, Effigy follows.** **DEFER the assets for the slice** — an Effigy player option doubles every arms asset and every gear-fit problem — but **do not defer the rig decisions**: one shared skeleton, one shared animation set, and a proportion-independent paper-doll attachment scheme are committed *before Phase A*. See the note preceding Phase A in §7.4. Record the direction now, build no Effigy assets:
 - Effigies wear the *same* militia kit over a non-human chassis. The kit is the tell that they are Breakers; the chassis is the tell that they were not built for it.
 - Caretaker origin should be visible in the hands: too gentle, too many fine joints, designed to handle things carefully. The militia bolted a weapon onto something built to carry a child.
 - Effigy hands are the strongest single art idea available for the setting. Worth building the day a second arms set is affordable.
@@ -236,11 +281,17 @@ Do not delete the blockout meshes. Keep them as a fallback per `CONTEXT.md` arch
 
 ### 3.5 CRITICAL — dodge and block must not be animated as inputs
 
-**Locked constraint: dodge is a passive chance to fully evade and block is a passive chance to reduce damage. They are defensive layers, not player inputs.**
+**RULED [O1] — law, not assumption: dodge is a passive chance to fully evade and block is a passive chance to reduce damage. They are defensive layers, not player inputs. There is no stamina pool. Parry is the only defensive input and carries its own short cooldown.**
 
 The obvious art instinct — a dodge-roll animation, a shield-raise stance — would lie to the player about the control scheme and take a week to undo.
 
-CONFLICT — `CONTEXT.md` line 47 currently describes block as a "frontal-only block stance" with a "dodge negation window," and master sheet 3.8 says BLOCK *"requires a shield or stance, works FRONTALLY only."* Master sheet 7.11 also lists an OPEN question: *"What dedicated input slots do Block and Dodge use?"* and 3.15 asks *"Whether Block requires a shield item or is a stance."* The passive-chance framing given as a hard constraint for this document contradicts the stance/input framing in the code and the master sheet. **This must be resolved before any block/dodge animation work begins.** This document proceeds on the passive-chance reading and specifies accordingly. If the stance reading wins, §3.2's motion set gains two poses and this section is void.
+**RULED [O1] — CONFLICT CLOSED. The passive-chance reading wins.** The stamina pool is removed entirely; block and dodge are passive chance layers with **no player input, no stance, no bound key, and therefore no animation of any kind**. The stance/input framing in `CONTEXT.md` line 47 and master sheet 3.8 / 3.15 / 7.11 is superseded — those are rename/strike targets, not live design. §3.2's motion set does **not** gain block or dodge poses, now or later. Defensive animation work is unblocked and its answer is: author none.
+
+**Parry is the only defensive player input**, and it runs on **its own short cooldown**. Art consequences:
+
+- Parry, when built, is the single defensive verb that gets an authored anticipatory pose and a distinct readable timing. It is tree-granted (Bulwark) and is one of only two tree-granted verbs, so it must look *earned* in the same way air jump does.
+- Parry must be visually unmistakable from a block, because block has no animation at all. There is no shared "defensive" vocabulary between them — one is a proc, the other is a verb.
+- Do not author parry until it is built; do not pre-author a generic "defend" pose that parry might inherit. The risk this section exists to prevent — a dodge roll or shield-raise that lies about the control scheme — applies equally to a speculative shared defensive pose.
 
 Under the passive-chance reading, the art is **reactive feedback, not anticipatory animation**:
 
@@ -439,7 +490,7 @@ Every asset goes into exactly one bucket, decided *before* work starts:
 | SMG, Sniper | BUY/KITBASH → author later | P1/P2. Kitbash from a bought pack, retextured, until the slice closes. |
 | Third-person modular body | BUY (base) + AUTHOR (kit layer) | Buy a base body/skeleton; author the militia kit over it. Halves the work. |
 | Vestige ×3 | AUTHOR | The wrongness cannot be bought. Bought monsters read as bought monsters. |
-| Elite modifier | **Material + scale only** | Zero mesh cost by design |
+| Elite modifier | **Material + scale + one shared VFX library** | Zero *mesh* cost by design, but **not zero cost** — budget the shared modifier-VFX library (~six reusable effects) once in Phase C. See revised §2.1. |
 | Altered base body | BUY (base) + AUTHOR (stage ladder + kit) | Same split as the player body |
 | ALT_First (Act II turn) | **AUTHOR** | Most carefully authored enemy in the game |
 | ALT_Commander (boss) | AUTHOR (outer layer only) | Reuses the ALT base body |
@@ -478,6 +529,22 @@ Each phase ends playable. This follows the `CONTEXT.md` architecture rule: *buil
 
 ---
 
+> **NOTE BEFORE PHASE A — plan the rig for two player models on day one. [O14]**
+>
+> **RULED [O14]: two player models are planned — Human and Effigy. Both are real player options, not cosmetic afterthoughts. Human ships first; Effigy follows.** §3.1 currently defers the Effigy and says "build nothing." That deferral stands for *assets*. It must **not** extend to the *rig and attachment scheme*, because those are exactly the decisions that are cheap to make today and ruinous to change later.
+>
+> Before a single arm is skinned, commit to:
+>
+> 1. **One shared skeleton** used by both the Human and the Effigy. Not two rigs, not a "we'll retarget later" plan.
+> 2. **One shared animation set** authored against that skeleton, so every movement pose, slide, wall ride, dash, and air jump plays on either model without re-authoring.
+> 3. **A paper-doll attachment scheme that does not assume human proportions.** Gear attaches by socket and adapts by parameter — no gear mesh may bake in human limb length, shoulder width, or hand shape as a fixed assumption. The Effigy is a non-human chassis wearing the same militia kit (§3.1), and that is the whole point of the read: the kit says Breaker, the chassis says it was not built for this.
+>
+> This is the cheapest possible insurance. **A note today versus a re-rig in a year.** If the FP arms, the third-person modular body, the six gear slots, and the bought base skeleton in §7.2 are all committed to human proportions before the Effigy exists, then shipping the Effigy means re-rigging the player, re-authoring the animation set, and re-fitting every gear part already built — a cost that grows with every asset authored after this point.
+>
+> Nothing in Phase A changes scope because of this. Only the rig and socket decisions change, and they cost time now measured in a conversation. **GAP — the specific socket list and proportion-independent fitting method are not designed here.**
+
+---
+
 **PHASE A — Replace what the player stares at (target: ~2 weeks)**
 *Goal: the game stops looking like a blockout, with the least possible work.*
 1. Author FP arms + gloves. Retarget a bought animation pack.
@@ -505,10 +572,12 @@ Each phase ends playable. This follows the `CONTEXT.md` architecture rule: *buil
 1. AI-generate ~50 silhouettes. Select 3 against the §2.1 rules.
 2. Blockout all three, drop them into the gym, playtest for readability.
 3. Author whichever survived. Do not author all three at once — do Crawler first, playtest, then the others.
-4. Elite modifier: scale + material parameters only.
+4. Elite modifier: scale + material parameters, **plus authoring the one shared modifier-VFX library** — roughly six reusable, parameterised effects (capsule, decal ring, tether, trail, polygon, streak) per the revised §2.1. **This is real, scheduled work, not a free shader toggle.** Still zero new meshes, and still no per-modifier bespoke effect.
 5. Flat-grey test.
 
-*Exit gate:* the flat-grey acceptance criteria in §2.1 pass at 9/10.
+*Exit gate:* the flat-grey acceptance criteria in §2.1 pass at 9/10, **and** the shared modifier-VFX library exists with all its primitives parameterised and reusable on both a Vestige and (later) an Altered without modification.
+
+*Note:* the previous version of this phase assumed elites cost nothing. That assumption is withdrawn. **GAP — the phase duration in §7.6 has not been re-estimated to absorb the library; that is an owner scheduling call, and no number is changed here.**
 
 ---
 
@@ -584,7 +653,9 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 - [ ] Paper-doll: zero cost when closed, ≤1.5ms when open, all five rarities readable without text.
 - [ ] Arena playable by a run/jump-only player; ≥3 wall-ride surfaces, ≥2 slide-throughs, ≥1 optional air-jump route.
 - [ ] Zero Altered asset references in any pre-Act-II content, verified by search.
-- [ ] Rift chroma appears only on rift phenomena, Vestige interiors, Anomalous items, and suppression hardware.
+- [ ] Rift chroma appears only on rift phenomena, Vestige interiors, Anomalous items, and suppression hardware. *(Scope of this criterion depends on the pending §2b [OWNER-CHOICE] — whether routine Rift-element damage VFX is inside or outside the reservation.)*
+- [ ] Elites: no new meshes, and every elite modifier read composes from the one shared modifier-VFX library (§2.1).
+- [ ] One shared skeleton and one shared animation set, with a paper-doll attachment scheme carrying no baked-in human proportion assumption (§7.4 pre-Phase-A note, [O14]).
 - [ ] One master material; all surfaces are instances.
 - [ ] Anchor contains no signage explaining rifts, Altered, or severance.
 - [ ] Accuracy While Airborne is visually identifiable on HELM/GLOV at T2+, in first person and on the paper-doll.
@@ -593,7 +664,7 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 
 ## 9. OPEN QUESTIONS
 
-1. **[BLOCKING — resolve before any defensive animation work] Are block and dodge passive chances or stance/timing inputs?** This document's hard constraint says passive chance. `CONTEXT.md` line 47 describes a "frontal-only block stance" and a "dodge negation window" in shipped code. Master sheet 3.8 says block "requires a shield or stance, works FRONTALLY only," and 7.11 and 3.15 both list this as OPEN. The two readings produce completely different art. Resolve first. (CONFLICT, §3.5)
+1. ~~**[BLOCKING] Are block and dodge passive chances or stance/timing inputs?**~~ **CLOSED — RULED [O1]: passive chance, no stamina pool, no inputs, no animations.** Parry is the only defensive input and has its own short cooldown. Defensive animation work is unblocked. (§3.5)
 
 2. **[BLOCKING for the Rocket] Self-damage and self-knockback rules.** Master sheet 12.5 lists this OPEN, and the Rocket currently ignores its instigator. If self-knockback ships, the Rocket needs a launch pose, a distinct camera treatment, and probably an authored recovery — and rocket-jumping becomes a movement verb the master sheet's guardrails (5.4) have not accounted for. Cannot finish the Rocket art until decided.
 
@@ -601,13 +672,15 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 
 4. Does the slice ship three finished weapons or five? Code has five; master sheet 12.3 scopes three. This plan assumes three finished + two kitbashed. (CONFLICT, §5)
 
+4b. **[OWNER-CHOICE PENDING — §2b] Does the Rift element get a distinct stated shade, or does the Pillar 3 reservation narrow to rift phenomena rather than rift damage?** Created by **RULED [O5]** (elements are Rift/Time/Void). Blocks all Rift-element damage VFX and the element glyph colours in `UI-UX-Spec.md` §4.5. Two options are presented verbatim in §2b; **not resolved here.**
+
 5. Is Anomalous permitted to be the only rarity carrying rift chroma? (EXTENDS, §3.3) If Anomalous items are not rift-derived in fiction, this needs a different visual language.
 
 6. Does the Anchor exist in the vertical slice at all, or only the Forge? This plan builds Forge-only. Confirm before Phase F.
 
 7. Do Effigies have legal personhood inside an Anchor (master sheet 1.8)? Affects whether Effigy NPCs appear in civilian spaces or only in militia ones — a real environment-population decision.
 
-8. Elite modifier list is undesigned (master sheet 10.3). This plan assumes elites are always material + scale with no new mesh. If any elite modifier needs bespoke geometry, that assumption and the Phase C budget both break.
+8. Elite modifier list is undesigned (master sheet 10.3). **REVISED:** this plan now assumes elites are material + scale + **one shared modifier-VFX library of ~six reusable effects**, with no new mesh and no per-modifier bespoke effect. If any elite modifier needs bespoke geometry, or cannot be composed from the six primitives, that assumption and the Phase C budget both break. **GAP — Phase C's duration has not been re-estimated to absorb the library.**
 
 9. Are the three build-defining legendaries in the slice Anomalous or Aberrant? Master sheet 12.5 asks whether unique weapons and Anomalous items are the same system. Determines whether they need bespoke meshes (Anomalous) or attachment + emissive mark (Aberrant) — a difference of roughly a week.
 
