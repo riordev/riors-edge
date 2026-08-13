@@ -208,6 +208,216 @@ bool FBreakerEquipmentContributionTest::RunTest(const FString& Parameters)
     return true;
 }
 
+namespace BreakerEquipmentTestHelpers
+{
+    // A minimal item that only needs to be identifiable and rarity-tagged.
+    FBreakerItemInstance MakeItem(EBreakerEquipSlot Slot, EBreakerItemRarity Rarity, int32 ItemLevel)
+    {
+        FBreakerItemInstance Item;
+        Item.ItemId = FGuid::NewGuid();
+        Item.Slot = Slot;
+        Item.Rarity = Rarity;
+        Item.ItemLevel = ItemLevel;
+        return Item;
+    }
+
+    FBreakerRolledAffix MakeAffix(FName AffixId, float Value)
+    {
+        FBreakerRolledAffix Rolled;
+        Rolled.AffixId = AffixId;
+        Rolled.Tier = 4;
+        Rolled.Value = Value;
+        return Rolled;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEquipLimitCountTest,
+    "RiorsEdge.Items.Equipment.RarityLimits",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEquipLimitCountTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerEquipmentTestHelpers;
+
+    // O11 / master sheet 4.1. Everything below Aberrant is uncapped.
+    TestEqual(TEXT("Aberrant caps at three"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant), 3);
+    TestEqual(TEXT("Anomalous caps at one"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous), 1);
+    TestEqual(TEXT("Exceptional is uncapped"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Exceptional), INDEX_NONE);
+    TestEqual(TEXT("Standard is uncapped"), UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Standard), INDEX_NONE);
+
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
+    Equipment->EquipItem(MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Aberrant, 30));
+    Equipment->EquipItem(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 30));
+    Equipment->EquipItem(MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Exceptional, 30));
+
+    TestEqual(TEXT("Aberrant count reads the equipped list"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant), 2);
+    TestEqual(TEXT("Exceptional count reads the equipped list"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Exceptional), 1);
+    TestEqual(TEXT("Anomalous count is zero"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous), 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEquipDisplacementTest,
+    "RiorsEdge.Items.Equipment.LimitDisplacement",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEquipDisplacementTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerEquipmentTestHelpers;
+
+    // Three Aberrant equipped: the cap is met.
+    const FBreakerItemInstance Helmet = MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Aberrant, 40);
+    const FBreakerItemInstance Gloves = MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 20);
+    const FBreakerItemInstance Boots = MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Aberrant, 30);
+    const TArray<FBreakerItemInstance> Loadout = {Helmet, Gloves, Boots};
+
+    // A fourth Aberrant into an EMPTY slot ejects the weakest — the ilvl 20
+    // gloves — not the piece in the target slot, because there is none.
+    const FBreakerItemInstance Waist = MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Aberrant, 50);
+    FBreakerEquipPreview Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(Loadout, Waist);
+    TestFalse(TEXT("The empty target slot displaces nothing itself"), Preview.bSlotOccupied);
+    TestTrue(TEXT("A fourth Aberrant exceeds the cap"), Preview.bExceedsRarityLimit);
+    TestEqual(TEXT("The preview reports the current count"), Preview.RarityCount, 3);
+    TestEqual(TEXT("The preview reports the cap"), Preview.RarityLimit, 3);
+    TestEqual(TEXT("The weakest Aberrant is ejected"), Preview.LimitDisplaced.ItemId.ToString(), Gloves.ItemId.ToString());
+
+    // Swapping Aberrant for Aberrant IN THE SAME SLOT ejects nothing extra:
+    // the outgoing piece already frees its place under the cap.
+    const FBreakerItemInstance BetterGloves = MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 45);
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(Loadout, BetterGloves);
+    TestTrue(TEXT("The occupied slot is reported"), Preview.bSlotOccupied);
+    TestEqual(TEXT("The slot swap names the outgoing gloves"), Preview.SlotDisplaced.ItemId.ToString(), Gloves.ItemId.ToString());
+    TestFalse(TEXT("A same-slot same-rarity swap does not exceed the cap"), Preview.bExceedsRarityLimit);
+    TestFalse(TEXT("Nothing extra is ejected"), Preview.LimitDisplaced.IsValid());
+
+    // Ties break on wear order, so the disclosure is deterministic.
+    const TArray<FBreakerItemInstance> Tied =
+    {
+        MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Aberrant, 30),
+        MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Aberrant, 30),
+        MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 30),
+    };
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(Tied, Waist);
+    TestEqual(TEXT("Equal item levels break on wear order"), static_cast<int32>(Preview.LimitDisplaced.Slot), static_cast<int32>(EBreakerEquipSlot::Helmet));
+
+    // Anomalous is capped at one, and a lower rarity is never capped.
+    const TArray<FBreakerItemInstance> OneAnomalous = {MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 10)};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Anomalous, 50));
+    TestTrue(TEXT("A second Anomalous exceeds its cap of one"), Preview.bExceedsRarityLimit);
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Exceptional, 50));
+    TestFalse(TEXT("Exceptional is never capped"), Preview.bExceedsRarityLimit);
+    TestEqual(TEXT("Uncapped rarities report no limit"), Preview.RarityLimit, INDEX_NONE);
+
+    // End to end: the cap is disclosed, never blocked. The equip succeeds, the
+    // named piece leaves, and the loadout is still legal.
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
+    for (const FBreakerItemInstance& Item : Loadout) Equipment->EquipItem(Item);
+    TestEqual(TEXT("Three Aberrant equipped"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant), 3);
+
+    const FBreakerEquipPreview Live = Equipment->PreviewEquip(Waist);
+    TestTrue(TEXT("The live preview agrees the cap is met"), Live.bExceedsRarityLimit);
+    TestTrue(TEXT("Equipping over the cap is never refused"), Equipment->EquipItem(Waist));
+    TestEqual(TEXT("The loadout stays at the cap"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant), 3);
+
+    FBreakerItemInstance Occupant;
+    TestFalse(TEXT("The ejected piece's slot is now empty"), Equipment->GetEquippedItem(EBreakerEquipSlot::Gloves, Occupant));
+    TestTrue(TEXT("The new piece is equipped"), Equipment->GetEquippedItem(EBreakerEquipSlot::Waist, Occupant));
+    TestEqual(TEXT("The piece named in the preview is the piece that left"), Occupant.ItemId.ToString(), Waist.ItemId.ToString());
+    TestTrue(TEXT("The ejected piece returned to the backpack"),
+        Equipment->GetBackpack().ContainsByPredicate([&Gloves](const FBreakerItemInstance& Item) { return Item.ItemId == Gloves.ItemId; }));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAffixDeltaTest,
+    "RiorsEdge.Items.Equipment.AffixDeltas",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAffixDeltaTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerEquipmentTestHelpers;
+
+    FBreakerItemInstance Candidate = MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Exceptional, 40);
+    Candidate.Affixes.Add(MakeAffix(TEXT("Core.Health"), 150.0f));       // better
+    Candidate.Affixes.Add(MakeAffix(TEXT("Crit.Chance"), 4.0f));         // worse
+    Candidate.Affixes.Add(MakeAffix(TEXT("Crit.Damage"), 20.0f));        // parity
+    Candidate.Affixes.Add(MakeAffix(TEXT("Move.DashCooldown"), 9.0f));   // not on the equipped piece
+
+    FBreakerItemInstance Reference = MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Exceptional, 40);
+    Reference.Affixes.Add(MakeAffix(TEXT("Core.Health"), 100.0f));
+    Reference.Affixes.Add(MakeAffix(TEXT("Crit.Chance"), 6.0f));
+    Reference.Affixes.Add(MakeAffix(TEXT("Crit.Damage"), 20.0f));
+
+    TArray<FBreakerAffixComparison> Deltas = UBreakerEquipmentComponent::CompareAffixes(Candidate, Reference);
+    TestEqual(TEXT("One row per candidate affix"), Deltas.Num(), 4);
+    TestEqual(TEXT("A higher roll is better"), static_cast<int32>(Deltas[0].Delta), static_cast<int32>(EBreakerAffixDelta::Better));
+    TestEqual(TEXT("The compared value is the equipped roll"), Deltas[0].ComparedValue, 100.0f);
+    TestEqual(TEXT("The difference is signed"), Deltas[0].GetDifference(), 50.0f);
+    TestEqual(TEXT("A lower roll is worse"), static_cast<int32>(Deltas[1].Delta), static_cast<int32>(EBreakerAffixDelta::Worse));
+    TestEqual(TEXT("An equal roll is parity"), static_cast<int32>(Deltas[2].Delta), static_cast<int32>(EBreakerAffixDelta::Parity));
+    TestEqual(TEXT("A stat the equipped piece lacks is better"), static_cast<int32>(Deltas[3].Delta), static_cast<int32>(EBreakerAffixDelta::Better));
+    TestEqual(TEXT("A stat the equipped piece lacks compares against zero"), Deltas[3].ComparedValue, 0.0f);
+
+    // Matching is by stat target and bucket, so two equipped affixes feeding
+    // the same stat are one number to the player.
+    FBreakerItemInstance DoubleUp = MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Exceptional, 40);
+    DoubleUp.Affixes.Add(MakeAffix(TEXT("Core.Health"), 90.0f));
+    DoubleUp.Affixes.Add(MakeAffix(TEXT("Core.Health"), 80.0f));
+    Deltas = UBreakerEquipmentComponent::CompareAffixes(Candidate, DoubleUp);
+    TestEqual(TEXT("Same-target rolls sum before comparison"), Deltas[0].ComparedValue, 170.0f);
+    TestEqual(TEXT("Losing on the total reads as worse"), static_cast<int32>(Deltas[0].Delta), static_cast<int32>(EBreakerAffixDelta::Worse));
+
+    // An empty slot: everything is an improvement, and the preview says so.
+    const FBreakerEquipPreview Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({}, Candidate);
+    TestFalse(TEXT("An empty slot displaces nothing"), Preview.bSlotOccupied);
+    TestEqual(TEXT("The preview carries the affix deltas"), Preview.AffixDeltas.Num(), 4);
+    for (const FBreakerAffixComparison& Row : Preview.AffixDeltas)
+    {
+        TestEqual(TEXT("Every affix improves on an empty slot"), static_cast<int32>(Row.Delta), static_cast<int32>(EBreakerAffixDelta::Better));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBulkDiscardCountTest,
+    "RiorsEdge.Items.Equipment.BulkDiscardCount",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBulkDiscardCountTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerEquipmentTestHelpers;
+
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Standard, 10));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Standard, 12));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Uncommon, 14));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Exceptional, 20));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Aberrant, 22));
+    Equipment->AddToBackpack(MakeItem(EBreakerEquipSlot::Primary, EBreakerItemRarity::Anomalous, 24));
+    // Equipped gear is a separate container and is never a discard candidate.
+    Equipment->EquipItem(MakeItem(EBreakerEquipSlot::Secondary, EBreakerItemRarity::Standard, 5));
+
+    TestEqual(TEXT("Below Uncommon counts only the Standards"), Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Uncommon), 2);
+    const int32 Predicted = Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Exceptional);
+    TestEqual(TEXT("Below Exceptional counts Standard and Uncommon"), Predicted, 3);
+
+    // The number the modal states is the number destroyed — same predicate.
+    const int32 Removed = Equipment->DiscardBackpackBelowRarity(EBreakerItemRarity::Exceptional);
+    TestEqual(TEXT("The stated count is the destroyed count"), Removed, Predicted);
+    TestEqual(TEXT("Nothing left to discard"), Equipment->CountBackpackBelowRarity(EBreakerItemRarity::Exceptional), 0);
+
+    // Aberrant and Anomalous are above every threshold the screen offers, so
+    // a bulk discard can never take them.
+    TestTrue(TEXT("Aberrant survives"), Equipment->GetBackpack().ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Rarity == EBreakerItemRarity::Aberrant; }));
+    TestTrue(TEXT("Anomalous survives"), Equipment->GetBackpack().ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Rarity == EBreakerItemRarity::Anomalous; }));
+    TestTrue(TEXT("Equipped gear is untouched"), Equipment->GetEquipped().ContainsByPredicate(
+        [](const FBreakerItemInstance& Item) { return Item.Slot == EBreakerEquipSlot::Secondary; }));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerDodgeBlockTest,
     "RiorsEdge.Combat.Defense.DodgeAndBlock",

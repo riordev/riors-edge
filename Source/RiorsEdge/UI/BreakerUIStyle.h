@@ -94,6 +94,26 @@ namespace BreakerUI
         return Rarity == EBreakerItemRarity::Anomalous;
     }
 
+    // --- Destructive surfaces ---------------------------------------------
+    // The one face reserved for irreversible confirmation, from the inventory
+    // canvas: a near-black red plate under a harm-red border. It is not part
+    // of the panel ramp and must never be used for an ordinary card.
+    inline const FLinearColor DestructiveFace = Hex(0x2A1414);
+
+    // --- Comparison glyphs -------------------------------------------------
+    // Per-affix deltas on a loadout card (UI-Inventory-Spec "Card anatomy").
+    // Cyan up for better, harm-red down for worse, muted equals for parity.
+    // The glyphs are tokens because the shipping faces are not imported yet:
+    // if the fallback face has no Geometric Shapes coverage this is the single
+    // line to change, not a pass over the card builder.
+    // This file is UTF-8 without a BOM, matching BreakerMenu.cpp, which
+    // already ships non-ASCII inside TEXT() literals.
+    inline const TCHAR* DeltaBetterGlyph = TEXT("▲");  // BLACK UP-POINTING TRIANGLE
+    inline const TCHAR* DeltaWorseGlyph = TEXT("▼");   // BLACK DOWN-POINTING TRIANGLE
+    inline const TCHAR* DeltaParityGlyph = TEXT("=");
+    // Fixed column so the affix names form a straight edge whatever the glyph.
+    inline constexpr float DeltaGlyphColumn = 14.0f;
+
     // --- Spacing scale -----------------------------------------------------
     // 4 / 8 / 16 / 24 / 40 / 64. 12 and 32 are not tokens; where the HUD spec
     // names a 12px interior pad it says so itself and uses HudClusterPad.

@@ -277,6 +277,9 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
     // arming click sees it, everything else disarms.
     CleanupArmedIndex = PendingCleanupArm;
     PendingCleanupArm = -1;
+    // A confirmation modal belongs to the screen that raised it; leaving the
+    // screen answers it with "no".
+    if (CurrentScreen != EBreakerMenuScreen::Inventory) DiscardModalIndex = -1;
     if (!ContentHost.IsValid()) return;
     switch (CurrentScreen)
     {
@@ -754,32 +757,136 @@ namespace
         }
     }
 
+    // The two bulk-discard thresholds the header offers, indexed by arm. One
+    // function so the chip, the modal's count and the modal's Destroy button
+    // cannot disagree about what "below" means.
+    EBreakerItemRarity CleanupThresholdForArm(int32 ArmIndex)
+    {
+        return ArmIndex == 1 ? EBreakerItemRarity::Exceptional : EBreakerItemRarity::Uncommon;
+    }
+
     FString TierLabel(int32 Tier)
     {
         return Tier < 0 ? TEXT("T-1") : FString::Printf(TEXT("T%d"), Tier);
     }
 
-    FString DescribeItem(const FBreakerItemInstance& Item)
+    // One affix as the player reads it: "Movement Speed  +5.0%  T4".
+    FString DescribeAffix(const FBreakerRolledAffix& Affix)
     {
         const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Affix.AffixId);
+        const FString Name = Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString();
+        const bool bPercent = Definition && Definition->StatBucket != EBreakerStatBucket::Flat;
+        // Critical Chance and Critical Damage roll as flat numbers but are
+        // printed as percentages, because that is what they mean.
+        const bool bPercentStyleFlat = Definition &&
+            (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
+        return FString::Printf(TEXT("%s  +%.1f%s  %s"), *Name, Affix.Value,
+            bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *TierLabel(Affix.Tier));
+    }
+
+    FString DescribeItem(const FBreakerItemInstance& Item)
+    {
         TArray<FString> Lines;
         Lines.Add(FString::Printf(TEXT("ITEM LEVEL %d"), Item.ItemLevel));
         for (const FBreakerRolledAffix& Affix : Item.Affixes)
         {
-            const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Affix.AffixId);
-            const FString Name = Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString();
-            const bool bPercent = Definition && Definition->StatBucket != EBreakerStatBucket::Flat;
-            const bool bPercentStyleFlat = Definition &&
-                (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
-            Lines.Add(FString::Printf(TEXT("%s  +%.1f%s  %s"), *Name, Affix.Value, bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *TierLabel(Affix.Tier)));
+            Lines.Add(DescribeAffix(Affix));
         }
         return FString::Join(Lines, TEXT("\n"));
+    }
+
+    // The affix list with per-affix deltas (UI-Inventory-Spec "Card anatomy"
+    // line 3): the glyph sits in a fixed column so the affix names keep a
+    // straight left edge whether or not a card is being compared.
+    //
+    // Deltas is UBreakerEquipmentComponent's answer, one row per affix in the
+    // same order as Item.Affixes — this function decides nothing about better
+    // or worse, it only picks a glyph and a colour. Pass an empty array for a
+    // card with nothing to compare against (an equipped piece).
+    TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas)
+    {
+        TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox);
+        Lines->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("ITEM LEVEL %d"), Item.ItemLevel)), BreakerUI::TypeCaption, SoftText)
+        ];
+        for (int32 Index = 0; Index < Item.Affixes.Num(); ++Index)
+        {
+            FString Glyph;
+            FLinearColor GlyphColor = Muted;
+            if (Deltas.IsValidIndex(Index))
+            {
+                switch (Deltas[Index].Delta)
+                {
+                    case EBreakerAffixDelta::Better: Glyph = BreakerUI::DeltaBetterGlyph; GlyphColor = Cyan; break;
+                    case EBreakerAffixDelta::Worse:  Glyph = BreakerUI::DeltaWorseGlyph;  GlyphColor = Harm; break;
+                    default:                         Glyph = BreakerUI::DeltaParityGlyph; GlyphColor = Muted; break;
+                }
+            }
+            Lines->AddSlot().AutoHeight()
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()
+                [
+                    SNew(SBox).WidthOverride(BreakerUI::DeltaGlyphColumn)
+                    [
+                        MenuText(FText::FromString(Glyph), BreakerUI::TypeCaption, GlyphColor, true)
+                    ]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f)
+                [
+                    MenuText(FText::FromString(DescribeAffix(Item.Affixes[Index])), BreakerUI::TypeCaption, SoftText)
+                ]
+            ];
+        }
+        return Lines;
+    }
+
+    // The five rarity beams, as the empty backpack draws them: one vertical
+    // bar per tier in the same ramp the ground drops use, so the screen and
+    // the world teach the same lesson.
+    TSharedRef<SWidget> MakeRarityBeams()
+    {
+        static const EBreakerItemRarity Ramp[] =
+        {
+            EBreakerItemRarity::Standard,
+            EBreakerItemRarity::Uncommon,
+            EBreakerItemRarity::Exceptional,
+            EBreakerItemRarity::Aberrant,
+            EBreakerItemRarity::Anomalous,
+        };
+        TSharedRef<SHorizontalBox> Beams = SNew(SHorizontalBox);
+        for (const EBreakerItemRarity Rarity : Ramp)
+        {
+            Beams->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space24, 0.0f)
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+                [
+                    // The beam itself: a 6px column of the rarity's own colour,
+                    // the same value the HUD draws a ground drop's beam with.
+                    SNew(SBox).WidthOverride(6.0f).HeightOverride(180.0f)
+                    [
+                        SolidBlock(BreakerUI::RarityColor(Rarity))
+                    ]
+                ]
+                + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(RarityName(Rarity)), BreakerUI::TypeCaption, BreakerUI::RarityColor(Rarity), true)
+                ]
+            ];
+        }
+        return Beams;
     }
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 {
     UBreakerEquipmentComponent* Equipment = Character.IsValid() ? Character->GetEquipment() : nullptr;
+
+    // The outline handles belong to the widget tree being replaced right now.
+    EquipSlotOutlines.Reset();
 
     // One-click cards: an equipped slot unequips on click, a backpack item
     // equips on click.
@@ -793,9 +900,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         const FString Name = bHasItem ? RarityName(Item.Rarity) : TEXT("EMPTY");
         const FString Details = bHasItem ? DescribeItem(Item) : TEXT("—");
 
-        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-        [
-            MakeRarityCard(
+        // The doomed-piece outline. It sits OUTSIDE the card's own ring so the
+        // rarity ring is never overwritten, and it rests on the screen field
+        // colour, which reads as nothing until a hovered backpack card names
+        // this slot.
+        TSharedRef<SBorder> Outline = SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(Background)
+            .Padding(FMargin(BreakerUI::BorderSelected))
+            [
+                MakeRarityCard(
                 SNew(SButton)
                 .ButtonColorAndOpacity(bHasItem ? PanelRaised : Panel)
                 .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
@@ -819,7 +933,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     ]
                 ],
                 bHasItem ? Item.Rarity : EBreakerItemRarity::Standard, bHasItem)
-        ];
+            ];
+
+        EquipSlotOutlines.Add(Slot, Outline);
+        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[Outline];
     };
 
     // ---- Character column, 560 wide (UI-Inventory-Spec "Zones") -----------
@@ -955,17 +1072,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     {
         const FGuid ItemId = Item.ItemId;
 
-        // Readability aid: what clicking this card would displace. One line,
-        // tinted with the rarity being replaced so a downgrade reads at a
-        // glance.
-        FBreakerItemInstance CurrentlyEquipped;
-        const bool bSlotOccupied = Equipment && Equipment->GetEquippedItem(Item.Slot, CurrentlyEquipped);
-        // Gold means "this costs you something", cyan means the action is
-        // free. The footer states the consequence of clicking, never hides it.
-        const FString DeltaLine = bSlotOccupied
-            ? FString::Printf(TEXT("EQUIP · REPLACES %s i%d"), *RarityName(CurrentlyEquipped.Rarity), CurrentlyEquipped.ItemLevel)
+        // Every consequence of clicking this card, answered by the equipment
+        // component before the click. The screen states them; it works none of
+        // them out itself.
+        const FBreakerEquipPreview Preview = Equipment
+            ? Equipment->PreviewEquip(Item)
+            : UBreakerEquipmentComponent::PreviewEquipAgainst(TArray<FBreakerItemInstance>(), Item);
+
+        // Footer line one: the ordinary slot swap. Gold means "this costs you
+        // something", cyan means the action is free.
+        const FString DeltaLine = Preview.bSlotOccupied
+            ? FString::Printf(TEXT("EQUIP · REPLACES %s i%d"), *RarityName(Preview.SlotDisplaced.Rarity), Preview.SlotDisplaced.ItemLevel)
             : FString(TEXT("EQUIP · SLOT EMPTY"));
-        const FLinearColor DeltaColor = bSlotOccupied ? Amber : Cyan;
+        const FLinearColor DeltaColor = Preview.bSlotOccupied ? Amber : Cyan;
+
+        // Footer line two, only when the rarity cap is already met: a SECOND
+        // consequence, so it gets a second line. The action is never blocked —
+        // it is disclosed (UI-Inventory-Spec "Limit tells"). Items carry no
+        // display name yet, so the ejected piece is named by rarity and slot,
+        // which is exactly how its own card is titled.
+        const bool bLimitTell = Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid();
+        const FString LimitLine = bLimitTell
+            ? FString::Printf(TEXT("LIMIT FULL %d/%d · EJECTS %s %s i%d"),
+                Preview.RarityCount, Preview.RarityLimit,
+                *RarityName(Preview.LimitDisplaced.Rarity), *SlotName(Preview.LimitDisplaced.Slot), Preview.LimitDisplaced.ItemLevel)
+            : FString();
+        const EBreakerEquipSlot DoomedSlot = Preview.LimitDisplaced.Slot;
 
         const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
         {
@@ -1016,6 +1148,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                 Rebuild(EBreakerMenuScreen::Inventory);
                                 return FReply::Handled();
                             }))
+                            // The hover half of the limit tell. Event-driven on
+                            // purpose: this paints one border on enter and
+                            // clears it on leave, and never runs on a tick.
+                            .OnHovered(FSimpleDelegate::CreateLambda([this, bLimitTell, DoomedSlot]()
+                            {
+                                if (bLimitTell) SetEquipSlotOutline(DoomedSlot, true);
+                            }))
+                            .OnUnhovered(FSimpleDelegate::CreateLambda([this, bLimitTell, DoomedSlot]()
+                            {
+                                if (bLimitTell) SetEquipSlotOutline(DoomedSlot, false);
+                            }))
                             [
                                 SNew(SVerticalBox)
                                 + SVerticalBox::Slot().AutoHeight()
@@ -1030,11 +1173,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [
-                                    MenuText(FText::FromString(DescribeItem(Item)), BreakerUI::TypeCaption, SoftText)
+                                    // Line 3 of the card anatomy: every affix
+                                    // carrying its delta against the equipped
+                                    // piece in this slot.
+                                    MakeAffixLines(Item, Preview.AffixDeltas)
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [
                                     MenuText(FText::FromString(DeltaLine.ToUpper()), BreakerUI::TypeCaption, DeltaColor, true)
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                                [
+                                    // Harm red, and only present when it is
+                                    // true: an always-visible limit line would
+                                    // stop meaning anything.
+                                    bLimitTell
+                                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(LimitLine), BreakerUI::TypeCaption, Harm, true))
+                                        : SNullWidget::NullWidget
                                 ]
                             ],
                             Item.Rarity, true)
@@ -1088,29 +1243,30 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         AddFilterChip(SlotName(static_cast<EBreakerEquipSlot>(SlotIndex)), SlotIndex);
     }
 
-    // Clean-up chips. First click arms (amber, "CONFIRM?"), second click
-    // executes; any other interaction rebuilds and disarms.
+    // Clean-up chips. First click arms (gold, "CONFIRM"), second click opens
+    // the confirmation modal — it never destroys anything directly. Any other
+    // interaction rebuilds and disarms.
     TSharedRef<SHorizontalBox> CleanupRow = SNew(SHorizontalBox);
-    auto AddCleanupChip = [this, &CleanupRow](const FString& Label, int32 ArmIndex, EBreakerItemRarity MinimumKept)
+    auto AddCleanupChip = [this, &CleanupRow](const FString& Label, int32 ArmIndex)
     {
         const bool bArmed = CleanupArmedIndex == ArmIndex;
-        // Two-step arm: the button turns gold and reads CONFIRM before it
-        // destroys anything. Armed carries the 2px gold ring, disarmed reads
-        // as a destructive control (deep-red ring, harm text).
+        // Two-step arm: the button turns gold and reads CONFIRM. Armed carries
+        // the 2px gold ring, disarmed reads as a destructive control (deep-red
+        // ring, harm text).
         CleanupRow->AddSlot().AutoWidth().Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
         [
             BorderWrap(
             SNew(SButton)
             .ButtonColorAndOpacity(bArmed ? PanelHover : Panel)
             .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
-            .OnClicked(FOnClicked::CreateLambda([this, ArmIndex, MinimumKept, bArmed]()
+            .OnClicked(FOnClicked::CreateLambda([this, ArmIndex, bArmed]()
             {
                 if (bArmed)
                 {
-                    const int32 Removed = Character.IsValid() && Character->GetEquipment()
-                        ? Character->GetEquipment()->DiscardBackpackBelowRarity(MinimumKept)
-                        : 0;
-                    InventoryStatus = FText::FromString(FString::Printf(TEXT("Discarded %d item%s."), Removed, Removed == 1 ? TEXT("") : TEXT("s")));
+                    // The modal is the only thing that can destroy: it states
+                    // the count and the exclusions first.
+                    DiscardModalIndex = ArmIndex;
+                    PendingCleanupArm = ArmIndex;
                 }
                 else
                 {
@@ -1126,8 +1282,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             bArmed ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
-    AddCleanupChip(TEXT("DISCARD < UNCOMMON"), 0, EBreakerItemRarity::Uncommon);
-    AddCleanupChip(TEXT("DISCARD < EXCEPTIONAL"), 1, EBreakerItemRarity::Exceptional);
+    AddCleanupChip(TEXT("DISCARD < UNCOMMON"), 0);
+    AddCleanupChip(TEXT("DISCARD < EXCEPTIONAL"), 1);
 
     // Dev gear grants ride the same playtest flag as dev class swap.
     bool bDevTools = false;
@@ -1200,29 +1356,40 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             MenuText(InventoryStatus, BreakerUI::TypeCaption, Amber, true)
         ];
     }
+    // The empty backpack is the one place the screen teaches the world: the
+    // five rarity beams as vertical bars, and the single line that ties them
+    // to what the player sees on the ground.
+    TSharedRef<SWidget> EmptyBackpack =
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)
+        [
+            MakeRarityBeams()
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("LOOT IS FOUND BY COLOUR")), BreakerUI::TypeH2, Primary, true)
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("EMPTY · ENEMY KILLS DROP ROLLED ITEMS")), BreakerUI::TypeCaption, Muted, true)
+        ];
+
     BackpackColumn->AddSlot().FillHeight(1.0f)
     [
         BackpackItems.IsEmpty()
-            ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("Empty. Enemy kills drop rolled items.\nLoot is found by colour.")), BreakerUI::TypeBody, SoftText))
+            ? EmptyBackpack
             : StaticCastSharedRef<SWidget>(SNew(SScrollBox) + SScrollBox::Slot()[BackpackGrid])
     ];
 
     // ---- Header band -------------------------------------------------------
     // The two equip-limit counters live here permanently, so the constraint is
-    // never a surprise at click time. Both counts are derived locally from the
-    // equipped list: UBreakerEquipmentComponent has no rarity-count accessor,
-    // and adding one would mean editing a file this pass does not own.
-    int32 AberrantEquipped = 0;
-    int32 AnomalousEquipped = 0;
-    if (Equipment)
-    {
-        for (const FBreakerItemInstance& EquippedItem : Equipment->GetEquipped())
-        {
-            if (!EquippedItem.IsValid()) continue;
-            if (EquippedItem.Rarity == EBreakerItemRarity::Aberrant) ++AberrantEquipped;
-            else if (EquippedItem.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousEquipped;
-        }
-    }
+    // never a surprise at click time. Both the counts and the caps come from
+    // the equipment component: the screen must never hold a second opinion
+    // about a rule that decides which of the player's items gets ejected.
+    const int32 AberrantEquipped = Equipment ? Equipment->CountEquippedOfRarity(EBreakerItemRarity::Aberrant) : 0;
+    const int32 AnomalousEquipped = Equipment ? Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous) : 0;
+    const int32 AberrantLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant);
+    const int32 AnomalousLimit = UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous);
 
     auto MakeLimitChip = [](const FString& Label, int32 Count, int32 Limit, const FLinearColor& Rail, bool bFullBorder) -> TSharedRef<SWidget>
     {
@@ -1247,11 +1414,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     // full teal border — the single legal teal on this screen.
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
     [
-        MakeLimitChip(TEXT("ABERRANT"), AberrantEquipped, 3, BreakerUI::RarityAberrant, false)
+        MakeLimitChip(TEXT("ABERRANT"), AberrantEquipped, AberrantLimit, BreakerUI::RarityAberrant, false)
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
     [
-        MakeLimitChip(TEXT("ANOMALOUS"), AnomalousEquipped, 1, BreakerUI::RarityAnomalous, true)
+        MakeLimitChip(TEXT("ANOMALOUS"), AnomalousEquipped, AnomalousLimit, BreakerUI::RarityAnomalous, true)
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[CleanupRow];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
@@ -1292,13 +1459,132 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 
     // No footer by design (UI-Inventory-Spec "Zones"): the input hints live in
     // the backpack filter bar and BACK sits in the header band.
-    return BuildZonedFrame(
+    TSharedRef<SWidget> Screen = BuildZonedFrame(
         FText::FromString(TEXT("LOADOUT")),
         FText::FromString(MetaLine),
         HeaderRight,
         Body,
         SNullWidget::NullWidget,
         1760.0f);
+
+    if (DiscardModalIndex < 0) return Screen;
+
+    // The confirmation modal sits above the whole screen, not inside a zone:
+    // it is the last thing between the player and an irreversible action.
+    const EBreakerItemRarity MinimumKept = CleanupThresholdForArm(DiscardModalIndex);
+    const int32 DoomedCount = Equipment ? Equipment->CountBackpackBelowRarity(MinimumKept) : 0;
+    return SNew(SOverlay)
+        + SOverlay::Slot()[Screen]
+        + SOverlay::Slot()[BuildDiscardModal(DiscardModalIndex, MinimumKept, DoomedCount)];
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildDiscardModal(int32 ArmIndex, EBreakerItemRarity MinimumKept, int32 Count)
+{
+    const FString Threshold = RarityName(MinimumKept);
+    // The count is the equipment component's own answer, produced by the same
+    // predicate the discard uses — the modal cannot promise a different number
+    // from the one it destroys.
+    TSharedRef<SVerticalBox> Plate = SNew(SVerticalBox);
+    Plate->AddSlot().AutoHeight()
+    [
+        MenuText(FText::FromString(TEXT("DESTROY BACKPACK ITEMS")), BreakerUI::TypeH1, Primary, true)
+    ];
+    Plate->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(FString::Printf(TEXT("%d backpack item%s below %s will be destroyed. This cannot be undone."),
+            Count, Count == 1 ? TEXT("") : TEXT("s"), *Threshold)), BreakerUI::TypeBody, SoftText)
+    ];
+    // The exclusions, stated rather than assumed. Both are properties of the
+    // component: equipped gear is a separate container, and Aberrant and
+    // Anomalous sit above every threshold this screen offers.
+    Plate->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(TEXT("NEVER INCLUDED\n· EQUIPPED GEAR\n· ABERRANT\n· ANOMALOUS")), BreakerUI::TypeCaption, Muted, true)
+    ];
+
+    TSharedRef<SHorizontalBox> Actions = SNew(SHorizontalBox);
+    Actions->AddSlot().AutoWidth()
+    [
+        BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(Panel)
+            .ContentPadding(FMargin(BreakerUI::Space24, BreakerUI::Space8))
+            .OnClicked(FOnClicked::CreateLambda([this]()
+            {
+                DiscardModalIndex = -1;
+                Rebuild(EBreakerMenuScreen::Inventory);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(TEXT("CANCEL")), BreakerUI::TypeCaption, Primary, true)
+            ],
+            BorderEmphasis)
+    ];
+    Actions->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+    [
+        // The destructive control: the count in the label, harm-red text on
+        // the destructive face, harm-red ring. Nothing else on the screen
+        // looks like this.
+        BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(BreakerUI::DestructiveFace)
+            .ContentPadding(FMargin(BreakerUI::Space24, BreakerUI::Space8))
+            .OnClicked(FOnClicked::CreateLambda([this, ArmIndex]()
+            {
+                const int32 Removed = Character.IsValid() && Character->GetEquipment()
+                    ? Character->GetEquipment()->DiscardBackpackBelowRarity(CleanupThresholdForArm(ArmIndex))
+                    : 0;
+                InventoryStatus = FText::FromString(FString::Printf(TEXT("Destroyed %d item%s."), Removed, Removed == 1 ? TEXT("") : TEXT("s")));
+                DiscardModalIndex = -1;
+                Rebuild(EBreakerMenuScreen::Inventory);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("DESTROY %d"), Count)), BreakerUI::TypeCaption, Harm, true)
+            ],
+            Harm, BreakerUI::BorderSelected)
+    ];
+    Plate->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f).HAlign(HAlign_Right)[Actions];
+
+    return SNew(SOverlay)
+        + SOverlay::Slot()
+        [
+            // The scrim both dims the screen and swallows clicks, so the
+            // controls behind a modal cannot be operated through it.
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BreakerUI::Alpha(BreakerUI::BgVoid, 0.85f))
+            .OnMouseButtonDown(FPointerEventHandler::CreateLambda([](const FGeometry&, const FPointerEvent&)
+            {
+                return FReply::Handled();
+            }))
+            [
+                SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+            ]
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+        [
+            SNew(SBox).WidthOverride(560.0f)
+            [
+                // The destructive face on a harm-red rail: the only plate in
+                // the system that is not part of the panel ramp.
+                MakePlate(Plate, BreakerUI::DestructiveFace, Harm,
+                    FMargin(BreakerUI::Space24, BreakerUI::Space24), false, Harm)
+            ]
+        ];
+}
+
+void SBreakerMenu::SetEquipSlotOutline(EBreakerEquipSlot Slot, bool bDoomed)
+{
+    if (const TWeakPtr<SBorder>* Found = EquipSlotOutlines.Find(Slot))
+    {
+        if (const TSharedPtr<SBorder> Outline = Found->Pin())
+        {
+            // Harm red while a card that would eject this piece is hovered,
+            // the screen field otherwise — which reads as no outline at all.
+            Outline->SetBorderBackgroundColor(FSlateColor(bDoomed ? Harm : Background));
+        }
+    }
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()

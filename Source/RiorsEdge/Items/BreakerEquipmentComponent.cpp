@@ -60,14 +60,153 @@ void UBreakerEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
     DOREPLIFETIME(UBreakerEquipmentComponent, Backpack);
 }
 
+namespace
+{
+    // One predicate for the bulk discard and for the count the confirmation
+    // modal prints. Aberrant and Anomalous sit above every threshold the UI
+    // offers, so "never bulk-discards your best gear" is a property of the
+    // rarity order rather than a special case bolted on here.
+    bool IsBelowRarity(const FBreakerItemInstance& Item, EBreakerItemRarity MinimumKept)
+    {
+        return static_cast<uint8>(Item.Rarity) < static_cast<uint8>(MinimumKept);
+    }
+}
+
 bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
 {
     if (!Item.IsValid() || !HasAttributeAuthority()) return false;
+    // Resolve the cap BEFORE anything moves, so the piece the UI named as
+    // doomed is exactly the piece that leaves. The cap never refuses the
+    // equip (UI-Inventory-Spec "Limit tells": disclosed, not blocked).
+    const FBreakerEquipPreview Preview = PreviewEquipAgainst(Equipped, Item);
     UnequipSlot(Item.Slot);
+    if (Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid())
+    {
+        UnequipSlot(Preview.LimitDisplaced.Slot);
+    }
     Equipped.Add(Item);
     RecalculateStats();
     OnEquipmentChanged.Broadcast();
     return true;
+}
+
+int32 UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity Rarity)
+{
+    switch (Rarity)
+    {
+        case EBreakerItemRarity::Aberrant:  return 3;
+        case EBreakerItemRarity::Anomalous: return 1;
+        default:                            return INDEX_NONE;
+    }
+}
+
+int32 UBreakerEquipmentComponent::CountEquippedOfRarity(EBreakerItemRarity Rarity) const
+{
+    int32 Count = 0;
+    for (const FBreakerItemInstance& Item : Equipped)
+    {
+        if (Item.IsValid() && Item.Rarity == Rarity) ++Count;
+    }
+    return Count;
+}
+
+int32 UBreakerEquipmentComponent::CountBackpackBelowRarity(EBreakerItemRarity MinimumKept) const
+{
+    int32 Count = 0;
+    for (const FBreakerItemInstance& Item : Backpack)
+    {
+        if (IsBelowRarity(Item, MinimumKept)) ++Count;
+    }
+    return Count;
+}
+
+FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquip(const FBreakerItemInstance& Candidate) const
+{
+    return PreviewEquipAgainst(Equipped, Candidate);
+}
+
+FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArray<FBreakerItemInstance>& EquippedItems, const FBreakerItemInstance& Candidate)
+{
+    FBreakerEquipPreview Preview;
+    if (!Candidate.IsValid()) return Preview;
+
+    const FBreakerItemInstance* InSlot = EquippedItems.FindByPredicate(
+        [&Candidate](const FBreakerItemInstance& Existing) { return Existing.IsValid() && Existing.Slot == Candidate.Slot; });
+    if (InSlot)
+    {
+        Preview.bSlotOccupied = true;
+        Preview.SlotDisplaced = *InSlot;
+    }
+    Preview.AffixDeltas = CompareAffixes(Candidate, InSlot ? *InSlot : FBreakerItemInstance());
+
+    Preview.RarityLimit = EquipLimitForRarity(Candidate.Rarity);
+    for (const FBreakerItemInstance& Existing : EquippedItems)
+    {
+        if (Existing.IsValid() && Existing.Rarity == Candidate.Rarity) ++Preview.RarityCount;
+    }
+    if (Preview.RarityLimit == INDEX_NONE) return Preview;
+
+    // The piece already in the candidate's slot is leaving no matter what, so
+    // it cannot be the cap's victim and its departure counts against the tally
+    // first. Swapping an Aberrant helmet for another Aberrant helmet therefore
+    // ejects nothing extra even at 3/3.
+    int32 Surviving = Preview.RarityCount;
+    if (InSlot && InSlot->Rarity == Candidate.Rarity) --Surviving;
+    if (Surviving < Preview.RarityLimit) return Preview;
+
+    // Over the cap: the WEAKEST equipped piece of that rarity leaves. Weakest
+    // is lowest item level, ties broken by wear order (slot index), which
+    // makes the choice deterministic — the player is told which piece dies and
+    // that is the piece that dies.
+    Preview.bExceedsRarityLimit = true;
+    const FBreakerItemInstance* Weakest = nullptr;
+    for (const FBreakerItemInstance& Existing : EquippedItems)
+    {
+        if (!Existing.IsValid() || Existing.Rarity != Candidate.Rarity) continue;
+        if (Existing.Slot == Candidate.Slot) continue;
+        const bool bBetterVictim = !Weakest
+            || Existing.ItemLevel < Weakest->ItemLevel
+            || (Existing.ItemLevel == Weakest->ItemLevel && static_cast<uint8>(Existing.Slot) < static_cast<uint8>(Weakest->Slot));
+        if (bBetterVictim) Weakest = &Existing;
+    }
+    if (Weakest) Preview.LimitDisplaced = *Weakest;
+    return Preview;
+}
+
+TArray<FBreakerAffixComparison> UBreakerEquipmentComponent::CompareAffixes(const FBreakerItemInstance& Candidate, const FBreakerItemInstance& Reference)
+{
+    const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+    TArray<FBreakerAffixComparison> Comparisons;
+    Comparisons.Reserve(Candidate.Affixes.Num());
+    for (const FBreakerRolledAffix& Rolled : Candidate.Affixes)
+    {
+        FBreakerAffixComparison Row;
+        Row.AffixId = Rolled.AffixId;
+        Row.Tier = Rolled.Tier;
+        Row.Value = Rolled.Value;
+
+        const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId);
+        for (const FBreakerRolledAffix& Other : Reference.Affixes)
+        {
+            if (Definition)
+            {
+                const FBreakerAffixDefinition* OtherDefinition = UBreakerAffixLibrary::FindAffix(Pool, Other.AffixId);
+                if (!OtherDefinition) continue;
+                if (OtherDefinition->StatTarget != Definition->StatTarget) continue;
+                if (OtherDefinition->StatBucket != Definition->StatBucket) continue;
+            }
+            // An affix with no definition (content removed under a live save)
+            // can only be compared against its own id.
+            else if (Other.AffixId != Rolled.AffixId) continue;
+            Row.ComparedValue += Other.Value;
+        }
+
+        Row.Delta = FMath::IsNearlyEqual(Row.Value, Row.ComparedValue, UE_KINDA_SMALL_NUMBER)
+            ? EBreakerAffixDelta::Parity
+            : (Row.Value > Row.ComparedValue ? EBreakerAffixDelta::Better : EBreakerAffixDelta::Worse);
+        Comparisons.Add(Row);
+    }
+    return Comparisons;
 }
 
 bool UBreakerEquipmentComponent::UnequipSlot(EBreakerEquipSlot Slot)
@@ -121,10 +260,9 @@ bool UBreakerEquipmentComponent::DiscardFromBackpack(const FGuid& ItemId)
 int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity MinimumKept)
 {
     if (!HasAttributeAuthority()) return 0;
-    const uint8 Threshold = static_cast<uint8>(MinimumKept);
-    const int32 Removed = Backpack.RemoveAll([Threshold](const FBreakerItemInstance& Existing)
+    const int32 Removed = Backpack.RemoveAll([MinimumKept](const FBreakerItemInstance& Existing)
     {
-        return static_cast<uint8>(Existing.Rarity) < Threshold;
+        return IsBelowRarity(Existing, MinimumKept);
     });
     if (Removed > 0) OnEquipmentChanged.Broadcast();
     return Removed;
