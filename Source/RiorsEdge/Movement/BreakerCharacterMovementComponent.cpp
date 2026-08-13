@@ -29,13 +29,15 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // authored ledges and wall-ride approaches from being reachable, and that
     // cannot be verified without playing the level.
     JumpZVelocity = 700.0f;
-    // The single biggest weight lever. The weight pass took 1.35 -> 1.60; the
-    // owner playtested that as too heavy, so it eases back to 1.45 (O26) —
-    // still meaningfully heavier than the floaty original, with the fall curve
-    // below doing most of the work instead of raw gravity.
-    // If it is STILL too heavy, the next step down is FallGravityMultiplier,
-    // then LandingMinimumSpeedScale to 1.0 to remove the landing cost outright.
-    GravityScale = 1.45f; // WEIGHT PASS: 1.60f  ORIGINAL: 1.35f
+    // Two playtests, opposite complaints, and they are about different halves
+    // of the arc. 1.35 read as floaty; 1.60 and then 1.45 both read as too
+    // heavy. The heaviness is the RISE — it is paid on every single jump — and
+    // the floatiness was the DESCENT. So the rise returns to near its original
+    // weight and FallGravityMultiplier keeps the fall heavy. Deliberately only
+    // one value moved this pass, so the next report attributes cleanly.
+    // If it is STILL heavy, drop FallGravityMultiplier next, then set
+    // LandingMinimumSpeedScale to 1.0 to remove the landing cost outright.
+    GravityScale = 1.38f; // WAS 1.45f, 1.60f AT THE WEIGHT PASS, 1.35f ORIGINALLY
     // Explicit rather than inherited: JumpHoldWindow makes the engine's jump
     // force window non-zero, and gravity must keep applying inside it. False
     // here would be a zero-gravity hold — maximum floatiness.

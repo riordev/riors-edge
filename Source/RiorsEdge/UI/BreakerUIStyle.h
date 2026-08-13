@@ -177,9 +177,14 @@ namespace BreakerUI
     inline constexpr float HudCrosshairBox = 80.0f;
 
     // Damage number sizes, section 4 of the HUD spec.
-    inline constexpr float DamageBodyPixels = 40.0f;
-    inline constexpr float DamageCritPixels = 80.0f;
-    inline constexpr float DamageWeakPointPixels = 64.0f;
+    // The spec's 40/64/80 were authored for a 1920x1080 mock viewed at desk
+    // distance. In the game they cover the target you are shooting at, which
+    // is worse than illegible — the owner called them too big on sight. Cut
+    // ~35% while keeping the crit/weak-point/body HIERARCHY intact, since the
+    // relative sizes are what carry the information.
+    inline constexpr float DamageBodyPixels = 26.0f;   // SPEC: 40
+    inline constexpr float DamageCritPixels = 52.0f;   // SPEC: 80
+    inline constexpr float DamageWeakPointPixels = 40.0f; // SPEC: 64
 
     // Ultimate frame, section 5.
     inline constexpr float UltimateFrameInset = 8.0f;
