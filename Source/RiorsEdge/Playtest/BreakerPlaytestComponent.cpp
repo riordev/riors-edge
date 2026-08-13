@@ -57,7 +57,7 @@ void UBreakerPlaytestComponent::AddTimeToKillSample(float Seconds, bool bElite)
 FString UBreakerPlaytestComponent::BuildReport() const
 {
     return FString::Printf(
-        TEXT("Rior's Edge Playtest Report\nDuration: %.1f minutes\nShots: %d\nHits: %d\nAccuracy: %.1f%%\nWeak-point hits: %d\nWeak-point rate: %.1f%%\nDamage dealt: %.0f\nReloads: %d\nKills: %d (avg TTK %.2fs)\nElite kills: %d (avg TTK %.2fs)\n\nMovement notes:\n- Walk/stopping:\n- Sprint:\n- Dash:\n- Slide:\n- Wall ride/jump:\n\nWeapon notes:\n- Hip fire / aim:\n- Cadence / reload:\n- Weak points / falloff:\n\nDefects or discomfort:\n- "),
+        TEXT("Rior's Edge Playtest Report\nDuration: %.1f minutes\nShots: %d\nHits: %d\nAccuracy: %.1f%%\nWeak-point hits: %d\nWeak-point rate: %.1f%%\nDamage dealt: %.0f\nReloads: %d\nKills: %d (avg TTK %.2fs)\nElite kills: %d (avg TTK %.2fs)\nTargets [O18]: trash <1s | elite ~3s | boss 20-45s | TTD 4-5s no sustain\nFlags [O23]: Veteran XP multiplier 3.0x vs 2.0x-health chassis\n\nMovement notes:\n- Walk/stopping:\n- Sprint:\n- Dash:\n- Slide:\n- Wall ride/jump:\n\nWeapon notes:\n- Hip fire / aim:\n- Cadence / reload:\n- Weak points / falloff:\n\nDefects or discomfort:\n- "),
         Stats.SessionSeconds / 60.0f, Stats.ShotsFired, Stats.Hits, Stats.Accuracy(), Stats.WeakPointHits,
         Stats.WeakPointRate(), Stats.DamageDealt, Stats.Reloads,
         Stats.TimeToKillSamples.Num(), FBreakerPlaytestStats::Average(Stats.TimeToKillSamples),

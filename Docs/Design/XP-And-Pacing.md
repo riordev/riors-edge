@@ -7,7 +7,9 @@ item-level relationship.
 
 **Authority.** `Docs/Design/Decisions.md` is law and supersedes anything here.
 This pass propagates O4 (§10.1), O6 (§8), O7 (§7), O8 (Frontier naming), and
-O9 (§5.1 Rank vocabulary). No new numeric values were authored — O2 freeze.
+O9 (§5.1 Rank vocabulary), O18 (§3 TTK/TTD seed targets), and O23 (§5.1
+Veteran flag). No new numeric values were authored — O2 freeze. The O18 figures
+are recorded verbatim as an owner ruling, not authored here.
 
 This document resolves four items marked OPEN in the master sheet:
 
@@ -190,6 +192,26 @@ warning on placeholder values. Re-derive it from Playtest Gym telemetry and
 then re-solve the act multipliers to preserve the 7 / 12 / 21 split. The
 *shape* is the design commitment; the *multipliers* are the tuning knob.
 
+### TTK / TTD seed targets — DESIGNER INPUTS [O18]
+
+O18 supplies the seed targets the wave-mode instrument measures *against*.
+These are designer inputs, not measurements and not authored values: the
+instrument reports **divergence** from them, it does not report truth, and a
+divergence is a signal to re-examine either the chassis or the target.
+
+| Target | Seed value [O18] |
+|---|---|
+| Trash TTK | a little under 1 second, scaling exponentially with enemy difficulty |
+| Rare / elite TTK | ~3 seconds |
+| Boss TTK | 20–45 seconds, unless a special enemy |
+| TTD, no resources/sustain | 4–5 seconds |
+| TTD, resources and sustain invested | substantially higher |
+
+The stat chassis solves backwards from these (see `Encounter-Design.md` §1.1).
+No value in this document is changed to fit them — O2's freeze still holds, and
+the throughput model above remains the placeholder it was. When wave mode
+reports, the seed targets and the throughput model get reconciled together.
+
 ---
 
 ## 4. Act breakpoints
@@ -284,7 +306,7 @@ Champion. Boss is authored, not modifier-derived.
 |---|---|---|---|---|---|---|
 | Standard | Trash | 0.35 | 25 | 46 | 72 | Swarm filler, dies to one burst. Use sparingly — trash exists for feel, not reward |
 | **Standard** | **Standard** | **1.00** | **70** | **130** | **206** | The unit. Three normal enemies of the slice sit here. 0 modifiers |
-| Veteran | Veteran | 3.0 | 210 | 390 | 618 | Exactly 1 modifier applied to a Standard |
+| Veteran | Veteran | 3.0 | 210 | 390 | 618 | Exactly 1 modifier applied to a Standard. **FLAGGED [O23]** — see below |
 | Champion | Pack leader | 8.0 | 560 | 1,040 | 1,648 | Named pack leader, 2 modifiers |
 | Champion | Mini-boss | 25.0 | 1,750 | 3,250 | 5,150 | 3 modifiers, guaranteed rare drop |
 | Boss | Rift boss | 120.0 | 8,400 | 15,600 | 24,720 | End of an instanced rift |
@@ -301,6 +323,11 @@ called "Elite" is a Champion.
 3-modifier encounter pays is an encounter-authoring choice, not a taxonomy
 one; if the owner wants one payout per Rank, bands must be collapsed and that
 is a value decision this pass does not make.
+
+**FLAGGED [O23]: anchored to the deleted 3x-health chassis; over-rewards ~1/3
+vs the canonical 2.0x chassis; frozen under O2; on wave mode's report list.**
+The multiplier is left at 3.0 deliberately — this pass records the flag and
+does not recost it.
 
 **Veteran anchor — reconciled to `Encounter-Design.md` §1.1.** The gym's
 existing `ConfigureElite` maps to **Veteran** (one modifier). Its stat chassis

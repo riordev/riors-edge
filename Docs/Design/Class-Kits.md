@@ -2,6 +2,10 @@
 
 Status: design draft. Numbers are placeholder and must be re-anchored after the Playtest Gym TTK pass, exactly as the affix tables are.
 
+**TTK anchors now exist [O18]:** the re-anchoring pass no longer runs against an unknown target. Seed targets are trash a little under 1s (scaling exponentially with enemy difficulty), rare/elite ~3s, boss 20-45s unless a special enemy, and TTD 4-5s with no resources/sustain (substantially higher once sustain is invested). Every "re-anchor after the TTK pass" note in this document means "measure divergence from those seeds"; no value in this document is re-authored ahead of wave mode's report (O2 freeze).
+
+**Element names [O19]:** the elements are **Rift / Entropy / Void**. "Time" as an element name is retired; all element references in this document read Entropy where they previously read Time.
+
 Scope: the five classes (Caster, Swift, Gunsmith, Tank, Support) — resource loop, three branches, ability list, ultimate, and branch skill trees costed against the 30 Class Points granted across levels 1-30.
 
 Detail level follows the master sheet's prototyping order (7.5): **Swift and Caster are authored in full.** Gunsmith, Tank, and Support are one-page treatments — enough to prove the resource grammar generalizes, not enough to build from.
@@ -23,15 +27,19 @@ Restated so a reader does not have to hold four documents open.
 | Air jump (Kinesis) and Parry (Bulwark) are the only tree-granted verbs | Master 5.2 / 7.6 | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
 | No grapple / tether | Master 5.1 | Kinetic and Demolitionist reposition with impulses and dashes only. |
 | Flat sums -> one additive Increased bucket -> More reserved for trees/Anomalous | Item-Foundation | Class nodes may author More multipliers, but each class gets a **hard budget of three** (see 0.1). |
-| Stat aggregation buckets unresolved | Master 3.15 / 6.6 | BLOCKED: the More-multiplier budget below cannot be implemented until buckets are decided. Design it now, build it after. |
+| More multipliers are an unordered product | **O3** | UNBLOCKED: the More-multiplier budget below is ratified — one More per branch keystone, build-wide cap 3, Aberrant signatures may not author a More. Remaining stat-aggregation-bucket work (Master 3.15 / 6.6) no longer gates it. |
+| Block/dodge are passive chance layers; no stamina; Parry is the only defensive input | **O1** | Every node keyed to a dodge or block "input" is re-expressed against a passive RNG proc. |
 
-### 0.1 The More-multiplier budget — EXTENDS
+### 0.1 The More-multiplier budget — RESOLVED [O3]
+
+**RESOLVED [O3]: More multipliers form an unordered product; at most one More per branch keystone; build-wide cap 3; Aberrant signatures may not author a More.** The proposal below is ratified as written — the EXTENDS flag is closed and the ordering question that blocked it (old OQ2) is answered by "unordered product," so no aggregation-bucket decision is owed before class content is authored. The "BLOCKED on stat aggregation buckets" line in the table above is superseded for the More budget specifically.
+
 
 The master sheet reserves More multipliers for trees and Anomalous items but does not say how many a tree may author. Without a cap, five classes x three branches is fifteen independent multipliers and the explosion risk in Master 7.10.1 arrives through the class layer instead of the affix layer.
 
 **Proposed rule: each class may author at most three More multipliers across all three branches — at most one per branch, and only on a branch keystone.** Every other node must be a rule rewrite, a resource-loop change, or a flat/Increased contribution that folds into the existing buckets.
 
-This is an EXTENDS on Master 7.6 and Layer-Ownership. Flagged for approval before any class content asset is authored.
+~~This is an EXTENDS on Master 7.6 and Layer-Ownership. Flagged for approval before any class content asset is authored.~~ Approved under O3.
 
 ### 0.2 Tree shape and cost grammar — EXTENDS
 
@@ -93,7 +101,7 @@ Momentum is a 0-100 bar that fills from purposeful movement and drains when the 
 | Slide | +12/s | Only while the slide is above the 750 cm/s threshold. Braked slides stop generating. |
 | Dash | +10 flat | Once per dash charge consumed; no credit from cooldown-refunded charges beyond one per 1.0s. |
 | Wall ride | +10/s | Master 5.4 forbids wall riding generating *speed*; it may generate *resource*. Capped at 0.85s, the wall-ride maximum. |
-| Successful dodge (passive evade fires) | +15 flat | 0.5s internal cooldown. This is the class fantasy line in Layer-Ownership: "Swift converts evasion into Momentum." |
+| Passive dodge proc (evade chance rolls and fires) | +15 flat | 0.5s internal cooldown. **RESOLVED [O1]:** this is an RNG proc off the passive evade chance layer, not a player input — the stamina pool is deleted and Parry is the only defensive input. The player cannot time this source; it is gear- and chance-driven. **Tuning risk (recorded, not solved):** proc variance makes Swift's floor and ceiling generation diverge over a short window. Variance is to be *measured* by wave mode, not solved here (O2). This still satisfies the Layer-Ownership class fantasy line, "Swift converts evasion into Momentum." |
 | Weak-point hit while airborne or sliding | +5 flat | 0.25s internal cooldown. Proc coefficient applies. |
 
 **Global generation cap: 25 Momentum per second from all sources combined.** Without it, an airborne sliding dashing headshot stacks four sources into a full bar in under a second.
@@ -138,6 +146,8 @@ Two are granted free at level 1 (marked *starter*): Slipcut and Skim. The other 
 
 Base behavior: for 8 seconds, Momentum does not decay and all Momentum generation is doubled against the per-second cap (cap raised to 40/s). The player is locked at whatever band they entered at, minimum Redline.
 
+**Naming note [O19]:** Overdrive's time-dilation read is a *presentation* of Swift's speed fantasy and is **unrelated to the Entropy element** — the collision is an artifact of the Time->Entropy rename, not a design coupling, and Overdrive grants no Entropy-element damage, scaling, or interaction.
+
 Branch keystones rewrite it:
 
 - **Frenzy keystone (Bloodrhythm):** Overdrive additionally makes every weapon hit refund 1 Momentum, and the ultimate ends immediately if the player goes 1.5s without landing a hit. Aggression-gated.
@@ -173,7 +183,7 @@ Identity: the specialist home for velocity, aerial work, and evasion. Kinetic do
 | K2 — Contact | 1 | 2 | 1 | Wall ride Momentum generation continues for 0.4s after loss of contact (R2: 0.8s). Does not extend the wall ride itself — Master 5.3's 0.85s cap is untouched. |
 | K3 — Carry | 1 | 2 | 1 | Slide-into-slide chaining generates a flat +10 Momentum on each successful chain (R2: +18), ignoring the per-second cap. Reads the Boots exclusive affix; does not grant chaining. |
 | K4 — Redirect | 2 | 2 | 1 | Skim's cooldown is reduced by 1.0s each time the player changes horizontal facing by more than 90 degrees while airborne (R2: 1.5s), max once per airtime. |
-| K5 — Evade Conversion | 2 | 2 | 1 | Successful dodge Momentum gain 15 -> 25 (R2: 35), and the internal cooldown drops to 0.3s. The Layer-Ownership class-fantasy node stated literally. |
+| K5 — Evade Conversion | 2 | 2 | 1 | Passive dodge proc Momentum gain 15 -> 25 (R2: 35), and the internal cooldown drops to 0.3s. **RESOLVED [O1]:** re-expressed against the passive proc — this node raises the *yield* of an RNG proc, not the reward for a timed input, so its real value scales with the player's evade chance from gear rather than with skill. The Layer-Ownership class-fantasy node stated literally. **NEEDS-RECOST [O1/O2]:** yield-per-proc and the shortened ICD were costed against a controllable input; recost once wave mode reports proc-rate variance. No value changed here (O2 freeze). |
 | K6 — Landing | 2 | 2 | 1 | Landing from more than 4 m of fall converts the fall's kinetic energy into Momentum (+1 per metre above 4, cap +25). R2: also refunds one dash charge. Interacts with Fall Damage Reduction; does not require it. |
 | K7 — Skim Discipline | 3 | 1 | 2 | **Grants S4 Hard Stop.** Skim may be used twice per airtime instead of once. |
 | K8 — Air Work | 3 | 1 | 2 | While airborne at Redline, the Accuracy While Airborne affix is treated as if one tier higher. If the player has none, grants the T5 value. Scales a verb the affix layer owns — flagged below as a CONFLICT candidate. |
@@ -294,20 +304,22 @@ Identity: close-range spell/melee hybrid and target-crossing mobility. The branc
 | SB2 — Follow Through | 1 | 2 | 1 | Cleave's Bleed application also generates its status-application Mana even if Bleed is already present (R2: and refunds 5 Mana on kill). Bypasses the 0.4s per-type internal cooldown for melee only. |
 | SB3 — Close | 1 | 2 | 1 | Weapon hits within 8 m generate double Mana (R2: within 12 m). The range-gated generation node that defines the branch's play distance. |
 | SB4 — Debt | 2 | 2 | 1 | Overcast's negative floor extends from -20 to -35 (R2: -50). More rope. |
-| SB5 — Momentum Transfer | 2 | 2 | 1 | Closequarter's arrival grants 0.4s in which the next melee hit cannot be blocked or dodged by the target (R2: 0.8s). Rewrites the target's defensive roll, not the player's damage. |
+| SB5 — Momentum Transfer | 2 | 2 | 1 | Closequarter's arrival grants 0.4s in which the next melee hit suppresses the target's passive block and evade *rolls* (R2: 0.8s). **RESOLVED [O1]:** re-expressed against the passive chance layer — this cancels a roll, it does not beat a stance. Rewrites the target's defensive roll, not the player's damage. |
 | SB6 — Bloodprice | 2 | 2 | 1 | While Mana is negative, melee hits restore health equal to a portion of damage dealt (R2: doubled). Turns the Overcast penalty into a sustain window. |
 | SB7 — Blink | 3 | 1 | 2 | **Grants C2 Closequarter.** Closequarter may be cast with no target to blink 12 m in the aim direction. |
 | SB8 — Edge | 3 | 1 | 2 | Cleave's arc widens to 180 degrees and its Bleed applies to every target hit. Rule change; no damage percentage. |
-| SB9 — Reprisal | 4 | 1 | 2 | When the passive Block roll fires, the next Cleave within 2s costs 0 Mana. Reads the passive defensive layer as a resource source. |
+| SB9 — Reprisal | 4 | 1 | 2 | When the passive Block proc fires, the next Cleave within 2s costs 0 Mana. **RESOLVED [O1]:** already authored against the passive chance layer and needs no re-expression; note only that its uptime is RNG-driven, a variance wave mode measures (O2). Reads the passive defensive layer as a resource source. |
 | SB10 — No Distance | 4 | 1 | 2 | Closequarter's Mana refund triggers at 100% health instead of 40%, but its cost rises to 50. Reshapes the ability from an execute tool into a traversal tool. |
 | SB11 — Overreach | 4 | 1 | 2 | While Mana is negative, all Caster abilities are cast at no cost *and* the damage-taken penalty rises from 15% to 30%. The full Overcast commitment. |
 | SB12 — EDGEWORK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (1 of 3):** melee damage is multiplied by 1.30. Melee-only is the tax. |
 
-## 2.4 Caster branch — VOID WHISPERER
+## 2.4 Caster branch — VOID WHISPERER — RULED [O19]
 
 Identity: damage over time, sustain, and controlled zones. The attrition branch and the one that most directly exercises the status architecture.
 
-**BLOCKED:** every elemental line in this branch (Fire, Frost, Shock references) waits on the resistance model missing from Master 6.1. Void, Bleed, and Poison are physical or armour-facing and can ship now. Nodes below are authored so that **no node requires an element to function** — elemental interactions are additive upgrades, not prerequisites.
+**RULED [O19]: Void Whisperer IS the Void-element specialist.** The name/element coupling is intentional and descriptive, not an accident to be renamed away — this branch is the class-layer home of Void-element damage, and the collision flagged against Multispell is resolved in Void Whisperer's favour. Elements are Rift / Entropy / Void.
+
+**BLOCKED:** every elemental line in this branch (Rift and Entropy references) waits on the resistance model missing from Master 6.1. Void, Bleed, and Poison are physical or armour-facing and can ship now. Nodes below are authored so that **no node requires an element to function** — elemental interactions are additive upgrades, not prerequisites.
 
 | Node | Tier | Ranks | Cost/rank | Effect |
 |---|---|---|---|---|
@@ -321,12 +333,12 @@ Identity: damage over time, sustain, and controlled zones. The attrition branch 
 | VW8 — Wellspring | 3 | 1 | 2 | Zones may be placed on the caster's own position and move with them for their duration. One at a time. |
 | VW9 — Snapshot Discipline | 4 | 1 | 2 | DoTs applied while the caster is standing inside their own zone snapshot as if the caster's Critical Chance were 25 points higher. Reads Master 6.4's snapshot contract directly. Does not create a second multiplier. |
 | VW10 — Terminal | 4 | 1 | 2 | DoTs applied by this Caster do not expire on targets below 25% health; they persist until death or cleanse. |
-| VW11 — Long Debt | 4 | 1 | 2 | While Mana is negative, all Caster DoTs tick at double frequency and the caster takes 25% increased damage instead of 15%. **CONFLICT — this interacts with the unresolved Tick Frequency cap (Master 3.7 / 3.15). If tick interval is snapshotted, this node must apply at application time only. Do not implement before that question resolves.** |
+| VW11 — Long Debt | 4 | 1 | 2 | While Mana is negative, all Caster DoTs tick at double frequency and the caster takes 25% increased damage instead of 15%. **RESOLVED [O10] — tick interval is snapshotted with discrete steps, so this node applies at application time only (a DoT applied while Overcast keeps double frequency for its lifetime). Unblocked.** |
 | VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. |
 
 ## 2.5 Caster branch — MULTISPELL
 
-Identity: sequencing different statuses to create reactions. The branch that reads the shared status container and the Elements constellation without duplicating either.
+Identity: sequencing different statuses to create reactions — **Multispell rotates all three elements (Rift / Entropy / Void); Void Whisperer masters one [O19].** That is the whole separation between the two branches: breadth-and-sequence versus depth-in-Void. The older separator — a mono-element restriction clause — is **retired as redundant under O19**; the retirement itself lives in Core-Constellations (C2) and is referenced here, not restated. The branch reads the shared status container and the Elements constellation without duplicating either.
 
 **BLOCKED:** cross-element reactions require the reaction matrix Data Asset (Character-Progression-Architecture, Elements) and the missing resistance step. Multispell ships in a physical-only form (Bleed/Poison/Void) and expands when elements exist. Every node below is authored against "distinct status types," not against named elements, so the branch does not need rewriting later.
 
@@ -409,7 +421,7 @@ Global cap 15/s. Spending: deployables cost 25-60 Scrap and are the only Gunsmit
 | Post-mitigation damage taken | +1 Grit per 2% of maximum health lost | **Post-mitigation is mandatory.** A high-Armour Tank must not out-generate a low-Armour Tank by taking the same hit. |
 | Self-inflicted damage | Generates at 25% rate | The Demolitionist anti-farm rule. Rocket-jumping must not be a Grit engine. |
 | Melee kill | +10 | |
-| Passive Block roll firing | +6 | 0.4s internal cooldown. The Layer-Ownership line: "Tank converts mitigation into Grit." |
+| Passive Block proc (block chance rolls and fires) | +6 | 0.4s internal cooldown. **RESOLVED [O1]:** an RNG proc off the passive block chance layer, not a stance the player holds — stamina is deleted, Parry is the only defensive input. **Tuning risk (recorded, not solved):** Grit's inflow now varies with block-chance rolls rather than player commitment; variance is measured by wave mode, not solved here (O2). The Layer-Ownership line holds: "Tank converts mitigation into Grit." |
 | Enemy within 5 m | +1.5/s | Count-independent. Rewards holding ground without rewarding pack size. |
 
 Decay: -5/s after 6s without taking damage or being within 5 m of an enemy. Global cap 20/s.
@@ -472,7 +484,9 @@ Decay: none. Global cap 18/s. Spending: abilities cost Charge, 4-10s cooldowns.
 | Caster | Multispell | 1.25x | Target has 3+ distinct statuses |
 | Gunsmith / Tank / Support | one per branch | TBD | To be authored with the full treatments |
 
-A character can hold **one** keystone (0.2). Therefore the class layer contributes at most **one** More multiplier, maximum 1.30x, always conditional. Combined with Anomalous items — the only other More source — the theoretical ceiling from non-crit multipliers is two conditional multipliers. This is the intended bound and should be re-verified whenever a keystone or Anomalous is added.
+**RESOLVED [O3]:** these multiply as an **unordered product**; each is authored on a branch keystone (the only legal class-layer site); the **build-wide cap is 3**; and **Aberrant signatures may not author a More**, so the Aberrant layer does not spend against this budget.
+
+A character can hold **one** keystone (0.2). Therefore the class layer contributes at most **one** More multiplier, maximum 1.30x, always conditional. Combined with Anomalous items — the only other More source — the theoretical ceiling from non-crit multipliers is two conditional multipliers, inside O3's build-wide cap of 3. This is the intended bound and should be re-verified whenever a keystone or Anomalous is added.
 
 ## 6.2 Crit policy compliance
 
@@ -480,7 +494,7 @@ No node, ability, or resource loop in this document rolls a chance to multiply d
 
 ## 6.3 Verb compliance
 
-No class tree grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, block, dodge, air jump, or parry. Skim (S3) and Closequarter (C2) are *abilities occupying loadout slots*, not base-kit additions, and both are gated behind Tier-3 nodes or the starter grant. Master 5.2 CONFIRMED.
+No class tree grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, air jump, or **Parry** (the only defensive input, per O1). **[O1]:** block and dodge are removed from this list because they are no longer verbs — they are passive chance layers, so there is nothing for a tree to grant; nodes may only read or re-yield their procs. Skim (S3) and Closequarter (C2) are *abilities occupying loadout slots*, not base-kit additions, and both are gated behind Tier-3 nodes or the starter grant. Master 5.2 CONFIRMED.
 
 ## 6.4 Affix-layer compliance
 
@@ -512,26 +526,28 @@ Data assets required, mapping to the existing `UClassDefinitionDataAsset` / `UPr
 
 - `DA_Class_Swift` — ClassId, Momentum attribute binding, 3 branch references, 2 starter abilities, 1 ultimate.
 - `DA_Branch_Kinetic`, `DA_Branch_Marksman` — node lists, tier gates, cost curve.
-- `DA_MomentumPolicy` — generation rates, per-source caps, global cap, decay thresholds and rates, band boundaries. **All Momentum tuning must live here, not in C++.** The same shape generalizes to `DA_ManaPolicy` and the other three.
+- `DA_MomentumPolicy` — generation rates, per-source caps, global cap, decay thresholds and rates, band boundaries. **All Momentum tuning must live here, not in C++.** The same shape generalizes to `DA_ManaPolicy` and the other three. **[O18]:** these policy assets are the surface the TTK/TTD seed targets are tuned against once wave mode reports; **[O2]:** no value in them is re-authored before that report.
 - Node effects that are pure Gameplay Effects (SB1, VW1, MS3) are content. Node effects that rewrite a rule (F2, K9, M9, MS11) need a code-side hook and should be enumerated before any of them is authored.
 
 ---
 
 # 8. OPEN QUESTIONS
 
-1. **Block and dodge as passive rolls versus player inputs — CONFLICT, and it is load-bearing.** This document's brief specifies dodge as a passive chance to fully evade and block as a passive chance to reduce damage, neither being a player input. Master 5.2/7.7, Layer-Ownership, and the shipped `UBreakerCombatComponent` all treat them as *active* stamina-spending actions (frontal block stance, instant dodge negation window). Every Swift node keyed to "successful dodge" (K5, F-adjacent generation) and every Tank node keyed to "Block roll firing" reads differently under each model — passive rolls make these generation sources uncontrollable and gear-driven; active inputs make them skill-driven and stamina-gated. **This must be resolved before any class node referencing block or dodge is implemented.** Nodes above are written against the passive-roll reading per the brief, and are marked so.
-2. **Stat aggregation buckets (Master 3.15 / 6.6) still block the More-multiplier budget in 0.1.** The three-per-class cap is meaningless until modifier ordering is decided. Should the class-layer More apply before or after the Anomalous More, and do they multiply or take the highest?
+**REDESIGN bucket [O20] — empty for this document.** O20's redesign items (K10 SLIPSTREAM's refund clause and the stamina-built Bulwark nodes) live in the constellation layer, not here. Every class node touching block or dodge in this document survives re-expression against the passive proc; none was built on the deleted stamina spend, so no class node is promoted to the redesign bucket. One recost flag was raised: **K5 (Evade Conversion) — NEEDS-RECOST [O1/O2]**.
+
+1. **Block and dodge as passive rolls versus player inputs — RESOLVED [O1].** The CONFLICT is closed: **block and dodge are passive chance layers, the stamina pool is deleted entirely, and Parry is the only defensive input** (Parry uses its own short cooldown). The document's original passive-roll reading was correct; Master 5.2/7.7, Layer-Ownership, and `UBreakerCombatComponent` are the stale side and have been corrected in code. Consequence retained as a standing note, not an open question: Swift's dodge->Momentum and Tank's block->Grit sources are uncontrollable and gear-driven by design, so their inflow carries **RNG variance that is measured by wave mode, not solved on paper** (O2). Affected nodes are annotated in place.
+2. **More-multiplier ordering — RESOLVED [O3]:** unordered product; max one More per branch keystone; build-wide cap 3; Aberrant signatures may not author a More. The stat-aggregation-bucket question no longer gates the 0.1 budget; class-layer and Anomalous/Aberrant Mores multiply as an unordered set, so "before or after" has no answer to give and "take the highest" is rejected.
 3. **Is the one-keystone-per-character ceiling correct, or should 30 points allow two?** Two keystones would require dropping branch cost to ~14, which would make full branches trivial. The current shape forces a genuine specialist/hybrid decision but may make hybrids feel like they got nothing memorable. Playtest question.
 4. Does the Caster's Overcast mechanic survive contact with the damage pipeline, or does a negative resource attribute break GAS cost prediction? Needs a technical spike before Caster prototyping.
 5. K8 (Air Work) grants a floor value of an affix the player may not have. Is that a legal class-layer action, or does it violate "affixes scale verbs the player already owns" from the other direction?
 6. MS3 (Reservoir) is the only flat-stat node in the document, granted as a knowing exception. Should it be cut and Multispell's headroom solved another way, or does one such node per class become the pattern?
-7. Momentum's global 25/s cap and Mana's 20/s are placeholders authored against no TTK. Both must be re-anchored after the Gym feedback pass alongside the affix tables.
+7. Momentum's global 25/s cap and Mana's 20/s are placeholders authored against no TTK. Both must be re-anchored after the Gym feedback pass alongside the affix tables. **[O18]:** seed targets now exist to anchor against (trash <1s, elite ~3s, boss 20-45s, TTD 4-5s with no sustain), so this is a measurement task rather than an unanswered design question — still frozen for authoring under O2.
 8. Do branch keystones rewriting a shared ultimate hold up in implementation, or does each rewrite become a separate ability asset in practice — and if so, does that violate the "one ultimate" lock?
-9. Tick Frequency's unresolved cap (Master 3.7) blocks VW11 specifically. Does the Void Whisperer branch ship without it, or wait?
+9. RESOLVED [O10]: tick interval snapshots with discrete steps; VW11 applies at application time and is unblocked.
 10. Support's Charge count-independence rule means a five-player Support generates no faster than a solo one from buffs. Is that the right call, or should party play retain a modest efficiency edge on that source as it does on assists?
 
 ## Top three, if only three get answered
 
-1. Block/dodge — passive rolls or active inputs. Blocks Swift and Tank both.
-2. Stat aggregation buckets and More ordering. Blocks every keystone.
-3. Whether one keystone per character is the right ceiling. Shapes all fifteen branches.
+1. ~~Block/dodge — passive rolls or active inputs.~~ **RESOLVED [O1].**
+2. ~~Stat aggregation buckets and More ordering.~~ **RESOLVED [O3].**
+3. Whether one keystone per character is the right ceiling. Shapes all fifteen branches. **Now the top open question** — followed by OQ4 (Overcast vs GAS cost prediction) and OQ5 (K8's affix floor).

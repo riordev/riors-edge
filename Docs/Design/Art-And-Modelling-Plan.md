@@ -5,7 +5,7 @@ Status: Design pass. No assets authored yet.
 Scope: Vertical slice only, with production hooks for Act I–II.
 Reads from: `Docs/Design/Master-Sheet-Import.txt` (LOCKED decisions are law), `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`.
 
-**Rulings applied to this document** (`Docs/Design/Decisions.md` is law and supersedes any conflicting text here): **O1** (§0, §3.5, §7.4 Phase A — block/dodge passive, no stamina, Parry the only defensive input), **O5** (§2b — three elements, and the teal collision it creates), **O9** (§2.1 — elites carry Modifiers), **O14** (§3.1 and the note before Phase A — two player models, shared rig). **O8** sweep: the content-type word "Anomaly" does not occur in this document, so no rename was needed; every "Anomalous" here is the **rarity tier**, which keeps its name.
+**Rulings applied to this document** (`Docs/Design/Decisions.md` is law and supersedes any conflicting text here): **O1** (§0, §3.5, §7.4 Phase A — block/dodge passive, no stamina, Parry the only defensive input), **O5** (§2b — three elements, and the teal collision it creates), **O19** (§2b — the teal collision is RULED and closed; the elements are **Rift / Entropy / Void**, "Time" is renamed), **O9** (§2.1 — elites carry Modifiers), **O14** (§3.1 and the note before Phase A — two player models, shared rig). **O8** sweep: the content-type word "Anomaly" does not occur in this document, so no rename was needed; every "Anomalous" here is the **rarity tier**, which keeps its name.
 
 This document decides what the game looks like and, more importantly, what gets built in what order by one developer with AI tooling. Every section ends with acceptance criteria that can be checked in Play In Editor, not argued about.
 
@@ -58,26 +58,26 @@ EXTENDS — the master sheet fixes Anomalous as Teal in the rarity table but doe
 
 #### 2b collision — the Rift element wants the reserved teal
 
-**RULED [O5] — the elements are RIFT, TIME, and VOID** (three, not four), with per-element resistances applied after armour and before shields. That ruling creates a collision with Pillar 3 that this document cannot resolve on its own:
+**RULED [O5] — three elements, not four**, with per-element resistances applied after armour and before shields. **RULED [O19] — the elements are RIFT, ENTROPY, and VOID** ("Time" is renamed to **Entropy**; every element reference in this document uses Rift / Entropy / Void). That ruling created a collision with Pillar 3, which **O19 also closes** (see below):
 
 - **Pillar 3 reserves teal** (`#3FD8C8` → `#0E5F5C`) for **rift phenomena** — rift portals, Vestige emissive, severance progression, Anomalous rarity, suppression hardware. The reservation's entire value is that it is *narrow and rare*: teal means "foreign, rift-origin, uncommon."
 - **The new Rift ELEMENT wants teal for routine damage VFX** — hits, ailment glyphs, DoT ticks, resistance feedback. That is high-frequency, high-area, and constant.
 
 If both hold, teal appears on every Rift-element trigger pull and stops meaning anything. The rarest colour in the game becomes the most common one, and Pillar 3's "the rift is a colour, and only the rift gets it" is dead on contact with a Rift-damage build.
 
-[OWNER-CHOICE]
+**RULED [O19] — CLOSED. Option 1 wins.** The former [OWNER-CHOICE] between "distinct stated shade" and "narrow the reservation" is decided:
 
-> **Option 1 — Give Rift damage a distinct stated shade.**
-> Keep Pillar 3's reservation exactly as written (rift phenomena, Vestige emissive, severance, Anomalous, suppression hardware). The Rift *element*'s routine damage VFX uses a separate, explicitly stated shade that is not the reserved teal band, so element damage and rift-origin phenomena never read as the same thing.
->
-> **Option 2 — Narrow the reservation to rift phenomena rather than rift damage.**
-> Restate Pillar 3's reservation so it covers rift *phenomena* only — portals, Vestige emissive, severance, Anomalous, suppression hardware — and explicitly does not cover routine Rift-element damage VFX, which may then use the teal band freely.
+- **Rift-element damage gets a distinct shade — a hotter, whiter cyan** — separate from the reserved teal band, so routine element damage and rift-origin phenomena never read as the same thing.
+- **The Pillar 3 teal reservation stays intact exactly as written**: rift portals, Vestige emissive, severance progression, Anomalous rarity, suppression hardware. It is not narrowed.
+- The rule, verbatim: **"saturated teal is a property of objects, not of damage."**
 
-**Not resolved here.** No shade, hex value, or band is authored for either option — under the O2 value freeze, if Option 1 is chosen the specific shade is a separate authoring step. Until this is answered:
+**No value is authored here.** "Hotter/whiter cyan" stays verbal — no shade, hex code, or band is written under the O2 value freeze. The specific shade is a separate art-authoring step.
 
-- Do not author Rift-element damage VFX.
-- Do not assign an element colour in `UI-UX-Spec.md` §4.5 (its Rift/Time/Void glyph colours are flagged as awaiting this resolution).
-- The Vestige "zero rift-chroma on outward surfaces" rule and the Anomalous-only rift-chroma gear rule (§3.3) are unaffected by either option.
+Consequences, now binding:
+
+- Rift-element damage VFX may be *directed* against the rule above, but **the shade itself is unauthored**. **GAP — the specific hotter/whiter cyan is not authored; that is an art-authoring step, not a design ruling.**
+- `UI-UX-Spec.md` §4.5's element glyph colours are unblocked *in rule* and still **unauthored in value**: Rift damage follows the hotter/whiter cyan rule; Entropy and Void colours remain undesigned. **GAP.**
+- The Vestige "zero rift-chroma on outward surfaces" rule and the Anomalous-only rift-chroma gear rule (§3.3) are unaffected — both are object chroma, and objects are exactly what saturated teal belongs to.
 
 ### Pillar 4 — Wrongness is compositional, not gory
 Vestiges are not monsters with too many teeth. They are objects assembled by something that did not know what a body is for. Wrongness comes from symmetry violations, repeated modules at the wrong scale, and motion that does not match mass. Gore, viscera, and body-horror flesh are **out of direction** — they read as Earth biology and Vestiges are not from an Earth.
@@ -653,7 +653,8 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 - [ ] Paper-doll: zero cost when closed, ≤1.5ms when open, all five rarities readable without text.
 - [ ] Arena playable by a run/jump-only player; ≥3 wall-ride surfaces, ≥2 slide-throughs, ≥1 optional air-jump route.
 - [ ] Zero Altered asset references in any pre-Act-II content, verified by search.
-- [ ] Rift chroma appears only on rift phenomena, Vestige interiors, Anomalous items, and suppression hardware. *(Scope of this criterion depends on the pending §2b [OWNER-CHOICE] — whether routine Rift-element damage VFX is inside or outside the reservation.)*
+- [ ] Rift chroma appears only on rift phenomena, Vestige interiors, Anomalous items, and suppression hardware. *(Scope settled by **RULED [O19]**: routine Rift-element damage VFX is **outside** the reservation and uses the distinct hotter/whiter cyan — "saturated teal is a property of objects, not of damage." §2b.)*
+- [ ] No Rift-element damage VFX uses the reserved teal band; it reads as a hotter/whiter cyan and is never mistaken for a rift-origin object.
 - [ ] Elites: no new meshes, and every elite modifier read composes from the one shared modifier-VFX library (§2.1).
 - [ ] One shared skeleton and one shared animation set, with a paper-doll attachment scheme carrying no baked-in human proportion assumption (§7.4 pre-Phase-A note, [O14]).
 - [ ] One master material; all surfaces are instances.
@@ -672,7 +673,7 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 
 4. Does the slice ship three finished weapons or five? Code has five; master sheet 12.3 scopes three. This plan assumes three finished + two kitbashed. (CONFLICT, §5)
 
-4b. **[OWNER-CHOICE PENDING — §2b] Does the Rift element get a distinct stated shade, or does the Pillar 3 reservation narrow to rift phenomena rather than rift damage?** Created by **RULED [O5]** (elements are Rift/Time/Void). Blocks all Rift-element damage VFX and the element glyph colours in `UI-UX-Spec.md` §4.5. Two options are presented verbatim in §2b; **not resolved here.**
+4b. ~~**[OWNER-CHOICE PENDING — §2b] Does the Rift element get a distinct stated shade, or does the Pillar 3 reservation narrow to rift phenomena rather than rift damage?**~~ **CLOSED — RULED [O19].** Rift-element damage gets a distinct **hotter/whiter cyan**; the Pillar 3 teal reservation stays intact; the rule is **"saturated teal is a property of objects, not of damage."** The elements are **Rift / Entropy / Void**. Rift-element damage VFX and `UI-UX-Spec.md` §4.5's element glyphs are unblocked *in rule*. **GAP — no shade, hex, or band is authored; the specific hotter/whiter cyan and the Entropy/Void colours remain an art-authoring step under the O2 value freeze.** (§2b)
 
 5. Is Anomalous permitted to be the only rarity carrying rift chroma? (EXTENDS, §3.3) If Anomalous items are not rift-derived in fiction, this needs a different visual language.
 

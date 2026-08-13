@@ -37,30 +37,44 @@ removal, wave-mode instrument, passive block/dodge — commits c86cbe2,
 | O16 | **No hardcore/permadeath.** |
 | O17 | **Account-wide stash: characters are builds, gear is an account asset.** Deliberate product position. |
 
+## 2026-08-12 — O18..O23 (post-propagation rulings)
+
+| # | Decision |
+|---|----------|
+| O18 | **TTK/TTD seed targets** (the designer inputs wave mode measures divergence from): trash mobs a little under 1 second, scaling exponentially with enemy difficulty; rare/elite enemies ~3 seconds; boss encounters 20–45 seconds unless a special enemy. **TTD: 4–5 seconds with no resources/sustain; substantially higher with resources and sustain invested.** Stat chassis solves backwards from these. |
+| O19 | **Element collisions ruled.** Void: Void Whisperer IS the Void-element specialist — coupling intentional; Multispell's separation becomes "rotates all three" vs "masters one"; C2's mono-element restriction clause is retired as redundant. Rift: Rift-element damage gets a distinct hotter/whiter cyan; teal reservation intact; rule: **saturated teal is a property of objects, not of damage.** Time is renamed — **the elements are Rift / Entropy / Void.** Sweep all references. |
+| O20 | **K10 SLIPSTREAM's refund clause and the stamina-built Bulwark nodes are REDESIGN items, not recost items** — separate bucket; O1 removed their trigger, new numbers cannot fix them. |
+| O21 | **The three [O3-VIOLATION] nodes are promoted, not cut**: Fixate, Necrosis, and Reflex move to their constellation's Convergence or Keystone tier. Execute now. |
+| O22 | **Replication position is owner-authored, due before 0c closes** (this week). If combat is server-authoritative, the proc-coefficient law and the More ceiling assertion live server-side; Damage-Pipeline.md carries a pointer note until the page lands. |
+| O23 | **XP §5.1's Veteran 3.0x XP multiplier is flagged over-rewarding** (~a third) against the canonical 2.0x-health chassis. Frozen under O2; on wave mode's report list so it is not carried forward silently. |
+
+## 2026-08-12 — O24 (world aesthetic)
+
+| # | Decision |
+|---|----------|
+| O24 | **World aesthetic: overgrown Earth.** Nature has reclaimed the ground — vegetation over ruins — with slight sci-fi styling and futuristic tech scattered through it (functional, weathered, out of place). This is the environmental read for Anchors, rift approaches, and erased Earths alike; art direction pillars in Art-And-Modelling-Plan.md compose with it. |
+
+Propagated 2026-08-12 to: Core-Constellations.md, Class-Kits.md,
+Art-And-Modelling-Plan.md, UI-UX-Spec.md, XP-And-Pacing.md,
+Master-Sheet-Import.txt, Game-Modes.md, Encounter-Design.md,
+Damage-Pipeline.md, and the wave-mode report (target seed lines).
+
 ## Owner choices currently pending (presented, not ruled)
 
-- **2b-1 Void vs Void Whisperer** — rename the Caster subclass, or make it
-  explicitly the Void-element specialist (accepting the coupling).
-- **2b-2 Rift element vs reserved teal** — distinct stated shade for Rift
-  damage VFX, or narrow the teal reservation to rift phenomena only.
-  ([OWNER-CHOICE] block lives in Art-And-Modelling-Plan.md Pillar 3.)
-- **2b-3 Time element vs Swift** — declare them unrelated systems, or
-  rename the element.
 - **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
-  collides with the Frontier content type (GAP [O8]).
+  collides with the Frontier content type (GAP [O8]). HELD per owner.
 - **Sealed / Bare modifier scope** vs Support and Leech generation
   (Game-Modes Class C audit).
-- **SLIPSTREAM's dodge→air-jump refund clause** — not cleanly expressible
-  under passive dodge (Core-Constellations K10).
+- **REDESIGN bucket [O20]** — K10 SLIPSTREAM refund clause; stamina-built
+  Bulwark nodes (B4 cooldown shape, B7 Riposte, B9 Guard Doctrine).
+  Redesign, not recost; owner-led.
 - **Dodge resource refund** — survives as base kit, tree rewrite, or dies
   (Item-Foundation GAP [O1]).
 - **Rift-archetype first-clear point budget** — 8 (Game-Modes) vs 2 (XP §7)
   within the 15-point canon list.
 - **XP band-to-Rank collapse** — two bands each under Champion and Boss.
-- **Networking/replication position** (raised by the directive §3): one
-  page ruling on server authority before any Tier 1 code.
-- **Target TTK/TTD seed figures** for wave mode (directive §4): the
-  instrument reports divergence from a target only the owner can set.
+- **Networking/replication position** — owner writing it this week, due
+  before 0c closes (O22).
 
 Implementation notes tied to these rulings:
 - O1: `Stamina`/`MaxStamina` removed from the attribute set and combat

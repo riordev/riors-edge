@@ -83,14 +83,16 @@ void ABreakerEnemy::ConfigureEncounter(const FVector& NewLeashOrigin, float NewP
 
 void ABreakerEnemy::ConfigureElite()
 {
+    // Canonical elite (Veteran+) chassis per Encounter-Design §1.1:
+    // 1.25x scale, 2.0x health, 1.5x damage.
     bIsElite = true;
-    SetActorScale3D(GetActorScale3D() * 1.5f);
-    AttackDamage *= 2.0f;
+    SetActorScale3D(GetActorScale3D() * 1.25f);
+    AttackDamage *= 1.5f;
     MoveSpeed *= 0.85f;
     EnemyLevel = FMath::Min(EnemyLevel + 5, 50);
     if (Attributes)
     {
-        Attributes->SetMaxHealth(660.0f);
+        Attributes->SetMaxHealth(440.0f);
         if (Combat) Combat->RestoreVitals();
     }
     StateLabel = TEXT("ELITE PATROL");

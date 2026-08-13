@@ -4,7 +4,7 @@ Status: design pass 1. Authored against the Master Sheet (LOCKED decisions treat
 
 Everything marked **EXTENDS** adds detail the master sheet does not contain and does not contradict. Everything marked **CONFLICT** contradicts or pressures an existing decision and needs a ruling before implementation.
 
-**Rulings applied to this document** (see `Docs/Design/Decisions.md` — those rulings are law and supersede any conflicting text here): **O1** (stamina pool removed; block/dodge passive; Parry the only defensive input), **O5** (three elements: Rift/Time/Void), **O8** (the endgame farm content type is named **Frontier**), **O11** (Aberrant: up to 3 equipped, global), **O12** (scalar tiered crafting currencies).
+**Rulings applied to this document** (see `Docs/Design/Decisions.md` — those rulings are law and supersede any conflicting text here): **O1** (stamina pool removed; block/dodge passive; Parry the only defensive input), **O5** (three elements), **O18** (TTK/TTD seed targets exist; see §4.6 and §12), **O19** (the three elements are **Rift / Entropy / Void** — "Time" is renamed; Rift-element *damage* colour ruled — see §4.4/§4.5), **O8** (the endgame farm content type is named **Frontier**), **O11** (Aberrant: up to 3 equipped, global), **O12** (scalar tiered crafting currencies).
 
 **O8 sweep result for this document:** the content-type word "Anomaly" does not appear anywhere in this spec, so no rename was required. Every occurrence of **Anomalous** in this document is the **rarity tier**, which *keeps its name* under O8 and must not be renamed. Any future UI string naming the endgame farm content type uses **Frontier**.
 
@@ -301,7 +301,7 @@ Rationale: the entire endgame is gear (LOCKED). The player's only feedback chann
 | Weak point | 1.25× | `#FFBF0D` | — |
 | Critical | 1.4× | `#FFF2C2` | slight scale-punch on spawn |
 | Critical weak point | 1.6× | `#FFD84D` | scale-punch + brief ring |
-| DoT tick | 0.7× | ailment colour | dimmer, no punch |
+| DoT tick | 0.7× | ailment / element colour (§4.5) | dimmer, no punch |
 | Shield damage | 1.0× | `#14A6FF` | — |
 | Absorbed / zero | 0.8× | `#5A6675` | shows `0`, never hidden |
 | Overkill | — | — | not shown; see below |
@@ -310,6 +310,8 @@ Rationale: the entire endgame is gear (LOCKED). The player's only feedback chann
 6. **Absorbed / zero damage is shown, not suppressed.** A grey `0` teaches the player about armour caps and immunity phases. Silence teaches them the game is broken.
 7. **No overkill numbers, no cumulative DPS meter, no damage-per-second readout.** A DPS meter converts a build-crafting game into a spreadsheet-optimisation game and pushes the community toward a single correct answer. The Forge's build preview (§7) is where numbers get compared, deliberately out of combat.
 8. **Hard cap: 40 simultaneous numbers.** Oldest cull first. Non-negotiable for a game where a Multishot+Pierce+Ricochet build hits eight enemies per trigger pull.
+
+**Damage-type colour [O19].** Where a damage number or DoT tick is coloured by element, **Rift-element damage renders in a hotter, whiter cyan — never the reserved teal band.** The rule, verbatim: **"saturated teal is a property of objects, not of damage."** Saturated teal remains the Anomalous rarity / rift-phenomena colour and must not appear as a damage colour. Entropy and Void damage colours are unauthored. **GAP — no element colour values exist; see §4.5.**
 
 **Settings exposed:** off / self only / all; scale multiplier 0.5–2.0; aggregation window 60/120/250ms. Default: all, 1.0, 120ms.
 
@@ -339,9 +341,13 @@ Each entry: `[glyph] NAME  4.2s` with a thin depletion underline. Buffs sort abo
 | Chill / Slow | crystal | `#5FD8FF` | no, shows potency ring |
 | Shock | bolt | `#E0D64A` | no |
 
-**RULED [O5] — the elements are RIFT, TIME, and VOID. There are exactly THREE element glyphs, not four.** The `Ignite / Chill / Shock` rows above are **placeholder naming** and will be re-flavoured onto Rift/Time/Void when the per-element resistance model is implemented (resistances apply after armour, before shields). Reserve three element glyph slots in the layout budget, not four, and do not author a fourth.
+**RULED [O5] — exactly THREE element glyphs, not four. RULED [O19] — the three elements are RIFT, ENTROPY, and VOID** ("Time" is renamed to **Entropy**). The `Ignite / Chill / Shock` rows above are **placeholder naming** and will be re-flavoured onto Rift / Entropy / Void when the per-element resistance model is implemented (resistances apply after armour, before shields). Reserve three element glyph slots in the layout budget, not four, and do not author a fourth.
 
-**GAP — glyph names and colours for Rift/Time/Void are not authored here.** Their visual identity is **awaiting the 2b collision resolutions** in `Art-And-Modelling-Plan.md` (Pillar 3 reserves teal for rift phenomena / Anomalous / suppression, and the new Rift *element* wants teal for routine damage VFX). Do not assign an element colour in this document until that owner choice is made. The existing hex values above are placeholder and carry no ruling.
+**Element names are now FINAL — Rift / Entropy / Void [O19].** The naming half of the former 6b gap is closed; use these names in every future UI string and rename target.
+
+**Rift damage colour rule [O19]:** Rift-element *damage* renders in a **hotter, whiter cyan** — never the reserved teal band. The rule, verbatim: **"saturated teal is a property of objects, not of damage."** Saturated teal stays with Anomalous rarity, rift phenomena, and suppression hardware (`Art-And-Modelling-Plan.md` Pillar 3, reservation intact).
+
+**GAP — glyph SHAPES and COLOUR VALUES for Rift / Entropy / Void are still unauthored.** Names are final; visual identity is not. No shade, hex, or band is written here: Rift damage is constrained only by the verbal rule above, and Entropy and Void have no colour direction yet. The existing hex values in the table above are placeholder and carry no ruling. Do not author element colour values in this document.
 
 Ignite, Chill, and Shock — i.e. the three element slots under their placeholder names — remain **BLOCKED** — Affixes 3.7 and Scaling 6.1 both state elemental lines cannot ship until a resistance model exists. Their glyphs are specified here so the layout budget is reserved, but they must not be implemented before the resistance step exists in the damage pipeline. Bleed and Poison are physical and can ship now; `UBreakerStatusComponent` already runs them.
 
@@ -349,7 +355,7 @@ Ignite, Chill, and Shock — i.e. the three element slots under their placeholde
 
 ### 4.6 Enemy nameplates and health
 
-- **Normal enemies:** health bar appears only on damage, fades after 2.5s. No persistent nameplate — a movement shooter with dense packs cannot afford permanent labels.
+- **Normal enemies:** health bar appears only on damage, fades after 2.5s. No persistent nameplate — a movement shooter with dense packs cannot afford permanent labels. **[O18]** — TTK/TTD **seed targets now exist** (trash a little under 1s, rare/elite ~3s, boss 20–45s; TTD 4–5s bare). The nameplate fade and the boss bar's phase segmentation must be checked against those seed targets, not against a guess. No timing value in this document is changed here; the seed targets are inputs wave mode measures divergence from (O2 freeze still applies).
 - **Elites:** persistent nameplate with elite modifier name. CONTEXT.md notes elites already exist (`ConfigureElite`: 1.5× scale, 3× health, 2× damage). The modifier name must be shown; an unlabeled elite is an unexplained difficulty spike.
 - **Boss:** dedicated top-centre bar, Tier B. Segmented by phase count. This is the one permitted violation of the "nothing at top-centre" convention and only during a boss encounter.
 - **Weak points:** highlighted only while aiming (ADS) and within effective range. Persistent weak-point highlighting turns every encounter into a whack-a-mole against a glowing dot and undercuts the "advanced movement is optional, not mandatory" guardrail (Movement 5.4).
@@ -585,7 +591,7 @@ Clicking a constellation zooms into its node list. Returning is one Escape press
 
 1. **Show the budget consequence, not just the balance.** The `▸` line is the whole design of this screen. The intended shape is two full plus one partial; the UI should state what the remaining points can actually buy so the player converges on that shape by understanding rather than by regret.
 2. **Mark verb-granting nodes distinctly.** Air jump (Kinesis) and parry (Bulwark) are the **only** tree-granted verbs in the entire game (LOCKED). They get a `✦` marker at the constellation level and a full-width highlighted card at the node level. Everything else in every tree is a modification of something the player already has; these two are new capabilities and must not be mistaken for percentages.
-3. **Mark BLOCKED constellations honestly.** Elements is blocked until an elemental resistance model exists in the damage pipeline. **[O5]** — when it unblocks, the constellation covers exactly three elements (Rift/Time/Void); its current Ignite/Chill/Shock node naming is placeholder and is a rename target, not new content. In a dev/slice build it shows as `BLOCKED — no resistance model`. In shipping it simply does not appear. Do not ship a constellation that grants nothing.
+3. **Mark BLOCKED constellations honestly.** Elements is blocked until an elemental resistance model exists in the damage pipeline. **[O5] / [O19]** — when it unblocks, the constellation covers exactly three elements (**Rift / Entropy / Void**); its current Ignite/Chill/Shock node naming is placeholder and is a rename target, not new content. In a dev/slice build it shows as `BLOCKED — no resistance model`. In shipping it simply does not appear. Do not ship a constellation that grants nothing.
 
 **Tier B (later) — the constellation map.** Star-field background, nodes as stars, connective lines as constellation edges, camera pan/zoom, each of the six occupying a region. This is the presentation payoff and it is genuinely a good fit for the fiction (timelines, erased worlds, star maps). It is also the single most expensive UI in the game and must not be built before the node list is final. **Building the map first would lock node counts and adjacency into art.**
 
@@ -849,6 +855,8 @@ ANCHOR-ONLY (interaction, not menu)
 - [ ] Poison shows current stacks against its cap.
 - [ ] Elite enemies show their modifier name.
 - [ ] Weak points highlight only while aiming and in range.
+- [ ] **[O18]** Damage-number aggregation, the enemy health-bar fade, and the low-health vignette are validated against the **TTK/TTD seed targets** (trash a little under 1s, rare/elite ~3s, boss 20–45s; TTD 4–5s with no resources/sustain) — a trash kill under one second must still produce one readable number and a readable bar, and a 4–5s death must give the vignette time to read. Seed targets are the reference the wave-mode report measures divergence from; **no timing value is authored here.**
+- [ ] **[O19]** No Rift-element damage number, DoT tick, or ailment glyph uses the reserved saturated teal — Rift damage reads as a hotter/whiter cyan. *(Rule only; colour values unauthored — GAP.)*
 
 ### Inventory and items
 
@@ -908,7 +916,7 @@ ANCHOR-ONLY (interaction, not menu)
 
 6. ~~**What is the exact stamina cap and its gear-scaling rule?**~~ **CLOSED — RULED [O1].** Moot: there is no stamina pool, no cap, and no stamina bar to draw.
 
-6b. **NEW GAP [O5] — what are the glyphs and colours for the Rift, Time, and Void elements?** Exactly three, not four. The colour question is entangled with the teal reservation and is presented as an owner choice in `Art-And-Modelling-Plan.md` §2b; this document must not assign element colours until that is answered.
+6b. **PARTLY CLOSED [O19] — the three elements are named Rift / Entropy / Void** ("Time" renamed). Exactly three, not four. The teal collision is **ruled**: Rift-element damage uses a hotter/whiter cyan, the Pillar 3 teal reservation stays intact, and **"saturated teal is a property of objects, not of damage."** **GAP REMAINS — glyph shapes and colour values for all three are unauthored**, and no shade, hex, or band is written under the O2 value freeze. Names may be used now; colours and glyph art may not be authored here.
 
 7. **Does the player character have a voice/identity, or are they a cipher?** (Fundamentals 1.8.) Affects whether the class select screen and death screen carry any character framing at all, and whether the Anchor UI ever addresses the player by name.
 

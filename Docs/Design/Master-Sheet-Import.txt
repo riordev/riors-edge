@@ -1202,13 +1202,15 @@ All PREFIX.
   Bleed Damage %                   GLOV, NECK, P1,P2  6% -\> 28% -\> 50%
 
   Ignite Chance %                  NECK, P1, P2       4% -\> 18% -\> 30%
-                                   \[PLACEHOLDER NAMES — O5\]
+                                   \[PLACEHOLDER AFFIX NAME — O5\]
+                                   Element set is FINAL per O19:
+                                   Rift / Entropy / Void.
 
   Chill / Slow Potency %           NECK, BOOT         5% -\> 22% -\> 38%
-                                   \[PLACEHOLDER NAMES — O5\]
+                                   \[PLACEHOLDER AFFIX NAME — O5\]
 
   Shock Chance %                   NECK, P1, P2       4% -\> 18% -\> 30%
-                                   \[PLACEHOLDER NAMES — O5\]
+                                   \[PLACEHOLDER AFFIX NAME — O5\]
 
   Poison Stacks                    NECK, P1, P2       +1 -\> +4 -\> +7
 
@@ -1224,13 +1226,19 @@ model. Bleed and Poison are physical and can ship earlier.
 
 
 
-\[PLACEHOLDER NAMES — O5\]: the elements are RIFT, TIME, and VOID — not
+\[PLACEHOLDER NAMES — O5 / element set FINAL per O19\]: THE ELEMENT SET IS
 
-fire/ice/lightning. Ignite/Chill/Shock above are placeholder names and
+RULED AND FINAL — RIFT, ENTROPY, and VOID — not fire/ice/lightning. O19
 
-will be re-flavored onto Rift/Time/Void when the resistance model lands.
+renames Time to Entropy; "Time" is no longer an element anywhere.
 
-Do not rename them here; the mapping is an owner choice.
+Only the AFFIX names remain placeholder: Ignite/Chill/Shock above are
+
+placeholder affix names and will be re-flavored onto Rift/Entropy/Void
+
+when the resistance model lands. Do not rename them here; the
+
+affix-to-element mapping is an owner choice, but the element set is not.
 
  
 
@@ -1524,9 +1532,11 @@ All PREFIX. None of these can ship until a weapon swap system exists.
 
 
 
-\[PLACEHOLDER NAMES — O5\]: Ignite Chance % and Shock Chance % above are
+\[PLACEHOLDER NAMES — O5 / element set FINAL per O19\]: Ignite Chance % and
 
-placeholder element names; the elements are Rift/Time/Void. See §3.7.
+Shock Chance % above are placeholder AFFIX names. The element set itself is
+
+ruled and final: Rift / Entropy / Void (O19 renamed Time to Entropy). See §3.7.
 
 
 

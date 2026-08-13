@@ -74,6 +74,24 @@ The existing `ConfigureElite()` (1.5x scale, 3x health, 2x damage, drops never b
 
 Rationale for cutting health: a 3x-health 2x-damage elite with no modifier is a sponge, which is the exact failure mode the master sheet names in 11.2. Difficulty should come from *what it does*.
 
+#### What the chassis solves backwards from — TTK/TTD SEED TARGETS [O18]
+
+**Ruling O18** supplies the designer inputs this chassis is solved backwards from. Recorded verbatim as an owner ruling; no value below is authored here and none is changed (O2):
+
+| Target | Seed value [O18] |
+|---|---|
+| Trash mobs | a little under 1 second, scaling exponentially with enemy difficulty |
+| Rare / elite enemies | ~3 seconds |
+| Boss encounters | 20–45 seconds, unless a special enemy |
+| TTD, no resources/sustain | 4–5 seconds |
+| TTD, resources and sustain invested | substantially higher |
+
+**The stat chassis solves backwards from these.** The health, damage, and stagger multipliers in the table above are the free variables; the targets are the constraint. Wave mode (§4) reports **divergence from these targets**, not truth — a divergence means either the chassis or the target is wrong, and which one is an owner call.
+
+**The 2.0x health figure is the canonical anchor.** Note the internal consistency check this enables: a Veteran at 2.0x the health of a Standard, against a Standard trash target a little under 1s, lands near the ~3s rare/elite target only once the player's own damage ramp and the modifier's difficulty contribution are counted — the modifiers are expected to carry that gap, exactly as the rationale above asserts. The retired 3.0x chassis overshot it.
+
+**Boss length — the 20–45s band replaces any prior boss-length assumption.** Any figure anywhere in Docs/ that assumes a longer default boss fight is superseded as the *default*; the O18 escape hatch is the "unless a special enemy" clause, which must be claimed explicitly for a given boss rather than assumed.
+
 ### 1.2 The modifier list — 10 modifiers
 
 Each modifier must satisfy three tests:
@@ -278,6 +296,8 @@ Corollary: this boss **must not be a damage sponge**, because its interest lives
 | Weak point | Command apparatus on the back — 1.75x, and **only exposed during Orders** | |
 | Drops | Boss table. **Only slice source of T-1** (master sheet 3.1). One guaranteed Exceptional+, T-1 on a controlled roll | |
 
+**DIVERGENCE [O18]: the boss health figure is not validated against the 20–45s band.** 2400 health (24x a Skitter) was anchored to the same placeholder baseline as every other health number here (see OPEN QUESTION 3), not to a TTK target. Whether 2400 lands inside 20–45s is unknown until wave mode reports. Compounding it: the fight is gated into **three 800-health phases** with fixed-cadence orders (20s DEPLOY in Phase 1, 15s FIRE in Phase 2), so the *phase script* imposes its own floor on fight length independent of health — a player who bursts a phase down in 10s still waits on the order cadence. If the phase cadence alone pushes the encounter past 45s, health cannot fix it. **Not resolved here; no value changed (O2).** The Field Marshal is a plausible candidate for O18's "unless a special enemy" clause, but that must be claimed by the owner, not assumed by this document.
+
 ### 3.3 The arena — graybox spec
 
 A single room, 4000cm x 4000cm, three tiers of elevation.
@@ -369,6 +389,8 @@ The Playtest Gym (`Docs/Playtest-Gym-v1.md`) currently has patrol/chase/attack e
 ### 4.1 Purpose
 
 Wave mode is a **measurement tool**, not content. Its job is to produce the numbers the master sheet says are missing everywhere: real TTK, real drop-rate pressure, real affix value anchoring (master sheet 3.0: "Re-anchor them after the Playtest Gym feedback pass").
+
+**It now measures against the O18 seed targets** (§1.1). The instrument reports **divergence from the designer inputs**, not truth: per-Rank TTK against a little under 1s / ~3s / 20–45s, and TTD against 4–5s bare and substantially higher with resources and sustain invested. A divergence is a finding for the owner, never a licence for this document to re-author a value under the O2 freeze.
 
 ### 4.2 Structure
 
@@ -513,7 +535,7 @@ A downed player should not remove a lane permanently. Recommend: downed state wi
 - **Enemy archetypes are three Data Assets over one `ABreakerEnemy`**, not three C++ classes. The behavioural differences (lunge commit, projectile volley, facing-armour) are three behaviour flags plus tuning, not three codebases.
 - **Facing-dependent armour** does not exist in the damage pipeline yet. The Warden and the boss both need it. It is a dot-product check between the hit normal and the enemy's forward vector, applied before the armour step in the master sheet 6.1 order. This is the one genuinely new combat-pipeline requirement in this document. **EXTENDS** master sheet 6.1.
 - **Enemy shields** (the Warded modifier) already route through the existing shield step.
-- **Elemental modifiers were deliberately excluded** from the elite list. Master sheet 6.1 and 3.7 both flag that no elemental resistance model exists; an elite modifier that deals fire damage would have nothing to resolve against. Revisit once resistances ship.
+- **Elemental modifiers were deliberately excluded** from the elite list. Master sheet 6.1 and 3.7 both flag that no elemental resistance model exists; an elite modifier dealing element damage would have nothing to resolve against. Revisit once resistances ship. **The element set is ruled and final [O19]: Rift / Entropy / Void** (O19 renames Time to Entropy) — not fire/ice/lightning, so any future elemental modifier is authored against those three names and no other. What is still missing is the resistance *model*, not the element names.
 
 ---
 

@@ -23,9 +23,10 @@ in exactly this order:
    facings are real armour, not a gimmick), THEN armour composition
    (section 2), THEN the mitigation formula. Physical shield-bypassing
    DoTs take half the result (existing global status rule).
-6. **Per-element resistance** — Rift, Time, or Void (O5) — applied after
-   armour mitigation, before shield routing. True Damage skips 5 and 6.
-   GAP [O5]: resistance formula and value ranges unauthored (O2 freeze).
+6. **Per-element resistance** — Rift, Entropy, or Void (O5/O19) — applied
+   after armour mitigation, before shield routing. True Damage skips 5
+   and 6. GAP [O5]: resistance formula and value ranges unauthored (O2
+   freeze).
 7. **Shield routing**, unless the event explicitly bypasses shields.
 8. **Remaining damage to health.**
 9. **Shield-break, damage, dodge/block, and death events.**
@@ -82,7 +83,24 @@ items remain the only item-layer source of one. Otherwise three equipped
 Aberrants × 2 signatures reopens at the item layer exactly what the tree
 layer's one-per-keystone rule closed.
 
-## 5. Current code vs this spec
+## 5. Replication pointer (O22)
+
+The owner's replication position paper is due before this spec closes. If
+combat is ruled server-authoritative, the proc coefficient law (§3) and
+the composed More ceiling assertion (§4) are server-side enforcement
+points; nothing in §1's ordering changes, but where it executes does.
+This section is replaced by a reference to that page when it lands.
+
+## 6. Seed targets (O18)
+
+Wave mode reports divergence from these designer inputs; the stat chassis
+is solved backwards from them: trash TTK a little under 1s, scaling
+exponentially with difficulty; rare/elite ~3s; boss 20–45s unless special.
+Player TTD 4–5s with no resources or sustain, substantially higher with
+investment. O23: XP §5.1's Veteran 3.0x XP multiplier is flagged against
+the 2.0x-health chassis on the same report.
+
+## 7. Current code vs this spec
 
 `UBreakerDamageLibrary::ResolveDamage` today implements steps 1-4, 5
 (without facing or composition — armour + penetration only), 7, 8, 9.

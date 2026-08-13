@@ -204,6 +204,8 @@ Note that **Exceptional is the tier that grows most**, per 9.2 — it is the rea
 
 **BLOCKED:** these weights cannot be finalised before a real TTK exists (4.9) and before "intended time from 50 to a finished build" is answered (9.4). They are shape, not values.
 
+**UPDATE [O18] — TTK/TTD seed targets now exist.** O18 supplies designer-input seed targets (trash a little under 1s scaling exponentially with difficulty; rare/elite ~3s; boss 20–45s unless a special enemy; TTD 4–5s with no resources/sustain, substantially higher with them invested). They are *inputs*, not the measured TTK this section is blocked on — the block above stands. What changes is the validation rule: **tier tuning validates against divergence from the O18 targets.** A tier band whose measured trash TTK drifts far above ~1s, or whose rift boss falls outside 20–45s, is a tuning failure of that band, reported as divergence rather than silently re-baselined. Enemy level, modifier count, and pack density are the knobs that answer a divergence; no value here changes in this pass (O2).
+
 ### 3.8 Acceptance criteria — Local Rifts
 
 - [ ] A solo player at the intended level clears a Standard rift in 8-11 minutes, measured across 20 runs, with a standard deviation under 2 minutes.
@@ -396,6 +398,8 @@ Every Frontier ends with a map boss. Requirements:
 - **The boss owns a dedicated T-1 table.** This is one of the three legal T-1 sources (3.1). A map boss should have a small, per-boss list of 3-5 T-1 affixes it can drop directly, so the community learns "you farm Boss X for the T-1 Slide Momentum Retention." This is the single most effective way to make an infinite mode feel targeted.
 - No boss may be immune to a damage type. Immunity invalidates builds; caps constrain them.
 
+**NOTE [O18] — seed targets now exist and this bullet diverges from them.** O18 sets boss encounters at **20–45 seconds unless a special enemy**. The "2-4 minutes at appropriate gear" figure above is 3-6× that band. Either the Frontier map boss is one of O18's sanctioned *special* enemies (a multi-phase set-piece rather than a rank-and-file boss), or the 2-4 minute figure is a divergence to be resolved when wave mode reports. **Not resolved here** — the figure is unchanged under O2 and this is recorded as an owner item.
+
 ### 4.6 Reward structure
 
 The Frontier reward package, per completed run:
@@ -410,6 +414,8 @@ The Frontier reward package, per completed run:
 **Modifier reward multipliers apply to:** item *quantity* from packs, and the Aberrant/Anomalous *rarity weights*. They do **not** apply to the boss's guaranteed drops or the completion cache — those are the floor that makes a low-modifier run still worth doing.
 
 **Frontiers out-reward equivalent-tier Local Rifts by ~35% in items per minute.** That gap is the mode's reason to exist. Local Rifts above T15 remain viable for players who prefer them but are explicitly the lower-yield option.
+
+**Tuning validation [O18].** Every reward figure in this section is expressed per *run* or per *minute*, so it is only as stable as the TTK the run assumes. With O18's seed targets in place, Frontier tier tuning validates against **divergence from those targets** (trash a little under 1s scaling exponentially; rare/elite ~3s; boss 20–45s unless a special enemy; TTD 4–5s bare, substantially higher with resources and sustain invested), not against a re-derived internal baseline. If a tier's measured TTK diverges, the items-per-minute gap in this section moves with it and must be re-checked rather than assumed. No reward value changes in this pass (O2).
 
 **Access:** Frontiers are entered with an access token, dropped from Frontier completion caches and from Local Rifts at T10+. A completed Frontier yields slightly more than one token on average (~1.15), so the mode is self-sustaining with a small surplus and a bad run streak cannot lock a player out. **Do not make tokens tradeable or the surplus large enough to hoard.**
 
@@ -526,7 +532,7 @@ The Frontier reward package, per completed run:
 7. **Modifiers Class B and C.**
 8. Dungeon → Raid → Conquest, in that order. Each depends on the prior mode's encounter tooling.
 
-Blocking prerequisites from the master sheet that this document depends on: item level (4.8, 6.5 — exists now per CONTEXT.md), stat aggregation buckets (6.6 — locked per CONTEXT.md), a real TTK (blocks every number here), and elemental resistances (blocks any elemental modifier — none are proposed above, deliberately).
+Blocking prerequisites from the master sheet that this document depends on: item level (4.8, 6.5 — exists now per CONTEXT.md), stat aggregation buckets (6.6 — locked per CONTEXT.md), a real TTK (blocks every number here), and elemental resistances (blocks any elemental modifier — none are proposed above, deliberately). **Element set is ruled and final [O19]: Rift / Entropy / Void** (Time renamed to Entropy); only the resistance model is still outstanding, not the names.
 
 ---
 
