@@ -8,7 +8,6 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "GameFramework/Controller.h"
-#include "Items/BreakerEquipmentComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -21,15 +20,6 @@ namespace
     // Salts the shared shot seed so the bleed roll never correlates with the
     // spread or critical rolls drawn from the same shot sequence.
     constexpr uint32 BreakerBleedSalt = 0x51ED0000u;
-
-    // Gear "increased Weapon Damage" folds into the request's source multiplier
-    // alongside the attribute-set value. Looked up once per shot, not per
-    // pellet; equipment can only change between shots.
-    float GearWeaponDamageMultiplier(const AActor* Owner)
-    {
-        const UBreakerEquipmentComponent* Equipment = Owner ? Owner->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
-        return Equipment ? Equipment->GetStats().WeaponDamageMultiplier : 1.0f;
-    }
 
     UBreakerWeaponDefinition* GetPrototypeDefinition(EBreakerWeaponArchetype Archetype)
     {
@@ -413,7 +403,6 @@ void UBreakerWeaponComponent::FireOnce()
     Shot.bFired = true;
     Shot.TraceStart = ViewLocation;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
-    const float GearDamageMultiplier = GearWeaponDamageMultiplier(GetOwner());
 
     // Lead's mark, resolved once per shot rather than once per pellet: the mark
     // cannot change between the pellets of a single trigger pull. A mark with
@@ -458,7 +447,11 @@ void UBreakerWeaponComponent::FireOnce()
             Damage.bWeakPointHit = bPelletWeakPoint;
             Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
-            Damage.SourceDamageMultiplier = (SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f) * GearDamageMultiplier;
+            // ONE number. Gear's Weapon Damage affix and every skill node that
+            // raises damage are already summed into the DamageMultiplier
+            // attribute's single additive Increased bucket; multiplying gear in
+            // separately here is what used to break the locked rule.
+            Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
             Damage.SourceLocation = GetOwner()->GetActorLocation();
             Damage.bHasSourceLocation = true;
@@ -531,7 +524,8 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Damage.ArmorPenetration = Definition->ArmorPenetration;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
-    Damage.SourceDamageMultiplier = (SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f) * GearWeaponDamageMultiplier(GetOwner());
+    // Same single composed number as the hitscan path.
+    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the

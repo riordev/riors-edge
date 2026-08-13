@@ -165,6 +165,8 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.36f, 0.0001f);
+    // Sightline's +4% and Long Lens's +3% per rank over two ranks, one bucket.
+    TestEqual(TEXT("Increased damage stacks additively across nodes and ranks"), Stats.DamageMultiplier, 1.10f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
     // Rule-rewrite and verb nodes publish tags instead of stats.

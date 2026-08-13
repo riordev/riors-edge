@@ -53,6 +53,27 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Wave mode (F4) is the TTK instrument: dense escalating packs (up to 24, elites every third wave), non-respawning, per-kill time-to-kill sampled into the playtest report. Enemies chain-detonate on death (35% max health, enemies only) so packs cascade.
 - The Swift Momentum resource loop is implemented in `Source/RiorsEdge/Classes/BreakerMomentumComponent`: generation from sprint/air/slide/wall-ride/dash/weak-points with a 25/s budget, safe-zone and anti-farm gates, Settled/Running/Redline states, decay bands, writing ClassResource. Active only when the permanent class is Swift. Values are C++ EditAnywhere pending the DA_MomentumPolicy data asset.
 - Skill trees are LIVE at runtime: `Source/RiorsEdge/Progression/BreakerProgressionLibrary` provides C++ fallback tree content (15-node Core slice + Swift Kinetic/Marksman tiers 1-3, all values O2 placeholders), `UBreakerProgressionComponent` aggregates node effects into the attribute set (equipment-pattern base caching), grants tags for rule rewrites, exposes dodge/block bonuses (consumed by the combat component) and movement multipliers (composed multiplicatively with gear in the movement component). SKILL TREES menu screen enumerates trees, purchases nodes with failure reasons, and respecs. `ApplySliceDefaultsIfFresh` seeds 10 class/12 core points. RESOLVED: equipment and progression no longer cache attribute bases or write absolute values. `UBreakerAttributeSet` owns the one true base per attribute (captured once, idempotently) and both layers submit a complete `FBreakerAttributeContribution`; every submission re-derives all shared attributes as `(Base + flat) * (1 + one additive Increased bucket) * More product`. Gear and nodes stack, order is irrelevant, and unequip/respec restore exactly. See `Source/RiorsEdge/Attributes/BreakerAttributeAggregation.h` and the "Unified attribute application" section of `Docs/Item-Foundation.md`.
+- DAMAGE SCALING IS LIVE (owner report: "affixes don't impact the character",
+  "no matter what I do damage still feels the same"). Both halves were real
+  bugs. `EBreakerNodeStatTarget` had NO damage entry, so a skill node was
+  structurally incapable of raising weapon damage; and the `DamageMultiplier`
+  attribute was read by every damage path (weapon hitscan/projectile, Cleave,
+  the Bleed snapshot's SourcePower) and written by NOBODY, so it was pinned at
+  1.0 forever. Now: `DamageMultiplier` joined `EBreakerAggregatedAttribute` and
+  is THE one composed damage number; `EBreakerNodeStatTarget::Damage` exists;
+  gear's `WeaponDamage` affix bids into the same additive Increased bucket
+  instead of being multiplied in separately at the weapon (the private
+  `GearWeaponDamageMultiplier` helper is deleted — same bug class as the
+  MoveSpeed item below); and `UBreakerProgressionComponent::
+  IncreasedDamagePerSpentPoint` (EditAnywhere, O2 PLACEHOLDER 1%/point) pays a
+  small Increased Damage for every point COMMITTED to nodes, counted by cost,
+  so spending anywhere is felt. Fallback tree content authors damage on Core
+  Precision Sightline, Core Volley Cyclic (3 ranks), Swift Marksman Long Lens
+  and Pierce Discipline. `FBreakerEquipmentStats::WeaponDamageMultiplier` is
+  now DISPLAY ONLY. Full affix/node consumption audit table is in
+  `Docs/Item-Foundation.md`; the only inert stat target left is
+  `ElementalDamageReduction` (reserved for O5, and absent from the affix pool
+  so it lies to nobody). Never playtested — proven by automation only.
 - Heavy implementation wave (Tier 1): `FBreakerDamageRequest::Instigator` on every damage path; attacker-side `OnHitDealt`/`OnKillDealt` with `FBreakerHitContext` (DoT ticks credit their applier); push/pop outgoing damage modifiers with the composed More product clamped at the 2.20 ceiling (warning-logged, suite-safe). Swift is COMPLETE end-to-end: `TryRedirect` movement hook (Skim is a true redirect), Lead and Overdrive implemented (E/T/G all live), keystone tag-variant pattern real via `FBreakerAbilityVariant`, `UBreakerAbilityStateComponent` for windows/streaks, push/pop temporary speed multipliers on movement. Caster's Mana loop exists (`UBreakerManaComponent`): accumulating bank, weapon-hit generation at 1/n per pellet, DoT ticks generate zero, Overcast floor with doubled generation, keyed generation suspension, and cap-bypassing `GrantMana`. Overcast's +15% incoming damage is now wired: `UBreakerCombatComponent` gained a keyed incoming-damage modifier chain (`PushIncomingDamageModifier`/`Remove`/`GetComposedIncomingDamageMultiplier`) composed into `FBreakerDefenseState::IncomingDamageMultiplier`, and the Mana component pushes/removes its entry as the debt opens and clears. OVERCAST IS NOW REACHABLE (spec D8 landed): `UBreakerAttributeSet` gained the replicated `ClassResourceFloor` attribute, default **0** for every class (so Swift's Momentum is bit-identical), and `PreAttributeChange` clamps ClassResource to `[Floor, Max]` — which is what lets an ordinary GAS cost GameplayEffect drive the bank negative. `UBreakerManaComponent` owns the floor: it publishes the Overcast floor only while the permanent class is Caster, closes it on class change (bound to `OnProgressionChanged` *and* polled from `AdvanceLoop`, because `DevForceClass` does not broadcast), lifts a bank stranded below a raised floor, and exposes `SetOvercastFloor` for SB4/MS10. `UBreakerCasterAbility::CheckCost` now compares against the floor — and is the first thing to actually put the Caster affordability rule on the activation path; a cast that would breach the floor is REFUSED, never truncated. Momentum gains dodge-proc generation. Enemies ground-snap every tick (no more floating over slabs).
 - Ability infrastructure Phase 0 exists under `Source/RiorsEdge/Abilities/`: `UBreakerAbilityDefinition` (fallback registry now carries both the Swift and the Caster kits), `UBreakerGameplayAbility` base with SetByCaller cost/cooldown, `UBreakerAbilityComponent` granting from the progression loadout, E/T/G key fallbacks.
 - Caster is playable on E/T/G. `UBreakerCasterAbility` is the shared base holding the two class-wide rules (no cooldowns ever — Mana *is* the cooldown, so no Caster definition authors a cooldown tag; and Unmake rewrites the price of every Caster cast). Three abilities are implemented end-to-end: **Cleave** (E, 20 Mana, 3 m forward arc via the new `UBreakerMeleeSweep` — the project's first melee damage path — tagged `Damage.Melee`, always applies Bleed, GAS-native animation lock that the Edgework keystone removes), **Closequarter** (T, 35 Mana, swept blink to the target under the crosshair arriving 2 m short, velocity zeroed, 15 Mana refund at or below 40% target health), and **Unmake** (G, ultimate, 80 Mana, 6s window in which Caster casts are free and Mana generation is suspended; the Long Dark keystone's 12s-at-50% rewrite is fully parametric). The grant chain is: BREAKER CLASS screen → `ChoosePermanentClassById(Caster)` (leaves the loadout ids None, since no Caster `UBreakerClassDefinition` is authored) → `UBreakerAbilityComponent::ResolveDefinition` → `UBreakerAbilityDefinition::DefaultAbilityIdForSlot`, which now has a Caster row per slot. `UBreakerAbilityStateComponent` windows gained an optional float payload; Unmake's window carries the cost scalar. Not built: Rot, Siphon, Fracture, Resonance (all need Combat/ systems — zones, healing, projectiles, status consumption), and the Edgework-on-Closequarter and Cascade keystone halves (their variant rows exist and resolve, so the gap is visible rather than silent).
@@ -196,7 +217,14 @@ Next actions, in priority order:
    percentages MULTIPLICATIVELY (`GearMoveSpeedMultiplier()` and friends),
    which contradicts the locked one-additive-Increased-bucket rule the
    MoveSpeed attribute now follows. That file is owned by the movement
-   layer, so it was left alone.
+   layer, so it was left alone. Damage was the same bug class and is now
+   fixed; movement is the LAST instance. Two things for the same ruling:
+   the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all (the
+   movement component caps from its own WalkSpeed/SprintSpeed), and
+   SlideSpeed/AirControl/DashCooldown never reach the attribute set at all.
+   Also unsurfaced: the inventory totals panel's WEAPON DAMAGE row still
+   prints the gear-only figure, so skill-tree damage is invisible in the UI
+   (`UI/BreakerMenu.cpp` ~1003 — should read the DamageMultiplier attribute).
 5. Real gym map authored in-editor (the stock First Person template
    geometry still crowds the runtime-spawned field) — editor work.
 6. Pending owner decisions beyond TTK: Overdrive's +25% damage window is a
@@ -207,7 +235,7 @@ Next actions, in priority order:
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
-- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 71 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 82 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
 - Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
 - `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
 - The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after green tests. All work to date is committed and pushed through addfd85.

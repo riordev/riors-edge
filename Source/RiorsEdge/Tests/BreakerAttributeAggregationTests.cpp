@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -315,6 +316,216 @@ bool FBreakerClassResourceFloorTest::RunTest(const FString& Parameters)
     FText Failure;
     Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
     TestEqual(TEXT("A respec does not touch the floor either"), Attributes->GetClassResourceFloor(), -20.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDamageNodeRaisesWeaponDamageTest,
+    "RiorsEdge.Attributes.Damage.NodePurchaseRaisesWeaponDamage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDamageNodeRaisesWeaponDamageTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerAggregationTestHelpers;
+
+    // THE owner-reported bug: "no matter what I do damage still feels the
+    // same". EBreakerNodeStatTarget had no damage entry and nothing ever wrote
+    // the DamageMultiplier attribute, so a purchased node could not move the
+    // number a weapon deals. This test buys a node and checks the damage.
+
+    // Exactly the composition UBreakerWeaponComponent performs per pellet:
+    // BaseDamage * the DamageMultiplier attribute, resolved through the shared
+    // damage library. Criticals are off so the assertion is deterministic.
+    auto WeaponDamageFor = [](const UBreakerAttributeSet* Attributes)
+    {
+        FBreakerDamageRequest Request;
+        Request.BaseDamage = 100.0f;
+        Request.bCanCritical = false;
+        Request.SourceDamageMultiplier = Attributes->GetDamageMultiplier();
+        FBreakerDefenseState Defense;
+        Defense.Health = 100000.0f;
+        return UBreakerDamageLibrary::ResolveDamage(Request, Defense).HealthDamage;
+    };
+
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    AActor* Owner = MakeOwner();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    // Isolate the node effect from the point-spend baseline for this first
+    // assertion; the baseline gets its own test below.
+    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    Progression->BindAttributes(Attributes);
+
+    TestEqual(TEXT("An unspent character deals exactly base damage"), WeaponDamageFor(Attributes), 100.0f, 0.001f);
+    TestEqual(TEXT("The damage multiplier starts neutral"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+
+    UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
+    Progression->ApplySliceDefaultsIfFresh();
+    FText Failure;
+    // Core.Precision.Sightline authors +4% Increased Damage (O2 PLACEHOLDER).
+    TestTrue(TEXT("The damage gateway purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+
+    TestEqual(TEXT("A purchased damage node moves the attribute"), Attributes->GetDamageMultiplier(), 1.04f, 0.0001f);
+    TestEqual(TEXT("A purchased damage node moves the damage a weapon would deal"), WeaponDamageFor(Attributes), 104.0f, 0.001f);
+
+    // Ranked purchases keep paying: Core.Volley.Cyclic is +3% per rank over
+    // three ranks, and the ranks sum rather than multiply.
+    TestTrue(TEXT("The Volley gateway purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure));
+    TestTrue(TEXT("Cyclic rank 1 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
+    TestEqual(TEXT("Rank 1 adds its increment"), Attributes->GetDamageMultiplier(), 1.07f, 0.0001f);
+    TestTrue(TEXT("Cyclic rank 2 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
+    TestTrue(TEXT("Cyclic rank 3 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
+    TestEqual(TEXT("Ranks sum into the one additive bucket"), Attributes->GetDamageMultiplier(), 1.13f, 0.0001f);
+    TestEqual(TEXT("Four purchases are worth 13% more damage"), WeaponDamageFor(Attributes), 113.0f, 0.001f);
+
+    // A respec must hand the damage back exactly, not approximately.
+    TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("Respec restores the neutral multiplier exactly"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+    TestEqual(TEXT("Respec restores base weapon damage exactly"), WeaponDamageFor(Attributes), 100.0f, 0.001f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPointSpendDamageBaselineTest,
+    "RiorsEdge.Attributes.Damage.PointSpendBaseline",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerAggregationTestHelpers;
+
+    // The owner asked for damage to rise with spending points, not only on the
+    // nodes that happen to author damage. Every committed point pays a small
+    // Increased Damage baseline into the same additive bucket.
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    AActor* Owner = MakeOwner();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    Progression->BindAttributes(Attributes);
+    TestEqual(TEXT("The baseline defaults to 1% per point"), Progression->IncreasedDamagePerSpentPoint, 1.0f, 0.0001f);
+    TestEqual(TEXT("Nothing spent pays nothing"), Progression->GetPointSpendDamagePercent(), 0.0f, 0.0001f);
+
+    UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
+    Progression->ApplySliceDefaultsIfFresh();
+    FText Failure;
+
+    // Core.Bulwark.SetStance costs 1 and authors NO damage effect at all: the
+    // whole point is that spending anywhere is felt.
+    TestTrue(TEXT("A node with no damage effect purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.SetStance"), Failure));
+    TestEqual(TEXT("One committed point is one percent"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
+    TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.01f, 0.0001f);
+
+    // Cost, not node count, is the unit: a 2-point notable is worth two.
+    TestTrue(TEXT("A second gateway purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+    TestTrue(TEXT("The 2-point notable purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
+    TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
+    // 4 points x 1% baseline + Sightline's 4% node effect, all one bucket.
+    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.08f, 0.0001f);
+
+    // Turning the baseline off must leave exactly the node content behind, so
+    // the owner can retune or disable it without touching content.
+    const FBreakerProgressionState Allocated = Progression->GetProgressionState();
+    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    Progression->LoadProgressionState(Allocated);
+    TestEqual(TEXT("A zeroed baseline leaves only node damage"), Attributes->GetDamageMultiplier(), 1.04f, 0.0001f);
+
+    Progression->IncreasedDamagePerSpentPoint = 2.5f;
+    Progression->LoadProgressionState(Allocated);
+    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.14f, 0.0001f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerGearAndTreeDamageShareOneBucketTest,
+    "RiorsEdge.Attributes.Damage.GearAndTreeShareOneBucket",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerGearAndTreeDamageShareOneBucketTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerAggregationTestHelpers;
+
+    // Gear's Weapon Damage affix used to reach the weapon on a private path
+    // and be MULTIPLIED against the attribute, which would have made gear and
+    // tree damage compose multiplicatively — the locked rule says one additive
+    // Increased bucket per stat. This pins the composition.
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    AActor* Owner = MakeOwner();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    Progression->IncreasedDamagePerSpentPoint = 0.0f;
+    Equipment->BindAttributes(Attributes);
+    Progression->BindAttributes(Attributes);
+
+    FBreakerItemInstance Gloves;
+    Gloves.ItemId = FGuid::NewGuid();
+    Gloves.Slot = EBreakerEquipSlot::Gloves;
+    Gloves.Affixes.Add(MakeRolled(TEXT("Offense.WeaponDamage"), 12.0f, EBreakerAffixCategory::Prefix));
+
+    FBreakerItemInstance Necklace;
+    Necklace.ItemId = FGuid::NewGuid();
+    Necklace.Slot = EBreakerEquipSlot::Necklace;
+    Necklace.Affixes.Add(MakeRolled(TEXT("Offense.WeaponDamage"), 8.0f, EBreakerAffixCategory::Prefix));
+
+    Equipment->EquipItem(Gloves);
+    Equipment->EquipItem(Necklace);
+    TestEqual(TEXT("Gear damage reaches the attribute at all"), Attributes->GetDamageMultiplier(), 1.20f, 0.0001f);
+    TestEqual(TEXT("The gear-only display figure is unchanged"), Equipment->GetStats().WeaponDamageMultiplier, 1.20f, 0.0001f);
+
+    FBreakerProgressionState Nodes;
+    Nodes.PermanentClass = EBreakerClassId::Swift;
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1}); // +4% damage
+    Nodes.CoreNodeRanks.Add({TEXT("Core.Volley.Cyclic"), 3});       // +3% x 3
+    Progression->LoadProgressionState(Nodes);
+
+    // 20% gear + 13% tree in ONE bucket = 1.33. Multiplying the layers would
+    // read 1.356; that six-tenths of a percent is the whole bug class.
+    TestEqual(TEXT("Gear and tree damage sum, never multiply"), Attributes->GetDamageMultiplier(), 1.33f, 0.0001f);
+
+    // And removal is exact in both directions.
+    Equipment->UnequipSlot(EBreakerEquipSlot::Gloves);
+    Equipment->UnequipSlot(EBreakerEquipSlot::Necklace);
+    TestEqual(TEXT("Unequipping leaves exactly the tree damage"), Attributes->GetDamageMultiplier(), 1.13f, 0.0001f);
+    FText Failure;
+    Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
+    TestEqual(TEXT("A respec restores the true base of 1.0"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
+    TestEqual(TEXT("The damage base was never polluted"), Attributes->GetAttributeBase(EBreakerAggregatedAttribute::DamageMultiplier), 1.0f, 0.0001f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerResourceAffixesReachConsumersTest,
+    "RiorsEdge.Attributes.Affixes.ResourceAffixesAreLive",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerResourceAffixesReachConsumersTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerAggregationTestHelpers;
+
+    // Core.MaxResource and Core.ResourceRegen were suspected dead. They are
+    // not: MaxResource is a flat bid on the MaxClassResource attribute (which
+    // Momentum and Mana both clamp against and the HUD bar reads as a
+    // fraction), and ResourceRegen is ticked by the equipment component itself.
+    // This test exists so a future refactor that quietly drops either one
+    // fails loudly instead of shipping an affix that lies to the player.
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    AActor* Owner = MakeOwner();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    Equipment->BindAttributes(Attributes);
+    const float BaseMaxResource = Attributes->GetMaxClassResource();
+
+    FBreakerItemInstance Waist;
+    Waist.ItemId = FGuid::NewGuid();
+    Waist.Slot = EBreakerEquipSlot::Waist;
+    Waist.Affixes.Add(MakeRolled(TEXT("Core.MaxResource"), 30.0f, EBreakerAffixCategory::Suffix));
+    Waist.Affixes.Add(MakeRolled(TEXT("Core.ResourceRegen"), 2.0f, EBreakerAffixCategory::Suffix));
+    Equipment->EquipItem(Waist);
+
+    TestEqual(TEXT("Maximum Resource raises the attribute the class loops clamp against"),
+        Attributes->GetMaxClassResource(), BaseMaxResource + 30.0f, 0.0001f);
+    TestEqual(TEXT("Resource Regeneration is aggregated for the equipment tick"),
+        Equipment->GetStats().ResourceRegenPerSecond, 2.0f, 0.0001f);
+
+    Equipment->UnequipSlot(EBreakerEquipSlot::Waist);
+    TestEqual(TEXT("Removing the piece restores the base maximum exactly"), Attributes->GetMaxClassResource(), BaseMaxResource, 0.0001f);
+    TestEqual(TEXT("Removing the piece stops the regeneration"), Equipment->GetStats().ResourceRegenPerSecond, 0.0f, 0.0001f);
     return true;
 }
 

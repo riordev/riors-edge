@@ -78,6 +78,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::CriticalMultiplier)] = GetCriticalMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::MoveSpeed)] = GetMoveSpeed();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageOverTimeMultiplier)] = GetDamageOverTimeMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = GetDamageMultiplier();
     Aggregator.CaptureBases(Values);
 }
 
@@ -131,6 +132,10 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetCriticalMultiplierAttribute(), CriticalMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalMultiplier));
     WriteAttributeValue(GetMoveSpeedAttribute(), MoveSpeed, Aggregator.Compose(EBreakerAggregatedAttribute::MoveSpeed));
     WriteAttributeValue(GetDamageOverTimeMultiplierAttribute(), DamageOverTimeMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageOverTimeMultiplier));
+    // The one number every damage path reads. It was permanently 1.0 until
+    // this line existed: nothing wrote it, which is why no amount of gear or
+    // skill-point spending changed how hard a weapon hit.
+    WriteAttributeValue(GetDamageMultiplierAttribute(), DamageMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
