@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "Weapons/BreakerWeaponFeel.h"
 #include "BreakerWeaponDefinition.generated.h"
 
 UCLASS(BlueprintType)
@@ -39,6 +40,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo", meta=(ClampMin="0")) float ReloadDuration = 1.8f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Handling", meta=(ClampMin="0")) float SwapInDuration = 0.5f;
+
+    // How the weapon pushes back. Recoil belongs in the same table as cadence,
+    // spread, and falloff so five archetypes feel like five weapons. Editable
+    // on the asset; the weapon component's RecoilOverrides map wins over it.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Handling") FBreakerRecoilProfile Recoil;
 
     // Per-pellet chance to apply the snapshotting Bleed DoT on a damaging hit.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Status", meta=(ClampMin="0", ClampMax="1")) float BleedChance = 0.0f;

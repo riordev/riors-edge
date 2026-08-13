@@ -117,6 +117,7 @@ UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { 
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    UpdateViewmodelKick();
     // Fall-out-of-map recovery: the template level has no kill volume, so
     // enforce our own floor relative to the spawn point.
     if (HasAuthority() && GetActorLocation().Z < FallKillZ)
@@ -474,15 +475,31 @@ void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput
 void ABreakerCharacter::StartAim()
 {
     if (Weapon) Weapon->SetAiming(true);
-    if (PrototypeWeaponVisual) PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 0.0f, -12.0f));
+    UpdateViewmodelKick();
     OnAimInput(true);
 }
 
 void ABreakerCharacter::StopAim()
 {
     if (Weapon) Weapon->SetAiming(false);
-    if (PrototypeWeaponVisual) PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 18.0f, -18.0f));
+    UpdateViewmodelKick();
     OnAimInput(false);
+}
+
+FVector ABreakerCharacter::GetWeaponRestLocation() const
+{
+    return Weapon && Weapon->IsAiming() ? FVector(48.0f, 0.0f, -12.0f) : FVector(48.0f, 18.0f, -18.0f);
+}
+
+void ABreakerCharacter::UpdateViewmodelKick()
+{
+    // The weapon component owns the spring; the character only reads it onto
+    // the placeholder mesh. Presentation, never a damage input.
+    if (!PrototypeWeaponVisual) return;
+    const FVector Offset = Weapon ? Weapon->GetViewmodelLocationOffset() : FVector::ZeroVector;
+    const FRotator Rotation = Weapon ? Weapon->GetViewmodelRotationOffset() : FRotator::ZeroRotator;
+    PrototypeWeaponVisual->SetRelativeLocation(GetWeaponRestLocation() + Offset);
+    PrototypeWeaponVisual->SetRelativeRotation(Rotation);
 }
 void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
 
@@ -543,25 +560,14 @@ void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
     {
         PrototypeMuzzleFlash->SetIntensity(8500.0f);
     }
-    if (PrototypeWeaponVisual)
-    {
-        const FVector RestingLocation = Weapon && Weapon->IsAiming()
-            ? FVector(48.0f, 0.0f, -12.0f)
-            : FVector(48.0f, 18.0f, -18.0f);
-        PrototypeWeaponVisual->SetRelativeLocation(RestingLocation - FVector(4.0f, 0.0f, 0.0f));
-    }
+    // The weapon mesh kick is no longer a timed snap: UBreakerWeaponComponent
+    // runs a spring that this character samples every Tick.
     GetWorldTimerManager().SetTimer(ShotCosmeticTimer, this, &ThisClass::EndShotCosmetics, 0.055f, false);
 }
 
 void ABreakerCharacter::EndShotCosmetics()
 {
     if (PrototypeMuzzleFlash) PrototypeMuzzleFlash->SetIntensity(0.0f);
-    if (PrototypeWeaponVisual)
-    {
-        PrototypeWeaponVisual->SetRelativeLocation(Weapon && Weapon->IsAiming()
-            ? FVector(48.0f, 0.0f, -12.0f)
-            : FVector(48.0f, 18.0f, -18.0f));
-    }
 }
 
 float ABreakerCharacter::GetCurrentFOV() const { return FirstPersonCamera ? FirstPersonCamera->FieldOfView : 90.0f; }

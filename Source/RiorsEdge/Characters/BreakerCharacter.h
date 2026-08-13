@@ -127,6 +127,10 @@ private:
     void EquipPrimaryWeapon();
     void EquipSecondaryWeapon();
     void ApplyWeaponPresentation();
+    // Rest pose of the placeholder weapon mesh, before the weapon component's
+    // per-shot kick offset is added on top of it in Tick.
+    FVector GetWeaponRestLocation() const;
+    void UpdateViewmodelKick();
     void ResetPlaytest();
     void CopyPlaytestReport();
     void TogglePlaytestDiagnostics();
