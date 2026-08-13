@@ -12,6 +12,7 @@
 
 class ABreakerCharacter;
 class UBreakerAbilityComponent;
+class UBreakerAbilityStateComponent;
 class UBreakerCombatComponent;
 class UBreakerWeaponComponent;
 
@@ -58,6 +59,12 @@ private:
     UFUNCTION() void HandlePlayerShot(const FBreakerShotResult& Shot);
     void EnsureWeaponBinding(const ABreakerCharacter* Character);
 
+    // Activations are instantaneous and leave no polled state (Skim in
+    // particular finishes inside its own frame), so every ability readout below
+    // is driven by this latch rather than by a per-frame query.
+    UFUNCTION() void HandleAbilityActivated(EBreakerAbilitySlot Slot);
+    void EnsureAbilityBinding(const ABreakerCharacter* Character);
+
     void DrawDefenseFeedback(const FVector2D& Center);
     void DrawStatusReadout(const ABreakerCharacter* Character, float X, float Y);
     void DrawVitalsBand(const ABreakerCharacter* Character, float X, float BottomY);
@@ -67,11 +74,37 @@ private:
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
 
+    // --- Ability legibility and active-effect feedback -------------------
+    static const UBreakerAbilityStateComponent* GetAbilityState(const ABreakerCharacter* Character);
+    // Labelled duration bars for every open Window.Swift.* state, stacked
+    // upward from BottomY so the cluster below never moves.
+    void DrawAbilityWindows(const ABreakerCharacter* Character, float X, float BottomY, float Width);
+    // The teaching callout: first few casts of each ability only.
+    void DrawAbilityCallout(const FVector2D& Center);
+    void DrawOverdriveVignette(const ABreakerCharacter* Character);
+    void DrawSkimBurst(const FVector2D& Center);
+    void DrawMarkedTarget(const ABreakerCharacter* Character);
+
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> BoundCombat;
     UPROPERTY() TObjectPtr<UBreakerWeaponComponent> BoundWeapon;
+    UPROPERTY() TObjectPtr<UBreakerAbilityComponent> BoundAbilities;
     double LastDodgeTime = -1000.0;
     double LastBlockTime = -1000.0;
     double LastEliteKillTime = -1000.0;
+
+    static constexpr int32 AbilitySlotCount = 3;
+    // Indexed by EBreakerAbilitySlot. Parallel arrays rather than a struct
+    // because every one of them is read by a different drawing pass.
+    double SlotActivationTime[AbilitySlotCount] = { -1000.0, -1000.0, -1000.0 };
+    int32 SlotActivationCount[AbilitySlotCount] = { 0, 0, 0 };
+    // Which slot was cast last, and what to say about it. Resolved at
+    // activation because the definition lookup is not worth repeating per frame.
+    int32 LastActivatedSlotIndex = INDEX_NONE;
+    FString CalloutText;
+    double CalloutTime = -1000.0;
+    // Latched separately from the callout: the crosshair burst fires on every
+    // Skim, not only the first three.
+    double SkimBurstTime = -1000.0;
 
     static constexpr int32 MaxTracers = 16;
     TArray<FBreakerHUDTracer> Tracers;

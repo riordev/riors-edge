@@ -109,6 +109,51 @@ int32 UBreakerAbilityStateComponent::GetActiveWindowCount() const
     return Count;
 }
 
+TArray<FName> UBreakerAbilityStateComponent::GetActiveWindowKeys() const
+{
+    TArray<FName> Keys;
+    Keys.Reserve(Windows.Num());
+    for (const TPair<FName, FWindowState>& Pair : Windows)
+    {
+        if (Pair.Value.EndTime > Clock)
+        {
+            Keys.Add(Pair.Key);
+        }
+    }
+    // Stable order: the HUD stacks these vertically, and a TMap's iteration
+    // order would make the rows swap places between frames.
+    Keys.Sort([](const FName& A, const FName& B) { return A.LexicalLess(B); });
+    return Keys;
+}
+
+void UBreakerAbilityStateComponent::SetMark(AActor* Target, float Duration)
+{
+    if (!Target || Duration <= 0.0f)
+    {
+        ClearMark();
+        return;
+    }
+    MarkTarget = Target;
+    MarkEndTime = Clock + Duration;
+}
+
+AActor* UBreakerAbilityStateComponent::GetMarkedTarget() const
+{
+    // Expiry is evaluated on read, so no tick work is needed to retire a mark.
+    return MarkEndTime > Clock ? MarkTarget.Get() : nullptr;
+}
+
+float UBreakerAbilityStateComponent::GetMarkRemaining() const
+{
+    return MarkTarget.IsValid() ? FMath::Max(MarkEndTime - Clock, 0.0f) : 0.0f;
+}
+
+void UBreakerAbilityStateComponent::ClearMark()
+{
+    MarkTarget = nullptr;
+    MarkEndTime = -1000.0f;
+}
+
 bool UBreakerAbilityStateComponent::ShouldContinueStreak(bool bSameTarget, float SecondsSinceLastHit, float GapSeconds)
 {
     return bSameTarget && SecondsSinceLastHit <= GapSeconds;

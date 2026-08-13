@@ -354,9 +354,14 @@ void ABreakerEnemy::HandleDeath()
         APawn* PlayerPawn = GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
         if (UBreakerPlaytestComponent* Playtest = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerPlaytestComponent>() : nullptr)
         {
-            Playtest->AddTimeToKillSample(static_cast<float>(GetWorld()->GetTimeSeconds() - FirstDamageTime), bIsElite);
+            // Engagement-gapped TTK: idle stretches between damage events are
+            // capped, so target-switching doesn't inflate the sample the way
+            // wall-clock first-damage-to-death did (session 3 finding).
+            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite);
         }
         FirstDamageTime = -1.0;
+        LastDamageEventTime = -1.0;
+        EngagedSeconds = 0.0f;
     }
 
     if (bRespawns) GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
@@ -365,10 +370,15 @@ void ABreakerEnemy::HandleDeath()
 
 void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
 {
-    if (FirstDamageTime < 0.0 && GetWorld() && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
+    if (!GetWorld() || (Result.HealthDamage <= 0.0f && Result.ShieldDamage <= 0.0f)) return;
+    const double Now = GetWorld()->GetTimeSeconds();
+    if (FirstDamageTime < 0.0) FirstDamageTime = Now;
+    if (LastDamageEventTime >= 0.0)
     {
-        FirstDamageTime = GetWorld()->GetTimeSeconds();
+        // Gaps longer than 1.5s are disengagement, not fighting.
+        EngagedSeconds += static_cast<float>(FMath::Min(Now - LastDamageEventTime, 1.5));
     }
+    LastDamageEventTime = Now;
 }
 
 void ABreakerEnemy::GrantLoot()
@@ -426,6 +436,8 @@ void ABreakerEnemy::RespawnEnemy()
         SetBodyVisible(true);
         bDead = false;
         FirstDamageTime = -1.0;
+        LastDamageEventTime = -1.0;
+        EngagedSeconds = 0.0f;
         Combat->RestoreVitals();
     }, RespawnDelay, false);
 }

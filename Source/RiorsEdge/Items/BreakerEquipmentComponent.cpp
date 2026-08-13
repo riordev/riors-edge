@@ -154,8 +154,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
 {
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
 
-    float FlatByTarget[12] = {};
-    float IncreasedByTarget[12] = {};
+    // Sized off the enum so a new stat target never silently overruns these.
+    constexpr int32 TargetCount = static_cast<int32>(EBreakerStatTarget::Count);
+    float FlatByTarget[TargetCount] = {};
+    float IncreasedByTarget[TargetCount] = {};
     for (const FBreakerItemInstance& Item : Items)
     {
         for (const FBreakerRolledAffix& Rolled : Item.Affixes)
@@ -185,6 +187,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerStatTarget::AirControl);
     Stats.DashCooldownMultiplier = 1.0f / Increased(EBreakerStatTarget::DashCooldownReduction);
+    Stats.WeaponDamageMultiplier = Increased(EBreakerStatTarget::WeaponDamage);
     return Stats;
 }
 

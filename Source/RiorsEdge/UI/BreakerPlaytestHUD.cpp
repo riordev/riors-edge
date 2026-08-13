@@ -2,6 +2,7 @@
 
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerMomentumComponent.h"
@@ -63,6 +64,37 @@ namespace BreakerHUD
     static constexpr float EnemyBarMaxDistance = 5000.0f;
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
     static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
+
+    // Ability feedback timings. All cosmetic: nothing here gates a rule.
+    static constexpr float AbilityFlashSeconds = 0.3f;
+    static constexpr float AbilityCalloutSeconds = 1.4f;
+    static constexpr int32 AbilityCalloutMaxShows = 3;
+    static constexpr float SkimBurstSeconds = 0.25f;
+    static constexpr float MarkHeadroomCm = 160.0f;
+
+    // Every ability state window shares this prefix; the HUD shows the whole
+    // family rather than a hard-coded list, so a new Swift ability gets its
+    // duration bar for free.
+    static const TCHAR* WindowPrefix = TEXT("Window.Swift.");
+
+    // The bar's colour is the ability's colour in the established language:
+    // orange is the ultimate's, cyan is a class ability's.
+    static FLinearColor WindowColor(const FString& ShortKey)
+    {
+        return ShortKey.Equals(TEXT("Overdrive"), ESearchCase::IgnoreCase) ? Orange : Cyan;
+    }
+
+    // First sentence of a description, used verbatim for the teaching callout.
+    // Falls back to the whole text when it carries no terminator.
+    static FString FirstSentence(const FString& Text)
+    {
+        int32 Stop = INDEX_NONE;
+        if (Text.FindChar(TEXT('.'), Stop) && Stop > 0)
+        {
+            return Text.Left(Stop);
+        }
+        return Text;
+    }
 
     // Loot pickup rules.
     static constexpr float PickupChipDistance = 1500.0f;
@@ -129,6 +161,9 @@ void ABreakerPlaytestHUD::DrawHUD()
     }
     EnsureDamageBinding(Character);
     EnsureWeaponBinding(Character);
+    EnsureAbilityBinding(Character);
+    // Everything below, ability callouts included, is suppressed while the
+    // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
 
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
@@ -140,8 +175,13 @@ void ABreakerPlaytestHUD::DrawHUD()
     // screen-anchored cluster, so the HUD frame always wins a collision.
     DrawTracers();
     DrawEnemyHealthBars(Character);
+    DrawMarkedTarget(Character);
     DrawDamageNumbers();
     DrawLootPickups(Character);
+
+    // Under the crosshair and under every cluster: the vignette is ambient,
+    // never something the eye has to read past.
+    DrawOverdriveVignette(Character);
 
     FLinearColor CrosshairColor = FLinearColor::White;
     if (bRecentShot && Shot && Shot->bHit) CrosshairColor = Shot->bWeakPoint ? BreakerHUD::Gold : FLinearColor::Red;
@@ -158,7 +198,16 @@ void ABreakerPlaytestHUD::DrawHUD()
         Canvas->ClipY - BreakerHUD::Margin - BreakerHUD::ClusterHeight,
         BreakerHUD::ClusterWidth, BreakerHUD::ClusterHeight);
 
+    // Duration bars stack upward from just above the cluster, so an expiring
+    // window never shifts the cluster itself.
+    DrawAbilityWindows(Character,
+        Canvas->ClipX - BreakerHUD::Margin - BreakerHUD::ClusterWidth,
+        Canvas->ClipY - BreakerHUD::Margin - BreakerHUD::ClusterHeight - BreakerHUD::Gutter,
+        BreakerHUD::ClusterWidth);
+
     // --- Centre: feedback only, nothing persistent ---------------------
+    DrawSkimBurst(Center);
+    DrawAbilityCallout(Center);
     DrawDefenseFeedback(Center);
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
@@ -349,7 +398,10 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
     // --- Three ability squares (right of the cluster body) ---------------
     const UBreakerAbilityComponent* Abilities = Character->GetAbilities();
     constexpr float SlotSize = 52.0f;
-    const float SlotY = Y + Height - SlotSize - BreakerHUD::Gutter;
+    // Reserve a line beneath the squares for the ability names so they stay
+    // inside the cluster's own footprint.
+    constexpr float NameStripH = 10.0f;
+    const float SlotY = Y + Height - SlotSize - NameStripH - BreakerHUD::Gutter;
     const float SlotsX = X + Width - BreakerHUD::Gutter - (SlotSize * 3.0f + BreakerHUD::Gutter * 2.0f);
     DrawAbilitySlot(Abilities, EBreakerAbilitySlot::ClassAbilityOne, TEXT("E"), SlotsX, SlotY, SlotSize, BreakerHUD::Cyan);
     DrawAbilitySlot(Abilities, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("T"), SlotsX + SlotSize + BreakerHUD::Gutter, SlotY, SlotSize, BreakerHUD::Cyan);
@@ -592,6 +644,183 @@ void ABreakerPlaytestHUD::EnsureWeaponBinding(const ABreakerCharacter* Character
     BoundWeapon = Weapon;
 }
 
+void ABreakerPlaytestHUD::EnsureAbilityBinding(const ABreakerCharacter* Character)
+{
+    UBreakerAbilityComponent* Abilities = Character ? Character->GetAbilities() : nullptr;
+    if (!Abilities || BoundAbilities == Abilities) return;
+    if (BoundAbilities) BoundAbilities->OnAbilityActivated.RemoveDynamic(this, &ABreakerPlaytestHUD::HandleAbilityActivated);
+    Abilities->OnAbilityActivated.AddDynamic(this, &ABreakerPlaytestHUD::HandleAbilityActivated);
+    BoundAbilities = Abilities;
+}
+
+void ABreakerPlaytestHUD::HandleAbilityActivated(EBreakerAbilitySlot Slot)
+{
+    const int32 Index = static_cast<int32>(Slot);
+    if (Index < 0 || Index >= AbilitySlotCount) return;
+
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    SlotActivationTime[Index] = Now;
+    ++SlotActivationCount[Index];
+    LastActivatedSlotIndex = Index;
+
+    const UBreakerAbilityComponent* Abilities = BoundAbilities;
+    const UBreakerAbilityDefinition* Definition = Abilities ? Abilities->GetDefinitionForSlot(Slot) : nullptr;
+
+    // Skim's crosshair burst is keyed off the ability's identity, not its slot:
+    // the loadout is free to move it between the two class slots.
+    if (Definition && Definition->AbilityId == FName(TEXT("Swift.Skim")))
+    {
+        SkimBurstTime = Now;
+    }
+
+    // The teaching callout retires itself. After three casts the player knows
+    // what the key does, and a permanent banner would be noise.
+    if (!Definition || SlotActivationCount[Index] > BreakerHUD::AbilityCalloutMaxShows) return;
+
+    const FString Name = (Definition->DisplayName.IsEmpty() ? FText::FromName(Definition->AbilityId) : Definition->DisplayName).ToString();
+    const FString Blurb = BreakerHUD::FirstSentence(Definition->Description.ToString()).TrimStartAndEnd();
+    CalloutText = Blurb.IsEmpty() ? Name.ToUpper() : FString::Printf(TEXT("%s — %s"), *Name.ToUpper(), *Blurb);
+    CalloutTime = Now;
+}
+
+const UBreakerAbilityStateComponent* ABreakerPlaytestHUD::GetAbilityState(const ABreakerCharacter* Character)
+{
+    // FindComponentByClass, not a character accessor: the state component is
+    // added on demand by whichever ability opens the first window, so no
+    // character class declares it.
+    return Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
+}
+
+// --------------------------------------------------------------------------
+// Labelled duration bars for every open ability window, e.g. "OVERDRIVE 4.2s".
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawAbilityWindows(const ABreakerCharacter* Character, float X, float BottomY, float Width)
+{
+    const UBreakerAbilityStateComponent* State = GetAbilityState(Character);
+    if (!State) return;
+
+    constexpr float RowH = 22.0f;
+    float RowBottom = BottomY;
+    for (const FName Key : State->GetActiveWindowKeys())
+    {
+        FString KeyText = Key.ToString();
+        if (!KeyText.StartsWith(BreakerHUD::WindowPrefix)) continue;
+        const FString ShortKey = KeyText.RightChop(FCString::Strlen(BreakerHUD::WindowPrefix));
+
+        const float Remaining = State->GetWindowRemaining(Key);
+        if (Remaining <= 0.0f) continue;
+        const FLinearColor Color = BreakerHUD::WindowColor(ShortKey);
+
+        const float RowY = RowBottom - RowH;
+        DrawLabel(FString::Printf(TEXT("%s  %.1fs"), *ShortKey.ToUpper(), Remaining), X, RowY, Color, 0.76f);
+
+        // The bar has no authored maximum to divide by — GetWindowRemaining is
+        // the only reading available — so it is drawn as a decaying 10s scale,
+        // clamped full. It communicates "running out", not an exact fraction.
+        const float Fraction = FMath::Clamp(Remaining / 10.0f, 0.0f, 1.0f);
+        const float BarY = RowY + 13.0f;
+        DrawRect(FLinearColor(0.06f, 0.09f, 0.13f, 0.92f), X, BarY, Width, 5.0f);
+        DrawRect(FLinearColor(Color.R, Color.G, Color.B, 0.95f), X, BarY, Width * Fraction, 5.0f);
+
+        RowBottom -= RowH;
+    }
+}
+
+// --------------------------------------------------------------------------
+// Centre-low teaching callout. Fades over its lifetime and never repeats past
+// the first few casts of each ability.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawAbilityCallout(const FVector2D& Center)
+{
+    if (CalloutText.IsEmpty()) return;
+    const double Age = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - CalloutTime;
+    if (Age < 0.0 || Age >= BreakerHUD::AbilityCalloutSeconds) return;
+
+    const float Fade = 1.0f - static_cast<float>(Age) / BreakerHUD::AbilityCalloutSeconds;
+    // Centred by estimate: the small font has no measured width available here,
+    // and the same 5.2px-per-glyph estimate is what the loot chips use.
+    const float HalfWidth = CalloutText.Len() * 2.6f;
+    DrawBoldLabel(CalloutText, Center.X - HalfWidth, Center.Y + 132.0f, BreakerHUD::Bright, 0.95f, Fade);
+}
+
+// --------------------------------------------------------------------------
+// Overdrive's ambient tell: four thin orange edge lines, low alpha, for as
+// long as the window runs. Deliberately quieter than the red damage frame.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawOverdriveVignette(const ABreakerCharacter* Character)
+{
+    const UBreakerAbilityStateComponent* State = GetAbilityState(Character);
+    if (!State || !State->IsWindowActive(FName(TEXT("Window.Swift.Overdrive")))) return;
+
+    const FLinearColor Edge(BreakerHUD::Orange.R, BreakerHUD::Orange.G, BreakerHUD::Orange.B, 0.25f);
+    const float W = Canvas->ClipX;
+    const float H = Canvas->ClipY;
+    constexpr float Inset = 3.0f;
+    constexpr float Thickness = 3.0f;
+    DrawLine(Inset, Inset, W - Inset, Inset, Edge, Thickness);
+    DrawLine(Inset, H - Inset, W - Inset, H - Inset, Edge, Thickness);
+    DrawLine(Inset, Inset, Inset, H - Inset, Edge, Thickness);
+    DrawLine(W - Inset, Inset, W - Inset, H - Inset, Edge, Thickness);
+}
+
+// --------------------------------------------------------------------------
+// Skim's confirmation: a radial speed-line burst at the crosshair. Short and
+// centre-screen because the redirect is felt, not seen.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawSkimBurst(const FVector2D& Center)
+{
+    const double Age = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - SkimBurstTime;
+    if (Age < 0.0 || Age >= BreakerHUD::SkimBurstSeconds) return;
+
+    const float Alpha01 = static_cast<float>(Age) / BreakerHUD::SkimBurstSeconds;
+    const float Fade = 1.0f - Alpha01;
+    // Lines travel outward as they fade, which reads as speed rather than as a
+    // flashing ring.
+    const float Inner = FMath::Lerp(16.0f, 40.0f, Alpha01);
+    const float Outer = Inner + FMath::Lerp(14.0f, 6.0f, Alpha01);
+    const FLinearColor Color(0.55f, 0.92f, 1.0f, Fade);
+
+    constexpr int32 LineCount = 8;
+    for (int32 Index = 0; Index < LineCount; ++Index)
+    {
+        const float Angle = (2.0f * UE_PI) * static_cast<float>(Index) / static_cast<float>(LineCount);
+        const float Cos = FMath::Cos(Angle);
+        const float Sin = FMath::Sin(Angle);
+        DrawLine(Center.X + Cos * Inner, Center.Y + Sin * Inner,
+                 Center.X + Cos * Outer, Center.Y + Sin * Outer, Color, 1.75f);
+    }
+}
+
+// --------------------------------------------------------------------------
+// Lead's mark. Projected the same way the enemy bars are, just higher, so the
+// diamond sits clear of the health bar on the same target.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawMarkedTarget(const ABreakerCharacter* Character)
+{
+    const UBreakerAbilityStateComponent* State = GetAbilityState(Character);
+    const AActor* Marked = State ? State->GetMarkedTarget() : nullptr;
+    if (!Marked) return;
+
+    const FVector Projected = Project(Marked->GetActorLocation() + FVector(0.0f, 0.0f, BreakerHUD::MarkHeadroomCm), false);
+    if (Projected.Z <= 0.0f) return;
+
+    // Slow pulse: enough to catch the eye in peripheral vision, not enough to
+    // compete with the impact feedback at the crosshair.
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float Pulse = 0.75f + 0.25f * FMath::Sin(static_cast<float>(Now) * 4.0f);
+    const FLinearColor Color(BreakerHUD::Cyan.R, BreakerHUD::Cyan.G, BreakerHUD::Cyan.B, Pulse);
+    const float Radius = 7.0f * Pulse;
+
+    const float CX = Projected.X;
+    const float CY = Projected.Y;
+    DrawLine(CX, CY - Radius, CX + Radius, CY, Color, 1.75f);
+    DrawLine(CX + Radius, CY, CX, CY + Radius, Color, 1.75f);
+    DrawLine(CX, CY + Radius, CX - Radius, CY, Color, 1.75f);
+    DrawLine(CX - Radius, CY, CX, CY - Radius, Color, 1.75f);
+
+    DrawLabel(TEXT("MARKED"), CX - 18.0f, CY - Radius - 14.0f, Color, 0.66f);
+}
+
 void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
@@ -750,12 +979,28 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const UBreakerAbilityComponent* Abilit
         const float Ready = FMath::Clamp(1.0f - Remaining / Duration, 0.0f, 1.0f);
         DrawRect(FLinearColor(Accent.R * 0.35f, Accent.G * 0.35f, Accent.B * 0.35f, 0.85f), X, Y, Size * Ready, Size);
     }
+    // Activation flash: a bright fill over the square that decays away. This is
+    // the only feedback that fires for an ability which changes no visible
+    // state, so it runs whatever else the square is showing.
+    const int32 SlotIndex = static_cast<int32>(Slot);
+    if (SlotIndex >= 0 && SlotIndex < AbilitySlotCount)
+    {
+        const double FlashAge = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - SlotActivationTime[SlotIndex];
+        if (FlashAge >= 0.0 && FlashAge < BreakerHUD::AbilityFlashSeconds)
+        {
+            const float Fade = 1.0f - static_cast<float>(FlashAge) / BreakerHUD::AbilityFlashSeconds;
+            DrawRect(FLinearColor(Accent.R, Accent.G, Accent.B, 0.75f * Fade), X, Y, Size, Size);
+        }
+    }
+
     DrawRect(FLinearColor(Accent.R * Brightness, Accent.G * Brightness, Accent.B * Brightness, 1.0f), X, Y, Size, 3.0f);
 
     DrawLabel(KeyHint, X + 5.0f, Y + 5.0f, FLinearColor(Accent.R, Accent.G, Accent.B, bGranted ? 1.0f : 0.5f), 0.9f);
 
     // Short name from the definition where one exists; the id otherwise, so a
-    // designed-but-unbuilt slot still labels itself.
+    // designed-but-unbuilt slot still labels itself. It sits *under* the square
+    // rather than inside it: inside, the cooldown sweep and the cost readout
+    // were both fighting it for the same pixels.
     FString ShortName = TEXT("--");
     if (bGranted)
     {
@@ -763,9 +1008,12 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const UBreakerAbilityComponent* Abilit
         {
             ShortName = Definition->DisplayName.IsEmpty() ? Definition->AbilityId.ToString() : Definition->DisplayName.ToString();
         }
-        ShortName = ShortName.Left(6).ToUpper();
+        // Ids arrive namespaced ("Swift.Skim"); only the leaf is worth the room.
+        int32 SeparatorIndex = INDEX_NONE;
+        if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
+        ShortName = ShortName.Left(10).ToUpper();
     }
-    DrawLabel(ShortName, X + 5.0f, Y + Size - 14.0f, FLinearColor(0.7f, 0.78f, 0.86f, Brightness), 0.62f);
+    DrawLabel(ShortName, X, Y + Size + 2.0f, FLinearColor(0.7f, 0.78f, 0.86f, Brightness), 0.62f);
 
     if (bOnCooldown)
         DrawLabel(FString::Printf(TEXT("%.1f"), Remaining), X + Size - 22.0f, Y + Size * 0.5f - 6.0f, BreakerHUD::Bright, 0.85f);

@@ -87,6 +87,8 @@ namespace
         Pool.Add(MakeAffix(TEXT("Move.DashCooldown"), TEXT("Dash Cooldown Reduction"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DashCooldownReduction, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Gloves}, 4.0f, 18.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Crit.Chance"), TEXT("Critical Chance"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 10.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Crit.Damage"), TEXT("Critical Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 8.0f, 35.0f, 60.0f));
+        // O2 PLACEHOLDER: master-sheet Weapon Damage % line, 4% (T8) -> 22% (T1).
+        Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 4.0f, 22.0f, 80.0f));
         return Pool;
     }
 }

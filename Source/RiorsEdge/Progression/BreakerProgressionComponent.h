@@ -62,8 +62,12 @@ public:
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|Playtest")
     void GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints);
-    // Fresh state only: seeds the slice budget and locks Swift if no class is
-    // chosen, so a gym pawn always has something to spend.
+    // Seeds the slice budget whenever the point economy is empty (no ranks in
+    // either currency and nothing unspent), and locks Swift only if no class
+    // is chosen — so both a new gym pawn and an existing save written before
+    // this seeding existed end up with something to spend. Called from
+    // BeginPlay and again from LoadProgressionState; a no-op once anything has
+    // actually been granted or spent.
     UFUNCTION(BlueprintCallable, Category="Progression|Playtest") void ApplySliceDefaultsIfFresh();
 
     // Pure aggregation over a rank set, mirroring

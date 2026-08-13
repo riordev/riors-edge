@@ -1,5 +1,27 @@
 # Playtest Feedback Log
 
+## 2026-08-13 — Session 3 (first TTK report)
+
+**Report:** 1.8 min, 279 shots, 59.1% accuracy, 51.5% weak-point rate,
+16 kills avg TTK 5.37s, 4 elite kills avg TTK 2.05s, 3632 damage dealt.
+
+**Reading vs O18 targets:** the 5.37s trash figure is an INSTRUMENT
+artifact, not a chassis miss — the sampler measured wall-clock from first
+damage to death, so tag-and-return play inflates it. Continuous-fire math
+(220 HP vs 24 dmg @ 600rpm) gives ~0.9s body / ~0.5s weak point, at or
+under the <1s target. Elites (2x HP) measured 2.05s BECAUSE they get
+focused — under the ~3s target. Damage dealt was ~70% of HP killed:
+chain detonations did the rest (density mechanic functioning).
+
+**Action:** TTK sampler switched to engagement-gapped time (gaps between
+damage events capped at 1.5s). Next report measures fighting time.
+**Owner findings same session:** skill-tree screen caused hard hitching
+(per-frame Alt lambdas — removed); slice points didn't seed on existing
+saves (seeding relaxed + dev grant button); abilities lacked in-game
+descriptions and visual feedback (HUD ability names, first-use callouts,
+activation flashes, window bars, Overdrive vignette, Skim burst, Lead
+mark diamond); Weapon Damage % affix added for TTK testing range.
+
 Owner playtest findings and the actions taken. Newest first. This is the
 gym's paper trail — wave-mode reports and re-anchoring decisions cite it.
 

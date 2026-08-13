@@ -108,6 +108,11 @@ private:
     bool bIsElite = false;
     int32 KillCount = 0;
     double FirstDamageTime = -1.0;
+    // Engagement-gapped TTK: sums time between damage events, capping each
+    // gap, so tagging an enemy and returning later doesn't book the idle
+    // time as time-to-kill.
+    double LastDamageEventTime = -1.0;
+    float EngagedSeconds = 0.0f;
     FString StateLabel = TEXT("PATROL");
     float WeaveTime = 0.0f;
     double LungeStartTime = -1000.0;

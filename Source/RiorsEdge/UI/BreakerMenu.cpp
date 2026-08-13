@@ -1056,6 +1056,17 @@ namespace
         return Pips;
     }
 
+    // Selector buttons are 240px wide; long authored tree names clip there
+    // ("CORE CONSTELLATIONS (S..."). Short display aliases live here rather
+    // than in the content library so authored names stay descriptive.
+    FString TreeSelectorLabel(const UBreakerProgressionTree* Tree)
+    {
+        if (!Tree) return FString();
+        if (Tree->TreeId == FName(TEXT("Core.Slice"))) return TEXT("CORE SLICE");
+        const FString Name = Tree->DisplayName.IsEmpty() ? Tree->TreeId.ToString() : Tree->DisplayName.ToString();
+        return Name.ToUpper();
+    }
+
     FString CurrencyLabel(EBreakerPointCurrency Currency)
     {
         return Currency == EBreakerPointCurrency::ClassPoints ? TEXT("CLASS") : TEXT("CORE");
@@ -1141,6 +1152,50 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         ]
     ];
 
+    // Dev-only recovery row: saves made before the slice seeding rule relaxed
+    // can land here with a class chosen and zero points. Same
+    // RiorsEdge.Playtest/DevClassSwap gate the class screen uses.
+    bool bDevTools = false;
+    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevTools, GGameUserSettingsIni);
+    if (bDevTools)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(Amber)
+                .ContentPadding(FMargin(14.0f, 7.0f))
+                .OnClicked(FOnClicked::CreateLambda([this]()
+                {
+                    UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                    if (Prog)
+                    {
+                        // O2 PLACEHOLDER: same 10 Class / 12 Core slice budget
+                        // ApplySliceDefaultsIfFresh seeds.
+                        Prog->GrantPlaytestPoints(10, 12);
+                        SkillTreeStatus = FText::FromString(TEXT("DEV: GRANTED 10 CLASS / 12 CORE"));
+                        if (Character.IsValid()) Character->SaveGameState();
+                    }
+                    else
+                    {
+                        SkillTreeStatus = FText::FromString(TEXT("DEV: NO PROGRESSION COMPONENT"));
+                    }
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(TEXT("DEV: GRANT SLICE POINTS")), 10, FLinearColor::Black, true)
+                ]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(12.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(TEXT("Dev tools are on (Class screen toggle). Adds 10 CLASS / 12 CORE.")), 9, SoftText)
+            ]
+        ];
+    }
+
     if (Trees.IsEmpty())
     {
         // INTEGRATION: no tree content is reachable through the progression
@@ -1178,7 +1233,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ProgressionTreeInvestment(Progression, Tree, Spent, Total);
             const bool bSelected = TreeIndex == SelectedTreeIndex;
             const int32 Unspent = ProgressionGetUnspent(Progression, Tree->Currency);
-            const FString TreeName = Tree->DisplayName.IsEmpty() ? Tree->TreeId.ToString().ToUpper() : Tree->DisplayName.ToString().ToUpper();
+            const FString TreeName = TreeSelectorLabel(Tree);
             const int32 CapturedIndex = TreeIndex;
 
             Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
@@ -1258,6 +1313,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // Everything that used to crowd the card now lives in the
                 // hover tooltip; the card keeps name, rank, cost, one line.
                 FString TooltipText;
+                // Built once per Rebuild and shared by the wrapper box and the
+                // button below — never rebuilt from an attribute lambda.
                 {
                     TArray<FString> TipLines;
                     TipLines.Add(NodeName + (Node->bCornerstone ? TEXT("   [CORNERSTONE]") : TEXT("")));
@@ -1297,6 +1354,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     }
                     TooltipText = FString::Join(TipLines, TEXT("\n"));
                 }
+                const FText TooltipTextValue = FText::FromString(TooltipText);
 
                 TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
                 Card->AddSlot().AutoHeight()
@@ -1321,12 +1379,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 Card->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
                 [
                     SNew(STextBlock)
-                    // Alt expands the card in place; the tooltip is the
-                    // always-available path to the same detail.
-                    .Text_Lambda([Description, ShortLine = ShortSummary(Description)]()
-                    {
-                        return FText::FromString(FSlateApplication::IsInitialized() && FSlateApplication::Get().GetModifierKeys().IsAltDown() ? Description : ShortLine);
-                    })
+                    // PERF: this line used to be a Text_Lambda that polled
+                    // FSlateApplication::GetModifierKeys() for Alt-expansion —
+                    // once per card (~46) per frame, which made the screen
+                    // jitter. The summary is now baked at build time and the
+                    // hover tooltip is the only path to full detail.
+                    .Text(FText::FromString(ShortSummary(Description)))
                     .ColorAndOpacity(bOwned ? FLinearColor::White : SoftText)
                     .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 9))
                     .AutoWrapText(true)
@@ -1337,12 +1395,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // Tooltip lives on the wrapper too so locked (disabled)
                     // cards still explain themselves on hover.
                     SNew(SBox).WidthOverride(250.0f)
-                    .ToolTipText(FText::FromString(TooltipText))
+                    .ToolTipText(TooltipTextValue)
                     [
                         SNew(SButton)
                         .ButtonColorAndOpacity(CardColor)
                         .IsEnabled(bPurchasable)
-                        .ToolTipText(FText::FromString(TooltipText))
+                        .ToolTipText(TooltipTextValue)
                         .ContentPadding(FMargin(12.0f, 8.0f))
                         .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId]()
                         {
@@ -1442,7 +1500,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         + SHorizontalBox::Slot().FillWidth(1.0f).Padding(14.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
         [
             // O2: node numbers are not balanced yet.
-            MenuText(FText::FromString(TEXT("Hover a node for full detail, or hold ALT to expand cards  |  [O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
+            MenuText(FText::FromString(TEXT("Hover a node for full detail  |  [O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
         ]
     ];
     return BuildFrame(FText::FromString(TEXT("SKILL TREES")), FText::FromString(TEXT("CLASS TREE / CORE CONSTELLATIONS")), Body, 1120.0f);

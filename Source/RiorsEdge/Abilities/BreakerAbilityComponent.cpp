@@ -186,7 +186,15 @@ bool UBreakerAbilityComponent::TryActivateSlot(EBreakerAbilitySlot Slot)
         }
         return false;
     }
-    return ASC->TryActivateAbility(Granted->Handle);
+    const bool bActivated = ASC->TryActivateAbility(Granted->Handle);
+    if (bActivated)
+    {
+        // Broadcast here rather than inside each ability: this is the one
+        // funnel every input path already goes through, and it fires on the
+        // machine that pressed the key, which is where the HUD lives.
+        OnAbilityActivated.Broadcast(Slot);
+    }
+    return bActivated;
 }
 
 void UBreakerAbilityComponent::ServerActivateSlot_Implementation(EBreakerAbilitySlot Slot)
@@ -195,7 +203,10 @@ void UBreakerAbilityComponent::ServerActivateSlot_Implementation(EBreakerAbility
     UAbilitySystemComponent* ASC = GetAbilitySystem();
     if (ASC && Granted && Granted->bImplemented && Granted->Handle.IsValid())
     {
-        ASC->TryActivateAbility(Granted->Handle);
+        if (ASC->TryActivateAbility(Granted->Handle))
+        {
+            OnAbilityActivated.Broadcast(Slot);
+        }
     }
 }
 

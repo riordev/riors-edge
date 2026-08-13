@@ -38,6 +38,10 @@ void UBreakerProgressionComponent::BeginPlay()
         BaseMoveSpeed = Attributes->GetMoveSpeed();
         BaseDamageOverTimeMultiplier = Attributes->GetDamageOverTimeMultiplier();
     }
+    // Seed the slice budget before any save load runs. Nothing else called
+    // this, which is why a gym pawn reached the tree screen with zero points;
+    // LoadProgressionState re-runs it after restoring a save.
+    ApplySliceDefaultsIfFresh();
     RecalculateStats();
 }
 
@@ -232,6 +236,10 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(State.PermanentClass);
     }
     RecalculateStats();
+    // A save written before slice seeding existed restores an empty economy.
+    // Re-seed here so loading never leaves the tree screen unspendable; the
+    // freshness test means a save with any real progress is left untouched.
+    ApplySliceDefaultsIfFresh();
     OnProgressionChanged.Broadcast();
 }
 
@@ -262,9 +270,17 @@ void UBreakerProgressionComponent::GrantPlaytestPoints(int32 ClassPoints, int32 
 
 void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
 {
+    // "Fresh" is a statement about the point economy, not about the save file.
+    // A character with nothing allocated in either currency and an empty pool
+    // has never received the slice budget — whether it is a brand-new gym pawn
+    // or an existing save written before this seeding existed. A permanent
+    // class already being chosen no longer disqualifies it; only real spending
+    // or a non-empty pool does. That is what left owner saves stuck on
+    // "CLASS 0 | CORE 0 UNSPENT" with a locked class and nothing to spend.
     const bool bFresh = State.ClassNodeRanks.Num() == 0 && State.CoreNodeRanks.Num() == 0
         && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0;
     if (!bFresh) return;
+    // Only pick a class for a character that has none; a chosen class is kept.
     if (State.PermanentClass == EBreakerClassId::None) ChoosePermanentClassById(EBreakerClassId::Swift);
     // O2 PLACEHOLDER: 10 Class / 12 Core is the XP-And-Pacing §9 slice budget
     // at cap 10; the shipping numbers come from the curve Data Asset.

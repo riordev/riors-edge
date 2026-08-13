@@ -11,6 +11,10 @@ class UBreakerAbilityDefinition;
 class UBreakerProgressionComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerAbilitySlotChanged, EBreakerAbilitySlot, Slot, FName, AbilityId);
+// Fires only when a slot actually activated. Polling cannot substitute: an
+// activation is instantaneous, and abilities like Skim leave no lasting state
+// for the HUD to notice on a later frame.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerAbilityActivated, EBreakerAbilitySlot, Slot);
 
 // One granted loadout slot. AbilityId is recorded even when the ability has no
 // implementation yet, so the HUD can label a designed-but-unbuilt slot instead
@@ -60,6 +64,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities") int32 GetGrantedCount() const;
 
     UPROPERTY(BlueprintAssignable, Category="Abilities") FBreakerAbilitySlotChanged OnSlotChanged;
+    UPROPERTY(BlueprintAssignable, Category="Abilities") FBreakerAbilityActivated OnAbilityActivated;
 
     // How often the component re-checks the loadout for changes. Cheap: it
     // compares three FNames and the class id.

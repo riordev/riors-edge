@@ -61,7 +61,9 @@ enum class EBreakerStatTarget : uint8
     CriticalDamage,
     SlideSpeed,
     AirControl,
-    DashCooldownReduction
+    DashCooldownReduction,
+    WeaponDamage,
+    Count UMETA(Hidden)
 };
 
 // Tiers run T8 (worst) to T1 linearly, then spike: T0 = 1.4x T1, T-1 = 1.8x
@@ -132,4 +134,7 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     UPROPERTY(BlueprintReadOnly) float SlideSpeedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AirControlMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float DashCooldownMultiplier = 1.0f;
+    // Gear-granted increased weapon damage, folded into the outgoing request's
+    // SourceDamageMultiplier by the weapon component.
+    UPROPERTY(BlueprintReadOnly) float WeaponDamageMultiplier = 1.0f;
 };

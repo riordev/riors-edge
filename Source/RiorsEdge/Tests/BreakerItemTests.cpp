@@ -69,6 +69,28 @@ bool FBreakerLootRollTest::RunTest(const FString& Parameters)
         }
     }
 
+    // Weapon Damage is a weapon/hands/neck affix: it must never appear on
+    // Boots, and must be reachable on an allowed slot.
+    const FBreakerAffixDefinition* WeaponDamage = UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), TEXT("Offense.WeaponDamage"));
+    TestNotNull(TEXT("Weapon Damage affix exists in the slice pool"), WeaponDamage);
+    if (WeaponDamage)
+    {
+        TestFalse(TEXT("Weapon Damage is illegal on Boots"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Boots));
+        TestTrue(TEXT("Weapon Damage is legal on Primary"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Primary));
+        TestTrue(TEXT("Weapon Damage is legal on Gloves"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Gloves));
+
+        bool bRolledOnPrimary = false;
+        for (int32 Seed = 0; Seed < 200; ++Seed)
+        {
+            const FBreakerItemInstance Weapon = UBreakerLootLibrary::RollItem(TEXT("Test"), EBreakerEquipSlot::Primary, EBreakerItemRarity::Exceptional, 30, Seed);
+            for (const FBreakerRolledAffix& Affix : Weapon.Affixes)
+            {
+                if (Affix.AffixId == WeaponDamage->AffixId) bRolledOnPrimary = true;
+            }
+        }
+        TestTrue(TEXT("Weapon Damage can roll on an allowed slot"), bRolledOnPrimary);
+    }
+
     // Standard items must stay fodder: 1-2 affixes, tiers no better than T3.
     const FBreakerItemInstance White = UBreakerLootLibrary::RollItem(TEXT("Test"), EBreakerEquipSlot::Helmet, EBreakerItemRarity::Standard, 50, 7);
     TestTrue(TEXT("Standard affix count"), White.Affixes.Num() >= 1 && White.Affixes.Num() <= 2);
@@ -109,10 +131,26 @@ bool FBreakerEquipmentAggregationTest::RunTest(const FString& Parameters)
     Helmet.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 3.0f, EBreakerAffixCategory::Prefix));
     Helmet.Affixes.Add(MakeRolled(TEXT("Crit.Chance"), 6.0f, EBreakerAffixCategory::Prefix));
 
-    const FBreakerEquipmentStats Stats = UBreakerEquipmentComponent::AggregateStats({Boots, Helmet});
+    // Two sources of increased Weapon Damage must land in one additive bucket.
+    FBreakerItemInstance Gloves;
+    Gloves.ItemId = FGuid::NewGuid();
+    Gloves.Slot = EBreakerEquipSlot::Gloves;
+    Gloves.Affixes.Add(MakeRolled(TEXT("Offense.WeaponDamage"), 12.0f, EBreakerAffixCategory::Prefix));
+
+    FBreakerItemInstance Necklace;
+    Necklace.ItemId = FGuid::NewGuid();
+    Necklace.Slot = EBreakerEquipSlot::Necklace;
+    Necklace.Affixes.Add(MakeRolled(TEXT("Offense.WeaponDamage"), 8.0f, EBreakerAffixCategory::Prefix));
+
+    const FBreakerEquipmentStats Stats = UBreakerEquipmentComponent::AggregateStats({Boots, Helmet, Gloves, Necklace});
     TestEqual(TEXT("Flat health sums"), Stats.BonusHealth, 150.0f);
     TestTrue(TEXT("Increased move speed is one additive bucket"), FMath::IsNearlyEqual(Stats.MoveSpeedMultiplier, 1.08f, 0.0001f));
     TestTrue(TEXT("Crit chance converts percent to fraction"), FMath::IsNearlyEqual(Stats.CriticalChanceBonus, 0.06f, 0.0001f));
+    TestTrue(TEXT("Increased weapon damage is one additive bucket"), FMath::IsNearlyEqual(Stats.WeaponDamageMultiplier, 1.20f, 0.0001f));
+
+    // No weapon damage equipped leaves the multiplier neutral.
+    const FBreakerEquipmentStats BareStats = UBreakerEquipmentComponent::AggregateStats({Boots});
+    TestTrue(TEXT("Weapon damage multiplier defaults to 1"), FMath::IsNearlyEqual(BareStats.WeaponDamageMultiplier, 1.0f, 0.0001f));
     return true;
 }
 

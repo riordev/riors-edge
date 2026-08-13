@@ -40,6 +40,19 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities|State") bool IsWindowActive(FName Key) const;
     UFUNCTION(BlueprintPure, Category="Abilities|State") float GetWindowRemaining(FName Key) const;
     UFUNCTION(BlueprintPure, Category="Abilities|State") int32 GetActiveWindowCount() const;
+    // Keys of every window still open, so a cosmetic reader (the HUD) can show
+    // "whatever is running" without hard-coding the ability roster.
+    UFUNCTION(BlueprintPure, Category="Abilities|State") TArray<FName> GetActiveWindowKeys() const;
+
+    // Marks ---------------------------------------------------------------
+    // A single mark, held on the *caster's* state component rather than on the
+    // target, so a destroyed target simply reads back as null. This is the
+    // minimum surface the HUD needs; UBreakerMarkComponent (spec §4.6) replaces
+    // it wholesale when it lands.
+    UFUNCTION(BlueprintCallable, Category="Abilities|State") void SetMark(AActor* Target, float Duration);
+    UFUNCTION(BlueprintPure, Category="Abilities|State") AActor* GetMarkedTarget() const;
+    UFUNCTION(BlueprintPure, Category="Abilities|State") float GetMarkRemaining() const;
+    UFUNCTION(BlueprintCallable, Category="Abilities|State") void ClearMark();
 
     // Per-target hit streaks ---------------------------------------------
     // Returns the streak count after recording the hit. The streak resets to 1
@@ -78,6 +91,11 @@ private:
         float EndTime = 0.0f;
     };
     TMap<FName, FWindowState> Windows;
+
+    // Shares the component's Clock, so the mark expires on exactly the same
+    // schedule as the window that opened it.
+    TWeakObjectPtr<AActor> MarkTarget;
+    float MarkEndTime = -1000.0f;
 
     TWeakObjectPtr<AActor> StreakTarget;
     int32 StreakCount = 0;

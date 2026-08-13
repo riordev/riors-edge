@@ -64,6 +64,10 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
+        // Publish the mark alongside the window so anything outside this
+        // ability instance — starting with the HUD's target diamond — can see
+        // *which* actor was marked, not merely that a mark is running.
+        State->SetMark(MarkedTarget.Get(), Duration);
     }
 
     // GAP: nothing consumes the mark yet. The distance-gated weak-point forcing
