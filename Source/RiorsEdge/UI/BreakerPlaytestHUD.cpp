@@ -51,9 +51,10 @@
 // ---------------------------------------------------------------------------
 namespace BreakerHUD
 {
-    // The HUD's default plate face: bg/base, held just under opaque so the
-    // world still reads through the chrome at the screen edges.
-    static const FLinearColor PlateFace = BreakerUI::Alpha(BreakerUI::BgBase, 0.88f);
+    // The HUD's default plate face: bg/base, near-opaque. The system is
+    // stamped metal, not glass — a translucent plate over a bright sky reads
+    // as mud, and the flat-fill rule exists to stop exactly that.
+    static const FLinearColor PlateFace = BreakerUI::Alpha(BreakerUI::BgBase, 0.96f);
 
     static constexpr float TracerLifetime = 0.12f;
     static constexpr float ImpactLifetime = 0.25f;
@@ -293,16 +294,26 @@ void ABreakerPlaytestHUD::DrawHUD()
     }
 
     // --- Top-left: playtest instrumentation ------------------------------
-    // Not in the design canvas and never shipping: kept on the token palette
-    // at text/muted so it stays legible without competing with the HUD.
-    DrawSpecText(TEXT("F1 RESET   F2 REPORT   F3 DIAGNOSTICS   ESC MENU"),
-        S(BreakerUI::HudSafeMargin), S(BreakerUI::HudSafeMargin), BreakerUI::TextMuted, 11.0f);
+    // Not in the design canvas and never shipping. It still has to obey the
+    // system: muted text on its own plate, because unbacked grey text over a
+    // bright sky is unreadable — which is exactly how the first pass shipped.
+    {
+        const FString KeyLegend(TEXT("F1 RESET   F2 REPORT   F3 DIAGNOSTICS   ESC MENU"));
+        const FVector2D LegendSize = MeasureSpecText(KeyLegend, 11.0f);
+        const float LegendX = S(BreakerUI::HudSafeMargin);
+        const float LegendY = S(BreakerUI::HudSafeMargin);
+        const float LegendH = LegendSize.Y + S(BreakerUI::Space8);
+        DrawPlate(LegendX, LegendY, LegendSize.X + S(BreakerUI::Space24) + S(BreakerUI::RailThickness), LegendH, BreakerUI::TextMuted);
+        DrawSpecText(KeyLegend, LegendX + S(BreakerUI::RailThickness) + S(BreakerUI::Space8), LegendY + S(BreakerUI::Space4),
+            BreakerUI::TextSecondary, 11.0f);
+    }
     if (Playtest && Playtest->AreDiagnosticsVisible())
     {
         const FBreakerPlaytestStats& Stats = Playtest->GetStats();
         const float FPS = GetWorld() && GetWorld()->GetDeltaSeconds() > UE_SMALL_NUMBER ? 1.0f / GetWorld()->GetDeltaSeconds() : 0.0f;
         const float DiagX = S(BreakerUI::HudSafeMargin);
-        const float DiagY = S(BreakerUI::HudSafeMargin + 20.0f);
+        // Clear of the key legend above it: the two used to overlap.
+        const float DiagY = S(BreakerUI::HudSafeMargin + 32.0f);
         const float DiagW = S(300.0f);
         const float DiagH = S(74.0f);
         DrawPlate(DiagX, DiagY, DiagW, DiagH, BreakerUI::TextMuted);
@@ -354,7 +365,7 @@ void ABreakerPlaytestHUD::DrawHUD()
 void ABreakerPlaytestHUD::DrawVitalsPlate(const ABreakerCharacter* Character, float X, float BottomY)
 {
     const float PlateW = S(BreakerUI::HudVitalsWidth);
-    const float PlateH = S(104.0f);
+    const float PlateH = S(100.0f);
     const float Y = BottomY - PlateH;
     const float Pad = S(BreakerUI::HudClusterPad);
     const float ValueColumn = S(BreakerUI::HudValueColumnWidth);
@@ -376,42 +387,54 @@ void ABreakerPlaytestHUD::DrawVitalsPlate(const ABreakerCharacter* Character, fl
 
     if (const UBreakerAttributeSet* Attributes = Character->GetAttributes())
     {
-        const float ShieldRowY = Y + Pad + S(20.0f);
-        const float ShieldH = S(BreakerUI::HudShieldBarHeight);
-        DrawTrack(BarX, ShieldRowY, BarW, ShieldH,
-            Attributes->GetMaxShield() > UE_SMALL_NUMBER ? Attributes->GetShield() / Attributes->GetMaxShield() : 0.0f,
-            BreakerUI::Cyan, BreakerUI::Panel10);
-        DrawSpecTextRight(FString::Printf(TEXT("%s/%s"),
-            *BreakerUI::FormatTicker(Attributes->GetShield()), *BreakerUI::FormatTicker(Attributes->GetMaxShield())),
-            InnerRight, ShieldRowY - S(2.0f), BreakerUI::Cyan, 15.0f);
+        // One row = one pool. The bar is vertically centred in its row and the
+        // value is centred against the bar in the fixed 84px column, so a
+        // four-digit pool never shifts a three-digit one and nothing overlaps.
+        auto DrawPoolRow = [this, BarX, BarW, InnerRight](float RowCenterY, float BarHeight, float Value, float Maximum,
+            const FLinearColor& Fill, float ValuePixels)
+        {
+            const bool bHasPool = Maximum > UE_SMALL_NUMBER;
+            const float Fraction = bHasPool ? Value / Maximum : 0.0f;
+            // An empty pool keeps its geometry but drops to the disabled
+            // colour: a stark full-width empty track reads as a broken widget.
+            DrawTrack(BarX, RowCenterY - BarHeight * 0.5f, BarW, BarHeight, Fraction,
+                bHasPool ? Fill : BreakerUI::Panel20, BreakerUI::Panel10);
+            const FString Text = FString::Printf(TEXT("%s/%s"),
+                *BreakerUI::FormatTicker(Value), *BreakerUI::FormatTicker(Maximum));
+            const FVector2D TextSize = MeasureSpecText(Text, ValuePixels);
+            DrawSpecTextRight(Text, InnerRight, RowCenterY - TextSize.Y * 0.5f,
+                bHasPool ? Fill : BreakerUI::TextDisabled, ValuePixels);
+        };
 
-        const float HealthRowY = ShieldRowY + ShieldH + S(BreakerUI::Space8);
-        const float HealthH = S(BreakerUI::HudHealthBarHeight);
-        DrawTrack(BarX, HealthRowY, BarW, HealthH,
-            Attributes->GetMaxHealth() > UE_SMALL_NUMBER ? Attributes->GetHealth() / Attributes->GetMaxHealth() : 0.0f,
-            BreakerUI::RarityStandard, BreakerUI::Panel10);
-        DrawSpecTextRight(FString::Printf(TEXT("%s/%s"),
-            *BreakerUI::FormatTicker(Attributes->GetHealth()), *BreakerUI::FormatTicker(Attributes->GetMaxHealth())),
-            InnerRight, HealthRowY - S(3.0f), BreakerUI::RarityStandard, 13.0f);
+        const float ShieldRowY = Y + Pad + S(30.0f);
+        DrawPoolRow(ShieldRowY, S(BreakerUI::HudShieldBarHeight),
+            Attributes->GetShield(), Attributes->GetMaxShield(), BreakerUI::Cyan, 15.0f);
+
+        const float HealthRowY = ShieldRowY + S(22.0f);
+        DrawPoolRow(HealthRowY, S(BreakerUI::HudHealthBarHeight),
+            Attributes->GetHealth(), Attributes->GetMaxHealth(), BreakerUI::RarityStandard, 13.0f);
 
         // Armour is a coefficient, not a pool: three chips, never a bar. Each
         // chip is a third of the way to the 80% mitigation ceiling.
-        const float ArmorRowY = HealthRowY + HealthH + S(BreakerUI::Space16);
+        const float ArmorRowY = HealthRowY + S(22.0f);
         const float Armor = Attributes->GetArmor();
         const float Mitigation = Armor > 0.0f ? FMath::Min(Armor / (Armor + 100.0f), 0.8f) : 0.0f;
-        DrawSpecText(TEXT("ARMOR"), BarX, ArmorRowY - S(3.0f), BreakerUI::TextMuted, 11.0f);
-        const float ChipW = S(BreakerUI::HudArmorChipWidth);
         const float ChipH = S(BreakerUI::HudArmorChipHeight);
-        const float ChipsX = BarX + S(56.0f);
+        const FVector2D ArmorLabelSize = MeasureSpecText(TEXT("ARMOR"), 11.0f);
+        DrawSpecText(TEXT("ARMOR"), BarX, ArmorRowY - ArmorLabelSize.Y * 0.5f, BreakerUI::TextMuted, 11.0f);
+        const float ChipW = S(BreakerUI::HudArmorChipWidth);
+        const float ChipsX = BarX + ArmorLabelSize.X + S(BreakerUI::Space8);
         for (int32 Index = 0; Index < 3; ++Index)
         {
             const float Filled = FMath::Clamp((Mitigation / 0.8f) * 3.0f - static_cast<float>(Index), 0.0f, 1.0f);
             const float ChipX = ChipsX + Index * (ChipW + S(BreakerUI::Space4));
-            DrawRect(BreakerUI::Panel10, ChipX, ArmorRowY, ChipW, ChipH);
-            if (Filled > 0.0f) DrawRect(BreakerUI::Gold, ChipX, ArmorRowY, ChipW * Filled, ChipH);
+            DrawRect(BreakerUI::Panel10, ChipX, ArmorRowY - ChipH * 0.5f, ChipW, ChipH);
+            if (Filled > 0.0f) DrawRect(BreakerUI::Gold, ChipX, ArmorRowY - ChipH * 0.5f, ChipW * Filled, ChipH);
         }
+        const FVector2D ArmorValueSize = MeasureSpecText(TEXT("000  00%"), 11.0f);
         DrawSpecTextRight(FString::Printf(TEXT("%.0f  %.0f%%"), Armor, Mitigation * 100.0f),
-            InnerRight, ArmorRowY - S(4.0f), BreakerUI::TextMuted, 11.0f);
+            InnerRight, ArmorRowY - ArmorValueSize.Y * 0.5f,
+            Armor > 0.0f ? BreakerUI::TextMuted : BreakerUI::TextDisabled, 11.0f);
     }
 
     // Status chips run above the plate so an expiring DoT never resizes it.
@@ -1313,10 +1336,100 @@ void ABreakerPlaytestHUD::DrawCooldownWedge(float X, float Y, float Size, float 
 }
 
 // --------------------------------------------------------------------------
+// Ability marks, built to UI-Ability-Icons-Spec.md's construction notes: one
+// stroke weight, one hue, side-on, motion rising toward the upper right. These
+// are code-drawn stand-ins for the commissioned SVGs, not a substitute for
+// them — but they carry the silhouette the spec describes, which a letter in a
+// box never did. Coordinates are normalised inside the 36x36 optical box.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawAbilityGlyph(const UBreakerAbilityDefinition* Definition, float CenterX, float CenterY, float BoxSize, const FLinearColor& Color)
+{
+    const float Left = CenterX - BoxSize * 0.5f;
+    const float Top = CenterY - BoxSize * 0.5f;
+    // 2px at 52px, scaled with the box and never below a hairline.
+    const float Stroke = FMath::Max(BoxSize * (2.0f / 36.0f), 1.0f);
+
+    // Normalised helpers: every glyph below reads as coordinates on a unit
+    // square, which is how the spec's sketches are dimensioned.
+    auto PX = [Left, BoxSize](float U) { return Left + U * BoxSize; };
+    auto PY = [Top, BoxSize](float V) { return Top + V * BoxSize; };
+    auto Stroke2 = [this, &PX, &PY, Stroke, &Color](float U0, float V0, float U1, float V1)
+    {
+        DrawLine(PX(U0), PY(V0), PX(U1), PY(V1), Color, Stroke);
+    };
+
+    FString Leaf;
+    if (Definition)
+    {
+        Leaf = Definition->AbilityId.ToString();
+        int32 Separator = INDEX_NONE;
+        if (Leaf.FindLastChar(TEXT('.'), Separator)) Leaf = Leaf.RightChop(Separator + 1);
+    }
+
+    if (Leaf.Equals(TEXT("Skim"), ESearchCase::IgnoreCase))
+    {
+        // A flat velocity line that snaps onto a new upward vector, with the
+        // arrowhead at the break. The elbow is the loudest feature: Skim
+        // redirects momentum, it does not create it.
+        Stroke2(0.04f, 0.74f, 0.46f, 0.74f);
+        Stroke2(0.46f, 0.74f, 0.94f, 0.20f);
+        Stroke2(0.94f, 0.20f, 0.74f, 0.26f);
+        Stroke2(0.94f, 0.20f, 0.86f, 0.44f);
+        // Two short speed ticks trailing behind the elbow.
+        Stroke2(0.00f, 0.92f, 0.20f, 0.92f);
+        Stroke2(0.10f, 0.58f, 0.26f, 0.58f);
+        return;
+    }
+    if (Leaf.Equals(TEXT("Lead"), ESearchCase::IgnoreCase))
+    {
+        // A dashed sightline climbing to a tagged diamond, dashes lengthening
+        // with distance: a tag clamped onto something, not a reticle floating
+        // over it.
+        Stroke2(0.02f, 0.92f, 0.12f, 0.83f);
+        Stroke2(0.20f, 0.76f, 0.34f, 0.63f);
+        Stroke2(0.42f, 0.56f, 0.60f, 0.40f);
+        const float DiamondU = 0.76f;
+        const float DiamondV = 0.24f;
+        const float R = 0.16f;
+        Stroke2(DiamondU, DiamondV - R, DiamondU + R, DiamondV);
+        Stroke2(DiamondU + R, DiamondV, DiamondU, DiamondV + R);
+        Stroke2(DiamondU, DiamondV + R, DiamondU - R, DiamondV);
+        Stroke2(DiamondU - R, DiamondV, DiamondU, DiamondV - R);
+        // Stub ticks on opposing corners.
+        Stroke2(DiamondU, DiamondV - R, DiamondU, DiamondV - R - 0.10f);
+        Stroke2(DiamondU, DiamondV + R, DiamondU, DiamondV + R + 0.10f);
+        return;
+    }
+    if (Leaf.Equals(TEXT("Overdrive"), ESearchCase::IgnoreCase))
+    {
+        // A meter whose fill has broken past its own end cap and continues as
+        // detached blocks: the container is complete and the contents are not.
+        const float BarTop = 0.46f;
+        const float BarBottom = 0.72f;
+        Stroke2(0.02f, BarTop, 0.56f, BarTop);
+        Stroke2(0.02f, BarBottom, 0.56f, BarBottom);
+        Stroke2(0.02f, BarTop, 0.02f, BarBottom);
+        Stroke2(0.56f, BarTop, 0.56f, BarBottom);
+        DrawRect(Color, PX(0.06f), PY(BarTop + 0.05f), BoxSize * 0.46f, BoxSize * (BarBottom - BarTop - 0.10f));
+        DrawRect(Color, PX(0.66f), PY(BarTop + 0.05f), BoxSize * 0.12f, BoxSize * (BarBottom - BarTop - 0.10f));
+        DrawRect(Color, PX(0.86f), PY(BarTop + 0.05f), BoxSize * 0.10f, BoxSize * (BarBottom - BarTop - 0.10f));
+        // The chevron lifting out of the bar.
+        Stroke2(0.40f, 0.32f, 0.58f, 0.10f);
+        Stroke2(0.58f, 0.10f, 0.76f, 0.32f);
+        return;
+    }
+
+    // Unbuilt or unknown ability: a hollow diamond, which is the set's
+    // "something is here" mark. Still a silhouette, never a letter.
+    Stroke2(0.50f, 0.14f, 0.86f, 0.50f);
+    Stroke2(0.86f, 0.50f, 0.50f, 0.86f);
+    Stroke2(0.50f, 0.86f, 0.14f, 0.50f);
+    Stroke2(0.14f, 0.50f, 0.50f, 0.14f);
+}
+
+// --------------------------------------------------------------------------
 // §3 — ability squares. 56x56, one plate, four states carried by geometry and
-// border rather than by brightness. No glyphs exist yet, so the 36x36 optical
-// box holds the ability's short name in the state colour; dropping authored
-// art in later replaces that line and nothing else.
+// border rather than by brightness.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, const UBreakerAbilityComponent* Abilities,
     EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, const FLinearColor& Accent)
@@ -1390,40 +1503,42 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
         DrawRect(Accent, X + Size - T, Y + Size - Tick, T, Tick);
     }
 
-    // Glyph stand-in: the leaf of the ability id, inside the optical box.
-    FString ShortName = TEXT("--");
-    if (Definition)
-    {
-        ShortName = Definition->DisplayName.IsEmpty() ? Definition->AbilityId.ToString() : Definition->DisplayName.ToString();
-        int32 SeparatorIndex = INDEX_NONE;
-        if (ShortName.FindLastChar(TEXT('.'), SeparatorIndex)) ShortName = ShortName.RightChop(SeparatorIndex + 1);
-        ShortName = ShortName.Left(8).ToUpper();
-    }
-    DrawSpecTextCentered(ShortName, X + Size * 0.5f, Y + Size * 0.42f, GlyphColor, 11.0f);
+    // The mark itself, drawn to the icon spec's construction notes inside the
+    // 36x36 optical box. Never a word: a letter in a 56px square is what made
+    // the first pass unreadable.
+    DrawAbilityGlyph(Definition, X + Size * 0.5f, Y + Size * 0.44f, Size * (36.0f / 56.0f), GlyphColor);
 
     // Cooldown timer over the wedge, one decimal below 3s.
     if (bOnCooldown)
     {
         const FString Timer = Remaining < 3.0f ? FString::Printf(TEXT("%.1f"), Remaining) : FString::Printf(TEXT("%.0f"), Remaining);
-        DrawSpecTextCentered(Timer, X + Size * 0.5f, Y + Size * 0.5f - S(9.0f), BreakerUI::TextPrimary, 18.0f);
+        const FVector2D TimerSize = MeasureSpecText(Timer, 18.0f);
+        // On its own opaque chip: the number has to win against the glyph and
+        // the wedge edge underneath it.
+        DrawRect(BreakerUI::Alpha(BreakerUI::BgVoid, 0.9f),
+            X + Size * 0.5f - TimerSize.X * 0.5f - S(4.0f), Y + Size * 0.5f - TimerSize.Y * 0.5f,
+            TimerSize.X + S(8.0f), TimerSize.Y);
+        DrawSpecTextCentered(Timer, X + Size * 0.5f, Y + Size * 0.5f - TimerSize.Y * 0.5f, BreakerUI::TextPrimary, 18.0f);
     }
     // Unaffordable: a struck hex chip lower-centre on its own opaque plate, so
-    // it never tangles with the mark behind it. No sweep, by design.
+    // it never tangles with the mark behind it. No sweep, by design — nothing
+    // is filling, so waiting will not fix it.
     else if (bGranted && !bAffordable)
     {
-        const float HexR = S(9.0f);
+        const float HexR = Size * 0.11f;
         const float HexX = X + Size * 0.5f;
-        const float HexY = Y + Size * 0.72f;
-        DrawRect(BreakerUI::BgVoid, HexX - HexR, HexY - HexR, HexR * 2.0f, HexR * 2.0f);
+        const float HexY = Y + Size * 0.80f;
+        DrawRect(BreakerUI::Alpha(BreakerUI::BgVoid, 0.95f),
+            HexX - HexR * 1.3f, HexY - HexR * 1.2f, HexR * 2.6f, HexR * 2.4f);
         FVector2D Previous = FVector2D::ZeroVector;
         for (int32 Index = 0; Index <= 6; ++Index)
         {
             const float Angle = UE_PI / 3.0f * Index - UE_HALF_PI;
             const FVector2D Point(HexX + FMath::Cos(Angle) * HexR, HexY + FMath::Sin(Angle) * HexR);
-            if (Index > 0) DrawLine(Previous.X, Previous.Y, Point.X, Point.Y, BreakerUI::Harm, S(1.5f));
+            if (Index > 0) DrawLine(Previous.X, Previous.Y, Point.X, Point.Y, BreakerUI::Harm, S(1.25f));
             Previous = Point;
         }
-        DrawLine(HexX - HexR, HexY + HexR * 0.6f, HexX + HexR, HexY - HexR * 0.6f, BreakerUI::Harm, S(1.5f));
+        DrawLine(HexX - HexR, HexY + HexR * 0.6f, HexX + HexR, HexY - HexR * 0.6f, BreakerUI::Harm, S(1.25f));
     }
 
     // Key hint bottom-right, inheriting the state colour: a glance at the

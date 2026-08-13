@@ -165,6 +165,9 @@ private:
     // Hard-edged clockwise sweep from 12 o'clock, clipped to the square's own
     // boundary so it never spills past the plate edge.
     void DrawCooldownWedge(float X, float Y, float Size, float CoveredFraction, const FLinearColor& Color);
+    // Code-drawn stand-ins for the commissioned ability marks, built to the
+    // icon spec's construction notes. One stroke weight, one hue, no text.
+    void DrawAbilityGlyph(const class UBreakerAbilityDefinition* Definition, float CenterX, float CenterY, float BoxSize, const FLinearColor& Color);
     void DrawAbilitySlot(const ABreakerCharacter* Character, const UBreakerAbilityComponent* Abilities,
         EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, const FLinearColor& Accent);
 };
