@@ -59,6 +59,39 @@ chrome.
 
 Respec is per-tree and its button label states which tree it will clear.
 
+## Branch selection and the build summary (2026-08-13, playtest response)
+
+Two additions to the canvas above, both from the owner's playtest ("you can't
+really see the numerical significance of your points… there should be a button
+to select your subclass and swap between to the others").
+
+**Branch strip.** The class board draws ONE branch at a time. A chip row above
+the board carries every branch of the class — name plus `n / m INVESTED` — and
+a `COMPARE ALL` chip that restores the side-by-side view. Focusing one branch
+is what buys the board the width it needs: three full-detail columns inside a
+1200px panel is what made it feel cramped.
+
+This is **browsing, not commitment**, and the strip says so. See "Subclass
+commitment" under Not landed.
+
+**Build summary.** The detail rail is now two zones: a pinned BUILD TOTALS
+plate above, and the hover node card below it in its own scroll. Totals are
+READ from the character's live aggregation, never recomputed beside it — the
+five composed rows (damage, crit chance, crit damage, max health, DoT) come
+from the `FBreakerAttributeAggregator` the attribute set owns, and the
+tree-layer rows (move/slide/air, dodge, block) come from the same
+`FBreakerNodeStats` the movement and combat components consume. The damage row
+splits its additive Increased bucket by layer (`TREE +x% · GEAR +y%`), which is
+the one-bucket rule made visible.
+
+**Before/after on every node.** A node card leads with what the purchase would
+produce — `DAMAGE 1.06x -> 1.10x +4%` — and, for multi-rank nodes, the same
+line for buying to max. The per-rank authoring values still print beneath it.
+The projection composes through a COPY of the character's real aggregator with
+only the progression contribution swapped, so it cannot drift from the live
+numbers; `RiorsEdge.UI.SkillProjection.ProjectionMatchesRealPurchase` buys the
+node for real and asserts the attribute lands exactly where the arrow pointed.
+
 ## Implementation status (2026-08-13, layout re-zoning pass)
 
 Landed in `SBreakerMenu::BuildSkillTreesScreen`:
@@ -112,9 +145,61 @@ Not landed / known compromises:
   silently vanishes.
 - `TAB` is not bound to the board switch; the legend says click instead.
 - Motion is still unimplemented (panel transition, purchase-confirm snap).
-- The board sits in a vertical scroll box at its computed pixel width. With
-  more branches than a 1760-wide panel holds it will clip horizontally rather
-  than scroll. Sizing off the allotted width was rejected on purpose — that is
-  the pattern that caused the historical layout oscillation.
+- **Subclass commitment does not exist in the data model.**
+  `FBreakerProgressionState` has no chosen-branch field and
+  `UBreakerClassDefinition::BranchTrees` is a flat list with no selected
+  member, so the branch strip is a VIEW and the screen says so rather than
+  inventing a persistence rule the owner has not ruled on. A real commitment
+  needs: a branch id on `UBreakerProgressionTree` or a selected index on
+  `FBreakerProgressionState`; a one-way setter beside
+  `ChoosePermanentClassById` carrying the same permanence rule (or an explicit
+  Forge-respec rule); save-version handling in `UBreakerSaveGame`; and a ruling
+  on whether unselected branches become unpurchasable — a balance decision that
+  collides with O15 (branch nodes freely mixed, no mutually exclusive tiers).
+- **Only two of Swift's three branches exist as content.** Class-Kits §1.3–1.5
+  names them FRENZY, KINETIC and MARKSMAN (not "Survivor");
+  `UBreakerProgressionLibrary` authors Kinetic and Marksman only, so the strip
+  shows two chips. Frenzy is unauthored content, not a UI gap.
 - **Nothing here is visually verified.** The build compiles and the automation
-  suite passes; no one has looked at the screen.
+  suite passes; no one has looked at the screen. That is the standing gap on
+  every item above — including whether the clipping the owner reported is fully
+  gone.
+
+## Layout fixes, 2026-08-13 (the "numbers clip / clunky" pass)
+
+The screen was authored at a hard 1760x1000 and drawn on an `SCanvas` at fixed
+1920x1080-canvas pixels, with no relationship to the window it renders in.
+What was fixed, and why:
+
+- **The panel now sizes from the viewport**, read once per rebuild via
+  `GEngine->GameViewport->GetViewportSize` and clamped to the authored 1760x1000
+  ceiling. Previously a maximised PIE window (about 1920x1000 of client area)
+  gave the vertically centred `MaxDesiredHeight(1000)` plate 920px to live in,
+  so the header counters and the footer count were sliced off by the viewport,
+  and any window narrower than 1840 cut the right-hand column outright. This is
+  NOT the banned allotted-size pattern: nothing measures its own arrangement,
+  so there is no layout feedback loop — it is the rule `ABreakerPlaytestHUD`
+  already follows.
+- **The board scrolls in both axes** (a horizontal `SScrollBox` nested inside
+  the vertical one), retiring the known compromise above. The branch header
+  strip rides inside the horizontal scroll with the columns it labels.
+- **Node pitch, label width and label height are derived** from the measured
+  board width instead of being frozen at 176/168/86. The label block was the
+  literal overflow: `+18 CRIT DAMAGE / RANK (+1 MORE)` and a lock reason like
+  `REQUIRES 2 INVESTED (0)` wrapped to five or six lines inside an 86px box on
+  a 190px tier pitch, so the copy ran down through the tier hairline beneath
+  it. The board line is now compact (`+18 CRIT DMG · +3% DMG`, `GATE 0/2`) with
+  the full sentence on the rail, the box is 96px on a 216px tier, and the font
+  stays at the 11px caption floor.
+- **`EBreakerNodeStatTarget::Damage` was missing from `StatTargetLabel`**, so
+  every damage node on the board printed `+4% STAT` — the one stat the owner
+  most wanted to read was the one with no name.
+- **The right-label margin is only reserved when a node actually labels
+  right**, instead of unconditionally widening the board past the panel.
+- **Core cluster plates size to their chip rows** (six per row, arithmetic on a
+  known count — deliberately not an `SWrapBox`), instead of a flat 156px that
+  assumed one row and let a wide cluster's chips run out through the plate.
+- **The header compacts below 1500px** rather than pushing BACK off the band.
+- `ProgressionGatherTrees` now calls `UBreakerProgressionComponent::GetAvailableTrees`
+  instead of walking `ClassDefinition->BranchTrees` alone, so a character with
+  no class Data Asset sees the fallback content instead of an empty screen.

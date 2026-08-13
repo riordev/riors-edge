@@ -54,8 +54,11 @@ private:
     // an 88px header band at bg/raised carrying the title, the meta line and
     // the screen's own controls, the body beneath it, and an optional footer.
     // BuildFrame's centred plate is kept for the narrow screens.
+    // PanelHeight caps the plate the same way PanelWidth caps its width; the
+    // skill matrix derives both from the viewport so the screen cannot run off
+    // the edge of a window smaller than the authored 1920x1080 canvas.
     TSharedRef<SWidget> BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
-        const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth) const;
+        const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight = 1000.0f) const;
     // Event-driven limit tell: paints (or clears) the harm-red outline on the
     // equipment-column row a hovered backpack card would eject. Called from
     // OnHovered/OnUnhovered only — never from a tick or a paint attribute.
@@ -103,6 +106,17 @@ private:
     // constellation map). One tab pair, not a mode toggle — the header and
     // the detail rail persist across the swap.
     int32 SkillBoardTab = 0;
+    // Which class BRANCH the path board draws: an index into the screen's
+    // class-branch list, or -1 for the side-by-side compare view.
+    //
+    // This is a VIEW selection, not a commitment. Nothing in the data model
+    // records a chosen subclass — FBreakerProgressionState has no branch field
+    // and UBreakerClassDefinition::BranchTrees is a flat list with no notion of
+    // one being selected — so the screen lets the player browse and compare
+    // branches, and says plainly that it is browsing. See the "Subclass
+    // selection" note in BuildSkillTreesScreen for what a real commitment
+    // would need.
+    int32 SkillBranchIndex = 0;
     // The fixed 420px hover-detail rail. Node hover handlers swap its content
     // through SetContent; it is never driven by a per-frame attribute, and it
     // never changes width, so the board cannot reflow when it populates.
