@@ -899,6 +899,15 @@ void UBreakerWeaponComponent::FinishReload()
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 }
 
+FVector UBreakerWeaponComponent::GetVisualMuzzleLocation() const
+{
+    FVector ViewLocation;
+    FRotator ViewRotation;
+    GetViewPoint(ViewLocation, ViewRotation);
+    const FVector Offset = bAiming ? AimedMuzzleViewOffset : MuzzleViewOffset;
+    return ViewLocation + ViewRotation.RotateVector(Offset);
+}
+
 void UBreakerWeaponComponent::GetViewPoint(FVector& OutLocation, FRotator& OutRotation) const
 {
     if (const APawn* Pawn = Cast<APawn>(GetOwner()))

@@ -5,6 +5,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponFeel.h"
 #include "Weapons/BreakerWeaponMath.h"
+#include "UI/BreakerTracerMath.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponCadenceTest,
@@ -396,6 +397,83 @@ bool FBreakerViewmodelKickTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("The weapon springs back to rest"), State.IsAtRest());
     TestTrue(TEXT("The recovery is fast, not floaty"), Frames < 90);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Tracer flight. The shot is still hitscan — these tests are about the round
+// APPEARING to travel, which is the whole difference between a bullet and a
+// laser. The drawing is untestable; the maths behind it is not.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTracerFlightTest,
+    "RiorsEdge.Weapons.TracerFlight",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
+{
+    const BreakerHUD::FTracerFlight Flight;
+    const FVector Muzzle(0.0f, 0.0f, 0.0f);
+
+    // Flight time is clamped into the readable band at both extremes: a
+    // point-blank shotgun round still occupies frames, a sniper round across
+    // the field does not float.
+    const float PointBlank = BreakerHUD::TracerFlightSeconds(Flight, 150.0f);
+    const float LongShot = BreakerHUD::TracerFlightSeconds(Flight, 12000.0f);
+    TestTrue(TEXT("A point-blank round is on screen for at least the floor"),
+        PointBlank >= Flight.MinFlightSeconds - KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("A long round never exceeds the flight ceiling"),
+        LongShot <= Flight.MaxFlightSeconds + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("A longer shot still takes longer than a short one"), LongShot > PointBlank);
+
+    // A mid-range shot: the streak must actually move downrange between two
+    // samples, and never reach the wall early.
+    const FVector Impact(3000.0f, 0.0f, 0.0f);
+    const float Total = BreakerHUD::TracerFlightSeconds(Flight, 3000.0f);
+    const BreakerHUD::FTracerSample Early = BreakerHUD::SampleTracer(Flight, Muzzle, Impact, Total * 0.25f);
+    const BreakerHUD::FTracerSample Late = BreakerHUD::SampleTracer(Flight, Muzzle, Impact, Total * 0.75f);
+    TestTrue(TEXT("The round is visible while it is in flight"), Early.bVisible && Late.bVisible);
+    TestTrue(TEXT("The round travels downrange"), Late.Head.X > Early.Head.X);
+    TestTrue(TEXT("The head never overshoots the impact"), Late.Head.X <= Impact.X + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The tail never trails behind the muzzle"), Early.Tail.X >= -KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The streak is short, not a beam from muzzle to wall"),
+        (Late.Head - Late.Tail).Size() <= Flight.LengthCm + KINDA_SMALL_NUMBER);
+
+    // Arrival hands over to the impact burst rather than lingering.
+    const BreakerHUD::FTracerSample Landed = BreakerHUD::SampleTracer(Flight, Muzzle, Impact, Total + 0.01f);
+    TestTrue(TEXT("The round reports arrival"), Landed.bArrived);
+    TestFalse(TEXT("A landed round draws nothing"), Landed.bVisible);
+
+    // Muzzle and impact on top of one another would be a dot with a random
+    // direction; that draws nothing at all.
+    const BreakerHUD::FTracerSample Contact =
+        BreakerHUD::SampleTracer(Flight, Muzzle, FVector(20.0f, 0.0f, 0.0f), 0.01f);
+    TestFalse(TEXT("A contact-range shot draws no streak"), Contact.bVisible);
+
+    // The impact star is drawn in the plane the round punched through.
+    FVector U, V;
+    BreakerHUD::ImpactBasis(FVector(1.0f, 2.0f, -0.5f), U, V);
+    TestTrue(TEXT("Impact basis is unit length"),
+        FMath::IsNearlyEqual(static_cast<float>(U.Size()), 1.0f, 0.001f) &&
+        FMath::IsNearlyEqual(static_cast<float>(V.Size()), 1.0f, 0.001f));
+    TestTrue(TEXT("Impact basis is perpendicular to travel"),
+        FMath::IsNearlyZero(FVector::DotProduct(U, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f) &&
+        FMath::IsNearlyZero(FVector::DotProduct(V, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f));
+    TestTrue(TEXT("Impact basis axes are perpendicular to each other"),
+        FMath::IsNearlyZero(FVector::DotProduct(U, V), 0.001f));
+    // Straight down the world Z is the case that degenerates if the seed axis
+    // is chosen carelessly.
+    BreakerHUD::ImpactBasis(FVector::UpVector, U, V);
+    TestTrue(TEXT("A straight-up shot still yields a usable basis"),
+        !U.IsNearlyZero() && !V.IsNearlyZero());
+
+    // Distance-correct thickness: the old tracer was the same width at 2 m and
+    // at 80 m, which is most of why it read as a HUD line rather than a round.
+    const float Near = BreakerHUD::WorldRadiusToPixels(2.0f, 200.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
+    const float Far = BreakerHUD::WorldRadiusToPixels(2.0f, 8000.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
+    TestTrue(TEXT("A near round is fatter than a far one"), Near > Far);
+    TestTrue(TEXT("Thickness falls off inversely with depth"),
+        FMath::IsNearlyEqual(Near / Far, 40.0f, 0.1f));
     return true;
 }
 

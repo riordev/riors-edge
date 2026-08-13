@@ -112,6 +112,30 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FVector GetViewmodelLocationOffset() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FRotator GetViewmodelRotationOffset() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FBreakerRecoilProfile GetRecoilProfile() const { return ResolveRecoilProfile(); }
+
+    // ---- Presentation ------------------------------------------------------
+    // VISUAL ONLY, and deliberately NOT where the trace starts.
+    //
+    // The trace begins at the camera (GetViewPoint) and that is load-bearing:
+    // the feel layer's tested invariant is that recoil moves the aim and the
+    // round follows the aim, so the round always lands on the crosshair. This
+    // accessor exists so the tracer LINE can be drawn from the gun instead of
+    // from the middle of the player's face. Visual origin and trace origin
+    // differing is standard practice in every first-person shooter; the two
+    // converge at the impact point, which is the only place they must agree.
+    //
+    // Nothing in the damage path may call this.
+    UFUNCTION(BlueprintPure, Category="Weapon|Presentation") FVector GetVisualMuzzleLocation() const;
+    // Camera-space muzzle offset in centimetres: X forward, Y right, Z up.
+    // The default matches the placeholder weapon assembly on ABreakerCharacter
+    // (visual at +48 fwd / +18 right / -18 up, barrel a further +31.5 fwd once
+    // the parent scale is applied, half its own length again to the tip).
+    // O2 PLACEHOLDER — replace with a socket lookup when authored arms land.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Presentation")
+    FVector MuzzleViewOffset = FVector(95.0f, 18.0f, -18.0f);
+    // Aiming pulls the gun under the crosshair, so the muzzle comes with it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Presentation")
+    FVector AimedMuzzleViewOffset = FVector(95.0f, 2.0f, -6.0f);
     // Clears kick, bloom, and viewmodel state without touching the aim.
     UFUNCTION(BlueprintCallable, Category="Weapon|Feel") void ResetWeaponFeel();
 
