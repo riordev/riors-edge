@@ -241,6 +241,84 @@ bool FBreakerUnifiedRemovalTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerClassResourceFloorTest,
+    "RiorsEdge.Attributes.ClassResourceFloor",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerClassResourceFloorTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerAggregationTestHelpers;
+
+    // Spec D8. PreAttributeChange is called by name here because that is
+    // literally what GAS calls on every attribute write, including the instant
+    // GameplayEffect an ability cost applies (FGameplayAttribute::
+    // SetNumericValueChecked). Testing it directly tests the real cost path.
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    TestEqual(TEXT("Every character starts with a closed floor"), Attributes->GetClassResourceFloor(), 0.0f);
+
+    // THE REGRESSION GUARD: with a closed floor the clamp is the old [0, Max].
+    float Value = -45.0f;
+    Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("A closed floor clamps the bank at zero, exactly as before"), Value, 0.0f);
+    Value = 250.0f;
+    Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("A closed floor still clamps at the maximum"), Value, 100.0f);
+
+    // Caster opens it. This is the single line that makes Overcast reachable.
+    Attributes->ApplyClassResourceFloor(-20.0f);
+    TestEqual(TEXT("The floor opens to the Overcast depth"), Attributes->GetClassResourceFloor(), -20.0f);
+
+    Value = -15.0f;
+    Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("A cost may now drive the bank negative"), Value, -15.0f);
+    Value = -20.0f;
+    Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("A cost may land exactly on the floor"), Value, -20.0f);
+    Value = -45.0f;
+    Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("Nothing drives the bank past the floor"), Value, -20.0f);
+
+    // A positive floor would mean "this bank may never be emptied".
+    Attributes->ApplyClassResourceFloor(25.0f);
+    TestEqual(TEXT("A positive floor is refused and reads as closed"), Attributes->GetClassResourceFloor(), 0.0f);
+
+    // Closing the floor must lift a bank that is now stranded below it: a
+    // respec or class change cannot leave a character in permanent debt.
+    Attributes->ApplyClassResourceFloor(-20.0f);
+    Attributes->ApplyClassResource(-18.0f);
+    TestEqual(TEXT("The bank sits in debt"), Attributes->GetClassResource(), -18.0f);
+    Attributes->ApplyClassResourceFloor(0.0f);
+    TestEqual(TEXT("Closing the floor lifts the stranded bank to zero"), Attributes->GetClassResource(), 0.0f);
+    TestEqual(TEXT("Closing the floor closes it"), Attributes->GetClassResourceFloor(), 0.0f);
+
+    // The floor is NOT an aggregated attribute: no gear affix and no skill node
+    // bids on it, and a fold of (Base + flat) * (1 + Increased) over a base of
+    // zero would annihilate every percentage anyway. Prove the aggregation pass
+    // leaves it — and a bank sitting in debt — completely alone.
+    Attributes->ApplyClassResourceFloor(-20.0f);
+    Attributes->ApplyClassResource(-12.0f);
+
+    AActor* Owner = MakeOwner();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    Equipment->BindAttributes(Attributes);
+    Progression->BindAttributes(Attributes);
+    TArray<FBreakerItemInstance> Gear;
+    MakeTestGear(Gear);
+    for (const FBreakerItemInstance& Item : Gear) Equipment->EquipItem(Item);
+    Progression->LoadProgressionState(MakeTestNodes());
+
+    TestEqual(TEXT("Equipping gear and allocating nodes does not touch the floor"), Attributes->GetClassResourceFloor(), -20.0f);
+    TestEqual(TEXT("A recalculation does not silently repay the debt"), Attributes->GetClassResource(), -12.0f);
+    TestEqual(TEXT("The aggregated attributes still fold as before"), Attributes->GetMaxHealth(), 340.0f);
+
+    FText Failure;
+    Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
+    TestEqual(TEXT("A respec does not touch the floor either"), Attributes->GetClassResourceFloor(), -20.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerUnifiedReloadConvergenceTest,
     "RiorsEdge.Attributes.Unified.ReloadConverges",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

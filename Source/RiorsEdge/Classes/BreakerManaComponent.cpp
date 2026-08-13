@@ -41,8 +41,16 @@ void UBreakerManaComponent::BeginPlay()
             Weapon->OnShot.AddDynamic(this, &UBreakerManaComponent::HandleShot);
         }
     }
+    // Resolves the class, publishes the floor, and puts the Overcast state (and
+    // its damage penalty) in agreement with a bank that may have been restored
+    // from a save mid-debt.
     HandleProgressionChanged();
-    bOvercast = IsOvercastValue(GetMana());
+}
+
+void UBreakerManaComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
+{
+    Attributes = InAttributes;
+    RefreshClassOwnership();
 }
 
 float UBreakerManaComponent::HitGeneration(bool bWeakPoint, int32 LandedPellets, int32 PelletsPerShot, float WeaponHitGain, float WeakPointGain, float ProcCoefficient)
@@ -90,13 +98,40 @@ bool UBreakerManaComponent::CanSpendFrom(float Mana, float Cost, float Floor)
 
 void UBreakerManaComponent::HandleProgressionChanged()
 {
+    RefreshClassOwnership();
+}
+
+void UBreakerManaComponent::RefreshClassOwnership()
+{
     if (!CachedProgression.IsValid() && GetOwner())
     {
         CachedProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
-    bIsCaster = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Caster;
+    ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    bIsCaster = ObservedClass == EBreakerClassId::Caster;
     if (!bIsCaster) PendingGrants = 0.0f;
+    // Order matters: close the floor first (which lifts a stranded negative
+    // bank back to zero), then re-evaluate Overcast, so the incoming-damage
+    // penalty can never outlive the class that justified it.
+    SyncClassResourceFloor();
+    RefreshOvercastState();
+}
+
+void UBreakerManaComponent::SetOvercastFloor(float Floor)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    OvercastFloor = FMath::Min(0.0f, Floor);
+    SyncClassResourceFloor();
+    RefreshOvercastState();
+}
+
+void UBreakerManaComponent::SyncClassResourceFloor()
+{
+    // Server authority only: the floor is a replicated attribute, so a client
+    // that wrote its own would fight the replicated value.
+    if (!Attributes || (GetOwner() && !GetOwner()->HasAuthority())) return;
+    Attributes->ApplyClassResourceFloor(GetPublishedFloor());
 }
 
 bool UBreakerManaComponent::IsActiveForOwner() const
@@ -128,7 +163,7 @@ float UBreakerManaComponent::GetOvercastIncomingDamageTaken() const
 
 bool UBreakerManaComponent::CanAffordSpend(float Cost) const
 {
-    return IsActiveForOwner() && CanSpendFrom(GetMana(), Cost, GetOvercastFloor());
+    return IsActiveForOwner() && CanSpendFrom(GetMana(), Cost, GetPublishedFloor());
 }
 
 bool UBreakerManaComponent::TrySpendMana(float Cost)
@@ -151,7 +186,11 @@ bool UBreakerManaComponent::IsInSafeZone() const
 void UBreakerManaComponent::ApplyManaDelta(float Delta)
 {
     if (!Attributes || FMath::IsNearlyZero(Delta)) return;
-    Attributes->SetClassResource(ClampToBank(Attributes->GetClassResource() + Delta, GetOvercastFloor(), Attributes->GetMaxClassResource()));
+    // ApplyClassResource, not the generated setter: identical in play (both go
+    // through the ability system's base-value write and the same clamp), but it
+    // does not fatally assert on an attribute set with no ability system, which
+    // is what makes the whole loop exercisable in an automation test.
+    Attributes->ApplyClassResource(ClampToBank(Attributes->GetClassResource() + Delta, GetPublishedFloor(), Attributes->GetMaxClassResource()));
 }
 
 void UBreakerManaComponent::RefreshOvercastState()
@@ -247,9 +286,22 @@ void UBreakerManaComponent::HandleShot(const FBreakerShotResult& Shot)
 void UBreakerManaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    AdvanceLoop(DeltaTime);
+}
 
+void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
+{
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
+
+    // Class changes that do not broadcast (DevForceClass, and any future path
+    // that mutates the progression state directly) would otherwise leave this
+    // component publishing a Caster floor for a non-Caster. Cheap comparison,
+    // and it is the safety net that guarantees the floor cannot be stranded.
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    const EBreakerClassId LiveClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    if (LiveClass != ObservedClass) RefreshClassOwnership();
+
     if (!IsActiveForOwner())
     {
         PendingGrants = 0.0f;

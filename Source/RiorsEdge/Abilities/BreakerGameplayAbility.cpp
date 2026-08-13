@@ -76,9 +76,29 @@ float UBreakerGameplayAbility::GetCurrentClassResource() const
     return Attributes ? Attributes->GetClassResource() : 0.0f;
 }
 
+float UBreakerGameplayAbility::GetCurrentClassResourceFloor() const
+{
+    const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
+    return Attributes ? FMath::Min(0.0f, Attributes->GetClassResourceFloor()) : 0.0f;
+}
+
 bool UBreakerGameplayAbility::IsAffordable(float CurrentResource, float Cost)
 {
-    return Cost <= 0.0f || CurrentResource >= Cost;
+    return IsAffordableWithFloor(CurrentResource, Cost, 0.0f);
+}
+
+bool UBreakerGameplayAbility::IsAffordableWithFloor(float CurrentResource, float Cost, float Floor)
+{
+    if (Cost <= 0.0f) return true;
+    const float DebtAllowance = FMath::Min(0.0f, Floor);
+    // The closed floor case is written as the original expression rather than
+    // as "0 - Cost >= 0" so that every existing class keeps bit-identical
+    // affordability, float edges included.
+    if (DebtAllowance == 0.0f) return CurrentResource >= Cost;
+    // Class-Kits §2.1: "No further ability may be cast until Mana is at or
+    // above zero."
+    if (CurrentResource < 0.0f) return false;
+    return CurrentResource - Cost >= DebtAllowance - KINDA_SMALL_NUMBER;
 }
 
 bool UBreakerGameplayAbility::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags) const
