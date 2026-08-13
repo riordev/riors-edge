@@ -103,7 +103,13 @@ clamping, monotone recovery to exactly zero, compensation credit, the ADS
 difference, bloom growth and decay, spring return to rest — and prove nothing
 about whether it feels good.
 
-## Round presentation (tracers, muzzle origin, impacts, rocket)
+## Round presentation, first pass (tracers, muzzle origin, impacts, rocket)
+
+**Largely superseded** — read the second-pass section below for what actually
+ships. The muzzle-origin accessor and the projectile-weapon exemption survive
+intact; the canvas drawing, the 9 m streak, the six-spoke star and the rocket
+build described here do not. Kept because the second pass is only legible next
+to the trade this one recorded.
 
 Owner report: "the bullet projectiles look a bit strange." Four causes were
 real, one was not.
@@ -151,28 +157,104 @@ What it is now:
   degrees.
 - Projectile weapons no longer record a HUD tracer at all.
 
-**Depth trade-off.** The tracer stayed on the HUD canvas, so it does not
-depth-sort: a streak composites over whatever is in front of it. This is safe
-here and only here, because every point on the streak lies on a line from
-(almost) the camera to a point the camera's own trace reached unobstructed —
-the muzzle is ~20 cm off the camera, so only geometry inside that sliver can
-wrongly occlude. The alternative (pooled world primitives) buys correct sorting
-at the cost of a pool, a material, and a per-frame transform update for a thing
-that lives 0.2 s. If a streak is ever seen through a wall, that is the trade
-being paid, and the fix is to move the layer into the world, not to tweak it.
+**Depth trade-off, and how it was paid.** The first pass kept the tracer on
+the HUD canvas and wrote the trade down: a canvas line does not depth-sort, so
+it composites over whatever is in front of it, and the stated fix if that ever
+showed was to move the layer into the world. It showed.
 
-`ABreakerRocketProjectile` got the matching pass: casing, nose cone, two fins
-and an emissive exhaust bloom from `/Engine/BasicShapes` primitives with
-dynamic material instances, coloured from the same orange tokens, plus a point
-light and a roll on the warhead. On detonation the rocket becomes its own
-explosion — collision and movement off, casing hidden, the exhaust bloom scaled
-to two thirds of the damage radius, the light flared — and dies
-`ExplosionFlashSeconds` later. No second actor, no pool, and clients see it
+## Round presentation, second pass (world-space tracers)
+
+Owner report on the first pass: "projectiles are ugly and weird." The
+parameters from the first pass were mostly right; the APPROACH was not.
+
+**Diagnosis.** A canvas stroke composites over the world, so a round could draw
+in front of the pillar it should have been behind; it held a screen-space
+width, so it never foreshortened when you shot along it; and at 9 m long it was
+not a round at all, it was a rod. Three more things were wrong on their own
+terms: every single round left a streak, so held automatic fire stacked two and
+a half overlapping streaks at all times and read as one continuous beam; the
+impact was a six-spoke star, which is a symbol rather than an event; and the
+rocket was five bright shapes rolling at 540 deg/s, which is a spinning toy.
+
+What it is now:
+
+- **The round is a world primitive.** `Source/RiorsEdge/UI/BreakerTracerRenderer.{h,cpp}`
+  is a client-side, non-replicated, lazily-spawned actor holding a fixed pool
+  of `UStaticMeshComponent`s: 12 tracers x (head + trail) and 24 impact sparks,
+  all `CreateDefaultSubobject`ed once. Nothing is spawned or destroyed per
+  bullet. Slots recycle round-robin.
+- **It depth-sorts.** The material is `/Engine/EngineMaterials/EmissiveMeshMaterial`
+  — unlit, additive. Additive translucency still depth-TESTS against the opaque
+  scene, so a wall occludes a round correctly, and unlit means the round reads
+  as light rather than as a painted stick. Its parameters were MEASURED, not
+  guessed (a throwaway automation probe over `GetAll*ParameterInfo`): vector
+  `Color`, texture `LinearColor`. That texture defaults to a WHITE GRID, so
+  `Source/RiorsEdge/UI/BreakerGlowMaterial.h` overrides it with
+  `WhiteSquareTexture`; without that override every tracer would have graph
+  paper printed on it. Additive surfaces have no alpha, so a fade is a multiply
+  toward black.
+- **Shape: a bright dash with a faint trail, not a rod.** `LengthCm` 900 -> 240,
+  split into a `HeadLengthCm` 55 bright head (`BreakerUI::Orange`, intensity
+  3.2) and a thinner, dimmer trail (`OrangeDeep`, 0.55). Two primitives,
+  because one stretched box cannot be bright at one end without a material that
+  does not exist yet. `SpeedCms` 26000 -> 30000, flight band
+  [0.045, 0.20], `MinimumTravelCm` 60 -> 120.
+- **World thickness with a screen floor.** `TracerThicknessCm` keeps the
+  authored 2.6 cm up close and widens the round in world space only as far as
+  needed to hold ~1.4 px at 1080p, so a round at 80 m does not strobe out of
+  existence between frames. `WorldRadiusToPixels` is gone with the canvas.
+- **Not every round traces.** `TracerRoundsPerTracer` returns 3 above 300 RPM
+  and 1 below it: rifle/SMG trace one round in three, sniper and other slow
+  weapons trace every round (a bolt-action skipping two shots in three would
+  read as broken, not restrained). Round 0 always traces, so the first round of
+  an engagement is the one that teaches where the gun points.
+- **The impact is a point flash.** The six-spoke star is gone. It is now a
+  small additive sphere that pops to `ImpactRadiusCm` 13 and collapses over
+  `ImpactSeconds` 0.10 — decay, not growth, because a bullet strike is not a
+  shockwave. Having no orientation, it cannot be oriented wrongly, which was
+  the star's whole problem given that `FBreakerShotResult` carries no impact
+  normal. The flash fires on EVERY hit, traced or not: hit confirmation is
+  feedback, tracer density is decoration.
+- **Pellet weapons get no streak.** `FBreakerShotResult` carries one impact
+  point for a whole spread, so the shotgun previously drew a single line for
+  eight pellets — a lie about where they went, and its own inconsistency. It
+  now gets the impact flash only. **Known gap, deliberately not forced from the
+  HUD:** doing this properly needs `FBreakerShotResult` to carry per-pellet
+  impacts, which is the weapon layer's contract to change.
+- Projectile weapons still record no tracer at all.
+
+`ABreakerRocketProjectile` was rebuilt on the same honesty. The old build had
+an orange casing, a cone nose, a cross of fins, a sphere on the back, and a
+540 deg/s roll — the body was the same colour as its own flame so nothing
+separated object from thrust, fins on a 50 cm primitive at 3000 cm/s are never
+resolved by the eye, and a rolling warhead is not a thing. Now: a DARK body
+(`Panel20` casing, `BorderEmphasis` nose) carrying the only bright element, an
+unlit additive flame stretched along -X that grows backward from the nozzle.
+Fins and roll deleted. The single animation is an `ExhaustFlickerHz` 26 /
+`ExhaustFlickerAmount` 0.22 two-term flicker of the flame's length and
+brightness, phased off world time so two rockets are never in sync. The point
+light drops 3200/420 cm -> 2000/340 cm. Detonation is unchanged in structure:
+collision and movement off, casing hidden, the flame scaled uniform to two
+thirds of the damage radius at `FireballIntensity` 6, the light flared, actor
+dead `ExplosionFlashSeconds` later. No second actor, no pool, clients see it
 through the existing cosmetic multicast.
 
-Nothing in this section has been PLAYTESTED. `RiorsEdge.Weapons.TracerFlight`
-proves the flight maths, the basis construction and the inverse-depth
-thickness; it proves nothing about whether a round now looks like a round.
+**Knobs.** `BreakerHUD::FTracerFlight` (speed, streak length, head length,
+flight band, minimum travel) and `BreakerHUD::FTracerLook` (thickness, trail
+thickness scale, screen-width floor, head/trail/impact intensities, impact
+seconds and radius) in `BreakerTracerMath.h`; `TracerRoundsPerTracer`'s 300 RPM
+threshold and 3-round cadence in the same header; pool sizes in
+`BreakerTracerRenderer.h`; `ExhaustLengthCm` / `ExhaustFlickerAmount` /
+`ExhaustFlickerHz` / `ExplosionFlashSeconds` as EditAnywhere on the rocket.
+Every one of them is O2 PLACEHOLDER.
+
+Nothing in this section has been PLAYTESTED, and this is the second attempt at
+a purely visual complaint, so say it plainly: automation cannot see the screen.
+`RiorsEdge.Weapons.TracerFlight` was updated rather than trimmed — it lost the
+`ImpactBasis` and `WorldRadiusToPixels` assertions because those functions no
+longer exist, and gained coverage of the head/trail split, the shortened
+streak, the screen-width floor, and tracer cadence. It proves none of these
+things look good.
 
 ## Runtime flow
 

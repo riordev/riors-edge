@@ -117,6 +117,27 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
   whether the orb actually reads in flight is exactly what automation cannot
   check. Knob table in `Docs/Playtest-Gym-v1.md`. Known gap: the playtest
   report does not separate ranged from melee TTK samples (Playtest/ untouched).
+- ROUNDS IN FLIGHT ARE WORLD PRIMITIVES (owner, twice: "the bullet projectiles
+  look a bit strange", then "projectiles are ugly and weird"). The second pass
+  changed the APPROACH, not the numbers. `ABreakerTracerRenderer` (UI/) is a
+  client-side, non-replicated, lazily-spawned pool actor — 12 tracers x
+  (head + trail) plus 24 impact sparks, all CreateDefaultSubobject'ed once, no
+  per-bullet spawn. The material is `/Engine/EngineMaterials/EmissiveMeshMaterial`
+  (unlit + additive, so a round reads as light AND still depth-tests against
+  the opaque scene, which is the whole point: the canvas version composited
+  over walls). Its parameters were measured, not guessed: vector `Color`,
+  texture `LinearColor` — the latter defaults to a WHITE GRID and must be
+  overridden with WhiteSquareTexture, which `UI/BreakerGlowMaterial.h` does for
+  every caller. Streak 900 -> 240 cm split into a 55 cm bright head and a
+  dimmer trail; thickness is world cm with a screen-width floor; one round in
+  three traces above 300 RPM and every round below it; pellet weapons get no
+  streak at all (the shot contract carries one impact for a whole spread —
+  fixing that properly needs per-pellet impacts in `FBreakerShotResult`); the
+  six-spoke impact star is a collapsing point flash. The rocket lost its fins
+  and its 540 deg/s roll and is now a dark body with an additive flickering
+  flame. Every value is O2 PLACEHOLDER and NOT PLAYTESTED — automation cannot
+  see the screen, which is exactly the limit that let two visual passes ship.
+  See the second-pass section of `Docs/Weapon-Foundation.md`.
 - The gym has an overgrown-Earth dressing pass (O24) in BreakerGameMode: seeded vegetation/ruins/tech props via dynamic material instances, saturated teal on exactly two suppression objects per the object-chroma law. Cosmetic only.
 - A parallel design sprint produced nine docs under `Docs/Design/` (class kits, constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, synthesis overview). `Design-Overview.md` §7 is the ranked owner-decision list; consult it before authoring content in any of those domains.
 - `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.

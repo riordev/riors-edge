@@ -404,6 +404,18 @@ bool FBreakerViewmodelKickTest::RunTest(const FString& Parameters)
 // Tracer flight. The shot is still hitscan — these tests are about the round
 // APPEARING to travel, which is the whole difference between a bullet and a
 // laser. The drawing is untestable; the maths behind it is not.
+//
+// UPDATED with the second visual pass. Three of the old assertions are gone
+// because the things they asserted are gone, not because they were in the way:
+//   * ImpactBasis — the impact was a six-spoke star drawn in the plane
+//     perpendicular to travel. It is a point flash now, which has no plane and
+//     therefore no basis to test.
+//   * WorldRadiusToPixels — the round was a canvas line whose PIXEL width was
+//     derived from its depth. It is a world primitive now, so it has a world
+//     thickness and the depth maths belongs to the renderer; the replacement
+//     is TracerThicknessCm, tested below.
+// What replaces them is the head/trail split, the shortened streak, the
+// screen-width floor, and tracer cadence.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerTracerFlightTest,
@@ -450,30 +462,78 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
         BreakerHUD::SampleTracer(Flight, Muzzle, FVector(20.0f, 0.0f, 0.0f), 0.01f);
     TestFalse(TEXT("A contact-range shot draws no streak"), Contact.bVisible);
 
-    // The impact star is drawn in the plane the round punched through.
-    FVector U, V;
-    BreakerHUD::ImpactBasis(FVector(1.0f, 2.0f, -0.5f), U, V);
-    TestTrue(TEXT("Impact basis is unit length"),
-        FMath::IsNearlyEqual(static_cast<float>(U.Size()), 1.0f, 0.001f) &&
-        FMath::IsNearlyEqual(static_cast<float>(V.Size()), 1.0f, 0.001f));
-    TestTrue(TEXT("Impact basis is perpendicular to travel"),
-        FMath::IsNearlyZero(FVector::DotProduct(U, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f) &&
-        FMath::IsNearlyZero(FVector::DotProduct(V, FVector(1.0f, 2.0f, -0.5f).GetSafeNormal()), 0.001f));
-    TestTrue(TEXT("Impact basis axes are perpendicular to each other"),
-        FMath::IsNearlyZero(FVector::DotProduct(U, V), 0.001f));
-    // Straight down the world Z is the case that degenerates if the seed axis
-    // is chosen carelessly.
-    BreakerHUD::ImpactBasis(FVector::UpVector, U, V);
-    TestTrue(TEXT("A straight-up shot still yields a usable basis"),
-        !U.IsNearlyZero() && !V.IsNearlyZero());
+    // --- Head and trail -----------------------------------------------------
+    // The streak is not a uniform bar. Most of its brightness is in a short
+    // head at the front, with a dim trail behind; the renderer draws those as
+    // two primitives, so the split has to be well ordered at every age.
+    TestTrue(TEXT("The head section sits between the tail and the head"),
+        Late.HeadStart.X >= Late.Tail.X - KINDA_SMALL_NUMBER &&
+        Late.HeadStart.X <= Late.Head.X + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The bright head is never longer than its authored length"),
+        (Late.Head - Late.HeadStart).Size() <= Flight.HeadLengthCm + KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("A settled round has a trail behind its head"),
+        BreakerHUD::TracerHasTrail(Late));
 
-    // Distance-correct thickness: the old tracer was the same width at 2 m and
-    // at 80 m, which is most of why it read as a HUD line rather than a round.
-    const float Near = BreakerHUD::WorldRadiusToPixels(2.0f, 200.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
-    const float Far = BreakerHUD::WorldRadiusToPixels(2.0f, 8000.0f, 1080.0f, FMath::DegreesToRadians(30.0f));
-    TestTrue(TEXT("A near round is fatter than a far one"), Near > Far);
-    TestTrue(TEXT("Thickness falls off inversely with depth"),
-        FMath::IsNearlyEqual(Near / Far, 40.0f, 0.1f));
+    // On the first frames the whole round IS the head: the trail has not been
+    // paid out of the muzzle yet, and drawing a degenerate one would be a
+    // flickering sliver at the barrel.
+    const BreakerHUD::FTracerSample JustLeft =
+        BreakerHUD::SampleTracer(Flight, Muzzle, Impact, Flight.HeadLengthCm * 0.5f / Flight.SpeedCms);
+    if (JustLeft.bVisible)
+    {
+        TestFalse(TEXT("A round that has only just left has no trail yet"),
+            BreakerHUD::TracerHasTrail(JustLeft));
+    }
+
+    // The streak is SHORT. Nine metres was the previous authored length and it
+    // read as a rod; this is the assertion that stops it drifting back.
+    TestTrue(TEXT("The whole streak is under three metres"), Flight.LengthCm <= 300.0f);
+    TestTrue(TEXT("Most of the streak is trail, not head"),
+        Flight.HeadLengthCm < Flight.LengthCm * 0.5f);
+
+    // --- Screen-width floor -------------------------------------------------
+    // The round is a world primitive now, so its thickness is world
+    // centimetres and a far round would be sub-pixel and strobe. The floor
+    // widens it in world space only as far as it must, and leaves near rounds
+    // exactly as authored.
+    const BreakerHUD::FTracerLook Look;
+    const float HalfFOV = FMath::DegreesToRadians(30.0f);
+    const float NearThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 200.0f, Look.MinScreenFraction, HalfFOV);
+    const float FarThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 8000.0f, Look.MinScreenFraction, HalfFOV);
+    TestTrue(TEXT("A near round keeps its authored world thickness"),
+        FMath::IsNearlyEqual(NearThickness, Look.ThicknessCm, 0.01f));
+    TestTrue(TEXT("A far round is widened rather than left sub-pixel"), FarThickness > NearThickness);
+    // Once the floor is doing the work, thickness is linear in distance, which
+    // is exactly what holds the on-screen width constant.
+    const float FarerThickness = BreakerHUD::TracerThicknessCm(Look.ThicknessCm, 16000.0f, Look.MinScreenFraction, HalfFOV);
+    TestTrue(TEXT("Beyond the floor, world thickness scales with distance"),
+        FMath::IsNearlyEqual(FarerThickness / FarThickness, 2.0f, 0.01f));
+
+    // --- Cadence ------------------------------------------------------------
+    // Every round used to leave a streak, which is what made held automatic
+    // fire read as one continuous beam. Fast weapons now trace one in three;
+    // slow ones trace every round, because a bolt-action that skipped two
+    // shots in three would read as broken rather than as restrained.
+    const int32 RifleCadence = BreakerHUD::TracerRoundsPerTracer(600.0f);
+    const int32 SniperCadence = BreakerHUD::TracerRoundsPerTracer(55.0f);
+    TestTrue(TEXT("A fast weapon traces a fraction of its rounds"), RifleCadence > 1);
+    TestEqual(TEXT("A slow weapon traces every round"), SniperCadence, 1);
+
+    int32 Traced = 0;
+    for (int32 Round = 0; Round < 30; ++Round)
+    {
+        if (BreakerHUD::ShouldTraceRound(Round, RifleCadence)) ++Traced;
+    }
+    TestEqual(TEXT("Thirty rifle rounds leave ten streaks"), Traced, 10);
+    TestTrue(TEXT("The first round of a burst always traces"),
+        BreakerHUD::ShouldTraceRound(0, RifleCadence));
+
+    Traced = 0;
+    for (int32 Round = 0; Round < 8; ++Round)
+    {
+        if (BreakerHUD::ShouldTraceRound(Round, SniperCadence)) ++Traced;
+    }
+    TestEqual(TEXT("Every slow round leaves a streak"), Traced, 8);
     return true;
 }
 
