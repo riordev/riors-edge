@@ -18,6 +18,7 @@
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SWrapBox.h"
+#include "UI/BreakerUIStyle.h"
 #include "Algo/Reverse.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
@@ -25,20 +26,95 @@
 
 namespace
 {
-    const FLinearColor Background(0.008f, 0.012f, 0.022f, 1.0f);
-    const FLinearColor Panel(0.025f, 0.04f, 0.065f, 0.98f);
-    const FLinearColor PanelRaised(0.045f, 0.07f, 0.105f, 1.0f);
-    const FLinearColor Cyan(0.12f, 0.78f, 1.0f, 1.0f);
-    const FLinearColor SoftText(0.62f, 0.72f, 0.82f, 1.0f);
-    // Destructive-confirm accent; only ever used for an armed cleanup button.
-    const FLinearColor Amber(1.0f, 0.5f, 0.08f, 1.0f);
+    // ---------------------------------------------------------------------
+    // FIELDPLATE. Every colour on this screen comes from BreakerUIStyle.h —
+    // see Docs/Design/UI-Style-Guide-Fieldplate.md. The old local names are
+    // kept as aliases so the whole file moves onto the system in one place
+    // instead of a thousand call sites.
+    // ---------------------------------------------------------------------
+    const FLinearColor Background = BreakerUI::BgVoid;      // screen field
+    const FLinearColor Panel = BreakerUI::Panel00;          // plate face
+    const FLinearColor PanelRaised = BreakerUI::Panel10;    // cards, rows, slots
+    const FLinearColor PanelHover = BreakerUI::Panel20;     // headers, selected
+    const FLinearColor Cyan = BreakerUI::Cyan;              // player / system
+    const FLinearColor Primary = BreakerUI::TextPrimary;
+    const FLinearColor SoftText = BreakerUI::TextSecondary;
+    const FLinearColor Muted = BreakerUI::TextMuted;
+    const FLinearColor Disabled = BreakerUI::TextDisabled;
+    const FLinearColor BorderRest = BreakerUI::BorderRest;
+    const FLinearColor BorderEmphasis = BreakerUI::BorderEmphasis;
+    const FLinearColor Harm = BreakerUI::Harm;
+    const FLinearColor HarmDeep = BreakerUI::HarmDeep;
+    // Reward / purchase-confirm gold. Gold is the only colour that means
+    // "spend now", which is what makes scanning a tree work.
+    const FLinearColor Amber = BreakerUI::Gold;
+    const FLinearColor Transparent(0.0f, 0.0f, 0.0f, 0.0f);
 
-    TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = FLinearColor::White, bool bBold = false)
+    TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = BreakerUI::TextPrimary, bool bBold = false)
     {
         return SNew(STextBlock)
             .Text(Text)
             .ColorAndOpacity(Color)
             .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
+    }
+
+    TSharedRef<SWidget> SolidBlock(const FLinearColor& Color)
+    {
+        return SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(Color)
+            [
+                SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+            ];
+    }
+
+    // 1px ring around a control. Buttons in this system are a fill plus a
+    // border; Slate's button brush has no border, so it gets one here.
+    TSharedRef<SWidget> BorderWrap(const TSharedRef<SWidget>& Inner, const FLinearColor& BorderColor, float Thickness = BreakerUI::BorderThin)
+    {
+        return SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BorderColor)
+            .Padding(FMargin(Thickness))
+            [
+                Inner
+            ];
+    }
+
+    // A plate: flat face, 1px border, one 3px rail full-bleed to the edge.
+    // FIELDPLATE 03 — the rail is the signature, and one plate never carries
+    // two of them. RailEdge Left is identity, Top is transient status.
+    TSharedRef<SWidget> MakePlate(const TSharedRef<SWidget>& Content, const FLinearColor& Face, const FLinearColor& Rail,
+        const FMargin& ContentPadding = FMargin(16.0f, 12.0f), bool bTopRail = false,
+        const FLinearColor& BorderColor = BreakerUI::BorderRest)
+    {
+        TSharedRef<SWidget> Face2 = SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(Face)
+            .Padding(ContentPadding)
+            [
+                Content
+            ];
+
+        TSharedRef<SWidget> Railed = bTopRail
+            ? StaticCastSharedRef<SWidget>(
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[SNew(SBox).HeightOverride(BreakerUI::RailThickness)[SolidBlock(Rail)]]
+                + SVerticalBox::Slot().FillHeight(1.0f)[Face2])
+            : StaticCastSharedRef<SWidget>(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::RailThickness)[SolidBlock(Rail)]]
+                + SHorizontalBox::Slot().FillWidth(1.0f)[Face2]);
+
+        // The 1px border is the outermost ring: borders carry depth in this
+        // system, gradients do not exist.
+        return SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BorderColor)
+            .Padding(FMargin(BreakerUI::BorderThin))
+            [
+                Railed
+            ];
     }
 }
 
@@ -155,16 +231,23 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
 
 TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth) const
 {
+    // Header zone: h1 title top-left with the caption directly beneath it,
+    // separated from the body by a 1px divider rather than by whitespace —
+    // the system reads structure off borders, not off gaps.
     TSharedRef<SVerticalBox> PanelContent = SNew(SVerticalBox);
-    PanelContent->AddSlot().AutoHeight().Padding(42.0f, 34.0f, 42.0f, 0.0f)
+    PanelContent->AddSlot().AutoHeight()
     [
-        MenuText(Title, 38, FLinearColor::White, true)
+        MenuText(Title, BreakerUI::TypeH1, Primary, true)
     ];
-    PanelContent->AddSlot().AutoHeight().Padding(44.0f, 5.0f, 42.0f, 22.0f)
+    PanelContent->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space16)
     [
-        MenuText(Subtitle, 12, Cyan, true)
+        MenuText(Subtitle, BreakerUI::TypeCaption, Muted, true)
     ];
-    PanelContent->AddSlot().FillHeight(1.0f).Padding(42.0f, 0.0f, 42.0f, 34.0f)
+    PanelContent->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+    [
+        SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+    ];
+    PanelContent->AddSlot().FillHeight(1.0f)
     [
         Body
     ];
@@ -176,25 +259,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
             .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
             .BorderBackgroundColor(Background)
         ]
-        + SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Top)
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
-            SNew(SBox).HeightOverride(5.0f)
+            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(880.0f)
             [
-                SNew(SBorder)
-                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                .BorderBackgroundColor(Cyan)
-            ]
-        ]
-        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(28.0f)
-        [
-            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(820.0f)
-            [
-                SNew(SBorder)
-                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                .BorderBackgroundColor(Panel)
-                [
-                    PanelContent
-                ]
+                // The screen plate carries the cyan identity rail: the front
+                // end belongs to the player/system family.
+                MakePlate(PanelContent, Panel, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space24))
             ]
         ];
 }
@@ -205,23 +276,29 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
     auto AddTab = [this, &Tabs, ActiveScreen](const FString& Label, EBreakerMenuScreen Target)
     {
         const bool bActive = ActiveScreen == Target;
-        Tabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)
+        // Selected carries the 2px accent border; unselected keeps the same
+        // geometry on a neutral 1px ring. Never a teal underline — teal is a
+        // noun in this system, and a tab is not a rift object.
+        Tabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
         [
-            SNew(SButton)
-            .ButtonColorAndOpacity(bActive ? Cyan : PanelRaised)
-            .ContentPadding(FMargin(16.0f, 6.0f))
-            .OnClicked(FOnClicked::CreateLambda([this, Target, bActive]()
-            {
-                if (!bActive)
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bActive ? PanelHover : Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, Target, bActive]()
                 {
-                    if (Target == EBreakerMenuScreen::SkillTrees) SkillTreeStatus = FText::GetEmpty();
-                    Rebuild(Target);
-                }
-                return FReply::Handled();
-            }))
-            [
-                MenuText(FText::FromString(Label), 11, FLinearColor::White, true)
-            ]
+                    if (!bActive)
+                    {
+                        if (Target == EBreakerMenuScreen::SkillTrees) SkillTreeStatus = FText::GetEmpty();
+                        Rebuild(Target);
+                    }
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bActive ? Primary : Muted, true)
+                ],
+                bActive ? Cyan : BorderEmphasis,
+                bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
     AddTab(TEXT("EQUIPMENT"), EBreakerMenuScreen::Inventory);
@@ -229,18 +306,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
     return Tabs;
 }
 
+// FIELDPLATE 01, interaction states. Primary: panel/20 fill inside a 1px cyan
+// ring, text/primary. Secondary: no fill inside a 1px #2A3E58 ring,
+// text/secondary. Neither ever changes opacity — that would show the plate
+// seams behind it.
 TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary) const
 {
-    return SNew(SBox).HeightOverride(52.0f)
+    return SNew(SBox).HeightOverride(BreakerUI::MinHitTarget + BreakerUI::Space8)
     [
-        SNew(SButton)
-        .ButtonColorAndOpacity(bPrimary ? Cyan : PanelRaised)
-        .ContentPadding(FMargin(18.0f, 10.0f))
-        .HAlign(HAlign_Left)
-        .OnClicked(OnClicked)
-        [
-            MenuText(Label, 14, FLinearColor::White, true)
-        ]
+        BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(bPrimary ? PanelHover : Panel)
+            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+            .HAlign(HAlign_Left)
+            .VAlign(VAlign_Center)
+            .OnClicked(OnClicked)
+            [
+                MenuText(Label, BreakerUI::TypeBody, bPrimary ? Primary : SoftText, true)
+            ],
+            bPrimary ? Cyan : BorderEmphasis)
     ];
 }
 
@@ -361,7 +445,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
     [
         SNew(STextBlock)
         .Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("LOOK SENSITIVITY     %.2f"), Character.IsValid() ? Character->GetLookSensitivity() : 1.0f)); })
-        .ColorAndOpacity(FLinearColor::White)
+        .ColorAndOpacity(Primary)
         .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 20.0f)
@@ -377,7 +461,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
     [
         SNew(STextBlock)
         .Text_Lambda([this]() { return FText::FromString(FString::Printf(TEXT("FIELD OF VIEW     %.0f"), Character.IsValid() ? Character->GetCurrentFOV() : 90.0f)); })
-        .ColorAndOpacity(FLinearColor::White)
+        .ColorAndOpacity(Primary)
         .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 13))
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 20.0f)
@@ -398,7 +482,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
             if (Character.IsValid()) Character->ApplyMenuSettings(Character->GetLookSensitivity(), Character->GetCurrentFOV(), State == ECheckBoxState::Checked);
         })
         [
-            MenuText(FText::FromString(TEXT("INVERT VERTICAL LOOK")), 13, FLinearColor::White, true)
+            MenuText(FText::FromString(TEXT("INVERT VERTICAL LOOK")), 13, Primary, true)
         ]
     ];
 
@@ -414,16 +498,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
 
 TSharedRef<SWidget> SBreakerMenu::MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const
 {
-    return SNew(SBorder)
-        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-        .BorderBackgroundColor(PanelRaised)
-        .Padding(FMargin(18.0f, 15.0f))
-        [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[MenuText(Slot, 10, Accent, true)]
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 5.0f)[MenuText(Name, 20, FLinearColor::White, true)]
-            + SVerticalBox::Slot().AutoHeight()[MenuText(Details, 10, SoftText)]
-        ];
+    // Card face stays panel/10 at every rarity so a wall of loot does not
+    // become a wall of colour; the accent lives on the rail and the name.
+    return MakePlate(
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()[MenuText(Slot, BreakerUI::TypeCaption, Muted, true)]
+        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, BreakerUI::Space4)[MenuText(Name, BreakerUI::TypeH2, Accent, true)]
+        + SVerticalBox::Slot().AutoHeight()[MenuText(Details, BreakerUI::TypeCaption, SoftText)],
+        PanelRaised, Accent, FMargin(BreakerUI::Space16, BreakerUI::Space16));
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
@@ -458,18 +540,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
             [
                 SNew(SBox).HeightOverride(64.0f)
                 [
-                    SNew(SButton)
-                    .ButtonColorAndOpacity(bAssigned ? Cyan : PanelRaised)
-                    .HAlign(HAlign_Center).VAlign(VAlign_Center)
-                    .OnClicked(FOnClicked::CreateLambda([this, CapturedSlot, CapturedArchetype]()
-                    {
-                        if (Character.IsValid() && Character->GetWeapon()) Character->GetWeapon()->SetSlotArchetype(CapturedSlot, CapturedArchetype);
-                        Rebuild(EBreakerMenuScreen::Loadout);
-                        return FReply::Handled();
-                    }))
-                    [
-                        MenuText(FText::FromString(Entry.Name), 12, FLinearColor::White, true)
-                    ]
+                    // Assigned carries the accent ring, not an accent fill:
+                    // a solid cyan tile would outrank the screen title.
+                    BorderWrap(
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(bAssigned ? PanelHover : Panel)
+                        .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                        .OnClicked(FOnClicked::CreateLambda([this, CapturedSlot, CapturedArchetype]()
+                        {
+                            if (Character.IsValid() && Character->GetWeapon()) Character->GetWeapon()->SetSlotArchetype(CapturedSlot, CapturedArchetype);
+                            Rebuild(EBreakerMenuScreen::Loadout);
+                            return FReply::Handled();
+                        }))
+                        [
+                            MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, bAssigned ? Primary : SoftText, true)
+                        ],
+                        // Weapons are the orange family; the assigned slot says so.
+                        bAssigned ? BreakerUI::Orange : BorderEmphasis,
+                        bAssigned ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
                 ]
             ];
         }
@@ -492,16 +580,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
 
 namespace
 {
+    // One rarity ramp for the whole game: the same values the HUD draws a
+    // ground drop's rail and beam with.
     FLinearColor RarityColor(EBreakerItemRarity Rarity)
     {
-        switch (Rarity)
-        {
-            case EBreakerItemRarity::Uncommon: return FLinearColor(0.25f, 0.55f, 1.0f);
-            case EBreakerItemRarity::Exceptional: return FLinearColor(0.72f, 0.4f, 1.0f);
-            case EBreakerItemRarity::Aberrant: return FLinearColor(1.0f, 0.25f, 0.25f);
-            case EBreakerItemRarity::Anomalous: return FLinearColor(0.15f, 0.95f, 0.85f);
-            default: return FLinearColor(0.85f, 0.85f, 0.85f);
-        }
+        return BreakerUI::RarityColor(Rarity);
+    }
+
+    // A card whose rarity reads from its 3px left rail. Anomalous also takes
+    // a full 1px border, because it is the only tier that is simultaneously a
+    // world object class.
+    TSharedRef<SWidget> MakeRarityCard(const TSharedRef<SWidget>& Inner, EBreakerItemRarity Rarity, bool bHasItem)
+    {
+        const FLinearColor Rail = bHasItem ? BreakerUI::RarityColor(Rarity) : BreakerUI::BorderEmphasis;
+        const FLinearColor Ring = bHasItem && BreakerUI::RarityGetsFullBorder(Rarity)
+            ? BreakerUI::RarityColor(Rarity) : BreakerUI::BorderRest;
+        return BorderWrap(
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::RailThickness)[SolidBlock(Rail)]]
+            + SHorizontalBox::Slot().FillWidth(1.0f)[Inner],
+            Ring);
     }
 
     FString RarityName(EBreakerItemRarity Rarity)
@@ -565,34 +663,38 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     {
         FBreakerItemInstance Item;
         const bool bHasItem = Equipment && Equipment->GetEquippedItem(Slot, Item);
-        const FLinearColor Accent = bHasItem ? RarityColor(Item.Rarity) : SoftText * 0.6f;
+        const FLinearColor Accent = bHasItem ? RarityColor(Item.Rarity) : Disabled;
+        // An empty slot keeps its full geometry and its name: the doll never
+        // looks broken, only unfinished.
         const FString Name = bHasItem ? RarityName(Item.Rarity) : TEXT("EMPTY");
         const FString Details = bHasItem ? DescribeItem(Item) : TEXT("—");
 
-        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, 6.0f)
+        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            SNew(SButton)
-            .ButtonColorAndOpacity(PanelRaised)
-            .ContentPadding(FMargin(12.0f, 8.0f))
-            .OnClicked(FOnClicked::CreateLambda([this, Slot]()
-            {
-                if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->UnequipSlot(Slot);
-                Rebuild(EBreakerMenuScreen::Inventory);
-                return FReply::Handled();
-            }))
-            [
-                SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight()
+            MakeRarityCard(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bHasItem ? PanelRaised : Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, Slot]()
+                {
+                    if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->UnequipSlot(Slot);
+                    Rebuild(EBreakerMenuScreen::Inventory);
+                    return FReply::Handled();
+                }))
                 [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Slot)), 10, Cyan, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Name), 10, Accent, true)]
-                ]
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
-                [
-                    MenuText(FText::FromString(Details), 10, bHasItem ? FLinearColor::White : SoftText)
-                ]
-            ]
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()
+                    [
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption, Muted, true)]
+                        + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Name), BreakerUI::TypeCaption, Accent, true)]
+                    ]
+                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(Details), BreakerUI::TypeCaption, bHasItem ? SoftText : Disabled)
+                    ]
+                ],
+                bHasItem ? Item.Rarity : EBreakerItemRarity::Standard, bHasItem)
         ];
     };
 
@@ -604,13 +706,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     [
         SNew(SBox).HeightOverride(240.0f)
         [
-            SNew(SBorder)
-            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(PanelRaised)
-            .HAlign(HAlign_Center).VAlign(VAlign_Center)
-            [
-                MenuText(FText::FromString(TEXT("[ CHARACTER ]\n\nmodel render arrives\nwith the presentation\npass")), 10, SoftText)
-            ]
+            // The render slot keeps full geometry while empty: the doll never
+            // looks broken, only unfinished.
+            MakePlate(
+                SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+                [
+                    MenuText(FText::FromString(TEXT("FULL-BODY RENDER SLOT\n\nSILHOUETTE PLACEHOLDER")), BreakerUI::TypeCaption, Muted)
+                ],
+                BreakerUI::BgRaised, BorderEmphasis, FMargin(BreakerUI::Space16))
         ]
     ];
     if (Equipment)
@@ -622,7 +725,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             Stats.MoveSpeedMultiplier, Stats.SlideSpeedMultiplier, Stats.AirControlMultiplier, Stats.DashCooldownMultiplier,
             Stats.PhysicalDamageReductionPercent, Stats.DropChancePercent, Stats.BonusMaxResource, Stats.ResourceRegenPerSecond);
         CharacterPanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("GEAR TOTALS")), 10, SoftText, true)];
-        CharacterPanel->AddSlot().AutoHeight()[MenuText(FText::FromString(StatText), 10, FLinearColor::White)];
+        CharacterPanel->AddSlot().AutoHeight()[MenuText(FText::FromString(StatText), 10, Primary)];
     }
 
     // Right side: gear slots arranged top-down like the body — head to
@@ -664,10 +767,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         // glance.
         FBreakerItemInstance CurrentlyEquipped;
         const bool bSlotOccupied = Equipment && Equipment->GetEquippedItem(Item.Slot, CurrentlyEquipped);
+        // Gold means "this costs you something", cyan means the action is
+        // free. The footer states the consequence of clicking, never hides it.
         const FString DeltaLine = bSlotOccupied
-            ? FString::Printf(TEXT("replaces: %s ilvl %d"), *RarityName(CurrentlyEquipped.Rarity), CurrentlyEquipped.ItemLevel)
-            : FString(TEXT("slot empty"));
-        const FLinearColor DeltaColor = bSlotOccupied ? RarityColor(CurrentlyEquipped.Rarity) : SoftText;
+            ? FString::Printf(TEXT("EQUIP · REPLACES %s i%d"), *RarityName(CurrentlyEquipped.Rarity), CurrentlyEquipped.ItemLevel)
+            : FString(TEXT("EQUIP · SLOT EMPTY"));
+        const FLinearColor DeltaColor = bSlotOccupied ? Amber : Cyan;
 
         const FOnClicked DiscardOne = FOnClicked::CreateLambda([this, ItemId]()
         {
@@ -701,44 +806,56 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                         return FReply::Unhandled();
                     }))
                     [
-                        SNew(SButton)
-                        .ButtonColorAndOpacity(PanelRaised)
-                        .ContentPadding(FMargin(12.0f, 9.0f))
-                        .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
-                        {
-                            if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
-                            Rebuild(EBreakerMenuScreen::Inventory);
-                            return FReply::Handled();
-                        }))
-                        [
-                            SNew(SVerticalBox)
-                            + SVerticalBox::Slot().AutoHeight()
+                        // Card anatomy (UI-Inventory-Spec): line 1 name plus
+                        // item level, line 2 rarity and slot, then the affix
+                        // list, then a footer stating what clicking costs you.
+                        MakeRarityCard(
+                            SNew(SButton)
+                            .ButtonColorAndOpacity(PanelRaised)
+                            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                            .OnClicked(FOnClicked::CreateLambda([this, ItemId]()
+                            {
+                                if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->EquipFromBackpack(ItemId);
+                                Rebuild(EBreakerMenuScreen::Inventory);
+                                return FReply::Handled();
+                            }))
                             [
-                                SNew(SHorizontalBox)
-                                + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Item.Slot)), 11, Cyan, true)]
-                                + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 22.0f, 0.0f)[MenuText(FText::FromString(RarityName(Item.Rarity)), 11, RarityColor(Item.Rarity), true)]
-                            ]
-                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
-                            [
-                                MenuText(FText::FromString(DeltaLine), 9, DeltaColor, true)
-                            ]
-                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
-                            [
-                                MenuText(FText::FromString(DescribeItem(Item)), 10, FLinearColor::White)
-                            ]
-                        ]
+                                SNew(SVerticalBox)
+                                + SVerticalBox::Slot().AutoHeight()
+                                [
+                                    SNew(SHorizontalBox)
+                                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(RarityName(Item.Rarity)), BreakerUI::TypeH2, RarityColor(Item.Rarity), true)]
+                                    + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 22.0f, 0.0f)[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)), BreakerUI::TypeCaption, Primary, true)]
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                                [
+                                    MenuText(FText::FromString(SlotName(Item.Slot)), BreakerUI::TypeCaption, Muted, true)
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                                [
+                                    MenuText(FText::FromString(DescribeItem(Item)), BreakerUI::TypeCaption, SoftText)
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                                [
+                                    MenuText(FText::FromString(DeltaLine.ToUpper()), BreakerUI::TypeCaption, DeltaColor, true)
+                                ]
+                            ],
+                            Item.Rarity, true)
                     ]
                 ]
-                + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(4.0f, 4.0f, 4.0f, 0.0f)
+                + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(BreakerUI::Space4, BreakerUI::Space4, BreakerUI::Space4, 0.0f)
                 [
-                    SNew(SButton)
-                    .ButtonColorAndOpacity(Panel)
-                    .ContentPadding(FMargin(6.0f, 1.0f))
-                    .ToolTipText(FText::FromString(TEXT("Discard this item (or right-click the card)")))
-                    .OnClicked(DiscardOne)
-                    [
-                        MenuText(FText::FromString(TEXT("X")), 9, SoftText, true)
-                    ]
+                    // Discard state: no fill, deep-red ring, harm-red glyph.
+                    BorderWrap(
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(Panel)
+                        .ContentPadding(FMargin(BreakerUI::Space8, 1.0f))
+                        .ToolTipText(FText::FromString(TEXT("Discard this item (or right-click the card)")))
+                        .OnClicked(DiscardOne)
+                        [
+                            MenuText(FText::FromString(TEXT("X")), BreakerUI::TypeCaption, Harm, true)
+                        ],
+                        HarmDeep)
                 ]
             ]
         ];
@@ -748,20 +865,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     TSharedRef<SHorizontalBox> FilterRow = SNew(SHorizontalBox);
     auto AddFilterChip = [this, &FilterRow](const FString& Label, int32 FilterValue)
     {
-        FilterRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 4.0f, 0.0f)
+        const bool bSelectedChip = BackpackSlotFilter == FilterValue;
+        FilterRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space4, 0.0f)
         [
-            SNew(SButton)
-            .ButtonColorAndOpacity(BackpackSlotFilter == FilterValue ? Cyan : PanelRaised)
-            .ContentPadding(FMargin(9.0f, 4.0f))
-            .OnClicked(FOnClicked::CreateLambda([this, FilterValue]()
-            {
-                BackpackSlotFilter = FilterValue;
-                Rebuild(EBreakerMenuScreen::Inventory);
-                return FReply::Handled();
-            }))
-            [
-                MenuText(FText::FromString(Label), 9, FLinearColor::White, true)
-            ]
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bSelectedChip ? PanelHover : Panel)
+                .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
+                .OnClicked(FOnClicked::CreateLambda([this, FilterValue]()
+                {
+                    BackpackSlotFilter = FilterValue;
+                    Rebuild(EBreakerMenuScreen::Inventory);
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bSelectedChip ? Primary : Muted, true)
+                ],
+                bSelectedChip ? Cyan : BorderEmphasis,
+                bSelectedChip ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
     AddFilterChip(TEXT("ALL"), -1);
@@ -776,11 +897,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     auto AddCleanupChip = [this, &CleanupRow](const FString& Label, int32 ArmIndex, EBreakerItemRarity MinimumKept)
     {
         const bool bArmed = CleanupArmedIndex == ArmIndex;
-        CleanupRow->AddSlot().AutoWidth().Padding(4.0f, 0.0f, 0.0f, 0.0f)
+        // Two-step arm: the button turns gold and reads CONFIRM before it
+        // destroys anything. Armed carries the 2px gold ring, disarmed reads
+        // as a destructive control (deep-red ring, harm text).
+        CleanupRow->AddSlot().AutoWidth().Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
         [
+            BorderWrap(
             SNew(SButton)
-            .ButtonColorAndOpacity(bArmed ? Amber : PanelRaised)
-            .ContentPadding(FMargin(9.0f, 4.0f))
+            .ButtonColorAndOpacity(bArmed ? PanelHover : Panel)
+            .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
             .OnClicked(FOnClicked::CreateLambda([this, ArmIndex, MinimumKept, bArmed]()
             {
                 if (bArmed)
@@ -798,8 +923,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 return FReply::Handled();
             }))
             [
-                MenuText(FText::FromString(bArmed ? FString(TEXT("CONFIRM?")) : Label), 9, FLinearColor::White, true)
-            ]
+                MenuText(FText::FromString(bArmed ? FString(TEXT("CONFIRM")) : Label), BreakerUI::TypeCaption, bArmed ? Amber : Harm, true)
+            ],
+            bArmed ? Amber : HarmDeep,
+            bArmed ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
     AddCleanupChip(TEXT("DISCARD < UNCOMMON"), 0, EBreakerItemRarity::Uncommon);
@@ -830,7 +957,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     return FReply::Handled();
                 }))
                 [
-                    MenuText(FText::FromString(FString::Printf(TEXT("GRANT TEST GEAR ilvl %d"), ItemLevel)), 9, FLinearColor::White, true)
+                    MenuText(FText::FromString(FString::Printf(TEXT("GRANT TEST GEAR ilvl %d"), ItemLevel)), 9, Primary, true)
                 ]
             ];
         };
@@ -945,12 +1072,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         const bool bSelectable = CurrentClass == EBreakerClassId::None || bDevClassSwap;
         const EBreakerClassId CapturedClass = Entry.ClassId;
         const bool bCapturedDevSwap = bDevClassSwap;
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
+            BorderWrap(
             SNew(SButton)
-            .ButtonColorAndOpacity(bIsCurrent ? Cyan : PanelRaised)
+            .ButtonColorAndOpacity(bSelectable ? PanelRaised : BreakerUI::BgRaised)
             .IsEnabled(bSelectable)
-            .ContentPadding(FMargin(16.0f, 11.0f))
+            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
             .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bCapturedDevSwap]()
             {
                 if (Character.IsValid() && Character->GetProgression())
@@ -967,12 +1095,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
                 + SVerticalBox::Slot().AutoHeight()
                 [
                     SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), 16, FLinearColor::White, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Entry.Resource), 11, Cyan, true)]
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, bSelectable ? Primary : Disabled, true)]
+                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Entry.Resource), BreakerUI::TypeCaption, bIsCurrent ? Cyan : Muted, true)]
                 ]
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), 10, SoftText, true)]
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 3.0f, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), 10, SoftText)]
-            ]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), BreakerUI::TypeCaption, Muted, true)]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), BreakerUI::TypeCaption, SoftText)]
+            ],
+            // Locked-in class carries the accent ring; everything else keeps
+            // the same geometry on the neutral rest border.
+            bIsCurrent ? Cyan : BorderRest,
+            bIsCurrent ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     }
 
@@ -1245,15 +1377,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];
 
-    // Unspent-points banner — the one number the player is spending against.
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+    // Two point counters as separate railed chips — class points cyan, core
+    // points gold — so the two currencies are never read as one pool.
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
-        SNew(SBorder)
-        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-        .BorderBackgroundColor(PanelRaised)
-        .Padding(FMargin(16.0f, 10.0f))
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
         [
-            MenuText(FText::FromString(FString::Printf(TEXT("CLASS %d  |  CORE %d  UNSPENT"), UnspentClass, UnspentCore)), 14, Cyan, true)
+            MakePlate(
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("CLASS POINTS")), BreakerUI::TypeCaption, Muted, true)]
+                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("%d UNSPENT"), UnspentClass)), BreakerUI::TypeH2, Cyan, true)],
+                PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space8))
+        ]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            MakePlate(
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("CORE POINTS")), BreakerUI::TypeCaption, Muted, true)]
+                + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("%d UNSPENT"), UnspentCore)), BreakerUI::TypeH2, Amber, true)],
+                PanelRaised, Amber, FMargin(BreakerUI::Space16, BreakerUI::Space8))
         ]
     ];
 
@@ -1291,7 +1434,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     return FReply::Handled();
                 }))
                 [
-                    MenuText(FText::FromString(TEXT("DEV: GRANT SLICE POINTS")), 10, FLinearColor::Black, true)
+                    MenuText(FText::FromString(TEXT("DEV: GRANT SLICE POINTS")), 10, Background, true)
                 ]
             ]
             + SHorizontalBox::Slot().FillWidth(1.0f).Padding(12.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
@@ -1341,27 +1484,33 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const FString TreeName = TreeSelectorLabel(Tree);
             const int32 CapturedIndex = TreeIndex;
 
-            Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
+            // Branch header strip: the selected branch carries the identity
+            // rail, the others sit on the neutral border.
+            Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
             [
-                SNew(SButton)
-                .ButtonColorAndOpacity(bSelected ? Cyan : PanelRaised)
-                .ContentPadding(FMargin(12.0f, 9.0f))
-                .HAlign(HAlign_Left)
-                .OnClicked(FOnClicked::CreateLambda([this, CapturedIndex]()
-                {
-                    SelectedTreeIndex = CapturedIndex;
-                    SkillTreeStatus = FText::GetEmpty();
-                    Rebuild(EBreakerMenuScreen::SkillTrees);
-                    return FReply::Handled();
-                }))
-                [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TreeName), 12, FLinearColor::White, true)]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                MakePlate(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
+                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                    .HAlign(HAlign_Left)
+                    .OnClicked(FOnClicked::CreateLambda([this, CapturedIndex]()
+                    {
+                        SelectedTreeIndex = CapturedIndex;
+                        SkillTreeStatus = FText::GetEmpty();
+                        Rebuild(EBreakerMenuScreen::SkillTrees);
+                        return FReply::Handled();
+                    }))
                     [
-                        MenuText(FText::FromString(FString::Printf(TEXT("%d / %d SPENT   %d %s UNSPENT"), Spent, Total, Unspent, *CurrencyLabel(Tree->Currency))), 9, bSelected ? FLinearColor::White : SoftText)
-                    ]
-                ]
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TreeName), BreakerUI::TypeH2, bSelected ? Primary : SoftText, true)]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            MenuText(FText::FromString(FString::Printf(TEXT("%d INVESTED · %d %s UNSPENT"), Spent, Unspent, *CurrencyLabel(Tree->Currency))), BreakerUI::TypeCaption, Muted, true)
+                        ]
+                    ],
+                    bSelected ? PanelHover : Panel,
+                    bSelected ? Cyan : BorderEmphasis,
+                    FMargin(0.0f))
             ];
         }
 
@@ -1451,15 +1600,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             const FString HeaderText = Section.bGated
                 ? FString::Printf(TEXT("▮ %s"), *Section.Header)
                 : Section.Header;
-            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, SectionNumber == 1 ? 0.0f : 16.0f, 0.0f, 8.0f)
+            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, SectionNumber == 1 ? 0.0f : BreakerUI::Space24, 0.0f, BreakerUI::Space8)
             [
-                SNew(SBorder)
-                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                .BorderBackgroundColor(Section.bGated ? Panel : PanelRaised)
-                .Padding(FMargin(12.0f, 7.0f))
-                [
-                    MenuText(FText::FromString(HeaderText), 11, Section.bGated ? SoftText : Cyan, true)
-                ]
+                MakePlate(
+                    MenuText(FText::FromString(HeaderText), BreakerUI::TypeCaption, Section.bGated ? Muted : Primary, true),
+                    Section.bGated ? Panel : BreakerUI::BgRaised,
+                    Section.bGated ? BorderEmphasis : Cyan,
+                    FMargin(BreakerUI::Space16, BreakerUI::Space8))
             ];
 
             // Fixed rows of two, never a wrap box: SWrapBox sized by its
@@ -1480,10 +1627,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const bool bOwned = Rank > 0;
                 const bool bMaxed = Rank >= Node->MaxRank;
 
-                // Owned reads cyan, purchasable reads as a raised panel,
-                // locked reads dimmed with its reason spelled out.
-                const FLinearColor CardColor = bOwned ? Cyan : (bPurchasable ? PanelRaised : Panel);
-                const FLinearColor NameColor = (bPurchasable || bOwned) ? FLinearColor::White : SoftText * 0.8f;
+                // UI-Skill-Tree-Spec node states. Owned: cyan rail. Purchasable:
+                // gold 2px border and a gold action line — gold is the only
+                // border colour that means "spend now", which is what makes
+                // scanning the tree work. Available: neutral 1px. Locked:
+                // muted, with the reason stated literally.
+                const FLinearColor CardColor = (bOwned || bPurchasable) ? PanelRaised : Panel;
+                const FLinearColor NameColor = (bPurchasable || bOwned) ? Primary : Disabled;
+                // "1 PT -> RANK 4" when it can be bought, the lock reason when
+                // it cannot. Never both, never neither.
+                const FString ActionLine = bMaxed
+                    ? FString(TEXT("MAXED"))
+                    : (bPurchasable
+                        ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
+                        : LockReason);
+                const FLinearColor ActionColor = bMaxed ? Cyan : (bPurchasable ? Amber : Harm);
 
                 const FName CapturedNodeId = Node->NodeId;
                 const UBreakerProgressionTree* CapturedTree = Selected;
@@ -1540,38 +1698,40 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // description drops to line 3 so a card never reads as flavour
                 // text with no stated effect.
                 const FString EffectLine = PrimaryEffectLine(Node);
-                const FLinearColor Transparent(0.0f, 0.0f, 0.0f, 0.0f);
 
                 TSharedRef<SVerticalBox> CardBody = SNew(SVerticalBox);
                 CardBody->AddSlot().AutoHeight()
                 [
                     SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(NodeName), 12, NameColor, true)]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(NodeName), BreakerUI::TypeH2, NameColor, true)]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
                     [
                         SNew(SBorder)
                         .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
                         .BorderBackgroundColor(Background)
-                        .Padding(FMargin(7.0f, 3.0f))
+                        .Padding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
                         [
-                            MenuText(FText::FromString(CostChip), 9, bMaxed ? SoftText : Cyan, true)
+                            MenuText(FText::FromString(CostChip), BreakerUI::TypeCaption, bMaxed ? Cyan : Muted, true)
                         ]
                     ]
                 ];
-                CardBody->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                // Line two is the number the player is buying, in the numeric
+                // face, so the tree is readable without hovering anything.
+                CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(EffectLine), 10, bOwned ? FLinearColor::White : (bPurchasable ? Cyan : SoftText), true)
+                    MenuText(FText::FromString(EffectLine), BreakerUI::TypeCaption, bOwned || bPurchasable ? Primary : Muted, true)
                 ];
-                // Owned rank reads as a word next to the filled edge bar; the
-                // old pip row was too small to parse at a glance.
+                // Owned rank reads as a word next to the filled rail; the old
+                // pip row was too small to parse at a glance. Maxed reads
+                // MAXED rather than 5/5 alone.
                 if (bOwned)
                 {
-                    CardBody->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                    CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                     [
-                        MenuText(FText::FromString(RankLabel(Rank, Node->MaxRank)), 9, FLinearColor::White, true)
+                        MenuText(FText::FromString(bMaxed ? FString(TEXT("MAXED")) : RankLabel(Rank, Node->MaxRank)), BreakerUI::TypeCaption, Cyan, true)
                     ];
                 }
-                CardBody->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                 [
                     SNew(STextBlock)
                     // PERF: this line used to be a Text_Lambda that polled
@@ -1580,25 +1740,31 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // jitter. The summary is now baked at build time and the
                     // hover tooltip is the only path to full detail.
                     .Text(FText::FromString(ShortSummary(Description)))
-                    .ColorAndOpacity(bOwned ? FLinearColor::White : SoftText)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 9))
+                    .ColorAndOpacity(bOwned || bPurchasable ? SoftText : Disabled)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
                     .AutoWrapText(true)
                 ];
+                // The state line, stated literally: what it costs to advance,
+                // or exactly why it is locked.
+                if (!ActionLine.IsEmpty())
+                {
+                    CardBody->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(ActionLine), BreakerUI::TypeCaption, ActionColor, true)
+                    ];
+                }
 
-                // Filled left edge bar: owned state readable from the edge of
-                // the card without reading any text at all.
+                // 3px owned rail: state readable from the edge of the card
+                // without reading any text at all.
                 TSharedRef<SHorizontalBox> Card = SNew(SHorizontalBox);
                 Card->AddSlot().AutoWidth()
                 [
-                    SNew(SBox).WidthOverride(5.0f)
+                    SNew(SBox).WidthOverride(BreakerUI::RailThickness)
                     [
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(bOwned ? FLinearColor::White : Transparent)
-                        [SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+                        SolidBlock(bOwned ? Cyan : Transparent)
                     ]
                 ];
-                Card->AddSlot().FillWidth(1.0f).Padding(10.0f, 0.0f, 0.0f, 0.0f)[CardBody];
+                Card->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[CardBody];
 
                 if (CardIndex % 2 == 0)
                 {
@@ -1614,18 +1780,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     SNew(SBox).WidthOverride(300.0f)
                     .ToolTipText(TooltipTextValue)
                     [
-                        // Affordable-right-now cards carry a cyan outline, so
-                        // "what can I buy" is a scan and not a read.
-                        SNew(SBorder)
-                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-                        .BorderBackgroundColor(bPurchasable && !bOwned ? Cyan : Transparent)
-                        .Padding(FMargin(2.0f))
-                        [
+                        // Purchasable-right-now cards carry the gold 2px ring,
+                        // so "what can I buy" is a scan and not a read.
+                        BorderWrap(
                             SNew(SButton)
                             .ButtonColorAndOpacity(CardColor)
                             .IsEnabled(bPurchasable)
                             .ToolTipText(TooltipTextValue)
-                            .ContentPadding(FMargin(16.0f, 13.0f))
+                            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
                             .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId, CapturedNode]()
                             {
                                 UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
@@ -1648,8 +1810,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                             }))
                             [
                                 Card
-                            ]
-                        ]
+                            ],
+                            bPurchasable ? Amber : BorderRest,
+                            bPurchasable ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
                     ]
                 ];
             }
@@ -1665,13 +1828,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%s — %d / %d POINTS"), *SelectedName, SelectedSpent, SelectedTotal)), 13, Cyan, true)
+                MenuText(FText::FromString(FString::Printf(TEXT("%s — %d / %d POINTS"), *SelectedName, SelectedSpent, SelectedTotal)), BreakerUI::TypeH2, Primary, true)
             ]
             + SHorizontalBox::Slot().AutoWidth()
             [
+                // Respec is per-tree and destructive: discard styling, and the
+                // label states which tree it will clear.
+                BorderWrap(
                 SNew(SButton)
-                .ButtonColorAndOpacity(PanelRaised)
-                .ContentPadding(FMargin(14.0f, 7.0f))
+                .ButtonColorAndOpacity(Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
                 .OnClicked(FOnClicked::CreateLambda([this, SelectedCurrency]()
                 {
                     UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
@@ -1689,8 +1855,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     return FReply::Handled();
                 }))
                 [
-                    MenuText(FText::FromString(TEXT("RESPEC")), 10, FLinearColor::White, true)
-                ]
+                    MenuText(FText::FromString(FString::Printf(TEXT("RESPEC %s"), *CurrencyLabel(SelectedCurrency))), BreakerUI::TypeCaption, Harm, true)
+                ],
+                HarmDeep)
             ]
         ];
         RightPane->AddSlot().FillHeight(1.0f)
@@ -1746,24 +1913,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
     }
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 18.0f)
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
     [
-        SNew(SBorder)
-        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-        .BorderBackgroundColor(PanelRaised)
-        .Padding(FMargin(20.0f, 16.0f))
-        [
+        MakePlate(
             SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(NPC->GetDisplayName(), 12, Cyan, true)]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(NPC->GetDisplayName(), BreakerUI::TypeCaption, Muted, true)]
             + SVerticalBox::Slot().AutoHeight()
             [
                 SNew(STextBlock)
                 .Text(FText::FromString(Node.SpeakerLine))
-                .ColorAndOpacity(FLinearColor::White)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 14))
+                .ColorAndOpacity(SoftText)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeBody))
                 .AutoWrapText(true)
-            ]
-        ]
+            ],
+            PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16))
     ];
 
     int32 ChoiceNumber = 0;
@@ -1772,11 +1935,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         ++ChoiceNumber;
         const FName NextNodeId = Choice.NextNodeId;
         const FName QuestFlag = Choice.SetsQuestFlag;
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
+            BorderWrap(
             SNew(SButton)
-            .ButtonColorAndOpacity(PanelRaised)
-            .ContentPadding(FMargin(16.0f, 10.0f))
+            .ButtonColorAndOpacity(Panel)
+            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
             .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag]()
             {
                 if (Character.IsValid())
@@ -1793,8 +1957,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
                 return FReply::Handled();
             }))
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%d.  %s"), ChoiceNumber, *Choice.Text)), 12, FLinearColor::White, true)
-            ]
+                MenuText(FText::FromString(FString::Printf(TEXT("%d.  %s"), ChoiceNumber, *Choice.Text)), BreakerUI::TypeBody, SoftText, true)
+            ],
+            BorderEmphasis)
         ];
     }
 

@@ -38,6 +38,15 @@ struct FBreakerHUDDamageNumber
     double Time = -1000.0;
 };
 
+// Which edge carries a plate's 3px rail. Left is identity — which system owns
+// this panel; Top is transient status, reserved for events and alerts.
+// FIELDPLATE §03: one rail per plate, a plate with two rails has no meaning.
+enum class EBreakerRail : uint8
+{
+    Left,
+    Top
+};
+
 UCLASS()
 class RIORSEDGE_API ABreakerPlaytestHUD : public AHUD
 {
@@ -66,9 +75,10 @@ private:
     void EnsureAbilityBinding(const ABreakerCharacter* Character);
 
     void DrawDefenseFeedback(const FVector2D& Center);
-    void DrawStatusReadout(const ABreakerCharacter* Character, float X, float Y);
-    void DrawVitalsBand(const ABreakerCharacter* Character, float X, float BottomY);
+    void DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY);
+    void DrawVitalsPlate(const ABreakerCharacter* Character, float X, float BottomY);
     void DrawCombatCluster(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
+    void DrawWaveBanner(const FVector2D& Center);
     void DrawTracers();
     void DrawDamageNumbers();
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
@@ -81,7 +91,8 @@ private:
     void DrawAbilityWindows(const ABreakerCharacter* Character, float X, float BottomY, float Width);
     // The teaching callout: first few casts of each ability only.
     void DrawAbilityCallout(const FVector2D& Center);
-    void DrawOverdriveVignette(const ABreakerCharacter* Character);
+    // FIELDPLATE HUD §5: violet frame, edge bands, title plate, step-down.
+    void DrawUltimateTreatment(const ABreakerCharacter* Character);
     void DrawSkimBurst(const FVector2D& Center);
     void DrawMarkedTarget(const ABreakerCharacter* Character);
 
@@ -91,6 +102,11 @@ private:
     double LastDodgeTime = -1000.0;
     double LastBlockTime = -1000.0;
     double LastEliteKillTime = -1000.0;
+    // Latched on the inactive->active edge of the ultimate window: the state
+    // component reports remaining time only, and §5's title plate needs
+    // elapsed time.
+    double UltimateWindowStartTime = -1000.0;
+    bool bUltimateWindowWasActive = false;
 
     static constexpr int32 AbilitySlotCount = 3;
     // Indexed by EBreakerAbilitySlot. Parallel arrays rather than a struct
@@ -114,13 +130,41 @@ private:
     TArray<FBreakerHUDDamageNumber> DamageNumbers;
     int32 NextDamageNumberIndex = 0;
 
+    // --- FIELDPLATE drawing primitives -----------------------------------
+    // Every geometry value in this class is authored in the spec's 1920x1080
+    // pixels and passed through S() once, so the HUD holds its proportions at
+    // any resolution instead of shrinking into the corner.
+    float UIScale = 1.0f;
+    float S(float SpecPixels) const { return SpecPixels * UIScale; }
+
+    // Flat fill, 1px border, one 3px rail. No gradient, no blur, no radius:
+    // Canvas cannot round a corner and the system's 2px radius is below the
+    // threshold where its absence reads as wrong.
+    // A transparent Face means "the HUD's default plate face" (bg/base at the
+    // readability alpha) rather than an actual transparent plate.
+    void DrawPlate(float X, float Y, float Width, float Height, const FLinearColor& Rail,
+        EBreakerRail RailEdge = EBreakerRail::Left, const FLinearColor& Face = FLinearColor::Transparent);
+    void DrawBorder(float X, float Y, float Width, float Height, const FLinearColor& Color, float Thickness);
+    void DrawTriangle(const FVector2D& A, const FVector2D& B, const FVector2D& C, const FLinearColor& Color);
+    // Chevron-cut block: a rectangle sheared along its top edge. The momentum
+    // track changes texture, not just colour, between states.
+    void DrawShearedBlock(float X, float Y, float Width, float Height, float Shear, const FLinearColor& Color);
+
+    // Text authored in spec pixels. Y is the top of the line, matching Canvas.
+    void DrawSpecText(const FString& Text, float X, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
+    void DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
+    void DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
+    FVector2D MeasureSpecText(const FString& Text, float SpecPixels) const;
+
+    // Outline + weight pass for numbers that sit over the world. The outline
+    // is tinted toward the number's own hue so it never reads as grey mud.
+    void DrawOutlinedNumber(const FString& Text, float CenterX, float Y, const FLinearColor& Face, float SpecPixels, float TextAlpha);
+
     void DrawCrosshair(const FVector2D& Center, const FLinearColor& Color, float Size, float Thickness);
-    void DrawLabel(const FString& Text, float X, float Y, const FLinearColor& Color, float Scale = 1.0f);
-    // Outline + shadow + face pass. Legible over any world background without
-    // resorting to a backing plate.
-    void DrawBoldLabel(const FString& Text, float X, float Y, const FLinearColor& Face, float Scale, float Alpha);
-    void DrawPanel(float X, float Y, float Width, float Height, const FLinearColor& Accent);
-    void DrawBar(const FString& Label, float Value, float Maximum, float X, float Y, float Width, const FLinearColor& Color);
-    void DrawChip(const FString& Text, float X, float Y, float Width, float Height, const FLinearColor& Accent, bool bFilled);
-    void DrawAbilitySlot(const UBreakerAbilityComponent* Abilities, EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, const FLinearColor& Accent);
+    void DrawTrack(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& Fill, const FLinearColor& Track);
+    // Hard-edged clockwise sweep from 12 o'clock, clipped to the square's own
+    // boundary so it never spills past the plate edge.
+    void DrawCooldownWedge(float X, float Y, float Size, float CoveredFraction, const FLinearColor& Color);
+    void DrawAbilitySlot(const ABreakerCharacter* Character, const UBreakerAbilityComponent* Abilities,
+        EBreakerAbilitySlot Slot, const FString& KeyHint, float X, float Y, float Size, const FLinearColor& Accent);
 };

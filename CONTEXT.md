@@ -65,6 +65,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
 - The gym encounter includes one elite (`ConfigureElite`): 1.5x scale, tripled health, doubled damage, drops never below Exceptional.
 - Inventory backpack sorts best-rarity-first with per-slot filter chips and auto-height cards.
+- The FIELDPLATE UI system is implemented. `Source/RiorsEdge/UI/BreakerUIStyle.h` is the single token header (sRGB palette, rarity ramp, 4/8/16/24/40/64 spacing scale, rail and border widths, type scale, HUD geometry) and both the canvas HUD and the Slate front end read from it — a colour authored twice is a bug. `ABreakerPlaytestHUD` is rebuilt to `Docs/Design/UI-HUD-Spec.md`: one 440x184 bottom-right cluster on a 3px orange rail, notched momentum track whose block texture changes per state, 56px ability squares with ready/window/cooldown-wedge/unaffordable states, 420-wide vitals plate with fixed 84px value column and armour chips, top-centre wave banner, spec'd damage-number scale with cluster stacking, 180x8 enemy bars, and the violet ultimate frame with edge bands and step-down. All HUD geometry is authored in the spec's 1080p pixels and scaled by `ViewportHeight/1080`. Two known gaps, both content not code: the three OFL faces (Saira Condensed / Barlow / JetBrains Mono) are not imported, so the type *scale* is honoured and the *faces* are not; and no ability glyphs exist, so each square falls back to the ability's short name in its state colour.
 
 ## Verification status
 
@@ -168,10 +169,14 @@ Next actions, in priority order:
 1. **Awaiting owner ruling — TTK re-anchor ("tune it")**: session 4
    measured trash 2.61s / elite 6.18s engaged-TTK vs targets <1s / ~3s.
    Solve enemy chassis backwards from O18 (trash ~90-100 HP).
-2. **UI style-guide implementation**: the owner is generating design docs
-   from `Docs/Design/UI-Generation-Prompts.md` in a separate session;
-   when they land in Docs/Design/, implement the color/typography/shape
-   system into `SBreakerMenu` and `ABreakerPlaytestHUD`.
+2. **UI follow-ups** (the style-guide implementation itself is done — see
+   the FIELDPLATE bullet above and the five `Docs/Design/UI-*.md` specs):
+   import the three OFL font families and point the tokens at them;
+   commission the nine ability glyphs per `UI-Ability-Icons-Spec.md`;
+   re-zone Inventory to the 1920 three-column layout and the skill tree to
+   the path board / constellation map (both specs list exactly what
+   remains). Slate panel-transition and purchase-confirm motion is also
+   unimplemented.
 3. Caster abilities (Spellblade first), Overdrive keystone branch stubs,
    remaining inert node tags (ledger in `BreakerAbilityStateComponent.h`).
 4. Fold the equipment + progression attribute passes into one application
