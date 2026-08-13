@@ -17,7 +17,9 @@ bool FBreakerMovementStateTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Movement starts outside sprint"), Movement->IsSprinting());
     TestFalse(TEXT("Movement starts outside slide"), Movement->IsSliding());
     TestFalse(TEXT("Movement starts outside wall ride"), Movement->IsWallRiding());
-    TestEqual(TEXT("Baseline gravity keeps jump arcs responsive"), Movement->GravityScale, 1.35f);
+    // Weight pass: the arc is deliberately heavier than the 1.35 it shipped
+    // with. This assertion exists so the value cannot drift silently.
+    TestEqual(TEXT("Baseline gravity keeps jump arcs responsive"), Movement->GravityScale, 1.60f);
 
     Movement->SetSprinting(true);
     TestTrue(TEXT("Sprint request changes max speed state"), Movement->IsSprinting());
@@ -129,6 +131,100 @@ bool FBreakerMovementSpeedMultiplierTest::RunTest(const FString& Parameters)
     Movement->PushSpeedMultiplier(NAME_None, 2.0f, 1.0f);
     Movement->PushSpeedMultiplier(TEXT("Bad"), 0.0f, 1.0f);
     TestEqual(TEXT("Invalid pushes are refused"), Movement->GetSpeedMultiplier(), 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMovementWeightTest,
+    "RiorsEdge.Movement.Weight",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMovementWeightTest::RunTest(const FString& Parameters)
+{
+    using FMovement = UBreakerCharacterMovementComponent;
+
+    // --- Gravity curve -------------------------------------------------
+    const float Band = 220.0f;
+    const float Apex = 1.5f;
+    const float Fall = 1.8f;
+
+    TestEqual(TEXT("A free rise is not made heavier"), FMovement::ComputeGravityMultiplier(700.0f, Band, Apex, Fall), 1.0f);
+    TestEqual(TEXT("The rise multiplier holds right up to the band edge"), FMovement::ComputeGravityMultiplier(Band, Band, Apex, Fall), 1.0f);
+    TestEqual(TEXT("The apex itself is the heaviest treated point of the rise"), FMovement::ComputeGravityMultiplier(0.0f, Band, Apex, Fall), Apex);
+    TestEqual(TEXT("A settled fall uses the fall multiplier"), FMovement::ComputeGravityMultiplier(-4000.0f, Band, Apex, Fall), Fall);
+    TestEqual(TEXT("The fall multiplier holds from the band edge down"), FMovement::ComputeGravityMultiplier(-Band, Band, Apex, Fall), Fall);
+    // Continuity: a step in gravity at the apex is visible as a camera hitch.
+    TestTrue(TEXT("The curve is continuous entering the band"),
+        FMath::IsNearlyEqual(FMovement::ComputeGravityMultiplier(Band - 0.01f, Band, Apex, Fall), 1.0f, 0.001f));
+    TestTrue(TEXT("The curve is continuous leaving the band"),
+        FMath::IsNearlyEqual(FMovement::ComputeGravityMultiplier(-Band + 0.01f, Band, Apex, Fall), Fall, 0.001f));
+    TestTrue(TEXT("Halfway up the band interpolates"),
+        FMath::IsNearlyEqual(FMovement::ComputeGravityMultiplier(Band * 0.5f, Band, Apex, Fall), 1.25f, 0.001f));
+    TestTrue(TEXT("Halfway down the band interpolates"),
+        FMath::IsNearlyEqual(FMovement::ComputeGravityMultiplier(-Band * 0.5f, Band, Apex, Fall), 1.65f, 0.001f));
+    // A fall is always at least as heavy as the matching rise: this is the
+    // asymmetry the whole pass is about.
+    for (float Speed = 20.0f; Speed <= 900.0f; Speed += 20.0f)
+    {
+        TestTrue(TEXT("Falling is never lighter than rising at the same speed"),
+            FMovement::ComputeGravityMultiplier(-Speed, Band, Apex, Fall) >= FMovement::ComputeGravityMultiplier(Speed, Band, Apex, Fall) - KINDA_SMALL_NUMBER);
+    }
+    // Degenerate input must not divide by zero.
+    TestEqual(TEXT("A zero band degrades to a plain rise/fall split"), FMovement::ComputeGravityMultiplier(-1.0f, 0.0f, Apex, Fall), Fall);
+
+    // --- Terminal velocity ---------------------------------------------
+    TestEqual(TEXT("A slow fall is untouched"), FMovement::ClampFallSpeed(-900.0f, 2400.0f), -900.0f);
+    TestEqual(TEXT("A long drop is capped"), FMovement::ClampFallSpeed(-5000.0f, 2400.0f), -2400.0f);
+    TestEqual(TEXT("Exactly terminal stays terminal"), FMovement::ClampFallSpeed(-2400.0f, 2400.0f), -2400.0f);
+    TestEqual(TEXT("A rise is never clamped by the fall cap"), FMovement::ClampFallSpeed(9000.0f, 2400.0f), 9000.0f);
+    TestEqual(TEXT("A zero cap disables terminal velocity"), FMovement::ClampFallSpeed(-9000.0f, 0.0f), -9000.0f);
+
+    // --- Jump cut -------------------------------------------------------
+    TestTrue(TEXT("Releasing mid-rise cuts the rise"),
+        FMath::IsNearlyEqual(FMovement::ApplyJumpCut(700.0f, 0.55f, 50.0f), 385.0f, 0.01f));
+    TestEqual(TEXT("A cut never accelerates a fall"), FMovement::ApplyJumpCut(-1200.0f, 0.55f, 50.0f), -1200.0f);
+    TestEqual(TEXT("A cut does nothing at the apex"), FMovement::ApplyJumpCut(0.0f, 0.55f, 50.0f), 0.0f);
+    TestEqual(TEXT("A cut ignores a rise below the threshold"), FMovement::ApplyJumpCut(40.0f, 0.55f, 50.0f), 40.0f);
+    TestEqual(TEXT("A multiplier of one is a no-op"), FMovement::ApplyJumpCut(700.0f, 1.0f, 50.0f), 700.0f);
+    TestTrue(TEXT("A cut can only ever reduce a rise"),
+        FMovement::ApplyJumpCut(700.0f, 2.0f, 50.0f) <= 700.0f);
+    // The full-hold jump must stay strictly taller than the tapped one.
+    const float FullRise = 700.0f;
+    const float CutRise = FMovement::ApplyJumpCut(700.0f, 0.55f, 50.0f);
+    TestTrue(TEXT("A tapped jump is strictly shorter than a held one"), CutRise * CutRise < FullRise * FullRise);
+
+    // --- Landing --------------------------------------------------------
+    TestEqual(TEXT("An ordinary jump landing costs nothing"), FMovement::LandingSpeedScale(900.0f, 950.0f, 2400.0f, 0.78f), 1.0f);
+    TestEqual(TEXT("The threshold itself costs nothing"), FMovement::LandingSpeedScale(950.0f, 950.0f, 2400.0f, 0.78f), 1.0f);
+    TestTrue(TEXT("A terminal-velocity landing costs the full scale"),
+        FMath::IsNearlyEqual(FMovement::LandingSpeedScale(2400.0f, 950.0f, 2400.0f, 0.78f), 0.78f, 0.0001f));
+    TestTrue(TEXT("Past terminal is clamped, not extrapolated"),
+        FMath::IsNearlyEqual(FMovement::LandingSpeedScale(99999.0f, 950.0f, 2400.0f, 0.78f), 0.78f, 0.0001f));
+    TestTrue(TEXT("A midway landing interpolates"),
+        FMath::IsNearlyEqual(FMovement::LandingSpeedScale(1675.0f, 950.0f, 2400.0f, 0.78f), 0.89f, 0.0001f));
+    TestEqual(TEXT("A scale of one disables the landing cost"), FMovement::LandingSpeedScale(2400.0f, 950.0f, 2400.0f, 1.0f), 1.0f);
+    TestEqual(TEXT("A degenerate range never divides by zero"), FMovement::LandingSpeedScale(2400.0f, 2400.0f, 2400.0f, 0.78f), 1.0f);
+
+    // --- Shipped defaults ------------------------------------------------
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    TestTrue(TEXT("The fall is heavier than the rise"), Movement->FallGravityMultiplier > 1.0f);
+    TestTrue(TEXT("The apex is heavier than the rise"), Movement->ApexGravityMultiplier > 1.0f);
+    TestTrue(TEXT("The apex is not heavier than a settled fall"), Movement->ApexGravityMultiplier <= Movement->FallGravityMultiplier);
+    TestTrue(TEXT("A long drop has a terminal velocity"), Movement->MaxFallSpeed > 0.0f);
+    TestTrue(TEXT("Terminal velocity binds before the physics volume default of 4000"), Movement->MaxFallSpeed < 4000.0f);
+    TestTrue(TEXT("Releasing jump early actually shortens the jump"), Movement->JumpCutMultiplier < 1.0f);
+    // The hold window has to outlast the rise or a held jump would cut itself.
+    const float RiseTime = Movement->JumpZVelocity / (980.0f * Movement->GravityScale);
+    TestTrue(TEXT("The jump hold window outlasts the rise"), Movement->JumpHoldWindow > RiseTime);
+    // Wall ride is specified speed-neutral and is exempt from the fall curve;
+    // its own gravity must still be lighter than the base fall.
+    TestTrue(TEXT("Wall ride gravity stays lighter than the base arc"), Movement->WallRideGravityScale < Movement->GravityScale);
+    // An ordinary full-height jump must land below the landing threshold, so
+    // routine jumping is never taxed.
+    const float JumpApex = FMath::Square(Movement->JumpZVelocity) / (2.0f * 980.0f * Movement->GravityScale);
+    const float LandingSpeed = FMath::Sqrt(2.0f * 980.0f * Movement->GravityScale * Movement->FallGravityMultiplier * JumpApex);
+    TestTrue(TEXT("A routine jump landing is not meaningfully taxed"),
+        FMovement::LandingSpeedScale(LandingSpeed, Movement->LandingHeavyFallSpeed, Movement->LandingMaxFallSpeed, Movement->LandingMinimumSpeedScale) >= 0.98f);
     return true;
 }
 

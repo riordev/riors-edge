@@ -56,6 +56,12 @@ enum class EBreakerStatTarget : uint8
     MoveSpeed,
     DropChance,
     PhysicalDamageReduction,
+    // RESERVED, NOT LIVE. There is no elemental resistance model yet (O5 rules
+    // the elements Rift/Entropy/Void and puts resistances after armour, before
+    // shields), so this target has no aggregated field and no consumer. It is
+    // deliberately absent from the slice affix pool — an affix that rolls it
+    // would be a line of text that does nothing. Wire it with the resistance
+    // model, not before.
     ElementalDamageReduction,
     CriticalChance,
     CriticalDamage,
@@ -191,7 +197,10 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     UPROPERTY(BlueprintReadOnly) float SlideSpeedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AirControlMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float DashCooldownMultiplier = 1.0f;
-    // Gear-granted increased weapon damage, folded into the outgoing request's
-    // SourceDamageMultiplier by the weapon component.
+    // DISPLAY ONLY. Gear-granted increased weapon damage, on its own. Combat
+    // does NOT read this: the same raw percentage is submitted to the
+    // DamageMultiplier attribute's shared additive Increased bucket, where it
+    // sums with skill-tree damage instead of multiplying against it. Reading
+    // this at a damage site would double-count gear.
     UPROPERTY(BlueprintReadOnly) float WeaponDamageMultiplier = 1.0f;
 };

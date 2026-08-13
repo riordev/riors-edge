@@ -8,12 +8,12 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "GameFramework/Controller.h"
-#include "Items/BreakerEquipmentComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Weapons/BreakerRocketProjectile.h"
 #include "Weapons/BreakerWeaponDefinition.h"
+#include "Weapons/BreakerWeaponFeel.h"
 #include "Weapons/BreakerWeaponMath.h"
 
 namespace
@@ -22,13 +22,128 @@ namespace
     // spread or critical rolls drawn from the same shot sequence.
     constexpr uint32 BreakerBleedSalt = 0x51ED0000u;
 
-    // Gear "increased Weapon Damage" folds into the request's source multiplier
-    // alongside the attribute-set value. Looked up once per shot, not per
-    // pellet; equipment can only change between shots.
-    float GearWeaponDamageMultiplier(const AActor* Owner)
+    // Recoil belongs in the archetype table beside cadence, spread, falloff and
+    // damage, so the five weapons kick like five weapons. Every number here is
+    // an O2 PLACEHOLDER. The struct's own defaults are the rifle; each case
+    // states only what makes that archetype different.
+    FBreakerRecoilProfile ArchetypeRecoilProfile(EBreakerWeaponArchetype Archetype)
     {
-        const UBreakerEquipmentComponent* Equipment = Owner ? Owner->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
-        return Equipment ? Equipment->GetStats().WeaponDamageMultiplier : 1.0f;
+        FBreakerRecoilProfile Profile;
+        switch (Archetype)
+        {
+        case EBreakerWeaponArchetype::SMG:
+            // Buzzy: barely moves per shot, but 900 RPM stacks it fast and it
+            // wanders sideways more than it climbs. Recovers quickly.
+            Profile.VerticalKickDegrees = 0.26f;              // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.24f;            // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 5;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.18f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.09f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 9.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 2.0f;               // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 8.0f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 4.5f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.72f;              // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.06f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 12.0f;              // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 20.0f; // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.11f;              // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 2.4f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 3.0f;     // O2 PLACEHOLDER
+            Profile.AimBloomMultiplier = 0.5f;                // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.28f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 2.0f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 1.0f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 1.6f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 320.0f;        // O2 PLACEHOLDER
+            break;
+        case EBreakerWeaponArchetype::Sniper:
+            // One enormous, slow kick that has to be re-aimed rather than
+            // ridden. ADS cuts it hardest: the scope is the reason to use it.
+            Profile.VerticalKickDegrees = 2.8f;               // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.45f;            // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 3;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.06f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.12f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 3.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 1.15f;              // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 9.0f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 2.5f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.55f;              // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.2f;              // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 5.0f;               // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 9.0f;  // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.6f;               // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 3.0f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 1.6f;     // O2 PLACEHOLDER
+            Profile.AimBloomMultiplier = 0.35f;               // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.9f;                 // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 9.0f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 1.6f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 6.5f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 150.0f;        // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 17.0f;           // O2 PLACEHOLDER
+            Profile.AimViewmodelMultiplier = 0.5f;            // O2 PLACEHOLDER
+            break;
+        case EBreakerWeaponArchetype::Shotgun:
+            // A shove. Note FirstShotSpreadMultiplier stays at 1.0: the pellet
+            // cone IS the shotgun, and zeroing it would turn it into a slug.
+            Profile.VerticalKickDegrees = 1.9f;               // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.7f;             // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 4;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.14f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.25f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 4.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 1.3f;               // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 8.5f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 3.5f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.75f;              // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.14f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 6.5f;               // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 13.0f; // O2 PLACEHOLDER
+            Profile.FirstShotSpreadMultiplier = 1.0f;         // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.4f;               // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 2.0f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 2.4f;     // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.6f;                 // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 8.0f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 1.4f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 5.2f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 180.0f;        // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 19.0f;           // O2 PLACEHOLDER
+            break;
+        case EBreakerWeaponArchetype::Rocket:
+            // Heaviest single kick in the table and the slowest settle. Almost
+            // no sideways component: it is mass, not muzzle climb.
+            Profile.VerticalKickDegrees = 2.4f;               // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.3f;             // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 2;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.05f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.06f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 2.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 1.1f;               // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 9.0f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 2.0f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.7f;               // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.22f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 4.5f;               // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 8.0f;  // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.25f;              // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 1.2f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 1.2f;     // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.8f;                 // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 10.0f;               // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 1.2f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 6.8f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 140.0f;        // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 16.0f;           // O2 PLACEHOLDER
+            break;
+        default:
+            // Rifle: the struct defaults. A learnable climb with a gentle
+            // sideways sway, settling in about a third of a second.
+            break;
+        }
+        return Profile;
     }
 
     UBreakerWeaponDefinition* GetPrototypeDefinition(EBreakerWeaponArchetype Archetype)
@@ -127,6 +242,7 @@ namespace
                 Definition->DisplayName = FText::FromString(TEXT("Rifle"));
                 break;
             }
+            Definition->Recoil = ArchetypeRecoilProfile(Archetype);
         }
         return Prototypes[Index];
     }
@@ -134,7 +250,11 @@ namespace
 
 UBreakerWeaponComponent::UBreakerWeaponComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+    // Ticks only while recoil, bloom, or the viewmodel spring have work left;
+    // UpdateFeelTickEnabled switches it off again the moment everything is at
+    // rest, so an idle weapon still costs nothing.
+    PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bStartWithTickEnabled = false;
     SetIsReplicatedByDefault(true);
 }
 
@@ -167,6 +287,172 @@ const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() con
     return WeaponDefinition ? WeaponDefinition.Get() : GetPrototypeDefinition(CurrentArchetype);
 }
 
+FBreakerRecoilProfile UBreakerWeaponComponent::ResolveRecoilProfile() const
+{
+    // Component override (editor-tunable per instance, no recompile) beats the
+    // definition asset, which beats the archetype fallback table.
+    FBreakerRecoilProfile Profile;
+    if (const FBreakerRecoilProfile* Override = RecoilOverrides.Find(CurrentArchetype))
+    {
+        Profile = *Override;
+    }
+    else if (const UBreakerWeaponDefinition* Definition = ResolveDefinition())
+    {
+        Profile = Definition->Recoil;
+    }
+    else
+    {
+        Profile = ArchetypeRecoilProfile(CurrentArchetype);
+    }
+
+    // A single global trim over aim kick only. Recovery, bloom, and viewmodel
+    // keep their authored values so scaling the kick cannot desynchronise the
+    // settle from the climb.
+    const float Scale = FMath::Max(0.0f, RecoilScale);
+    if (!FMath::IsNearlyEqual(Scale, 1.0f))
+    {
+        Profile.VerticalKickDegrees *= Scale;
+        Profile.HorizontalKickDegrees *= Scale;
+        Profile.HorizontalRandomDegrees *= Scale;
+    }
+    return Profile;
+}
+
+float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (!Definition) return 0.0f;
+    const float BaseSpread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
+    return FBreakerWeaponFeel::EffectiveSpreadDegrees(ResolveRecoilProfile(), BaseSpread, BloomDegrees, BurstShotIndex);
+}
+
+FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
+{
+    // -X is toward the player: the weapon is driven back into the shoulder.
+    return FVector(-Viewmodel.BackOffset, Viewmodel.LateralOffset, 0.0f);
+}
+
+FRotator UBreakerWeaponComponent::GetViewmodelRotationOffset() const
+{
+    // Positive pitch on a camera-relative component points the muzzle up.
+    return FRotator(Viewmodel.PitchOffset, 0.0f, 0.0f);
+}
+
+void UBreakerWeaponComponent::ResetWeaponFeel()
+{
+    RecoilPitchAccumulated = 0.0f;
+    RecoilYawAccumulated = 0.0f;
+    RecoveryDelayRemaining = 0.0f;
+    BloomDegrees = 0.0f;
+    BurstShotIndex = 0;
+    bHasAppliedControlRotation = false;
+    Viewmodel = FBreakerViewmodelState();
+    UpdateFeelTickEnabled();
+}
+
+void UBreakerWeaponComponent::UpdateFeelTickEnabled()
+{
+    const bool bBusy = RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f
+        || BloomDegrees > 0.0f || !Viewmodel.IsAtRest();
+    SetComponentTickEnabled(bBusy);
+}
+
+void UBreakerWeaponComponent::ApplyShotFeel(const FBreakerShotResult& Shot)
+{
+    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
+    const FBreakerRecoilKick Kick = FBreakerWeaponFeel::ComputeShotKick(Profile, Shot.BurstShotIndex, Shot.RecoilSeed, Shot.bAimedShot);
+
+    if (bViewmodelKickEnabled)
+    {
+        FBreakerWeaponFeel::AddViewmodelKick(Profile, Viewmodel, Kick.YawDegrees, Shot.bAimedShot);
+    }
+
+    // Recoil moves the aim, and only the aim, and only for the player who is
+    // actually looking through this weapon.
+    APawn* Pawn = Cast<APawn>(GetOwner());
+    AController* OwningController = Pawn ? Pawn->GetController() : nullptr;
+    if (bRecoilEnabled && Pawn && OwningController && Pawn->IsLocallyControlled())
+    {
+        const FBreakerRecoilKick Applied = FBreakerWeaponFeel::AccumulateKick(Profile, Kick, RecoilPitchAccumulated, RecoilYawAccumulated);
+
+        const FRotator Current = OwningController->GetControlRotation();
+        const float CurrentPitch = FRotator::NormalizeAxis(Current.Pitch);
+        // Never let the kick drive the view through vertical; give back to the
+        // settle budget whatever the clamp refused, so recovery stays exact.
+        const float ClampedPitch = FMath::Clamp(CurrentPitch + Applied.PitchDegrees, -89.0f, 89.0f);
+        const float ActualPitchDelta = ClampedPitch - CurrentPitch;
+        RecoilPitchAccumulated -= (Applied.PitchDegrees - ActualPitchDelta);
+
+        FRotator Kicked = Current;
+        Kicked.Pitch = ClampedPitch;
+        Kicked.Yaw = Current.Yaw + Applied.YawDegrees;
+        OwningController->SetControlRotation(Kicked);
+        LastAppliedControlRotation = OwningController->GetControlRotation();
+        bHasAppliedControlRotation = true;
+        RecoveryDelayRemaining = FMath::Max(RecoveryDelayRemaining, Profile.RecoveryDelaySeconds);
+    }
+
+    UpdateFeelTickEnabled();
+}
+
+void UBreakerWeaponComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+    TickRecoil(DeltaSeconds);
+}
+
+void UBreakerWeaponComponent::TickRecoil(float DeltaSeconds)
+{
+    if (DeltaSeconds <= 0.0f) return;
+    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
+
+    BloomDegrees = FBreakerWeaponFeel::BloomAfterTime(Profile, BloomDegrees, DeltaSeconds);
+    FBreakerWeaponFeel::IntegrateViewmodel(Profile, Viewmodel, DeltaSeconds);
+
+    APawn* Pawn = Cast<APawn>(GetOwner());
+    AController* OwningController = Pawn ? Pawn->GetController() : nullptr;
+    if (OwningController && Pawn->IsLocallyControlled() && (RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f))
+    {
+        FRotator Current = OwningController->GetControlRotation();
+        if (bHasAppliedControlRotation)
+        {
+            // Aim movement that opposes the kick is the player compensating.
+            // Spend the settle budget on it rather than shoving the view the
+            // same distance again once the burst ends.
+            const float PlayerPitchDelta = FRotator::NormalizeAxis(Current.Pitch - LastAppliedControlRotation.Pitch);
+            const float PlayerYawDelta = FRotator::NormalizeAxis(Current.Yaw - LastAppliedControlRotation.Yaw);
+            RecoilPitchAccumulated = FBreakerWeaponFeel::ConsumeCompensation(RecoilPitchAccumulated, PlayerPitchDelta);
+            RecoilYawAccumulated = FBreakerWeaponFeel::ConsumeCompensation(RecoilYawAccumulated, PlayerYawDelta);
+        }
+
+        if (RecoveryDelayRemaining > 0.0f)
+        {
+            RecoveryDelayRemaining = FMath::Max(0.0f, RecoveryDelayRemaining - DeltaSeconds);
+        }
+        else
+        {
+            const float NewPitch = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilPitchAccumulated, DeltaSeconds);
+            const float NewYaw = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilYawAccumulated, DeltaSeconds);
+            Current.Pitch = FRotator::NormalizeAxis(Current.Pitch) + (NewPitch - RecoilPitchAccumulated);
+            Current.Yaw = Current.Yaw + (NewYaw - RecoilYawAccumulated);
+            RecoilPitchAccumulated = NewPitch;
+            RecoilYawAccumulated = NewYaw;
+            OwningController->SetControlRotation(Current);
+        }
+        LastAppliedControlRotation = OwningController->GetControlRotation();
+        bHasAppliedControlRotation = true;
+    }
+    else if (!OwningController)
+    {
+        // No aim to move: drop the budget rather than banking a kick that
+        // would be handed back the next time a controller appears.
+        RecoilPitchAccumulated = 0.0f;
+        RecoilYawAccumulated = 0.0f;
+    }
+
+    UpdateFeelTickEnabled();
+}
+
 void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetype)
 {
     if (CurrentArchetype == NewArchetype) return;
@@ -174,6 +460,9 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
     CurrentArchetype = NewArchetype;
     bReloading = false;
+    // A different weapon starts its pattern from zero.
+    BurstShotIndex = 0;
+    BloomDegrees = 0.0f;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     MagazineAmmo = Definition ? Definition->MagazineSize : 0;
     ReserveAmmo = Definition ? Definition->StartingReserveAmmo : 0;
@@ -230,6 +519,10 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
     bReloading = false;
+    // The incoming weapon starts its pattern from zero; any kick still in the
+    // air keeps settling, because the aim it moved is still the player's aim.
+    BurstShotIndex = 0;
+    BloomDegrees = 0.0f;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 
@@ -296,6 +589,8 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
         if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
         bReloading = false;
         CurrentArchetype = NewArchetype;
+        BurstShotIndex = 0;
+        BloomDegrees = 0.0f;
         MagazineAmmo = Definition->MagazineSize;
         ReserveAmmo = Definition->StartingReserveAmmo;
         OnReloadChanged.Broadcast(false);
@@ -393,6 +688,17 @@ void UBreakerWeaponComponent::FireOnce()
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return;
 
+    const FBreakerRecoilProfile RecoilProfile = ResolveRecoilProfile();
+    // A burst is a run of shots with no meaningful gap. Let the trigger rest
+    // and the weapon is dead accurate again, its pattern back at shot zero:
+    // that is the whole reward for trigger discipline.
+    const double IdleSeconds = GetWorld()->GetTimeSeconds() - LastShotTime;
+    if (IdleSeconds > RecoilProfile.BurstResetSeconds)
+    {
+        BurstShotIndex = 0;
+        BloomDegrees = 0.0f;
+    }
+
     LastShotTime = GetWorld()->GetTimeSeconds();
     --MagazineAmmo;
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
@@ -400,20 +706,33 @@ void UBreakerWeaponComponent::FireOnce()
     FVector ViewLocation;
     FRotator ViewRotation;
     GetViewPoint(ViewLocation, ViewRotation);
-    const float Spread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
+    // ADS tightens the cone twice over: the definition's aimed spread is the
+    // floor, and bloom grows more slowly on top of it.
+    const float BaseSpread = bAiming ? Definition->AimSpreadDegrees : Definition->HipSpreadDegrees;
+    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(RecoilProfile, BaseSpread, BloomDegrees, BurstShotIndex);
+
+    // Recoil state for this shot, resolved before the pellets so the cosmetic
+    // event can carry it to every machine and they all kick identically.
+    const int32 FiredBurstIndex = BurstShotIndex;
+    const int32 RecoilSeed = static_cast<int32>(HashCombine(GetTypeHash(GetOwner()), static_cast<uint32>(ShotSequence + 1)));
+    ++BurstShotIndex;
+    BloomDegrees = FBreakerWeaponFeel::BloomAfterShot(RecoilProfile, BloomDegrees, bAiming);
+    UpdateFeelTickEnabled();
 
     if (Definition->bProjectile)
     {
-        FireProjectile(Definition, ViewLocation, ViewRotation, Spread);
+        FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
         return;
     }
 
     FBreakerShotResult Shot;
     Shot.bFired = true;
+    Shot.BurstShotIndex = FiredBurstIndex;
+    Shot.RecoilSeed = RecoilSeed;
+    Shot.bAimedShot = bAiming;
     Shot.TraceStart = ViewLocation;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
-    const float GearDamageMultiplier = GearWeaponDamageMultiplier(GetOwner());
 
     // Lead's mark, resolved once per shot rather than once per pellet: the mark
     // cannot change between the pellets of a single trigger pull. A mark with
@@ -458,7 +777,11 @@ void UBreakerWeaponComponent::FireOnce()
             Damage.bWeakPointHit = bPelletWeakPoint;
             Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
-            Damage.SourceDamageMultiplier = (SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f) * GearDamageMultiplier;
+            // ONE number. Gear's Weapon Damage affix and every skill node that
+            // raises damage are already summed into the DamageMultiplier
+            // attribute's single additive Increased bucket; multiplying gear in
+            // separately here is what used to break the locked rule.
+            Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
             Damage.SourceLocation = GetOwner()->GetActorLocation();
             Damage.bHasSourceLocation = true;
@@ -515,7 +838,7 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, GetOwner());
 }
 
-void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread)
+void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed)
 {
     const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
 
@@ -531,7 +854,8 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Damage.ArmorPenetration = Definition->ArmorPenetration;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
-    Damage.SourceDamageMultiplier = (SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f) * GearWeaponDamageMultiplier(GetOwner());
+    // Same single composed number as the hitscan path.
+    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the
@@ -554,6 +878,9 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
 
     FBreakerShotResult Shot;
     Shot.bFired = true;
+    Shot.BurstShotIndex = BurstIndex;
+    Shot.RecoilSeed = RecoilSeed;
+    Shot.bAimedShot = bAiming;
     Shot.TraceStart = ViewLocation;
     Shot.TraceEnd = SpawnLocation + Direction * 400.0f;
     MulticastShotCosmetics(Shot);
@@ -589,6 +916,10 @@ void UBreakerWeaponComponent::MulticastShotCosmetics_Implementation(const FBreak
 {
     LastShot = Shot;
     LastCosmeticShotTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    // Feel runs on the cosmetic path, after the trace has already been
+    // resolved: the round goes where the player was aiming when they pulled,
+    // and the kick then moves the aim for the shot after it.
+    if (Shot.bFired) ApplyShotFeel(Shot);
     OnShot.Broadcast(Shot);
 }
 
@@ -608,6 +939,7 @@ void UBreakerWeaponComponent::ResetAmmunition()
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
     bReloading = false;
+    ResetWeaponFeel();
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 }

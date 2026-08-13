@@ -349,6 +349,14 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)]);
+        // Weapon Damage used to reach the weapon on its own private path
+        // (GearWeaponDamageMultiplier, multiplied against the DamageMultiplier
+        // attribute), which meant gear damage and tree damage would have
+        // composed MULTIPLICATIVELY. It now bids into the shared additive
+        // bucket like every other Increased percentage. Stats
+        // .WeaponDamageMultiplier survives as the gear-only display figure the
+        // inventory totals panel prints; nothing in combat reads it any more.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]);
     }
     return Stats;
 }

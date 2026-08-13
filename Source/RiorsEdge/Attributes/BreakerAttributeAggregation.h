@@ -20,7 +20,7 @@
 // (reserved for trees and Anomalous items, capped by ruling O3).
 
 // The attributes the unified pass owns. An attribute a single system owns
-// outright (Shield, Armor, DamageMultiplier, ...) deliberately stays out.
+// outright (Shield, Armor, ...) deliberately stays out.
 enum class EBreakerAggregatedAttribute : uint8
 {
     MaxHealth,
@@ -29,6 +29,12 @@ enum class EBreakerAggregatedAttribute : uint8
     CriticalMultiplier,
     MoveSpeed,
     DamageOverTimeMultiplier,
+    // Outgoing damage scaling. THE single place damage Increased percentages
+    // land: gear's Weapon Damage affix and every skill node that raises damage
+    // both bid here, so they form one additive bucket instead of composing
+    // multiplicatively at the weapon. Base 1.0, so a 20% gear roll and a 15%
+    // tree allocation read 1.35 — never 1.20 * 1.15.
+    DamageMultiplier,
     Count
 };
 

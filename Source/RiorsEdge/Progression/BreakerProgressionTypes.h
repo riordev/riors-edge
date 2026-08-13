@@ -45,6 +45,15 @@ enum class EBreakerNodeStatTarget : uint8
     BlockChance,
     Health,
     DamageOverTime,
+    // Increased damage dealt. Appended rather than inserted: node effects are
+    // authored content and saves store node ids, but Data Assets serialize this
+    // enum by value, so existing rows must keep their numbers.
+    //
+    // Until this entry existed a skill node was STRUCTURALLY incapable of
+    // raising weapon damage — the reason spending points never felt like
+    // anything. It shares the DamageMultiplier attribute's additive Increased
+    // bucket with gear's Weapon Damage affix.
+    Damage,
     Count UMETA(Hidden)
 };
 
@@ -86,6 +95,10 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float SlideSpeedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AirControlMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float DamageOverTimeMultiplier = 1.0f;
+    // Composed from node Damage effects PLUS the per-spent-point baseline, so
+    // this is the whole tree layer's contribution to the shared additive
+    // Increased bucket on the DamageMultiplier attribute.
+    UPROPERTY(BlueprintReadOnly) float DamageMultiplier = 1.0f;
     // Rule-rewrite and verb-grant nodes cannot be expressed as stats; they
     // publish a tag here and the owning system reads it.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer GrantedTags;

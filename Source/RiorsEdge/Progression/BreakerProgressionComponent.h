@@ -58,6 +58,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") float GetMoveSpeedMultiplier() const { return CachedStats.MoveSpeedMultiplier; }
     UFUNCTION(BlueprintPure, Category="Progression") float GetSlideSpeedMultiplier() const { return CachedStats.SlideSpeedMultiplier; }
     UFUNCTION(BlueprintPure, Category="Progression") float GetAirControlMultiplier() const { return CachedStats.AirControlMultiplier; }
+    // Whole tree-layer damage contribution as a 1.0-based multiplier, node
+    // effects and the point-spend baseline together. Read for display only:
+    // combat reads the composed DamageMultiplier ATTRIBUTE, never this, or the
+    // two layers would multiply instead of sharing one additive bucket.
+    UFUNCTION(BlueprintPure, Category="Progression") float GetDamageMultiplier() const { return CachedStats.DamageMultiplier; }
+    // Points committed to nodes across both wallets (rank x cost).
+    UFUNCTION(BlueprintPure, Category="Progression") float GetSpentPoints() const;
+    // The point-spend baseline in whole percent, before node effects.
+    UFUNCTION(BlueprintPure, Category="Progression") float GetPointSpendDamagePercent() const;
+
+    // O2 PLACEHOLDER: 1.0% increased damage per committed point. Deliberately
+    // small — the feel target is that a purchase is noticeable and a full slice
+    // budget is a real step, not that one node doubles your output. EditAnywhere
+    // so the owner can retune it on BP_BreakerCharacter without a recompile;
+    // set it to 0 to switch the baseline off entirely and leave only the nodes.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression|Tuning", meta=(ClampMin="0.0", UIMax="5.0"))
+    float IncreasedDamagePerSpentPoint = 1.0f;
 
     // Playtest hook: hands the gym the slice point budget so trees can be
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).

@@ -134,20 +134,95 @@ The rules the new path enforces:
   end in the same numbers regardless of sequence.
 
 The attributes on this path are MaxHealth, MaxClassResource, CriticalChance,
-CriticalMultiplier, MoveSpeed and DamageOverTimeMultiplier. Attributes a
-single system owns outright (Shield, Armor, DamageMultiplier) stay off it.
-`FBreakerEquipmentStats` and `FBreakerNodeStats` are unchanged: the movement,
-combat, weapon and loot consumers still read the composed multipliers from
+CriticalMultiplier, MoveSpeed, DamageOverTimeMultiplier and **DamageMultiplier**.
+Attributes a single system owns outright (Shield, Armor) stay off it.
+`FBreakerEquipmentStats` and `FBreakerNodeStats` are otherwise unchanged: the
+movement, combat and loot consumers still read the composed multipliers from
 `GetStats()` / `GetNodeStats()`.
 
-Coverage: `Source/RiorsEdge/Tests/BreakerAttributeAggregationTests.cpp` plus
+## Damage scaling lands in exactly one place
+
+`DamageMultiplier` is THE composed outgoing-damage number. Every damage path
+already read it (`UBreakerWeaponComponent` hitscan and projectile,
+`UBreakerAbility_Cleave`, and the Bleed snapshot's `SourcePower`); until this
+pass nothing wrote it, so it was permanently 1.0 — the literal cause of the
+owner's report that damage never changes no matter what is equipped or spent.
+
+Three sources bid into its single additive Increased bucket:
+
+- **Gear.** The `WeaponDamage` affix target. Its raw percentage is submitted by
+  `UBreakerEquipmentComponent::AggregateStats`. It used to reach the weapon on a
+  private path (`GearWeaponDamageMultiplier`, MULTIPLIED against the attribute),
+  which would have made gear and tree damage compose multiplicatively; that
+  helper is deleted. `FBreakerEquipmentStats::WeaponDamageMultiplier` survives
+  as the gear-only figure the inventory totals panel prints — reading it at a
+  damage site would double-count gear.
+- **Skill nodes.** The new `EBreakerNodeStatTarget::Damage`. Before it existed a
+  node was structurally incapable of raising weapon damage.
+- **The point-spend baseline.** `UBreakerProgressionComponent::
+  IncreasedDamagePerSpentPoint` (EditAnywhere, O2 PLACEHOLDER 1.0% per point)
+  pays a small Increased Damage per point COMMITTED to nodes, counted by cost so
+  a 3-point Convergence is worth three times a 1-point minor. It is a property
+  of spending, not of level, so it does not touch the cap-50 /
+  no-post-cap-power ruling. Set it to 0 to leave only node content.
+
+Slice fallback content authoring damage (all O2 PLACEHOLDER): Core Precision
+Sightline +4%, Core Volley Cyclic +3%/rank over 3 ranks, Swift Marksman Long
+Lens and Pierce Discipline +3%/rank over 2 ranks each.
+
+Coverage: `Source/RiorsEdge/Tests/BreakerAttributeAggregationTests.cpp` —
+including `RiorsEdge.Attributes.Damage.NodePurchaseRaisesWeaponDamage`, which
+buys a node and asserts the damage a weapon would deal actually rises — plus
 `RiorsEdge.Items.Equipment.AttributeContribution` and
 `RiorsEdge.Progression.RespecRestoresAttributes`.
+
+## Affix and node consumption audit (2026-08-13)
+
+Every stat target, end to end. "Live" means a purchased/equipped line changes
+something a player can observe.
+
+| Layer | Target | Consumer | Live |
+|---|---|---|---|
+| Affix | Health | MaxHealth attribute | yes |
+| Affix | ResourceRegen | `UBreakerEquipmentComponent::TickComponent` writes ClassResource (server) | yes |
+| Affix | MaxResource | MaxClassResource attribute; Momentum/Mana clamp and the HUD bar read it | yes |
+| Affix | MoveSpeed | MoveSpeed attribute **and** `GearMoveSpeedMultiplier()` | yes — see OPEN below |
+| Affix | DropChance | `ABreakerEnemy` loot roll (`RollRarity`) | yes |
+| Affix | PhysicalDamageReduction | `UBreakerCombatComponent::ReceiveDamage` | yes |
+| Affix | ElementalDamageReduction | none — no stats field, no consumer, deliberately absent from the pool | **no, reserved for O5** |
+| Affix | CriticalChance | CriticalChance attribute → weapon/Cleave | yes |
+| Affix | CriticalDamage | CriticalMultiplier attribute | yes |
+| Affix | SlideSpeed | `GearSlideSpeedMultiplier()` | yes |
+| Affix | AirControl | `GearAirControlMultiplier()` (steer rate) | yes |
+| Affix | DashCooldownReduction | `GearDashCooldownMultiplier()` | yes |
+| Affix | WeaponDamage | DamageMultiplier attribute (this pass) | yes |
+| Node | CriticalChance | CriticalChance attribute | yes |
+| Node | CriticalDamage | CriticalMultiplier attribute | yes |
+| Node | MoveSpeed | MoveSpeed attribute **and** `GearMoveSpeedMultiplier()` | yes — see OPEN below |
+| Node | SlideSpeed | `GearSlideSpeedMultiplier()` | yes |
+| Node | AirControl | `GearAirControlMultiplier()` | yes |
+| Node | DodgeChance | `UBreakerCombatComponent` defense state | yes |
+| Node | BlockChance | `UBreakerCombatComponent` defense state | yes |
+| Node | Health | MaxHealth attribute | yes |
+| Node | DamageOverTime | DamageOverTimeMultiplier attribute → DoT snapshots | yes |
+| Node | Damage | DamageMultiplier attribute (this pass) | yes |
+
+`BonusMaxResource` and `ResourceRegenPerSecond` were suspected dead and are
+not; `RiorsEdge.Attributes.Affixes.ResourceAffixesAreLive` now pins both so a
+refactor that drops either fails loudly. They stay in the pool.
+`ElementalDamageReduction` is the only genuinely inert target, and because no
+affix in the pool rolls it, it lies to nobody — it is left in place, commented,
+for the O5 resistance model.
 
 OPEN: `UBreakerCharacterMovementComponent` still multiplies the gear and tree
 movement multipliers together (`GearMoveSpeedMultiplier()` and friends) rather
 than adding their Increased percentages, which contradicts the rule above.
-That is a movement-layer change and needs an owner ruling.
+That is a movement-layer change and needs an owner ruling. Damage was the same
+bug class and is fixed; movement is the last instance. Related: the composed
+`MoveSpeed` ATTRIBUTE currently has no gameplay consumer at all — the movement
+component caps speed from its own WalkSpeed/SprintSpeed times those
+multipliers — so the correctly-aggregated attribute is only read by tests and
+the same ruling should decide which of the two is authoritative.
 
 ## Gym drops
 
