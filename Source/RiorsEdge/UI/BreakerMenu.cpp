@@ -1,6 +1,7 @@
 #include "UI/BreakerMenu.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerClassDefinition.h"
@@ -1000,7 +1001,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             AddTotalRow(TEXT("SLIDE SPEED"), FString::Printf(TEXT("x%.2f"), Stats.SlideSpeedMultiplier), Cyan);
             AddTotalRow(TEXT("AIR CONTROL"), FString::Printf(TEXT("x%.2f"), Stats.AirControlMultiplier), Cyan);
             AddTotalRow(TEXT("DASH COOLDOWN"), FString::Printf(TEXT("x%.2f"), Stats.DashCooldownMultiplier), Cyan);
-            AddTotalRow(TEXT("WEAPON DAMAGE"), FString::Printf(TEXT("x%.2f"), Stats.WeaponDamageMultiplier), BreakerUI::Orange);
+            // Read the composed attribute, not the gear-only figure. Gear,
+            // skill nodes and the point-spend baseline all land in one additive
+            // Increased bucket on DamageMultiplier now, and this row printing
+            // only the gear half is precisely how "I spend points and damage
+            // never changes" would still look true after it stopped being true.
+            {
+                const UBreakerAttributeSet* Attributes = Character.IsValid() ? Character->GetAttributes() : nullptr;
+                const float ComposedDamage = Attributes ? Attributes->GetDamageMultiplier() : Stats.WeaponDamageMultiplier;
+                AddTotalRow(TEXT("DAMAGE"), FString::Printf(TEXT("x%.2f"), ComposedDamage), BreakerUI::Orange);
+            }
             AddTotalRow(TEXT("CRIT CHANCE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalChanceBonus * 100.0f), BreakerUI::Orange);
             AddTotalRow(TEXT("CRIT DAMAGE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalMultiplierBonus * 100.0f), BreakerUI::Orange);
             AddTotalRow(TEXT("DROP CHANCE"), FString::Printf(TEXT("+%.1f%%"), Stats.DropChancePercent), Amber);
