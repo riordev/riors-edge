@@ -103,6 +103,16 @@ void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
     UE_LOG(LogTemp, Log, TEXT("[MenuRebuild] %d -> %d at %.3f"),
         static_cast<int32>(CurrentScreen), static_cast<int32>(NewScreen),
         FPlatformTime::Seconds());
+    // Flip-flop diagnosis: when the transition is between Inventory and
+    // SkillTrees, dump the callstack so the log names the caller.
+    if ((CurrentScreen == EBreakerMenuScreen::Inventory && NewScreen == EBreakerMenuScreen::SkillTrees) ||
+        (CurrentScreen == EBreakerMenuScreen::SkillTrees && NewScreen == EBreakerMenuScreen::Inventory))
+    {
+        ANSICHAR StackTrace[4096];
+        StackTrace[0] = 0;
+        FPlatformStackWalk::StackWalkAndDump(StackTrace, UE_ARRAY_COUNT(StackTrace), 1);
+        UE_LOG(LogTemp, Log, TEXT("[MenuRebuild] caller:\n%hs"), StackTrace);
+    }
 
     // Deferred: swapping the content synchronously destroys the button whose
     // OnClicked is still on the callstack — a Slate re-entrancy footgun and
@@ -625,8 +635,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     for (const EBreakerEquipSlot Slot : RightColumn) RightSlots->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
 
     // Bottom: backpack grid — best rarity first, optional slot filter,
-    // cards grow to fit their affix list so nothing truncates.
-    TSharedRef<SWrapBox> BackpackGrid = SNew(SWrapBox).UseAllottedSize(true);
+    // cards grow to fit their affix list so nothing truncates. Fixed rows of
+    // three, never a wrap box: SWrapBox measured by allotted width inside a
+    // scroll box oscillates between two layouts every frame.
+    TSharedRef<SVerticalBox> BackpackGrid = SNew(SVerticalBox);
+    TSharedPtr<SHorizontalBox> BackpackRow;
+    int32 BackpackCardIndex = 0;
     TArray<FBreakerItemInstance> BackpackItems = Equipment ? Equipment->GetBackpack() : TArray<FBreakerItemInstance>();
     Algo::Reverse(BackpackItems);
     BackpackItems.StableSort([](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
@@ -663,7 +677,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             return FReply::Handled();
         });
 
-        BackpackGrid->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
+        if (BackpackCardIndex % 3 == 0)
+        {
+            BackpackRow = SNew(SHorizontalBox);
+            BackpackGrid->AddSlot().AutoHeight()[BackpackRow.ToSharedRef()];
+        }
+        ++BackpackCardIndex;
+        BackpackRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 8.0f)
         [
             SNew(SBox).WidthOverride(300.0f)
             [
@@ -1313,7 +1333,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 MenuText(FText::FromString(TierHeader), 10, Gate > SelectedSpent ? SoftText : Cyan, true)
             ];
 
-            TSharedRef<SWrapBox> TierRow = SNew(SWrapBox).UseAllottedSize(true);
+            // Fixed rows of three, never a wrap box: SWrapBox sized by its
+            // allotted width inside a scroll box re-measures to a different
+            // answer every frame — the layout oscillation the owner saw as
+            // the screen "bouncing between two sizes".
+            TSharedRef<SVerticalBox> TierRow = SNew(SVerticalBox);
+            TSharedPtr<SHorizontalBox> CurrentRow;
+            int32 CardIndex = 0;
             for (const UBreakerProgressionNode* Node : Selected->Nodes)
             {
                 if (!Node || Node->RequiredTreeInvestment != Gate) continue;
@@ -1417,7 +1443,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     .AutoWrapText(true)
                 ];
 
-                TierRow->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
+                if (CardIndex % 3 == 0)
+                {
+                    CurrentRow = SNew(SHorizontalBox);
+                    TierRow->AddSlot().AutoHeight()[CurrentRow.ToSharedRef()];
+                }
+                ++CardIndex;
+                CurrentRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 8.0f)
                 [
                     // Tooltip lives on the wrapper too so locked (disabled)
                     // cards still explain themselves on hover.
