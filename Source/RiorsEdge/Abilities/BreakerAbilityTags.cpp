@@ -20,4 +20,18 @@ namespace BreakerAbilityTags
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_Bloodrhythm, "Keystone.Swift.Bloodrhythm");
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_TerminalVelocity, "Keystone.Swift.TerminalVelocity");
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_StandingWave, "Keystone.Swift.StandingWave");
+
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Cleave, "Ability.Class.Caster.Cleave");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Closequarter, "Ability.Class.Caster.Closequarter");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Unmake, "Ability.Class.Caster.Unmake");
+
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Cleave, "State.Ability.Cleave");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Closequarter, "State.Ability.Closequarter");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ultimate_Unmake, "State.Ultimate.Unmake");
+
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Caster_Edgework, "Keystone.Caster.Edgework");
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Caster_LongDark, "Keystone.Caster.LongDark");
+    UE_DEFINE_GAMEPLAY_TAG(Keystone_Caster_Cascade, "Keystone.Caster.Cascade");
+
+    UE_DEFINE_GAMEPLAY_TAG(Damage_Melee, "Damage.Melee");
 }

@@ -59,23 +59,62 @@ chrome.
 
 Respec is per-tree and its button label states which tree it will clear.
 
-## Implementation status (2026-08-13)
+## Implementation status (2026-08-13, layout re-zoning pass)
 
 Landed in `SBreakerMenu::BuildSkillTreesScreen`:
 
-- Fieldplate palette, the header/board/detail proportions in spirit (tree
-  selector column, node grid, status line), the type scale.
-- The four node states as the spec's colour language: owned cyan rail and pips,
-  purchasable gold 2px border with a gold action line, available neutral,
-  locked muted with the failure reason printed literally.
-- `MAXED` in place of `5/5`, and the effect line in mono on line two.
-- The per-tree respec button in the discard style, labelled with its tree.
+- Fieldplate palette and the type scale throughout.
+- The four node states as the spec's colour language: owned cyan, purchasable
+  gold 2px border with a gold action line, available neutral, locked muted
+  with the failure reason printed literally. `MAXED` in place of `5/5`.
+- **The header zone.** An 88-tall band at `bg/raised` (via
+  `SBreakerMenu::BuildZonedFrame`): title `SKILL MATRIX`, the
+  `BREAKER · <CLASS> · LV n` meta line, the two-tab `CLASS · <class>` / `CORE`
+  switch, both point counters as separate railed chips (class cyan, core gold,
+  unspent large with `/ N SPENT` beneath), and respec at the far right in the
+  discard style, labelled with the pool it clears.
+- **The class board as PATHS.** Drawn on an `SCanvas` at fixed pixel
+  positions: a 60px branch header strip above the field, one 2px trunk per
+  branch running the full height (cyan where the route is owned, `#1F3047`
+  where it is not), 2px diagonals dropping from the trunk to each node,
+  tier-gate dashed hairlines across the field labelled once in a dedicated
+  76px left gutter as two short lines (tier, then gate cost), and the markers
+  themselves — 48px square for multi-rank Minors with the rank inside, 44px
+  diamond for Notables, 64px square for Convergences, 60px diamond for
+  Keystones. Name, effect number and state sit as plain text near the marker,
+  not inside a card; Convergence and Keystone label to the RIGHT so the trunk
+  never runs through their text.
+- **The Core board as the constellation map.** Kinesis is the hub at centre
+  with Precision, Volley, Affliction and Bulwark positioned around it,
+  convergence lines drawn between hub and cluster (cyan only when both ends
+  are owned), each cluster showing its node grid as compact markers plus a
+  purchasable count, and Elements sealed below centre in suppression teal
+  `#08B8A8` — the one legal teal here, because a rift is a world object.
+- **The fixed 420px hover-detail rail.** Populated through `SetContent` from
+  `SButton::OnHovered`, which is event-driven; the column never changes width,
+  so the board cannot reflow when it fills. Markers are deliberately never
+  disabled, because a disabled `SButton` fires no hover events and a locked
+  node most needs to explain itself.
+- **Footer**, 56 tall: the input legend and the live purchasable count in gold.
+- `SHIFT+LMB` buys to max. The modifier state is read once, inside the click
+  handler — never polled from a per-frame attribute.
 
-Not landed:
+Not landed / known compromises:
 
-- The path board: trunks, diagonals, tier-gate hairlines, and the marker
-  geometry (48px square / 44px diamond / 64px square / 60px diamond). The grid
-  of node cards remains.
-- The Core constellation map (five clusters around Kinesis, convergence lines,
-  sealed Elements cluster) — core nodes still enumerate as cards.
-- The 420px hover-detail rail and the `SHIFT+LMB buy to max` input.
+- **Node kind is derived, not authored.** `UBreakerProgressionNode` carries no
+  kind field, so `ClassifyNode` infers it: `bCornerstone` → Keystone,
+  `MaxRank > 1` → Minor, single-rank costing 3+ → Convergence (the O21
+  promotion tier), otherwise Notable. Replace with a direct read when a Kind
+  enum lands on the node asset.
+- The Elements cluster renders as a sealed placeholder because no Elements
+  nodes exist in the fallback content; an `UNMAPPED` cluster catches any node
+  authored outside the five known `Core.<Constellation>.` prefixes so nothing
+  silently vanishes.
+- `TAB` is not bound to the board switch; the legend says click instead.
+- Motion is still unimplemented (panel transition, purchase-confirm snap).
+- The board sits in a vertical scroll box at its computed pixel width. With
+  more branches than a 1760-wide panel holds it will clip horizontally rather
+  than scroll. Sizing off the allotted width was rejected on purpose — that is
+  the pattern that caused the historical layout oscillation.
+- **Nothing here is visually verified.** The build compiles and the automation
+  suite passes; no one has looked at the screen.

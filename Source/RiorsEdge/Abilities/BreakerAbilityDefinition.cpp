@@ -1,7 +1,10 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbility_Cleave.h"
+#include "Abilities/BreakerAbility_Closequarter.h"
 #include "Abilities/BreakerAbility_Lead.h"
+#include "Abilities/BreakerAbility_Unmake.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
 
@@ -158,6 +161,90 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     }
     Registry.Add(Overdrive);
 
+    // ------------------------------------------------------------------
+    // Caster. Costs quoted from Class-Kits §2.2. NO COOLDOWNS ANYWHERE in
+    // this class: Mana *is* the cooldown (Class-Kits §2.1), so no entry below
+    // authors CooldownSeconds or a CooldownTag, and the HUD can therefore tell
+    // "cost-gated" from "cooldown of zero" (spec D3).
+    // ------------------------------------------------------------------
+
+    // C1 Cleave — Class-Kits §2.2 row C1: 20 Mana, no cooldown.
+    UBreakerAbilityDefinition* Cleave = MakeFallback(TEXT("FallbackAbility_Caster_Cleave"));
+    Cleave->AbilityId = TEXT("Caster.Cleave");
+    Cleave->ClassId = EBreakerClassId::Caster;
+    Cleave->DisplayName = FText::FromString(TEXT("Cleave"));
+    Cleave->Description = FText::FromString(TEXT("Short forward melee arc that always applies Bleed."));
+    Cleave->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Cleave->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Cleave;
+    Cleave->AbilityClass = UBreakerAbility_Cleave::StaticClass();
+    Cleave->ResourceCost = 20.0f;
+    Cleave->CooldownSeconds = 0.0f;
+    // O2 PLACEHOLDER: the animation lock is named by Class-Kits (Edgework
+    // removes it) but never timed. Mirrors the ability's own default.
+    Cleave->WindowDuration = 0.45f;
+    Registry.Add(Cleave);
+
+    // C2 Closequarter — Class-Kits §2.2 row C2: 35 Mana, no cooldown.
+    UBreakerAbilityDefinition* Closequarter = MakeFallback(TEXT("FallbackAbility_Caster_Closequarter"));
+    Closequarter->AbilityId = TEXT("Caster.Closequarter");
+    Closequarter->ClassId = EBreakerClassId::Caster;
+    Closequarter->DisplayName = FText::FromString(TEXT("Closequarter"));
+    Closequarter->Description = FText::FromString(TEXT("Blink to the target under the crosshair, arriving just short of it."));
+    Closequarter->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Closequarter->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Closequarter;
+    Closequarter->AbilityClass = UBreakerAbility_Closequarter::StaticClass();
+    Closequarter->ResourceCost = 35.0f;
+    Closequarter->CooldownSeconds = 0.0f;
+    Registry.Add(Closequarter);
+
+    // UNMAKE — Class-Kits §2.2 ultimate: 80 Mana, no cooldown, 6s base window.
+    UBreakerAbilityDefinition* Unmake = MakeFallback(TEXT("FallbackAbility_Caster_Unmake"));
+    Unmake->AbilityId = TEXT("Caster.Unmake");
+    Unmake->ClassId = EBreakerClassId::Caster;
+    Unmake->DisplayName = FText::FromString(TEXT("Unmake"));
+    Unmake->Description = FText::FromString(TEXT("Caster abilities cost nothing and Mana generation stops."));
+    Unmake->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Unmake->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Unmake;
+    Unmake->AbilityClass = UBreakerAbility_Unmake::StaticClass();
+    Unmake->ResourceCost = 80.0f;
+    Unmake->CooldownSeconds = 0.0f;
+    Unmake->WindowDuration = 6.0f;
+
+    // Keystone variant rows (spec D1). Every duration and cost scalar below is
+    // quoted from Class-Kits §2.2 — 6s/0% base, 12s/50% for Long Dark. Edgework
+    // and Cascade change behavior, not parameters, so their rows carry the base
+    // numbers and exist so the selector resolves them rather than silently
+    // falling through to base.
+    {
+        FBreakerAbilityVariant BaseRow;
+        BaseRow.VariantName = FText::FromString(TEXT("Unmake"));
+        BaseRow.WindowDuration = 6.0f;
+        BaseRow.AbilityCostMultiplier = 0.0f;
+        Unmake->Variants.Add(BaseRow);
+
+        FBreakerAbilityVariant Edgework;
+        Edgework.KeystoneTag = BreakerAbilityTags::Keystone_Caster_Edgework;
+        Edgework.VariantName = FText::FromString(TEXT("Unmake - Edgework"));
+        Edgework.WindowDuration = 6.0f;
+        Edgework.AbilityCostMultiplier = 0.0f;
+        Unmake->Variants.Add(Edgework);
+
+        FBreakerAbilityVariant LongDark;
+        LongDark.KeystoneTag = BreakerAbilityTags::Keystone_Caster_LongDark;
+        LongDark.VariantName = FText::FromString(TEXT("Unmake - Long Dark"));
+        LongDark.WindowDuration = 12.0f;
+        LongDark.AbilityCostMultiplier = 0.5f;
+        Unmake->Variants.Add(LongDark);
+
+        FBreakerAbilityVariant Cascade;
+        Cascade.KeystoneTag = BreakerAbilityTags::Keystone_Caster_Cascade;
+        Cascade.VariantName = FText::FromString(TEXT("Unmake - Cascade"));
+        Cascade.WindowDuration = 6.0f;
+        Cascade.AbilityCostMultiplier = 0.0f;
+        Unmake->Variants.Add(Cascade);
+    }
+    Registry.Add(Unmake);
+
     return Registry;
 }
 
@@ -179,15 +266,34 @@ UBreakerAbilityDefinition* UBreakerAbilityDefinition::FindFallback(FName InAbili
 
 FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId, EBreakerAbilitySlot Slot)
 {
-    if (ClassId != EBreakerClassId::Swift)
+    // This is the whole reachability chain for a class with no authored class
+    // definition: UBreakerProgressionComponent::ChoosePermanentClassById leaves
+    // the loadout FNames as None for anything but Swift, and
+    // UBreakerAbilityComponent::ResolveDefinition then asks here. A class
+    // missing from this switch has three dead keys.
+    switch (ClassId)
     {
+    case EBreakerClassId::Swift:
+        switch (Slot)
+        {
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Swift.Skim");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Swift.Lead");
+        case EBreakerAbilitySlot::Ultimate:        return TEXT("Swift.Overdrive");
+        default: return NAME_None;
+        }
+    case EBreakerClassId::Caster:
+        switch (Slot)
+        {
+        // Class-Kits §2.2 names Cleave and Rot as the Caster starters. Rot needs
+        // the zone actor system, which does not exist, so slot two ships
+        // Closequarter — the other Spellblade ability and the one buildable
+        // without new Combat/ systems. Swap it for Rot when zones land.
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Caster.Cleave");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Caster.Closequarter");
+        case EBreakerAbilitySlot::Ultimate:        return TEXT("Caster.Unmake");
+        default: return NAME_None;
+        }
+    default:
         return NAME_None;
-    }
-    switch (Slot)
-    {
-    case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Swift.Skim");
-    case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Swift.Lead");
-    case EBreakerAbilitySlot::Ultimate:        return TEXT("Swift.Overdrive");
-    default: return NAME_None;
     }
 }

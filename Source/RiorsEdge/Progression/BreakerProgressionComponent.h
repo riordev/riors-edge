@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerProgressionComponent.generated.h"
 
@@ -74,7 +75,19 @@ public:
     // UBreakerEquipmentComponent::AggregateStats so tests can exercise the
     // math with no actor. Flat values sum, then one additive Increased
     // bucket per stat; More multipliers stay reserved for keystones (O3).
-    static FBreakerNodeStats AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks);
+    // The optional out-contribution is this layer's offer to the unified
+    // application path in UBreakerAttributeSet, built from the same raw
+    // buckets so Increased percentages reach the shared additive bucket
+    // unmerged.
+    static FBreakerNodeStats AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution* OutContribution = nullptr);
+
+    // Binds the attribute set this component contributes to. BeginPlay calls
+    // it with the set found on the owner's ability system; tests call it with
+    // a standalone set. Capturing the bases is the attribute set's job.
+    void BindAttributes(UBreakerAttributeSet* InAttributes);
+
+    // This layer's current offer, exactly as submitted.
+    const FBreakerAttributeContribution& GetAttributeContribution() const { return CachedContribution; }
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Progression") TObjectPtr<UBreakerClassDefinition> ClassDefinition;
     UPROPERTY(BlueprintAssignable, Category="Progression") FBreakerProgressionChanged OnProgressionChanged;
@@ -84,11 +97,10 @@ private:
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
 
     FBreakerNodeStats CachedStats;
-    float BaseMaxHealth = -1.0f;
-    float BaseCriticalChance = -1.0f;
-    float BaseCriticalMultiplier = -1.0f;
-    float BaseMoveSpeed = -1.0f;
-    float BaseDamageOverTimeMultiplier = -1.0f;
+    // No base-value cache lives here any more. The attribute set owns the one
+    // true base; this component only ever submits a contribution, which is why
+    // skill nodes and gear now stack instead of overwriting each other.
+    FBreakerAttributeContribution CachedContribution;
 
     int32 GetRefundValue(EBreakerPointCurrency Currency) const;
     const UBreakerProgressionNode* FindOwnedNodeDefinition(FName NodeId, EBreakerPointCurrency Currency) const;

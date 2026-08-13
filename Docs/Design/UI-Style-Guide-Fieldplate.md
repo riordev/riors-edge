@@ -200,6 +200,11 @@ Not implemented, and deliberately so:
 - **Motion.** The canvas HUD honours the damage-number timings; Slate panel
   transitions and the purchase-confirm snap are not animated.
 - **Texture and wear.** Section 05 is post-V1 by the spec's own labelling.
-- Full screen re-zoning for Inventory and the Skill Tree board (the 1920-wide
-  three-column and path-field layouts) — the token/state pass landed, the
-  layout re-architecture did not. See the two specs for what remains.
+- Screen re-zoning for Inventory and the Skill Tree board LANDED in a second
+  pass: the three-column loadout, the class path board with its trunks, tier
+  gutter and marker geometry, and the Core constellation map all exist. What
+  remains in each is listed in that screen's own spec. Note the zone arithmetic
+  deviates knowingly: the spec's 560 + 400 + 960 sums to a full-bleed 1920,
+  which the 64px screen margin makes impossible, so the panel is 1760 wide.
+- None of the re-zoned layout has been looked at by a human. It compiles and
+  the automation suite passes; that is not the same as it being right.

@@ -47,6 +47,12 @@ private:
     // behind it so the I-key flow reaches trees in one click.
     TSharedRef<SWidget> BuildScreenTabs(EBreakerMenuScreen ActiveScreen);
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
+    // Zoned screen shell for the two wide screens (Loadout / Skill matrix):
+    // an 88px header band at bg/raised carrying the title, the meta line and
+    // the screen's own controls, the body beneath it, and an optional footer.
+    // BuildFrame's centred plate is kept for the narrow screens.
+    TSharedRef<SWidget> BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
+        const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth) const;
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
     FReply GoBack();
@@ -69,6 +75,14 @@ private:
     // purchase/respec message echoed under the node grid.
     int32 SelectedTreeIndex = 0;
     FText SkillTreeStatus;
+    // Skill matrix board tab: 0 = Class (the path board), 1 = Core (the
+    // constellation map). One tab pair, not a mode toggle — the header and
+    // the detail rail persist across the swap.
+    int32 SkillBoardTab = 0;
+    // The fixed 420px hover-detail rail. Node hover handlers swap its content
+    // through SetContent; it is never driven by a per-frame attribute, and it
+    // never changes width, so the board cannot reflow when it populates.
+    TSharedPtr<SBox> SkillDetailHost;
     EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
     bool bRebuildScheduled = false;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;

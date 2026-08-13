@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AttributeSet.h"
 #include "AbilitySystemComponent.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "BreakerAttributeSet.generated.h"
 
 #define BREAKER_ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
@@ -50,6 +51,32 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MoveSpeed, Category="Movement") FGameplayAttributeData MoveSpeed;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, MoveSpeed)
 
+    // --- Unified attribute application path -------------------------------
+    // This attribute set is the ONE owner of the true base value for every
+    // attribute in EBreakerAggregatedAttribute. Equipment and progression (and
+    // anything added to EBreakerAttributeContributor later) submit a complete
+    // contribution and never write those attributes directly; every submission
+    // re-derives all of them from bases + all contributions, so order does not
+    // matter and removal is exact. See BreakerAttributeAggregation.h.
+
+    // Snapshots the currently authored values as the true bases. Idempotent:
+    // whichever component runs first captures pristine values and every later
+    // call is a no-op, which is precisely what stops one layer from baking the
+    // other layer's bonus into "its" base.
+    void CaptureAttributeBases();
+    bool HasCapturedAttributeBases() const { return Aggregator.HasCapturedBases(); }
+
+    // Replaces one layer's contribution and re-applies everything.
+    void ApplyAttributeContribution(EBreakerAttributeContributor Contributor, const FBreakerAttributeContribution& Contribution);
+    // Equivalent to submitting an empty contribution: the layer stops
+    // contributing and the composed values return exactly to what they would
+    // be had it never contributed at all.
+    void ClearAttributeContribution(EBreakerAttributeContributor Contributor);
+
+    float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
+    float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
+    const FBreakerAttributeAggregator& GetAttributeAggregator() const { return Aggregator; }
+
 protected:
     UFUNCTION() void OnRep_Health(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MaxHealth(const FGameplayAttributeData& OldValue) const;
@@ -63,4 +90,19 @@ protected:
     UFUNCTION() void OnRep_DamageMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DamageOverTimeMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& OldValue) const;
+
+private:
+    FBreakerAttributeAggregator Aggregator;
+
+    // Re-derives every aggregated attribute from the captured bases and the
+    // current contributions. The only place those attributes are written by
+    // the aggregation path.
+    void RecomputeAggregatedAttributes();
+    // Routes through the ability system when there is one, and writes the
+    // attribute data directly (same clamp policy) when there is not, so the
+    // aggregation is exercisable in tests without an ability system.
+    void WriteAggregatedAttribute(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue);
+    // Null-safe replacement for GetOwningAbilitySystemComponent(), which
+    // CastChecked's the outer to an actor.
+    UAbilitySystemComponent* FindOwningAbilitySystemSafe() const;
 };

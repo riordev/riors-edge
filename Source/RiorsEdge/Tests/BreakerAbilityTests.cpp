@@ -5,10 +5,15 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbility_Cleave.h"
+#include "Abilities/BreakerAbility_Closequarter.h"
 #include "Abilities/BreakerAbility_Lead.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
+#include "Abilities/BreakerAbility_Unmake.h"
+#include "Abilities/BreakerCasterAbility.h"
 #include "Abilities/BreakerGameplayAbility.h"
+#include "Abilities/BreakerMeleeSweep.h"
 #include "GameFramework/Actor.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -306,8 +311,20 @@ bool FBreakerAbilityResolutionTest::RunTest(const FString& Parameters)
     const UBreakerAbilityDefinition* Ultimate = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::Ultimate, NAME_None);
     TestNotNull(TEXT("An empty Swift ultimate defaults to Overdrive"), Ultimate);
 
-    // A class with no kit authored yet grants nothing rather than borrowing Swift's.
-    TestNull(TEXT("Caster has no fallback kit yet"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, EBreakerAbilitySlot::ClassAbilityOne, NAME_None));
+    // Caster is now reachable through the same path: an empty loadout (which is
+    // exactly what ChoosePermanentClassById leaves for a class with no authored
+    // class definition) resolves to the Caster kit, not to nothing and not to
+    // Swift's.
+    const UBreakerAbilityDefinition* CasterOne = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, EBreakerAbilitySlot::ClassAbilityOne, NAME_None);
+    TestNotNull(TEXT("An empty Caster slot one defaults to Cleave"), CasterOne);
+    if (CasterOne)
+    {
+        TestEqual(TEXT("The Caster default is Cleave"), CasterOne->AbilityId, FName(TEXT("Caster.Cleave")));
+        TestEqual(TEXT("Cleave is a Caster ability"), CasterOne->ClassId, EBreakerClassId::Caster);
+    }
+    // A class that genuinely has no kit still grants nothing rather than
+    // borrowing another class's.
+    TestNull(TEXT("Tank has no fallback kit yet"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Tank, EBreakerAbilitySlot::ClassAbilityOne, NAME_None));
     // An explicitly equipped ability that does not fit the slot is refused.
     TestNull(TEXT("Overdrive cannot be equipped into a class slot"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Overdrive")));
     // Rule changed after the owner hit dead abilities from a stale loadout:
@@ -413,6 +430,253 @@ bool FBreakerAbilityImpactRulesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Overdrive's More respects the per-modifier ceiling"), UBreakerAbility_Overdrive::OutgoingMoreMultiplier <= 1.30f);
     TestFalse(TEXT("Overdrive's modifier key is real"), UBreakerAbility_Overdrive::OutgoingModifierKey().IsNone());
     TestNotEqual(TEXT("The modifier key is distinct from the window key"), UBreakerAbility_Overdrive::OutgoingModifierKey(), UBreakerAbility_Overdrive::WindowKey());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCasterKitRegistryTest,
+    "RiorsEdge.Abilities.CasterKit",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCasterKitRegistryTest::RunTest(const FString& Parameters)
+{
+    // Values quoted from Docs/Design/Class-Kits.md §2.2.
+    const UBreakerAbilityDefinition* Cleave = UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Cleave"));
+    if (!Cleave)
+    {
+        AddError(TEXT("Cleave is missing from the fallback registry"));
+        return false;
+    }
+    TestEqual(TEXT("Cleave costs 20 Mana"), Cleave->GetResourceCost(), 20.0f);
+    TestTrue(TEXT("Cleave is implemented"), Cleave->IsImplemented());
+    TestTrue(TEXT("Cleave derives from the Caster base"), Cleave->AbilityClass->IsChildOf(UBreakerCasterAbility::StaticClass()));
+
+    const UBreakerAbilityDefinition* Closequarter = UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Closequarter"));
+    if (!Closequarter)
+    {
+        AddError(TEXT("Closequarter is missing from the fallback registry"));
+        return false;
+    }
+    TestEqual(TEXT("Closequarter costs 35 Mana"), Closequarter->GetResourceCost(), 35.0f);
+    TestTrue(TEXT("Closequarter is implemented"), Closequarter->IsImplemented());
+
+    const UBreakerAbilityDefinition* Unmake = UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Unmake"));
+    if (!Unmake)
+    {
+        AddError(TEXT("Unmake is missing from the fallback registry"));
+        return false;
+    }
+    TestEqual(TEXT("Unmake costs 80 Mana"), Unmake->GetResourceCost(), 80.0f);
+    TestTrue(TEXT("Unmake is the ultimate"), Unmake->IsUltimate());
+    TestEqual(TEXT("Unmake's base window is 6s"), Unmake->WindowDuration, 6.0f);
+
+    // Class-Kits §2.1: Mana IS the cooldown. A Caster ability that grows a
+    // cooldown has stopped being a Caster ability.
+    for (const UBreakerAbilityDefinition* Definition : UBreakerAbilityDefinition::GetFallbackRegistry())
+    {
+        if (!Definition || Definition->ClassId != EBreakerClassId::Caster) continue;
+        TestFalse(TEXT("No Caster ability has a cooldown"), Definition->HasCooldown());
+        TestFalse(TEXT("No Caster ability authors a cooldown tag"), Definition->CooldownTag.IsValid());
+        TestTrue(TEXT("Every Caster ability is implemented"), Definition->IsImplemented());
+    }
+
+    // Every Caster slot resolves and is activatable: E, T and G all reach an
+    // ability class rather than a designed-but-unbuilt slot.
+    for (const EBreakerAbilitySlot Slot : { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate })
+    {
+        const UBreakerAbilityDefinition* Definition = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, Slot, NAME_None);
+        TestNotNull(TEXT("Every Caster slot resolves"), Definition);
+        if (Definition)
+        {
+            TestTrue(TEXT("Every Caster slot is implemented"), Definition->IsImplemented());
+            TestTrue(TEXT("Every Caster ability derives from the Caster base"), Definition->AbilityClass->IsChildOf(UBreakerCasterAbility::StaticClass()));
+        }
+    }
+
+    // A stale save carrying an unknown Caster id still lands on a live ability
+    // rather than a dead key (the addf85 rule, now applied to Caster).
+    const UBreakerAbilityDefinition* Unknown = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Nonsense"));
+    TestNotNull(TEXT("An unknown Caster id falls back to the class default"), Unknown);
+    if (Unknown) TestEqual(TEXT("The Caster fallback is Cleave"), Unknown->AbilityId, FName(TEXT("Caster.Cleave")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCasterUnmakeVariantTest,
+    "RiorsEdge.Abilities.UnmakeVariants",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCasterUnmakeVariantTest::RunTest(const FString& Parameters)
+{
+    const UBreakerAbilityDefinition* Unmake = UBreakerAbilityDefinition::FindFallback(TEXT("Caster.Unmake"));
+    if (!Unmake)
+    {
+        AddError(TEXT("Unmake is missing from the fallback registry"));
+        return false;
+    }
+    TestEqual(TEXT("Unmake authors a base row and three keystone rows"), Unmake->Variants.Num(), 4);
+
+    const FGameplayTagContainer NoTags;
+    const FBreakerAbilityVariant Base = Unmake->ResolveVariant(NoTags);
+    TestFalse(TEXT("The base row carries no keystone tag"), Base.KeystoneTag.IsValid());
+    TestEqual(TEXT("The base window is 6s"), Base.WindowDuration, 6.0f);
+    TestEqual(TEXT("Base Unmake makes Caster abilities free"), Base.AbilityCostMultiplier, 0.0f);
+
+    // Long Dark is the only fully parametric rewrite: 12s at 50% cost.
+    FGameplayTagContainer LongDark;
+    LongDark.AddTag(BreakerAbilityTags::Keystone_Caster_LongDark);
+    const FBreakerAbilityVariant LongDarkRow = Unmake->ResolveVariant(LongDark);
+    TestEqual(TEXT("Long Dark resolves to its own row"), LongDarkRow.KeystoneTag, BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());
+    TestEqual(TEXT("Long Dark doubles the window"), LongDarkRow.WindowDuration, 12.0f);
+    TestEqual(TEXT("Long Dark halves the cost instead of removing it"), LongDarkRow.AbilityCostMultiplier, 0.5f);
+
+    FGameplayTagContainer Edgework;
+    Edgework.AddTag(BreakerAbilityTags::Keystone_Caster_Edgework);
+    TestEqual(TEXT("Edgework resolves to its own row"),
+        Unmake->ResolveVariant(Edgework).KeystoneTag, BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
+
+    FGameplayTagContainer Cascade;
+    Cascade.AddTag(BreakerAbilityTags::Keystone_Caster_Cascade);
+    TestEqual(TEXT("Cascade resolves to its own row"),
+        Unmake->ResolveVariant(Cascade).KeystoneTag, BreakerAbilityTags::Keystone_Caster_Cascade.GetTag());
+
+    // A Swift keystone must never select a Caster row.
+    FGameplayTagContainer WrongClass;
+    WrongClass.AddTag(BreakerAbilityTags::Keystone_Swift_Bloodrhythm);
+    TestFalse(TEXT("A foreign keystone falls back to the base row"), Unmake->ResolveVariant(WrongClass).KeystoneTag.IsValid());
+
+    // Duration and cost-scalar resolution rules.
+    TestEqual(TEXT("An authored row duration wins"), UBreakerAbility_Unmake::ResolveDuration(12.0f, 6.0f), 12.0f);
+    TestEqual(TEXT("An unauthored row inherits the definition window"), UBreakerAbility_Unmake::ResolveDuration(0.0f, 6.0f), 6.0f);
+    TestEqual(TEXT("Free casts resolve to zero"), UBreakerAbility_Unmake::ResolveCostScalar(0.0f), 0.0f);
+    TestEqual(TEXT("Half cost passes through"), UBreakerAbility_Unmake::ResolveCostScalar(0.5f), 0.5f);
+    TestEqual(TEXT("A scalar above one is clamped: Unmake never raises costs"), UBreakerAbility_Unmake::ResolveCostScalar(3.0f), 1.0f);
+    TestEqual(TEXT("A negative scalar is clamped to free, never inverted"), UBreakerAbility_Unmake::ResolveCostScalar(-1.0f), 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCasterCostWindowTest,
+    "RiorsEdge.Abilities.CasterCostWindow",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCasterCostWindowTest::RunTest(const FString& Parameters)
+{
+    // The price rule, world-free.
+    TestEqual(TEXT("With no window a cast pays full price"), UBreakerCasterAbility::CostUnderWindow(20.0f, 1.0f), 20.0f);
+    TestEqual(TEXT("Base Unmake makes a cast free"), UBreakerCasterAbility::CostUnderWindow(20.0f, 0.0f), 0.0f);
+    TestEqual(TEXT("Long Dark halves a cast"), UBreakerCasterAbility::CostUnderWindow(35.0f, 0.5f), 17.5f);
+    TestEqual(TEXT("A negative scalar never refunds"), UBreakerCasterAbility::CostUnderWindow(35.0f, -2.0f), 0.0f);
+
+    // The affordability rule. Strict until the ClassResourceFloor attribute
+    // exists (Ability-Implementation-Spec D8) — see UBreakerCasterAbility.h.
+    TestTrue(TEXT("Exactly enough Mana affords the cast"), UBreakerCasterAbility::CanCastAt(20.0f, 20.0f));
+    TestFalse(TEXT("One short is refused"), UBreakerCasterAbility::CanCastAt(19.99f, 20.0f));
+    TestTrue(TEXT("A free cast is always allowed"), UBreakerCasterAbility::CanCastAt(0.0f, 0.0f));
+    TestTrue(TEXT("An empty bank still casts a freed ability"), UBreakerCasterAbility::CanCastAt(0.0f, UBreakerCasterAbility::CostUnderWindow(80.0f, 0.0f)));
+
+    // The window carries the scalar, so the ultimate and the abilities it
+    // discounts cannot drift apart.
+    UBreakerAbilityStateComponent* State = NewObject<UBreakerAbilityStateComponent>();
+    const FName Key = UBreakerCasterAbility::UnmakeWindowKey();
+    TestEqual(TEXT("With no window open the payload default is returned"), State->GetWindowPayload(Key, 1.0f), 1.0f);
+
+    State->StartWindowWithPayload(Key, 6.0f, 0.0f);
+    TestTrue(TEXT("Unmake's window opens"), State->IsWindowActive(Key));
+    TestEqual(TEXT("The window carries the free-cast scalar"), State->GetWindowPayload(Key, 1.0f), 0.0f);
+
+    State->AdvanceTime(5.0f);
+    TestTrue(TEXT("The window is still open before its time"), State->IsWindowActive(Key));
+    State->AdvanceTime(1.5f);
+    TestFalse(TEXT("The window closes on time"), State->IsWindowActive(Key));
+    TestEqual(TEXT("A closed window stops discounting"), State->GetWindowPayload(Key, 1.0f), 1.0f);
+
+    // Long Dark's longer window with its own scalar.
+    State->StartWindowWithPayload(Key, 12.0f, 0.5f);
+    TestEqual(TEXT("Long Dark's window carries the half-cost scalar"), State->GetWindowPayload(Key, 1.0f), 0.5f);
+    State->CloseWindow(Key);
+    TestEqual(TEXT("An explicitly closed window stops discounting"), State->GetWindowPayload(Key, 1.0f), 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCleaveRulesTest,
+    "RiorsEdge.Abilities.CleaveRules",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCleaveRulesTest::RunTest(const FString& Parameters)
+{
+    // Damage scales off the weapon; an unarmed Caster still has a melee verb.
+    TestEqual(TEXT("Cleave scales off weapon damage"), UBreakerAbility_Cleave::SwingDamage(30.0f, 1.5f, 20.0f), 45.0f);
+    TestEqual(TEXT("An unarmed swing uses the fallback"), UBreakerAbility_Cleave::SwingDamage(0.0f, 1.5f, 20.0f), 30.0f);
+    TestEqual(TEXT("A zero coefficient still resolves"), UBreakerAbility_Cleave::SwingDamage(30.0f, 0.0f, 20.0f), 0.0f);
+    TestEqual(TEXT("Damage is never negative"), UBreakerAbility_Cleave::SwingDamage(30.0f, -2.0f, 20.0f), 0.0f);
+
+    // Class-Kits §2.2: the Edgework keystone removes the animation lock.
+    TestEqual(TEXT("Without Edgework the lock is the authored value"), UBreakerAbility_Cleave::AnimationLockFor(false, 0.45f), 0.45f);
+    TestEqual(TEXT("Edgework removes the lock entirely"), UBreakerAbility_Cleave::AnimationLockFor(true, 0.45f), 0.0f);
+    TestEqual(TEXT("A negative authored lock is treated as none"), UBreakerAbility_Cleave::AnimationLockFor(false, -1.0f), 0.0f);
+
+    // The arc, world-free. 3 m forward, 120 degrees included.
+    const FVector Origin = FVector::ZeroVector;
+    const FVector Forward = FVector::ForwardVector;
+    const float Range = 300.0f;
+    const float Arc = 120.0f;
+    TestTrue(TEXT("Straight ahead and in range is a hit"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(200.0, 0.0, 0.0), Range, Arc));
+    TestFalse(TEXT("Straight ahead and out of range is a miss"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(400.0, 0.0, 0.0), Range, Arc));
+    TestTrue(TEXT("Exactly at the range boundary connects"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(300.0, 0.0, 0.0), Range, Arc));
+    TestFalse(TEXT("Directly behind is never a hit"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(-100.0, 0.0, 0.0), Range, Arc));
+    // 45 degrees off centre is inside a 120-degree arc; 70 is not.
+    TestTrue(TEXT("45 degrees off centre is inside a 120 degree arc"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(100.0, 100.0, 0.0), Range, Arc));
+    TestFalse(TEXT("70 degrees off centre is outside a 120 degree arc"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(FMath::Cos(FMath::DegreesToRadians(70.0)) * 100.0, FMath::Sin(FMath::DegreesToRadians(70.0)) * 100.0, 0.0), Range, Arc));
+    // SB8 Edge widens the arc to 180: the same 70-degree target now connects.
+    TestTrue(TEXT("A 180 degree arc reaches 70 degrees off centre"),
+        UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(FMath::Cos(FMath::DegreesToRadians(70.0)) * 100.0, FMath::Sin(FMath::DegreesToRadians(70.0)) * 100.0, 0.0), Range, 180.0f));
+    // Height must not decide reach: an enemy on a crate is still in front of you.
+    TestTrue(TEXT("Range is measured horizontally"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(200.0, 0.0, 250.0), Range, Arc));
+    // A degenerate arc hits nothing rather than everything.
+    TestFalse(TEXT("A zero arc hits nothing"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(100.0, 0.0, 0.0), Range, 0.0f));
+    TestFalse(TEXT("A zero range hits nothing"), UBreakerMeleeSweep::IsInsideArc(Origin, Forward, FVector(1.0, 0.0, 0.0), 0.0f, Arc));
+
+    // Deterministic ordering: centre-most first, nearest breaks the tie.
+    const float Centre = UBreakerMeleeSweep::SortKey(Origin, Forward, FVector(250.0, 0.0, 0.0));
+    const float OffAxis = UBreakerMeleeSweep::SortKey(Origin, Forward, FVector(100.0, 100.0, 0.0));
+    TestTrue(TEXT("A centred far target sorts before an off-axis near one"), Centre < OffAxis);
+    const float NearCentre = UBreakerMeleeSweep::SortKey(Origin, Forward, FVector(100.0, 0.0, 0.0));
+    TestTrue(TEXT("Distance breaks ties on the centre line"), NearCentre < Centre);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerClosequarterRulesTest,
+    "RiorsEdge.Abilities.ClosequarterRules",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerClosequarterRulesTest::RunTest(const FString& Parameters)
+{
+    // Class-Kits §2.2 C2: arrive 2 m short of the target.
+    const FVector Caster = FVector::ZeroVector;
+    const FVector Target(1000.0, 0.0, 0.0);
+    const FVector Arrival = UBreakerAbility_Closequarter::ArrivalPoint(Caster, Target, 200.0f);
+    TestTrue(TEXT("The arrival point is 2 m short of the target"), Arrival.Equals(FVector(800.0, 0.0, 0.0), 0.01));
+    TestTrue(TEXT("The blink never overshoots the target"), FVector::Dist(Arrival, Target) >= 199.0);
+
+    // Already inside the standoff: do not step backwards.
+    const FVector Close(150.0, 0.0, 0.0);
+    TestTrue(TEXT("A target inside the standoff produces no movement"),
+        UBreakerAbility_Closequarter::ArrivalPoint(Caster, Close, 200.0f).Equals(Caster, 0.01));
+    TestTrue(TEXT("A target exactly at the standoff produces no movement"),
+        UBreakerAbility_Closequarter::ArrivalPoint(Caster, FVector(200.0, 0.0, 0.0), 200.0f).Equals(Caster, 0.01));
+
+    // The refund gate: "at or below 40% health".
+    TestTrue(TEXT("A target below the threshold refunds"), UBreakerAbility_Closequarter::ShouldRefund(0.2f, 0.4f));
+    TestTrue(TEXT("A target exactly at the threshold refunds"), UBreakerAbility_Closequarter::ShouldRefund(0.4f, 0.4f));
+    TestFalse(TEXT("A healthy target does not refund"), UBreakerAbility_Closequarter::ShouldRefund(0.41f, 0.4f));
+    TestFalse(TEXT("A full-health target does not refund"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 0.4f));
+    // SB10 No Distance moves the threshold to 100% — a data change, not a branch.
+    TestTrue(TEXT("A 100% threshold refunds on anything"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 1.0f));
     return true;
 }
 

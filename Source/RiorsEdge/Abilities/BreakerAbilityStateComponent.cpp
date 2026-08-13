@@ -59,13 +59,25 @@ void UBreakerAbilityStateComponent::AdvanceTime(float DeltaSeconds)
 
 void UBreakerAbilityStateComponent::StartWindow(FName Key, float Duration)
 {
+    StartWindowWithPayload(Key, Duration, 0.0f);
+}
+
+void UBreakerAbilityStateComponent::StartWindowWithPayload(FName Key, float Duration, float Payload)
+{
     if (Key.IsNone() || Duration <= 0.0f)
     {
         return;
     }
     FWindowState State;
     State.EndTime = Clock + Duration;
+    State.Payload = Payload;
     Windows.Add(Key, State);
+}
+
+float UBreakerAbilityStateComponent::GetWindowPayload(FName Key, float DefaultValue) const
+{
+    const FWindowState* State = Windows.Find(Key);
+    return (State && State->EndTime > Clock) ? State->Payload : DefaultValue;
 }
 
 void UBreakerAbilityStateComponent::ExtendWindow(FName Key, float ExtraSeconds)

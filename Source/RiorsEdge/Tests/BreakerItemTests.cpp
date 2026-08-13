@@ -1,6 +1,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "GameFramework/Actor.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -151,6 +153,58 @@ bool FBreakerEquipmentAggregationTest::RunTest(const FString& Parameters)
     // No weapon damage equipped leaves the multiplier neutral.
     const FBreakerEquipmentStats BareStats = UBreakerEquipmentComponent::AggregateStats({Boots});
     TestTrue(TEXT("Weapon damage multiplier defaults to 1"), FMath::IsNearlyEqual(BareStats.WeaponDamageMultiplier, 1.0f, 0.0001f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEquipmentContributionTest,
+    "RiorsEdge.Items.Equipment.AttributeContribution",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEquipmentContributionTest::RunTest(const FString& Parameters)
+{
+    FBreakerItemInstance Gloves;
+    Gloves.ItemId = FGuid::NewGuid();
+    Gloves.Slot = EBreakerEquipSlot::Gloves;
+
+    FBreakerRolledAffix Health;
+    Health.AffixId = TEXT("Core.Health");
+    Health.Tier = 4;
+    Health.Value = 120.0f;
+    Health.Category = EBreakerAffixCategory::Suffix;
+    Gloves.Affixes.Add(Health);
+
+    FBreakerRolledAffix Speed;
+    Speed.AffixId = TEXT("Core.MoveSpeed");
+    Speed.Tier = 4;
+    Speed.Value = 6.0f;
+    Speed.Category = EBreakerAffixCategory::Prefix;
+    Gloves.Affixes.Add(Speed);
+
+    // The contribution carries RAW buckets, not composed multipliers: the
+    // Increased percentage has to reach the attribute set unmerged so it can
+    // join the tree's percentages in one additive bucket.
+    FBreakerAttributeContribution Contribution;
+    UBreakerEquipmentComponent::AggregateStats({Gloves}, &Contribution);
+    TestEqual(TEXT("Flat health lands in the flat lane"), Contribution.GetFlat(EBreakerAggregatedAttribute::MaxHealth), 120.0f);
+    TestEqual(TEXT("Increased move speed stays a raw percentage"), Contribution.GetIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed), 6.0f);
+    TestEqual(TEXT("Gear authors no More multipliers"), Contribution.GetMore(EBreakerAggregatedAttribute::MoveSpeed), 1.0f);
+
+    // End to end through the single application path.
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
+    Equipment->BindAttributes(Attributes);
+    const float BaseHealth = Attributes->GetMaxHealth();
+    const float BaseSpeed = Attributes->GetMoveSpeed();
+
+    TestTrue(TEXT("Equip succeeds"), Equipment->EquipItem(Gloves));
+    TestEqual(TEXT("Equipping raises max health"), Attributes->GetMaxHealth(), BaseHealth + 120.0f);
+    TestEqual(TEXT("Equipping raises move speed"), Attributes->GetMoveSpeed(), BaseSpeed * 1.06f, 0.001f);
+
+    TestTrue(TEXT("Unequip succeeds"), Equipment->UnequipSlot(EBreakerEquipSlot::Gloves));
+    TestEqual(TEXT("Unequipping restores the pre-equip health exactly"), Attributes->GetMaxHealth(), BaseHealth);
+    TestEqual(TEXT("Unequipping restores the pre-equip move speed exactly"), Attributes->GetMoveSpeed(), BaseSpeed);
+    TestEqual(TEXT("The base value is never overwritten"), Attributes->GetAttributeBase(EBreakerAggregatedAttribute::MaxHealth), BaseHealth);
     return true;
 }
 

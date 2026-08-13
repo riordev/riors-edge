@@ -18,30 +18,29 @@ UBreakerProgressionComponent::UBreakerProgressionComponent()
 void UBreakerProgressionComponent::BeginPlay()
 {
     Super::BeginPlay();
+    UBreakerAttributeSet* FoundAttributes = nullptr;
     if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
     {
         if (UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
         {
-            Attributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
+            FoundAttributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
         }
-    }
-    if (Attributes)
-    {
-        // Base-value cache, same discipline as the equipment component. Note
-        // that equipment caches its own bases; both layers write absolute
-        // values derived from their own cache, so whichever recalculates last
-        // wins on the shared attributes. Folding the two layers into one
-        // application pass is a follow-up, not a slice blocker.
-        BaseMaxHealth = Attributes->GetMaxHealth();
-        BaseCriticalChance = Attributes->GetCriticalChance();
-        BaseCriticalMultiplier = Attributes->GetCriticalMultiplier();
-        BaseMoveSpeed = Attributes->GetMoveSpeed();
-        BaseDamageOverTimeMultiplier = Attributes->GetDamageOverTimeMultiplier();
     }
     // Seed the slice budget before any save load runs. Nothing else called
     // this, which is why a gym pawn reached the tree screen with zero points;
     // LoadProgressionState re-runs it after restoring a save.
     ApplySliceDefaultsIfFresh();
+    BindAttributes(FoundAttributes);
+}
+
+void UBreakerProgressionComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
+{
+    Attributes = InAttributes;
+    // No base cache here. The attribute set owns the one true base and
+    // capturing is idempotent, so it does not matter whether progression or
+    // equipment binds first — neither can snapshot a base that already
+    // contains the other's contribution. That was the bug.
+    if (Attributes) Attributes->CaptureAttributeBases();
     RecalculateStats();
 }
 
@@ -353,7 +352,7 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     return false;
 }
 
-FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks)
+FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution* OutContribution)
 {
     constexpr int32 TargetCount = static_cast<int32>(EBreakerNodeStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
@@ -395,6 +394,21 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.SlideSpeedMultiplier = Increased(EBreakerNodeStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerNodeStatTarget::AirControl);
     Stats.DamageOverTimeMultiplier = Increased(EBreakerNodeStatTarget::DamageOverTime);
+
+    if (OutContribution)
+    {
+        // Raw buckets, not the composed multipliers: tree percentages have to
+        // join gear percentages in ONE additive bucket per stat. Nodes cannot
+        // author More multipliers yet (EBreakerNodeStatBucket has no More
+        // entry); when keystones gain them under O3 they compose here through
+        // FBreakerAttributeContribution::ComposeMore.
+        OutContribution->Reset();
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
+    }
     return Stats;
 }
 
@@ -407,21 +421,16 @@ void UBreakerProgressionComponent::RecalculateStats()
     TArray<FBreakerNodeRank> Ranks = State.ClassNodeRanks;
     Ranks.Append(State.CoreNodeRanks);
 
-    CachedStats = AggregateStats(Nodes, Ranks);
+    CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution);
     ApplyStatsToAttributes();
 }
 
 void UBreakerProgressionComponent::ApplyStatsToAttributes()
 {
-    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority() || BaseMaxHealth < 0.0f) return;
-
-    const float HealthFraction = Attributes->GetMaxHealth() > 0.0f ? Attributes->GetHealth() / Attributes->GetMaxHealth() : 1.0f;
-    Attributes->SetMaxHealth(BaseMaxHealth + CachedStats.BonusHealth);
-    Attributes->SetHealth(Attributes->GetMaxHealth() * HealthFraction);
-    Attributes->SetCriticalChance(BaseCriticalChance + CachedStats.CriticalChanceBonus);
-    Attributes->SetCriticalMultiplier(BaseCriticalMultiplier + CachedStats.CriticalMultiplierBonus);
-    Attributes->SetMoveSpeed(BaseMoveSpeed * CachedStats.MoveSpeedMultiplier);
-    Attributes->SetDamageOverTimeMultiplier(BaseDamageOverTimeMultiplier * CachedStats.DamageOverTimeMultiplier);
+    // One submission, no absolute writes. A respec submits an empty
+    // contribution, which restores exactly the pre-purchase composition.
+    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
+    Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, CachedContribution);
 }
 
 TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency)
