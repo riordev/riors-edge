@@ -227,7 +227,32 @@ static bool  ValidateMoreCap(const TArray<FBreakerMoreMultiplier>& Mores);    //
 
 This is a structural addition, not a balance value. It is **shared infrastructure** (§2, SI-7).
 
-### 1.8 D8 — Overcast and negative resource (Class-Kits OQ4, answered)
+### 1.8 D8 — Overcast and negative resource (Class-Kits OQ4, answered) — **IMPLEMENTED**
+
+> **STATUS: LANDED.** `ClassResourceFloor` exists on `UBreakerAttributeSet` (replicated, default
+> **0** for every class, so Swift's Momentum and every pre-existing test are bit-identical).
+> `PreAttributeChange` clamps `ClassResource` to `[ClassResourceFloor, MaxClassResource]`, which
+> is what makes an ordinary GAS cost GameplayEffect able to drive the bank negative — Overcast is
+> reachable in play for the first time. `UBreakerManaComponent` owns the floor: it publishes the
+> Overcast floor while the owner's permanent class is Caster and 0 the moment it is not, closing
+> it on class change (bound to `OnProgressionChanged` *and* polled from the loop, because
+> `DevForceClass` does not broadcast) and lifting a bank stranded below the new floor.
+> `SetOvercastFloor` is the SB4/MS10 hook.
+> `UBreakerCasterAbility::CheckCost` is overridden to compare against the floor, and it is the
+> first time the Caster affordability rule is actually on the activation path — `CanCastAt`
+> existed but nothing called it. A cast that would breach the floor is **refused**, never
+> truncated to the floor: a partial spend is a silent discount, which is worse than a refused
+> cast. Nothing may be cast at all while the bank is below zero.
+> Deviations from the shape proposed below: (a) the floor is deliberately **not** part of the
+> `FBreakerAttributeAggregator` set — it is an authored single-writer value, and folding
+> `(Base + flat) * (1 + Increased)` over a base of 0 would annihilate every percentage anyway;
+> (b) the `State.Overcast.Locked` tag/GE form is not built — the same rule is enforced in the
+> shared floor-aware predicate (`UBreakerGameplayAbility::IsAffordableWithFloor`) that CheckCost
+> and the HUD's `CanAffordSlot` both call, so there is still no per-ability special-casing. The
+> tag remains the nicer expression if a node ever needs to *read* the locked state.
+> **Still unspiked:** client-side cost prediction across zero. All three Caster abilities are
+> `ServerOnly`, so nothing predicts a Caster cost today; the spike is owed before any Caster
+> ability becomes `LocalPredicted`.
 
 Caster's Overcast drives `ClassResource` to −20 (deeper with SB4/MS10). Two problems:
 
@@ -500,8 +525,9 @@ Cleave first because it is the only melee verb in the game and melee damage subm
 exist yet.
 **PARTLY DONE, out of the listed order:** Cleave, Closequarter, and Unmake shipped together
 because all three were buildable without new `Combat/` systems, while Rot / Siphon / Fracture /
-Resonance each need one (zones, healing, a projectile base, status consumption). D8 was *not*
-resolved and remains the gate on Overcast — see the status block at the top of §5.
+Resonance each need one (zones, healing, a projectile base, status consumption). D8 is now
+resolved, so Overcast is live for the three shipped abilities — see the status block at the top
+of §5.
 Exit test: Class-Kits §2.7 criteria 1–7.
 
 **Phase 4 — Verbs.** Air Jump (Kinesis K4) → Parry (Bulwark B4). Deliberately after Swift and
@@ -903,16 +929,13 @@ only (Class-Kits §2.1). Do not author cooldown GEs for this class.
 > and Cascade keystone halves. Each is blocked on a Combat/ system that does not exist
 > (zone actor, partial healing, projectile base, status consumption).
 >
-> **D8 IS STILL THE BLOCKER, AND IT IS BIGGER THAN A SPIKE.** `UBreakerAttributeSet::
-> PreAttributeChange` clamps `ClassResource` to `[0, MaxClassResource]`, and GAS ability costs
-> are GameplayEffects, which pass through exactly that clamp. So today **no Caster ability can
-> drive the bank negative at all** — Overcast, the class's defining mechanic, is unreachable in
-> play even though the Mana component implements it faithfully. The implemented abilities
-> therefore keep a *strict* affordability rule (`UBreakerCasterAbility::CanCastAt`): a cast the
-> bank cannot fully pay for is refused. Relaxing that before the floor exists would silently
-> hand the player a partial refund instead of a debt, which is worse than refusing. The fix is
-> the `ClassResourceFloor` attribute below; when it lands, `CanCastAt` becomes floor-aware and
-> nothing else changes. **Do not add a second, non-GAS spend path to work around this (D3).**
+> **D8 IS RESOLVED — OVERCAST IS REACHABLE.** `ClassResourceFloor` (default 0) landed on the
+> attribute set, `PreAttributeChange` clamps `ClassResource` to `[Floor, Max]`, the Mana
+> component publishes the floor for Casters only, and `UBreakerCasterAbility::CheckCost` compares
+> against it. Ability costs are still ordinary GameplayEffects — no second, non-GAS spend path
+> (D3). A cast that would breach the floor is refused rather than truncated, and nothing may be
+> cast while the bank is below zero. See the status block on §1.8 for what was deliberately not
+> built (the `State.Overcast.Locked` tag form) and what is still owed (the prediction spike).
 
 **Mana loop component EXISTS**: `Source/RiorsEdge/Classes/BreakerManaComponent`. Beyond the shape
 described below it now also carries `GrantMana(Amount, bIgnoreGlobalCap)` (used by Closequarter's
@@ -1253,8 +1276,10 @@ values — the test is written now and starts passing when O2 lifts.
 > - **Cascade is not built**: it needs Fracture's status cycle, which does not exist. Its
 >   variant row exists and resolves so the keystone is visibly unfinished rather than silently
 >   inert.
-> - Overcast-into-Unmake (the §2.2 interaction) is **unreachable** for the D8 reason at the top
->   of §5, not because of anything in this ability.
+> - Overcast-into-Unmake (the §2.2 interaction) is now **reachable**: D8 landed, so a Caster can
+>   overdraft into the ultimate, and a cost of 0 under the Unmake window is castable at any bank
+>   level including deep in debt (`CheckCost` returns true before it ever looks at the bank).
+>   Unverified in play — no one has playtested the interaction.
 
 **Design source.** §2.2. Cost 80 Mana, no cooldown. Base: for 6s all Caster abilities cost 0 Mana
 and Mana generation is suspended.

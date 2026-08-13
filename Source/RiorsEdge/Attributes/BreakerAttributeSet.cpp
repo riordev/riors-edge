@@ -13,6 +13,9 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitArmor(0.0f);
     InitClassResource(0.0f);
     InitMaxClassResource(100.0f);
+    // Spec D8: zero for everyone. A class that wants a negative bank opens it
+    // explicitly; nothing else in the game can tell the attribute is there.
+    InitClassResourceFloor(0.0f);
     InitCriticalChance(0.05f);
     InitCriticalMultiplier(1.5f);
     InitDamageMultiplier(1.0f);
@@ -31,6 +34,7 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(Armor);
     BREAKER_REPLICATE(ClassResource);
     BREAKER_REPLICATE(MaxClassResource);
+    BREAKER_REPLICATE(ClassResourceFloor);
     BREAKER_REPLICATE(CriticalChance);
     BREAKER_REPLICATE(CriticalMultiplier);
     BREAKER_REPLICATE(DamageMultiplier);
@@ -47,8 +51,16 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     else if (Attribute == GetShieldAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxShield());
     else if (Attribute == GetMaxShieldAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetArmorAttribute()) NewValue = FMath::Max(0.0f, NewValue);
-    else if (Attribute == GetClassResourceAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxClassResource());
+    // Spec D8. The floor is 0 unless a class opened it, so for every class but
+    // an Overcasting Caster this is the identical [0, Max] clamp it replaced —
+    // and it is the ONE line that makes Overcast reachable, because GAS ability
+    // costs are GameplayEffects and every one of them passes through here.
+    else if (Attribute == GetClassResourceAttribute()) NewValue = FMath::Clamp(NewValue, FMath::Min(0.0f, GetClassResourceFloor()), GetMaxClassResource());
     else if (Attribute == GetMaxClassResourceAttribute()) NewValue = FMath::Max(0.0f, NewValue);
+    // A floor is a debt allowance; a positive one would mean "the bank may
+    // never be emptied", which no design asks for and which would strand a
+    // spent resource above zero.
+    else if (Attribute == GetClassResourceFloorAttribute()) NewValue = FMath::Min(0.0f, NewValue);
     else if (Attribute == GetCriticalChanceAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
     else if (Attribute == GetCriticalMultiplierAttribute()) NewValue = FMath::Max(1.0f, NewValue);
     else if (Attribute == GetDamageMultiplierAttribute() || Attribute == GetDamageOverTimeMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
@@ -84,6 +96,24 @@ void UBreakerAttributeSet::ClearAttributeContribution(EBreakerAttributeContribut
     if (Aggregator.HasCapturedBases()) RecomputeAggregatedAttributes();
 }
 
+void UBreakerAttributeSet::ApplyClassResourceFloor(float NewFloor)
+{
+    const float Floor = FMath::Min(0.0f, NewFloor);
+    WriteAttributeValue(GetClassResourceFloorAttribute(), ClassResourceFloor, Floor);
+    // Raising the floor — a class change away from Caster, a respec that gives
+    // back the node that deepened it — must not leave the bank stranded below
+    // it, unable to climb out and permanently flagged as in debt.
+    if (GetClassResource() < Floor)
+    {
+        WriteAttributeValue(GetClassResourceAttribute(), ClassResource, Floor);
+    }
+}
+
+void UBreakerAttributeSet::ApplyClassResource(float NewValue)
+{
+    WriteAttributeValue(GetClassResourceAttribute(), ClassResource, NewValue);
+}
+
 void UBreakerAttributeSet::RecomputeAggregatedAttributes()
 {
     // Health and class resource ride their maximum by fraction/clamp so a
@@ -91,16 +121,16 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     const float PreviousMaxHealth = GetMaxHealth();
     const float HealthFraction = PreviousMaxHealth > 0.0f ? GetHealth() / PreviousMaxHealth : 1.0f;
 
-    WriteAggregatedAttribute(GetMaxHealthAttribute(), MaxHealth, Aggregator.Compose(EBreakerAggregatedAttribute::MaxHealth));
-    WriteAggregatedAttribute(GetHealthAttribute(), Health, GetMaxHealth() * HealthFraction);
+    WriteAttributeValue(GetMaxHealthAttribute(), MaxHealth, Aggregator.Compose(EBreakerAggregatedAttribute::MaxHealth));
+    WriteAttributeValue(GetHealthAttribute(), Health, GetMaxHealth() * HealthFraction);
 
-    WriteAggregatedAttribute(GetMaxClassResourceAttribute(), MaxClassResource, Aggregator.Compose(EBreakerAggregatedAttribute::MaxClassResource));
-    WriteAggregatedAttribute(GetClassResourceAttribute(), ClassResource, FMath::Min(GetClassResource(), GetMaxClassResource()));
+    WriteAttributeValue(GetMaxClassResourceAttribute(), MaxClassResource, Aggregator.Compose(EBreakerAggregatedAttribute::MaxClassResource));
+    WriteAttributeValue(GetClassResourceAttribute(), ClassResource, FMath::Min(GetClassResource(), GetMaxClassResource()));
 
-    WriteAggregatedAttribute(GetCriticalChanceAttribute(), CriticalChance, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalChance));
-    WriteAggregatedAttribute(GetCriticalMultiplierAttribute(), CriticalMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalMultiplier));
-    WriteAggregatedAttribute(GetMoveSpeedAttribute(), MoveSpeed, Aggregator.Compose(EBreakerAggregatedAttribute::MoveSpeed));
-    WriteAggregatedAttribute(GetDamageOverTimeMultiplierAttribute(), DamageOverTimeMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageOverTimeMultiplier));
+    WriteAttributeValue(GetCriticalChanceAttribute(), CriticalChance, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalChance));
+    WriteAttributeValue(GetCriticalMultiplierAttribute(), CriticalMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalMultiplier));
+    WriteAttributeValue(GetMoveSpeedAttribute(), MoveSpeed, Aggregator.Compose(EBreakerAggregatedAttribute::MoveSpeed));
+    WriteAttributeValue(GetDamageOverTimeMultiplierAttribute(), DamageOverTimeMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageOverTimeMultiplier));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
@@ -115,7 +145,7 @@ UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() con
     return nullptr;
 }
 
-void UBreakerAttributeSet::WriteAggregatedAttribute(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue)
+void UBreakerAttributeSet::WriteAttributeValue(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue)
 {
     if (UAbilitySystemComponent* OwningAbilitySystem = FindOwningAbilitySystemSafe())
     {
@@ -139,6 +169,7 @@ BREAKER_ON_REP(MaxShield)
 BREAKER_ON_REP(Armor)
 BREAKER_ON_REP(ClassResource)
 BREAKER_ON_REP(MaxClassResource)
+BREAKER_ON_REP(ClassResourceFloor)
 BREAKER_ON_REP(CriticalChance)
 BREAKER_ON_REP(CriticalMultiplier)
 BREAKER_ON_REP(DamageMultiplier)

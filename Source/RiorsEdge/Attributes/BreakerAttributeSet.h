@@ -38,6 +38,15 @@ public:
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ClassResource)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxClassResource, Category="Resources") FGameplayAttributeData MaxClassResource;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, MaxClassResource)
+    // How far below zero the class resource may be driven (spec D8). ZERO for
+    // every class and every character by default, which is exactly the old
+    // [0, Max] clamp — Swift's Momentum, and every test written against it,
+    // cannot tell this attribute exists. Only Caster opens it, to −20, so
+    // Overcast is reachable at all; SB4/MS10 deepen it later. It is authored
+    // (never negative-summed by gear), so it is deliberately NOT part of the
+    // aggregated set — see the note on the aggregation block below.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ClassResourceFloor, Category="Resources") FGameplayAttributeData ClassResourceFloor;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ClassResourceFloor)
 
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CriticalChance, Category="Offense") FGameplayAttributeData CriticalChance;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, CriticalChance)
@@ -73,6 +82,27 @@ public:
     // be had it never contributed at all.
     void ClearAttributeContribution(EBreakerAttributeContributor Contributor);
 
+    // --- Class-resource floor (spec D8) -----------------------------------
+    // ClassResourceFloor is deliberately outside the aggregator. The fold is
+    // (Base + flat) * (1 + Increased) * More over the Equipment/Progression
+    // contributors; with a base of 0 every percentage term is annihilated, so
+    // "Increased floor" would silently do nothing, and no gear affix or skill
+    // node authors a floor anyway — it is set by the class-resource loop
+    // component that owns the mechanic (Mana for Caster), one writer, one
+    // authored value. Aggregation is for attributes several layers bid on.
+    //
+    // Sets the floor (clamped at or below zero) and, when the floor is raised,
+    // lifts a bank that is now below it. That is what makes a class change or a
+    // respec unable to strand a character in permanent debt.
+    void ApplyClassResourceFloor(float NewFloor);
+    // Null-safe write of the bank itself, for the resource-loop components:
+    // routes through the ability system in play and writes the attribute data
+    // with the same clamp policy when there is none (a standalone test).
+    // This is NOT an ability spend path — ability costs stay GameplayEffects
+    // (spec D3); this is the generation/regen write the loop components have
+    // always done, made testable.
+    void ApplyClassResource(float NewValue);
+
     float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
     float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
     const FBreakerAttributeAggregator& GetAttributeAggregator() const { return Aggregator; }
@@ -85,6 +115,7 @@ protected:
     UFUNCTION() void OnRep_Armor(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_ClassResource(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MaxClassResource(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_ClassResourceFloor(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_CriticalChance(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_CriticalMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DamageMultiplier(const FGameplayAttributeData& OldValue) const;
@@ -101,7 +132,7 @@ private:
     // Routes through the ability system when there is one, and writes the
     // attribute data directly (same clamp policy) when there is not, so the
     // aggregation is exercisable in tests without an ability system.
-    void WriteAggregatedAttribute(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue);
+    void WriteAttributeValue(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue);
     // Null-safe replacement for GetOwningAbilitySystemComponent(), which
     // CastChecked's the outer to an actor.
     UAbilitySystemComponent* FindOwningAbilitySystemSafe() const;

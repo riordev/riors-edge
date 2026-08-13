@@ -1,8 +1,11 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerManaComponent.h"
+#include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -138,6 +141,210 @@ bool FBreakerManaIncomingDamageTest::RunTest(const FString& Parameters)
     // Negative multipliers would heal the victim. Clamped at push.
     Combat->PushIncomingDamageModifier(TEXT("Test.Negative"), -3.0f);
     TestEqual(TEXT("A negative multiplier is clamped to immunity, never healing"), Combat->GetComposedIncomingDamageMultiplier(), 0.0f);
+    return true;
+}
+
+namespace BreakerOvercastTestHelpers
+{
+    // A freshly constructed actor is ROLE_Authority, which is all the server
+    // paths in the Mana component require; nothing here needs a world (the
+    // safe-zone query answers "no" without one) or an ability system (the
+    // attribute set falls back to writing its own data under the same clamp).
+    struct FCasterRig
+    {
+        AActor* Owner = nullptr;
+        UBreakerProgressionComponent* Progression = nullptr;
+        UBreakerManaComponent* Mana = nullptr;
+        UBreakerAttributeSet* Attributes = nullptr;
+    };
+
+    FCasterRig MakeRig(EBreakerClassId ClassId)
+    {
+        FCasterRig Rig;
+        Rig.Owner = NewObject<AActor>();
+        Rig.Progression = NewObject<UBreakerProgressionComponent>(Rig.Owner);
+        Rig.Mana = NewObject<UBreakerManaComponent>(Rig.Owner);
+        Rig.Attributes = NewObject<UBreakerAttributeSet>();
+        Rig.Progression->DevForceClass(ClassId);
+        Rig.Mana->BindAttributes(Rig.Attributes);
+        return Rig;
+    }
+
+    // Runs the component's own tick loop. The generation budget is metered per
+    // second, so a long window is spent in slices exactly as it is in play.
+    void RunFor(UBreakerManaComponent* Mana, float Seconds, float Step = 0.1f)
+    {
+        for (float Elapsed = 0.0f; Elapsed < Seconds; Elapsed += Step)
+        {
+            Mana->AdvanceLoop(Step);
+        }
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOvercastReachableTest,
+    "RiorsEdge.Classes.OvercastReachable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOvercastReachableTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // This is the test the whole ClassResourceFloor attribute exists for: until
+    // it landed, the bank clamped at zero and Overcast — the Caster's defining
+    // mechanic — could not be entered at all.
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster);
+    TestTrue(TEXT("The Mana loop runs for a Caster"), Caster.Mana->IsActiveForOwner());
+    TestEqual(TEXT("Becoming a Caster opens the floor on the attribute set"), Caster.Attributes->GetClassResourceFloor(), -20.0f);
+    TestEqual(TEXT("The published floor is the Overcast floor"), Caster.Mana->GetPublishedFloor(), -20.0f);
+
+    // Bank 30, then spend 45: the cast is affordable because it lands inside
+    // the debt allowance, and the bank genuinely goes negative.
+    Caster.Mana->GrantMana(30.0f, /*bIgnoreGlobalCap*/ true);
+    TestEqual(TEXT("Generation banks normally above zero"), Caster.Mana->GetMana(), 30.0f);
+    TestFalse(TEXT("A full bank is not Overcast"), Caster.Mana->IsOvercast());
+
+    TestTrue(TEXT("A cast that exceeds the bank is affordable inside the floor"), Caster.Mana->CanAffordSpend(45.0f));
+    TestTrue(TEXT("The overdraft spend succeeds"), Caster.Mana->TrySpendMana(45.0f));
+    TestEqual(TEXT("The bank is driven negative — Overcast is entered"), Caster.Mana->GetMana(), -15.0f);
+    TestTrue(TEXT("The component reports Overcast"), Caster.Mana->IsOvercast());
+    TestEqual(TEXT("The incoming-damage penalty is published"), Caster.Mana->GetOvercastIncomingDamageTaken(), 0.15f);
+
+    // "No further ability may be cast until Mana is at or above zero."
+    TestFalse(TEXT("Nothing may be cast while in debt"), Caster.Mana->CanAffordSpend(1.0f));
+    TestFalse(TEXT("A spend attempted in debt is refused"), Caster.Mana->TrySpendMana(1.0f));
+    TestEqual(TEXT("A refused spend leaves the bank untouched"), Caster.Mana->GetMana(), -15.0f);
+
+    // A cast that would breach the floor is REFUSED, not truncated to the
+    // floor: a partial spend would hand the player a silent discount.
+    FCasterRig Deep = MakeRig(EBreakerClassId::Caster);
+    Deep.Mana->GrantMana(10.0f, true);
+    TestFalse(TEXT("A cast past the floor is refused"), Deep.Mana->CanAffordSpend(31.0f));
+    TestFalse(TEXT("The over-floor spend does not happen"), Deep.Mana->TrySpendMana(31.0f));
+    TestEqual(TEXT("A refused over-floor cast costs nothing"), Deep.Mana->GetMana(), 10.0f);
+    TestTrue(TEXT("A cast landing exactly on the floor is allowed"), Deep.Mana->TrySpendMana(30.0f));
+    TestEqual(TEXT("The bank rests exactly on the floor"), Deep.Mana->GetMana(), -20.0f);
+    // And the attribute clamp is the backstop: even a direct write past the
+    // floor lands ON the floor, so no path can produce unbounded debt.
+    Deep.Attributes->ApplyClassResource(-500.0f);
+    TestEqual(TEXT("Nothing drives the bank below the floor"), Deep.Mana->GetMana(), -20.0f);
+
+    // SB4/MS10 deepen the floor at runtime.
+    Deep.Mana->SetOvercastFloor(-35.0f);
+    TestEqual(TEXT("A deepened floor reaches the attribute set"), Deep.Attributes->GetClassResourceFloor(), -35.0f);
+    TestTrue(TEXT("The deeper floor allows more rope"), Deep.Mana->GetPublishedFloor() < -20.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOvercastRecoveryTest,
+    "RiorsEdge.Classes.OvercastRecovery",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOvercastRecoveryTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // Doubled generation while in debt (Class-Kits §2.1). Now that the debt is
+    // reachable, confirm the doubling actually runs rather than merely existing.
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster);
+    Caster.Mana->GrantMana(30.0f, true);
+    Caster.Mana->TrySpendMana(45.0f);
+    TestEqual(TEXT("The bank starts the recovery in debt"), Caster.Mana->GetMana(), -15.0f);
+
+    // Metered generation: 10 of credit, paid out through the 20/s budget. The
+    // exact landing point depends on which slice crosses zero (the doubling is
+    // evaluated against the bank as it stands when each credit is paid), so
+    // assert the property rather than a step-size-sensitive number: 10 of
+    // credit moved the bank by MORE than 10 and carried it out of debt.
+    const float DebtBefore = Caster.Mana->GetMana();
+    Caster.Mana->GrantMana(10.0f, /*bIgnoreGlobalCap*/ false);
+    RunFor(Caster.Mana, 2.0f);
+    TestTrue(TEXT("Doubled generation climbs the bank out of debt"), Caster.Mana->GetMana() > 0.0f);
+    TestTrue(TEXT("Ten of credit repaid more than ten of debt"), Caster.Mana->GetMana() - DebtBefore > 10.0f);
+    TestFalse(TEXT("Clearing the debt leaves Overcast"), Caster.Mana->IsOvercast());
+    TestEqual(TEXT("Leaving Overcast drops the damage penalty"), Caster.Mana->GetOvercastIncomingDamageTaken(), 0.0f);
+
+    // Above zero the doubling stops: 10 more credit banks exactly 10.
+    const float BankAfterRecovery = Caster.Mana->GetMana();
+    Caster.Mana->GrantMana(10.0f, false);
+    RunFor(Caster.Mana, 2.0f);
+    TestEqual(TEXT("Generation is single rate once the debt is cleared"), Caster.Mana->GetMana(), BankAfterRecovery + 10.0f, 0.001f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOvercastFloorClosesTest,
+    "RiorsEdge.Classes.OvercastFloorCloses",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOvercastFloorClosesTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // A class change must never strand a negative floor — or a bank sitting
+    // below the floor that replaces it, which would be permanent debt.
+    FCasterRig Rig = MakeRig(EBreakerClassId::Caster);
+    Rig.Mana->GrantMana(30.0f, true);
+    Rig.Mana->TrySpendMana(45.0f);
+    TestTrue(TEXT("The Caster is in debt before the change"), Rig.Mana->IsOvercast());
+
+    // DevForceClass deliberately does NOT broadcast OnProgressionChanged, so
+    // this exercises the tick-side poll, which is the real safety net.
+    Rig.Progression->DevForceClass(EBreakerClassId::Swift);
+    RunFor(Rig.Mana, 0.1f);
+
+    TestFalse(TEXT("The Mana loop goes inert for a non-Caster"), Rig.Mana->IsActiveForOwner());
+    TestEqual(TEXT("The floor closes on the class change"), Rig.Attributes->GetClassResourceFloor(), 0.0f);
+    TestEqual(TEXT("The stranded debt is repaid to zero"), Rig.Attributes->GetClassResource(), 0.0f);
+    TestFalse(TEXT("Nothing is left reporting Overcast"), Rig.Mana->IsOvercast());
+    TestEqual(TEXT("No incoming-damage penalty survives the change"), Rig.Mana->GetOvercastIncomingDamageTaken(), 0.0f);
+
+    // A respec broadcasts, so the bound handler covers that path.
+    FCasterRig Respec = MakeRig(EBreakerClassId::Caster);
+    Respec.Mana->GrantMana(30.0f, true);
+    Respec.Mana->TrySpendMana(45.0f);
+    FText Failure;
+    Respec.Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure);
+    TestEqual(TEXT("A respec keeps a Caster's floor open"), Respec.Attributes->GetClassResourceFloor(), -20.0f);
+    TestTrue(TEXT("A respec does not silently repay the debt"), Respec.Mana->IsOvercast());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumUnaffectedByFloorTest,
+    "RiorsEdge.Classes.MomentumUnaffectedByFloor",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumUnaffectedByFloorTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // The hard constraint on the whole feature: Swift is tuned and playtested,
+    // so Momentum must behave exactly as it did before the floor existed.
+    FCasterRig Swift = MakeRig(EBreakerClassId::Swift);
+    UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>(Swift.Owner);
+    TestFalse(TEXT("The Mana loop is inert on a Swift"), Swift.Mana->IsActiveForOwner());
+    TestEqual(TEXT("A Swift's floor is closed"), Swift.Attributes->GetClassResourceFloor(), 0.0f);
+    TestEqual(TEXT("A Swift publishes no debt allowance"), Swift.Mana->GetPublishedFloor(), 0.0f);
+
+    // With the floor closed the clamp GAS applies is the original [0, Max].
+    float Value = -25.0f;
+    Swift.Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("Momentum can never be driven below zero"), Value, 0.0f);
+    Value = 130.0f;
+    Swift.Attributes->PreAttributeChange(UBreakerAttributeSet::GetClassResourceAttribute(), Value);
+    TestEqual(TEXT("Momentum still clamps at the maximum"), Value, 100.0f);
+
+    // A Caster's floor is per-character state on that character's attribute
+    // set, so it cannot leak onto a Swift.
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster);
+    Caster.Mana->GrantMana(20.0f, true);
+    Caster.Mana->TrySpendMana(35.0f);
+    TestTrue(TEXT("The Caster is in debt"), Caster.Mana->IsOvercast());
+    TestEqual(TEXT("The Swift's floor is untouched by another character"), Swift.Attributes->GetClassResourceFloor(), 0.0f);
+    TestEqual(TEXT("The Swift's bank is untouched"), Swift.Attributes->GetClassResource(), 0.0f);
+    TestEqual(TEXT("The Momentum component is still inert without a Swift-owned bar"), Momentum->GetMomentum(), 0.0f);
     return true;
 }
 
