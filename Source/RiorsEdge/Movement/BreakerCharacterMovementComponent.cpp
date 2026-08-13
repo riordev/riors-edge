@@ -325,6 +325,29 @@ float UBreakerCharacterMovementComponent::ComposeSpeedMultipliers(const TArray<f
     return Composed;
 }
 
+bool UBreakerCharacterMovementComponent::CanBeginWallRide(
+    bool bAlreadyWallRiding,
+    bool bFalling,
+    bool bSlidingNow,
+    float HorizontalSpeed,
+    float MinimumSpeed,
+    bool bHasMovementInput,
+    float SecondsSinceLastWallRide,
+    float Cooldown)
+{
+    if (bAlreadyWallRiding || !bFalling || bSlidingNow || !bHasMovementInput)
+    {
+        return false;
+    }
+    if (SecondsSinceLastWallRide < Cooldown)
+    {
+        return false;
+    }
+    // Strictly-greater on the threshold would make an exactly-at-cap approach a
+    // coin flip against float rounding, which is half of how this verb died.
+    return HorizontalSpeed >= MinimumSpeed;
+}
+
 float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
 {
     PruneSpeedMultipliers();
@@ -383,6 +406,11 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
     // The dash owns its vertical floor from here on; releasing jump after an
     // air dash must not cut it.
     bJumpCutArmed = false;
+    // Owner report: "cant really feel it or see it since your speed just jumps
+    // up". The rule is right and the READ is missing, so the fix is entirely on
+    // the presentation side. Broadcast last, after the velocity is committed,
+    // so a listener can never observe a half-applied dash.
+    OnDashStarted.Broadcast(Direction, OutputSpeed);
     return true;
 }
 
@@ -449,9 +477,12 @@ void UBreakerCharacterMovementComponent::PrepareSlideJump()
 void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     FHitResult RunnableWall;
-    if (!bWallRiding && IsFalling() && !bSliding && Velocity.Size2D() >= WallRideMinimumSpeed
-        && Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER
-        && GetWorld() && GetWorld()->GetTimeSeconds() - LastWallRideEndTime >= WallRideCooldown
+    const float SecondsSinceLastWallRide = GetWorld()
+        ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastWallRideEndTime)
+        : 0.0f;
+    if (GetWorld()
+        && CanBeginWallRide(bWallRiding, IsFalling(), bSliding, Velocity.Size2D(), WallRideMinimumSpeed,
+            Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER, SecondsSinceLastWallRide, WallRideCooldown)
         && FindRunnableWall(RunnableWall))
     {
         BeginWallRide(RunnableWall);
@@ -642,10 +673,22 @@ bool UBreakerCharacterMovementComponent::TryWallJump()
 
     FVector AlongWall = FVector::VectorPlaneProject(Velocity, WallRideNormal);
     AlongWall.Z = 0.0f;
-    const float PreservedSpeed = FMath::Max(AlongWall.Size2D(), WallRideMinimumSpeed);
+    // Its own floor, not the entry gate's: the two used to share a value, so
+    // lowering the entry gate would have quietly weakened every wall jump.
+    const float PreservedSpeed = FMath::Max(AlongWall.Size2D(), WallRideJumpMinimumSpeed);
     Velocity = AlongWall.GetSafeNormal2D() * PreservedSpeed
         + WallRideNormal * WallRideJumpAwaySpeed
         + FVector::UpVector * WallRideJumpUpSpeed;
+    // Wall jump and the O25 second jump share one key and used to compete for
+    // the same budget: by the time a player reached a wall both jumps were
+    // usually spent, so the wall jump threw them off the wall with no way to
+    // correct. Clamping (never clearing) the count hands back exactly one air
+    // jump, so a wall jump chains instead of stranding, and the baseline is
+    // still two.
+    if (bWallJumpRefreshesAirJump && CharacterOwner)
+    {
+        CharacterOwner->JumpCurrentCount = FMath::Min(CharacterOwner->JumpCurrentCount, FMath::Max(CharacterOwner->JumpMaxCount - 1, 0));
+    }
     EndWallRide();
     return true;
 }

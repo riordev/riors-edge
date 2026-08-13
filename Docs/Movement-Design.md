@@ -12,7 +12,7 @@ Movement gives players expressive positioning, recovery, and route choice withou
 - Air control: moderate CMC control plus a Source-inspired steering assist that rotates existing horizontal momentum toward input without adding speed or permitting free reversals.
 - Dash: available on ground or in air whenever the player is not sliding, with a four-second cooldown. It redirects momentum with a 1500 cm/s floor plus a 200 cm/s bonus and preserves earned speed while movement input continues. Releasing movement or colliding clears the boosted ceiling; a 4200 cm/s safety cap remains.
 - Slide: available from 550 cm/s, eases its small deterministic entry push across 0.35 seconds, gives that boost at most once per 1.2 seconds, and never uses the entry boost to exceed sprint speed plus 120 cm/s. This prevents crouch-spam speed generation while allowing downhill momentum. It carries momentum and ends after one second or when released/slowed; holding slide while airborne queues one slide for landing; downhill surfaces add restrained acceleration.
-- Wall ride: implemented baseline with 0.85-second maximum, minimum 700 cm/s, reduced gravity, no passive speed gain, loss-of-contact exit, and a controlled wall jump.
+- Wall ride: implemented baseline with 0.85-second maximum, minimum **450 cm/s** (was 700 — see "Wall ride was dead" below), reduced gravity, no passive speed gain, loss-of-contact exit, and a controlled wall jump. The wall jump keeps its own 700 cm/s exit floor and hands back one air jump.
 - Mantle: pressing jump at a clear 35-150 cm ledge smoothly lifts the capsule over it in 0.20 seconds; tall walls and obstructed landing space reject the attempt.
 - Grapple: excluded.
 
@@ -83,6 +83,94 @@ Tuning order if it is still wrong: **still floaty** → raise
 None of this has been playtested. It is verified by automation and by the
 arithmetic above only; floatiness is a feeling and the numbers cannot confirm
 it landed.
+
+## Wall ride was dead (owner: "wall riding doesnt work but jumping does and its awkward")
+
+**Root cause.** `WallRideMinimumSpeed` was 700 cm/s — *exactly* `WalkSpeed`, which
+is the hard airborne horizontal ceiling whenever the sprint toggle is off. The
+gate is read in `TickComponent` **after** the capsule has already touched the
+wall, and UE's `PhysFalling` rewrites horizontal velocity from the wall-slid
+displacement on a blocking hit, so what the gate actually measures is the
+*along-wall* component that survives contact, not the approach speed:
+
+| Approach | Speed | Along-wall at 30° | at 45° | at 60° |
+|---|---:|---:|---:|---:|
+| Walking | 700 | 606 | 495 | 350 |
+| Sprinting | 1100 | 953 | 778 | 550 |
+
+Against a 700 gate a walking player could **never** enter — every row is below
+it — and a sprinting player lost it past roughly a 50° approach. Every other
+entry gate in the component sits strictly *below* the speed it gates (slide
+enters at 550, under the 700 walk speed); the wall ride was the one set at
+100% of its own ceiling.
+
+**Why the wall JUMP also disappeared.** `TryWallJump()` returns false unless
+`bWallRiding` is already true, and `ABreakerCharacter::HandleJumpInput` tries it
+first. With the ride dead there is no other path to a wall jump at all, so what
+the owner felt next to a wall was `ACharacter::Jump`'s plain second jump (O25
+base kit) — a vertical hop with no wall push. That is exactly the "awkward".
+
+**The fix, split by kind:**
+
+| Change | Kind | Why |
+|---|---|---|
+| `WallRideMinimumSpeed` 700 → **450** | bug fix | Restores the invariant that an entry gate sits below the speed it gates, and sizes it for post-contact along-wall speed. |
+| Entry rule extracted to the pure static `CanBeginWallRide(...)` | bug fix | The verb broke silently once; the rule now has a name and a regression test. |
+| `WallRideJumpMinimumSpeed` = **700**, new | bug fix | The wall jump used to borrow the entry gate as its exit floor, so lowering the gate would have silently weakened every wall jump. Two jobs, two values. |
+| `bWallJumpRefreshesAirJump` = true | **feel** | Wall jump and the O25 second jump share one key and one budget; both jumps were usually spent by the time a player reached a wall, so a wall jump threw them off with nothing left. The count is *clamped* to `JumpMaxCount - 1`, never cleared, so the baseline is still two and wall-to-wall traversal chains instead of stranding. Set false to restore the old behaviour. |
+
+Deliberately **not** touched: gravity, the fall curve, jump impulse, air control,
+air steer rate, the landing cost, the jump-hold window, `WallRideMaxDuration`,
+`WallRideGravityScale`, the trace, and the speed-neutrality rule. The weight pass
+shortened total airtime from 1.06 s to ~0.79 s, which narrows the window in which
+a ride can start, but it is not the blocker and O26 puts it out of scope.
+
+Covered by `RiorsEdge.Movement.WallRideEntry`.
+
+## Dash feedback (owner: "cant really feel it or see it since your speed just jumps up")
+
+The dash rule is correct and unreadable. A dash is instantaneous and its entire
+effect is a velocity change; in first person over open ground there is almost no
+optical flow to read it from. **No dash value was changed** — the fix is
+presentation, added the same way the landing weight already does it.
+
+- `UBreakerCharacterMovementComponent::OnDashStarted(FVector DashDirection, float DashSpeed)`
+  — a `BlueprintAssignable` delegate broadcast from `TryDash` after the velocity
+  is committed. Same shape and same contract as `OnLandingImpact`: presentation
+  binds to it, C++ stays ignorant of cameras, and any listener can be replaced
+  without touching movement.
+- `ABreakerCharacter` consumes it with two camera cues, both `EditAnywhere` under
+  **Camera|Dash Feedback**, both honouring the guardrail below that camera roll
+  and FOV changes stay subtle and configurable:
+  - **FOV punch** (`DashFOVPunch` 12°, `DashFOVPunchAttack` 0.05 s,
+    `DashFOVPunchRecovery` 0.30 s, quadratic ease-out). The genre-standard speed
+    cue: a wider frustum multiplies the peripheral motion the eye uses to judge
+    speed. Answers *how much*. Scaled by actual dash speed against
+    `DashFeedbackReferenceSpeed` (1700) and clamped to
+    `DashFeedbackMinimumScale`/`MaximumScale`, so a dash that carried momentum in
+    reads harder than a standing one.
+  - **Camera roll** (`DashCameraRoll` 5°, signed by `dot(dashDir, actorRight)`).
+    Answers *which way* — a forward dash rolls not at all, a strafe dash rolls
+    fully. FOV alone cannot carry direction. Applied through the controller's
+    control-rotation roll, because the camera runs `bUsePawnControlRotation` and
+    re-derives its world rotation every frame, which would discard a relative
+    roll. Roll about the view axis leaves aim, and therefore every weapon trace,
+    untouched; `bUseControllerRotationRoll` is false so the capsule never tilts.
+- The player's FOV setting now lives in `BaseFieldOfView` and the punch is a pure
+  offset on top of it. `GetCurrentFOV()` reports the *setting*, so a punch in
+  flight can never be read back by the settings screen or persisted by
+  `SavePlaytestSettings`. A playtest reset drops any punch in flight.
+
+**What a HUD would need to finish this** (UI/ is owned elsewhere and was not
+touched): bind `OnDashStarted` for the event, and read
+`ABreakerCharacter::GetDashFeedbackAlpha()` (0 at rest, 1 at the punch peak,
+decaying) and `GetLastDashDirection()` to drive a radial speed-line burst — the
+existing `DrawSkimBurst` in `ABreakerPlaytestHUD` is already the right visual
+vocabulary and already the right shape. Riding the character's envelope instead
+of starting a second timer keeps the burst in sync with the camera.
+
+Whether any of this *feels* good is unverified: automation can prove the envelope
+and the plumbing, not the read.
 
 ## Base kit
 
