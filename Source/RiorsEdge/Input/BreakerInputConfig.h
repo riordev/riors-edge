@@ -22,6 +22,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Fire;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Aim;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Reload;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> AbilityOne;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> AbilityTwo;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> Ultimate;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestReset;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestReport;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Playtest") TObjectPtr<UInputAction> PlaytestDiagnostics;

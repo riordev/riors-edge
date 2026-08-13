@@ -14,6 +14,7 @@ enum class EBreakerMenuScreen : uint8
     Loadout,
     Inventory,
     ClassSelect,
+    SkillTrees,
     Dialogue
 };
 
@@ -39,6 +40,7 @@ private:
     TSharedRef<SWidget> BuildLoadoutScreen();
     TSharedRef<SWidget> BuildInventoryScreen();
     TSharedRef<SWidget> BuildClassSelectScreen();
+    TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     TSharedRef<SWidget> MakeButton(const FText& Label, const FOnClicked& OnClicked, bool bPrimary = false) const;
@@ -50,6 +52,10 @@ private:
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
     // -1 shows every slot; otherwise an EBreakerEquipSlot index.
     int32 BackpackSlotFilter = -1;
+    // Skill trees: which tree the left selector has focused, and the last
+    // purchase/respec message echoed under the node grid.
+    int32 SelectedTreeIndex = 0;
+    FText SkillTreeStatus;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;
     FName DialogueNodeId = NAME_None;
     EBreakerMenuScreen RootScreen = EBreakerMenuScreen::Main;

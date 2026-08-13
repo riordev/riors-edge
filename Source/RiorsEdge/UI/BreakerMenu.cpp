@@ -3,7 +3,10 @@
 #include "Characters/BreakerCharacter.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionNode.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
@@ -79,7 +82,7 @@ void SBreakerMenu::HandleEscape()
         if (Character.IsValid()) Character->ResumeFromMenu();
         return;
     }
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees)
     {
         Rebuild(RootScreen);
     }
@@ -100,6 +103,7 @@ void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Loadout: ContentHost->SetContent(BuildLoadoutScreen()); break;
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
         case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
+        case EBreakerMenuScreen::SkillTrees: ContentHost->SetContent(BuildSkillTreesScreen()); break;
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
@@ -207,6 +211,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
     [
+        MakeButton(FText::FromString(TEXT("SKILL TREES")), FOnClicked::CreateLambda([this]()
+        {
+            SkillTreeStatus = FText::GetEmpty();
+            Rebuild(EBreakerMenuScreen::SkillTrees);
+            return FReply::Handled();
+        }))
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+    [
         MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
         {
             Rebuild(EBreakerMenuScreen::Settings);
@@ -248,6 +261,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
     AddButton(MakeButton(FText::FromString(TEXT("INVENTORY")), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Inventory);
+        return FReply::Handled();
+    })));
+    AddButton(MakeButton(FText::FromString(TEXT("SKILL TREES")), FOnClicked::CreateLambda([this]()
+    {
+        SkillTreeStatus = FText::GetEmpty();
+        Rebuild(EBreakerMenuScreen::SkillTrees);
         return FReply::Handled();
     })));
     AddButton(MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
@@ -770,6 +789,432 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     return BuildFrame(FText::FromString(TEXT("BREAKER CLASS")), FText::FromString(TEXT("PERMANENT SELECTION / FIVE DISCIPLINES")), Body, 860.0f);
+}
+
+namespace
+{
+    // ---------------------------------------------------------------------
+    // Progression adapter.
+    //
+    // Every call this screen makes into UBreakerProgressionComponent goes
+    // through one of these one-line shims. The progression API is being
+    // extended concurrently (fallback tree content, purchase/enumeration
+    // helpers); when a signature lands or changes, the fix is one line in
+    // this block rather than a sweep through the Slate tree below.
+    // ---------------------------------------------------------------------
+
+    TArray<const UBreakerProgressionTree*> ProgressionGatherTrees(UBreakerProgressionComponent* Progression)
+    {
+        TArray<const UBreakerProgressionTree*> Trees;
+        if (!Progression) return Trees;
+        // INTEGRATION: expected enumerator is
+        //   TArray<const UBreakerProgressionTree*> UBreakerProgressionComponent::GetAvailableTrees() const
+        // (with a static fallback-content variant supplying the class tree and
+        // the six core constellations). No such method exists on the header
+        // this file was written against, so we walk the only reachable source
+        // today: the class definition's branch trees. When the enumerator
+        // lands, replace this whole body with the single call.
+        if (const UBreakerClassDefinition* ClassDef = Progression->ClassDefinition)
+        {
+            for (const UBreakerProgressionTree* Tree : ClassDef->BranchTrees)
+            {
+                if (Tree) Trees.Add(Tree);
+            }
+        }
+        return Trees;
+    }
+
+    int32 ProgressionGetNodeRank(UBreakerProgressionComponent* Progression, FName NodeId, EBreakerPointCurrency Currency)
+    {
+        return Progression ? Progression->GetNodeRank(NodeId, Currency) : 0;
+    }
+
+    int32 ProgressionGetUnspent(UBreakerProgressionComponent* Progression, EBreakerPointCurrency Currency)
+    {
+        if (!Progression) return 0;
+        const FBreakerProgressionState& ProgState = Progression->GetProgressionState();
+        return Currency == EBreakerPointCurrency::ClassPoints ? ProgState.UnspentClassPoints : ProgState.UnspentCorePoints;
+    }
+
+    bool ProgressionPurchaseNode(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason)
+    {
+        if (!Progression || !Tree)
+        {
+            OutFailureReason = FText::FromString(TEXT("No progression component."));
+            return false;
+        }
+        return Progression->PurchaseNode(Tree, NodeId, OutFailureReason);
+    }
+
+    bool ProgressionRespec(UBreakerProgressionComponent* Progression, EBreakerPointCurrency Currency, FText& OutFailureReason)
+    {
+        if (!Progression)
+        {
+            OutFailureReason = FText::FromString(TEXT("No progression component."));
+            return false;
+        }
+        // bIsAtForge is passed true unconditionally: Forge-proximity gating
+        // arrives with the hub. Until then respec is always available from
+        // the menu so the flow is testable. UI-UX-Spec 6.6 wants the button
+        // visible-but-disabled away from a Forge — wire that here when the
+        // hub exists.
+        return Progression->RespecAtForge(Currency, /*bIsAtForge=*/true, OutFailureReason);
+    }
+
+    // Points already committed to a tree, and the tree's full cost if every
+    // node were maxed. Derived locally from node ranks so it needs no new
+    // progression API.
+    void ProgressionTreeInvestment(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, int32& OutSpent, int32& OutTotal)
+    {
+        OutSpent = 0;
+        OutTotal = 0;
+        if (!Tree) return;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            if (!Node) continue;
+            OutSpent += ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) * Node->CostPerRank;
+            OutTotal += Node->MaxRank * Node->CostPerRank;
+        }
+    }
+
+    FString CurrencyLabel(EBreakerPointCurrency Currency)
+    {
+        return Currency == EBreakerPointCurrency::ClassPoints ? TEXT("CLASS") : TEXT("CORE");
+    }
+
+    // INTEGRATION: the progression API is expected to grow
+    //   bool UBreakerProgressionComponent::CanPurchase(const UBreakerProgressionTree*, FName, FText& OutReason) const
+    // Until it exists this mirrors the purchase rules the component enforces
+    // (max rank, unspent points, investment gate, prerequisite ranks) so the
+    // cards can render a lock reason without attempting a purchase. Delete
+    // this function and forward to CanPurchase when it lands — the returned
+    // reason text is already shaped for direct display.
+    bool SkillNodeIsPurchasable(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node, int32 TreeSpent, FString& OutLockReason)
+    {
+        OutLockReason.Reset();
+        if (!Progression || !Tree || !Node)
+        {
+            OutLockReason = TEXT("NO DATA");
+            return false;
+        }
+        if (ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency) >= Node->MaxRank)
+        {
+            OutLockReason = TEXT("MAX RANK");
+            return false;
+        }
+        if (Node->RequiredTreeInvestment > TreeSpent)
+        {
+            OutLockReason = FString::Printf(TEXT("REQUIRES %d INVESTED (%d)"), Node->RequiredTreeInvestment, TreeSpent);
+            return false;
+        }
+        for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
+        {
+            const int32 HeldRank = ProgressionGetNodeRank(Progression, Prereq.NodeId, Node->Currency);
+            if (HeldRank < Prereq.RequiredRank)
+            {
+                const UBreakerProgressionNode* PrereqNode = nullptr;
+                for (const UBreakerProgressionNode* Candidate : Tree->Nodes)
+                {
+                    if (Candidate && Candidate->NodeId == Prereq.NodeId) PrereqNode = Candidate;
+                }
+                const FString PrereqName = PrereqNode ? PrereqNode->DisplayName.ToString() : Prereq.NodeId.ToString();
+                OutLockReason = FString::Printf(TEXT("NEEDS %s RANK %d"), *PrereqName.ToUpper(), Prereq.RequiredRank);
+                return false;
+            }
+        }
+        for (const FName ExclusiveId : Node->MutuallyExclusiveNodeIds)
+        {
+            if (ProgressionGetNodeRank(Progression, ExclusiveId, Node->Currency) > 0)
+            {
+                OutLockReason = FString::Printf(TEXT("LOCKED OUT BY %s"), *ExclusiveId.ToString().ToUpper());
+                return false;
+            }
+        }
+        if (ProgressionGetUnspent(Progression, Node->Currency) < Node->CostPerRank)
+        {
+            OutLockReason = FString::Printf(TEXT("NEEDS %d %s POINTS"), Node->CostPerRank, *CurrencyLabel(Node->Currency));
+            return false;
+        }
+        return true;
+    }
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
+{
+    UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const TArray<const UBreakerProgressionTree*> Trees = ProgressionGatherTrees(Progression);
+
+    const int32 UnspentClass = ProgressionGetUnspent(Progression, EBreakerPointCurrency::ClassPoints);
+    const int32 UnspentCore = ProgressionGetUnspent(Progression, EBreakerPointCurrency::CorePoints);
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+
+    // Unspent-points banner — the one number the player is spending against.
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
+    [
+        SNew(SBorder)
+        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+        .BorderBackgroundColor(PanelRaised)
+        .Padding(FMargin(16.0f, 10.0f))
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("CLASS %d  |  CORE %d  UNSPENT"), UnspentClass, UnspentCore)), 14, Cyan, true)
+        ]
+    ];
+
+    if (Trees.IsEmpty())
+    {
+        // INTEGRATION: no tree content is reachable through the progression
+        // API available to this file. When GetAvailableTrees() (or the static
+        // fallback-content provider) lands, ProgressionGatherTrees() starts
+        // returning trees and this placeholder stops rendering — no other
+        // change is needed here.
+        Body->AddSlot().FillHeight(1.0f).Padding(0.0f, 20.0f, 0.0f, 20.0f)
+        [
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(PanelRaised)
+            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(TEXT("[ NO TREE CONTENT ]\n\nThe progression component is not serving any\ntrees yet. Class tree and the six core\nconstellations appear here once tree content\nis registered.")), 12, SoftText)
+            ]
+        ];
+    }
+    else
+    {
+        SelectedTreeIndex = FMath::Clamp(SelectedTreeIndex, 0, Trees.Num() - 1);
+
+        // Left column: one selector button per tree, each showing its own
+        // spent/total plus the unspent pool that tree draws from.
+        TSharedRef<SVerticalBox> Selector = SNew(SVerticalBox);
+        Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        [
+            MenuText(FText::FromString(TEXT("TREES")), 11, SoftText, true)
+        ];
+        for (int32 TreeIndex = 0; TreeIndex < Trees.Num(); ++TreeIndex)
+        {
+            const UBreakerProgressionTree* Tree = Trees[TreeIndex];
+            int32 Spent = 0;
+            int32 Total = 0;
+            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+            const bool bSelected = TreeIndex == SelectedTreeIndex;
+            const int32 Unspent = ProgressionGetUnspent(Progression, Tree->Currency);
+            const FString TreeName = Tree->DisplayName.IsEmpty() ? Tree->TreeId.ToString().ToUpper() : Tree->DisplayName.ToString().ToUpper();
+            const int32 CapturedIndex = TreeIndex;
+
+            Selector->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(bSelected ? Cyan : PanelRaised)
+                .ContentPadding(FMargin(12.0f, 9.0f))
+                .HAlign(HAlign_Left)
+                .OnClicked(FOnClicked::CreateLambda([this, CapturedIndex]()
+                {
+                    SelectedTreeIndex = CapturedIndex;
+                    SkillTreeStatus = FText::GetEmpty();
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    return FReply::Handled();
+                }))
+                [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TreeName), 12, FLinearColor::White, true)]
+                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(FString::Printf(TEXT("%d / %d SPENT   %d %s UNSPENT"), Spent, Total, Unspent, *CurrencyLabel(Tree->Currency))), 9, bSelected ? FLinearColor::White : SoftText)
+                    ]
+                ]
+            ];
+        }
+
+        // Right side: the selected tree's nodes, one row per investment gate.
+        const UBreakerProgressionTree* Selected = Trees[SelectedTreeIndex];
+        int32 SelectedSpent = 0;
+        int32 SelectedTotal = 0;
+        ProgressionTreeInvestment(Progression, Selected, SelectedSpent, SelectedTotal);
+
+        TArray<int32> TierGates;
+        for (const UBreakerProgressionNode* Node : Selected->Nodes)
+        {
+            if (Node) TierGates.AddUnique(Node->RequiredTreeInvestment);
+        }
+        TierGates.Sort();
+
+        TSharedRef<SVerticalBox> NodeColumn = SNew(SVerticalBox);
+        int32 TierNumber = 0;
+        for (const int32 Gate : TierGates)
+        {
+            ++TierNumber;
+            const FString TierHeader = Gate > 0
+                ? FString::Printf(TEXT("TIER %d — GATE %d INVESTED  (%d)"), TierNumber, Gate, SelectedSpent)
+                : FString::Printf(TEXT("TIER %d"), TierNumber);
+            NodeColumn->AddSlot().AutoHeight().Padding(0.0f, TierNumber == 1 ? 0.0f : 10.0f, 0.0f, 6.0f)
+            [
+                MenuText(FText::FromString(TierHeader), 10, Gate > SelectedSpent ? SoftText : Cyan, true)
+            ];
+
+            TSharedRef<SWrapBox> TierRow = SNew(SWrapBox).UseAllottedSize(true);
+            for (const UBreakerProgressionNode* Node : Selected->Nodes)
+            {
+                if (!Node || Node->RequiredTreeInvestment != Gate) continue;
+
+                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                FString LockReason;
+                const bool bPurchasable = SkillNodeIsPurchasable(Progression, Selected, Node, SelectedSpent, LockReason);
+                const bool bOwned = Rank > 0;
+                const bool bMaxed = Rank >= Node->MaxRank;
+
+                // Owned reads cyan, purchasable reads as a raised panel,
+                // locked reads dimmed with its reason spelled out.
+                const FLinearColor CardColor = bOwned ? Cyan : (bPurchasable ? PanelRaised : Panel);
+                const FLinearColor NameColor = (bPurchasable || bOwned) ? FLinearColor::White : SoftText * 0.8f;
+
+                const FName CapturedNodeId = Node->NodeId;
+                const UBreakerProgressionTree* CapturedTree = Selected;
+                const FString NodeName = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
+                const FString Description = Node->Description.IsEmpty() ? TEXT("—") : Node->Description.ToString();
+                const FString StateLine = bMaxed
+                    ? FString::Printf(TEXT("RANK %d / %d   MAXED"), Rank, Node->MaxRank)
+                    : FString::Printf(TEXT("RANK %d / %d   COST %d %s"), Rank, Node->MaxRank, Node->CostPerRank, *CurrencyLabel(Node->Currency));
+
+                TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
+                Card->AddSlot().AutoHeight()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(NodeName), 12, NameColor, true)]
+                    + SHorizontalBox::Slot().AutoWidth()
+                    [
+                        MenuText(FText::FromString(Node->bCornerstone ? TEXT("CORNERSTONE") : TEXT("")), 9, bOwned ? FLinearColor::White : Cyan, true)
+                    ]
+                ];
+                Card->AddSlot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(StateLine), 9, bOwned ? FLinearColor::White : SoftText, true)
+                ];
+                Card->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(Description))
+                    .ColorAndOpacity(bOwned ? FLinearColor::White : SoftText)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 9))
+                    .AutoWrapText(true)
+                ];
+                if (!LockReason.IsEmpty())
+                {
+                    Card->AddSlot().AutoHeight().Padding(0.0f, 5.0f, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(LockReason), 9, bMaxed ? SoftText : FLinearColor(1.0f, 0.45f, 0.35f), true)
+                    ];
+                }
+
+                TierRow->AddSlot().Padding(0.0f, 0.0f, 8.0f, 8.0f)
+                [
+                    SNew(SBox).WidthOverride(250.0f)
+                    [
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(CardColor)
+                        .IsEnabled(bPurchasable)
+                        .ContentPadding(FMargin(12.0f, 10.0f))
+                        .OnClicked(FOnClicked::CreateLambda([this, CapturedTree, CapturedNodeId]()
+                        {
+                            UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                            FText FailureReason;
+                            if (ProgressionPurchaseNode(Prog, CapturedTree, CapturedNodeId, FailureReason))
+                            {
+                                SkillTreeStatus = FText::FromString(FString::Printf(TEXT("ALLOCATED %s"), *CapturedNodeId.ToString().ToUpper()));
+                                if (Character.IsValid()) Character->SaveGameState();
+                            }
+                            else
+                            {
+                                SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("PURCHASE FAILED")) : FailureReason;
+                            }
+                            Rebuild(EBreakerMenuScreen::SkillTrees);
+                            return FReply::Handled();
+                        }))
+                        [
+                            Card
+                        ]
+                    ]
+                ];
+            }
+            NodeColumn->AddSlot().AutoHeight()[TierRow];
+        }
+
+        const FString SelectedName = Selected->DisplayName.IsEmpty() ? Selected->TreeId.ToString().ToUpper() : Selected->DisplayName.ToString().ToUpper();
+        const EBreakerPointCurrency SelectedCurrency = Selected->Currency;
+
+        TSharedRef<SVerticalBox> RightPane = SNew(SVerticalBox);
+        RightPane->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("%s — %d / %d POINTS"), *SelectedName, SelectedSpent, SelectedTotal)), 13, Cyan, true)
+            ]
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(PanelRaised)
+                .ContentPadding(FMargin(14.0f, 7.0f))
+                .OnClicked(FOnClicked::CreateLambda([this, SelectedCurrency]()
+                {
+                    UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                    FText FailureReason;
+                    if (ProgressionRespec(Prog, SelectedCurrency, FailureReason))
+                    {
+                        SkillTreeStatus = FText::FromString(FString::Printf(TEXT("%s POINTS REFUNDED"), *CurrencyLabel(SelectedCurrency)));
+                        if (Character.IsValid()) Character->SaveGameState();
+                    }
+                    else
+                    {
+                        SkillTreeStatus = FailureReason.IsEmpty() ? FText::FromString(TEXT("RESPEC FAILED")) : FailureReason;
+                    }
+                    Rebuild(EBreakerMenuScreen::SkillTrees);
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(TEXT("RESPEC")), 10, FLinearColor::White, true)
+                ]
+            ]
+        ];
+        RightPane->AddSlot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox) + SScrollBox::Slot()[NodeColumn]
+        ];
+
+        Body->AddSlot().FillHeight(1.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SBox).WidthOverride(240.0f)[Selector]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(16.0f, 0.0f, 0.0f, 0.0f)
+            [
+                RightPane
+            ]
+        ];
+    }
+
+    if (!SkillTreeStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
+        [
+            MenuText(SkillTreeStatus, 10, Cyan, true)
+        ];
+    }
+    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(180.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+        ]
+        + SHorizontalBox::Slot().FillWidth(1.0f).Padding(14.0f, 0.0f, 0.0f, 0.0f).VAlign(VAlign_Center)
+        [
+            // O2: node numbers are not balanced yet.
+            MenuText(FText::FromString(TEXT("[O2] values are placeholder until TTK re-anchoring  |  ESC Back")), 9, SoftText)
+        ]
+    ];
+    return BuildFrame(FText::FromString(TEXT("SKILL TREES")), FText::FromString(TEXT("CLASS TREE / CORE CONSTELLATIONS")), Body, 1120.0f);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()

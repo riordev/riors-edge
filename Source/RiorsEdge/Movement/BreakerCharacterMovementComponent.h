@@ -79,6 +79,9 @@ private:
     float GearAirControlMultiplier() const;
     float GearDashCooldownMultiplier() const;
     mutable TWeakObjectPtr<class UBreakerEquipmentComponent> CachedEquipment;
+    // Tree-node movement multipliers compose multiplicatively with gear.
+    class UBreakerProgressionComponent* GetProgression() const;
+    mutable TWeakObjectPtr<class UBreakerProgressionComponent> CachedProgression;
 
     bool bWantsToSprint = false;
     bool bSlideRequested = false;

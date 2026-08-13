@@ -18,6 +18,7 @@ class UPointLightComponent;
 class UBreakerPlaytestComponent;
 class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
+class UBreakerAbilityComponent;
 class ABreakerNPC;
 class SBreakerMenu;
 struct FInputActionValue;
@@ -44,6 +45,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Equipment") UBreakerEquipmentComponent* GetEquipment() const { return Equipment; }
     UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
     UFUNCTION(BlueprintPure, Category="Momentum") UBreakerMomentumComponent* GetMomentum() const { return Momentum; }
+    UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAbilityComponent* GetAbilities() const { return Abilities; }
     UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
     UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
@@ -78,6 +80,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UBreakerWeaponComponent> Weapon;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UBreakerAbilityComponent> Abilities;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponBarrel;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponSight;
@@ -128,6 +131,9 @@ private:
     void ToggleInventoryMenu();
     void InteractWithNearbyNPC();
     void StartWave();
+    void ActivateAbilityOne();
+    void ActivateAbilityTwo();
+    void ActivateUltimate();
     void ShowInitialMenu();
     void OpenMenu(bool bInitialMenu);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);

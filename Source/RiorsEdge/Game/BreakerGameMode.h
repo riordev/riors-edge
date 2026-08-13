@@ -39,4 +39,10 @@ private:
     void SpawnCombatEncounter(const APawn* Pawn);
     void SpawnSafeZone(const APawn* Pawn);
     void SpawnAnchorCamp(const APawn* Pawn);
+    // Overgrown-Earth dressing (O24): vegetation, ruins, and scattered tech.
+    // Cosmetic only — no gameplay values, spawn points, or radii change.
+    void SpawnWorldDressing(const APawn* Pawn);
+    void SpawnOvergrowth(const FVector& Origin, const FVector& Forward, const FVector& Right, struct FRandomStream& Stream);
+    void SpawnRuins(const FVector& Origin, const FVector& Forward, const FVector& Right, struct FRandomStream& Stream);
+    void SpawnScatteredTech(const FVector& Origin, const FVector& Forward, const FVector& Right, struct FRandomStream& Stream);
 };

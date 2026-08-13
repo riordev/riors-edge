@@ -6,6 +6,7 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "GameFramework/Actor.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Net/UnrealNetwork.h"
 
 UBreakerCombatComponent::UBreakerCombatComponent()
@@ -52,6 +53,12 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Defense.DodgeChance = DodgeChance;
     Defense.BlockChance = BlockChance;
     Defense.BlockMitigation = BlockMitigation;
+    // Tree nodes raise the passive layers on top of the component baseline.
+    if (const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+    {
+        Defense.DodgeChance = FMath::Clamp(Defense.DodgeChance + Progression->GetDodgeChanceBonus(), 0.0f, 1.0f);
+        Defense.BlockChance = FMath::Clamp(Defense.BlockChance + Progression->GetBlockChanceBonus(), 0.0f, 1.0f);
+    }
 
     Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
     if (Result.bDodged)

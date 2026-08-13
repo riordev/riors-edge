@@ -1,6 +1,7 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
@@ -32,22 +33,37 @@ UBreakerEquipmentComponent* UBreakerCharacterMovementComponent::GetEquipment() c
     return CachedEquipment.Get();
 }
 
+UBreakerProgressionComponent* UBreakerCharacterMovementComponent::GetProgression() const
+{
+    if (!CachedProgression.IsValid() && GetOwner())
+    {
+        CachedProgression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    }
+    return CachedProgression.Get();
+}
+
 float UBreakerCharacterMovementComponent::GearMoveSpeedMultiplier() const
 {
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
-    return Equipment ? Equipment->GetStats().MoveSpeedMultiplier : 1.0f;
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    return (Equipment ? Equipment->GetStats().MoveSpeedMultiplier : 1.0f)
+        * (Progression ? Progression->GetMoveSpeedMultiplier() : 1.0f);
 }
 
 float UBreakerCharacterMovementComponent::GearSlideSpeedMultiplier() const
 {
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
-    return Equipment ? Equipment->GetStats().SlideSpeedMultiplier : 1.0f;
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    return (Equipment ? Equipment->GetStats().SlideSpeedMultiplier : 1.0f)
+        * (Progression ? Progression->GetSlideSpeedMultiplier() : 1.0f);
 }
 
 float UBreakerCharacterMovementComponent::GearAirControlMultiplier() const
 {
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
-    return Equipment ? Equipment->GetStats().AirControlMultiplier : 1.0f;
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    return (Equipment ? Equipment->GetStats().AirControlMultiplier : 1.0f)
+        * (Progression ? Progression->GetAirControlMultiplier() : 1.0f);
 }
 
 float UBreakerCharacterMovementComponent::GearDashCooldownMultiplier() const

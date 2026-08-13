@@ -22,6 +22,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Interaction/BreakerNPC.h"
@@ -55,6 +56,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Playtest = CreateDefaultSubobject<UBreakerPlaytestComponent>(TEXT("Playtest"));
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));
+    Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
 
     PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));
     PrototypeWeaponVisual->SetupAttachment(FirstPersonCamera);
@@ -215,6 +217,12 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
     PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
+    // Raw-key ability fallbacks so the slice is playable before DA_PlayerInputConfig
+    // gains ability actions. Q is dash, R is reload, C is slide, so abilities take
+    // E / T / G. The Enhanced Input actions below override these once authored.
+    PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ThisClass::ActivateAbilityOne);
+    PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ThisClass::ActivateAbilityTwo);
+    PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ThisClass::ActivateUltimate);
 
     UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!InputConfig || !Input)
@@ -269,6 +277,24 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     if (InputConfig->PlaytestDiagnostics) Input->BindAction(InputConfig->PlaytestDiagnostics, ETriggerEvent::Started, this, &ThisClass::TogglePlaytestDiagnostics);
     if (InputConfig->FOVUp) Input->BindAction(InputConfig->FOVUp, ETriggerEvent::Started, this, &ThisClass::IncreaseFOV);
     if (InputConfig->FOVDown) Input->BindAction(InputConfig->FOVDown, ETriggerEvent::Started, this, &ThisClass::DecreaseFOV);
+    if (InputConfig->AbilityOne) Input->BindAction(InputConfig->AbilityOne, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityOne);
+    if (InputConfig->AbilityTwo) Input->BindAction(InputConfig->AbilityTwo, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityTwo);
+    if (InputConfig->Ultimate) Input->BindAction(InputConfig->Ultimate, ETriggerEvent::Started, this, &ThisClass::ActivateUltimate);
+}
+
+void ABreakerCharacter::ActivateAbilityOne()
+{
+    if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
+}
+
+void ABreakerCharacter::ActivateAbilityTwo()
+{
+    if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo);
+}
+
+void ABreakerCharacter::ActivateUltimate()
+{
+    if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::Ultimate);
 }
 
 void ABreakerCharacter::Move(const FInputActionValue& Value)
