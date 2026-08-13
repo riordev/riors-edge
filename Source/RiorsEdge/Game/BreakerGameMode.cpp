@@ -240,8 +240,8 @@ void ABreakerGameMode::SpawnAnchorCamp(const APawn* Pawn)
     for (int32 Marker = 0; Marker < 6; ++Marker)
     {
         const float Angle = Marker * 60.0f;
-        const FVector Offset = Forward.RotateAngleAxis(Angle, FVector::UpVector) * 900.0f;
-        SpawnGymBlock(GetWorld(), Origin + Forward * (SafeZoneRadius + 2400.0f) + Offset + FVector(0, 0, 90), FVector(0.3f, 0.3f, 1.8f), FRotator::ZeroRotator, PaletteStone);
+        const FVector Offset = Forward.RotateAngleAxis(Angle, FVector::UpVector) * 1400.0f;
+        SpawnGymBlock(GetWorld(), Origin + Forward * (SafeZoneRadius + 4200.0f) + Offset + FVector(0, 0, 90), FVector(0.3f, 0.3f, 1.8f), FRotator::ZeroRotator, PaletteStone);
     }
 }
 
@@ -251,20 +251,28 @@ void ABreakerGameMode::SpawnSafeZone(const APawn* Pawn)
     SafeZoneCenter = Pawn->GetActorLocation() - FVector(0.0f, 0.0f, 88.0f);
     bSafeZoneSet = true;
 
-    // Visible pad so the boundary reads at a glance: wide flat cylinder with
-    // a thin rim ring at the zone radius.
+    // Owner feedback: the full-radius teal disc swallowed the spawn area.
+    // The boundary now reads as a modest center pad plus a ring of short
+    // teal posts at the radius — teal stays on suppression OBJECTS, the
+    // ground stays ground.
     AStaticMeshActor* Pad = GetWorld()->SpawnActor<AStaticMeshActor>(SafeZoneCenter + FVector(0, 0, 2.0f), FRotator::ZeroRotator);
     if (Pad)
     {
         UStaticMeshComponent* Mesh = Pad->GetStaticMeshComponent();
         Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
-        Mesh->SetWorldScale3D(FVector(SafeZoneRadius / 50.0f, SafeZoneRadius / 50.0f, 0.04f));
+        Mesh->SetWorldScale3D(FVector(4.0f, 4.0f, 0.04f));
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        // Object chroma: the pad is suppression hardware, so it carries the
-        // reserved saturated teal. Nothing else does except the pylon below.
-        ApplyShapeColor(Mesh, PaletteRiftTeal);
+        ApplyShapeColor(Mesh, PaletteRiftTeal * 0.5f);
         Mesh->SetMobility(EComponentMobility::Static);
         Pad->SetActorLabel(TEXT("Runtime_SafeZone"));
+    }
+    for (int32 Post = 0; Post < 12; ++Post)
+    {
+        const FVector PostLocation = SafeZoneCenter
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Post * 30.0f, FVector::UpVector) * SafeZoneRadius
+            + FVector(0, 0, 40.0f);
+        SpawnShape(GetWorld(), ShapeCylinder, PostLocation, FVector(0.08f, 0.08f, 0.8f), FRotator::ZeroRotator,
+            PaletteRiftTeal, false, TEXT("Runtime_SafeZone"));
     }
 
     // Suppression pylon inside the zone: the second and last teal object.
@@ -292,7 +300,7 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
     {
         // Spawn well outside the safe zone so the fight starts on the
         // player's terms.
-        const FVector SpawnLocation = Origin + Forward * (SafeZoneRadius + 1200.0f + Index * 300.0f) + Right * LateralOffsets[Index];
+        const FVector SpawnLocation = Origin + Forward * (SafeZoneRadius + 2600.0f + Index * 400.0f) + Right * LateralOffsets[Index];
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
         if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))
@@ -303,7 +311,7 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
 
     // One elite anchors the back of the pack: tougher, harder-hitting, and
     // guaranteed Exceptional-or-better drops.
-    const FVector EliteLocation = Origin + Forward * (SafeZoneRadius + 2400.0f);
+    const FVector EliteLocation = Origin + Forward * (SafeZoneRadius + 4200.0f);
     FActorSpawnParameters EliteParams;
     EliteParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
     if (ABreakerEnemy* Elite = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), EliteLocation, FRotator::ZeroRotator, EliteParams))
@@ -415,7 +423,7 @@ void ABreakerGameMode::SpawnRuins(const FVector& Origin, const FVector& Forward,
         const float Angle = 34.0f + Slab * 61.0f;
         const FVector Offset = Forward.RotateAngleAxis(Angle, FVector::UpVector) * Stream.FRandRange(1100.0f, 1500.0f);
         SpawnShape(GetWorld(), ShapeCube,
-            Origin + Forward * (SafeZoneRadius + 2400.0f) + Offset + FVector(0, 0, Stream.FRandRange(10.0f, 40.0f)),
+            Origin + Forward * (SafeZoneRadius + 4200.0f) + Offset + FVector(0, 0, Stream.FRandRange(10.0f, 40.0f)),
             FVector(Stream.FRandRange(2.0f, 3.6f), Stream.FRandRange(1.6f, 2.8f), 0.22f),
             FRotator(Stream.FRandRange(-8.0f, 8.0f), Angle, Stream.FRandRange(-8.0f, 8.0f)),
             Stream.FRand() < 0.5f ? PaletteStone : PaletteConcrete, true, TEXT("Runtime_Ruin"));
@@ -671,7 +679,7 @@ void ABreakerGameMode::StartNextWave()
 
     const FVector Origin = PlayerPawn->GetActorLocation();
     const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
-    const FVector ArenaCenter = Origin + Forward * (SafeZoneRadius + 2400.0f);
+    const FVector ArenaCenter = Origin + Forward * (SafeZoneRadius + 4200.0f);
     // Dense packs by design: AoE, on-death chains, and multikill procs need
     // crowds to feel like anything. Clusters of ~4 around the arena ring.
     const int32 EnemyCount = FMath::Min(4 + CurrentWave * 3, 24);
@@ -681,7 +689,7 @@ void ABreakerGameMode::StartNextWave()
     {
         const int32 Pack = Index / 4;
         const float PackAngle = 360.0f * Pack / FMath::Max(1, (EnemyCount + 3) / 4);
-        const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * 700.0f;
+        const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * 1100.0f;
         const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;

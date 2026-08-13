@@ -65,7 +65,7 @@ namespace BreakerHUD
     static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
 
     // Loot pickup rules.
-    static constexpr float PickupChipDistance = 3000.0f;
+    static constexpr float PickupChipDistance = 1500.0f;
     static constexpr float PickupPopupDistance = 800.0f;
     // cos(3 degrees): the popup only opens when the player is genuinely
     // looking at the drop, not merely facing its half of the room.
@@ -222,21 +222,25 @@ void ABreakerPlaytestHUD::DrawHUD()
         DrawLabel(FString::Printf(TEXT("DMG %.0f   RELOADS %d"), Stats.DamageDealt, Stats.Reloads),
             BreakerHUD::Margin + 12.0f, DiagY + 40.0f, FLinearColor(0.5f, 1.0f, 0.65f), 0.78f);
 
+        // Diagnostics world labels stay short-range and small: past 25m they
+        // were pure screen noise.
         for (TActorIterator<ABreakerTargetDummy> It(GetWorld()); It; ++It)
         {
+            const float Distance = FVector::Distance(Character->GetActorLocation(), It->GetActorLocation());
+            if (Distance > 2500.0f) continue;
             FVector2D Screen;
             if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen))
             {
-                const float DistanceMeters = FVector::Distance(Character->GetActorLocation(), It->GetActorLocation()) / 100.0f;
-                DrawLabel(FString::Printf(TEXT("%s  %.0fm"), *It->GetProfileLabel(), DistanceMeters), Screen.X - 34.0f, Screen.Y, FLinearColor(0.8f, 0.9f, 1.0f), 0.75f);
+                DrawLabel(FString::Printf(TEXT("%s  %.0fm"), *It->GetProfileLabel(), Distance / 100.0f), Screen.X - 34.0f, Screen.Y, FLinearColor(0.8f, 0.9f, 1.0f, 0.7f), 0.65f);
             }
         }
         for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
         {
+            if (FVector::DistSquared(Character->GetActorLocation(), It->GetActorLocation()) > FMath::Square(2500.0f)) continue;
             FVector2D Screen;
             if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen))
             {
-                DrawLabel(FString::Printf(TEXT("ENEMY  %s"), *It->GetEnemyStateLabel()), Screen.X - 48.0f, Screen.Y, BreakerHUD::Orange, 0.75f);
+                DrawLabel(It->GetEnemyStateLabel(), Screen.X - 24.0f, Screen.Y, FLinearColor(1.0f, 0.45f, 0.12f, 0.7f), 0.65f);
             }
         }
     }

@@ -168,6 +168,8 @@ After movement is stable, follow `Docs/Roadmap.md` through combat sandbox, loot 
 - `Docs/Weapon-Foundation.md` — hitscan flow, prototype rifle, weak points, and target dummy
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done
 - `Docs/Item-Foundation.md` — item instances, item level, affix tiers, loot rolls, equipment, and the stat aggregation rule
+- `Docs/Playtest-Feedback-Log.md` — owner playtest findings and actions taken
+- `Docs/Design/` — the design corpus: Decisions.md is the append-only rulings ledger (read first); Design-Overview.md maps the space; per-domain docs cover classes (Class-Kits + Gunsmith/Tank/Support), constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, damage pipeline, and the ability implementation spec
 
 ## Handoff discipline
 

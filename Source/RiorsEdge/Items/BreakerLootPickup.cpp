@@ -54,15 +54,17 @@ ABreakerLootPickup::ABreakerLootPickup()
     ItemVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemVisual"));
     ItemVisual->SetupAttachment(PickupSphere);
     ItemVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    ItemVisual->SetRelativeScale3D(FVector(0.3f));
+    ItemVisual->SetRelativeScale3D(FVector(0.38f));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (CubeMesh.Succeeded()) ItemVisual->SetStaticMesh(CubeMesh.Object);
 
     RarityBeam = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RarityBeam"));
     RarityBeam->SetupAttachment(PickupSphere);
     RarityBeam->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    RarityBeam->SetRelativeScale3D(FVector(0.12f, 0.12f, 8.0f));
-    RarityBeam->SetRelativeLocation(FVector(0.0f, 0.0f, 380.0f));
+    // Short marker column, not a flagpole: tall enough to spot over cover,
+    // low enough not to skyline the whole field.
+    RarityBeam->SetRelativeScale3D(FVector(0.05f, 0.05f, 2.2f));
+    RarityBeam->SetRelativeLocation(FVector(0.0f, 0.0f, 105.0f));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> BeamMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (BeamMesh.Succeeded()) RarityBeam->SetStaticMesh(BeamMesh.Object);
 }
@@ -108,7 +110,7 @@ void ABreakerLootPickup::ApplyRarityVisuals()
     ApplyPickupColor(ItemVisual, Color);
     // The beam has no translucency to work with, so "alpha" is expressed as
     // colour intensity: a dimmer column that still reads as the rarity hue.
-    ApplyPickupColor(RarityBeam, Color * 0.55f);
+    ApplyPickupColor(RarityBeam, Color * 0.35f);
 }
 
 void ABreakerLootPickup::Tick(float DeltaSeconds)
