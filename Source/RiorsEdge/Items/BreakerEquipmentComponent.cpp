@@ -3,6 +3,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
@@ -25,6 +26,60 @@ void UBreakerEquipmentComponent::BeginPlay()
         }
     }
     BindAttributes(FoundAttributes);
+
+    BindCombatEvents();
+}
+
+void UBreakerEquipmentComponent::BindCombatEvents()
+{
+    // Health on Kill and Resource on Kill are paid at an EVENT, so they need a
+    // listener rather than an attribute. Bound once and never from
+    // RecalculateStats — a rebind per recalculation would pay the affix once
+    // per equipment change per kill, which is the kind of bug that only shows
+    // up after an hour of play. IsAlreadyBound makes that structural rather
+    // than a rule the next caller has to remember.
+    UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Combat) return;
+    if (Combat->OnKillDealt.IsAlreadyBound(this, &UBreakerEquipmentComponent::HandleKillDealt)) return;
+    Combat->OnKillDealt.AddDynamic(this, &UBreakerEquipmentComponent::HandleKillDealt);
+}
+
+void UBreakerEquipmentComponent::HandleKillDealt(const FBreakerHitContext& Hit)
+{
+    if (!HasAttributeAuthority()) return;
+    UBreakerCombatComponent* Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (!Combat) return;
+
+    // DoT ticks credit their applier, which means a Bleed killing something
+    // five seconds after the shot would otherwise pay on-kill sustain from a
+    // fight the player may already have left. It still counts — the player
+    // earned that kill — but it is worth being explicit that this fires on the
+    // ATTACKER's component for every kill including a DoT's.
+    if (CachedStats.LifeOnKill > 0.0f)
+    {
+        // Through ApplyHealing, the one healing path, rather than writing
+        // Health: an ability that writes Health directly is invisible to the
+        // overheal clamp and to every listener, and gear is not exempt.
+        Combat->ApplyHealingAmount(CachedStats.LifeOnKill, GetOwner(), FGameplayTag());
+    }
+    if (CachedStats.ResourceOnKill > 0.0f && Attributes)
+    {
+        // Through UBreakerAttributeSet::ApplyClassResource rather than
+        // UBreakerCombatComponent::AddClassResource, and the difference is only
+        // testability: AddClassResource writes through the GENERATED setter,
+        // which ensures when there is no owning ability system, so a rig
+        // without one cannot observe the grant at all. ApplyClassResource is
+        // the null-safe write the attribute set exposes for exactly this, and
+        // it routes through the same PreAttributeChange clamp — [Floor, Max] —
+        // so the observable behaviour is identical to AddClassResource's
+        // Min-against-Max, in a live game and in automation alike.
+        //
+        // REPORTED, not worked around: the one-line fix is for
+        // UBreakerCombatComponent::AddClassResource (and SpendClassResource) to
+        // use ApplyClassResource too, which would make the whole class-resource
+        // path exercisable. That file belongs to another lane this pass.
+        Attributes->ApplyClassResource(Attributes->GetClassResource() + CachedStats.ResourceOnKill);
+    }
 }
 
 void UBreakerEquipmentComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
@@ -62,6 +117,7 @@ void UBreakerEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(UBreakerEquipmentComponent, Equipped);
     DOREPLIFETIME(UBreakerEquipmentComponent, Backpack);
+    DOREPLIFETIME(UBreakerEquipmentComponent, ForgeWallet);
 }
 
 namespace
@@ -87,6 +143,17 @@ bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
     if (Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid())
     {
         UnequipSlot(Preview.LimitDisplaced.Slot);
+    }
+    // A legendary whose rule claims another slot ejects whatever is standing in
+    // it. Cadence occupies both hands, so it and a Secondary cannot be worn
+    // together — in EITHER direction, which is why the conflict test is
+    // symmetric and why this ejects rather than refusing. Nothing in this
+    // component refuses an equip; the rarity cap does not, and a rule inventing
+    // a second, harsher failure mode would be a worse experience than a
+    // disclosed swap.
+    if (Preview.bRuleDisplaces && Preview.RuleDisplaced.IsValid())
+    {
+        UnequipSlot(Preview.RuleDisplaced.Slot);
     }
     Equipped.Add(Item);
     RecalculateStats();
@@ -143,6 +210,19 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     }
     Preview.AffixDeltas = CompareAffixes(Candidate, InSlot ? *InSlot : FBreakerItemInstance());
 
+    // The rule displacement, resolved BEFORE the rarity cap so the two are
+    // independent: the piece the slot rule ejects is not a candidate for the
+    // cap's victim, because it is already leaving. The piece in the candidate's
+    // own slot is excluded for the same reason it is excluded below.
+    for (const FBreakerItemInstance& Existing : EquippedItems)
+    {
+        if (!Existing.IsValid() || Existing.Slot == Candidate.Slot) continue;
+        if (!UBreakerItemRuleLibrary::RulesConflict(Candidate, Existing)) continue;
+        Preview.bRuleDisplaces = true;
+        Preview.RuleDisplaced = Existing;
+        break;
+    }
+
     Preview.RarityLimit = EquipLimitForRarity(Candidate.Rarity);
     for (const FBreakerItemInstance& Existing : EquippedItems)
     {
@@ -156,6 +236,12 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     // ejects nothing extra even at 3/3.
     int32 Surviving = Preview.RarityCount;
     if (InSlot && InSlot->Rarity == Candidate.Rarity) --Surviving;
+    // A piece the SLOT RULE already ejects is leaving too, so it cannot also be
+    // the cap's victim and its departure counts against the tally the same way.
+    // Without this, equipping Cadence over an Anomalous Secondary at a cap of
+    // one would eject the Secondary AND name a second piece to die for a cap
+    // the first ejection had already satisfied.
+    if (Preview.bRuleDisplaces && Preview.RuleDisplaced.Rarity == Candidate.Rarity) --Surviving;
     if (Surviving < Preview.RarityLimit) return Preview;
 
     // Over the cap: the WEAKEST equipped piece of that rarity leaves. Weakest
@@ -168,6 +254,7 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     {
         if (!Existing.IsValid() || Existing.Rarity != Candidate.Rarity) continue;
         if (Existing.Slot == Candidate.Slot) continue;
+        if (Preview.bRuleDisplaces && Existing.Slot == Preview.RuleDisplaced.Slot) continue;
         const bool bBetterVictim = !Weakest
             || Existing.ItemLevel < Weakest->ItemLevel
             || (Existing.ItemLevel == Weakest->ItemLevel && static_cast<uint8>(Existing.Slot) < static_cast<uint8>(Weakest->Slot));
@@ -272,6 +359,123 @@ int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity 
     return Removed;
 }
 
+// ---------------------------------------------------------------------------
+// THE FORGE
+// ---------------------------------------------------------------------------
+// Authority-checked, wallet-owning wrappers over the pure functions in
+// UBreakerForgeLibrary. Everything that can be arithmetic is arithmetic and
+// lives there; this layer only owns the wallet, finds the item, and decides
+// whether the change has to re-fold attributes.
+//
+// KNOWN GAP, stated rather than hidden: there is no Forge UI. UI/ is another
+// lane's directory this pass, so these are reachable from Blueprint, from a
+// console exec, and from automation, and not yet from the inventory screen.
+// The mechanic is real; the button is not.
+
+void UBreakerEquipmentComponent::GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount)
+{
+    if (!HasAttributeAuthority()) return;
+    ForgeWallet.Add(Currency, Amount);
+    OnEquipmentChanged.Broadcast();
+}
+
+bool UBreakerEquipmentComponent::SalvageFromBackpack(const FGuid& ItemId)
+{
+    if (!HasAttributeAuthority()) return false;
+    const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+    if (Index == INDEX_NONE) return false;
+
+    const FBreakerForgeWallet Yield = UBreakerForgeLibrary::SalvageValue(Backpack[Index]);
+    Backpack.RemoveAt(Index);
+    for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
+    {
+        ForgeWallet.Add(static_cast<EBreakerForgeCurrency>(Currency), Yield.Get(static_cast<EBreakerForgeCurrency>(Currency)));
+    }
+    OnEquipmentChanged.Broadcast();
+    return true;
+}
+
+int32 UBreakerEquipmentComponent::SalvageBackpackBelowRarity(EBreakerItemRarity MinimumKept)
+{
+    if (!HasAttributeAuthority()) return 0;
+    // Shares IsBelowRarity with the plain discard, so the count the
+    // confirmation modal prints is the count that melts. Salvage and discard
+    // are deliberately different verbs: one pays, one does not, and both
+    // destroy exactly the same set.
+    int32 Salvaged = 0;
+    for (int32 Index = Backpack.Num() - 1; Index >= 0; --Index)
+    {
+        if (!IsBelowRarity(Backpack[Index], MinimumKept)) continue;
+        const FBreakerForgeWallet Yield = UBreakerForgeLibrary::SalvageValue(Backpack[Index]);
+        for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
+        {
+            ForgeWallet.Add(static_cast<EBreakerForgeCurrency>(Currency), Yield.Get(static_cast<EBreakerForgeCurrency>(Currency)));
+        }
+        Backpack.RemoveAt(Index);
+        ++Salvaged;
+    }
+    if (Salvaged > 0) OnEquipmentChanged.Broadcast();
+    return Salvaged;
+}
+
+FBreakerItemInstance* UBreakerEquipmentComponent::FindHeldItem(const FGuid& ItemId, bool& bOutEquipped)
+{
+    bOutEquipped = true;
+    if (FBreakerItemInstance* Worn = Equipped.FindByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; }))
+    {
+        return Worn;
+    }
+    bOutEquipped = false;
+    return Backpack.FindByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+}
+
+void UBreakerEquipmentComponent::OnHeldItemMutated(bool bWasEquipped)
+{
+    // A worn item that changed has to re-fold, because its affixes are inside
+    // the submitted contribution. A backpack item only has to repaint — but
+    // recalculating anyway is cheap and is one branch fewer to get wrong.
+    if (bWasEquipped) RecalculateStats();
+    OnEquipmentChanged.Broadcast();
+}
+
+EBreakerForgeResult UBreakerEquipmentComponent::TemperItem(const FGuid& ItemId, int32 AffixIndex, bool bIsAtForge)
+{
+    if (!HasAttributeAuthority()) return EBreakerForgeResult::InvalidItem;
+    bool bEquipped = false;
+    FBreakerItemInstance* Item = FindHeldItem(ItemId, bEquipped);
+    if (!Item) return EBreakerForgeResult::InvalidItem;
+    const EBreakerForgeResult Result = UBreakerForgeLibrary::Temper(*Item, AffixIndex, ForgeWallet, bIsAtForge);
+    if (Result == EBreakerForgeResult::Success) OnHeldItemMutated(bEquipped);
+    return Result;
+}
+
+EBreakerForgeResult UBreakerEquipmentComponent::ReforgeItem(const FGuid& ItemId, bool bIsAtForge)
+{
+    if (!HasAttributeAuthority()) return EBreakerForgeResult::InvalidItem;
+    bool bEquipped = false;
+    FBreakerItemInstance* Item = FindHeldItem(ItemId, bEquipped);
+    if (!Item) return EBreakerForgeResult::InvalidItem;
+    // Seeded from the item's own GUID plus the wallet state, so a reforge is
+    // deterministic for a given (item, wallet) and cannot be save-scummed by
+    // repeating the call — the wallet moved, so the next roll differs.
+    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get(EBreakerForgeCurrency::Slag) * 7919);
+    const EBreakerForgeResult Result = UBreakerForgeLibrary::Reforge(*Item, ForgeWallet, bIsAtForge, Seed);
+    if (Result == EBreakerForgeResult::Success) OnHeldItemMutated(bEquipped);
+    return Result;
+}
+
+EBreakerForgeResult UBreakerEquipmentComponent::AttuneItem(const FGuid& ItemId, bool bIsAtForge)
+{
+    if (!HasAttributeAuthority()) return EBreakerForgeResult::InvalidItem;
+    bool bEquipped = false;
+    FBreakerItemInstance* Item = FindHeldItem(ItemId, bEquipped);
+    if (!Item) return EBreakerForgeResult::InvalidItem;
+    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get(EBreakerForgeCurrency::Flux) * 104729);
+    const EBreakerForgeResult Result = UBreakerForgeLibrary::Attune(*Item, ForgeWallet, bIsAtForge, Seed);
+    if (Result == EBreakerForgeResult::Success) OnHeldItemMutated(bEquipped);
+    return Result;
+}
+
 void UBreakerEquipmentComponent::DevGrantTestGear(int32 ItemLevel)
 {
     if (!HasAttributeAuthority()) return;
@@ -291,6 +495,22 @@ void UBreakerEquipmentComponent::DevGrantTestGear(int32 ItemLevel)
     }
 }
 
+void UBreakerEquipmentComponent::DevGrantLegendaries(int32 ItemLevel)
+{
+    if (!HasAttributeAuthority()) return;
+    const int32 SafeLevel = FMath::Max(1, ItemLevel);
+    static int32 LegendaryGrantCounter = 0;
+    ++LegendaryGrantCounter;
+    // Into the BACKPACK, not equipped: only one Anomalous piece may be worn, so
+    // equipping all three would silently eject two and the grant would look
+    // broken. Handing over three and making the player choose is the mechanic.
+    for (const FBreakerLegendaryDefinition& Definition : UBreakerItemRuleLibrary::GetLegendaries())
+    {
+        const int32 Seed = LegendaryGrantCounter * 7919 + GetTypeHash(Definition.LegendaryId) + SafeLevel * 31;
+        AddToBackpack(UBreakerLootLibrary::RollLegendary(Definition.LegendaryId, SafeLevel, Seed));
+    }
+}
+
 bool UBreakerEquipmentComponent::GetEquippedItem(EBreakerEquipSlot Slot, FBreakerItemInstance& OutItem) const
 {
     if (const FBreakerItemInstance* Found = Equipped.FindByPredicate([Slot](const FBreakerItemInstance& Existing) { return Existing.Slot == Slot; }))
@@ -306,6 +526,12 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
 {
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
 
+    // RULES FIRST. Every rewrite below changes how the affixes are READ, so the
+    // resolved set has to exist before a single line is folded. Resolving is
+    // order-independent (flags OR, caps take the loosest value), so which slot
+    // carried the rewrite cannot change the answer.
+    const FBreakerItemRuleSet Rules = UBreakerItemRuleLibrary::ResolveRules(Items);
+
     // Sized off the enum so a new stat target never silently overruns these.
     constexpr int32 TargetCount = static_cast<int32>(EBreakerStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
@@ -315,38 +541,101 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     // already inside IncreasedByTarget.
     float ActiveConditionalPercent = 0.0f;
     float PotentialConditionalPercent = 0.0f;
+    // The condition test, with the rewrites folded in. One lambda, consulted
+    // once per conditional line, so UNBOUND and DEADFALL cannot end up applied
+    // in one place and forgotten in another.
+    auto BreakerConditionSatisfied = [&Conditions, &Rules](EBreakerBuildCondition Condition)
+    {
+        // UNBOUND (and nothing else) makes the predicate itself vacuous.
+        if (Rules.bAllConditionsSatisfied) return true;
+        if (Conditions.IsActive(Condition)) return true;
+        // DEADFALL is narrower on purpose: it REDIRECTS the airborne family
+        // onto the two grounded traversal states rather than freeing every
+        // conditional line. A legendary that was strictly better than the
+        // generic Anomalous rewrite would make the generic one dead content.
+        if (Rules.bAirborneAlsoGroundTraversal && Condition == EBreakerBuildCondition::Airborne)
+        {
+            return Conditions.IsActive(EBreakerBuildCondition::Sliding)
+                || Conditions.IsActive(EBreakerBuildCondition::WallRiding);
+        }
+        return false;
+    };
+
     for (const FBreakerItemInstance& Item : Items)
     {
+        // PROLIFIC resolves THIS item's affixes one tier better. Per item, not
+        // per wearer: folding it into the rule set would leak the uplift onto
+        // every other piece the character is wearing.
+        const int32 TierUplift = UBreakerItemRuleLibrary::TierUpliftForItem(Item);
         for (const FBreakerRolledAffix& Rolled : Item.Affixes)
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId);
             if (!Definition) continue;
+
+            float Value = Rolled.Value;
+            if (TierUplift > 0)
+            {
+                // Scaled by the RATIO between the two tiers rather than
+                // re-derived at the better tier, so a lucky in-band roll is
+                // carried upward instead of being flattened to the floor of the
+                // new tier. T1 -> T0 is x1.4 and T0 -> T-1 is x1.286, straight
+                // off the authored spike; an affix already at T-1 has nowhere
+                // to go and the ratio is exactly 1.
+                const int32 UpliftedTier = FMath::Max(Rolled.Tier - TierUplift, -1);
+                const float FromTier = UBreakerAffixLibrary::ValueForTier(*Definition, Rolled.Tier);
+                const float ToTier = UBreakerAffixLibrary::ValueForTier(*Definition, UpliftedTier);
+                if (FromTier > UE_KINDA_SMALL_NUMBER) Value *= ToTier / FromTier;
+            }
+
             if (Definition->IsConditional())
             {
-                PotentialConditionalPercent += Rolled.Value;
+                PotentialConditionalPercent += Value;
                 // A conditional line whose condition is false contributes
                 // NOTHING — not a reduced amount, not a separate multiplier.
                 // That is what keeps the locked one-bucket rule intact while
                 // the bucket's contents change with the movement state.
-                if (!Conditions.IsActive(Definition->Condition)) continue;
-                ActiveConditionalPercent += Rolled.Value;
+                if (!BreakerConditionSatisfied(Definition->Condition)) continue;
+                ActiveConditionalPercent += Value;
             }
             const int32 Target = static_cast<int32>(Definition->StatTarget);
-            if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Rolled.Value;
-            else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Rolled.Value;
+            if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Value;
+            else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
         }
     }
 
     // Every conditional damage line and the unconditional one share the single
     // additive Increased bucket for outgoing damage. Summed here once so both
     // the display figure below and the contribution submit the same number.
-    const float TotalIncreasedDamagePercent =
+    float TotalIncreasedDamagePercent =
         IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirborneDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::SlidingDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WallRideDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RedlineDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RecentlyDashedDamage)];
+
+    // ---- The two bucket-CROSSING rewrites ---------------------------------
+    // Both add to the SAME single additive bucket every other Increased
+    // percentage lands in. Neither is a More, and that is the point: they take
+    // a number the player already owns in one lane and make it count in a
+    // second, which changes what is worth stacking without adding a multiplier
+    // against the O3 budget.
+    //
+    // OVERFLOW: each point of Added Damage also grants 1% Increased Damage.
+    // Added Damage is authored in percentage points of base weapon damage, so
+    // "a point is a percent" is a real exchange rate rather than a coincidence.
+    if (Rules.bAddedDamageAlsoIncreased)
+    {
+        TotalIncreasedDamagePercent += FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)];
+    }
+    // CADENCE: half of Fire Rate also counts as Increased Damage. Fire Rate is
+    // a peer of Weapon Damage that lands on a different attribute, so the two
+    // normally cannot compound at all; this is the one item that makes them.
+    if (Rules.FireRateToIncreasedDamage > 0.0f)
+    {
+        TotalIncreasedDamagePercent += IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::FireRate)]
+            * Rules.FireRateToIncreasedDamage;
+    }
 
     auto Increased = [&IncreasedByTarget](EBreakerStatTarget Target)
     {
@@ -359,11 +648,23 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.BonusMaxResource = FlatByTarget[static_cast<int32>(EBreakerStatTarget::MaxResource)];
     Stats.MoveSpeedMultiplier = Increased(EBreakerStatTarget::MoveSpeed);
     Stats.DropChancePercent = IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DropChance)];
-    Stats.PhysicalDamageReductionPercent = FMath::Min(IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::PhysicalDamageReduction)], 60.0f);
+    // RELENTLESS rewrites this cap. The clamp was a bare 60.0f literal; it is
+    // now the one number the rule set publishes, and the resolved value is
+    // published on the stats so the inventory can show a raised cap instead of
+    // a figure that mysteriously stops moving.
+    Stats.PhysicalDamageReductionCap = Rules.PhysicalDamageReductionCap;
+    Stats.PhysicalDamageReductionPercent = FMath::Min(
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::PhysicalDamageReduction)], Rules.PhysicalDamageReductionCap);
     Stats.CriticalChanceBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalChance)] / 100.0f;
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
-    Stats.AirControlMultiplier = Increased(EBreakerStatTarget::AirControl);
+    // DEADFALL's bill. An ordinary NEGATIVE Increased percentage into the same
+    // additive bucket, never a sub-1.0 More: affixes and items must not author
+    // More multipliers (RiorsEdge.Items.Affixes.Breadth pins it), and a
+    // downside is not an exemption from the locked aggregation rule.
+    const float AirControlPercent =
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirControl)] + Rules.AirControlPercentDelta;
+    Stats.AirControlMultiplier = 1.0f + AirControlPercent / 100.0f;
     Stats.DashCooldownMultiplier = 1.0f / Increased(EBreakerStatTarget::DashCooldownReduction);
     // The gear-only display multiplier now includes whatever conditional lines
     // are live, because that is what the player's damage actually is at this
@@ -372,6 +673,34 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.AddedDamagePercent = FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)];
     Stats.ActiveConditionalDamagePercent = ActiveConditionalPercent;
     Stats.PotentialConditionalDamagePercent = PotentialConditionalPercent;
+
+    // ---- The non-damage breadth pass --------------------------------------
+    Stats.BonusArmour = FlatByTarget[static_cast<int32>(EBreakerStatTarget::Armour)];
+    Stats.LifeOnKill = FlatByTarget[static_cast<int32>(EBreakerStatTarget::LifeOnKill)];
+    Stats.ResourceOnKill = FlatByTarget[static_cast<int32>(EBreakerStatTarget::ResourceOnKill)];
+    Stats.DamageOverTimeMultiplier = Increased(EBreakerStatTarget::DamageOverTime);
+
+    // OVERRUN rewrites what resource regeneration IS. Gear regen is a flat
+    // per-second trickle ticked on the server, which pays a player standing
+    // still exactly as well as one in a fight; this deletes the trickle and
+    // pays triple for fast traversal, which is the only line in the game that
+    // makes the class-resource loop a movement question.
+    //
+    // Applied to the composed number rather than per affix, because the rule is
+    // about the wearer's regeneration, not about any one roll.
+    if (Rules.bRegenGatedOnTraversal)
+    {
+        const bool bTraversing = Conditions.IsActive(EBreakerBuildCondition::Airborne)
+            || Conditions.IsActive(EBreakerBuildCondition::Sliding)
+            || Conditions.IsActive(EBreakerBuildCondition::WallRiding);
+        Stats.ResourceRegenPerSecond *= bTraversing ? Rules.TraversalRegenMultiplier : 0.0f;
+    }
+
+    // Which rewrites are in force, for the card and for the tests.
+    for (const FBreakerItemInstance& Item : Items)
+    {
+        if (Item.HasRule()) Stats.ActiveRules.AddUnique(Item.Rule);
+    }
 
     if (OutContribution)
     {
@@ -392,7 +721,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // tree's own multipliers and multiplied the two. Same bug class as
         // WeaponDamage. The Stats.* fields above survive as display figures.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::SlideSpeedMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::SlideSpeed)]);
-        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirControl)]);
+        // Deadfall's negative is inside AirControlPercent, so the tree's air
+        // control and the legendary's bill meet in the SAME additive bucket
+        // rather than the item multiplying the tree's result down.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, AirControlPercent);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DashCooldownReduction)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::FireRate)]);
         // Weapon Damage used to reach the weapon on its own private path
@@ -412,6 +744,25 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // increased line are two different decisions instead of one.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::DamageMultiplier,
             FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)] / 100.0f);
+
+        // Flat armour, joining the fold for the first time. Its consumer is
+        // UBreakerCombatComponent::GetEffectiveArmor(), which is the same route
+        // the flat armour STRIPPERS already take — so a point of gear armour
+        // and a point of authored armour are stripped identically, which is
+        // the property that would have been lost had gear armour been given a
+        // private path of its own.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor,
+            FlatByTarget[static_cast<int32>(EBreakerStatTarget::Armour)]);
+        // Damage over time, into the attribute every DoT snapshots at
+        // application. Six skill nodes already bid here; gear now does too, in
+        // the same additive bucket rather than beside it.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier,
+            IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DamageOverTime)]);
+
+        // Life on Kill and Resource on Kill submit NOTHING here on purpose.
+        // They are amounts paid at an event, not values an attribute can hold,
+        // so an attribute for them would be a number nobody reads. They reach
+        // gameplay through HandleKillDealt below.
     }
     return Stats;
 }

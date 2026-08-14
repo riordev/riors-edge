@@ -62,6 +62,18 @@ enum class EBreakerAggregatedAttribute : uint8
     // share an additive bucket -- two layers each folding a percentage into a
     // duration do not add. Consumed by UBreakerWeaponComponent's fire timing.
     FireRateMultiplier,
+    // Flat mitigation. The comment above says attributes a single system owns
+    // outright stay off this path, and Armor USED to be one: nothing wrote it
+    // on the player at all (base 0), so the most ordinary defensive line in the
+    // genre could not exist. It joins the fold because gear now bids on it, and
+    // the moment a second layer does (a Bulwark node) the two are additive from
+    // day one instead of repeating the gear-x-tree multiplication bug.
+    //
+    // Enemies and target dummies are untouched: they carry neither an equipment
+    // nor a progression component, so nothing captures their bases and
+    // RecomputeAggregatedAttributes never runs on them. ABreakerTargetDummy
+    // keeps writing Armor directly and keeps meaning it.
+    Armor,
     Count
 };
 
@@ -133,6 +145,37 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
 
     // The locked fold. Deterministic in the contributor enum's order.
     float Compose(EBreakerAggregatedAttribute Attribute) const;
+
+    // ---- The O3 More ceiling, enforced GLOBALLY --------------------------
+    // Docs/Item-Foundation.md recorded this as an open hole in so many words:
+    // "The O3 More cap is enforced per LAYER, not globally. Three tree Mores is
+    // the whole budget today because nothing else authors one. When Anomalous
+    // items gain Mores, the clamp has to move to a single shared pass over the
+    // composed contribution or a build can hold three tree Mores plus an
+    // item's."
+    //
+    // This is that shared pass. UBreakerProgressionComponent still picks its
+    // own strongest three and clamps each at 1.30x — that selection needs to
+    // know about individual SOURCES and only that layer has them — but the
+    // product every layer's selection composes to is clamped here, once, over
+    // the whole build. A contributor cannot buy its way past O3 by arriving
+    // second.
+    //
+    // 1.30^3 == 2.197, i.e. Damage-Pipeline §4's 2.20 composed ceiling and
+    // UBreakerCombatComponent::ComposedMoreCeiling, reached from the two numbers
+    // that define it rather than restated as a third constant that can drift.
+    // Damage only: no other aggregated attribute has an authored More budget,
+    // and silently clamping (say) move speed would be a balance decision hiding
+    // in a safety net.
+    static constexpr int32 MaxComposedMoreSources = 3;
+    static constexpr float SingleMoreCeiling = 1.30f;
+    static float ComposedMoreCeiling();
+    // True when Attribute is under the O3 budget. Named so the rule is
+    // greppable rather than living inside an `if` in Compose.
+    static bool IsMoreCappedAttribute(EBreakerAggregatedAttribute Attribute)
+    {
+        return Attribute == EBreakerAggregatedAttribute::DamageMultiplier;
+    }
 
 private:
     float Bases[AttributeCount] = {};

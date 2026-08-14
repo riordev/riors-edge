@@ -100,6 +100,102 @@ enum class EBreakerStatTarget : uint8
     // WeaponDamage rather than a strictly better version of it, because it
     // does nothing for a single-shot burst and everything for held fire.
     FireRate,
+    // --- The non-damage breadth pass, appended like everything above ------
+    // O27 wants "significantly more options in ALL avenues", and the pool that
+    // came out of the first breadth pass was nine offensive lines against a
+    // survivability family of exactly one (Physical DR) and a resource family
+    // of two. These four widen the other axes, and each one was chosen because
+    // a LIVE consumer already existed and was going unused — the standard this
+    // project set after shipping a node that could not raise damage.
+
+    // Flat armour. Consumer: EBreakerAggregatedAttribute::Armor ->
+    // UBreakerCombatComponent::GetEffectiveArmor() -> the mitigation formula.
+    // The player's Armor attribute was authored 0 and written by NOBODY, so the
+    // most ordinary defensive stat in the genre had a whole pipeline behind it
+    // and no way in.
+    Armour,
+    // Health restored when the wearer lands a killing blow. Consumer:
+    // UBreakerEquipmentComponent binds UBreakerCombatComponent::OnKillDealt and
+    // routes the heal through ApplyHealing — the one healing path — so it is
+    // visible to overheal rules and to every listener, rather than poking
+    // Health directly.
+    LifeOnKill,
+    // Class resource granted on a killing blow. Same hook, AddClassResource.
+    // Deliberately a peer of LifeOnKill rather than a strictly worse one: it is
+    // the line that lets a Caster pay for a cast by killing something.
+    ResourceOnKill,
+    // Increased damage-over-time. Consumer: the DamageOverTimeMultiplier
+    // attribute, snapshotted by every DoT application (Bleed on the SMG,
+    // Cleave, Rot, Fracture). Skill nodes already bid on it; no affix did, so
+    // a Bleed build could be built in the tree and not in the stash.
+    DamageOverTime,
+    Count UMETA(Hidden)
+};
+
+// ---------------------------------------------------------------------------
+// RULE REWRITES — what rarity MEANS above Exceptional.
+// ---------------------------------------------------------------------------
+// Before this, rarity gated affix COUNT and a tier ceiling and nothing else, so
+// an Anomalous item was a Standard item with more lines and finding one was an
+// arithmetic event rather than a build event. Item-Foundation always said
+// Anomalous was meant to be the home of rule rewrites (the locked aggregation
+// rule reserves More multipliers "for tree nodes and Anomalous rule rewrites")
+// and nothing implemented it.
+//
+// THE CONSTRAINT THAT SHAPED EVERY ENTRY BELOW. O3 caps a build at THREE
+// composed More multipliers and the trees already author six options against
+// it, so an Anomalous rewrite that is simply a fourth More is either dead
+// weight (the global clamp in FBreakerAttributeAggregator eats it) or a quiet
+// nerf to the three the player chose. So none of these is a More. Each one
+// changes a RULE the aggregation obeys — the precedent is a tree keystone,
+// which removes an animation lock or makes casts free rather than adding a
+// number.
+//
+// Every entry is applied inside UBreakerEquipmentComponent::AggregateStats,
+// which is the one function whose output reaches both the attribute set and
+// the combat component. That is deliberate: a rewrite that could only be seen
+// by a card would be the same failure as an affix nobody consumes.
+UENUM(BlueprintType)
+enum class EBreakerItemRule : uint8
+{
+    None,
+
+    // ---- Rolled on ordinary Anomalous drops ------------------------------
+    // UNBOUND. Every conditional affix line the wearer has pays out regardless
+    // of whether its condition holds. Rewrites the predicate, not the number:
+    // the lines still land in the same single additive bucket, they simply stop
+    // being switched off. Worth most to the player who over-committed to the
+    // conditional family and least to one who has none, which is what makes it
+    // a build item rather than a bonus.
+    Unbound,
+    // OVERFLOW. Each point of Added Damage also grants 1% Increased Damage.
+    // A bucket-CROSSING rule: Added Damage is Flat and multiplies before the
+    // bucket, and this makes the same roll count in both lanes at once. It is
+    // not a More — it moves a number the player already has from one lane into
+    // two.
+    Overflow,
+    // PROLIFIC. Every affix on THIS item resolves one tier better, T1 -> T0 ->
+    // T-1. Rewrites tier resolution, and it is the only path to the T0/T-1
+    // spike that does not go through the Forge.
+    Prolific,
+    // RELENTLESS. The wearer's Physical Damage Reduction cap becomes 80%
+    // instead of 60%. A CAP rewrite, and the survivability family's first
+    // reason to keep stacking a line past the point it stopped paying.
+    Relentless,
+
+    // ---- Legendary rules: never rolled, only carried by a named item -----
+    // DEADFALL (boots). Damage while Airborne also pays while Sliding and while
+    // Wall Riding; Air Control is reduced by 40%. Bends the CONDITION system.
+    Deadfall,
+    // CADENCE (primary). Fire Rate also grants Increased Damage at half its
+    // value, and the weapon occupies both hands: equipping it ejects the
+    // Secondary and equipping a Secondary ejects it. Bends the BUCKET rule and
+    // the SLOT rule.
+    Cadence,
+    // OVERRUN (waist). Resource Regeneration is tripled while airborne,
+    // sliding or wall riding, and zero while it is not. Bends the REGEN rule.
+    Overrun,
+
     Count UMETA(Hidden)
 };
 
@@ -169,6 +265,24 @@ struct RIORSEDGE_API FBreakerItemInstance
     // field existed loads as a rifle instead of as an invalid archetype.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerWeaponArchetype WeaponArchetype = EBreakerWeaponArchetype::Rifle;
 
+    // THE RULE THIS ITEM REWRITES, or None. Rolled onto Anomalous drops and
+    // fixed on legendaries; every other item in the game leaves it None.
+    //
+    // It is a FIELD, not something derived from Rarity, and that distinction is
+    // load-bearing. Deriving it from rarity would silently hand a rewrite to
+    // every Anomalous item that already exists in a save, in a test fixture, or
+    // in the power-band loadouts — which build every piece at Anomalous purely
+    // to lift the tier cap. An item earns a rewrite when it is ROLLED one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerItemRule Rule = EBreakerItemRule::None;
+
+    // Named legendary this item is, or None. Kept separate from Rule because a
+    // rule is a mechanic and a legendary is an identity: two legendaries could
+    // one day share a rewrite, and the display name, the signature and the drop
+    // table all key off the identity.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName LegendaryId = NAME_None;
+
+    bool HasRule() const { return Rule != EBreakerItemRule::None; }
+    bool IsLegendary() const { return !LegendaryId.IsNone(); }
     bool IsValid() const { return ItemId.IsValid(); }
     // The two slots where WeaponArchetype means anything. Static so callers
     // can ask about a slot before an item exists (the loot roll needs this).
@@ -234,6 +348,17 @@ struct RIORSEDGE_API FBreakerEquipPreview
     UPROPERTY(BlueprintReadOnly) int32 RarityCount = 0;
     UPROPERTY(BlueprintReadOnly) int32 RarityLimit = INDEX_NONE;
     UPROPERTY(BlueprintReadOnly) TArray<FBreakerAffixComparison> AffixDeltas;
+
+    // A THIRD displacement, and it has nothing to do with the rarity cap: a
+    // legendary whose rule claims another slot ejects whatever is standing in
+    // it. Cadence is the first — it occupies both hands, so it and a Secondary
+    // cannot both be worn, in either direction.
+    //
+    // Disclosed rather than refused, exactly like the rarity cap: the piece the
+    // UI names as doomed is the piece that leaves. Nothing REFUSES an equip in
+    // this component and this does not start.
+    UPROPERTY(BlueprintReadOnly) bool bRuleDisplaces = false;
+    UPROPERTY(BlueprintReadOnly) FBreakerItemInstance RuleDisplaced;
 };
 
 // Aggregated result of everything equipped. Flat and Increased buckets are
@@ -272,4 +397,27 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // condition satisfied at once — the tooltip figure, so a player can see what
     // a piece is offering before they are airborne.
     UPROPERTY(BlueprintReadOnly) float PotentialConditionalDamagePercent = 0.0f;
+
+    // ---- The non-damage breadth pass --------------------------------------
+    // Flat armour. Submitted into the Armor attribute; this field is the
+    // gear-only display figure, same rule as WeaponDamageMultiplier.
+    UPROPERTY(BlueprintReadOnly) float BonusArmour = 0.0f;
+    // Health and class resource granted on a killing blow. NOT display-only:
+    // UBreakerEquipmentComponent's OnKillDealt handler reads these two directly,
+    // because they are not attributes — they are amounts paid at an event.
+    UPROPERTY(BlueprintReadOnly) float LifeOnKill = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float ResourceOnKill = 0.0f;
+    // Increased damage-over-time, gear only. Combat reads the composed
+    // DamageOverTimeMultiplier attribute; this is the inventory figure.
+    UPROPERTY(BlueprintReadOnly) float DamageOverTimeMultiplier = 1.0f;
+
+    // ---- Rule rewrites ----------------------------------------------------
+    // Every rule currently in force from equipped items, in the order the slots
+    // were walked. Duplicates are impossible in practice (Anomalous is capped
+    // at one equipped) but the array does not assume it.
+    UPROPERTY(BlueprintReadOnly) TArray<EBreakerItemRule> ActiveRules = {};
+    // The Physical DR cap actually applied, after Relentless. Published so the
+    // inventory can show a raised cap instead of a number that stopped moving
+    // for no visible reason.
+    UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionCap = 60.0f;
 };

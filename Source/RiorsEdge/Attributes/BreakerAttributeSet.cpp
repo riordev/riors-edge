@@ -102,6 +102,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = GetFireRateMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::Armor)] = GetArmor();
     Aggregator.CaptureBases(Values);
 }
 
@@ -187,6 +188,13 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetSlideSpeedMultiplierAttribute(), SlideSpeedMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::SlideSpeedMultiplier));
     WriteAttributeValue(GetAirControlMultiplierAttribute(), AirControlMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::AirControlMultiplier));
     WriteAttributeValue(GetDashCooldownReductionAttribute(), DashCooldownReduction, Aggregator.Compose(EBreakerAggregatedAttribute::DashCooldownReduction));
+
+    // Flat mitigation from gear. Reaches gameplay through
+    // UBreakerCombatComponent::GetEffectiveArmor() -> FBreakerDefenseState
+    // ::Armor -> the mitigation formula, which is the same route the flat
+    // armour strippers already use, so a stripped point of gear armour and a
+    // stripped point of authored armour are the same point.
+    WriteAttributeValue(GetArmorAttribute(), Armor, Aggregator.Compose(EBreakerAggregatedAttribute::Armor));
     WriteAttributeValue(GetFireRateMultiplierAttribute(), FireRateMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier));
 }
 
