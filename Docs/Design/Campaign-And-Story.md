@@ -1,6 +1,17 @@
 # Campaign and Story — the spine, the missions, and the handoff
 
-**Last reconciled against: O28**
+**Last reconciled against: O32**
+
+**O29 closes §5.3's endgame question.** The five options this document was
+written around are resolved: the answer is **gear depth** — item level runs to
+120, past the character cap of 50, and the affix tier ladder widens to T12..T-1
+with a back-loaded curve. A paragon-style post-cap tree was **rejected** as
+colliding with the locked no-post-cap-character-power rule. **The campaign-side
+contract below is unaffected, exactly as §5.3 predicted it would be**, and the
+"cap area level at 50" exception it names did **not** happen — the climb above
+50 exists, so the three erased Earths do not acquire the extra job. O31 adds one
+requirement the campaign should carry forward: **no encounter may have a build
+that cannot participate.**
 
 Domain: the premise as a *working* fiction, the three-act spine expressed as a
 ladder of area levels, the story mission list with what each one teaches and
@@ -633,7 +644,34 @@ is doing rather than a gate in front of it.
 
 ## 6. Quest and flag architecture
 
+### 6.0 STATUS UPDATE (2026-08-14) — five of the nine needs in §6.3 have LANDED
+
+**Read this before §6.1–§6.3, which describe the state before the quest/save
+lane merged and are otherwise accurate as history.**
+
+| §6.3 # | Need | Now |
+|---:|---|---|
+| **1** | Flags readable as gates | **BUILT.** `RequiredFlags` / `BlockedByFlags` exist on entries, choices **and** nodes, evaluated by `UBreakerQuestLibrary::PassesFlagConditions`. |
+| **2** | Per-NPC entry state | **BUILT** — the same flag conditions carry it. |
+| **3** | A quest object | **BUILT, and as a LENS rather than an object.** `FBreakerQuestDefinition` / `FBreakerQuestObjective` / `FBreakerQuestReward` exist, and `ComputeQuestState` is a **pure function of the flag set**. Nothing about a quest is serialized; the save gained exactly one field. That is what keeps the format from forking, which is what this section asked for. |
+| **4** | Non-dialogue flag sources | **PARTIAL.** Kill counters exist; rift completion, first-clears, zone entry, item pickup and area discovery still write nothing. |
+| **5** | Save on flag change | **BUILT, and it was a real data-loss bug.** `AddQuestFlag` wrote into a bare non-`UPROPERTY` array, and the only callers of `SaveGameState` were EndPlay, class lock and three menu commit points — so a beat earned in conversation reached disk only on a clean shutdown. `SetFlag` now requests a save whenever the set actually changes, through a **delegate** rather than a direct save, so the journal stays world-free and unit-testable. |
+| **6** | A flag registry | **BUILT, and deliberately NOT GameplayTags.** A tag cannot be added by a save file and must survive a build that no longer declares it, so a validated central list is the right shape. A typo now fails the suite instead of becoming a silent no-op. |
+| **7** | `SaveVersion` must be read | **BUILT for the save game.** `CurrentSaveVersion` is **2**, migrating one step at a time, **refusing a NEWER file rather than repairing it**, and preserving unknown flags verbatim. An existing `BreakerSave0` still loads. The two *struct* `SaveVersion` fields are still read by nothing. |
+| **8** | Objective presentation | **STILL NOTHING.** No quest log, no tracker, no waypoint. The player cannot see what they are doing. **This is now the binding constraint on the campaign layer** — every other piece of the loop exists. |
+| **9** | Per-character vs account scope | **STILL NOT SPLIT.** One flat set, one character, one slot. |
+
+**One correction the lane made to its own brief, worth keeping.** The first
+contract's kill objective was specified as **8**. The encounter the
+Quartermaster actually *names* — the spill out past the pad — spawns three melee
+and two LATTICE alongside its elite, so eight would have sent the player to wave
+mode to finish a story beat. **Set to 5**, which is what the named encounter can
+pay. The general rule: an objective count is a claim about a specific piece of
+content, and it has to be checked against that content rather than chosen for
+feel.
+
 ### 6.1 What exists today — read from the code, not assumed
+**(As of the pass before the quest/save lane. Superseded in part by §6.0.)**
 
 **TRANSCRIBED** from `Source/RiorsEdge/Interaction/BreakerNPC.{h,cpp}`,
 `Source/RiorsEdge/Save/BreakerSaveGame.h`,
