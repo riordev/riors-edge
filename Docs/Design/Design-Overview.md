@@ -446,10 +446,10 @@ ledger. S1–S4 keep their letters.**
 | Q19 (was O19) are the slice legendaries Anomalous or Aberrant | **RULED (O32).** The question's own framing was wrong — it's neither-or-rather-both-and-more: **Anomalous is a rarity**, and **legendary is a separate field** naming an authored item. Every legendary rolls Anomalous; most Anomalous drops are not legendaries. Aberrant does not enter into it. Equip caps are further clarified by **O37**: 1 legendary, 1 non-legendary Anomalous, 3 Aberrant — separate axes, not one shared cap. |
 | Q20 (was O20) party loot distribution | **OPEN.** No party code exists. |
 | Q21 (was O21) Frontier tiers infinite or capped | **OPEN.** |
-| Q22 (was O22) elite loot floor vs modifier count | **OPEN.** Partially answered by the drop pipeline — the elite Exceptional floor survives but now COMPOSES with the rarity gates rather than competing with them; it can only lift a drop to a rarity the drop's item level actually unlocks. Whether it should additionally scale with modifier count remains unruled. |
+| Q22 (was O22) elite loot floor vs modifier count | **OPEN.** Partially answered by the drop pipeline — the elite Exceptional floor survives but now COMPOSES with the rarity gates rather than competing with them; it can only lift a drop to a rarity the drop's item level actually unlocks. Whether it should additionally scale with modifier count remains unruled. *(Partial coverage — reread against ledger before citing.)* |
 | Q23 (was O23) stagger / flinch | **OPEN.** Nothing built. |
 | Q24 (was O24) XP in endgame | **OPEN — and blocking.** There is no XP system at all, which is why the third-jump gate keyed to `CharacterLevel` was unreachable by construction; **O40(b)** now makes this a general rule (no CharacterLevel gate until an XP loop exists), not just this one symptom. |
-| Q25 (was O25) keystone respec friction | **OPEN.** Distinct from **O37**'s subclass-commitment ruling — O37 governs class-branch commitment, not Core Point keystone respec friction; the two are adjacent, not the same question. |
+| Q25 (was O25) keystone respec friction | **OPEN.** Distinct from **O37**'s subclass-commitment ruling — O37 governs class-branch commitment, not Core Point keystone respec friction; the two are adjacent, not the same question. *(Partial coverage — reread against ledger before citing.)* |
 
 **Questions the ledger has since raised that this section never asked**, and
 which now outrank most of what is above: the O29 power band (~15x measured
