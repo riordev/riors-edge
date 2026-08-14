@@ -551,3 +551,307 @@ A downed player should not remove a lane permanently. Recommend: downed state wi
 8. Does the elite loot floor of Exceptional scale with modifier count? A 3-modifier elite is meaningfully harder than a 1-modifier one and currently pays identically.
 9. Do enemies get stagger/flinch as a system at all? §1.1 assigns elites stagger resistance, which presupposes a stagger model that does not currently exist.
 10. ~~Self-damage from the Rocket archetype~~ **CLOSED by O13** — strong self-damage reduction, full self-knockback control, never immunity; rocket-jumping tolerated, never required. Volatile and Cascading are costed against that in §1.2. The general weapon self-damage *rate* remains unauthored and is frozen by O2.
+
+---
+
+# AS BUILT — 2026-08-14
+
+Last reconciled against: `Decisions.md` (O1-O28), `Story-Source.md` §1.2/§1.5,
+`Power-Curve.md` §2, `CONTEXT.md`.
+
+Everything below is **shipped C++ under `Source/RiorsEdge/Combat/`** and proven
+by 12 new automation tests (`RiorsEdge.Combat.Modifiers.*`,
+`RiorsEdge.Combat.Boss.*`, `RiorsEdge.Combat.Archetypes.*`); the suite is 163
+green. **Nothing here is playtested.** Automation proves arithmetic and legality
+rules and cannot see whether a telegraph reads on a screen — which is exactly
+the limit that let two bad visual passes ship elsewhere in this project. Every
+number is `EditAnywhere` and flagged `O2 PLACEHOLDER` at the code.
+
+## A. The modifier system — §1 is now real
+
+`EBreakerMonsterRank::ModifierBearing` existed and multiplied health by 2.5x,
+and **nothing anywhere authored a modifier**. The rank was a stat bump wearing
+the name of a system, which left trash health as the only place difficulty
+could live — the sponge O27 forbids.
+
+**Files.** `BreakerEnemyModifiers.{h,cpp}` is the pure, world-free layer (the
+precedent of `BreakerRangedBehavior.h`): the enum, the authored
+`FBreakerEnemyModifierParams`, the pressure/weight tables, forbidden pairs,
+legality, deterministic selection, and every magnitude.
+`BreakerModifierComponent.{h,cpp}` is the runtime: one component on every
+`ABreakerEnemy`, replicated modifier list, server-only effects.
+
+**Nine of §1.2's ten, plus Wakeful.** Shipped: Warded, Volatile, Fleetfoot,
+Anchored, Splitting, Warding Aura, Reflective, Phasing, Cascading, Wakeful.
+
+- **SUPPRESSING is deliberately absent.** §1.2 tags it NEEDS-RECOST [O1/O2]:
+  its stamina-drain half has no referent since O1, its surviving air-control
+  half lives in `Movement/` (not this lane), and authoring a replacement second
+  effect is a new value decision frozen by O2. Shipping it as a stub would have
+  been worse than its absence — an enemy visibly carrying a modifier that does
+  nearly nothing teaches the player modifiers do not matter.
+- **WAKEFUL (§1.2's optional #12) is promoted into the shipping set.** TETHERED
+  (#11) is not: it is a rule about a *pair* of enemies and needs a spawn-time
+  pairing contract nothing in `Game/` can express.
+
+**TWO DELIBERATE DEVIATIONS, both forced by O27.** §1.2 authors Volatile at
+"45% of **player** max health" and Reflective's cap at "6% of **player** max
+health". Both read the player. Re-expressed:
+
+| Modifier | Doc | As built | Why |
+|---|---|---|---|
+| Volatile | 45% of player max health | `VolatileDamageAsAttackMultiple` x the monster's own chassis damage (9x) | Chassis damage is already a curve in area level, so the detonation scales with the CONTENT |
+| Reflective | cap 6% of player max health | `ReflectCapFractionOfMonsterHealth` x the monster's own max health (5%) | The cap grows with area level and never with the player's build |
+
+The cap is the load-bearing half of Reflective either way: §1.2 is right that an
+uncapped reflect punishes high-DPS builds for existing.
+
+**Composition (§1.3) is enforced at selection AND checkable after.** Forbidden
+pairs: Warded+Reflective, Splitting+Volatile, Phasing+Cascading, any modifier
+with itself, **plus one EXTENDS entry — Wakeful+Splitting** (dies, splits,
+revives is a three-step death chain a player cannot read; the same reason
+Splitting+Volatile is forbidden). The pressure-diversity rule and the
+"no two Durability in a 3-set" anti-sponge rule are both live.
+`RiorsEdge.Combat.Modifiers.SelectionSweep` runs §1.5's acceptance criterion
+verbatim — 10,000 rolls per family, zero illegal sets, every modifier reachable.
+
+**Announcement is a hard requirement, not a nicety.** Granting modifiers always
+builds a halo (a coloured sphere plus a point light, engine primitives, sized by
+modifier count and coloured by the first modifier) and always publishes a banner
+that `ABreakerEnemy::GetEnemyStateLabel()` prefixes onto the existing overhead
+readout. Reusing the readout the HUD already prints means a future UI pass that
+knows nothing about modifiers cannot drop the announcement. An unmodified
+enemy's label is byte-identical to before.
+
+**Rank composition.** O9 names ranks Standard/Veteran/Champion;
+`EBreakerMonsterRank` predates the rename. Mapping shipped: 0 modifiers =
+`Trash`, 1+ = `ModifierBearing`; `Elite` stays an AUTHORED pack anchor and is
+not modifier-derived. §1.1's "+0.35x per modifier beyond the first" composes as
+a third multiplier alongside rank and archetype — one product, three inputs, no
+second source of truth.
+
+**FINDING, recorded not fixed (O2).** At the shipped rank row (2.5x) and step
+(+0.35), the count step contributes MORE health than the rank promotion does:
+a 3-modifier Champion is +1.75x-trash above `ModifierBearing`, while
+`ModifierBearing` is only +1.5x-trash above `Trash`. §1.1's own 2.0x/+0.35
+numbers have the same shape. The bound that does hold, and is tested, is that
+three modifiers never doubles a one-modifier enemy's health. Whether the step
+should be smaller than the rank row is an owner call.
+
+**Also new, and needed by two of them:** `UBreakerCombatComponent::OnDamageTaken`
+— a VICTIM-side `FBreakerHitContext` broadcast. `OnDamageReceived` carries only
+a result and cannot say *who* hit you, so Reflective had no way to answer the
+attacker and the skirmisher's flinch had no way to tell a bullet from a bleed.
+Reflect is dealt as `TrueDamage` and the handler refuses `TrueDamage`, so a
+reflect can never reflect a reflect.
+
+## B. Facing-dependent armour — §7's "one genuinely new pipeline requirement"
+
+Built, and built **per-hit** rather than per-frame.
+`UBreakerDamageLibrary::GetFacingArmorMultiplier` is pure 2D geometry;
+`UBreakerCombatComponent` applies it inside `ReceiveDamage` using the
+`SourceLocation`/`bHasSourceLocation` the weapon, both projectiles, the zones
+and the melee sweep already fill in. A per-frame "is the player behind me"
+approximation would let a shot fired from the front resolve as a rear hit
+because the shooter moved during flight — the kind of silent inconsistency that
+teaches players a mechanic is random.
+
+`RearArcArmorMultiplier` defaults to **1.0 (off)**, so no existing enemy
+changed. `RearArcCosine` (0.15) widens the vulnerable arc slightly onto the
+flanks, which is what makes "circle it" the answer rather than "stand precisely
+behind it" against something that always turns to face. Z is excluded: getting
+*above* an enemy is not flanking it. **This closes OPEN QUESTION 2.**
+
+## C. Archetypes
+
+### C1. SKITTER — the committed leap is now real (§2.1)
+
+The base melee lunge shipped with neither half of what §2.1 specifies: no
+wind-up, and a direction re-solved every frame, so it **tracked** the player
+through the whole burst and there was nothing to step out of. Now:
+`LungeWindupSeconds` 0.55, movement cut to 25%, the weak point **swells** during
+the wind-up (`LungeWeakPointSwell` 2.1x), and the direction is locked **once**
+at commit and never re-solved. The doc's design lands: "step sideways and shoot
+the thing it just showed you."
+
+### C2. SEVERED WARDEN — `ABreakerWardenEnemy` (§2.3)
+
+Health 3.2x / damage 1.86x as chassis ratios (§2.3's 320 and 26 against the
+Skitter baseline), 90 frontal armour with an unarmoured rear, move 260,
+implacable (no weave, no lunge), always faces the player.
+
+- **Attack A, shield sweep:** 320 cm, 65-degree arc, 0.5 s shield draw-back that
+  also heats. The arc is re-checked at RESOLUTION, so walking out of the cone
+  during the draw-back beats it — the counterplay under passive defence.
+- **Attack B, ground slam:** 650 cm, 7 s cooldown, a ground ring that grows to
+  **exactly** the real radius over 0.9 s. The preview is the hitbox. The slam
+  exists so standing behind it is not free, or the archetype would teach "get
+  behind it and hold the trigger".
+- **DIVERGENCE [O18]:** 3.2x health on a Trash-rank enemy is a long fight
+  against "trash a little under 1 second", before its frontal armour roughly
+  doubles effective health from the front. §2.3's own answer is that it is not
+  meant to be fought frontally. Unresolved; O2 freezes it until wave mode
+  reports.
+
+### C3. SEVERED SKIRMISHER — `ABreakerSkirmisherEnemy` — NOT IN THIS DOCUMENT
+
+Added from `Story-Source.md` §1.5's severance spectrum, and it fills the largest
+gap in the roster. Skitter closes, Lattice holds a band, Warden advances — all
+three answer to "keep moving and shoot the thing in front of you", and **nothing
+in the project had ever broken line of sight or reacted to being shot.**
+
+§1.5: an early-stage Altered "still wears insignia, still uses cover, still
+flinches". This is that sentence. Loop: **Relocating -> InCover -> Exposed ->
+(Flinched) -> Relocating.** It picks a cover point whose line from the player is
+actually blocked (`WorldStatic` trace at eye height; another enemy is not
+cover), crouches behind it, peeks after 1.1 s, stands and fires a **3-round
+burst** of fast flat rounds (2600 cm/s, no lead — LATTICE's partial lead exists
+because its orb is slow), and goes back down after 2.6 s. Landing a
+non-DoT hit while it is exposed **cancels the burst** and sends it back to cover
+(0.45 s flinch, 1.2 s cooldown so a high-RPM weapon cannot chain it).
+
+**The response it demands is the only one in the roster that is not about aim:
+PUSH.** You cannot out-shoot something behind a wall; waiting loses the
+attrition; the answer is to close, take an angle its cover does not face, and
+catch it during a relocation — a movement decision under O1.
+
+Pure cover maths is `BreakerCoverBehavior.{h,cpp}` (candidate ring generation
+with per-enemy phase desync, range-band rejection, travel-vs-range scoring).
+With **no cover in range it correctly finds none and degrades to an open-ground
+shooter**, labelling itself `NO COVER` so a playtester can tell "this map has no
+cover" from "the cover logic is broken". *Nobody has confirmed the gym has any
+geometry it can hide behind — in the open field this is honest but is NOT the
+fight.*
+
+### C4. Composition (§2.4) is now four axes, not three
+
+Skitters punish standing still. Lattices punish moving predictably. Wardens
+punish approaching from the front. **Skirmishers punish staying at range.**
+
+## D. THE FIELD MARSHAL — `ABreakerBossEnemy` (§3)
+
+**It subclasses the Warden**, which is §3.1's thesis in the type system: "the
+boss is not a big Warden. The boss is a Warden that COMMANDS." The sweep, the
+slam, the facing armour and the advance are the fight the player has already
+learned; everything the class adds is command.
+
+**Not a sponge (§3.1's corollary).** It does not author a health number — rank
+`Boss` (x25) comes from the chassis rank table, and `ArchetypeHealthMultiplier`
+is **0.35** so the inherited Warden 3.2x does not compound into eighty times a
+trash mob. §3.2's literal 2400 was anchored to a baseline that no longer exists;
+duplicating it would be the second-source-of-truth bug O27 deleted from
+`ConfigureElite`.
+
+**Telegraph vocabulary — three tells, all learnable:**
+
+1. Shield draw-back -> a sweep is coming to your front. *(inherited)*
+2. Growing ground ring -> a slam is coming to your feet. *(inherited)*
+3. **Apparatus raise -> an ORDER is coming, and where it POINTS says which.**
+   §3.4 deliberately reuses one gesture for both orders, so the player reads the
+   direction rather than the pose. A second channel (colour: amber DEPLOY, blue
+   FIRE) is insurance for a player standing behind it who cannot see the point.
+
+The raise is also **the punish window**: it lifts the rear weak point above the
+shoulder line so it is hittable from the front. Outside orders the weak point is
+literally untargetable, not a damage filter.
+
+**Phases are health gates (§3.4), and the machine is pure**
+(`BreakerBossPhases.{h,cpp}`) so every transition is testable with no world:
+
+| Phase | Gate | What it does |
+|---|---|---|
+| **Deployment** | 100-66% | Fights like a Warden. **DEPLOY** every 20 s: 2.5 s raise pointing at an alcove (round-robin, so it reads as a *choice*), 2 adds arrive 1.5 s later at that alcove — previewed before anything comes out (§5.1) |
+| **Suppression** | 66-33% | Two gallery Lattices spawn and respawn 12 s after death. **FIRE** every 15 s: 2.0 s raise, then every live Lattice volleys simultaneously |
+| **Commitment** | 33-0% | **Stops commanding.** +40% speed, sweep cadence -30%, slam 7s -> 4s, **each slam leaves a lingering hazard** (the Cascading modifier's behaviour, reused because the player already learned to read it), frontal armour 90 -> 45, apparatus **permanently exposed** |
+
+Phase advancement is **monotonic**: a heal, a shield, or a chassis rebuild under
+the boss cannot walk it back into a phase it left, or the fight has no defined
+length. The order clock **resets rather than subtracting**, so a 60-second hitch
+deploys one pack and not three — §5.1 forbids unpreviewed spawns.
+
+**FIRE commands a WIND-UP, not a shot.** `ABreakerRangedEnemy::CommandVolley()`
+starts the Lattice's own 0.85 s emitter bloom rather than firing. Six
+projectiles appearing with no tell has no answer under O1. The boss's 2.0 s
+raise is therefore the first half of the telegraph and the Lattices' bloom the
+second — over 2.8 s of warning. A doubled order cannot restart a wind-up already
+in progress, which would *shorten* the tell.
+
+Also live: DoT capped at 3 stacks (§3.2), `MaximumLiveAdds` enforcing §5.3's
+density ceiling **at the source that creates the density**, gallery Lattices
+capped at 3 (§5.3's "single most dangerous scaling knob"), no respawn, no chain
+detonation, and the galleries die with the boss so the encounter has an end
+condition.
+
+**NOT BUILT: the arena (§3.3).** Levels are editor work and `Game/` is not this
+lane. Alcove and gallery positions are **authored offsets from the boss's own
+spawn point**, so it works in the flat gym today and snaps onto the real
+4000x4000 room by retuning six vectors.
+
+**DIVERGENCE [O18] carried forward, unresolved.** The fight has a *script
+floor*: a player who bursts a phase down still waits on the order cadence, so
+phase cadence imposes a length independent of health. Whether the composition
+lands inside 20-45 s is a measurement. O2 freezes the values.
+
+## E. The two families (`Story-Source.md` §1.5)
+
+`EBreakerEnemyFamily` (Vestige / Altered) and `EBreakerSeveranceStage`
+(NotApplicable / Early / Mid / Late) are fields on `ABreakerEnemy`, defaulting
+to Vestige — everything that shipped before the families existed is rift-native
+by fiction and by behaviour. **They are gameplay fields, not lore tags:**
+
+- **Modifier selection is family-scoped.** Splitting, Phasing and Reflective are
+  Vestige-only (alien-body rules); Anchored and Warding Aura are Altered-only
+  (tactical decisions, and §1.5 says a Vestige has no tactics resembling a
+  military). The other five are things a body does rather than things a mind
+  chooses and are legal on both. Both families still reach a legal 3-set —
+  tested.
+- **Stage drives behaviour, not just the model.** `UsesCoverDiscipline()` and
+  `FlinchesWhenHit()` are asked of the family/stage pair every frame, so
+  re-authoring the skirmisher as late-stage genuinely turns both off and leaves
+  a plain open-field shooter. A Vestige can never use cover or flinch whatever
+  stage is set on it — a hard family gate, so a content author cannot
+  accidentally produce a tactical rift-native creature.
+- **The Altered print their stage** over their heads; Vestiges print nothing,
+  because a Vestige was never a person and never degraded from anything. This is
+  also the only place the militia's engage-on-sight tragedy is visible in
+  gameplay: the readout tells you what stage it is and you still have to kill it.
+
+**Roster placement:** Skitter and Lattice are Vestige (unchanged). Warden is
+**Altered / Mid** — §2.3 describes an early stage ("still uses cover"), but the
+implemented behaviour does not use cover and does not flinch, and labelling it
+early while it fights like that would make the stage a lie. Skirmisher and the
+Field Marshal are **Altered / Early** — the boss because command is the highest
+cognition on the spectrum, which is what makes "the first humanoid that
+demonstrably gives orders" land mechanically.
+
+**Naming:** VESTIGE is the formal term and is what the HUD prints; SPILL is
+field slang and deliberately does not appear in instrumentation. No Bastion, no
+Aberrant, no Anomalous anywhere in this work.
+
+## F. What still needs doing in `Game/` — NOT DONE BY THIS LANE
+
+`Game/BreakerGameMode.cpp` is owned by another agent this wave and was not
+touched. Everything below is exposed and ready; it needs spawning:
+
+1. **Modifiers on gym and wave elites.** Call
+   `ABreakerEnemy::ConfigureWithModifiers(Seed)` on the arena elite and on
+   wave-mode elites. It rolls a legal family-scoped set, promotes the rank, and
+   rebuilds the chassis. §1.4's rate is built in; a deterministic seed
+   (location hash + wave index) keeps a playtest reproducible.
+2. **Wardens.** Spawn `ABreakerWardenEnemy` in the encounter and from wave 3
+   (§4.2 budget cost 6). §5.3: never more than one per player, and §2.4: never
+   two in one pack under 5 players.
+3. **Skirmishers.** Spawn `ABreakerSkirmisherEnemy` **near cover** — its whole
+   fight depends on there being geometry, and the gym's combat pockets, ruins
+   and watchtowers are the candidates. In the open it degrades to a plain
+   shooter and the archetype is wasted.
+4. **The boss.** Spawn `ABreakerBossEnemy` — a key binding (F5) for a boss test,
+   and §4.2's wave 12 boss wave. It needs `SetAreaLevel()` and room: its default
+   alcove offsets are +/-1700 cm and galleries +/-1900 cm from its own location.
+   Bind `OnBossDefeated` for the encounter-end.
+5. **Wave-mode budget (§4.2).** The budget solver (Skitter 1 / Lattice 3 /
+   Warden 6 / +4 per elite modifier), rest waves every 6, loot only on rest and
+   boss waves. None of it exists; wave mode still spawns a flat count.
+6. **Playtest report.** TTK is bucketed melee/ranged/elite. There is no bucket
+   for boss or for modifier-bearing enemies, so a Champion's kill time pollutes
+   the elite average. `Playtest/` is not this lane.

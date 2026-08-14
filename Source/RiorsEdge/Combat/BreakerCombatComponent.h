@@ -130,11 +130,48 @@ public:
     // Damage-Pipeline §4: at most three More multipliers, each capped at 1.30x.
     static constexpr float ComposedMoreCeiling = 2.20f;
 
+    // --- Facing-dependent armour -----------------------------------------
+    // Encounter-Design §7 names this "the one genuinely new combat-pipeline
+    // requirement in this document": the Severed Warden and the slice boss are
+    // both designed around "flank it and its defence disappears", and without
+    // it both collapse into ordinary armoured enemies and lose their whole
+    // teaching value.
+    //
+    // It is a PER-HIT check, not a per-frame one, because the request already
+    // carries where the damage came from (SourceLocation / bHasSourceLocation,
+    // which the weapon, both projectiles, the zones and the melee sweep all
+    // fill in). A per-frame "is the player behind me" approximation would let a
+    // shot fired from the front resolve as a rear hit because the shooter moved
+    // during the bullet's flight, which is the kind of silent inconsistency
+    // that teaches players the mechanic is random.
+    //
+    // 1.0 is OFF and is the default, so no existing enemy changes.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense|Facing", meta=(ClampMin="0"))
+    float RearArcArmorMultiplier = 1.0f;
+    // Cosine of the half-angle that counts as "behind". 0 is the strict rear
+    // hemisphere; a small positive number widens the vulnerable arc onto the
+    // flanks, which is what makes "circle it" rather than "stand exactly
+    // behind it" the answer. O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense|Facing", meta=(ClampMin="-1", ClampMax="1"))
+    float RearArcCosine = 0.15f;
+
+    // Whether a hit from this location lands in the rear arc. Public so an
+    // archetype can drive presentation (a seam flash) off the same decision the
+    // damage used, instead of a second copy of the geometry.
+    UFUNCTION(BlueprintPure, Category="Defense|Facing")
+    bool IsRearArcHit(const FVector& SourceLocation) const;
+
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDamageReceived OnDamageReceived;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDeathEvent OnDeath;
     // Attacker-side (SI-8): raised on the component of whoever dealt the hit.
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerHitDealt OnHitDealt;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerKillDealt OnKillDealt;
+    // VICTIM-side, carrying the same context. OnDamageReceived hands out only a
+    // FBreakerDamageResult, which does not say WHO dealt the hit — so a
+    // listener that needs to answer the attacker (the Reflective modifier is
+    // the first) had no way to find them. Broadcast alongside OnDamageReceived
+    // on every hit that is not dodged.
+    UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerHitDealt OnDamageTaken;
     // Passive defensive layers: classes and gear raise these; no inputs.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
@@ -143,7 +180,7 @@ public:
 
 private:
     void PruneExpiredOutgoingModifiers();
-    void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result) const;
+    void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;
     // Keyed so a pusher removes exactly its own entry. No expiry: an incoming

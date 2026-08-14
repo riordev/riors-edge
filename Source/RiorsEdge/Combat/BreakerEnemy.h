@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Combat/BreakerEnemyModifiers.h"
 #include "BreakerEnemy.generated.h"
 
 class UAbilitySystemComponent;
@@ -52,9 +53,86 @@ public:
     virtual bool IsRangedForTelemetry() const { return false; }
     UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyStateLabel() const;
 
+    // --- The modifier layer (Encounter-Design §1, O27) ---------------------
+    // Every enemy carries the component; the overwhelmingly common case is an
+    // EMPTY one, which costs a pointer and nothing else. Difficulty lives here
+    // rather than in trash health, which is what O27 asks for.
+    UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
+    class UBreakerEnemyModifierComponent* GetModifierComponent() const { return ModifierComponent; }
+
+    // Rolls a legal modifier set, promotes the rank to ModifierBearing, and
+    // rebuilds the chassis so the count-based health step lands. Deterministic
+    // in the seed. Returns how many modifiers were granted.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Modifiers")
+    int32 ConfigureWithModifiers(int32 Seed);
+
+    // The authored path: grant exactly this set. Rejects illegal sets (returns
+    // false and changes nothing) rather than trimming them silently.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Modifiers")
+    bool ConfigureWithExactModifiers(const TArray<EBreakerEnemyModifier>& InModifiers);
+
+    // Read-only views the modifier component needs. Both are ENEMY-side
+    // numbers: the modifier layer is allowed to see the monster's own chassis
+    // and nothing about the player (O27).
+    UFUNCTION(BlueprintPure, Category="Enemy|Family") EBreakerEnemyFamily GetFamily() const { return Family; }
+    UFUNCTION(BlueprintPure, Category="Enemy|Family") EBreakerSeveranceStage GetSeveranceStage() const { return SeveranceStage; }
+    // Behavioural contracts, asked rather than hardcoded, so an archetype that
+    // is authored as a different stage changes behaviour without a code change.
+    UFUNCTION(BlueprintPure, Category="Enemy|Family") bool UsesCoverDiscipline() const;
+    UFUNCTION(BlueprintPure, Category="Enemy|Family") bool FlinchesWhenHit() const;
+
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetMonsterMaxHealth() const;
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackDamage() const { return AttackDamage; }
+    UFUNCTION(BlueprintPure, Category="Enemy") bool IsDeadEnemy() const { return bDead; }
+    // Read-only views of the authored tuning. Public so tools, the playtest
+    // report and the automation suite can assert against what an archetype
+    // SHIPS with, without opening the tuning itself for writing.
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeHealthMultiplier() const { return ArchetypeHealthMultiplier; }
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeDamageMultiplier() const { return ArchetypeDamageMultiplier; }
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackRange() const { return AttackRange; }
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetLungeRange() const { return LungeRange; }
+    UFUNCTION(BlueprintPure, Category="Enemy") bool DoesRespawn() const { return bRespawns; }
+    UFUNCTION(BlueprintPure, Category="Enemy") bool DoesExplodeOnDeath() const { return bExplodesOnDeath; }
+
+    // --- Mutators the modifier layer drives -------------------------------
+    // Public rather than friend-classed: a modifier changing an enemy's speed
+    // is a legitimate part of the enemy's contract, and a friend declaration
+    // would let it change everything else too.
+
+    // Warded. Sets MaxShield and fills it. Also used to clear the ward (0).
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers") void SetModifierShield(float Amount);
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers") void AddModifierShield(float Amount);
+
+    // Fleetfoot. Multiplier is against the AUTHORED base speed, never against
+    // the current one, so applying it twice does not compound. A negative
+    // WeaveStrengthOverride means "leave the authored weave alone".
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers")
+    void ApplyModifierMovementProfile(float SpeedMultiplier, float WeaveStrengthOverride);
+
+    // Anchored. Applies a temporary movement slow to whatever this enemy is
+    // currently tracking, through the movement layer's own keyed push.
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers")
+    void ApplyModifierSlowToTarget(float SpeedMultiplier, float Duration);
+
+    // Phasing. Turns the hit boxes off for the blink, so "briefly untargetable"
+    // is literally true rather than a damage filter the player cannot see.
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers") void SetModifierUntargetable(bool bUntargetable);
+
+    // Splitting. A copy is a plain enemy at a fraction of health with no
+    // modifiers, no loot and no respawn.
+    UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers")
+    void ConfigureAsSplitCopy(int32 InAreaLevel, float HealthFraction);
+
 protected:
     virtual void BeginPlay() override;
-    UFUNCTION() void HandleDeath();
+    // Virtual so the boss can end an encounter rather than recycle a corpse.
+    UFUNCTION() virtual void HandleDeath();
+    // Wakeful's downed state: the body goes away, nothing drops, and the enemy
+    // stands back up at a fraction of health. Deliberately NOT RespawnEnemy —
+    // that returns to the leash origin at full health, which is a respawn and
+    // not a revive.
+    void EnterWakefulDowned();
+    UFUNCTION() void FinishWakefulRevive();
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
     void GrantLoot();
     // Ammo economy: kills return reserve ammo to the killer (O2 placeholder).
@@ -98,6 +176,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerStatusComponent> Status;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UBreakerEnemyModifierComponent> ModifierComponent;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float DetectionRange = 2200.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float AttackRange = 260.0f;
@@ -122,6 +201,16 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area", meta=(ClampMin="1", ClampMax="100")) int32 AreaLevel = 10;   // O2 PLACEHOLDER
     // Rank multiplies the chassis rather than replacing it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area") EBreakerMonsterRank MonsterRank = EBreakerMonsterRank::Trash;
+
+    // --- The two families (Story-Source §1.5) ------------------------------
+    // Vestige is the default because everything that existed before the
+    // families did is rift-native by fiction and by behaviour. It is a
+    // GAMEPLAY field, not a lore tag: it scopes which modifiers may appear
+    // (a Vestige has no tactics, so no tactical modifier), and on an Altered
+    // the severance stage decides whether the archetype takes cover and
+    // whether it flinches.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Family") EBreakerEnemyFamily Family = EBreakerEnemyFamily::Vestige;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Family") EBreakerSeveranceStage SeveranceStage = EBreakerSeveranceStage::NotApplicable;
     // The curve itself, all O2 placeholders, tunable per enemy in-editor.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area") FBreakerMonsterChassisParams Chassis;
     // Per-archetype ratios ON TOP of rank, so two trash monsters in the same
@@ -168,6 +257,25 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeDuration = 0.35f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeCooldown = 1.2f;
 
+    // SKITTER's committed leap, Encounter-Design §2.1. The lunge shipped
+    // without either half of what the document specifies: no wind-up, and a
+    // direction re-solved every frame, so it tracked the player through the
+    // whole burst and there was nothing to step out of. The document is
+    // explicit that "the committed leap is the whole design" — the direction is
+    // LOCKED at wind-up and it cannot track, so any lateral movement defeats
+    // it, and the wind-up EXPOSES the weak point so the correct answer is
+    // "step sideways and shoot the thing it just showed you".
+    //
+    // O1 makes this the right shape for the whole game: a passive-defence
+    // player answers with position, so a committed, telegraphed, non-tracking
+    // commitment is fair where a tracking one is not.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0")) float LungeWindupSeconds = 0.55f;   // O2 PLACEHOLDER
+    // The tell: the weak point swells during the wind-up. A scale change on one
+    // primitive, so it survives in untextured graybox (§2.1).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="1")) float LungeWeakPointSwell = 2.1f;   // O2 PLACEHOLDER
+    // Movement during the wind-up, as a fraction of normal. The crouch.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0", ClampMax="1")) float LungeWindupMoveScale = 0.25f;   // O2 PLACEHOLDER
+
     // Shared state a derived archetype legitimately needs to read or drive.
     // PatrolPhase doubles as the per-enemy desync seed so a pack never acts in
     // lockstep; StateLabel is what the playtest HUD prints over the enemy.
@@ -180,6 +288,22 @@ protected:
     // sideways while facing the player, so it sets this every frame.
     FVector DesiredFacing = FVector::ZeroVector;
 
+    // Composed into the chassis alongside ArchetypeHealthMultiplier. DERIVED
+    // from the modifier count (Encounter-Design §1.1's "+0.35x per modifier
+    // beyond the first"); never authored, because that would be a second source
+    // of truth for what a modifier is worth.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Area") float ModifierCountHealthMultiplier = 1.0f;
+
+    // The authored speed and weave, captured once so Fleetfoot multiplies
+    // against a base rather than compounding against whatever it did last time.
+    float BaseMoveSpeed = -1.0f;
+    float BaseWeaveStrength = -1.0f;
+    // Whoever this enemy is currently engaging, handed to the modifier layer as
+    // a bare AActor*. The modifier layer reads its POSITION and nothing else.
+    TWeakObjectPtr<AActor> ModifierTrackedTarget;
+    // Wakeful needs to know how the killing blow landed.
+    bool bLastHitWasWeakPoint = false;
+
 private:
     FVector LeashOrigin = FVector::ZeroVector;
     int32 KillCount = 0;
@@ -191,4 +315,10 @@ private:
     float EngagedSeconds = 0.0f;
     float WeaveTime = 0.0f;
     double LungeStartTime = -1000.0;
+    // Set when the wind-up begins, cleared when the burst ends. The whole point
+    // of the archetype: this is decided ONCE and never re-solved.
+    double LungeWindupStartTime = -1000.0;
+    FVector LungeLockedDirection = FVector::ZeroVector;
+    bool bLungeWindingUp = false;
+    float WeakPointBaseScale = 0.4f;
 };
