@@ -53,6 +53,10 @@ public:
     // Every tree this character may spend in, fallback content included. The
     // UI enumerates trees here and nodes through UBreakerProgressionTree.
     UFUNCTION(BlueprintPure, Category="Progression") TArray<UBreakerProgressionTree*> GetAvailableTrees() const;
+    // Public because it is one half of "does the front end describe the class I
+    // am actually in" — the axis the owner caught broken in play and the axis
+    // no attribute-value test can reach (RiorsEdge.Progression.ClassSwap*).
+    UFUNCTION(BlueprintPure, Category="Progression") bool IsAbilityUnlocked(FName AbilityId) const;
 
     // Aggregated node output. Combat and movement read these rather than
     // walking node ranks themselves.
@@ -178,7 +182,6 @@ private:
     int32 GetRefundValue(EBreakerPointCurrency Currency) const;
     const UBreakerProgressionNode* FindOwnedNodeDefinition(FName NodeId, EBreakerPointCurrency Currency) const;
     void CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const;
-    bool IsAbilityUnlocked(FName AbilityId) const;
     TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency);
     const TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency) const;
     int32& SpentPointsFor(EBreakerPointCurrency Currency);

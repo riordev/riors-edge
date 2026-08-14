@@ -73,16 +73,45 @@ void UBreakerProgressionComponent::BindAttributes(UBreakerAttributeSet* InAttrib
 void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
 {
     State.PermanentClass = ClassId;
-    if (!ClassDefinition)
+    // THE STALE-DEFINITION GAP IS CLOSED, and it was not cosmetic. Owner
+    // playtest: "when selecting a different class i can only see the swift
+    // nodes", and "i dont see proper ability selection based on what character
+    // im at". Both were this one line. A dev swap kept whatever ClassDefinition
+    // was already held, and TWO readers trust it directly:
+    // GetAvailableTrees unions ClassDefinition->BranchTrees (so a Caster was
+    // handed Swift's three branch trees) and IsAbilityUnlocked answers from
+    // ClassDefinition->StartingClassAbilityIds/BaseUltimateId (so a Caster was
+    // offered Swift's abilities). RecalculateStats already guarded itself by
+    // re-reading State.PermanentClass, which is why the STATS were right while
+    // the whole front end was wrong — the bug was invisible to every test that
+    // checked numbers.
+    //
+    // The recorded objection was that re-fetching unconditionally would stomp
+    // an authored Data Asset with the C++ fallback. That objection is answered
+    // by re-fetching ONLY on a mismatch: a definition describing a DIFFERENT
+    // class is never the right one to keep, whatever its source, and a
+    // correctly-matching authored asset is left exactly where it is.
+    if (!ClassDefinition || ClassDefinition->ClassId != ClassId)
     {
-        ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
+        if (UBreakerClassDefinition* Fallback = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId))
+        {
+            ClassDefinition = Fallback;
+        }
+        else
+        {
+            // O39: the class has no implemented kit. Dropping the stale
+            // definition is still correct — showing the PREVIOUS class's trees
+            // and abilities is worse than showing none — but it must be loud,
+            // because an empty class screen is otherwise indistinguishable
+            // from a broken one.
+            ClassDefinition = nullptr;
+            UE_LOG(LogTemp, Warning,
+                TEXT("DevForceClass(%d): no implemented kit, so the class definition is cleared rather than left ")
+                TEXT("describing the class just left. Trees and abilities will be empty for this class (O39)."),
+                static_cast<int32>(ClassId));
+        }
     }
     RecalculateStats();
-    // KNOWN GAP, deliberately not fixed here: a dev swap keeps whatever
-    // ClassDefinition is already held, so it can describe the class we just
-    // left. Re-fetching unconditionally would stomp an authored Data Asset
-    // with the C++ fallback, which is the worse failure. Needs a rule about
-    // which source wins; not a dev-tool decision.
     OnProgressionChanged.Broadcast();
 }
 
@@ -363,7 +392,16 @@ TArray<UBreakerProgressionTree*> UBreakerProgressionComponent::GetAvailableTrees
     {
         for (const TObjectPtr<UBreakerProgressionTree>& Tree : ClassDefinition->BranchTrees)
         {
-            if (Tree) Trees.AddUnique(Tree.Get());
+            // The SAME class filter RecalculateStats applies, and for the same
+            // reason: this union is the one that showed a Caster Swift's three
+            // branch trees. DevForceClass no longer leaves a mismatched
+            // definition behind, so this is defence in depth rather than the
+            // fix — but the reader should not depend on every writer being
+            // correct, and an authored Data Asset can list a foreign tree by
+            // simple authoring error with nothing to catch it.
+            if (!Tree) continue;
+            if (Tree->RequiredClass != EBreakerClassId::None && Tree->RequiredClass != State.PermanentClass) continue;
+            Trees.AddUnique(Tree.Get());
         }
     }
     for (UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetTreesForClass(State.PermanentClass))
@@ -493,7 +531,16 @@ const UBreakerProgressionNode* UBreakerProgressionComponent::FindOwnedNodeDefini
 
 bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
 {
-    if (ClassDefinition && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StartingClassAbilityIds.Contains(AbilityId))) return true;
+    // The definition is only authoritative for the class it actually describes.
+    // The same defence GetAvailableTrees applies, and against the same failure:
+    // a definition left over from another class made the ABILITIES tab offer
+    // that class's kit (owner: "i dont see proper ability selection based on
+    // what character im at"). DevForceClass no longer leaves one behind, so
+    // this guard should never fire — which is exactly why it is cheap to keep.
+    const bool bDefinitionDescribesCurrentClass =
+        ClassDefinition && (State.PermanentClass == EBreakerClassId::None || ClassDefinition->ClassId == State.PermanentClass);
+    if (bDefinitionDescribesCurrentClass
+        && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StartingClassAbilityIds.Contains(AbilityId))) return true;
     for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints, EBreakerPointCurrency::CorePoints})
     {
         TArray<const UBreakerProgressionNode*> Nodes;
