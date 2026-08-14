@@ -260,17 +260,58 @@ void ABreakerGameMode::LogGymSummary() const
 {
     const UWorld* World = GetWorld();
     if (!World) return;
+    // Counted by CLASS as well as by telemetry bucket. The summary line used to
+    // say "melee N | ranged N", which was true and useless the moment four
+    // archetypes existed: a Warden and a Skitter are both "melee" and a
+    // Skirmisher and a Lattice are both "ranged", so the one line that proves
+    // the gym spawned what it meant to could not tell them apart. A headless
+    // smoke run reads this line to confirm the integration, so it has to name
+    // every archetype it is asserting.
     int32 Melee = 0;
     int32 Ranged = 0;
+    int32 Wardens = 0;
+    int32 Skirmishers = 0;
+    int32 Lattices = 0;
+    int32 Bosses = 0;
+    int32 ModifierBearing = 0;
+    int32 Elites = 0;
+    int32 ModifierTotal = 0;
     for (TActorIterator<ABreakerEnemy> It(const_cast<UWorld*>(World)); It; ++It)
     {
         if (It->IsRangedForTelemetry()) ++Ranged; else ++Melee;
+        // Boss first: it SUBCLASSES the Warden (§3.1 "a Warden that commands
+        // the other three archetypes"), so an unordered cast chain would count
+        // the Field Marshal as a Warden and silently break the §5.3 cap check.
+        if (It->IsA<ABreakerBossEnemy>()) ++Bosses;
+        else if (It->IsA<ABreakerWardenEnemy>()) ++Wardens;
+        else if (It->IsA<ABreakerSkirmisherEnemy>()) ++Skirmishers;
+        else if (It->IsA<ABreakerRangedEnemy>()) ++Lattices;
+        if (It->IsElite()) ++Elites;
+        if (const UBreakerEnemyModifierComponent* Modifiers = It->GetModifierComponent();
+            Modifiers && Modifiers->GetModifierCount() > 0)
+        {
+            ++ModifierBearing;
+            ModifierTotal += Modifiers->GetModifierCount();
+        }
     }
     int32 Targets = 0;
     for (TActorIterator<ABreakerTargetDummy> It(const_cast<UWorld*>(World)); It; ++It) ++Targets;
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | target dummies %d"),
-        GymAreaLevel, Melee, Ranged, Targets);
+        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | skitter/other %d | lattice %d | warden %d | skirmisher %d | boss %d | elite %d | modifier-bearing %d (%d modifiers) | target dummies %d"),
+        GymAreaLevel, Melee, Ranged,
+        Melee + Ranged - Lattices - Wardens - Skirmishers - Bosses,
+        Lattices, Wardens, Skirmishers, Bosses, Elites, ModifierBearing, ModifierTotal, Targets);
+    // The §5.3 caps, asserted rather than assumed. They are the difference
+    // between "dense" and "unplayable", and every one of them was violated at
+    // some point by a spawner that did not know the others existed.
+    if (Wardens + Bosses > 1)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d Warden-class anchors alive; Encounter-Design 5.3 caps them at 1 per player."), Wardens + Bosses);
+    }
+    if (Lattices + Skirmishers > 3)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d ranged sources alive; Encounter-Design 5.3 caps Lattices at 3 regardless of party size."), Lattices + Skirmishers);
+    }
 
     // The stock First Person template geometry is the other half of the "map
     // scope" complaint and it can only be removed in the editor. Measuring it
@@ -855,6 +896,43 @@ void ABreakerGameMode::SpawnCombatEncounter()
             Ranged->SetAreaLevel(GymAreaLevel);
         }
     }
+
+    // ONE Warden, front and centre (Encounter-Design §5.3: live Wardens per
+    // player = 1, "frontal-armour anchors overlapping create unsolvable
+    // geometry"). It stands in FRONT of the pack rather than behind it, which
+    // is the point of the archetype: §2.4's third axis is "Wardens punish
+    // approaching from the front", so the player meets it first and has to
+    // decide to go around something instead of through it.
+    const FVector WardenLocation = Frame.At(EncounterPocketDistance - CombatPocketRadius * 0.85f, 0.0f, 120.0f);
+    FActorSpawnParameters WardenParams;
+    WardenParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    if (ABreakerWardenEnemy* Warden = World->SpawnActor<ABreakerWardenEnemy>(
+        ABreakerWardenEnemy::StaticClass(), WardenLocation, FRotator::ZeroRotator, WardenParams))
+    {
+        Warden->ConfigureEncounter(WardenLocation, 1.4f);
+        Warden->SetAreaLevel(GymAreaLevel);
+    }
+
+    // TWO Skirmishers, and their placement is the whole point. They go AT the
+    // pocket's cover ring, not at an arbitrary bearing: the pocket's four cover
+    // blocks sit on a CoverPitchMax ring around the pocket centre, and a
+    // Skirmisher that starts beside one of them is behind cover on frame one.
+    // Spawned in the open they are a plain shooter with a longer telegraph than
+    // a Lattice, which is strictly worse than a Lattice and teaches the player
+    // nothing.
+    const FVector PocketCentre = Frame.At(EncounterPocketDistance, 0.0f, 0.0f);
+    const FVector PlayerApproach = Frame.At(EncounterPocketDistance - CombatPocketRadius * 2.0f, 0.0f, 0.0f);
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        // Two different bearings off the pocket centre so they resolve to two
+        // different cover blocks rather than crowding one.
+        const FVector Bearing = Frame.Forward.RotateAngleAxis(Index == 0 ? 55.0f : -55.0f, FVector::UpVector);
+        if (ABreakerSkirmisherEnemy* Skirmisher = SpawnSkirmisherNearCover(
+            PocketCentre + Bearing * (CoverPitchMax * 0.5f), PlayerApproach, 0.6f + Index * 1.3f))
+        {
+            Skirmisher->SetAreaLevel(GymAreaLevel);
+        }
+    }
 }
 
 void ABreakerGameMode::GrantModifiers(ABreakerEnemy* Enemy, int32 Seed) const
@@ -1143,18 +1221,28 @@ void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& St
     {
         const float Angle = BaseYaw + 45.0f + Block * 90.0f;
         const FVector Offset = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector) * (CoverPitchMax * 0.5f);
-        SpawnShape(World, ShapeCube, Frame.At(Fwd, Rgt, 55.0f) + Offset,
+        const FVector CoverLocation = Frame.At(Fwd, Rgt, 55.0f) + Offset;
+        SpawnShape(World, ShapeCube, CoverLocation,
             FVector(Stream.FRandRange(1.8f, 2.6f), Stream.FRandRange(0.9f, 1.5f), 1.1f),
             FRotator(0.0f, Angle + Stream.FRandRange(-30.0f, 30.0f), 0.0f),
             PaletteStone, true, TEXT("Runtime_PocketCover"));
+        // These four blocks are the staggered cover chain a Skirmisher is meant
+        // to work: on a CoverPitchMax ring, so a player crossing the pocket
+        // always has the next piece inside one telegraph-plus-flight window,
+        // and so does the enemy.
+        RegisterCoverAnchor(CoverLocation);
     }
 
     // One full-height pillar per pocket: the only thing here that breaks a
     // LATTICE sight line outright (Encounter-Design 3.3 gives the boss arena
     // two for the same reason). Off centre, so it never covers the whole rim.
-    SpawnShape(World, ShapeCylinder,
-        Frame.At(Fwd, Rgt, 250.0f) + Frame.Forward.RotateAngleAxis(BaseYaw + 200.0f, FVector::UpVector) * (CombatPocketRadius * 0.45f),
+    const FVector PillarLocation =
+        Frame.At(Fwd, Rgt, 250.0f) + Frame.Forward.RotateAngleAxis(BaseYaw + 200.0f, FVector::UpVector) * (CombatPocketRadius * 0.45f);
+    SpawnShape(World, ShapeCylinder, PillarLocation,
         FVector(1.4f, 1.4f, 5.0f), FRotator::ZeroRotator, PaletteConcrete, true, TEXT("Runtime_PocketPillar"));
+    // Full height, so it is the only thing in the pocket that blocks a sight
+    // line outright rather than at a crouch. The best cover in the pocket.
+    RegisterCoverAnchor(PillarLocation);
 
     for (int32 Bush = 0; Bush < 6; ++Bush)
     {
@@ -1310,8 +1398,78 @@ void ABreakerGameMode::SpawnExpandedField()
     // clear ground behind a single piece of hard cover, which is the minimum
     // geometry a LATTICE needs to use its whole 900-1900 band instead of
     // backing into a kerb.
-    SpawnShape(World, ShapeCube, Frame.At(LaneStart + RangedSightlineDepth, LaneRight + 500.0f, 150.0f),
+    const FVector LaneCoverLocation = Frame.At(LaneStart + RangedSightlineDepth, LaneRight + 500.0f, 150.0f);
+    SpawnShape(World, ShapeCube, LaneCoverLocation,
         FVector(2.6f, 0.5f, 3.0f), FRotator(0.0f, 8.0f, -4.0f), PaletteConcrete, true, TEXT("Runtime_LaneCover"));
+    RegisterCoverAnchor(LaneCoverLocation);
+
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] cover anchors recorded: %d (pitch limit %.0f cm, Level-Design G23)"),
+        CoverAnchors.Num(), CoverPitchMax);
+}
+
+void ABreakerGameMode::RegisterCoverAnchor(const FVector& WorldLocation)
+{
+    CoverAnchors.Add(WorldLocation);
+}
+
+bool ABreakerGameMode::FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const
+{
+    float BestDistanceSquared = MaxDistance * MaxDistance;
+    bool bFound = false;
+    for (const FVector& Anchor : CoverAnchors)
+    {
+        // 2D: cover is chosen on the ground plane, and a pillar's registered
+        // point is at its mid-height, which would otherwise cost it 250 cm of
+        // spurious distance against a block registered at 55.
+        const float DistanceSquared = FVector::DistSquared2D(Anchor, Around);
+        if (DistanceSquared > BestDistanceSquared) continue;
+        BestDistanceSquared = DistanceSquared;
+        OutAnchor = Anchor;
+        bFound = true;
+    }
+    return bFound;
+}
+
+ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVector& Around,
+    const FVector& ThreatLocation, float PatrolPhase)
+{
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+
+    // Stand it just BEHIND the cover relative to the threat. Its opening state
+    // is Relocating, so the first thing it does is look for a point whose line
+    // from the threat is blocked; starting on the blocked side means it finds
+    // one on frame one instead of walking across open ground to get there.
+    FVector Anchor = Around;
+    const bool bHasCover = FindCoverAnchorNear(Around, CoverPitchMax, Anchor);
+    FVector SpawnLocation = Anchor;
+    if (bHasCover)
+    {
+        const FVector AwayFromThreat = (Anchor - ThreatLocation).GetSafeNormal2D();
+        // 260 cm: clear of the cover block's own footprint (the pocket blocks
+        // are up to 260 cm on their long axis) and well inside the 1400 cm
+        // search radius, so every candidate ring it generates still contains
+        // this piece.
+        SpawnLocation = Anchor + AwayFromThreat * 260.0f;
+    }
+    SpawnLocation.Z = Frame.Ground.Z + 120.0f;
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    ABreakerSkirmisherEnemy* Skirmisher = World->SpawnActor<ABreakerSkirmisherEnemy>(
+        ABreakerSkirmisherEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+    if (!Skirmisher) return nullptr;
+    Skirmisher->ConfigureEncounter(SpawnLocation, PatrolPhase);
+    if (!bHasCover)
+    {
+        // Loud, because a Skirmisher with nothing to hide behind is a plain
+        // shooter and the whole archetype has quietly stopped existing. That is
+        // exactly the failure its own class note warns about.
+        UE_LOG(LogTemp, Warning,
+            TEXT("[BreakerGym] Skirmisher spawned with NO cover anchor within %.0f cm of (%.0f, %.0f) — it will degrade to an open-ground shooter."),
+            CoverPitchMax, Around.X, Around.Y);
+    }
+    return Skirmisher;
 }
 
 

@@ -296,6 +296,10 @@ private:
     void BuildCaptureTour();
 
     bool bPlaytestTargetsSpawned = false;
+    // Every piece of hard cover the field built, in world space. Populated
+    // during SpawnExpandedField, so it survives an F1 reset (which rebuilds the
+    // enemies but not the geometry).
+    TArray<FVector> CoverAnchors;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
     FVector SafeZoneCenter = FVector::ZeroVector;
@@ -315,6 +319,32 @@ private:
     void SpawnPlaytestTargets();
     void SpawnMovementCourse();
     void SpawnCombatEncounter();
+
+    // --- The cover registry ------------------------------------------------
+    // ABreakerSkirmisherEnemy has a PLACEMENT REQUIREMENT, not a preference:
+    // it is the only enemy in the project that breaks line of sight, and its
+    // own class note says so plainly — "in an empty field it correctly finds no
+    // cover and degrades to an open-ground shooter, which is honest but is NOT
+    // the fight." Its cover search is a ring of SearchRadiusCm (1400) around
+    // ITSELF, filtered to candidates whose line from the threat is blocked, so
+    // whether the archetype exists at all is decided by where it is spawned.
+    //
+    // The field already builds hard cover — pocket cover blocks on a
+    // CoverPitchMax ring, pocket pillars, the sniper lane's hard-cover piece.
+    // Nothing recorded WHERE, so the spawners could not aim at it. This records
+    // every piece as it is built, which also makes the derived cover pitch
+    // (Level-Design G23, max 1700 cm) checkable at runtime instead of by
+    // reading the spawner.
+    void RegisterCoverAnchor(const FVector& WorldLocation);
+    // Nearest recorded cover to Around, within MaxDistance. False means "there
+    // is no cover here", which is a real answer and is why the Skirmisher
+    // spawners fall back to a plain position rather than skipping the spawn.
+    bool FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const;
+    // Spawns a Skirmisher AT a cover anchor near Around, standing off from the
+    // threat side so its first act is to duck rather than to walk into view.
+    class ABreakerSkirmisherEnemy* SpawnSkirmisherNearCover(const FVector& Around,
+        const FVector& ThreatLocation, float PatrolPhase);
+
     // Rolls a legal modifier set onto an enemy and then RESTORES the rank it
     // was authored with.
     //
