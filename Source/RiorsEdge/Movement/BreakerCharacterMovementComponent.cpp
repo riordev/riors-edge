@@ -3,6 +3,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
@@ -395,8 +396,33 @@ float UBreakerCharacterMovementComponent::GetMaxSpeed() const
     {
         return FMath::Max(SprintSpeed * GetComposedSlideSpeedMultiplier(), Velocity.Size2D());
     }
-    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier();
+    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed)
+        * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
     return FMath::Max(GroundedCap, BoostedSpeedCeiling);
+}
+
+float UBreakerCharacterMovementComponent::GetAimSpeedMultiplier() const
+{
+    // The movement half of the hip-fire / ADS trade. The weapons layer authors
+    // the penalty per archetype and composes it against live aim progress, so
+    // everything about HOW MUCH and HOW FAST belongs over there; this is the
+    // single consumer that side asked for, and it deliberately holds no state
+    // and no opinion of its own.
+    //
+    // Read through the owning pawn rather than cached, because the player
+    // swaps weapons mid-movement and a cached component would apply the
+    // outgoing archetype's penalty until something invalidated it.
+    const AActor* Owner = GetOwner();
+    if (!Owner) return 1.0f;
+    const UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>();
+    if (!Weapon) return 1.0f;
+
+    // Clamped at 1.0 on this side as well as the weapon's. Two independent
+    // clamps on the same invariant is not redundancy worth deleting: an
+    // archetype authored above 1.0 by mistake would otherwise turn aiming into
+    // a speed BUFF, which inverts the whole trade rather than merely
+    // mistuning it.
+    return FMath::Clamp(Weapon->GetAimMoveSpeedMultiplier(), 0.0f, 1.0f);
 }
 
 bool UBreakerCharacterMovementComponent::CanRedirect(float HorizontalSpeed, float MinimumSpeed)

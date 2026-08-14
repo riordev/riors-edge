@@ -79,6 +79,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedMoveSpeedMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedSlideSpeedMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedAirControlMultiplier() const;
+    // The movement half of the hip-fire / ADS trade, and the one consumer the
+    // weapons layer named at `UBreakerWeaponComponent::GetAimMoveSpeedMultiplier`.
+    // Applied to the GROUNDED cap only: sliding and the boosted ceiling keep no
+    // opinion, because whether an aimed slide is slowed is a movement-feel
+    // ruling nobody has made. Returns exactly 1.0 with no weapon component, so
+    // a bare test object and a hip-firing player are bit-identical to before.
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetAimSpeedMultiplier() const;
     // Cooldown SCALE, so 0.80 is a 20% shorter dash cooldown. The attribute
     // stores the reduction (x1.20) because that is the shape an additive
     // bucket can hold; this is its reciprocal, which is what the dash wants.
