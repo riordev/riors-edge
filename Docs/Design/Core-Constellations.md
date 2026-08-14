@@ -1,6 +1,12 @@
-# Core Constellations — six universal trees authored, FIVE shipping
+# Core Constellations — six universal trees authored, FIVE shipping, SEVEN CLUSTERS LIVE
 
-Last reconciled against: O31
+**Last reconciled against: O32** (2026-08-14).
+
+> **The title of this document is no longer true and is left standing on
+> purpose.** Six constellations are authored below; five were the plan of
+> record; **seven clusters exist in the shipped tree.** The seventh is
+> **VELOCITY**, and it is described in §8a, added 2026-08-14. Renaming the title
+> would hide the drift rather than record it.
 
 > **O30 — THIS DOCUMENT IS OPEN TO REDESIGN, AND IT ALREADY DISAGREES WITH THE
 > CODE.** O30 puts the Core tree up for reorganisation around build axes rather
@@ -10,12 +16,16 @@ Last reconciled against: O31
 >
 > Two facts that document establishes and this one does not yet reflect:
 >
-> 1. **The live roster is seven clusters and 24 nodes, not six of eleven.** A
->    **VELOCITY** constellation of six movement-conditional nodes was added
->    under O27 and is not described anywhere in this document. It is the only
->    cluster already organised the way O30 wants the tree organised, and it is
->    currently drawn in the skill board's `UNMAPPED` catch-all because
->    `Core.Velocity.` is not one of the six prefixes the UI knows.
+> 1. **The live roster is seven clusters and 30 nodes, not six of eleven.**
+>    (**CORRECTED 2026-08-14: 30, not 24.** The 24 was the roster before the six
+>    Elements nodes were authored; the redesign document's own cluster table
+>    always summed to 30 and its prose did not. Re-derived by listing every
+>    `Tree->Nodes.Add` in `GetCoreSliceTree()`.) A **VELOCITY** constellation of
+>    six movement-conditional nodes was added under O27. **It is now described,
+>    in §8a.** It is the only cluster already organised the way O30 wants the
+>    tree organised, and it is currently drawn in the skill board's `UNMAPPED`
+>    catch-all because `Core.Velocity.` is not one of the six prefixes the UI
+>    knows.
 > 2. **No constellation is authored at the 11-node/26-point size this document
 >    specifies.** Affliction has two live nodes; Bulwark has three. The §2.2
 >    budget arithmetic — and the "at most two keystones, ever" conclusion that
@@ -434,6 +444,95 @@ No new mechanics are introduced by this retirement. **FLAG [O19]:** E10's cost a
 
 ---
 
+## 8a. VELOCITY — **the seventh cluster, BUILT and undescribed until now**
+
+**Added 2026-08-14, reconciling this document with
+`Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp` (L312-371).**
+
+Velocity was authored in code under **O27** and appears in no design document.
+This section is a **RECONCILIATION, not a design pass**: every node, magnitude
+and condition below is transcribed from the shipped roster. Nothing here is
+invented, and **no magnitude may be re-authored (O2)**.
+
+**Theme (transcribed from the code's own block comment):** *"Movement is part of
+character building rather than a fixed utility layer" was true of the movement
+STATS and false of everything that mattered: no node anywhere converted a
+movement state into damage, so the pillar had no offensive expression at all.*
+Velocity is that expression — every node pays only while the player is in a
+movement state, and pays nothing while they stand still.
+
+**Owns:** movement-conditional *damage*. This is the line that separates it from
+Kinesis, which owns movement *quality* (evasion, i-frames, air jump, slide
+steering) and authors no damage at all. **The two are complementary, not
+overlapping**, and that is worth stating because their names do not say so.
+
+**Structure: four conditional ladders and two Convergences. It does NOT use §2.1's
+11-node/26-point grammar.** No live cluster does (see the O30 banner), but
+Velocity is the one that was designed after the grammar was written and still
+did not use it, so the divergence is a decision rather than an omission.
+
+| Node id | Node | Tier / ranks | Cost | Effect as shipped | Condition |
+|---|---|---|---|---|---|
+| `Core.Velocity.Freefall` | **Freefall** | 1 / 3 ranks | 1 | +9% Increased Damage per rank | **Airborne** |
+| `Core.Velocity.Slipstream` | **Slipstream** | 1 / 3 ranks | 1 | +9% Increased Damage per rank, and +5% Increased Slide Speed (unconditional) | **Sliding** |
+| `Core.Velocity.Traction` | **Traction** | 2 / 2 ranks | 1 | +14% Increased Damage per rank — the largest per-rank in the cluster | **Wall riding** |
+| `Core.Velocity.Afterburn` | **Afterburn** | 2 / 3 ranks | 1 | +8% Increased Damage per rank | **Recently dashed** |
+| `Core.Velocity.TerminalVelocity` | **TERMINAL VELOCITY** | 3 / 1 rank | 3 | **More ×1.30** to all damage dealt | **Airborne** |
+| `Core.Velocity.RedlineDoctrine` | **REDLINE DOCTRINE** | 3 / 1 rank | 3 | **More ×1.20** to all damage dealt | **Redline Momentum** |
+
+Prerequisites as shipped: Traction requires Freefall; Afterburn requires
+Slipstream; Terminal Velocity requires Traction; Redline Doctrine requires
+Afterburn. Two independent gateways, two lanes, one Convergence each.
+
+**Total: 6 nodes, 3+3+2+3+3+3 = 17 points.** Against §2.1's 26 and §2.2's budget
+arithmetic, Velocity is a **two-thirds-size cluster**, which is a second reason
+§2.2's "two keystones, ever" conclusion is a statement about a tree that does
+not exist yet rather than a description of the build.
+
+### 8a.1 Four things this cluster does that the rest of the document forbids
+
+Recorded rather than corrected. Each is a real conflict between the shipped tree
+and the grammar above it, and each is an owner call.
+
+1. **It authors TWO More multipliers, not one.** §2.4 rule 1 is explicit: *at
+   most ONE More multiplier per constellation.* Terminal Velocity and Redline
+   Doctrine are both Mores. They sit on Convergence nodes, so rule 1's *tier*
+   half is satisfied and only its *count* half is broken. The mitigating fact is
+   that their conditions are close to mutually exclusive in practice — you are
+   rarely airborne and at Redline while it matters — but "rarely" is not
+   "never", and O3's build-wide cap of 3 is a hard clamp in the aggregator, so
+   the breach is bounded by code even where the document is breached.
+2. **Terminal Velocity's ×1.30 is authored AT the per-More ceiling.** The
+   aggregator clamps a single More at 1.30 (Damage-Pipeline §4), so this node is
+   a statement that nothing will ever be allowed past it. Nothing else in the
+   Core tree is authored at its ceiling.
+3. **The name collides with Swift/Kinetic's K12 keystone**, which
+   `Class-Kits.md` §1.4 also calls Terminal Velocity and also describes as an
+   airborne More. **Unresolved: which layer owns "airborne More".** Both exist;
+   `Class-Kits.md` §6.1.1 carries the other half of this note.
+4. **Redline Doctrine is class-coupled without a `RequiredClass` field.** It
+   keys off Redline Momentum, which only Swift generates, so for any other class
+   it is a 3-point purchase that does nothing. The code's own comment defends
+   this under O15 (no mutually exclusive tiers — a Tank may see and decline the
+   trade honestly), and that reasoning is sound. But it is the **first node in
+   the universal tree that is inert for four of five classes**, and the skill
+   board gives a player no way to know that before buying.
+
+### 8a.2 What Velocity means for O30
+
+Velocity is the worked example under O30's own terms: a cluster organised around
+a **build axis** (movement state) rather than a fantasy, where every node states
+a condition and a payout and nothing is a flat percentage. `Core-Tree-Redesign.md`
+§1.4 lists all six as surviving a re-theme with no effect authoring at all —
+they are the only nodes in the tree of which that is unambiguously true.
+
+**It is also the reason the skill board has an `UNMAPPED` cluster.**
+`SBreakerMenu` maps nodes to constellations by ID prefix and knows six prefixes;
+`Core.Velocity.` is not one of them, so all six nodes fall into the catch-all.
+That is a UI gap, not a design one, and it is recorded in CONTEXT.md.
+
+---
+
 ## 9. Cross-constellation interaction matrix
 
 Which pairs a ~65-point character can actually complete (two keystones maximum):
@@ -452,6 +551,26 @@ Which pairs a ~65-point character can actually complete (two keystones maximum):
 **Shipping-set note (O5 plan of record).** Only the five non-Elements pairings above are live at first release. That is **10 possible pairs** from five constellations rather than 15 from six — and one of those ten (Bulwark + Kinesis) is deliberately impossible at keystone tier, leaving **nine viable two-keystone pairs at ship**. Whether nine clears O4's explicit "breadth of options and creative expression" bar is an owner judgement; it is not made here.
 
 **Mandatory-cornerstone audit (§7.10 risk 3).** Each keystone imposes a real, named loss: FIXATION loses all off-target crit; PERPETUAL loses burst and all on-reload effects; TERMINAL loses all pressure damage; RESONANCE loses element choice; AEGIS loses half its mitigation value and all Dodge; SLIPSTREAM loses grounded evasion. No keystone is a strict upgrade over not taking it.
+
+**O31 audit — every build must be able to make an impact.** O31 rules that raids
+are many distinct encounters, that a build may excel in some and be weak in
+others, and that **no encounter may have a build that cannot participate.** Read
+against the keystone list above, that is a constraint on *encounter design*
+rather than on this document — but three keystones here define the hardest cases
+the encounter designer will face, and they are named so the constraint can be
+tested rather than assumed:
+
+| Keystone | The encounter shape it cannot participate in |
+|---|---|
+| **FIXATION** | Anything requiring damage on more than one target at a time. It sets off-target Critical Chance to **0**, not merely lower. A swarm phase, a multi-add DPS check, or a "break three shields simultaneously" puzzle is not a weak matchup for a FIXATION build — it is a non-participation. |
+| **TERMINAL** | Anything with an enrage timer where the target does not die. Banked damage is delivered on death, expiry or a weak-point hit, so against a boss with no reachable weak point and a phase gate, a TERMINAL build's contribution can be genuinely zero until a threshold is crossed. |
+| **PERPETUAL** | Anything gated on a burst window. Ten seconds to refill a magazine is a build choice; a four-second damage window that opens once per phase is an encounter that structurally excludes it. |
+
+**This is not a request to weaken the keystones.** Each of those losses is what
+makes the keystone a decision, and O4 asks for breadth of options rather than
+higher ceilings. The finding is that **O31 constrains the encounter roster to
+always offer these three builds a lane**, and `Encounter-Design.md` is where that
+has to be enforced. Recorded here so the constraint has a named subject.
 
 ---
 

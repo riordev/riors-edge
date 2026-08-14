@@ -1,6 +1,17 @@
 # Core Tree Redesign — scouting the build axes (O30)
 
-Last reconciled against: O31
+**Last reconciled against: O32** (2026-08-14).
+
+> **CORRECTION, 2026-08-14: the headline count in §1.1 was wrong by six.** The
+> live Core roster is **seven clusters and 30 nodes**, not 24. The §1.1 table
+> itself has always been right — its rows sum to 4+5+2+3+4+6+6 = 30 — and 24 is
+> the total *without* the six Elements nodes, which is what the roster looked
+> like before the Elements cluster was authored. Every "24" in this document is
+> corrected below and marked. The count was re-derived by listing every
+> `Tree->Nodes.Add` call in `GetCoreSliceTree()`. **This matters beyond
+> bookkeeping: the "24" figure was quoted onward into
+> `Core-Constellations.md`'s O30 banner and into at least one work brief, so
+> the error had already propagated twice before it was caught.**
 
 **Status: SCOUTING. Nothing here is implemented and nothing here is ruled.**
 This document costs O30's proposal; it does not execute it. Every recommendation
@@ -38,8 +49,9 @@ impact in every encounter).
 **RECONCILED.** `Docs/Design/Core-Constellations.md` describes **six**
 constellations of **11 nodes / 26 points** each, of which five ship. The live
 roster in `Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp`
-(`GetCoreSliceTree`, lines 158-461) is **seven clusters and 24 nodes**, none of
-them 11 nodes deep:
+(`GetCoreSliceTree`, lines 158-461) is **seven clusters and 30 nodes**
+(**CORRECTED** from 24 — see the banner at the top; the table below always
+summed to 30), none of them 11 nodes deep:
 
 | Cluster | Live nodes | Where |
 |---|---|---|
@@ -124,10 +136,22 @@ the node's *effect authoring* is portable to any new structure with only its
 | Bulwark's three, Kinesis' four | 7 | Defence and mobility. **O30's taxonomy has no defensive axis at all.** See Open Question 1. |
 | Volley's Trigger Discipline, Last Round | 2 | Tag-only. They survive because they do nothing today either. |
 
-So of 24 live nodes, **21 survive a re-theme with no effect authoring at all**,
-and 7 of those (Bulwark + Kinesis) have nowhere to go in O30's taxonomy as
-stated. The expensive part of the redesign is not the existing content. It is
-the axes with no consumer (§2) and the minion system (§6).
+**CORRECTED: 30 live nodes, not 24** — and the table above accounts for all
+thirty, every row of it marked "survives as-is". **The "21 survive" figure that
+stood here does not follow from the table and is left unrecomputed.** It is
+reachable as 30 − 7 (Bulwark + Kinesis, homeless in O30's taxonomy) − 2
+(Volley's two tag-only nodes), but that reading contradicts the very next
+clause, which counts those same 7 as being *among* the survivors. Rather than
+pick a derivation and present it as the finding, both readings are recorded:
+
+- **30 nodes have portable effect authoring** (the table's own claim), of which
+- **7 (Bulwark + Kinesis) have nowhere to go in O30's taxonomy as stated** —
+  the taxonomy has no defensive axis at all (Open Question 1), and
+- **4 are inert or mis-named today** (§1.6), so re-homing them re-homes a debt.
+
+The conclusion the section was drawing survives either way: the expensive part
+of the redesign is not the existing content. It is the axes with no consumer
+(§2) and the minion system (§6).
 
 ### 1.5 The cost basis nobody should forget
 
@@ -155,7 +179,7 @@ mean more multiplier layers — see §4.4.
    the code comment at L211-214 says so.
 
 None of these is a scandal — each is documented at the code — but four of the
-tree's 24 nodes are currently either inert or paying in a currency their name
+tree's 30 nodes are currently either inert or paying in a currency their name
 does not describe. **A redesign that re-themes the tree without wiring these
 carries the same debt under new names.**
 
@@ -420,7 +444,7 @@ A plausible mapping (AUTHORED, illustrative only):
 
 | Cost | Assessment |
 |---|---|
-| Authored content | **LOWEST.** 21 of 24 nodes survive with a prefix change (§1.4). One new cluster to author. |
+| Authored content | **LOWEST.** Almost every one of the 30 live nodes survives with a prefix change (§1.4; the old “21 of 24” is CORRECTED — the total is 30 and the 21 is unrecomputed). One new cluster to author. |
 | Code | One enum row (fire rate) buys Cadence. Everything else is optional. |
 | Save | Prefix renames orphan every allocation — see §4.5. |
 | UI | Rename six strings, reposition six clusters, delete the `UNMAPPED` catch-all. Under an hour. |
@@ -432,7 +456,7 @@ Sixteen axes, sixteen clusters. Or a trimmed set — say ten.
 
 | Cost | Assessment |
 |---|---|
-| Authored content | **HIGHEST.** Sixteen clusters at Core-Constellations' 11-node/26-point grammar is 176 nodes against 24 today. Even at four nodes each it is 64. |
+| Authored content | **HIGHEST.** Sixteen clusters at Core-Constellations' 11-node/26-point grammar is 176 nodes against 30 today. Even at four nodes each it is 64. |
 | Code | Every axis in §2.5's "large" and "new system" tiers must be built first, or two-thirds of the board is inert clusters. |
 | Save | Same orphaning as A, at greater volume. |
 | UI | The board is a 1060x800 canvas holding six 300px cluster plates. Sixteen does not fit; it becomes a scrolling or paged map. Real UI work, not a rename. |
