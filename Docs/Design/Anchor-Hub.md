@@ -1,6 +1,21 @@
 # The Anchor Hub — the settlement, the loop through it, and the boundary it stands on
 
-**Last reconciled against: O28**
+**Last reconciled against: O32**
+
+**Nothing in O29–O32 touches this document's subject.** They rule gear depth,
+the Core-tree axes, content shape and legendary cadence; this document authors a
+*place*. Two second-order notes, both recorded rather than acted on:
+
+- **O31** ("no encounter may have a build that cannot participate") applies to
+  the hub only in that the hub is where a player *changes* build. It strengthens
+  §7's case for the Forge being reachable and legible, since respec is the
+  mechanism a player uses to answer an encounter they cannot participate in.
+- **The field around the Anchor gained a cover-anchor registry** (21 anchors) and
+  a real spatial grammar in `Docs/Design/Level-Design.md`. The hub's own spaces
+  were authored before that grammar existed and have **not** been checked against
+  it. Whether the camp's 14 m plaza and its 3 m interaction range read correctly
+  against G-numbers derived from the movement constants is an open question this
+  document does not answer.
 
 Domain: the main Anchor as a *place* — what the player does there, where each
 function physically sits and why, the suppression radius as the organising idea,
@@ -154,10 +169,20 @@ and `Source/RiorsEdge/Classes/BreakerMomentumComponent.cpp`. All primitives are
 `/Engine/BasicShapes` cubes and cylinders coloured by a dynamic material instance;
 the base cube is 100 cm, so a scale value reads directly as metres.
 
-**Note on ownership:** `Game/BreakerGameMode.cpp` is currently owned by another
-agent and `Combat/` by a third. Nothing in this document edits `Source/`. The
-inventory below is read-only observation and the build plan in §7 is a description
-of work, not a claim that it was done.
+**Note on ownership:** at the time of writing, `Game/BreakerGameMode.cpp` was
+owned by another agent and `Combat/` by a third. **Those lanes have since
+merged**, so the ownership note is historical — but the substantive part still
+holds: nothing in this document edits `Source/`. The inventory below is
+read-only observation and the build plan in §7 is a description of work, **not a
+claim that it was done**.
+
+**The inventory below has NOT been re-verified since the enemy-integration and
+field passes landed**, and `BreakerGameMode.cpp` changed substantially in them.
+Treat every number in the table as *last confirmed at transcription time* rather
+than as current. In particular the camp now shares a game mode with a cover
+registry, a wave budget solver and a boss spawner, and the five deltas below were
+derived against the file as it stood before any of that. Re-transcribe before
+acting on a specific value.
 
 | Thing | What it actually is | Where |
 |---|---|---|
