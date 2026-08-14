@@ -33,14 +33,8 @@ void UBreakerManaComponent::BeginPlay()
             CachedProgression = Progression;
             Progression->OnProgressionChanged.AddDynamic(this, &UBreakerManaComponent::HandleProgressionChanged);
         }
-        // Weapon hits are the Caster's primary bank. Statuses, kills, and
-        // reloads (Class-Kits 2.1) wait on hooks the combat and status layers
-        // do not publish attacker-side yet.
-        if (UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>())
-        {
-            Weapon->OnShot.AddDynamic(this, &UBreakerManaComponent::HandleShot);
-        }
     }
+    BindOwnerEvents();
     // Resolves the class, publishes the floor, and puts the Overcast state (and
     // its damage penalty) in agreement with a bank that may have been restored
     // from a save mid-debt.
@@ -50,7 +44,38 @@ void UBreakerManaComponent::BeginPlay()
 void UBreakerManaComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
 {
     Attributes = InAttributes;
+    // A component wired up outside a world never gets a BeginPlay, so this is
+    // where it picks up the shot and reset hooks. Idempotent.
+    BindOwnerEvents();
     RefreshClassOwnership();
+}
+
+void UBreakerManaComponent::BindOwnerEvents()
+{
+    AActor* Owner = GetOwner();
+    if (!Owner) return;
+
+    // Weapon hits ACCELERATE recovery (owner ruling 2026-08-14); passive
+    // regeneration is the primary path and needs no hook. Statuses, kills, and
+    // reloads (Class-Kits 2.1) wait on hooks the combat and status layers do
+    // not publish attacker-side yet.
+    if (UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>())
+    {
+        if (!Weapon->OnShot.IsAlreadyBound(this, &UBreakerManaComponent::HandleShot))
+        {
+            Weapon->OnShot.AddDynamic(this, &UBreakerManaComponent::HandleShot);
+        }
+    }
+    // The playtest reset and respawn path. "Start full" has to survive F1, or a
+    // reset would leave a Caster standing in the safe ring waiting out a refill
+    // that spawn already gave them once.
+    if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        if (!Combat->OnVitalsRestored.IsAlreadyBound(this, &UBreakerManaComponent::HandleVitalsRestored))
+        {
+            Combat->OnVitalsRestored.AddDynamic(this, &UBreakerManaComponent::HandleVitalsRestored);
+        }
+    }
 }
 
 float UBreakerManaComponent::HitGeneration(bool bWeakPoint, int32 LandedPellets, int32 PelletsPerShot, float WeaponHitGain, float WeakPointGain, float ProcCoefficient)
@@ -101,6 +126,11 @@ void UBreakerManaComponent::HandleProgressionChanged()
     RefreshClassOwnership();
 }
 
+void UBreakerManaComponent::HandleVitalsRestored()
+{
+    FillToMaximum();
+}
+
 void UBreakerManaComponent::RefreshClassOwnership()
 {
     if (!CachedProgression.IsValid() && GetOwner())
@@ -109,12 +139,29 @@ void UBreakerManaComponent::RefreshClassOwnership()
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    const bool bWasCaster = bIsCaster;
     bIsCaster = ObservedClass == EBreakerClassId::Caster;
     if (!bIsCaster) PendingGrants = 0.0f;
     // Order matters: close the floor first (which lifts a stranded negative
     // bank back to zero), then re-evaluate Overcast, so the incoming-damage
     // penalty can never outlive the class that justified it.
     SyncClassResourceFloor();
+    // Owner ruling 2026-08-14: a Caster starts FULL. Only on the transition
+    // INTO Caster, never on every refresh — this function is also the tick's
+    // safety poll and the respec handler, and refilling from either would hand
+    // a player a free bar mid-fight for doing nothing.
+    if (bIsCaster && !bWasCaster) FillToMaximum();
+    RefreshOvercastState();
+}
+
+void UBreakerManaComponent::FillToMaximum()
+{
+    if (!Attributes || !IsActiveForOwner()) return;
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    // Queued conditional income is discarded, not banked: it would otherwise
+    // arrive a frame after a refill and read as the bar overfilling.
+    PendingGrants = 0.0f;
+    Attributes->ApplyClassResource(Attributes->GetMaxClassResource());
     RefreshOvercastState();
 }
 
@@ -307,13 +354,11 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         PendingGrants = 0.0f;
         return;
     }
-    if (IsInSafeZone())
-    {
-        PendingGrants = 0.0f;
-        RefreshOvercastState();
-        return;
-    }
 
+    // Suspension is checked BEFORE regeneration, because Unmake suspends
+    // "Mana generation" (Class-Kits §2.2) and regeneration is now the bulk of
+    // it. If regeneration ran through the free window, Unmake would hand back
+    // most of its own 80-Mana price while it was being spent.
     if (IsGenerationSuspended())
     {
         PendingGrants = 0.0f;
@@ -321,8 +366,30 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
-    // The bank never decays and never trickles: with nothing queued there is
-    // nothing to do but keep the Overcast state honest.
+    // Passive regeneration, the primary recovery path under the 2026-08-14
+    // owner ruling. Deliberately ABOVE the safe-zone gate and outside the
+    // per-second generation budget:
+    //  * the safe-zone gate is an anti-FARM rule aimed at target-dependent
+    //    income, and a Caster who cannot refill in camp would have to leave it
+    //    to become able to fight;
+    //  * the budget is the ceiling on that same conditional income. Metering
+    //    the baseline through it would make every accelerator a no-op whenever
+    //    regeneration alone already filled the frame's allowance.
+    // Overcast doubling still applies, because clearing a debt faster is
+    // exactly what the doubling is for.
+    if (PassiveRegenPerSecond > 0.0f)
+    {
+        ApplyManaDelta(PassiveRegenPerSecond * DeltaTime * GenerationMultiplierForMana(GetMana(), OvercastGenerationMultiplier));
+    }
+
+    if (IsInSafeZone())
+    {
+        PendingGrants = 0.0f;
+        RefreshOvercastState();
+        return;
+    }
+
+    // Conditional income on top: accelerators, metered against the budget.
     if (PendingGrants > 0.0f)
     {
         const float Budget = ClampGeneration(GlobalGenerationCap, GlobalGenerationCap) * DeltaTime;

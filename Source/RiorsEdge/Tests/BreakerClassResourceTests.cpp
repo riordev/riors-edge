@@ -180,10 +180,13 @@ bool FBreakerClassResourceOvercastFloorTest::RunTest(const FString& Parameters)
     Mana->BindAttributes(Attributes);
 
     TestEqual(TEXT("A Caster's floor is open"), Attributes->GetClassResourceFloor(), -20.0f);
+    // A Caster now spawns with a FULL bar (owner ruling 2026-08-14).
+    TestEqual(TEXT("A fresh Caster starts full"), Attributes->GetClassResource(), Attributes->GetMaxClassResource());
 
     // Drive the bank into debt through the Mana loop, which is the only path
-    // allowed to (ability costs are GameplayEffects; spec D3).
-    Mana->GrantMana(30.0f, /*bIgnoreGlobalCap*/ true);
+    // allowed to (ability costs are GameplayEffects; spec D3). The bank is set
+    // explicitly so this test asserts the debt rule and not the fill rule.
+    Attributes->ApplyClassResource(30.0f);
     TestTrue(TEXT("The overdraft cast succeeds"), Mana->TrySpendMana(45.0f));
     TestEqual(TEXT("The bank is in debt"), Attributes->GetClassResource(), -15.0f);
 

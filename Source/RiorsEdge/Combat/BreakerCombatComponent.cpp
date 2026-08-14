@@ -352,9 +352,13 @@ void UBreakerCombatComponent::AddClassResource(float Amount)
 void UBreakerCombatComponent::RestoreVitals()
 {
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
-    Attributes->SetHealth(Attributes->GetMaxHealth());
-    Attributes->SetShield(Attributes->GetMaxShield());
+    // Same null-safe route as the damage and healing paths, and for the same
+    // reason: the generated setters ensure() with no ability system, which made
+    // the reset path unexercisable in automation exactly like the resource one.
+    Attributes->ApplyHealth(Attributes->GetMaxHealth());
+    Attributes->ApplyShield(Attributes->GetMaxShield());
     bDeathBroadcast = false;
+    OnVitalsRestored.Broadcast();
 }
 
 bool UBreakerCombatComponent::IsDead() const

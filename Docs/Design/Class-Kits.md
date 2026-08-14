@@ -296,7 +296,84 @@ Identity: projectile behavior — ricochet, pierce, arcs, range. Marksman is the
 
 **Fantasy:** the only class whose weapon is a *resource generator* rather than the primary damage source. The Caster shoots to pay for spells. A Caster with a full Mana bar and no ammunition is still dangerous; a Caster with full ammunition and no Mana is a worse shooter than every other class.
 
+> **AMENDED BY THE FANTASY INVERSION BELOW (owner ruling 2026-08-14).** The weapon is now an *accelerator*, not the income. "The Caster shoots to pay for spells" is superseded; a Caster who never fires still casts, more slowly.
+
 ## 2.1 The Mana loop
+
+### OWNER RULING — 2026-08-14 — THE BAR IS INVERTED
+
+> *"Caster's mana bar should be full and go down when using spells, and affixes like resource efficiency and resource regeneration should exist."*
+
+This supersedes the accumulating-bank model described in the rest of this
+section wherever the two conflict. **Mana starts FULL, spends DOWN, and
+REGENERATES back up.** Passive regeneration is the PRIMARY recovery path; the
+conditional sources below are kept, unchanged in their relative rates, and
+reframed as **accelerators** on top of it.
+
+What is implemented (`Source/RiorsEdge/Classes/BreakerManaComponent.*`):
+
+| Rule | Value | Note |
+|---|---|---|
+| Starting bank | `MaxClassResource` | Filled on becoming a Caster and on every vitals restore (spawn, respawn, F1 reset). A fresh Caster casts immediately. |
+| Passive regeneration | **6.0/s**, O2 PLACEHOLDER, `EditAnywhere` | Was +2.0/s. That number was a FLOOR under an accumulating loop and is far too slow as the primary path. 6.0/s refills the bar in ~17s and sustains one 30-cost cast every 5s with no target present. |
+| Conditional generation cap | **6.0/s**, O2 PLACEHOLDER, was 20.0/s | This is where the re-weighting was done. At par with regeneration it says exactly what the ruling asks: fighting well recovers at most twice as fast as standing still. |
+| Per-source rates | **unchanged** | Deliberately. SB1/SB3/VW1/MS1 and §2.7's shotgun-vs-rifle criterion are authored against these magnitudes, and the anti-Multishot 1/n ratio lives between them. |
+| Regeneration in the safe zone | runs | The safe-zone gate is an anti-FARM rule aimed at target-dependent income. A Caster who cannot refill in camp has to leave camp to become able to fight. |
+| Regeneration during Unmake | suspended | Unmake suspends "Mana generation" (§2.2), and regeneration is now most of it. Otherwise the ultimate refunds most of its own 80-Mana price while it is being spent. |
+| Regeneration while Overcast | doubled | Same rule as conditional generation. See the Overcast note below — this is now a materially bigger effect than it was. |
+
+**Resource efficiency.** Cost is composed as
+`cost = AuthoredCost * ResourceCostMultiplier * UnmakeWindowScalar`
+in `UBreakerCasterAbility::ComposeResourceCost`, read live on every cast so
+re-gearing mid-fight is immediate. The two factors multiply rather than fight:
+Unmake's 0 scalar makes a cast free regardless of efficiency, Long Dark's 0.5
+and a 20% efficiency roll read 0.4x, and there is no division anywhere so no
+scalar can be a divide-by-zero. Efficiency is floored
+(`MinimumResourceCostMultiplier`) — gear may reduce a cost, never eliminate it,
+because Mana *is* the cooldown.
+
+**Invalidated by the inversion, and NOT yet re-sited** (flagged rather than
+silently rewritten — these are owner calls):
+
+- **VW3 — Patience** ("passive Mana regeneration doubles while the caster has
+  not fired for 2s") was a minor trickle bonus and is now one of the strongest
+  nodes in the class, doubling the primary income for standing still. Reads as
+  over-tuned at the new rate.
+- **SB1 / SB3 / VW1 / MS1 / MS6 / MS11** are all *generation-rate* nodes. They
+  still function, but they now buy a share of the smaller half of the income,
+  so the branches that lead with them read weaker than authored.
+- **VW2 — Standing Water** (2-4 Mana/s from zones) was competitive with the old
+  +2.0/s baseline and is now a fraction of it.
+- **MS3 — Reservoir** (+15/+25 maximum Mana) *strengthens* under the inversion:
+  maximum Mana is now the size of the magazine you start with, not just a
+  ceiling you rarely reach. Its "one intentional stat node" exception is more
+  defensible than when it was written.
+- **SB9 — Reprisal** and **MS5 — Payment** (cost refunds) are unaffected.
+- **§2.7 acceptance criterion 1** ("one 25-cost ability roughly every 13
+  seconds from passive regeneration alone") must be restated: at 6.0/s it is
+  roughly every 4 seconds, and the criterion's *point* — that a Caster with no
+  target is not helpless — is better served by the new number.
+
+**Overcast, re-read against a full bar.** Unaffected in mechanism: the negative
+floor, the doubling, the +15% incoming damage, and the refuse-rather-than-
+truncate rule at `UBreakerCasterAbility::CheckCost` all behave identically.
+Its *meaning* moved, and one part is worth an owner look. Overcast was designed
+as "the fourth cast is expensive rather than impossible" when the bar was hard
+to fill; with a full starting bar it reads instead as "the bar is a magazine
+and the overdraft is the last round", which is arguably a cleaner read. But the
+doubled generation now applies mostly to a 6.0/s regeneration rather than to
+target-dependent income, so a 20-deep debt is repaid in **under two seconds of
+standing still**. Overcast's cost is now almost entirely the 15% damage window,
+not the recovery time. §2.7 criterion 4 ("Overcast cannot produce a net-positive
+Mana loop") still holds — the debt is repaid, never profited from — but the
+*deterrent* is weaker than authored. Deepening the floor, lengthening the
+penalty past the debt, or exempting regeneration from the doubling are the
+three obvious dials; none is taken here, because that is a tuning ruling.
+
+---
+
+*Original section, retained for reasoning (see the amendment above for what is
+superseded):*
 
 Mana is a 0-100 bar with slow passive regeneration and fast conditional generation. Unlike Momentum it never decays — it is a *bank*, not a *state*. This is the deliberate opposite of Swift, and it is why the two classes prototype together: they prove the resource attribute supports both a decaying state machine and an accumulating wallet.
 
@@ -304,14 +381,14 @@ Mana is a 0-100 bar with slow passive regeneration and fast conditional generati
 
 | Source | Rate | Cap / anti-farm rule |
 |---|---|---|
-| Passive regeneration | +2.0/s, always, in and out of combat | Scaled by the universal `Resource (regen /s)` affix. Alone, a full bar takes 50s — usable but never sufficient. |
+| Passive regeneration | +2.0/s, always, in and out of combat — **SUPERSEDED, now 6.0/s and the primary path** | Scaled by the universal `Resource (regen /s)` affix. Alone, a full bar takes 50s — usable but never sufficient. |
 | Weapon hit | +1.5 | Proc coefficient applies. Multishot pellets generate at 1/n, so a shotgun and a rifle bank at comparable rates. **This is the anti-Multishot rule and it is mandatory.** |
 | Weak-point hit | +4.0 | Replaces the weapon-hit gain, does not stack with it. |
 | Kill | +8.0 | Flat. Stacks with `Resource on Kill`. |
 | Status application (Bleed, Poison, and later elemental) | +3.0 | 0.4s internal cooldown *per status type*. DoT ticks generate nothing — only applications. Prevents Tick Frequency from becoming a Mana engine. |
 | Reload completed | +6.0 | Once per reload; no credit for cancelled reloads. Rewards the down-time the class already has. |
 
-**Global generation cap: 20 Mana per second.** Lower than Swift's because Caster generation is target-dependent and a dense pack would otherwise fill the bar instantly.
+**Global generation cap: 20 Mana per second.** Lower than Swift's because Caster generation is target-dependent and a dense pack would otherwise fill the bar instantly. **SUPERSEDED 2026-08-14: 6.0/s**, at par with the new regeneration rate, so conditional income is an accelerator rather than the income.
 
 **Spending**
 
