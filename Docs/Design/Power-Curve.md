@@ -335,3 +335,46 @@ See the §4 entry above: the band measures 8.74x, the accumulation baseline is
 cut to 0.25%/point, the affix pool is 18 lines with damage on all eight slots,
 and `RiorsEdge.Progression.PowerBand` pins the ratio so a future tuning pass
 cannot flatten builds silently.
+
+## OPEN: the endgame item-level clamp
+
+Found while writing `RiorsEdge.Combat.PowerCurve.Composition`, which is the
+first test to compose the two curves rather than checking each half alone.
+Across the levelling game the composition is **exact**: an unmodified character
+in on-level gear has an identical baseline TTK at area level 1, 10, 25 and 50,
+because `w` and `g` are both 0.09 and cancel term for term. That is §3's
+prediction, confirmed.
+
+Past the character cap it breaks, and the contradiction is between this
+document and the code:
+
+- **§1 claims**: "because area level drives drop item level, climbing tiers is
+  what keeps gear improving after the level cap. That is the mechanism by which
+  'all endgame character power comes from gear' actually functions."
+- **The code does not do that.** `GetDropItemLevel` clamps to 50, for a sound
+  local reason stated at the function: affix tier tables are authored to 50 and
+  rolling past the end of the tier curve produces illegal items. Meanwhile the
+  chassis keeps climbing to area level 100.
+
+So across the whole endgame the monster curve runs and the player's base-damage
+curve does not. Measured: baseline TTK is **1.00x at area level 50 and 74x at
+area level 100**. Nothing in the game answers that 74x. The build variance band
+is 8.7x, which does not come close, and it is the same band a level-50 player
+already has — it is not endgame progression, it is the price of entry.
+
+This is not a bug in either function. Both are correct in isolation; what is
+missing is a **design**. The endgame needs a power source that keeps climbing
+past item level 50, and which one it gets is an owner ruling:
+
+| Option | Shape | Cost |
+|---|---|---|
+| Extend the affix tier table past 50 | Fewest moving parts; §3's mechanism works as written | Tier authoring to whatever the ceiling becomes; the T0/T-1 spike needs re-siting |
+| An item level track above 50 with a separate value curve | Keeps the 1-50 tier table untouched | A second curve to author and keep aligned with `g` |
+| Ascended rarities above Anomalous | Rarity is already a strong felt axis | Rarity currently gates affix COUNT, not magnitude — a new rule |
+| A separate endgame multiplier (paragon-like) | Familiar, easy to tune | Collides with the locked "no post-cap character power" rule; would need O-ledger amendment |
+| Cap area level at 50 | Free; the contradiction disappears | Deletes the endgame tier ladder, and with it the reason to keep playing past 50 |
+
+Until one is ruled, `RiorsEdge.Combat.PowerCurve.EndgameClamp` asserts the gap
+is **still open**, so it cannot be quietly forgotten. That test failing is good
+news; it means someone closed it, and the instruction at the test is to delete
+it and rewrite §1 to describe whatever now carries endgame power.
