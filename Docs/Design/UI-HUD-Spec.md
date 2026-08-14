@@ -130,3 +130,30 @@ Deviations, all deliberate:
   confirmation) is not in the design canvas. It is kept, restyled onto the
   tokens, at `text/muted` in the top-left — it is instrumentation, not shipping
   UI, and it leaves with the gym.
+
+
+## Type-size corrections from looking at it (2026-08-14)
+
+The spec's cluster type sizes were authored on a design canvas and never seen
+in-engine. Once the screenshot harness existed the owner looked at the rendered
+HUD and asked for two of them down: *"the settled font and the gun ammo size
+seem a little too big and disjointed on both ends."*
+
+| Readout | Spec | Shipped | Why |
+|---|---:|---:|---|
+| Class-resource state word | 17 | **13** | It is a CONFIRMATION of what the track already says in colour, fill height and block texture. At 17 it competed with the track for the row instead of annotating it. |
+| Magazine | 44 | **32** | At 44 it was taller than the weapon name and state line stacked together, pulling the eye into the corner — the opposite of what a subordinate readout should do. |
+| Reserve | 18 | **15** | Held in proportion to the magazine. |
+
+All three are now tokens in `BreakerUIStyle.h` (`HudResourceStatePixels`,
+`HudMagazinePixels`, `HudReservePixels`) rather than literals at the call site,
+so the next size request is a one-line edit in one place.
+
+**"Disjointed" was a real geometry bug, not only a size complaint.** Both pairs
+were positioned with hand-tuned vertical offsets — `Y + Pad - 3` for the state
+word, `+2` and `+22` for the two ammo numbers — that only coincidentally lined
+up at the sizes they were tuned against, and drifted apart the moment either
+size moved. Each pair now shares one **baseline computed from the measured
+glyph heights**, so the smaller number sits on the larger one's bottom edge at
+every size and every UI scale. That is the same class of fix as the
+`MOMENTUMSETTLED` collision: a magic number replaced by a measurement.

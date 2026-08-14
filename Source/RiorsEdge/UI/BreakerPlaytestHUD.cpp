@@ -499,9 +499,22 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         // found by looking at a screenshot, because no test can see a
         // collision. Measuring also keeps Caster's shorter "MANA" from leaving
         // a hole, which a wider fixed gutter would have.
+        //
+        // 13px, down from the spec's 17. Owner, looking at it on a screen:
+        // the state word "seems a little too big and disjointed". It is a
+        // CONFIRMATION of what the track already says in colour, fill height
+        // and block texture -- at 17 it was competing with the track for the
+        // row instead of annotating it.
+        //
+        // Both strings now share a BASELINE derived from their measured
+        // heights rather than from a hand-tuned vertical nudge. The old
+        // -3px offset was eyeballed against 17px text and would have gone
+        // wrong the moment either size moved, which is exactly what happened.
         const FVector2D ResourceLabelSize = MeasureSpecText(Row.Label, 11.0f);
+        const FVector2D StateWordSize = MeasureSpecText(Row.StateWord, BreakerUI::HudResourceStatePixels);
+        const float ResourceBaseline = Y + Pad + ResourceLabelSize.Y;
         DrawSpecText(Row.StateWord, InnerX + ResourceLabelSize.X + S(BreakerUI::Space8),
-            Y + Pad - S(3.0f), Row.StateColor, 17.0f);
+            ResourceBaseline - StateWordSize.Y, Row.StateColor, BreakerUI::HudResourceStatePixels);
         DrawSpecTextRight(FString::Printf(TEXT("%.0f M/S"), Character->GetHorizontalSpeed() / 100.0f),
             InnerRight, Y + Pad, BreakerUI::TextMuted, 11.0f);
 
@@ -525,14 +538,30 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         DrawSpecText(StateText, InnerX, WeaponRowY + S(28.0f),
             Weapon->IsReloading() ? BreakerUI::Orange : BreakerUI::TextMuted, 11.0f);
 
-        // Magazine dominates; reserve is deliberately subordinate (number-large
-        // at 44, reserve at 18 in text/muted).
+        // Magazine dominates; reserve is deliberately subordinate. 32/15, down
+        // from the spec's 44/18 -- owner, looking at it: "the gun ammo size
+        // seems a little too big and disjointed on both ends". At 44 the
+        // magazine was taller than the weapon name and the state line stacked
+        // together and pulled the eye to the corner of the screen, which is
+        // the opposite of what a subordinate readout should do.
+        //
+        // "Disjointed" was a real geometry bug, not only a size complaint: the
+        // two numbers were positioned by two hand-tuned vertical offsets (+2
+        // and +22) that only coincidentally lined up at 44/18 and would drift
+        // apart at any other pair. They now share one BASELINE computed from
+        // the measured glyph heights, so the reserve sits ON the magazine's
+        // bottom edge at every size and at every UI scale.
+        const FString MagazineText = FString::Printf(TEXT("%d"), Weapon->GetMagazineAmmo());
         const FString Reserve = FString::Printf(TEXT("/%s"), *BreakerUI::FormatTicker(Weapon->GetReserveAmmo()));
-        const FVector2D ReserveSize = MeasureSpecText(Reserve, 18.0f);
-        DrawSpecTextRight(Reserve, InnerRight, WeaponRowY + S(22.0f), BreakerUI::TextMuted, 18.0f);
-        DrawSpecTextRight(FString::Printf(TEXT("%d"), Weapon->GetMagazineAmmo()),
-            InnerRight - ReserveSize.X - S(BreakerUI::Space4), WeaponRowY + S(2.0f),
-            Weapon->GetMagazineAmmo() > 0 ? BreakerUI::TextPrimary : BreakerUI::Harm, 44.0f);
+        const FVector2D MagazineSize = MeasureSpecText(MagazineText, BreakerUI::HudMagazinePixels);
+        const FVector2D ReserveSize = MeasureSpecText(Reserve, BreakerUI::HudReservePixels);
+        const float AmmoTop = WeaponRowY + S(6.0f);
+        const float AmmoBaseline = AmmoTop + MagazineSize.Y;
+        DrawSpecTextRight(Reserve, InnerRight, AmmoBaseline - ReserveSize.Y,
+            BreakerUI::TextMuted, BreakerUI::HudReservePixels);
+        DrawSpecTextRight(MagazineText, InnerRight - ReserveSize.X - S(BreakerUI::Space4), AmmoTop,
+            Weapon->GetMagazineAmmo() > 0 ? BreakerUI::TextPrimary : BreakerUI::Harm,
+            BreakerUI::HudMagazinePixels);
     }
 
     // --- Row 3: three ability squares, anchored to the bottom pad (§3) ----

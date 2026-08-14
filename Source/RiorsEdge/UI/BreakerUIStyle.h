@@ -174,6 +174,20 @@ namespace BreakerUI
     inline constexpr float HudMomentumTrackHeight = 12.0f;
     inline constexpr float HudEnemyBarWidth = 180.0f;
     inline constexpr float HudEnemyBarHeight = 8.0f;
+    // --- Combat cluster type sizes ----------------------------------------
+    // Tokens rather than literals at the call site, because these three are
+    // the sizes the owner has actually asked to move and the next request
+    // should be a one-line edit in one place.
+    //
+    // All three sit BELOW the HUD spec's authored figures (17 / 44 / 18), on
+    // the owner's direct feedback after seeing them rendered: the state word
+    // and the magazine were "a little too big and disjointed on both ends".
+    // The spec's numbers were authored on a design canvas and never looked at
+    // in-engine; these were.
+    inline constexpr float HudResourceStatePixels = 13.0f;   // spec 17
+    inline constexpr float HudMagazinePixels = 32.0f;        // spec 44
+    inline constexpr float HudReservePixels = 15.0f;         // spec 18
+
     inline constexpr float HudCrosshairBox = 80.0f;
 
     // Damage number sizes, section 4 of the HUD spec.
