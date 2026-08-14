@@ -9,7 +9,34 @@ Status: synthesis pass 1. This document does not author new systems. It reads th
 
 It closes with a build-order recommendation and a single deduplicated, ranked list of the decisions that need the project owner.
 
-**Authority.** `Docs/Design/Master-Sheet-Import.txt` is law. Where this document disagrees with it, the disagreement is labelled and the master sheet still wins until the owner rules. Where this document disagrees with one of the seven design docs, this document wins, because it can see the other six.
+**Last reconciled against: O32**
+
+**AUTHORITY — CORRECTED BY O28, READ THIS BEFORE THE REST.** The line below is
+how this document was written and it is **no longer true**:
+
+> ~~`Docs/Design/Master-Sheet-Import.txt` is law. Where this document disagrees
+> with it, the disagreement is labelled and the master sheet still wins until
+> the owner rules.~~
+
+`Master-Sheet-Import.txt` is **superseded**. It is historical source material
+and **is not to be cited as authority again**. The chain is three links:
+
+1. `Docs/Design/Decisions.md` — the append-only O-ledger, owner-authored, law.
+2. `CONTEXT.md` — current state, and its next-actions list is the operative plan.
+3. This document — a **map, not law** — then the per-domain docs.
+
+Where this document disagrees with one of the design docs, this document still
+wins, because it can see the others. Where it disagrees with `Decisions.md`,
+`Decisions.md` wins without argument.
+
+**⚠ THE O-NUMBERS IN §7 ARE NOT THE O-NUMBERS IN `Decisions.md`.** §7 was
+written before the ledger existed and numbers its own questions O1–O25. Those
+labels coincide with the ledger for O1–O17 and then **diverge**: this
+document's O18 asks whether the slice ships three or five weapons, while ledger
+O18 sets the TTK targets; this document's O19 asks whether the slice
+legendaries are Anomalous or Aberrant, while ledger O19 rules the element
+collisions. **Always say which file an O-number is from.** A citation to "O19"
+with no file is ambiguous and has to be resolved by reading both.
 
 **Corpus read for this pass:** Master-Sheet-Import.txt, Core-Constellations.md, Class-Kits.md, XP-And-Pacing.md, Encounter-Design.md, Game-Modes.md, Save-Architecture.md, UI-UX-Spec.md, Art-And-Modelling-Plan.md, plus `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`, `Docs/Item-Foundation.md`, `Docs/Roadmap.md`.
 
@@ -269,7 +296,27 @@ Together, a second Breaker arrives at level 50 in 26 hours wearing the first one
 
 ---
 
-## 6. Build-order recommendation
+## 6. Build-order recommendation — **RETIRED TO HISTORICAL (O28)**
+
+**Do not plan from this section.** O28 retires it explicitly, alongside
+`Roadmap.md`'s five milestones. It describes a plan the project no longer
+follows; the actual loop is **playtest → report → fix**, and
+**`CONTEXT.md`'s next-actions list is the operative plan.**
+
+It is kept because the reasoning is auditable and, read as a prediction, it
+turned out well: Tier 0's three decisions all landed (O1, O8, and the damage
+pipeline spec), Tier 1's wave mode and its instrumentation are the reason any
+TTK number exists at all, and Tier 2's item-level and save retrofits were both
+done before the content that would have made them expensive. What it got wrong
+is the shape rather than the contents — the tiers did not execute in order,
+because owner playtests kept re-prioritising, which is precisely why O28
+replaced it with a next-actions list that can be reordered every session.
+
+Two of its tiers are also now factually stale: Tier 5's Field Marshal is built
+and spawning, and Tier 3's XP system still does **not** exist, which is the
+root cause of the third-jump gate being unreachable (see `CONTEXT.md`).
+
+The original text follows unedited.
 
 The governing observation: **almost every number in all seven documents is downstream of a time-to-kill that does not exist, and the only instrument that can produce it is wave-mode instrumentation in the gym.** The second observation: three things in this corpus are cheap this week and expensive forever after — item-level sourcing, save file safety, and enum discipline.
 
@@ -324,7 +371,48 @@ The order below follows both, and preserves the project rule that every mileston
 
 ## 7. OPEN QUESTIONS — the owner-decision list, deduplicated and ranked
 
-Ranked by how much downstream work each blocks. Every item carries a recommended default, so a decision can be a single word.
+**STATUS, reconciled against `Decisions.md` through O32.** O28 keeps this
+section as the **question** list and requires it to be reconciled against the
+ledger rather than answering anything on its own. Most of it is now answered.
+**Numbering caution repeats: these O-numbers are this document's, not the
+ledger's, and they diverge from O18 onward.**
+
+| §7 question | Status against the ledger |
+|---|---|
+| O1 block/dodge, stamina | **RULED** — ledger O1. Passive; stamina pool deleted. |
+| O2 measure before authoring | **RULED** — ledger O2. Wave mode built; `O2 PLACEHOLDER` is now the project-wide flag. |
+| O3 More composition and budget | **RULED** — ledger O3. Unordered product, hard cap 3. |
+| O4 time to a finished build | **RULED** — ledger O4. 300–400 h, viable by ~25. |
+| O5 elemental resistance | **RULED** — ledger O5/O19. Rift / Entropy / Void, after armour, before shields. **Not built.** |
+| O6 hybrid item level | **RULED** — ledger O6. |
+| O7 which Core Point list | **RULED** — ledger O7. |
+| O8 rename Anomaly | **RULED** — ledger O8. "Frontier". |
+| O9 enemy taxonomy | **RULED** — ledger O9, and now BUILT: rank multiplies the chassis, `bIsElite` is gone, ten modifiers spawn. |
+| O10 tick interval in the snapshot | **RULED** — ledger O10. |
+| O11 Aberrant limit | **RULED** — ledger O11. |
+| O12 crafting currencies | **RULED** — ledger O12. Scalar. **No UI, no save wallet.** |
+| O13 rocket self-damage | **RULED** — ledger O13. |
+| O14 player as a person | **RULED** — ledger O14. |
+| O15 branch nodes vs gates | **RULED** — ledger O15. Freely mixed — **and this is what subclass commitment still collides with.** |
+| O16 hardcore | **RULED** — ledger O16. No. |
+| O17 account stash | **RULED** — ledger O17. |
+| O18 three or five slice weapons | **ANSWERED BY THE CODE, not by a ruling.** Five exist (Rifle, SMG, Sniper, Shotgun, Rocket). Ledger O18 is a different question entirely. |
+| O19 are the slice legendaries Anomalous or Aberrant | **RULED — ledger O32, and the question's framing was wrong.** They are neither-or-rather-both-and-more: **Anomalous is a rarity**, and **legendary is a separate field** naming an authored item. Every legendary rolls Anomalous; most Anomalous drops are not legendaries. Aberrant does not enter into it. |
+| O20 party loot distribution | **STILL OPEN.** No party code exists. |
+| O21 Frontier tiers infinite or capped | **STILL OPEN.** |
+| O22 elite loot floor vs modifier count | **PARTIALLY ANSWERED by the drop pipeline.** The elite Exceptional floor survives but now COMPOSES with the rarity gates rather than competing with them — it can only lift a drop to a rarity the drop's item level actually unlocks. Whether it should additionally scale with modifier count is **still open**. |
+| O23 stagger / flinch | **STILL OPEN.** Nothing built. |
+| O24 XP in endgame | **STILL OPEN — and now blocking.** There is no XP system at all, which is why the third-jump gate keyed to `CharacterLevel` was unreachable by construction. |
+| O25 keystone respec friction | **STILL OPEN.** |
+
+**Questions the ledger has since raised that this section never asked**, and
+which now outrank most of what is above: the O29 power band (~15x measured
+against an authored 8–10x, holding two tests red); O30's Core-tree redesign
+around build axes and the `EBreakerBuildCondition` widening it needs; O31's
+requirement that no encounter have a build that cannot participate; and O32's
+legendary pool, ruled to grow and still at three items. See `CONTEXT.md`.
+
+Original text follows. Ranked by how much downstream work each blocks. Every item carries a recommended default, so a decision can be a single word.
 
 ---
 

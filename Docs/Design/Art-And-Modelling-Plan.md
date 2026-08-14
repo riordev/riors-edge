@@ -3,7 +3,18 @@
 Owner: Art / Character direction
 Status: Design pass. No assets authored yet.
 Scope: Vertical slice only, with production hooks for Act I–II.
-Reads from: `Docs/Design/Master-Sheet-Import.txt` (LOCKED decisions are law), `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`.
+Reads from: `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`, and — **for history only** — `Docs/Design/Master-Sheet-Import.txt`.
+
+**Last reconciled against: O32**
+
+**AUTHORITY CORRECTION (O28).** This document was written treating the master
+sheet's LOCKED decisions as law. **They are not.** `Master-Sheet-Import.txt` is
+superseded historical source material and is not to be cited as authority again.
+Every "master sheet N.N" citation below should be read as *"this is where the
+idea came from"*, never as *"this is settled"* — several of them (the Anomalous
+equip limit of 1, the rarity colour table, the unique-weapons question at 12.5)
+have no corresponding entry in `Decisions.md` and are therefore **not ruled at
+all**. Check the ledger before building against any of them.
 
 **Rulings applied to this document** (`Docs/Design/Decisions.md` is law and supersedes any conflicting text here): **O1** (§0, §3.5, §7.4 Phase A — block/dodge passive, no stamina, Parry the only defensive input), **O5** (§2b — three elements, and the teal collision it creates), **O19** (§2b — the teal collision is RULED and closed; the elements are **Rift / Entropy / Void**, "Time" is renamed), **O9** (§2.1 — elites carry Modifiers), **O14** (§3.1 and the note before Phase A — two player models, shared rig). **O8** sweep: the content-type word "Anomaly" does not occur in this document, so no rename was needed; every "Anomalous" here is the **rarity tier**, which keeps its name.
 
@@ -449,6 +460,15 @@ Modular split — six visible slots (WAIST is a mesh; NECK is small; P1/P2 are w
 Anomalous being the only rarity permitted rift chroma is deliberate and reinforces Pillar 3: the rule-rewriting item is visibly rift-derived.
 
 EXTENDS — the master sheet fixes rarity colours but not gear visual treatment. This is new, and it commits to only ~1 bespoke mesh per Anomalous (there are 3 build-defining legendaries in the slice, so 3 meshes).
+
+> **CORRECTION (O32).** That parenthesis conflates two different things. Legendary
+> is not a rarity: **Anomalous is the rarity**, and **legendary is a separate
+> field** naming an authored item. Every legendary is Anomalous, but most
+> Anomalous drops are not legendaries, so "1 bespoke mesh per Anomalous" would
+> commit to a bespoke mesh for every fifth-tier drop in the game. The rule this
+> row should carry is **one bespoke mesh per LEGENDARY**, and generic Anomalous
+> drops get the rarity treatment ladder only. See open question 9 for the budget
+> consequence — the legendary pool is ruled to grow and has no target size.
 
 **Marquee-affix tell (master sheet 3.4 explicitly asks for this).** *Accuracy While Airborne* is called out as the affix that most sells "movement FPS" and is told to be *visually obvious on the item*. Implementation: any HELM or GLOV rolling Accuracy While Airborne at T2 or better gets a stabiliser element — a small gyroscopic housing on the helmet temple, or a wrist brace on the glove — with a slow idle rotation. Visible in the paper-doll and in first person on the gloves.
 
@@ -987,6 +1007,12 @@ Realistic planning number: **20 weeks**, because mechanic churn is certain and t
 
 8. Elite modifier list is undesigned (master sheet 10.3). **REVISED:** this plan now assumes elites are material + scale + **one shared modifier-VFX library of ~six reusable effects**, with no new mesh and no per-modifier bespoke effect. If any elite modifier needs bespoke geometry, or cannot be composed from the six primitives, that assumption and the Phase C budget both break. **GAP — Phase C's duration has not been re-estimated to absorb the library.**
 
-9. Are the three build-defining legendaries in the slice Anomalous or Aberrant? Master sheet 12.5 asks whether unique weapons and Anomalous items are the same system. Determines whether they need bespoke meshes (Anomalous) or attachment + emissive mark (Aberrant) — a difference of roughly a week.
+9. ~~Are the three build-defining legendaries in the slice Anomalous or Aberrant?~~ **RULED — `Decisions.md` O32, and the question's framing was wrong.** They are not "Anomalous *or* Aberrant", because legendary is not a rarity at all. **Anomalous is a rarity** (the fifth tier, gating affix count and tier ceiling, carrying one *rolled* rule rewrite from a generic pool of four). **Legendary is a separate field** — `FBreakerItemInstance::LegendaryId` — naming a specific authored item with a fixed slot, guaranteed affixes and a *hand-authored* rule. **Every legendary rolls at Anomalous rarity; most Anomalous drops are not legendaries.** Aberrant does not enter into it.
+
+    **The art consequence, which is the reason this question was asked: three bespoke meshes, not attachments — but the cost model in §3.3 is now wrong in both directions.** §3.3 commits to "~1 bespoke mesh per Anomalous (there are 3 build-defining legendaries in the slice, so 3 meshes)", which silently assumed one mesh per legendary *and* that Anomalous and legendary are the same population. They are not. The honest budget has two lines:
+    - **Legendaries: one bespoke mesh each, and the pool is ruled to GROW.** O32 keeps the drop rate and grows the pool instead, because three legendaries covering three of eight slots is what makes the current wait ~57 hours rather than ~21. So this is not a fixed 3 — it is 3 today, 8 at one per slot, and more after. **Whoever costs art for this needs the target pool size, and nobody has ruled one.** It is the largest uncosted art commitment in this plan.
+    - **Generic Anomalous drops carry a *rolled* rule from a pool of four and are ordinary items otherwise.** They cannot each have a bespoke mesh — they are a rarity, not a set. They need the rarity treatment ladder (rift chroma on the item, unmistakable at a glance) and nothing bespoke.
+
+    **Gap for the owner:** this document does not say how a legendary reads differently from a generic Anomalous drop *on the item itself*. Both are rift-chroma'd rule-rewriters under §3.3. If a named legendary is meant to be recognisable as that specific item at a glance — and a looter shooter usually wants it to be — that is a visual language this plan has not authored.
 
 10. What is the target platform and performance envelope? All triangle budgets, Nanite decisions, and the paper-doll capture budget in this document assume a PC target roughly equal to the Windows dev machine. A console or Steam Deck target would revise every number in §7.5.

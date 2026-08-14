@@ -1,5 +1,7 @@
 # FIELDPLATE — Combat HUD spec
 
+**Last reconciled against: O32**
+
 Owner-authored design canvas, transcribed from `HUD.dc.html` on 2026-08-13.
 Reads on top of `UI-Style-Guide-Fieldplate.md`; every colour token below is
 defined there. Reference resolution 1920×1080; the implementation scales all
@@ -279,11 +281,24 @@ Deviations, all deliberate:
   needs a known total duration; `UBreakerAbilityStateComponent` exposes only
   remaining time, so the step-down keys off the final 3 seconds directly, which
   is what the spec describes anyway.
-- **Overcast is not reachable in play yet.** `UBreakerAttributeSet::
-  PreAttributeChange` clamps ClassResource to `[0, Max]`, so nothing drives the
-  bank negative until the `ClassResourceFloor` attribute (spec D8) lands. The
-  debt half of the track is correct the moment it does; it is verified by the
-  `RiorsEdge.UI.ClassResourceRow` automation test, not by a playtest.
+- ~~**Overcast is not reachable in play yet.**~~ **SUPERSEDED 2026-08-14 — it is
+  reachable.** `UBreakerAttributeSet` gained the replicated `ClassResourceFloor`
+  attribute (spec D8), defaulting to **0** for every class so Swift's Momentum is
+  bit-identical, and `PreAttributeChange` now clamps ClassResource to
+  `[Floor, Max]` — which is what lets an ordinary GAS cost effect drive the bank
+  negative. `UBreakerManaComponent` owns the floor and publishes it only while
+  the permanent class is Caster. The debt half of the track is live.
+- **The Mana row's SEMANTICS inverted underneath this section, and the drawing
+  did not change.** Per an owner ruling on 2026-08-14, Mana no longer
+  accumulates from zero — the bar **starts full, spends down, and regenerates**
+  (`PassiveRegenPerSecond` 6.0/s), with conditional income from weapon hits
+  demoted to an accelerator capped at par with it. The signed channel described
+  above is still exactly right, because Overcast is still the only thing that
+  crosses zero and length-reads-magnitude / side-reads-sign is indifferent to
+  which direction the ordinary case travels. **What is NOT re-checked is the
+  label.** `BANKED` was chosen for an accumulating bank and now names a pool
+  that starts full; whether it should read `MANA` is a copy question this spec
+  should answer and currently does not. **Recorded for the owner, not decided.**
 - **Playtest chrome** (F1/F2/F3 key legend, diagnostics panel, report-copied
   confirmation) is not in the design canvas. It is kept, restyled onto the
   tokens, at `text/muted` in the top-left — it is instrumentation, not shipping
@@ -361,3 +376,51 @@ absorbed state, and a wave banner cycling its three shapes — the owner's
 drawing paths, so what is photographed is the real thing.
 
 Combine with `-BreakerAutoPlay -BreakerScreenshots=N`.
+
+## The verified / unverified split for this HUD (2026-08-14)
+
+Stated in one place, because "photographed" and "playtested" are different
+claims and this spec makes both.
+
+**VERIFIED BY LOOKING** — captured at 1920×1080 and read:
+
+- The whole bottom-right combat cluster: plate, rail, class-resource track with
+  its notches and state word, weapon/ammo row on its shared baseline, and the
+  three ability squares in their resting state.
+- The bottom-left vitals plate: shield over health, the fixed 84px value column,
+  the armour chips, and the status chips **inside their new bound** (they
+  previously ran rightward with no bound at all and walked off the plate).
+- Damage numbers at every magnitude the abbreviation table produces, plus the
+  weak-point and crit sizes and the absorbed treatment.
+- The hit marker in all three tick states, including the absorbed corner
+  brackets.
+- The wave banner in all three shapes it can take.
+- The minimap plate, graticule, safe ring, blips and player triangle.
+
+The last three exist as captures **only because `-BreakerCaptureHUD` was
+written**, and all three had shipped wrong before it existed.
+
+**NOT VERIFIED, and the harness structurally cannot** — it has no mouse and
+cannot pull a trigger or press a key:
+
+- Every hover state anywhere on the front end. On this HUD that is limited (the
+  canvas HUD is not hover-driven), but the loot popup's look-at behaviour is
+  adjacent and has only ever been seen in its resting composition.
+- The four **ability state overlays** — ready, window-active, cooldown wedge,
+  unaffordable. `-BreakerCaptureHUD` fabricates damage and banner events; it
+  does not yet fabricate ability states. See `UI-Ability-Icons-Spec.md`.
+- The Overcast debt half of the resource track. It is reachable in play now, but
+  reaching it requires a Caster overspending, which a headless run does not do.
+  Proven by `RiorsEdge.UI.ClassResourceRow`, which is arithmetic, not a picture.
+
+**NOT VERIFIED, and no capture ever will be** — these need a playtest:
+
+- Whether 56 cm per pixel is the right minimap window.
+- Whether the absorbed read is noticed mid-fight, which is the entire point of
+  it.
+- Whether the damage-number hierarchy survives at combat pace, and whether the
+  abbreviation reads as information or as a number that got smaller.
+- Whether the cluster's peripheral position works while aiming.
+
+**A screenshot shows composition. It has never once shown whether something
+feels right, and this spec should not be read as claiming otherwise.**

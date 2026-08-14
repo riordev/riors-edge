@@ -1,5 +1,7 @@
 # FIELDPLATE — Loadout / inventory screen spec
 
+**Last reconciled against: O32**
+
 Owner-authored design canvas, transcribed from `Inventory.dc.html` on
 2026-08-13. Reads on top of `UI-Style-Guide-Fieldplate.md`.
 
@@ -185,6 +187,28 @@ Still unverified:
   BY COLOUR) reads correctly and is verified.
 - The ▲/▼ tofu question is therefore still open — see the delta-glyph note
   below.
+
+**The empty-backpack problem got HARDER, not easier, on 2026-08-14.** A capture
+run does not fight, so the only way a backpack fills is a dev grant — and the
+drop pipeline now means even a fighting session drops ~134 items/hour instead of
+~692, with Aberrant and Anomalous cards **structurally impossible** below area
+levels 25 and 40. So the two card states with the most spec surface (the top two
+rarity ramps, their affix counts, their rule-rewrite lines) are the two hardest
+to get in front of a camera at all.
+
+This is the same shape as the wave banner and the damage numbers: **the states a
+headless run cannot reach are the states that ship broken.** The fix is the same
+one that worked there — a capture switch that fabricates the state and lets the
+real drawing paths render it. `-BreakerCaptureMenu=INVENTORY` opens the screen;
+what it needs alongside is a dev grant of one card per rarity, including a
+legendary, before the shot. **Recorded as the obvious next harness extension,
+not built.**
+
+Note also that **legendary cards have never been drawn at all** by anyone: the
+three authored legendaries are Blueprint/console/automation reachable only, and
+a legendary card is not merely an Anomalous card — O32 makes legendary a
+separate field carrying a hand-authored rule, and this spec does not say how
+that rule line differs from Anomalous's rolled one. **Gap for the owner.**
 
 ### Superseded (2026-08-13)
 

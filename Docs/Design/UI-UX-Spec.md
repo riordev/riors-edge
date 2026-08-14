@@ -1,6 +1,24 @@
 # UI / UX Specification — Rior's Edge (Project Breaker)
 
-Status: design pass 1. Authored against the Master Sheet (LOCKED decisions treated as law), `CONTEXT.md`, `Docs/Character-Progression-Architecture.md`, and `Docs/Layer-Ownership.md`.
+**Last reconciled against: O32**
+
+Status: design pass 1. Authored against the Master Sheet, `CONTEXT.md`,
+`Docs/Character-Progression-Architecture.md`, and `Docs/Layer-Ownership.md`.
+
+**AUTHORITY CORRECTION (O28).** This document was written when
+`Master-Sheet-Import.txt` was treated as law. **It is not, and has not been
+since O28** — it is historical source material and is not to be cited as
+authority again. The chain is `Decisions.md` → `CONTEXT.md` → `Design-Overview.md`
+(map, not law) → the per-domain docs. Where this document defers to the master
+sheet below, read that deference as void and check `Decisions.md` instead.
+
+**SCOPE CORRECTION.** This is the broad UX domain document. It is **not** the
+visual authority. FIELDPLATE is: `UI-Style-Guide-Fieldplate.md` owns palette,
+type scale, shape and motion, and the HUD, Inventory, Skill Tree and Ability
+Icon specs own their screens and carry the implementation-status sections
+recording what is built and what has been photographed. Where this document
+and a FIELDPLATE spec disagree about a colour, a size or a layout, **the
+FIELDPLATE spec wins** — it is the one the code reads tokens from.
 
 Everything marked **EXTENDS** adds detail the master sheet does not contain and does not contradict. Everything marked **CONFLICT** contradicts or pressures an existing decision and needs a ruling before implementation.
 

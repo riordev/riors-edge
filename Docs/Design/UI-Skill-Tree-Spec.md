@@ -1,5 +1,7 @@
 # FIELDPLATE — Skill matrix spec
 
+**Last reconciled against: O32**
+
 Owner-authored design canvas, transcribed from `Skill Tree v2.dc.html` on
 2026-08-13 (`Skill Tree.dc.html` is the superseded first pass). Reads on top of
 `UI-Style-Guide-Fieldplate.md`.
@@ -342,14 +344,28 @@ Captured at 1920x1080 and READ: `BRANCH0` (Swift — Frenzy), `BRANCH2`
 were also measured out of the PNG rather than eyeballed: three complete runs
 per `0/2` marker with equal margins either side, and complete single digits in
 every Core chip. **No number is clipped on any board.** The tier gutter reads
-`TIER n` / `OPENS AT n` in full. 206 automation tests pass.
+`TIER n` / `OPENS AT n` in full.
 
 **Zoom and pan are NOT visually verified, and cannot be.** The capture harness
 cannot move a mouse, so no wheel event, no drag, and no cursor-anchored zoom
 has ever been executed against this code — only the resting state at 1:1 has
-been seen. The same limit still covers everything hover-driven: the detail
-rail, the before/after projection, and the marker hover states remain
-unphotographed. Nothing here is playtested.
+been seen. That is a **permanent** limit of the harness, not a backlog item:
+the two things the owner reported about this screen (clipped numbers, scroll
+feel) split exactly across it, and only the first could be confirmed fixed by
+looking. The same limit still covers everything hover-driven: the detail rail,
+the before/after projection, and the marker hover states remain unphotographed.
+
+Worth being precise about what that leaves unproven, because the zoom
+implementation carries a specific risk. Zoom is a render transform set
+imperatively from input handlers and the board lays out once at authored size,
+so it **cannot** become the per-frame rebuild trap `CONTEXT.md` warns about —
+that much is structural and readable from the code. What is unproven is
+everything about the gesture as a gesture: whether cursor-anchored zoom lands
+where the cursor is, whether the 1.15x notch is the right step, whether drag-pan
+fights the wheel, and whether 0.5x–2.0x is the useful range. None of that is
+arithmetic, and none of it is photographable.
+
+Nothing on this screen is playtested.
 
 Unchanged from the pass below: the Core map's `UNMAPPED` cluster still holds
 six nodes authored outside the five `Core.<Constellation>.` prefixes (content

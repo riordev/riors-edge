@@ -1,5 +1,67 @@
 # Playtest Feedback Log
 
+**Last reconciled against: O32**
+
+Owner playtest findings and the actions taken, **newest first**. This is the
+gym's paper trail — wave-mode reports and re-anchoring decisions cite it. Append
+a session per playtest, as a finding → root cause → response table.
+
+## 2026-08-14 — Session 6 (post-O29: movement, ground, loot, HUD, skill board)
+
+The largest single session in the log, spanning three merged lanes. Two things
+are worth stating before the table.
+
+**Half of these were found by LOOKING, not by reasoning.** The ground tearing
+needed a new grazing-angle capture vantage to be visible at all; the clipped
+rank numbers were diagnosed by measuring glyph runs out of a PNG; the wave
+banner overprint and every damage number were literally unphotographable until
+`-BreakerCaptureHUD` existed — and those two are exactly the two that shipped
+broken. That is not a coincidence, and it is the argument for the harness.
+
+**Two reports were consequences of O29 rather than of the thing reported.** The
+damage numbers and the tier cap both moved because item level ran to 120 and
+affix values roughly doubled. Diagnosing them as type or as loot problems would
+have produced the wrong fix twice.
+
+| Finding | Root cause | Response |
+|---|---|---|
+| "i never could do a 3rd jump" | **Not a bug in the grant — unreachable BY CONSTRUCTION.** Every link was verified and every one was correct: the permanent-class read, the `OnProgressionChanged` bind, the tick-poll backstop, `DevForceClass`'s broadcast, the clamp on a banked jump surviving a swap. The gate read `FBreakerProgressionState::CharacterLevel` against 20, and **nothing in the project writes that field** — declared with a default of 1, no XP loop, no assignment anywhere. The condition was false for every character that has ever existed | `SwiftThirdJumpUnlockLevel` 20 → **1**: a gate must key off something that moves, and until an XP loop exists nothing does. `RefreshJumpGrant` warns once if it is ever set above a level the game can produce; the budget is logged whenever it changes. **The test gap is the real fix**: the pre-existing `JumpGrant` test proved the RULE and passed the entire time the feature was dead, so `JumpGrantMatrix` now asserts the SHIPPED CONFIGURATION against a default-constructed progression state |
+| "gravity needs to be tuned down just a little bit (needs to make the character slightly more floaty)" | **Rise versus descent, the fourth report on this arc.** The rise had already been walked back to 1.38, a hair over its original 1.35, while the fall still ran 1.80x on top of it | `FallGravityMultiplier` 1.80 → **1.55**; `GravityScale` deliberately untouched. **One value moved**, so the next report attributes cleanly (O26). Apex height unchanged by construction at 181 cm, so no ledge, gap or wall-ride approach changes reach; airtime 0.90 → 0.93 s, landing 939 → 871 cm/s. Next dial if still heavy: `LandingMinimumSpeedScale` → 1.0 |
+| "a lot of the textures on the ground were tearing" | **The ground was coplanar with ITSELF**, three populations on the apron — and the visible majority was not coplanarity at all. The 200 tint patches were placed by rejection-free random sampling at one fixed height, so overlapping pairs shared a surface exactly; each patch was a 4 cm cube that **cast a shadow**, and at 150–200 m both that shadow and the lip's own shaded side face are sub-pixel and alias into a stippled dashed line tracing every patch outline; and the jump-gap trench floor was authored with its top at exactly the apron's top. The apron-against-template-floor hypothesis was checked against the runtime frame and **rejected** | Overlapping placements rejected against the rotated footprint (196 placed from 420 attempts, density unchanged); patches are shadowless **planes** with no lip at all; the trench floor sits on the new `GroundOverlayLift` (6 cm, `EditAnywhere`, 0 reproduces the bug for an A/B). Confirmed gone in the after-capture |
+| "damage numbers font size is too high" (**second report**) | **Width, not size — and what changed was O29, not the type.** They had already been cut ~35% once (40/64/80 → 26/40/52). Item level to 120 and roughly doubled affix values turned three-digit hits into six-digit ones, and `FormatTicker`'s thin space makes a six-digit number eight glyphs, which at crit size covers the target | Sizes **held** — they are the only thing separating body from weak point from crit, and a third cut collapses the hierarchy. `BreakerUI::FormatDamage` abbreviates above 10 000 (12.4k / 148k / 1.24M), holding every damage number to at most five glyphs at any magnitude the power curve can produce. `RiorsEdge.UI.DamageNumberFormat` pins the width budget across twelve magnitudes |
+| A Warden hit registering with no health movement | **Design gap, and the item worth the most this session.** Frontal armour ate the hit and nothing said so, which reads as a broken game rather than as a wrong angle. Needed nothing new in `Combat/`: `FBreakerDamageResult` already carries `RawDamage` and `MitigatedDamage` | Two reads, because the player needs one at the crosshair and one at the target. The hit marker's ticks pull outward and close into corner brackets — **geometry, not a third colour**, so it cannot be confused with the gold weak-point tick; the floating number recedes to muted with an `ABSORBED -47%` caption. Threshold 0.20. **Rejected after looking**: the first pass drew both reads in OrangeDeep, and on screen an absorbed crit then sat one value step from an ordinary crit — the two states most needing separation reading most alike |
+| `WAVE 01` and `4 HOSTILE` printing on top of each other | **The fixed-offset defect**, third instance: a left-aligned string and a right-aligned string share a row and nothing in the code knows they share it. The plate was a fixed 260px with its divider at a fixed 55%, and a 28px title renders wider than the 143px gutter | Both strings measured, laid out left-to-right from the measurements, divider X from the title's width, plate sized from the content with 260 as a minimum only. The file was then **swept** for the same shape: the speed readout, the ammo/weapon-name pair, the status chips (which had **no bound at all** — three DoTs walked them off the vitals plate) and the loot popup. `FitSpecPixels` is the shared helper |
+| No sense of where anything is in the field | Design gap | Minimap, top-right, 320×176 **landscape and field-aligned** rather than square and rotating, because the field is a 25 000 cm long axis against ~8 000 of width — a square window spends most of its area on empty flank and rotation destroys the alignment that answers the only question this field raises. 56 cm/px puts the encounter pocket on the map from the safe ring. Costs zero extra iteration: it fills its blip array inside the loop that already walked every enemy. **Authored here — no minimap exists on the owner's design canvas, so every decision in it is a proposal awaiting a ruling** |
+| "not every single enemy needs to drop an item … I was getting way way too many Aberrants at this item level when it shouldn't even be fundamentally possible, and every single enemy dropped an item" | **Both halves were one structural gap, confirmed in code.** `GrantLoot` called `RollRarity` unconditionally on every death, so kill count WAS item count; and `RollRarity` was a **flat** table, so a 2.5% Aberrant weight applied to a trash mob at area level 1 exactly as it did to a boss at 50. Nothing in the loot path read level or rank at all, so "shouldn't even be fundamentally possible" was literally true | Three steps where there was one: **drop chance by rank**, then a **rarity gate**, then the weighted roll. Gate rule in one sentence, so the owner can overrule it: a rarity rolls only when the drop's item level is at or above its unlock AND the monster's rank is at or above its minimum, with gated-out weight redistributing across what remains. 692 items/hour → 134; ~17 Aberrants/hour at ANY level → zero below area level 25 and 0.90/hour above. `LootPerHour` simulates 200 hours through the real `RollDrop` and asserts it matches the published projection, so the documented rate cannot drift from the shipped one |
+| "the item level tier capping at 8 might make for awkward feeling progression, let's bring that to 6" | A single slope of one tier per ten levels put the **character cap** at T8 — a third of a back-loaded ladder — so a player who finished the levelling game had met only the shallow lower half of a curve authored for the endgame | Two slopes: ~8.3 item levels per tier to the cap, ~14 after it. The levelling game now crosses half the ladder and finishes standing on the shoulder of the curve; the endgame is slower per tier **because each tier is worth more**, not as a tax. `GetDropItemLevel`'s clamp to 50 was also removed in the same pass — the last link in the 74x endgame gap |
+| "numbers clip" on the skill board (**second report**) | **Not the marker.** The 48px box holds 40px of content around 20px of text. `SButton` centres its child at the child's DESIRED width, an `STextBlock`'s desired width is its MEASURED width, and Slate clips the drawn run to that same box — measuring and rasterising round independently. Proof is in the baseline capture: two identical `0/2` markers disagreed, the Tier 1 one sitting at a different fractional X because of its 2px purchasable ring. **The previous pass read this as "the box is too small" and moved 30px → 36px, which only reshuffled the rounding** | Markers sized from a measurement plus ring and button padding, with the spec's 48/44/64/60 as a **floor**, so `10/10` grows instead of clipping. The tier gutter measured the same way against the longest `OPENS AT n` it will actually print. The defect class is recorded in `UI-Style-Guide-Fieldplate.md` beside the `SHorizontalBox` one |
+| "scrolling is off by a little bit" | **Two nested scroll boxes fighting for one wheel gesture** | The board is a **viewport** now: laid out once at full authored size and moved by a **render transform** set imperatively from the input handlers, so nothing rebuilds per frame and nothing measures its own arrangement. Wheel zooms about the cursor (0.5x–2.0x), drag pans, RESET VIEW returns to the opening zoom, and both survive a purchase rebuild. Boards open at **1:1 deliberately**: fit-to-width was implemented, photographed and reverted, because COMPARE ALL is ~2600px in a ~1300px column and fitting means 0.5x — 5px type against FIELDPLATE's 11px floor |
+
+**Rulings taken this session:** O29 (endgame power is gear depth, item level to
+120, tiers T12..T-1 back-loaded), O30 (the Core tree opens to redesign around
+build axes), O31 (content shape — Destiny × PoE, every build participates), and
+O32 (legendary drop rate holds, the pool grows; legendary and Anomalous are
+different axes).
+
+**Consequences reported rather than silently absorbed**, all still open:
+
+- The Mana inversion weakens **Overcast's deterrent**: doubled generation now
+  applies to a much larger regen, so a full debt repays in under two seconds and
+  the cost is almost entirely the damage window.
+- Several **Void Whisperer and Spellblade nodes** buy a share of what is now the
+  smaller half of Mana income; **VW3 Patience** became one of the strongest
+  nodes in the class. Flagged with dials, not retuned.
+- The **wave budget curve and the density caps contradict** each other from
+  about wave 8. The caps win and the solver reports the shortfall rather than
+  choosing silently.
+- The **power band now measures ~15x against an authored 8–10x**. Two tests fail
+  on `main` deliberately because of it. See CONTEXT.md.
+
+**Not playtested.** A capture shows composition; it cannot say whether the arc
+feels right, whether the minimap window is the right scale, or whether 134
+items/hour is a satisfying rain. The gravity change in particular is unverified
+as a feeling.
+
 ## 2026-08-13 — Session 5 (post-FIELDPLATE, post-feel pass)
 
 **Report:** 1.5 min, 414 shots, 40.3% acc, 36.5% weak-point rate,
