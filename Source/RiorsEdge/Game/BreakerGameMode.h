@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Game/BreakerWaveBudget.h"
 #include "BreakerGameMode.generated.h"
 
 UCLASS(Blueprintable)
@@ -210,6 +211,15 @@ public:
     // Wave mode: the TTK measurement instrument. Escalating non-respawning
     // waves in the elite arena; every third wave carries an elite.
     UFUNCTION(BlueprintCallable, Category="Playtest|Waves") void StartNextWave();
+    // Encounter-Design §4.2's budget, costs, cadence and §5.3's caps, in one
+    // authored block. The composition is SOLVED from these rather than ramped,
+    // so the whole shape of wave mode is retunable in-editor and provable by
+    // automation. O2: every value inside is a PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves") FBreakerWaveBudgetParams WaveBudget;
+    // What wave N would spawn, without spawning it. Exposed so a tuning pass
+    // can read the ramp out of the editor rather than by playing to wave 12.
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves")
+    FBreakerWaveComposition GetWaveComposition(int32 WaveIndex) const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetCurrentWave() const { return CurrentWave; }
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
@@ -384,6 +394,10 @@ private:
     // re-derive-after-the-chassis order ConfigureWithModifiers itself uses, and
     // for the same reason.
     void GrantModifiers(class ABreakerEnemy* Enemy, int32 Seed) const;
+    // §4.3's "loot only on rest and boss waves". Reaches a protected property
+    // by reflection because adding a setter would mean editing Combat/ — see
+    // the note at the implementation.
+    void SetEnemyDropsLoot(class ABreakerEnemy* Enemy, bool bDrops) const;
     void SpawnSafeZone();
     void SpawnAnchorCamp();
     // Overgrown-Earth dressing (O24): vegetation, ruins, and scattered tech.

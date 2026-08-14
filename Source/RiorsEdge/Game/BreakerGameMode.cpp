@@ -1605,65 +1605,176 @@ void ABreakerGameMode::StartNextWave()
     // Encounter-Design 5.2's 1500-4000 cm spawn band at the near packs and
     // still far enough that nothing materialises in the player's face.
     const FVector ArenaCenter = Origin + Forward * DashRefreshDistance;
-    // Dense packs by design: AoE, on-death chains, and multikill procs need
-    // crowds to feel like anything. Clusters of ~4 around the arena ring.
-    const int32 EnemyCount = FMath::Min(4 + CurrentWave * 3, 24);
-    const bool bEliteWave = CurrentWave % 3 == 0;
 
-    // LATTICE ranged enemies join from wave 2 and climb to the hard cap of 3
-    // live at once (Encounter-Design §5.3: "four converging projectile sources
-    // removes all safe ground; this is the single most dangerous scaling
-    // knob"). They come OUT OF the melee budget rather than on top of it, so
-    // pack density and the TTK sample size are unchanged — what changes is the
-    // kind of pressure, not the amount.
-    const int32 RangedCount = FMath::Clamp(CurrentWave / 2, 0, 3);
-    const int32 MeleeCount = FMath::Max(EnemyCount - RangedCount, 1);
+    // THE WAVE IS SOLVED, NOT RAMPED. What was here was `4 + wave * 3` capped
+    // at 24, an elite every third wave and `wave/2` Lattices: no budget, no
+    // archetype costs, no rest waves, no boss wave, no variety rule, and 24
+    // live enemies against Encounter-Design §5.3's ceiling of TWELVE.
+    // UBreakerWaveBudgetLibrary is §4.2's arithmetic as pure world-free maths,
+    // so what a wave IS can be asserted by automation, and all this function
+    // does is place the answer in the world.
+    const FBreakerWaveComposition Composition =
+        UBreakerWaveBudgetLibrary::SolveWave(CurrentWave, 1, WaveBudget);
+    FString IllegalReason;
+    if (!UBreakerWaveBudgetLibrary::IsCompositionLegal(Composition, 1, WaveBudget, IllegalReason))
+    {
+        // Loud, never silent, and never trimmed: a spawner that quietly drops
+        // an enemy makes the instrument report a wave that did not happen.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] wave %d composition is ILLEGAL: %s"), CurrentWave, *IllegalReason);
+    }
+    const int32 AreaLevel = GetAreaLevelForWave(CurrentWave);
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] %s | area level %d"),
+        *UBreakerWaveBudgetLibrary::DescribeComposition(Composition), AreaLevel);
 
-    for (int32 Index = 0; Index < MeleeCount; ++Index)
+    // --- The boss wave (§4.2, wave 12) -------------------------------------
+    // The Field Marshal and nothing else. It deploys its own adds and respawns
+    // its own gallery Lattices, and §5.3's density ceiling is enforced at that
+    // SOURCE — a wave budget spent alongside it would blow the cap from two
+    // directions at once and neither would know about the other.
+    if (Composition.bBoss)
+    {
+        SpawnBossTest();
+        if (IsValid(ActiveBoss))
+        {
+            ActiveBoss->ConfigureWave(AreaLevel);
+            WaveEnemies.Add(ActiveBoss);
+        }
+        return;
+    }
+
+    // --- Melee, including the elite promotions ------------------------------
+    // An elite is a PROMOTED body, not an extra one, which is what keeps the
+    // density ceiling honest: the solver counts elites inside Skitters.
+    for (int32 Index = 0; Index < Composition.Skitters; ++Index)
     {
         const int32 Pack = Index / 4;
-        const float PackAngle = 360.0f * Pack / FMath::Max(1, (MeleeCount + 3) / 4);
+        const float PackAngle = 360.0f * Pack / FMath::Max(1, (Composition.Skitters + 3) / 4);
         // Packs sit on the pocket rim rather than at a flat 1100 cm, so the
         // ring the player circles is the same radius everywhere in the field.
         const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * (CombatPocketRadius * 0.55f);
         const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))
+        ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+        if (!Enemy) continue;
+        Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
+        Enemy->ConfigureWave(AreaLevel);
+        if (Index < Composition.Elites)
         {
-            Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
-            // Later waves climb in level so drops and TTK data climb too.
-            Enemy->ConfigureWave(GetAreaLevelForWave(CurrentWave));
-            if (bEliteWave && Index == 0)
-            {
-                Enemy->ConfigureElite();
-                // Seeded on the WAVE, so wave 3 is the same Champion every run
-                // and a TTK sample taken across two sessions compares.
-                GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919);
-            }
-            WaveEnemies.Add(Enemy);
+            Enemy->ConfigureElite();
+            // Seeded on the WAVE and the index, so wave 8 meets the same
+            // Champion every run and a TTK sample taken across two sessions
+            // compares. The solver decided HOW MANY modifiers it could afford;
+            // the roll decides which, subject to §1.3's composition rules.
+            GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
         }
+        SetEnemyDropsLoot(Enemy, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Enemy);
+        WaveEnemies.Add(Enemy);
     }
 
-    // Ranged support sits a ring further out and spread evenly around the
-    // arena, so the melee packs push the player ACROSS the ranged fire lanes
-    // instead of away from them. Never promoted to elite: the elite is already
-    // the melee anchor, and two things to read at once is one too many.
-    for (int32 Index = 0; Index < RangedCount; ++Index)
+    // --- LATTICE ------------------------------------------------------------
+    // A ring further out and spread evenly around the arena, so the melee packs
+    // push the player ACROSS the ranged fire lanes instead of away from them.
+    for (int32 Index = 0; Index < Composition.Lattices; ++Index)
     {
-        const float Angle = 360.0f * Index / FMath::Max(1, RangedCount) + 45.0f;
+        const float Angle = 360.0f * Index / FMath::Max(1, Composition.Lattices) + 45.0f;
         const FVector SpawnLocation = ArenaCenter
             + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * CombatPocketRadius;
         FActorSpawnParameters RangedParams;
         RangedParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        if (ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
-            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
+        ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
+            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams);
+        if (!Ranged) continue;
+        Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
+        Ranged->ConfigureWave(AreaLevel);
+        SetEnemyDropsLoot(Ranged, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Ranged);
+        WaveEnemies.Add(Ranged);
+    }
+
+    // --- SKIRMISHER ---------------------------------------------------------
+    // Placed against COVER, never on a bearing. Wave mode spawns wherever the
+    // playtest happens to be standing, so the anchor it finds is whatever the
+    // field built nearby — a pocket's cover ring inside a pocket, the sniper
+    // lane's hard-cover piece on the lane. In the open it degrades to a Lattice
+    // with a longer telegraph, which is strictly worse than a Lattice.
+    for (int32 Index = 0; Index < Composition.Skirmishers; ++Index)
+    {
+        const float Angle = 360.0f * Index / FMath::Max(1, Composition.Skirmishers) + 200.0f;
+        const FVector Around = ArenaCenter
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * (CombatPocketRadius * 0.8f);
+        if (ABreakerSkirmisherEnemy* Skirmisher = SpawnSkirmisherNearCover(Around, Origin, Index * 1.1f))
         {
-            Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
-            Ranged->ConfigureWave(GetAreaLevelForWave(CurrentWave));
-            WaveEnemies.Add(Ranged);
+            Skirmisher->ConfigureWave(AreaLevel);
+            SetEnemyDropsLoot(Skirmisher, Composition.bDropsLoot);
+            WaveEnemies.Add(Skirmisher);
         }
     }
+
+    // --- WARDEN -------------------------------------------------------------
+    // BETWEEN the player and the pack. §2.4's axis is "Wardens punish
+    // approaching from the front", and a Warden behind the pack is a Warden the
+    // player never has to solve.
+    for (int32 Index = 0; Index < Composition.Wardens; ++Index)
+    {
+        const FVector SpawnLocation = ArenaCenter - Forward * (CombatPocketRadius * 0.6f)
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 300.0f;
+        FActorSpawnParameters WardenParams;
+        WardenParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        ABreakerWardenEnemy* Warden = GetWorld()->SpawnActor<ABreakerWardenEnemy>(
+            ABreakerWardenEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, WardenParams);
+        if (!Warden) continue;
+        Warden->ConfigureEncounter(SpawnLocation, 1.7f + Index);
+        Warden->ConfigureWave(AreaLevel);
+        SetEnemyDropsLoot(Warden, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Warden);
+        WaveEnemies.Add(Warden);
+    }
+
+    if (Composition.Kind == EBreakerWaveKind::Rest)
+    {
+        // §4.3: the rest wave exists so wave mode measures COMBAT rather than
+        // endurance. Half budget, no elites, loot on, and a breather — the
+        // breather is the player's to take, because F4 is what starts the next
+        // wave, so what this does is restock and say so.
+        RefillPlayerAmmo();
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerGym] wave %d is a REST wave: half budget, no elites, loot enabled, ammo restocked. Take %.0fs before F4."),
+            CurrentWave, WaveBudget.RestBreatherSeconds);
+    }
+}
+
+void ABreakerGameMode::SetEnemyDropsLoot(ABreakerEnemy* Enemy, bool bDrops) const
+{
+    if (!Enemy) return;
+
+    // §4.3: "Loot only on rest and boss waves. Otherwise the gym becomes a farm
+    // and pollutes drop-rate data" — and drop-rate data is one of the two
+    // numbers wave mode exists to produce.
+    //
+    // WHY REFLECTION AND NOT A SETTER. `bDropsLoot` is protected on
+    // ABreakerEnemy and there is no mutator; adding one is a one-line change to
+    // Combat/, which this lane does not own and which two other agents are
+    // editing in parallel. The property is marked BlueprintReadWrite, so it is
+    // deliberately writable from outside the class — this reaches it the way a
+    // Blueprint would. A missing property WARNS rather than failing silently,
+    // because the failure mode is a farm that nobody notices.
+    static const FName DropsLootName(TEXT("bDropsLoot"));
+    if (FBoolProperty* Property = FindFProperty<FBoolProperty>(ABreakerEnemy::StaticClass(), DropsLootName))
+    {
+        Property->SetPropertyValue_InContainer(Enemy, bDrops);
+        return;
+    }
+    UE_LOG(LogTemp, Warning,
+        TEXT("[BreakerGym] ABreakerEnemy::bDropsLoot not found by reflection; Encounter-Design 4.3's loot rule is not being applied."));
+}
+
+FBreakerWaveComposition ABreakerGameMode::GetWaveComposition(int32 WaveIndex) const
+{
+    // Solo, because solo is the primary balance target and the gym has one
+    // player. Party sizes go through the same solver with a different count.
+    return UBreakerWaveBudgetLibrary::SolveWave(WaveIndex, 1, WaveBudget);
 }
 
 int32 ABreakerGameMode::GetAreaLevelForWave(int32 WaveIndex) const
