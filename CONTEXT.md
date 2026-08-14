@@ -12,6 +12,94 @@ The current character concept proposes five classes—Caster, Swift, Gunsmith, T
 
 Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge; the level cap is 50 with a hard stop and no post-cap power progression, so all endgame character power comes from gear; dash, slide, wall ride, block, and dodge are all base kit, with trees improving them rather than unlocking them; TWO JUMPS are base kit for everyone and Swift innately unlocks a third later (O25, superseding the earlier air-jump-is-tree-granted line), leaving parry as the only tree-granted verb. Movement is a big part of the game but is NOT the centre of the design and gets no further dedicated passes for now (O26).
 
+## Current milestone and next actions (updated 2026-08-13)
+
+Current milestone: **Vertical-slice systems — Swift playable end-to-end**.
+Movement gym, combat sandbox, loot loop, and the progression framework are
+all live; presentation is deliberately blockout.
+
+The whole loop works in Play In Editor today: spawn at the safe ring →
+talk to camp NPCs (F) → fight the encounter/waves (F4) → loot ground drops
+(F) → equip (I, tabs for EQUIPMENT | SKILL TREES) → spend points → use
+Swift abilities (E Skim / T Lead / G Overdrive) or Caster abilities
+(E Cleave / T Closequarter / G Unmake). Playtest keys: F1 reset,
+F2 copy report (includes engagement-gapped TTK vs O18 targets), F3
+diagnostics, 1/2 weapon slots. Dev tools (class swap, test gear, point
+grants) gate on the DEV checkbox on the BREAKER CLASS screen.
+
+**In flight right now** (four parallel agent lanes, unmerged worktree
+branches — do not start these): the movement lane (Swift's third jump per O25,
+the gear x tree additive conformance, the orphaned MoveSpeed attribute); the
+progression-content lane (Swift's Frenzy branch, the Elements constellation);
+the combat-systems lane (damage zones, a shared player projectile base, status
+consumption, healing through the damage contract, and the Caster abilities that
+need them); and the weapons lane (per-pellet shot impacts and the shotgun
+tracer, more archetypes, the weapons half of the ADS trade). Items 3, 4 and 6
+below are partly claimed by that wave.
+
+Next actions, in priority order:
+
+1. **RULED (O27) and BUILT — the power curve now needs MEASURING, not more
+   code.** Both halves landed: the monster chassis is a curve in area level,
+   and `WeaponBase(ilvl)` scales base damage on the matching growth rate, so
+   the two compose. What nobody has done is check the composition against a
+   controller. The measuring run: set `WeakPointToleranceCm = 0` (the
+   forgiveness halo inflates damage per hit by 8-14% at a 50-60% weak-point
+   rate and will flatter every number), then walk `GymAreaLevel` up — 1, 10,
+   25, 50 — and read the F2 report's split melee / ranged / elite TTK at each
+   stop. The prediction to falsify is Power-Curve §3's: a baseline build holds
+   a roughly CONSTANT TTK across all four, and only the build multipliers move
+   it. If TTK climbs with area level, `w` is too low against `g`; if it falls,
+   too high. That is a two-number retune, and it is the single highest-value
+   playtest available right now.
+2. **Assets are now the binding constraint on feel, not code.** In order of
+   how much they block: AUDIO (nothing exists — recoil, bloom and viewmodel
+   kick are all built and land on silence); the three OFL faces (Saira
+   Condensed / Barlow / JetBrains Mono — everything renders in Roboto, the
+   type scale is already correct so it is a swap); weapon and character
+   meshes (recoil currently kicks a grey box); muzzle flash and impact VFX
+   (hooks and timings fire into nothing); the nine ability glyph SVGs (code
+   stand-ins exist). All of these need the owner: downloading fonts and
+   authoring `.uasset`s is editor work.
+3. **Owner decisions, none blocking code:**
+   - **Movement is the LAST multiplicative gear x tree violation.**
+     `GearMoveSpeedMultiplier()` and friends compose percentages
+     multiplicatively against the locked one-additive-bucket rule. Damage was
+     the same bug class and is fixed. Conforming makes +20/+20 read x1.40 not
+     x1.44 — a movement FEEL change, which is why it is a ruling. Related:
+     the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all, and
+     SlideSpeed/AirControl/DashCooldown never reach the attribute set.
+   - **Subclass commitment.** The branch strip browses; committing needs a
+     branch field on the progression state or tree, a one-way setter with a
+     permanence-or-Forge rule, save versioning, and a ruling on whether
+     unselected branches become unpurchasable — which collides with O15.
+   - **Swift's third jump** (O25) is unimplemented and needs a kit design:
+     when it unlocks and whether it is free.
+   - Overdrive's +25% damage window is a 4th More against the O3 budget of 3
+     (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
+     page, which gates Damage-Pipeline sign-off and also decides whether
+     recoil should be client-predicted; the held items in Decisions.md.
+4. **Content gaps that are content, not code:**
+   - **Swift's FRENZY branch is unauthored.** Class-Kits 1.3-1.5 names
+     Frenzy / Kinetic / Marksman; only two exist in
+     `UBreakerProgressionLibrary`, so the branch strip shows two chips.
+   - Caster's Rot / Siphon / Fracture / Resonance need Combat/ systems that
+     do not exist (zones, partial healing, a projectile base, status
+     consumption). Overdrive keystone branch stubs and the inert node tags
+     (ledger in `BreakerAbilityStateComponent.h`).
+   - Elements constellation has no nodes; the cluster renders sealed.
+5. **Real gym map authored in-editor.** The stock First Person template
+   geometry still crowds the runtime-spawned field, and the owner has now
+   twice reported that the SPACE reads wrong ("walk speed feels weird but i
+   think its a map scope issue"). Editor work.
+6. **Known smaller gaps, each recorded at the code:** the shotgun draws no
+   tracer because `FBreakerShotResult` carries one impact for a whole spread
+   (per-pellet impacts are a weapon-contract change); ADS has no movement
+   SPEED penalty because `Movement/` has no aim awareness, which is the
+   other half of the hip/ADS trade; `DevForceClass` keeps a stale
+   `ClassDefinition` after a dev swap; Slate panel-transition and
+   purchase-confirm motion are unimplemented.
+
 ## Canonical project
 
 - Unreal project: `riors_edge.uproject` (repository root)
@@ -168,10 +256,21 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
   `AreaLevelPerWave` on the game mode, both EditAnywhere, so a playtest walks
   the curve by turning a number up. `EnemyLevel` still drives loot item level
   and now follows area level (clamped 50). Every constant is O2 PLACEHOLDER.
-  CAUTION: this is one half of a ratio. For an UNCHANGED player, trash TTK is
-  1.81s at area level 1, 3.93s at 10 and 9.3s at 20; the other half is the
-  weapon base-damage-by-item-level curve (Power-Curve §3, NOT built here). Set
-  `GymAreaLevel = 1` to recover today's exact feel until that lands.
+- THE OTHER HALF OF THE RATIO IS BUILT. `Weapons/BreakerWeaponMath.{h,cpp}` is
+  Power-Curve §3: `WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1)`, with
+  `w` = `UBreakerWeaponComponent::ItemLevelDamageGrowth` (0.09, EditAnywhere,
+  O2 PLACEHOLDER) deliberately tracking the monster health growth `g` = 0.09 so
+  a BASELINE build holds a roughly constant TTK across the whole game and every
+  bit of felt progression comes from the multiplier band instead. Before this,
+  `Weapons/` contained no reference to `ItemLevel` at all — base damage was an
+  archetype constant, so an ilvl 1 weapon and an ilvl 50 weapon hit identically
+  and item level moved only affix tier values. `GetEquippedItemLevel()` reads
+  the equipped item for the active slot and falls back to `UnequippedItemLevel`
+  for the fallback weapon; the scalar is exactly 1.0 at ilvl 1 for any growth,
+  so the curve is opt-in by content rather than a silent retune. The two curves
+  now compose: monster health and weapon base damage climb together, and the
+  build variance band (Power-Curve §4) is what separates a baseline character
+  from an optimized one. Every constant is O2 PLACEHOLDER and NOT PLAYTESTED.
 - The gym encounter includes one elite (`ConfigureElite`): 1.25x scale, the
   elite rank chassis, slower implacable advance, drops never below Exceptional.
 - Inventory backpack sorts best-rarity-first with per-slot filter chips and auto-height cards.
@@ -217,7 +316,7 @@ Source/RiorsEdge/
   Playtest/       Instrumentation + report (TTK vs O18 targets)
   Progression/    Trees/nodes, fallback content, purchase/respec, node effects
   Save/           UBreakerSaveGame (slot BreakerSave0)
-  Tests/          107 automation tests (RiorsEdge.* filter)
+  Tests/          automation tests (RiorsEdge.* filter)
   UI/             SBreakerMenu (all screens) + ABreakerPlaytestHUD (canvas)
 ```
 
@@ -267,81 +366,6 @@ The first audit is recorded in `Docs/Godot-Mechanics-Audit.md`. It confirms the 
 
 The user's future affix system is intentionally different from the Godot attachment/perk model. Do not design or implement Unreal affixes by copying those systems. Affix architecture is deferred to a dedicated design pass.
 
-## Current milestone and next actions (updated 2026-08-13)
-
-Current milestone: **Vertical-slice systems — Swift playable end-to-end**.
-Movement gym, combat sandbox, loot loop, and the progression framework are
-all live; presentation is deliberately blockout.
-
-The whole loop works in Play In Editor today: spawn at the safe ring →
-talk to camp NPCs (F) → fight the encounter/waves (F4) → loot ground drops
-(F) → equip (I, tabs for EQUIPMENT | SKILL TREES) → spend points → use
-Swift abilities (E Skim / T Lead / G Overdrive) or Caster abilities
-(E Cleave / T Closequarter / G Unmake). Playtest keys: F1 reset,
-F2 copy report (includes engagement-gapped TTK vs O18 targets), F3
-diagnostics, 1/2 weapon slots. Dev tools (class swap, test gear, point
-grants) gate on the DEV checkbox on the BREAKER CLASS screen.
-
-Next actions, in priority order:
-
-1. **RULED (O27) and half-built — the power curve.** The TTK re-anchor is no
-   longer a single retune: monster health is a curve in AREA level and the
-   target is stated for a baseline build in on-level content. The monster
-   chassis half is BUILT (see above); Encounter-Design 2.2's 1.6x is applied
-   to the Lattice. **The other half is `WeaponBase(ilvl)` (Power-Curve §3) and
-   until it lands the two curves do not compose** — an unchanged player at
-   `GymAreaLevel = 10` sees 3.93s trash, not 1.81s. Still true for a measuring
-   run: set `WeakPointToleranceCm = 0` (the forgiveness halo adds 8-14% damage
-   per hit at a 50-60% weak-point rate). The ranged/melee bucket mixing noted
-   in session 5 is FIXED — the report splits melee, ranged and elite.
-2. **Assets are now the binding constraint on feel, not code.** In order of
-   how much they block: AUDIO (nothing exists — recoil, bloom and viewmodel
-   kick are all built and land on silence); the three OFL faces (Saira
-   Condensed / Barlow / JetBrains Mono — everything renders in Roboto, the
-   type scale is already correct so it is a swap); weapon and character
-   meshes (recoil currently kicks a grey box); muzzle flash and impact VFX
-   (hooks and timings fire into nothing); the nine ability glyph SVGs (code
-   stand-ins exist). All of these need the owner: downloading fonts and
-   authoring `.uasset`s is editor work.
-3. **Owner decisions, none blocking code:**
-   - **Movement is the LAST multiplicative gear x tree violation.**
-     `GearMoveSpeedMultiplier()` and friends compose percentages
-     multiplicatively against the locked one-additive-bucket rule. Damage was
-     the same bug class and is fixed. Conforming makes +20/+20 read x1.40 not
-     x1.44 — a movement FEEL change, which is why it is a ruling. Related:
-     the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all, and
-     SlideSpeed/AirControl/DashCooldown never reach the attribute set.
-   - **Subclass commitment.** The branch strip browses; committing needs a
-     branch field on the progression state or tree, a one-way setter with a
-     permanence-or-Forge rule, save versioning, and a ruling on whether
-     unselected branches become unpurchasable — which collides with O15.
-   - **Swift's third jump** (O25) is unimplemented and needs a kit design:
-     when it unlocks and whether it is free.
-   - Overdrive's +25% damage window is a 4th More against the O3 budget of 3
-     (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
-     page, which gates Damage-Pipeline sign-off and also decides whether
-     recoil should be client-predicted; the held items in Decisions.md.
-4. **Content gaps that are content, not code:**
-   - **Swift's FRENZY branch is unauthored.** Class-Kits 1.3-1.5 names
-     Frenzy / Kinetic / Marksman; only two exist in
-     `UBreakerProgressionLibrary`, so the branch strip shows two chips.
-   - Caster's Rot / Siphon / Fracture / Resonance need Combat/ systems that
-     do not exist (zones, partial healing, a projectile base, status
-     consumption). Overdrive keystone branch stubs and the inert node tags
-     (ledger in `BreakerAbilityStateComponent.h`).
-   - Elements constellation has no nodes; the cluster renders sealed.
-5. **Real gym map authored in-editor.** The stock First Person template
-   geometry still crowds the runtime-spawned field, and the owner has now
-   twice reported that the SPACE reads wrong ("walk speed feels weird but i
-   think its a map scope issue"). Editor work.
-6. **Known smaller gaps, each recorded at the code:** the shotgun draws no
-   tracer because `FBreakerShotResult` carries one impact for a whole spread
-   (per-pellet impacts are a weapon-contract change); ADS has no movement
-   SPEED penalty because `Movement/` has no aim awareness, which is the
-   other half of the hip/ADS trade; `DevForceClass` keeps a stale
-   `ClassDefinition` after a dev swap; Slate panel-transition and
-   purchase-confirm motion are unimplemented.
-
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
@@ -354,10 +378,9 @@ Next actions, in priority order:
 
 ## Working documents
 
-- `README.md` — project entry point
+- `README.md` — routing table and the authority chain (O28)
 - `Docs/Setup.md` — Mac/Windows onboarding and editor integration
 - `Docs/Architecture.md` — ownership boundaries
-- `Docs/Roadmap.md` — milestone sequence
 - `Docs/Godot-Mechanics-Audit.md` — confirmed prototype mechanics and Unreal mapping
 - `Docs/Character-Progression-Architecture.md` — class, Core Tree, status, and GAS architecture
 - `Docs/Layer-Ownership.md` — which layer owns verbs, scaling, and identity
