@@ -576,6 +576,100 @@ bool FBreakerEquipDisplacementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// O37 — per-axis equip caps (audit item 8)
+// ---------------------------------------------------------------------------
+// Before this, EquipLimitForRarity/PreviewEquipAgainst/CountEquippedOfRarity
+// all keyed purely off Item.Rarity, so a legendary (which rolls Anomalous per
+// O32) shared the "1 Anomalous" cap with ordinary Anomalous drops: equipping
+// one could silently evict the other, and the two axes O37 separates were
+// really one. This section pins the split, and that Aberrant (which no
+// legendary ever carries) and a solo non-legendary Anomalous are unaffected.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEquipCapAxesTest,
+    "RiorsEdge.Items.Equipment.PerAxisCaps",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEquipCapAxesTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerEquipmentTestHelpers;
+
+    auto MakeLegendary = [](EBreakerEquipSlot Slot, int32 ItemLevel)
+    {
+        FBreakerItemInstance Item = MakeItem(Slot, EBreakerItemRarity::Anomalous, ItemLevel);
+        Item.LegendaryId = TEXT("Legendary.Test");
+        return Item;
+    };
+
+    // --- A legendary and a non-legendary Anomalous coexist, in both directions
+    const FBreakerItemInstance Legendary = MakeLegendary(EBreakerEquipSlot::Boots, 50);
+    const FBreakerItemInstance OrdinaryAnomalous = MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 50);
+
+    FBreakerEquipPreview Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({Legendary}, OrdinaryAnomalous);
+    TestFalse(TEXT("A non-legendary Anomalous does not exceed its cap while a legendary is worn"), Preview.bExceedsRarityLimit);
+    TestFalse(TEXT("...and does not name the legendary as a victim"), Preview.LimitDisplaced.IsValid());
+
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst({OrdinaryAnomalous}, Legendary);
+    TestFalse(TEXT("A legendary does not exceed its cap while an ordinary Anomalous is worn"), Preview.bExceedsRarityLimit);
+    TestFalse(TEXT("...and does not name the Anomalous piece as a victim"), Preview.LimitDisplaced.IsValid());
+
+    // --- The legendary axis still caps at exactly one -----------------------
+    const TArray<FBreakerItemInstance> OneLegendary = {MakeLegendary(EBreakerEquipSlot::Primary, 50)};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneLegendary, MakeLegendary(EBreakerEquipSlot::Waist, 40));
+    TestTrue(TEXT("A second legendary exceeds the legendary cap of one"), Preview.bExceedsRarityLimit);
+    TestTrue(TEXT("...and the first legendary is the one displaced"), Preview.LimitDisplaced.IsLegendary());
+
+    // --- The non-legendary Anomalous axis still caps at exactly one --------
+    const TArray<FBreakerItemInstance> OneOrdinaryAnomalous = {OrdinaryAnomalous};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(OneOrdinaryAnomalous, MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Anomalous, 50));
+    TestTrue(TEXT("A second non-legendary Anomalous still exceeds its own cap of one"), Preview.bExceedsRarityLimit);
+    TestFalse(TEXT("...and the displaced piece is not a legendary (there is none here)"), Preview.LimitDisplaced.IsLegendary());
+
+    // --- Aberrant is untouched: still three, still its own axis ------------
+    const TArray<FBreakerItemInstance> ThreeAberrant = {
+        MakeItem(EBreakerEquipSlot::Helmet, EBreakerItemRarity::Aberrant, 10),
+        MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Aberrant, 20),
+        MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Aberrant, 30)};
+    Preview = UBreakerEquipmentComponent::PreviewEquipAgainst(ThreeAberrant, MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Aberrant, 50));
+    TestTrue(TEXT("A fourth Aberrant still exceeds the O11/O37 cap of three"), Preview.bExceedsRarityLimit);
+
+    // --- End to end through the real component, and the validator ----------
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(NewObject<AActor>());
+    TestTrue(TEXT("The legendary equips"), Equipment->EquipItem(Legendary));
+    TestTrue(TEXT("An ordinary Anomalous equips alongside it"), Equipment->EquipItem(OrdinaryAnomalous));
+    TestEqual(TEXT("One legendary is equipped"), Equipment->CountEquippedLegendaries(), 1);
+    TestEqual(TEXT("...and the Anomalous count excludes it"), Equipment->CountEquippedOfRarity(EBreakerItemRarity::Anomalous), 1);
+
+    FBreakerItemInstance Found;
+    TestTrue(TEXT("The legendary is still equipped, not evicted by the Anomalous piece"),
+        Equipment->GetEquippedItem(Legendary.Slot, Found) && Found.IsLegendary());
+    TestTrue(TEXT("The Anomalous piece is still equipped, not evicted by the legendary"),
+        Equipment->GetEquippedItem(OrdinaryAnomalous.Slot, Found) && !Found.IsLegendary());
+
+    FText Failure;
+    TestTrue(TEXT("One legendary plus one non-legendary Anomalous validates clean"),
+        UBreakerEquipmentComponent::ValidateEquipCaps(Equipment->GetEquipped(), Failure));
+    TestTrue(TEXT("...and an empty set validates clean"), UBreakerEquipmentComponent::ValidateEquipCaps({}, Failure));
+
+    // A second legendary crammed into the set (as a save predating O37, a
+    // hand-edited fixture, or a content bug could) is exactly what the
+    // validator exists to catch — equip-time displacement never lets a live
+    // component reach this state on its own.
+    TArray<FBreakerItemInstance> OverfullLegendary = Equipment->GetEquipped();
+    OverfullLegendary.Add(MakeLegendary(EBreakerEquipSlot::Primary, 30));
+    TestFalse(TEXT("A second legendary fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullLegendary, Failure));
+    TestFalse(TEXT("The failure carries a reason"), Failure.IsEmpty());
+
+    TArray<FBreakerItemInstance> OverfullAnomalous = Equipment->GetEquipped();
+    OverfullAnomalous.Add(MakeItem(EBreakerEquipSlot::Gloves, EBreakerItemRarity::Anomalous, 30));
+    TestFalse(TEXT("A second non-legendary Anomalous fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullAnomalous, Failure));
+
+    TArray<FBreakerItemInstance> OverfullAberrant = ThreeAberrant;
+    OverfullAberrant.Add(MakeItem(EBreakerEquipSlot::Waist, EBreakerItemRarity::Aberrant, 30));
+    TestFalse(TEXT("A fourth Aberrant fails validation"), UBreakerEquipmentComponent::ValidateEquipCaps(OverfullAberrant, Failure));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAffixDeltaTest,
     "RiorsEdge.Items.Equipment.AffixDeltas",

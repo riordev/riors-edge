@@ -155,6 +155,15 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
             return false;
         }
     }
+    // O37: a branch keystone/cornerstone node is purchasable only once the
+    // character has committed to ITS branch. Ordinary nodes of every branch
+    // stay freely purchasable — O15 is untouched — so this is the one place
+    // O37's "commitment empowers rather than excludes" is actually enforced.
+    if (Node->bCornerstone && State.CommittedBranch != Tree->TreeId)
+    {
+        OutFailureReason = LOCTEXT("NotCommitted", "Commit to this branch before its keystone can be purchased.");
+        return false;
+    }
     const int32 Gate = FMath::Max(Node->RequiredTreeInvestment, Node->bCornerstone ? Tree->CornerstoneInvestmentGate : 0);
     if (GetTreeInvestment(Tree) < Gate)
     {
@@ -183,6 +192,10 @@ bool UBreakerProgressionComponent::PurchaseNode(const UBreakerProgressionTree* T
 
     int32& AvailablePoints = Node->Currency == EBreakerPointCurrency::ClassPoints ? State.UnspentClassPoints : State.UnspentCorePoints;
     AvailablePoints -= Node->CostPerRank;
+    // Running total maintained here instead of recomputed by walking node
+    // definitions inside GetSpentPoints/GetRefundValue on every
+    // RecalculateStats (audit item 6 perf fix).
+    SpentPointsFor(Node->Currency) += Node->CostPerRank;
 
     RecalculateStats();
     OnProgressionChanged.Broadcast();
@@ -230,6 +243,9 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     TArray<FBreakerNodeRank>& Ranks = RanksFor(Currency);
     const int32 Refunded = GetRefundValue(Currency);
     Ranks.Reset();
+    // The running total this currency was tracking is refunded in full and
+    // starts back at zero (audit item 6).
+    SpentPointsFor(Currency) = 0;
     if (Currency == EBreakerPointCurrency::ClassPoints) State.UnspentClassPoints += Refunded;
     else State.UnspentCorePoints += Refunded;
     if (Currency == EBreakerPointCurrency::ClassPoints)
@@ -239,11 +255,55 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
         State.AbilityLoadout.ClassAbilityTwo = ClassDefinition && ClassDefinition->StartingClassAbilityIds.Num() > 1
             ? ClassDefinition->StartingClassAbilityIds[1] : NAME_None;
         State.AbilityLoadout.Ultimate = ClassDefinition ? ClassDefinition->BaseUltimateId : NAME_None;
+        // O37: commitment is a class-branch choice, so the respec that clears
+        // branch node ranks (including any keystone) clears the commitment
+        // with them. This is the one-way rule's escape hatch: "no
+        // un-committing without a Forge visit", not "never".
+        State.CommittedBranch = NAME_None;
     }
     // Cleared ranks must clear their effects, tags and verb grants included.
     RecalculateStats();
     OnProgressionChanged.Broadcast();
     OutFailureReason = FText::GetEmpty();
+    return true;
+}
+
+bool UBreakerProgressionComponent::CommitToBranch(FName BranchTreeId, FText& OutFailureReason)
+{
+    // ONE-WAY: refuses an overwrite rather than silently replacing it. A
+    // Forge respec (ClassPoints) is the only path back to None.
+    if (!State.CommittedBranch.IsNone())
+    {
+        OutFailureReason = LOCTEXT("AlreadyCommitted", "A subclass commitment is already made; only a Forge respec can change it.");
+        return false;
+    }
+    if (BranchTreeId.IsNone())
+    {
+        OutFailureReason = LOCTEXT("NoBranchNamed", "No branch was named.");
+        return false;
+    }
+    // The named tree must actually be a CLASS BRANCH this character can spend
+    // in — not Core (RequiredClass == None), which is not a subclass and has
+    // no keystone tier gated by commitment. A typo'd or foreign id would
+    // otherwise silently lock the player out of every keystone forever.
+    bool bFound = false;
+    for (const UBreakerProgressionTree* Tree : GetAvailableTrees())
+    {
+        if (Tree && Tree->TreeId == BranchTreeId && Tree->RequiredClass == State.PermanentClass
+            && Tree->RequiredClass != EBreakerClassId::None)
+        {
+            bFound = true;
+            break;
+        }
+    }
+    if (!bFound)
+    {
+        OutFailureReason = LOCTEXT("UnknownBranch", "That branch is not available to this character.");
+        return false;
+    }
+    State.CommittedBranch = BranchTreeId;
+    OutFailureReason = FText::GetEmpty();
+    OnProgressionChanged.Broadcast();
     return true;
 }
 
@@ -267,6 +327,10 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
     {
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(State.PermanentClass);
     }
+    // Ranks were just bulk-replaced from outside; the running spent-points
+    // totals have to be rebuilt from what actually loaded rather than
+    // incrementally tracked, exactly once, here (audit item 6).
+    RecomputeSpentPointsFromState();
     RecalculateStats();
     // A save written before slice seeding existed restores an empty economy.
     // Re-seed here so loading never leaves the tree screen unspendable; the
@@ -312,8 +376,10 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     const bool bFresh = State.ClassNodeRanks.Num() == 0 && State.CoreNodeRanks.Num() == 0
         && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0;
     if (!bFresh) return;
-    // Only pick a class for a character that has none; a chosen class is kept.
-    if (State.PermanentClass == EBreakerClassId::None) ChoosePermanentClassById(EBreakerClassId::Swift);
+    // Only pick a class for a character that has none; a chosen class is
+    // kept. Gated on bAutoLockSwiftIfFresh (O39): default true keeps this
+    // line's behaviour identical to before the flag existed.
+    if (bAutoLockSwiftIfFresh && State.PermanentClass == EBreakerClassId::None) ChoosePermanentClassById(EBreakerClassId::Swift);
     // O2 PLACEHOLDER: 10 Class / 12 Core is the XP-And-Pacing §9 slice budget
     // at cap 10; the shipping numbers come from the curve Data Asset.
     GrantPlaytestPoints(UBreakerProgressionLibrary::SliceClassPointGrant, UBreakerProgressionLibrary::SliceCorePointGrant);
@@ -332,20 +398,58 @@ int32 UBreakerProgressionComponent::GetTreeInvestment(const UBreakerProgressionT
 
 int32 UBreakerProgressionComponent::GetRefundValue(EBreakerPointCurrency Currency) const
 {
-    int32 Total = 0;
-    for (const FBreakerNodeRank& Rank : RanksFor(Currency))
+    // O(1): a running total maintained at purchase/respec/load (audit item 6)
+    // instead of recomputed here by walking every owned rank's node
+    // definition. That walk used to call FindOwnedNodeDefinition once PER
+    // OWNED RANK, and FindOwnedNodeDefinition rebuilt the ENTIRE known-node
+    // array from scratch on every single call (CollectKnownNodes, itself
+    // O(N^2) via TArray::AddUnique) — O(ranks x N^2) on GetSpentPoints's path,
+    // which RecalculateStats calls on every movement-state transition.
+    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
+}
+
+void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
+{
+    // Called once per load rather than once per RecalculateStats, so the
+    // O(ranks x N^2) walk FindOwnedNodeDefinition does is an acceptable
+    // one-time cost here — the fix is keeping that walk OFF the per-tick
+    // path, not eliminating it everywhere it could ever run.
+    auto SumFor = [this](EBreakerPointCurrency Currency)
     {
-        const UBreakerProgressionNode* Definition = FindOwnedNodeDefinition(Rank.NodeId, Currency);
-        Total += Rank.Rank * (Definition ? Definition->CostPerRank : 1);
-    }
-    return Total;
+        int32 Total = 0;
+        for (const FBreakerNodeRank& Rank : RanksFor(Currency))
+        {
+            const UBreakerProgressionNode* Definition = FindOwnedNodeDefinition(Rank.NodeId, Currency);
+            Total += Rank.Rank * (Definition ? Definition->CostPerRank : 1);
+        }
+        return Total;
+    };
+    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints);
+    CachedSpentCorePoints = SumFor(EBreakerPointCurrency::CorePoints);
+}
+
+int32& UBreakerProgressionComponent::SpentPointsFor(EBreakerPointCurrency Currency)
+{
+    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
 }
 
 void UBreakerProgressionComponent::CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const
 {
-    auto AddTree = [&OutNodes, Currency](const UBreakerProgressionTree* Tree)
+    auto AddTree = [this, &OutNodes, Currency](const UBreakerProgressionTree* Tree)
     {
         if (!Tree || Tree->Currency != Currency) return;
+        // O37/audit item 6 class filter: a tree scoped to another class must
+        // not keep paying out ranks a dev class swap left behind.
+        // RequiredClass == None (Core) is class-agnostic and always
+        // included; CanPurchaseNode already refuses a NEW purchase outside
+        // this rule (the WrongClass check above) — this is the same rule
+        // applied at AGGREGATION, so an EXISTING rank stops contributing the
+        // moment the permanent class changes instead of only blocking future
+        // spending. Correctly covers DevForceClass's documented gap too: it
+        // deliberately leaves a stale ClassDefinition in place, so this reads
+        // State.PermanentClass rather than trusting ClassDefinition->BranchTrees
+        // to already be scoped to the current class.
+        if (Tree->RequiredClass != EBreakerClassId::None && Tree->RequiredClass != State.PermanentClass) return;
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {
             if (Node) OutNodes.AddUnique(Node);
@@ -435,6 +539,24 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 // be x1.5625, which no node table means. Every More node in the
                 // content is single-rank; this is the guard, not a limitation.
                 DamageMoreMultipliers.Add(1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f);
+            }
+            else
+            {
+                // Audit item 2: every OTHER target used to drop a MorePercent
+                // effect with no signal at all — Class-Kits' VW12 authors a
+                // DoT More that would silently no-op. Only Damage composes a
+                // More product today; a future DamageOverTime (or any other)
+                // More needs its own aggregation lane before it can pay out,
+                // exactly like Damage's DamageMoreMultipliers array above.
+                // Loud once per offending node rather than silent forever.
+                static TSet<FName> WarnedOnceNodeIds;
+                if (!WarnedOnceNodeIds.Contains(Node->NodeId))
+                {
+                    WarnedOnceNodeIds.Add(Node->NodeId);
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only EBreakerNodeStatTarget::Damage composes a More product — this effect is silently dropped."),
+                        *Node->NodeId.ToString(), Target);
+                }
             }
         }
         Stats.GrantedTags.AppendTags(Node->GrantedTags);

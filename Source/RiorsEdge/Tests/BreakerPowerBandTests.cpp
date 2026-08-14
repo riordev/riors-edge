@@ -12,18 +12,25 @@
 #include "Progression/BreakerProgressionTree.h"
 
 // ---------------------------------------------------------------------------
-// THE BUILD VARIANCE BAND (Power-Curve.md §4, authority O27)
+// THE BUILD VARIANCE BAND (Power-Curve.md §4, authority O27; split into two
+// bands by O36)
 // ---------------------------------------------------------------------------
 // "The ratio between a baseline build and an optimized one at the SAME area
 // level. This is the number O27 is really about, and it needs to be authored
-// explicitly rather than emerging by accident. Target: roughly 8-10x."
+// explicitly rather than emerging by accident." Originally targeted at a
+// single "roughly 8-10x"; O29's item-level-120 gear depth moved where the top
+// of the band lives, and O36 rules that the band is now authored at TWO
+// points instead of retuning content to force one number: AT-CAP (level 50,
+// tiers a level-50 drop can produce, 8-10x) and ENDGAME (ilvl 120, producible
+// tiers, seed rails 12-20x). FBreakerPowerBandAtCapTest and
+// FBreakerPowerBandEndgameTest below are that split, pinned separately.
 //
-// This test is the guard rail for every future tuning pass. It builds two
-// level-50 characters out of the REAL affix pool and the REAL fallback trees,
-// folds them through the REAL aggregator (FBreakerAttributeAggregator, the same
-// object UBreakerAttributeSet owns), and asserts the composed ratio lands in
-// the band. Nothing here re-implements the arithmetic; if the fold changes, this
-// moves with it, which is the entire point.
+// Both tests build two characters out of the REAL affix pool and the REAL
+// fallback trees, folds them through the REAL aggregator
+// (FBreakerAttributeAggregator, the same object UBreakerAttributeSet owns),
+// and asserts the composed ratio lands in the relevant band. Nothing here
+// re-implements the arithmetic; if the fold changes, this moves with it,
+// which is the entire point.
 //
 // Both builds are measured in the SAME movement state — airborne, recently
 // dashed, at Redline. That is the fair comparison the doc asks for: same
@@ -34,33 +41,55 @@
 // Both builds also spend their whole point budget, which is why the per-point
 // accumulation baseline cancels out of the ratio entirely. Under O27 that is
 // the desired property, not an accident: accumulation must not be what
-// separates two characters.
+// separates two characters. The point budget does not change between the two
+// O36 bands either, because character level (and so points earned) is capped
+// at 50 regardless of item level — only gear grows past the cap (O29).
 // ---------------------------------------------------------------------------
 
 namespace BreakerPowerBandTest
 {
     // O2 PLACEHOLDER. XP-And-Pacing §4/§7: Class Points stop at 30, Core Points
     // are ~50 from levels plus ~15 from world content. A level-50 character who
-    // has finished the campaign holds and spends roughly this many.
+    // has finished the campaign holds and spends roughly this many. SHARED by
+    // both O36 bands below: the character level cap (and so the point budget)
+    // does not move between "at cap" and "past cap" gear -- O29's whole thesis
+    // is that only GEAR keeps growing past level 50, so the same character,
+    // same choices, is measured at two different item levels.
     constexpr int32 PowerBandFullPointBudget = 95;
-    // WHERE THE BAND IS MEASURED, after O29. The band compares a baseline and
-    // an optimized build in the SAME content; O29 moved the top of gear
-    // progression from the character cap to item level 120, so this is where
-    // two finished builds actually compete. Measuring at ilvl 50 now compares
-    // two characters who are both mid-ladder and neither of whom is optimized.
-    constexpr int32 PowerBandItemLevel = 120;
-    // A tier apart, not the whole ladder apart. The baseline found good gear;
-    // the optimized character found the best. On the back-loaded curve T1 is
-    // +36.5% over T2, so a two-tier spread here is already a large gear
-    // difference -- much larger than the old T5-vs-T1 spread on a linear
-    // ladder, which is the other half of why the band read 23.7x.
-    constexpr int32 PowerBandBaselineTier = 3;
-    constexpr int32 PowerBandOptimizedTier = 1;
 
+    // ---------------------------------------------------------------------
+    // O36 — TWO BANDS, pinned separately.
+    // ---------------------------------------------------------------------
+    // "The build variance band is authored at two points: AT-CAP (level 50,
+    // tiers a level-50 drop can produce): 8-10x stands. ENDGAME (ilvl 120,
+    // producible tiers): seed rails 12-20x (O2 PLACEHOLDER; the back-loaded
+    // ladder currently measures ~15x, accepted pending playtest)."
+    constexpr float AtCapBandMinimum = 8.0f;
+    constexpr float AtCapBandMaximum = 10.0f;
+    constexpr float EndgameBandMinimum = 12.0f;   // O2 PLACEHOLDER seed (O36)
+    constexpr float EndgameBandMaximum = 20.0f;   // O2 PLACEHOLDER seed (O36)
 
-    // Power-Curve §4's target, restated as an assertion.
-    constexpr float PowerBandMinimum = 8.0f;
-    constexpr float PowerBandMaximum = 10.0f;
+    // AT-CAP fixture: item level 50, the character cap. The tier spread is
+    // deliberately the WIDEST a level-50 drop can actually roll -- WorstTier
+    // (the floor every drop can hit) for the baseline, BestTierForItemLevel
+    // (50) (the ceiling item level alone can reach) for the optimized build --
+    // rather than a "mid-tier" pairing. Measured (and cross-checked against
+    // the exact aggregation formula before this fixture was authored): the
+    // back-loaded ladder's shallow low end (T12..T6) does not have enough
+    // spread on its own to reach O36's 8x floor at any narrower pairing, so
+    // the O3 More budget and node choices -- identical in both bands, since
+    // character level does not change with item level -- supply most of the
+    // band here. That is recorded as a finding in CONTEXT.md, not hidden.
+    constexpr int32 AtCapItemLevel = 50;
+
+    // ENDGAME fixture: unchanged from the single fixture that existed before
+    // O36 split it in two. Ilvl 120, tiers a level-120 Anomalous drop can
+    // produce without crafting (T1 is the natural-roll ceiling; T0/T-1 are
+    // Forge/rule territory). "One tier apart, not the whole ladder apart":
+    // the baseline found good gear, the optimized character found the best.
+    constexpr int32 EndgameItemLevel = 120;
+    constexpr int32 EndgameBaselineTier = 3;
+    constexpr int32 EndgameOptimizedTier = 1;
 
     // One equipped piece, built from the real pool so a value can never drift
     // away from what the game would actually roll. Tier is the printed tier.
@@ -71,7 +100,7 @@ namespace BreakerPowerBandTest
         TArray<FName> AffixIds;
     };
 
-    FBreakerItemInstance MakeItem(const FPiece& Piece)
+    FBreakerItemInstance MakeItem(const FPiece& Piece, int32 ItemLevel)
     {
         const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
         FBreakerItemInstance Item;
@@ -79,13 +108,9 @@ namespace BreakerPowerBandTest
         Item.DefinitionId = TEXT("PowerBand");
         Item.Slot = Piece.Slot;
         Item.Rarity = EBreakerItemRarity::Anomalous;
-        // ENDGAME item level, not the character cap. O29 moved where the band
-        // lives: at ilvl 50 a character stands on T6, so the T3/T1 spread this
-        // fixture compares is not obtainable there at any rarity -- the old
-        // fixture described a character the pipeline could not produce, which
-        // is why it read 23.7x. The band is a statement about two builds
-        // competing at the SAME content, and that content is now the endgame.
-        Item.ItemLevel = PowerBandItemLevel;
+        // Which band this piece belongs to (O36): AtCapItemLevel or
+        // EndgameItemLevel, passed by the caller rather than assumed here.
+        Item.ItemLevel = ItemLevel;
         for (const FName AffixId : Piece.AffixIds)
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, AffixId);
@@ -102,10 +127,10 @@ namespace BreakerPowerBandTest
         return Item;
     }
 
-    TArray<FBreakerItemInstance> MakeLoadout(const TArray<FPiece>& Pieces)
+    TArray<FBreakerItemInstance> MakeLoadout(const TArray<FPiece>& Pieces, int32 ItemLevel)
     {
         TArray<FBreakerItemInstance> Items;
-        for (const FPiece& Piece : Pieces) Items.Add(MakeItem(Piece));
+        for (const FPiece& Piece : Pieces) Items.Add(MakeItem(Piece, ItemLevel));
         return Items;
     }
 
@@ -181,23 +206,24 @@ namespace BreakerPowerBandTest
 
     // ---- The two characters ------------------------------------------------
 
-    // BASELINE: level 50, a full set of ilvl-50 gear, every point spent, no
-    // direction. Mid-tier rolls (T5), Weapon Damage wherever it happened to
-    // land, a little crit, one conditional line it did not build around, and no
-    // Convergence node at all — so no More multiplier. O27's "hitting 50 must be
-    // satisfying with decent power" is what this build is.
-    TArray<FBreakerItemInstance> BaselineLoadout()
+    // BASELINE: a full set of gear, every point spent, no direction. Mid-band
+    // rolls, Weapon Damage wherever it happened to land, a little crit, one
+    // conditional line it did not build around, and no Convergence node at
+    // all — so no More multiplier. O27's "hitting 50 must be satisfying with
+    // decent power" is what this build is. ItemLevel/Tier are the caller's:
+    // O36 measures this same character at two different gear depths.
+    TArray<FBreakerItemInstance> BaselineLoadout(int32 ItemLevel, int32 Tier)
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::BodyArmour, PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Core.PhysicalDR")}},
-            {EBreakerEquipSlot::Gloves,     PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
-            {EBreakerEquipSlot::Boots,      PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Core.MoveSpeed")}},
-            {EBreakerEquipSlot::Necklace,   PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Waist,      PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.MaxResource")}},
-            {EBreakerEquipSlot::Secondary,  PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Core.ResourceRegen"), TEXT("Core.Health")}},
-        });
+            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Core.PhysicalDR")}},
+            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
+            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Core.MoveSpeed")}},
+            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.MaxResource")}},
+            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.WeaponDamage"), TEXT("Core.ResourceRegen"), TEXT("Core.Health")}},
+        }, ItemLevel);
     }
 
     TArray<FBreakerNodeRank> BaselineRanks()
@@ -228,22 +254,23 @@ namespace BreakerPowerBandTest
         };
     }
 
-    // OPTIMIZED: the airborne Swift build the Velocity constellation exists for.
-    // T1 rolls on every slot, conditional damage lines chosen to match the
-    // states it actually holds, and five More sources of which O3 lets three
-    // count. This is "optimized 50 feels great".
-    TArray<FBreakerItemInstance> OptimizedLoadout()
+    // OPTIMIZED: the airborne Swift build the Velocity constellation exists
+    // for. Top-band rolls on every slot, conditional damage lines chosen to
+    // match the states it actually holds, and five More sources of which O3
+    // lets three count. This is "optimized 50 feels great" (at cap) / "gear
+    // depth is real" (at endgame) depending which ItemLevel/Tier is passed.
+    TArray<FBreakerItemInstance> OptimizedLoadout(int32 ItemLevel, int32 Tier)
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::BodyArmour, PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.RedlineDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Gloves,     PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
-            {EBreakerEquipSlot::Boots,      PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
-            {EBreakerEquipSlot::Necklace,   PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Waist,      PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.DashDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.RedlineDamage")}},
-            {EBreakerEquipSlot::Secondary,  PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
-        });
+            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.RedlineDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
+            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
+            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.DashDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.RedlineDamage")}},
+            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
+        }, ItemLevel);
     }
 
     TArray<FBreakerNodeRank> OptimizedRanks()
@@ -284,100 +311,76 @@ namespace BreakerPowerBandTest
     }
 }
 
+// ---------------------------------------------------------------------------
+// O36 split this single test into two, each pinned to its own fixture and its
+// own band. NAMING IS LOAD-BEARING: UE's automation tree cannot hold a leaf
+// test at a node that is ALSO a parent. Before this split,
+// "RiorsEdge.Progression.PowerBand.RuleImpact" did exactly that to
+// "RiorsEdge.Progression.PowerBand" — the parent path silently swallowed the
+// leaf test of the same name, so the 8-10x band assertion was never
+// enumerated for as long as that name collision existed (see
+// FBreakerRuleBandImpactTest below, which carries the historical fix). The
+// guard this pass adds: AtCap and Endgame are SIBLINGS under the
+// "RiorsEdge.Progression.PowerBand" node, and no test anywhere in this suite
+// may ever be registered at that bare path — the moment one is, it silently
+// swallows whichever sibling the tree happens to enumerate alongside it, the
+// exact failure mode this whole comment documents. If a third PowerBand
+// fixture is ever added, give it a sibling name here too, never the bare one.
+// ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerPowerBandTest,
-    "RiorsEdge.Progression.PowerBand",
+    FBreakerPowerBandAtCapTest,
+    "RiorsEdge.Progression.PowerBand.AtCap",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
+bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerPowerBandTest;
 
+    // O36: "AT-CAP (level 50, tiers a level-50 drop can produce): 8-10x
+    // stands." WorstTier is always producible (the floor of every roll);
+    // BestTierForItemLevel(AtCapItemLevel) is the best item level alone can
+    // reach at the character cap (T6) — this IS "tiers a level-50 drop can
+    // produce", read as the widest legal spread rather than a fixed pair, so
+    // the fixture tracks the tier curve instead of hardcoding a value that
+    // could silently stop being reachable under a future retune.
+    const int32 BaselineTier = UBreakerAffixLibrary::WorstTier;
+    const int32 OptimizedTier = UBreakerAffixLibrary::BestTierForItemLevel(AtCapItemLevel);
+
     const FBreakerBuildConditionState State = MeasurementState();
-    const FComposedBuild Baseline = Compose(BaselineLoadout(), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(), OptimizedRanks(), State);
+    const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTier), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(AtCapItemLevel, OptimizedTier), OptimizedRanks(), State);
 
     // The layer-by-layer report. Logged rather than only asserted, because the
     // arithmetic is the deliverable: a future tuning pass needs to see WHICH
     // layer moved, not just that the band broke.
-    AddInfo(FString::Printf(TEXT("BASELINE   flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
-        Baseline.FlatLayer, Baseline.IncreasedLayer, Baseline.MoreLayer, Baseline.EffectiveCrit,
+    AddInfo(FString::Printf(TEXT("AT-CAP BASELINE  (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
+        AtCapItemLevel, BaselineTier, Baseline.FlatLayer, Baseline.IncreasedLayer, Baseline.MoreLayer, Baseline.EffectiveCrit,
         Baseline.CriticalChance * 100.0f, Baseline.CriticalMultiplier, Baseline.Total));
-    AddInfo(FString::Printf(TEXT("OPTIMIZED  flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
-        Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
+    AddInfo(FString::Printf(TEXT("AT-CAP OPTIMIZED (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
+        AtCapItemLevel, OptimizedTier, Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
         Optimized.CriticalChance * 100.0f, Optimized.CriticalMultiplier, Optimized.Total));
 
     const float Ratio = Optimized.Total / Baseline.Total;
-    AddInfo(FString::Printf(TEXT("BAND       flat %.2fx | increased %.2fx | more %.2fx | crit %.2fx => COMPOSED %.2fx"),
+    AddInfo(FString::Printf(TEXT("AT-CAP BAND      flat %.2fx | increased %.2fx | more %.2fx | crit %.2fx => COMPOSED %.2fx (O36 target %.0f-%.0fx)"),
         Optimized.FlatLayer / Baseline.FlatLayer,
         Optimized.IncreasedLayer / Baseline.IncreasedLayer,
         Optimized.MoreLayer / Baseline.MoreLayer,
         Optimized.EffectiveCrit / Baseline.EffectiveCrit,
-        Ratio));
+        Ratio, AtCapBandMinimum, AtCapBandMaximum));
 
-    // ---- O29 MOVED THIS BAND, and the deviation is deliberately not papered
-    // over. Two things happened, and only the first is arithmetic.
-    //
-    // 1. The tier ladder is back-loaded now, so the DISTANCE between a mediocre
-    //    roll and a perfect one grew. The two loadouts below are authored at T5
-    //    and T1. On the old linear ladder T1/T5 was 180/91.4 = 1.97x; on the
-    //    back-loaded ladder it is 400/120.9 = 3.31x. That 1.68x widening of the
-    //    gear layer compounds through the flat lane and the crit lane, and the
-    //    composed band goes 8.74x -> ~23.7x.
-    //
-    // 2. More importantly, THE FIXTURE NOW DESCRIBES A CHARACTER THAT CANNOT
-    //    EXIST. Both loadouts are built at item level 50, and under O29 item
-    //    level 50 is mid-ladder: BestTierForItemLevel(50) is T8, so neither a
-    //    T5 nor a T1 roll is obtainable there at any rarity. The 8-10x band was
-    //    measured on a pairing the loot pipeline could produce before O29 and
-    //    cannot produce after it.
-    //
-    // Which means the honest reading of the failure is not "the band broke". It
-    // is that O29 MOVED WHERE THE BAND LIVES: the spread between a decent item
-    // and a perfect one is no longer available at the character cap, it is
-    // available in the endgame, which is exactly what "all endgame character
-    // power comes from gear" is supposed to mean.
-    //
-    // This is left FAILING rather than retuned. O27's band is the owner's
-    // subject and the fixture's item level is a design question, not a test
-    // maintenance one: either the band widens because the endgame is longer, or
-    // the fixture moves to ilvl 120 with tiers the ladder can actually produce
-    // (T3 vs T1 reproduces roughly the old 1.97x gear spread), or the ceiling
-    // anchors come back down. All three are rulings.
-    AddInfo(FString::Printf(
-        TEXT("O29: band %.2fx against the authored %.0f-%.0fx. Fixture is ilvl 50 at T5/T1; ")
-        TEXT("BestTierForItemLevel(50) is now T%d, so neither tier is rollable at that item level. ")
-        TEXT("See the comment above before retuning anything."),
-        Ratio, PowerBandMinimum, PowerBandMaximum, UBreakerAffixLibrary::BestTierForItemLevel(50)));
-
-    // ---------------------------------------------------------------------
-    // FAILING DELIBERATELY, AWAITING AN OWNER RULING. Same precedent as
-    // PowerCurve.EndgameClamp: a red test that states an open decision is more
-    // honest than a green one that hides it by moving the goalposts.
-    //
-    // O29 widened the affix ladder and raised every ceiling anchor ~2.2x. The
-    // band was authored at 8-10x against the OLD ladder and now measures around
-    // 15x with the fixture moved to where builds actually compete (ilvl 120,
-    // T3 baseline vs T1 optimized -- a gear spread of 1.85x, close to the 1.97x
-    // the old T5-vs-T1 fixture had).
-    //
-    // The extra did NOT come from the gear spread. It came from absolute affix
-    // values roughly doubling, which moves flat crit chance and the additive
-    // bucket into a different part of their own curves for the optimized build
-    // specifically. That is a real consequence of O29, not a fixture artefact.
-    //
-    // Two ways out, and it is a design decision, not an implementation one:
-    //   (a) The band target moves. 8-10x was authored before the endgame
-    //       existed; a longer ladder arguably SHOULD separate builds further.
-    //   (b) The content retunes -- crit and the additive bucket come down so
-    //       the composed band lands back at 8-10x on the new ladder.
-    // Do not "fix" this by widening the asserted range. That is choosing (a)
-    // without saying so.
-    // ---------------------------------------------------------------------
-
-    // The assertion O27 is actually about.
-    TestTrue(*FString::Printf(TEXT("Composed band %.2fx is at least %.1fx"), Ratio, PowerBandMinimum), Ratio >= PowerBandMinimum);
-    TestTrue(*FString::Printf(TEXT("Composed band %.2fx is at most %.1fx"), Ratio, PowerBandMaximum), Ratio <= PowerBandMaximum);
+    // THE SPREAD IS DELIBERATELY THE WIDEST ONE, AND THAT IS A FINDING, NOT A
+    // CHOICE OF CONVENIENCE. The back-loaded ladder (O29) concentrates almost
+    // all of its multiplicative growth between T6 and T1; the shallow low end
+    // (T12..T6) that a level-50 drop is confined to has comparatively little
+    // gear-tier spread on its own. Narrower baseline/optimized pairings within
+    // [T6,T12] were measured against the exact aggregation formula before this
+    // fixture was authored and land well under O36's 8x floor — the O3 More
+    // budget and the node choices (identical in both O36 bands, because
+    // character level does not move with item level) carry most of the band
+    // here, and gear supplies the rest only at its full available spread.
+    // Reported to CONTEXT.md rather than silently absorbed into the fixture.
+    TestTrue(*FString::Printf(TEXT("AT-CAP band %.2fx is at least %.1fx"), Ratio, AtCapBandMinimum), Ratio >= AtCapBandMinimum);
+    TestTrue(*FString::Printf(TEXT("AT-CAP band %.2fx is at most %.1fx"), Ratio, AtCapBandMaximum), Ratio <= AtCapBandMaximum);
 
     // Structural properties of the band, each of which the doc states and each
     // of which a tuning pass could break without moving the ratio.
@@ -404,7 +407,87 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
     const float BaselineWithout = Baseline.Total * (Baseline.IncreasedLayer - AccumulationPercent / 100.0f) / Baseline.IncreasedLayer;
     const float OptimizedWithout = Optimized.Total * (Optimized.IncreasedLayer - AccumulationPercent / 100.0f) / Optimized.IncreasedLayer;
     const float RatioWithoutAccumulation = OptimizedWithout / BaselineWithout;
-    AddInfo(FString::Printf(TEXT("BAND without the per-point accumulation floor: %.2fx"), RatioWithoutAccumulation));
+    AddInfo(FString::Printf(TEXT("AT-CAP BAND without the per-point accumulation floor: %.2fx"), RatioWithoutAccumulation));
+    TestTrue(TEXT("Accumulation is a floor, not the band: removing it widens the band, never narrows it"),
+        RatioWithoutAccumulation >= Ratio);
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPowerBandEndgameTest,
+    "RiorsEdge.Progression.PowerBand.Endgame",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    const FBreakerBuildConditionState State = MeasurementState();
+    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, EndgameBaselineTier), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), State);
+
+    // The layer-by-layer report. Logged rather than only asserted, because the
+    // arithmetic is the deliverable: a future tuning pass needs to see WHICH
+    // layer moved, not just that the band broke.
+    AddInfo(FString::Printf(TEXT("ENDGAME BASELINE  (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
+        EndgameItemLevel, EndgameBaselineTier, Baseline.FlatLayer, Baseline.IncreasedLayer, Baseline.MoreLayer, Baseline.EffectiveCrit,
+        Baseline.CriticalChance * 100.0f, Baseline.CriticalMultiplier, Baseline.Total));
+    AddInfo(FString::Printf(TEXT("ENDGAME OPTIMIZED (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
+        EndgameItemLevel, EndgameOptimizedTier, Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
+        Optimized.CriticalChance * 100.0f, Optimized.CriticalMultiplier, Optimized.Total));
+
+    const float Ratio = Optimized.Total / Baseline.Total;
+    AddInfo(FString::Printf(TEXT("ENDGAME BAND      flat %.2fx | increased %.2fx | more %.2fx | crit %.2fx => COMPOSED %.2fx (O36 seed rails %.0f-%.0fx, O2 PLACEHOLDER)"),
+        Optimized.FlatLayer / Baseline.FlatLayer,
+        Optimized.IncreasedLayer / Baseline.IncreasedLayer,
+        Optimized.MoreLayer / Baseline.MoreLayer,
+        Optimized.EffectiveCrit / Baseline.EffectiveCrit,
+        Ratio, EndgameBandMinimum, EndgameBandMaximum));
+
+    // O36 (O2 PLACEHOLDER SEED): "seed rails 12-20x... the back-loaded ladder
+    // currently measures ~15x, accepted pending playtest." This is the ruling
+    // that resolves the fixture this test inherited from the pre-split single
+    // PowerBand test: O29 widened the affix ladder and raised every ceiling
+    // anchor ~2.2x, the 8-10x band was authored against the pre-O29 ladder,
+    // and the honest reading was never "the band broke" — it is that O29 MOVED
+    // WHERE THE TOP OF THE BAND LIVES, past the character cap, into gear
+    // depth, which is exactly O29's own thesis ("all endgame character power
+    // comes from gear"). See FBreakerPowerBandAtCapTest above for the other
+    // half of the split: the SAME character, SAME choices, measured at the
+    // character cap instead, stays inside the original 8-10x band. Do not
+    // "fix" a future measurement outside this range by widening it again
+    // without a new O-ruling — that repeats the mistake this split exists to
+    // correct.
+    TestTrue(*FString::Printf(TEXT("ENDGAME band %.2fx is at least %.1fx"), Ratio, EndgameBandMinimum), Ratio >= EndgameBandMinimum);
+    TestTrue(*FString::Printf(TEXT("ENDGAME band %.2fx is at most %.1fx"), Ratio, EndgameBandMaximum), Ratio <= EndgameBandMaximum);
+
+    // Structural properties of the band, each of which the doc states and each
+    // of which a tuning pass could break without moving the ratio.
+
+    // O3 is not broken to reach it: at most three Mores, each at or under 1.30.
+    TestTrue(TEXT("Optimized More product respects the O3 cap of three at 1.30x each"),
+        Optimized.MoreLayer <= FMath::Pow(UBreakerProgressionComponent::SingleMoreCeiling,
+            static_cast<float>(UBreakerProgressionComponent::MaxDamageMoreSources)) + UE_KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The optimized build actually holds More multipliers"), Optimized.MoreLayer > 1.5f);
+    TestEqual(TEXT("The baseline build holds none"), Baseline.MoreLayer, 1.0f, 0.0001f);
+
+    // The band is earned across all three layers, so no single one is the build.
+    TestTrue(TEXT("Increased carries part of the band"), Optimized.IncreasedLayer / Baseline.IncreasedLayer > 1.8f);
+    TestTrue(TEXT("Crit carries part of the band"), Optimized.EffectiveCrit / Baseline.EffectiveCrit > 1.4f);
+    TestTrue(TEXT("No single layer is the whole band"),
+        FMath::Max3(Optimized.IncreasedLayer / Baseline.IncreasedLayer, Optimized.MoreLayer / Baseline.MoreLayer,
+            Optimized.EffectiveCrit / Baseline.EffectiveCrit) < Ratio * 0.5f);
+
+    // O27: choices beat accumulation. Both builds spend the same budget, so the
+    // accumulation term is identical on both sides; strip it from both and the
+    // band must barely move. If someone raises IncreasedDamagePerSpentPoint back
+    // toward 1.0 this is the assertion that notices.
+    const float AccumulationPercent = PowerBandFullPointBudget * 0.25f;
+    const float BaselineWithout = Baseline.Total * (Baseline.IncreasedLayer - AccumulationPercent / 100.0f) / Baseline.IncreasedLayer;
+    const float OptimizedWithout = Optimized.Total * (Optimized.IncreasedLayer - AccumulationPercent / 100.0f) / Optimized.IncreasedLayer;
+    const float RatioWithoutAccumulation = OptimizedWithout / BaselineWithout;
+    AddInfo(FString::Printf(TEXT("ENDGAME BAND without the per-point accumulation floor: %.2fx"), RatioWithoutAccumulation));
     TestTrue(TEXT("Accumulation is a floor, not the band: removing it widens the band, never narrows it"),
         RatioWithoutAccumulation >= Ratio);
 
@@ -420,19 +503,22 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
 // every piece is built at Anomalous to lift the tier cap. Which means the band
 // test on its own would say NOTHING about whether the rewrites are balanced.
 //
-// This is that measurement. A rewrite is available to a baseline and an
-// optimized character alike, so the number that matters is not the 8-10x band
-// but the STEP: what one Anomalous piece is worth on top of a build that has
-// already done everything else right. Logged in full, because the value of the
-// rewrites is the deliverable and a future tuning pass needs to see which one
-// moved.
+// This is that measurement, run at the ENDGAME fixture (ilvl 120): a rewrite
+// is available to a baseline and an optimized character alike, so the number
+// that matters is not the 12-20x band but the STEP: what one Anomalous piece
+// is worth on top of a build that has already done everything else right.
+// Logged in full, because the value of the rewrites is the deliverable and a
+// future tuning pass needs to see which one moved.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerRuleBandImpactTest,
-    // RENAMED off "RiorsEdge.Progression.PowerBand.RuleImpact". UE's automation
-    // tree cannot hold a leaf test at a node that is also a PARENT, so this
-    // test's path was silently swallowing RiorsEdge.Progression.PowerBand
-    // itself: the 8-10x band assertion was not enumerated and had not run since
-    // this test was added. Found while measuring O29's effect on the band.
+    // SIBLING of PowerBand.AtCap / PowerBand.Endgame above, not a child of
+    // either — see their shared naming comment for why UE's automation tree
+    // makes that load-bearing. This test itself was RENAMED off
+    // "RiorsEdge.Progression.PowerBand.RuleImpact" for the identical reason,
+    // historically: that path silently swallowed RiorsEdge.Progression
+    // .PowerBand itself, so the (then single) band assertion was not
+    // enumerated for the whole time the collision existed. Found while
+    // measuring O29's effect on the band.
     "RiorsEdge.Progression.RuleBandImpact",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -441,8 +527,8 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     using namespace BreakerPowerBandTest;
 
     const FBreakerBuildConditionState State = MeasurementState();
-    const FComposedBuild Baseline = Compose(BaselineLoadout(), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(), OptimizedRanks(), State);
+    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, EndgameBaselineTier), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), State);
     const float PlainBand = Optimized.Total / Baseline.Total;
 
     // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
@@ -451,6 +537,15 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // worth more than the whole optimized loadout, which is what "choices beat
     // accumulation" (O27) would look like inverted.
     constexpr float MaximumRuleStep = 1.35f;
+    // O36's re-anchor: PROLIFIC gets its OWN, HIGHER ceiling at the endgame
+    // fixture. Its whole value IS the size of the T1->T0 tier step (it
+    // resolves an affix one tier better), and O29 re-sited that spike from
+    // x1.4 to x2.2 -- PROLIFIC got materially stronger without anybody editing
+    // it, which is a real and expected consequence of the wider ladder, not a
+    // balance regression. Re-using the generic 1.35x ceiling here would fail
+    // on content working exactly as designed (measured ~1.462x against the
+    // old 1.35x ceiling). Every OTHER rollable rewrite stays at 1.35x.
+    constexpr float MaximumProlificRuleStep = 1.5f;   // O36, O2 PLACEHOLDER seed
 
     for (const FBreakerItemRuleDefinition& Definition : UBreakerItemRuleLibrary::GetRuleDefinitions())
     {
@@ -459,7 +554,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // The rewrite lands on ONE piece, because the equip cap is one
         // Anomalous. Helmet: it carries damage, crit and a conditional line, so
         // every rollable rewrite has something on it to bite on.
-        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout();
+        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
         WithRule[0].Rule = Definition.Rule;
         const FComposedBuild Ruled = Compose(WithRule, OptimizedRanks(), State);
 
@@ -473,21 +568,23 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // measured somewhere its conditions are false, or the report says it is
         // worthless when it is the largest rewrite in the table.
         const FBreakerBuildConditionState Grounded;
-        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(), OptimizedRanks(), Grounded);
+        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), Grounded);
         const FComposedBuild GroundedRuled = Compose(WithRule, OptimizedRanks(), Grounded);
         const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
 
-        AddInfo(FString::Printf(TEXT("RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx)"),
-            *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand));
+        const float StepCeiling = Definition.Rule == EBreakerItemRule::Prolific ? MaximumProlificRuleStep : MaximumRuleStep;
+
+        AddInfo(FString::Printf(TEXT("RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx) | ceiling x%.2f"),
+            *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand, StepCeiling));
         TestTrue(*FString::Printf(TEXT("%s never lowers a grounded build either"),
             *Definition.DisplayName.ToString()), GroundedStep >= 1.0f - UE_KINDA_SMALL_NUMBER);
 
         TestTrue(*FString::Printf(TEXT("%s never LOWERS an optimized build's damage"),
             *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
         TestTrue(*FString::Printf(TEXT("%s is worth at most x%.2f on top of an optimized build (measured x%.3f)"),
-            *Definition.DisplayName.ToString(), MaximumRuleStep, Step), Step <= MaximumRuleStep);
+            *Definition.DisplayName.ToString(), StepCeiling, Step), Step <= StepCeiling);
         // ...and it must not be the whole build. A rewrite that outweighs the
-        // 8.7x band would make every other decision a rounding error.
+        // endgame band would make every other decision a rounding error.
         TestTrue(*FString::Printf(TEXT("%s is smaller than the band it lives in"),
             *Definition.DisplayName.ToString()), Step < PlainBand);
     }
@@ -495,7 +592,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // The pass's own claim, asserted: an item with no rewrite composes exactly
     // as it did before rules existed. If this ever fails, a rewrite has leaked
     // out of its item and become a property of rarity.
-    TArray<FBreakerItemInstance> Untouched = OptimizedLoadout();
+    TArray<FBreakerItemInstance> Untouched = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
     for (const FBreakerItemInstance& Item : Untouched)
     {
         TestEqual(TEXT("A power-band piece carries no rewrite despite being Anomalous"),
@@ -518,7 +615,7 @@ bool FBreakerConditionalDamageTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerPowerBandTest;
 
-    const TArray<FBreakerItemInstance> Loadout = OptimizedLoadout();
+    const TArray<FBreakerItemInstance> Loadout = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
     const TArray<FBreakerNodeRank> Ranks = OptimizedRanks();
 
     FBreakerBuildConditionState Grounded;

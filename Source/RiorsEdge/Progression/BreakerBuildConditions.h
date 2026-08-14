@@ -85,7 +85,16 @@ struct RIORSEDGE_API FBreakerBuildConditionState
     static FBreakerBuildConditionState All();
 
 private:
-    static uint8 Bit(EBreakerBuildCondition Condition) { return static_cast<uint8>(1u << static_cast<uint8>(Condition)); }
+    // Widened uint8 -> uint32 (pre-O30 hardening pass). EBreakerBuildCondition
+    // ::Count is 6 today, which fits either width, but a uint8 Mask/Bit() pair
+    // silently breaks the 9th entry: 1u << 8 overflows a uint8 to 0 with no
+    // warning, so that condition would compile, purchase, and simply never
+    // activate. O30's taxonomy (ailment, crit, stacking, ...) is exactly the
+    // kind of pass that adds several entries at once, so the width is widened
+    // now rather than the day it silently breaks.
+    static_assert(ConditionCount <= 32,
+        "EBreakerBuildCondition has grown past 32 entries; FBreakerBuildConditionState::Mask needs a wider type.");
+    static uint32 Bit(EBreakerBuildCondition Condition) { return 1u << static_cast<uint32>(Condition); }
 
-    uint8 Mask = 0;
+    uint32 Mask = 0;
 };

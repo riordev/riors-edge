@@ -149,6 +149,21 @@ namespace
     {
         return static_cast<uint8>(Item.Rarity) < static_cast<uint8>(MinimumKept);
     }
+
+    // O37: legendary and (non-legendary) Anomalous are separate equip-cap
+    // axes even though every legendary rolls Anomalous rarity (O32) — a worn
+    // legendary must not spend the Anomalous cap, and a second Anomalous
+    // piece must not evict a legendary, or be evicted for one, as if they
+    // shared a single pool. Every OTHER rarity still shares its axis with
+    // itself exactly as before. This is the one predicate PreviewEquipAgainst
+    // consults for cap membership, so equip-time counting, eviction-victim
+    // selection and the "surviving" tally cannot disagree about which axis a
+    // piece is on.
+    bool SharesEquipCapAxis(const FBreakerItemInstance& A, const FBreakerItemInstance& B)
+    {
+        if (A.IsLegendary() || B.IsLegendary()) return A.IsLegendary() && B.IsLegendary();
+        return A.Rarity == B.Rarity;
+    }
 }
 
 bool UBreakerEquipmentComponent::EquipItem(const FBreakerItemInstance& Item)
@@ -195,9 +210,68 @@ int32 UBreakerEquipmentComponent::CountEquippedOfRarity(EBreakerItemRarity Rarit
     int32 Count = 0;
     for (const FBreakerItemInstance& Item : Equipped)
     {
-        if (Item.IsValid() && Item.Rarity == Rarity) ++Count;
+        if (!Item.IsValid() || Item.Rarity != Rarity) continue;
+        // O37: a legendary occupies its own equip-cap axis and must not be
+        // counted against the (non-legendary) Anomalous cap it happens to
+        // share a rarity with — CountEquippedLegendaries answers for it.
+        if (Rarity == EBreakerItemRarity::Anomalous && Item.IsLegendary()) continue;
+        ++Count;
     }
     return Count;
+}
+
+int32 UBreakerEquipmentComponent::CountEquippedLegendaries() const
+{
+    int32 Count = 0;
+    for (const FBreakerItemInstance& Item : Equipped)
+    {
+        if (Item.IsValid() && Item.IsLegendary()) ++Count;
+    }
+    return Count;
+}
+
+bool UBreakerEquipmentComponent::ValidateEquipCaps(const TArray<FBreakerItemInstance>& Items, FText& OutFailureReason)
+{
+    int32 LegendaryCount = 0;
+    int32 AnomalousCount = 0;
+    int32 AberrantCount = 0;
+    for (const FBreakerItemInstance& Item : Items)
+    {
+        if (!Item.IsValid()) continue;
+        // Same axis split as SharesEquipCapAxis / CountEquippedOfRarity: a
+        // legendary is never ALSO counted as a non-legendary Anomalous.
+        if (Item.IsLegendary()) ++LegendaryCount;
+        else if (Item.Rarity == EBreakerItemRarity::Anomalous) ++AnomalousCount;
+        else if (Item.Rarity == EBreakerItemRarity::Aberrant) ++AberrantCount;
+    }
+
+    // O37: "exactly 1 equipped legendary, 1 non-legendary Anomalous, 3
+    // Aberrant" (O11 reaffirmed). Equip-time displacement enforces this live,
+    // so finding MORE than the cap here means a save predating O37, a
+    // hand-edited fixture, or a content bug — never a normal equip.
+    if (LegendaryCount > 1)
+    {
+        OutFailureReason = FText::Format(
+            NSLOCTEXT("BreakerEquipment", "TooManyLegendaries", "{0} legendaries are equipped; the cap is 1 (O37)."),
+            FText::AsNumber(LegendaryCount));
+        return false;
+    }
+    if (AnomalousCount > 1)
+    {
+        OutFailureReason = FText::Format(
+            NSLOCTEXT("BreakerEquipment", "TooManyAnomalous", "{0} non-legendary Anomalous items are equipped; the cap is 1 (O37)."),
+            FText::AsNumber(AnomalousCount));
+        return false;
+    }
+    if (AberrantCount > 3)
+    {
+        OutFailureReason = FText::Format(
+            NSLOCTEXT("BreakerEquipment", "TooManyAberrant", "{0} Aberrant items are equipped; the cap is 3 (O11/O37)."),
+            FText::AsNumber(AberrantCount));
+        return false;
+    }
+    OutFailureReason = FText::GetEmpty();
+    return true;
 }
 
 int32 UBreakerEquipmentComponent::CountBackpackBelowRarity(EBreakerItemRarity MinimumKept) const
@@ -242,10 +316,15 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
         break;
     }
 
+    // O37: the cap axis is SharesEquipCapAxis, not bare Rarity equality — a
+    // legendary and a non-legendary Anomalous share a rarity (O32) but sit on
+    // separate axes, so neither counts against, evicts, or is evicted for the
+    // other. Every other rarity is unaffected: SharesEquipCapAxis falls back
+    // to plain Rarity equality whenever neither side is a legendary.
     Preview.RarityLimit = EquipLimitForRarity(Candidate.Rarity);
     for (const FBreakerItemInstance& Existing : EquippedItems)
     {
-        if (Existing.IsValid() && Existing.Rarity == Candidate.Rarity) ++Preview.RarityCount;
+        if (Existing.IsValid() && SharesEquipCapAxis(Existing, Candidate)) ++Preview.RarityCount;
     }
     if (Preview.RarityLimit == INDEX_NONE) return Preview;
 
@@ -254,24 +333,24 @@ FBreakerEquipPreview UBreakerEquipmentComponent::PreviewEquipAgainst(const TArra
     // first. Swapping an Aberrant helmet for another Aberrant helmet therefore
     // ejects nothing extra even at 3/3.
     int32 Surviving = Preview.RarityCount;
-    if (InSlot && InSlot->Rarity == Candidate.Rarity) --Surviving;
+    if (InSlot && SharesEquipCapAxis(*InSlot, Candidate)) --Surviving;
     // A piece the SLOT RULE already ejects is leaving too, so it cannot also be
     // the cap's victim and its departure counts against the tally the same way.
     // Without this, equipping Cadence over an Anomalous Secondary at a cap of
     // one would eject the Secondary AND name a second piece to die for a cap
     // the first ejection had already satisfied.
-    if (Preview.bRuleDisplaces && Preview.RuleDisplaced.Rarity == Candidate.Rarity) --Surviving;
+    if (Preview.bRuleDisplaces && SharesEquipCapAxis(Preview.RuleDisplaced, Candidate)) --Surviving;
     if (Surviving < Preview.RarityLimit) return Preview;
 
-    // Over the cap: the WEAKEST equipped piece of that rarity leaves. Weakest
-    // is lowest item level, ties broken by wear order (slot index), which
-    // makes the choice deterministic — the player is told which piece dies and
-    // that is the piece that dies.
+    // Over the cap: the WEAKEST equipped piece ON THE SAME AXIS leaves.
+    // Weakest is lowest item level, ties broken by wear order (slot index),
+    // which makes the choice deterministic — the player is told which piece
+    // dies and that is the piece that dies.
     Preview.bExceedsRarityLimit = true;
     const FBreakerItemInstance* Weakest = nullptr;
     for (const FBreakerItemInstance& Existing : EquippedItems)
     {
-        if (!Existing.IsValid() || Existing.Rarity != Candidate.Rarity) continue;
+        if (!Existing.IsValid() || !SharesEquipCapAxis(Existing, Candidate)) continue;
         if (Existing.Slot == Candidate.Slot) continue;
         if (Preview.bRuleDisplaces && Existing.Slot == Preview.RuleDisplaced.Slot) continue;
         const bool bBetterVictim = !Weakest
@@ -597,9 +676,12 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
                 // Scaled by the RATIO between the two tiers rather than
                 // re-derived at the better tier, so a lucky in-band roll is
                 // carried upward instead of being flattened to the floor of the
-                // new tier. T1 -> T0 is x1.4 and T0 -> T-1 is x1.286, straight
-                // off the authored spike; an affix already at T-1 has nowhere
-                // to go and the ratio is exactly 1.
+                // new tier. T1 -> T0 is x2.2 and T0 -> T-1 is x1.636 (O29's
+                // re-sited spikes — UBreakerAffixLibrary::TierSpikeT0Multiplier
+                // / TierSpikeTopMultiplier, both against ValueAtT1; the pre-O29
+                // ratios were x1.4 and x1.286), straight off the authored
+                // spike; an affix already at T-1 has nowhere to go and the
+                // ratio is exactly 1.
                 const int32 UpliftedTier = FMath::Max(Rolled.Tier - TierUplift, -1);
                 const float FromTier = UBreakerAffixLibrary::ValueForTier(*Definition, Rolled.Tier);
                 const float ToTier = UBreakerAffixLibrary::ValueForTier(*Definition, UpliftedTier);
@@ -619,6 +701,24 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
             const int32 Target = static_cast<int32>(Definition->StatTarget);
             if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
+            else
+            {
+                // Audit item 2, the Items-side twin of the Progression fix:
+                // gear must never author EBreakerStatBucket::MorePercent (More
+                // multipliers are reserved for trees/Anomalous rewrites, and
+                // RiorsEdge.Items.Affixes.Breadth pins that no pool entry does)
+                // — but before this, a definition that DID would silently drop
+                // here with no signal, same as the Progression aggregator did.
+                // Loud once per offending affix id rather than silent forever.
+                static TSet<FName> WarnedOnceAffixIds;
+                if (!WarnedOnceAffixIds.Contains(Definition->AffixId))
+                {
+                    WarnedOnceAffixIds.Add(Definition->AffixId);
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[BreakerEquipment] affix '%s' is authored with StatBucket MorePercent, which gear never composes — this effect is silently dropped."),
+                        *Definition->AffixId.ToString());
+                }
+            }
         }
     }
 

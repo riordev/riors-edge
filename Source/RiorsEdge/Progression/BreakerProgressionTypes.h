@@ -169,6 +169,14 @@ struct RIORSEDGE_API FBreakerProgressionState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> ClassNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> CoreNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerAbilityLoadout AbilityLoadout;
+    // O37: subclass commitment. None until UBreakerProgressionComponent::
+    // CommitToBranch is called; that call is one-way (refuses once this is
+    // already set) and only RespecAtForge(ClassPoints, ...) clears it back to
+    // None. Committing EMPOWERS rather than excludes — it unlocks the named
+    // branch's keystone/cornerstone tier; ordinary nodes of every branch stay
+    // freely purchasable regardless (O15 intact). A defaulted UPROPERTY, so
+    // an existing save loads with no commitment and stays save-compatible.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName CommittedBranch = NAME_None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
 };
 

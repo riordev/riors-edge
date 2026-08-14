@@ -114,16 +114,21 @@ public:
     // Consumed by UBreakerLootLibrary::RollItem.
     static constexpr float TierUpgradeChance = 0.64f;        // O2 PLACEHOLDER
 
-    // Item level gates the best rollable tier: 1-120 onto T12..T1, one tier
-    // per 10 levels. Level 1 rolls only T12; T1 opens at ilvl 111.
-    // T0/T-1 never come from item level alone — they are crafted or carried by
-    // a rule, which is what keeps the Forge a destination.
+    // Item level gates the best rollable tier via TWO SLOPES, not one (owner
+    // ruling after playtesting O29: the tier capping at 8 by the character cap
+    // read as awkward progression, brought to 6). Levels 1-50 cross T12..T6,
+    // roughly 8.2 levels per tier (the campaign); levels 50-120 cross T6..T1,
+    // roughly 14 levels per tier (the chase) — the exact step derivation is on
+    // BestTierForItemLevel in the .cpp. T0/T-1 never come from item level
+    // alone — they are crafted or carried by a rule, which is what keeps the
+    // Forge a destination.
     //
-    // The old mapping was 1-50 onto T8..T1 at one tier per 7 levels. Both the
-    // range and the ladder roughly tripled, so the levels-per-tier only rises
-    // from 7 to 10: an item level still buys a tier at a comparable rate, and
-    // the endgame is longer because there is more of it, not because it is
-    // slower.
+    // Both predecessors it replaced: the ORIGINAL pre-O29 mapping was 1-50
+    // onto T8..T1 at one tier per 7 levels. O29's first pass widened that to a
+    // SINGLE slope, 1-120 onto T12..T1 at a flat one tier per 10 levels (T1
+    // opening at ilvl 111); that single slope put the CHARACTER CAP at T8, a
+    // third of the ladder and entirely inside its shallow lower half, which is
+    // what the two-slope mapping above corrects.
     UFUNCTION(BlueprintPure, Category="Items|Affixes")
     static int32 BestTierForItemLevel(int32 ItemLevel);
 

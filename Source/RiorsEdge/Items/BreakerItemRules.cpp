@@ -8,7 +8,7 @@ bool FBreakerItemRuleSet::IsIdentity() const
         && !bAirborneAlsoGroundTraversal
         && !bAddedDamageAlsoIncreased
         && !bRegenGatedOnTraversal
-        && FMath::IsNearlyEqual(PhysicalDamageReductionCap, 60.0f)
+        && FMath::IsNearlyEqual(PhysicalDamageReductionCap, FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap)
         && FireRateToIncreasedDamage == 0.0f
         && AirControlPercentDelta == 0.0f;
 }
