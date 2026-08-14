@@ -36,8 +36,10 @@ struct RIORSEDGE_API FBreakerDetonationParams
     GENERATED_BODY()
 
     // O2 PLACEHOLDER. Class-Kits §2.7.5 gives the BOUND and no values at all,
-    // so every number here is a shape rather than balance.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float DamagePerDistinctStatus = 40.0f;
+    // so every number here is a shape rather than balance. These are
+    // item-level-1 numbers: Resonance multiplies the composed burst by the
+    // weapon item-level scalar (O35), which cancels out of the §2.7.5 ratio.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float DamagePerDistinctStatus = 40.0f;   // O2 PLACEHOLDER
     // Paid once when at least one status is consumed. Zero statuses always
     // detonates for zero — detonating nothing must never pay out.
     //
@@ -46,14 +48,14 @@ struct RIORSEDGE_API FBreakerDetonationParams
     // exactly 3.0 and breaches §2.7.5's 2.2x cap before a single node is taken.
     // A flat base flattens the ratio without flattening the incentive to
     // diversify, which is the design goal MS9 states in words.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FlatDamageIfAny = 150.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FlatDamageIfAny = 150.0f;   // O2 PLACEHOLDER
     // MS9 only.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 ThresholdCount = 3;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float ThresholdFlatBonus = 40.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 ThresholdCount = 3;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float ThresholdFlatBonus = 40.0f;   // O2 PLACEHOLDER
     // Hard stop on how many distinct statuses can be paid for. Five elements
     // plus Bleed is six statuses today; the cap exists so a future seventh
     // status type cannot silently inflate an already-bounded ability.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MaximumCountedStatuses = 6;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MaximumCountedStatuses = 6;   // O2 PLACEHOLDER
 };
 
 UCLASS()

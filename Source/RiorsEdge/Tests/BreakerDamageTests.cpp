@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 
@@ -191,12 +192,14 @@ bool FBreakerOutgoingModifierTest::RunTest(const FString& Parameters)
     Combat->RemoveOutgoingModifier(TEXT("MoreB"));
     TestEqual(TEXT("Removal drops that factor"), Combat->GetComposedMoreMultiplier(), 1.30f, 0.0001f);
 
-    // Damage-Pipeline S4: the composed product is clamped at 2.20x, loudly.
+    // O34: the composed product is clamped at THE one aggregator-derived
+    // ceiling, loudly. With no attribute set bound the attribute side is 1.0,
+    // so the chain may spend the whole budget — 1.30^3, not the deleted 2.20.
     AddExpectedError(TEXT("exceeds the"), EAutomationExpectedErrorFlags::Contains, 0);
     Combat->PushOutgoingModifier(TEXT("MoreC"), 0.0f, 1.30f, 0.0f);
     Combat->PushOutgoingModifier(TEXT("MoreD"), 0.0f, 1.30f, 0.0f);
     Combat->PushOutgoingModifier(TEXT("MoreE"), 0.0f, 1.30f, 0.0f);
     TestEqual(TEXT("Composed More product clamps at the ceiling"),
-        Combat->GetComposedMoreMultiplier(), UBreakerCombatComponent::ComposedMoreCeiling, 0.0001f);
+        Combat->GetComposedMoreMultiplier(), FBreakerAttributeAggregator::ComposedMoreCeiling(), 0.0001f);
     return true;
 }

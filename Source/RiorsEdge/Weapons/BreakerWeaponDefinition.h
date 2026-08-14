@@ -21,8 +21,14 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FText DisplayName;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FGameplayTagContainer WeaponTags;
 
+    // The ITEM LEVEL 1 number — the weapon component scales it up the
+    // (1 + w)^(ilvl - 1) curve. O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float Damage = 24.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="1")) float WeakPointMultiplier = 1.75f;
+    // O34 bounds this per archetype to [1.0, 2.0] (weak point is the aim-skill
+    // lane, outside the O3 More budget; the resolve site clamps to
+    // UBreakerDamageLibrary's shared pair and a test pins every archetype).
+    // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="1", ClampMax="2")) float WeakPointMultiplier = 1.75f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0")) float ArmorPenetration = 0.0f;
     // Falloff, rifle values (the archetype table states only its differences).
     // The gym is now an open field whose ranged enemy holds 9-19 m, so the

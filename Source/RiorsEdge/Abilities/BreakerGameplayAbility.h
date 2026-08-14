@@ -58,6 +58,18 @@ public:
     // Caster.
     UFUNCTION(BlueprintPure, Category="Abilities") float GetCurrentClassResourceFloor() const;
 
+    // O35: ABILITIES RIDE GEAR DEPTH. The item-level damage scalar every class
+    // ability's damage multiplies by — the EQUIPPED WEAPON's
+    // (1 + w)^(ilvl - 1), read off the owner's weapon component so `w` is the
+    // component's live ItemLevelDamageGrowth, never a copy. Unequipped (or no
+    // weapon component at all) is item level 1, where the scalar is EXACTLY
+    // 1.0 — the anchor that keeps every authored ability number bit-identical
+    // at the bottom of the curve. Without this, weapon base damage grows
+    // (1 + w)^(ilvl - 1) while every flat ability number stands still, and the
+    // whole ABILITIES axis (O30) decays x74 against the curve by ilvl 50.
+    // Static and null-safe so application sites and tests share one seam.
+    static float AbilityDamageScalarFor(const AActor* OwnerActor);
+
     // Pure rule, exposed for tests: an ability is affordable when the owner's
     // class resource is at or above its cost. Free abilities are always
     // affordable.

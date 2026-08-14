@@ -6,21 +6,25 @@
 
 UBreakerAttributeSet::UBreakerAttributeSet()
 {
-    InitHealth(100.0f);
-    InitMaxHealth(100.0f);
+    // THE BASE TABLE. Every authored magnitude here is frozen under O2 —
+    // wave-mode measurement, not this constructor, decides the real numbers.
+    // The 0/1 identities (empty shield, multiplier bases of 1.0) are shapes,
+    // not balance, and carry no flag.
+    InitHealth(100.0f);              // O2 PLACEHOLDER
+    InitMaxHealth(100.0f);           // O2 PLACEHOLDER
     InitShield(0.0f);
     InitMaxShield(0.0f);
     InitArmor(0.0f);
     InitClassResource(0.0f);
-    InitMaxClassResource(100.0f);
+    InitMaxClassResource(100.0f);    // O2 PLACEHOLDER
     // Spec D8: zero for everyone. A class that wants a negative bank opens it
     // explicitly; nothing else in the game can tell the attribute is there.
     InitClassResourceFloor(0.0f);
-    InitCriticalChance(0.05f);
-    InitCriticalMultiplier(1.5f);
+    InitCriticalChance(DefaultCriticalChance);           // O2 PLACEHOLDER
+    InitCriticalMultiplier(DefaultCriticalMultiplier);   // O2 PLACEHOLDER
     InitDamageMultiplier(1.0f);
     InitDamageOverTimeMultiplier(1.0f);
-    InitMoveSpeed(650.0f);
+    InitMoveSpeed(650.0f);           // O2 PLACEHOLDER
     // Multiplier-shaped, so 1.0 is "nothing contributed". The movement
     // component divides by DashCooldownReduction, which is why
     // PreAttributeChange gives it a hard floor rather than clamping at zero.

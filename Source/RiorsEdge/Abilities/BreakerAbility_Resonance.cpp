@@ -75,7 +75,12 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         Status->ScaleRemainingDurations(DurationScalarWhenNotConsuming);
     }
 
-    const float BaseDamage = UBreakerStatusConsumption::DetonationDamage(DistinctCount, Detonation, Curve);
+    // O35: the detonation's authored parameters are item-level-1 numbers; the
+    // burst rides the equipped weapon's item-level scalar. Applied to the
+    // RESULT of the curve, not its parameters, so the §2.7.5 ratio bound is
+    // untouched at every item level (a common scalar cancels out of the ratio).
+    const float BaseDamage = UBreakerStatusConsumption::DetonationDamage(DistinctCount, Detonation, Curve)
+        * AbilityDamageScalarFor(Character);
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
 
     if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
@@ -88,8 +93,8 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         Damage.DamageFamily = EBreakerDamageFamily::Elemental;
         Damage.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
         Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Resonance.GetTag());
-        Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-        Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+        Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+        Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
         Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
         Damage.SourceLocation = Character->GetActorLocation();

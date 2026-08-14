@@ -118,7 +118,6 @@ float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute
 
     float Flat = 0.0f;
     float IncreasedPercent = 0.0f;
-    float More = 1.0f;
     // Fixed order over the contributor enum: the result cannot depend on the
     // sequence in which the layers happened to recalculate.
     for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
@@ -126,7 +125,23 @@ float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute
         const FBreakerAttributeContribution& Contribution = Contributions[Contributor];
         Flat += Contribution.GetFlat(Attribute);
         IncreasedPercent += Contribution.GetIncreasedPercent(Attribute);
-        More *= Contribution.GetMore(Attribute);
+    }
+
+    // The More factor comes from the ONE function that owns the O3/O34 clamp,
+    // so what Compose folds in and what the combat chain budgets against can
+    // never be two different numbers.
+    return (Bases[Index] + Flat) * (1.0f + IncreasedPercent / 100.0f) * ComposedMoreProduct(Attribute);
+}
+
+float FBreakerAttributeAggregator::ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const
+{
+    const int32 Index = AttributeIndex(Attribute);
+    if (Index == INDEX_NONE) return 1.0f;
+
+    float More = 1.0f;
+    for (int32 Contributor = 0; Contributor < ContributorCount; ++Contributor)
+    {
+        More *= Contributions[Contributor].GetMore(Attribute);
     }
 
     // O3's hard cap, applied ACROSS contributors rather than inside each of
@@ -137,8 +152,7 @@ float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute
     {
         More = FMath::Min(More, ComposedMoreCeiling());
     }
-
-    return (Bases[Index] + Flat) * (1.0f + IncreasedPercent / 100.0f) * More;
+    return More;
 }
 
 float FBreakerAttributeAggregator::ComposedMoreCeiling()

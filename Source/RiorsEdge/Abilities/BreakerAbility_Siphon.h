@@ -50,9 +50,11 @@ public:
     // Everything below is O2 PLACEHOLDER: GAP [O2] in spec §5.4 says the damage
     // per tick, the tick interval, the heal portion and the break threshold are
     // all unspecified.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0.05")) float TickIntervalSeconds = 0.5f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float DamagePerTick = 14.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="2")) float LeechFraction = 0.4f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0.05")) float TickIntervalSeconds = 0.5f;   // O2 PLACEHOLDER
+    // The item-level-1 number; each tick rides the equipped weapon's
+    // item-level scalar (O35).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float DamagePerTick = 14.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="2")) float LeechFraction = 0.4f;   // O2 PLACEHOLDER
     // VW6 Drain moves this to 0.15 and then 0.30 — a data row, not a branch.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0", ClampMax="1")) float BreakThresholdFraction = 0.05f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Siphon", meta=(ClampMin="0")) float MaximumRangeCm = 3000.0f;

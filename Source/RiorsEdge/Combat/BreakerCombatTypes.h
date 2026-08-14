@@ -24,6 +24,8 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer SourceTags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceDamageMultiplier = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalChance = 0.0f;
+    // Struct default only — live requests are filled from the attribute set
+    // (or its named fallback constants). O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalMultiplier = 1.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float WeakPointMultiplier = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ArmorPenetration = 0.0f;
@@ -63,7 +65,7 @@ struct RIORSEDGE_API FBreakerDefenseState
     // the chances. Neither applies to damage over time.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float DodgeChance = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;   // O2 PLACEHOLDER
 };
 
 USTRUCT(BlueprintType)

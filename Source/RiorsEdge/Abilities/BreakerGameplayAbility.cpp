@@ -5,6 +5,7 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 UBreakerAbilityCostEffect::UBreakerAbilityCostEffect()
 {
@@ -56,6 +57,16 @@ float UBreakerGameplayAbility::GetCooldownSeconds() const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
     return Definition ? Definition->CooldownSeconds : 0.0f;
+}
+
+float UBreakerGameplayAbility::AbilityDamageScalarFor(const AActor* OwnerActor)
+{
+    // The weapon component owns both halves of the reading: the equipped item
+    // level (unequipped = 1) and the growth `w`. Asking it, rather than
+    // recomputing here, is what keeps an editor retune of ItemLevelDamageGrowth
+    // reaching abilities and weapon rounds in the same frame.
+    const UBreakerWeaponComponent* Weapon = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerWeaponComponent>() : nullptr;
+    return Weapon ? Weapon->GetItemLevelDamageScalar() : 1.0f;
 }
 
 ABreakerCharacter* UBreakerGameplayAbility::GetBreakerCharacter() const

@@ -147,15 +147,18 @@ void UBreakerAbility_Siphon::TickChannel()
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
 
     FBreakerDamageRequest Damage;
-    Damage.BaseDamage = DamagePerTick;
+    // O35: flat ability damage rides the equipped weapon's item-level scalar.
+    // Read per tick, not snapshotted at channel start, because a channel is a
+    // repeated LIVE hit — the same reason it carries no bIsDamageOverTime.
+    Damage.BaseDamage = DamagePerTick * AbilityDamageScalarFor(Character);
     // O5: Elemental is the pipeline family until the resistance model lands;
     // Void rides on the type tag, so Siphon gains resistance interaction later
     // with no rewrite.
     Damage.DamageFamily = EBreakerDamageFamily::Elemental;
     Damage.DamageTypeTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Void"), false);
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Siphon.GetTag());
-    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
     // A channel is not a damage-over-time STATUS: it is a repeated direct hit
     // from a live ability, so it does not snapshot and it does not carry

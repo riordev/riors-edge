@@ -50,10 +50,14 @@ public:
 
     // Class-Kits §1.2: "all Momentum generation is doubled".
     static constexpr float LoopGenerationMultiplier = 2.0f;
-    // O2 PLACEHOLDER, and FLAGGED: Class-Kits §0.1 budgets Swift three More
-    // multipliers and spends all three on branch keystones (F12/K12/M12), so an
-    // ultimate-owned More is a fourth. It ships because "a temporary speed
-    // multiplier" is not a power state and the owner's feedback is explicit;
-    // the design call (drop it, or re-budget) is owed before sign-off.
+    // O2 PLACEHOLDER. The old "4th More" self-flag is RESOLVED by O34:
+    // temporary ability windows ARE Mores and count within the ONE
+    // aggregator-derived budget (FBreakerAttributeAggregator::
+    // ComposedMoreCeiling), so this window competes with the three branch
+    // keystones (F12/K12/M12) for the same headroom instead of stacking a
+    // fourth on top. On a build already holding three tree Mores near the
+    // ceiling, Overdrive buys little damage — that competition is the choice
+    // O27 wants, not a defect. The value stays per-source legal (at or under
+    // the shared single-More ceiling, asserted in the ability tests).
     static constexpr float OutgoingMoreMultiplier = 1.25f;
 };
