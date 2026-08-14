@@ -369,7 +369,7 @@ per O7 and are consumed, not authored. All levels and area levels are
 | ID | Mission | Lvl | AL | What happens | Teaches | Gives |
 |---|---|---|---|---|---|---|
 | **A1-P** | **Spill in Sector Four** | 1→3 | 1 | A rift opens on the perimeter. The player is handed a rifle and a line to hold, then sent in. One rift, three beats, closed. | Fire, reload, weak points, sprint/jump. The rift skeleton. **The closing ritual, in full, unskippable, once.** | Core Point #1 (XP §7 #1). A weapon. The 3,000 XP prologue bolus (XP §2). |
-| **A1-1** | **Induction** | 3 | — | Return to the camp. Command signs the player in. The induction range: five loaner kits, thirty seconds each, three dummies. Then the choice, and it is permanent. | Class resource loop; two abilities and one ultimate; the shape of a class. | **The permanent class** (see §4). Three banked Class Points, spent on the spot. |
+| **A1-1** | **Induction** | 3 | — | Return to the camp. Command signs the player in. The induction range: five loaner kits (two live in the slice — O39; see §4.2), thirty seconds each, three dummies. Then the choice, and it is permanent. | Class resource loop; two abilities and one ultimate; the shape of a class. | **The permanent class** (see §4). Three banked Class Points, spent on the spot. |
 | **A1-2** | **Ground Under Foot** | 3→5 | 4 | A pack keeps regrouping in the ruin field past the pad. Skitters only. The route matters more than the fight. | Dash, slide, wall ride, wall jump, the second jump. The traversal segment as a pacing valve. | The **second weapon slot** and the swap tempo. The Quartermaster. |
 | **A1-3** | **The Forge Is Cold** | 5→6 | 5 | Kess. The first gear worth equipping drops on the way in, and she explains what to do with it — and what she will and will not answer. | Loot, item level, affixes, the additive bucket. Respec. | Core Point #2 (XP §7 #2). Forge access. Kess's refusal thread opens. |
 | **A1-4** | **What You Spend** | 6→7 | 6 | A short rift with a wide-open second room, run twice with two different node loadouts because Command wants a comparison. | Skill trees. **Two currencies, deliberately not interchangeable.** | Archetype first-clear: **Clear**. |
@@ -507,6 +507,17 @@ has recycling diagnostic targets, `DevForceClass` already swaps a class kit at
 runtime, and the two starter abilities per class already resolve through
 `UBreakerAbilityDefinition::DefaultAbilityIdForSlot`. The shipping work is a
 scoped, non-permanent version of a mechanism that exists for debugging.
+
+**[O39 note]** "Five loaner kits" is the full-game design this section
+describes, and this document is post-slice scope. As of the slice itself, only
+**two** are real: Swift and Caster have implemented class kits; Gunsmith,
+Tank, and Support remain designed-only and are gated off the class-select
+screen until built (O39 — outside dev mode, the class screen offers only
+classes with implemented kits, so no player can permanently lock a character
+into a class that grants nothing). Until the other three ship, the induction
+range either offers two live kits, or shows the missing three as
+coming-soon rather than selectable. Implementation detail against a slice
+constraint, not a change to this section's design.
 
 **Then the lock is explicit.** The confirmation uses the word *permanent*, states
 that respec at the Forge moves points and never class, and requires a second
