@@ -141,6 +141,11 @@ private:
     // skill nodes and gear now stack instead of overwriting each other.
     FBreakerAttributeContribution CachedContribution;
     FBreakerBuildConditionState ActiveConditions;
+    // The node tags currently pushed onto the owner's ability system, so the
+    // next submission can remove exactly what the last one added. Without this
+    // a respec would leave keystone tags behind and the ultimate would keep a
+    // rewrite the player no longer owns.
+    FGameplayTagContainer PublishedNodeTags;
 
     // Conditional node effects are live state, so the offer they belong to has
     // to be rebuilt on a transition. Called from the tick; only recalculates
@@ -154,4 +159,9 @@ private:
     const TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency) const;
     void RecalculateStats();
     void ApplyStatsToAttributes();
+    // Mirrors CachedStats.GrantedTags onto the owner's ability system as loose
+    // tags. Rule-rewrite nodes published tags that only this component could
+    // see, so a keystone whose whole job is to rewrite an ability — Overdrive
+    // resolves its variant from the OWNER's tag container — could not reach it.
+    void PublishNodeTagsToAbilitySystem();
 };

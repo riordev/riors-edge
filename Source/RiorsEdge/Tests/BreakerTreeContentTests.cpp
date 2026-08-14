@@ -14,7 +14,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
 {
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();
-    TestEqual(TEXT("Core tree plus two Swift branches exist"), Trees.Num(), 3);
+    // Class-Kits §1.3-1.5 names THREE Swift branches. Frenzy is now authored,
+    // so the branch strip shows three chips instead of two.
+    TestEqual(TEXT("Core tree plus three Swift branches exist"), Trees.Num(), 4);
 
     TSet<FName> SeenNodeIds;
     for (const UBreakerProgressionTree* Tree : Trees)
@@ -69,14 +71,21 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // The numbers below are still EXACT equalities on purpose. The point of the
     // pin was never the value 15 — it is that content cannot drift without
     // somebody saying so in a diff.
+    //
+    // Re-set again for the ELEMENTS constellation: the Core board rendered
+    // Elements as a sealed placeholder because its roster was empty, and O5
+    // plus Core-Constellations §6 both say it is designed-but-unshipped rather
+    // than cut. Six nodes joined the Core tree (24 -> 30).
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core slice ships exactly the authored 24"), Core->Nodes.Num(), 24);
+    TestEqual(TEXT("Core slice ships exactly the authored 30"), Core->Nodes.Num(), 30);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // Swift branches, tiers 1-3 only: no tier 4/5 content leaked into the slice.
+    TestEqual(TEXT("Frenzy ships ten nodes"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 10);
     TestEqual(TEXT("Kinetic ships eleven nodes"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 11);
     TestEqual(TEXT("Marksman ships ten nodes"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 10);
-    for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
+    for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
+        UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
     {
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {

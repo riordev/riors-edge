@@ -537,10 +537,41 @@ void UBreakerProgressionComponent::RecalculateStats()
 
 void UBreakerProgressionComponent::ApplyStatsToAttributes()
 {
+    PublishNodeTagsToAbilitySystem();
     // One submission, no absolute writes. A respec submits an empty
     // contribution, which restores exactly the pre-purchase composition.
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
     Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, CachedContribution);
+}
+
+void UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem()
+{
+    // A node's GrantedTags used to live only in FBreakerNodeStats, which meant
+    // the one system most of them exist to talk to could not read them:
+    // UBreakerAbility_Overdrive resolves its keystone variant from
+    // ASC->GetOwnedGameplayTags, and Class-Kits' whole branch-keystone pattern
+    // is "the keystone rewrites the ultimate". Publishing the aggregate as
+    // loose tags is what makes Bloodrhythm a real rewrite instead of a label.
+    //
+    // Diffed against the last publication rather than cleared and re-added, so
+    // a recalculation that changes nothing touches nothing, and a respec
+    // removes exactly the tags this component put there and no others.
+    AActor* Owner = GetOwner();
+    if (!Owner || !Owner->HasAuthority()) return;
+    const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(Owner);
+    UAbilitySystemComponent* ASC = AbilityOwner ? AbilityOwner->GetAbilitySystemComponent() : nullptr;
+    if (!ASC) return;
+
+    const FGameplayTagContainer& Desired = CachedStats.GrantedTags;
+    for (const FGameplayTag& Tag : PublishedNodeTags)
+    {
+        if (!Desired.HasTagExact(Tag)) ASC->RemoveLooseGameplayTag(Tag);
+    }
+    for (const FGameplayTag& Tag : Desired)
+    {
+        if (!PublishedNodeTags.HasTagExact(Tag)) ASC->AddLooseGameplayTag(Tag);
+    }
+    PublishedNodeTags = Desired;
 }
 
 TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency)

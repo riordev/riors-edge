@@ -266,6 +266,60 @@ Slow Bleed intentionally *conflicts* with the Tick Frequency affix rather than m
 | E9 | **Reaction Chain** | Convergence | 3 | Requires two lanes. A reaction can trigger a second reaction on the same target, once, if a third element is present. Hard depth cap of 2. Proc coefficient of the second reaction is 0. | `[ELEM-MATRIX]` **[REMAP — O5]** — with exactly three elements, "if a third element is present" means **all three** are on the target. The node's trigger condition is now the maximum achievable element state rather than a mid-range one; it fires far less often than authored. Structural, not a value change. Also the constellation's **compliant O3 More slot** (§2.4) if a More is ever wanted here. |
 | **E10** | **RESONANCE** | **Keystone** | **5** | **Rewrite:** you may carry only one element, chosen at a Forge. All elemental damage you deal converts to that element. In exchange, applying *any* other source's element to a target you have already built up instantly fills that target's buildup to threshold and triggers the reaction at maximum magnitude. **O19 framing:** RESONANCE is the "**masters one**" pole; Multispell is the "**rotates all three**" pole. That opposition — not a restriction clause — is the separation. The rewrite text above is unchanged; no new mechanic is introduced. | `[ELEM-RES]` `[ELEM-MATRIX]` `[ELEM-BUILDUP]` **[REMAP — O5]** — "you may carry only one element" now means one of **three** (Rift, Entropy, Void), giving up two rather than three. The restriction is materially *cheaper* under O5 than as authored. **FLAG [O19]:** the cost argument for this keystone was already weakened by the drop from four elements to three, and the retirement of the mono-element separation clause removes its remaining load-bearing justification — **re-examine E10's cost basis.** Not redesigned here; no value authored (O2). |
 
+### Elements — implementation status (slice)
+
+*(Unnumbered on purpose: "§6.1" in this document already refers to the Master
+Sheet's damage resolution order.)*
+
+Elements is authored in `UBreakerProgressionLibrary::GetCoreSliceTree()` under
+the `Core.Elements.` node-id prefix, which is how `SBreakerMenu` assigns
+constellation membership — so the cluster the board used to draw as a **sealed
+placeholder** is now a real, purchasable six-node roster. **Every magnitude is
+O2 PLACEHOLDER** and nothing here is playtested.
+
+This does **not** unblock Elements. The constellation still has no resistance
+step, no buildup track and no reaction matrix, and `ElementalDamageReduction`
+remains the project's one inert stat target and is deliberately untouched. What
+ships is the **physical-only pre-resistance form** this document already
+mandates for Multispell and Void Whisperer — "no node requires an element to
+function". Each node carries its elemental rule as a tag for the resistance
+model to claim later, plus a stat line that pays **today** through a live
+consumer, so no node is purchasable-but-inert.
+
+| Shipped node | Doc node | Rule half (TRANSCRIBED, tag) | Pays today (AUTHORED) |
+|---|---|---|---|
+| Conductive | E0 | Buildup decays 50% slower | +8% Increased Damage over Time |
+| Charge Up | E1 (Minor x3) | Buildup applied is increased | +7% Increased DoT / rank |
+| Threshold | E2 (Notable) | Threshold resets to 50%, not 0 | +14% Increased DoT |
+| Catalyst | E3 (Lane B) | Reaction internal cooldown reduced | +4 flat Critical Chance / rank |
+| Penetrance | E5 (Lane C) | Ignores elemental resistance | +4% Increased Damage / rank |
+| Reaction Chain | E9 (Convergence) | One chained reaction, depth cap 2 | +25% Increased DoT, +6% Increased Damage |
+
+**Deliberate omissions, each one a decision rather than an oversight:**
+
+1. **No More multiplier.** §2.4 reserves E9 as Elements' compliant More slot and
+   this pass leaves it **empty**. A More here would have to be conditioned on
+   "a reaction fired", and `EBreakerBuildCondition` carries only movement
+   states — so the only authorable form is unconditional, which would make it a
+   strictly-better generalist than Precision's Fixate and Volley's Barrage,
+   bought with a theme it cannot enforce. The slot is reserved, not spent.
+2. **E10 RESONANCE is not authored.** Its rewrite is a restriction ("you may
+   carry only one element") plus a payoff; with no elements in the pipeline the
+   restriction half cannot exist, so shipping it now would be a pure-upside
+   keystone. O19 independently flags its cost basis for re-examination. It
+   lands with the resistance step.
+3. **E4, E6, E7, E8 are not authored.** Second Order, Insulator's Bane and both
+   links are pure reaction-matrix behaviour with no half that pays before the
+   matrix exists. Six nodes at the depth of the other live constellations
+   (Precision 4, Volley 5, Kinesis 4, Velocity 6) was the right size; padding it
+   with tag-only nodes would not have been.
+
+**Cost of shipping early, stated plainly:** pre-resistance, Elements reads as a
+second status-pressure constellation and overlaps Affliction. That overlap
+resolves the moment the resistance step lands and the tags begin paying their
+own half. It is the honest price of un-sealing the cluster, and it is cheaper
+than a board with a hole in it.
+
 **Why the keystone is not universally superior:** **[REMAP — O5] + [FLAG — O19] — this argument is weakened twice over and needs re-examination.** O19 retires the mono-element separation clause (below), which was the same clause this paragraph spends as RESONANCE's cost; with the clause retired the cost argument has to be re-derived rather than restated. Flagged for the owner; not redesigned here. Mono-element is a severe restriction in a game whose enemy families are meant to have differing resistances — but under O5 the player forgoes two elements, not three, and a three-element resist profile has fewer places to hide a hard counter. The claim below is retained as written pending an owner re-read; it is not re-argued here. Mono-element is a restriction in a game whose enemy families are meant to have differing resistances, and RESONANCE's payoff depends on a *second* element arriving from somewhere — a class ability, a weapon, or an ally. Solo, that is a real constraint; solo is the primary balance target.
 
 **CONFLICT — Multispell. RESOLVED by O19.** RESONANCE is close to Caster/Multispell's stated fantasy ("sequencing different elements to create reactions"). The two previously proposed mitigations were:

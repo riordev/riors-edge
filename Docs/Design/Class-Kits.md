@@ -173,6 +173,64 @@ Identity: trigger discipline and cadence. The branch that wants a full magazine 
 | F11 — No Safety | 4 | 1 | 2 | Momentum decay is doubled, and abilities cost 40% less Momentum. Straight rewrite with a real downside; this is the node that makes Frenzy read as a *class* choice rather than a bonus. |
 | F12 — BLOODRHYTHM (keystone) | 5 | 1 | 4 | Rewrites Overdrive (above). **More multiplier (1 of 3):** while at Redline, weapon damage is multiplied by 1.20. This is Swift's Frenzy More and the only one in this branch. |
 
+### 1.3.1 Frenzy — implementation status (slice, tiers 1-3)
+
+Frenzy is now authored in `UBreakerProgressionLibrary::GetSwiftFrenzyTree()`, so
+the branch strip shows the three chips §1.3-1.5 has always named. Ten nodes,
+21 class points, tiers 1-3 only — the same slice cut as Kinetic and Marksman
+(§7), not the five-tier full branch above. **Every magnitude is O2 PLACEHOLDER.**
+
+**The problem this section exists to record.** Every node in the table above is
+a *Momentum-loop* rewrite, and the Momentum loop is not a `EBreakerNodeStatTarget`.
+Transcribed literally, the whole branch would have been ten gameplay tags and
+nothing else — a branch the player can buy and cannot feel. So each shipped node
+carries **two** halves: the design document's rule, verbatim, as a tag for the
+Momentum loop to read when it learns to; and a stat line that states the same
+intent in a currency that reaches gameplay today. The second half is **authored
+here, not transcribed**, and is listed below so nobody mistakes it for §1.3.
+
+| Shipped node | Rule half (TRANSCRIBED) | Stat half (AUTHORED) | Why that stat |
+|---|---|---|---|
+| Trigger Discipline | F1 | +3 Critical Chance / rank | The node is about earning weak-point hits on the ground. |
+| Loaded | F2 | +6% Increased Damage / rank **at Redline** | A magazine held into Redline is the node's whole payoff. |
+| Short Leash | F3 | +5% Increased Move Speed / rank | Decay is keyed to a speed threshold; raising the speed is the same node said as a stat. |
+| Rhythm | F4 | +3 Critical Chance / rank | Consecutive hits on one target. |
+| Dry Fire | F5 | +5% Increased Damage / rank **at Redline** | Rewards emptying rather than tapping. |
+| Feed | F6 | +45 flat Health / rank | Frenzy is the branch that stands its ground; standing costs health. |
+| **Overrev** | **none — AUTHORED NODE** | +12% Increased Damage / rank **at Redline** | Frenzy's offensive spine, the counterpart to Kinetic's Downforce/Grind. See below. |
+| Slipcut Mastery | F7 (rule only) | +20 flat Critical Damage | — |
+| Ammunition Economy | F8 | +5% Increased Damage | The branch's one unconditional line. |
+| BLOODRHYTHM | F12 | **More x1.20 at Redline** (transcribed) | Swift's Frenzy More; see §6.1. |
+
+**Three deviations from the table above, each deliberate:**
+
+1. **Overrev is an authored node with no F-number.** O27 rules that choices must
+   beat accumulation and that the movement pillar is where build identity
+   belongs. Kinetic received Downforce and Grind for exactly this reason;
+   Frenzy needed the same, and **Redline** is the state it can hold. The result
+   is that the three branches now own three distinct conditions — Kinetic
+   airborne/wall/slide, Marksman unconditional, Frenzy Redline — which is what
+   makes the branch strip a decision rather than a flavour label.
+2. **F7 grants no ability.** §1.3 has it grant S2 Cadence Break; `Swift.CadenceBreak`
+   does not exist in the ability fallback registry, and a node that unlocks a
+   loadout entry resolving to nothing is worse than a missing grant. The rule
+   half ships; the grant lands with the ability.
+3. **The keystone costs 3, not 4.** The implemented branch grammar prices
+   keystones at 3 (Overpressure, Culling) and internal consistency of the cost
+   curve beat matching a number frozen under O2.
+
+**BLOODRHYTHM'S ULTIMATE REWRITE IS REAL.** It is the first branch keystone in
+the project whose ultimate rewrite actually resolves: `UBreakerAbility_Overdrive`
+picks its variant from the OWNER's tag container, and node tags previously lived
+only inside `FBreakerNodeStats` where no ability could see them.
+`UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem` now mirrors the
+aggregate onto the ability system component as loose tags, diffed against the
+last publication so a respec removes exactly what it added. Bloodrhythm carries
+`Keystone.Swift.Bloodrhythm`, which is already a row in Overdrive's variant
+table. Kinetic's Terminal Velocity and Marksman's Standing Wave rows exist and
+are still unclaimed — Overpressure and Culling carry no keystone tag, so those
+two rewrites remain unreachable. Not playtested; automation only.
+
 ## 1.4 Swift branch — KINETIC
 
 Identity: the specialist home for velocity, aerial work, and evasion. Kinetic does not make the player *faster* — Master 5.4 forbids it. It makes the player *harder to resolve*: more direction changes, more air time, more value extracted per unit of speed.
