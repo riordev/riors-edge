@@ -382,6 +382,71 @@ longer exist, and gained coverage of the head/trail split, the shortened
 streak, the screen-width floor, and tracer cadence. It proves none of these
 things look good.
 
+## Base damage scales with item level [O27, Power-Curve.md §3]
+
+Until this pass `Source/RiorsEdge/Weapons/` contained **no reference to
+`ItemLevel` at all**. Base damage was an archetype constant, so an item level 1
+weapon and an item level 50 weapon hit identically and item level moved only
+affix tier values. That is the multiplicand every affix, node and crit
+multiplies, and it is the single largest reason full level 50 gear did not feel
+significant.
+
+The curve, implemented as a pure function beside the rest of the weapon maths
+(`FBreakerWeaponMath::ItemLevelDamageScalar` / `WeaponBaseDamage`):
+
+    WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1)
+
+- **`w` = 0.09 per level** (`UBreakerWeaponComponent::ItemLevelDamageGrowth`,
+  EditAnywhere, O2 PLACEHOLDER). It is chosen equal to the monster health
+  growth `g` from the same document, which the Combat layer owns. With `w == g`
+  a BASELINE build's shots-to-kill is level-invariant, so the base curve keeps
+  the game playable at every level and every bit of *felt* progression comes
+  from the multiplier band. If `w < g` the content outruns the player and
+  baseline TTK climbs; if `w > g` baseline TTK falls with level and the build
+  layers have nothing left to add. `RiorsEdge.Weapons.ItemLevelTracksMonsterHealth`
+  states all three cases so a retune of either curve cannot drift silently.
+- **Item level 1 is the anchor.** The scalar is exactly 1.0 there, so every
+  authored archetype number keeps meaning exactly what it meant before and no
+  previously measured TTK moves.
+- **One shared exponent, so the archetype table keeps its shape.** A sniper
+  out-hits an SMG per shot at level 1 and at level 50 by the same ratio;
+  `RiorsEdge.Weapons.ArchetypeOrderingAcrossLevels` pins it at every level.
+
+**Every damage path uses it**, not only hitscan: the pellet loop (per pellet,
+before falloff), the rocket projectile's payload, and the Bleed DoT's base per
+tick. The item level is resolved ONCE per trigger pull and passed down, so a
+shotgun blast cannot straddle an equipment change.
+
+### How item level reaches the weapon
+
+`UBreakerWeaponComponent::GetEquippedItemLevel()` reads the owner's
+`UBreakerEquipmentComponent` through its existing const `GetEquippedItem`
+accessor — no change to `Items/` was required. Weapon loadout slot 1 reads the
+`Primary` equipment slot and slot 2 reads `Secondary`.
+
+**That correspondence is positional, and it is the only link the two layers
+have.** `FBreakerItemInstance` carries no weapon archetype, so *which of the
+five guns* a Primary item is remains unanswered: the component's slot
+archetypes and the equipped items are still independent. Item level is the one
+thing both layers already agree on, so item level is what crosses, and the
+archetype question is left as the design question it is.
+
+### An unequipped weapon is item level 1
+
+`UnequippedItemLevel` (EditAnywhere, O2 PLACEHOLDER 1) is what a weapon with no
+item in its slot represents. 1 is deliberate: the scalar is then exactly 1.0,
+so the zero-setup convention — a clean clone with no loadout firing the
+code-driven fallback archetypes — plays on the archetype numbers precisely as
+authored. Any other choice would silently rebalance the gym and every TTK
+measurement taken in it.
+
+### What this pass did NOT change
+
+The multiplier layers are untouched: the single additive Increased bucket, the
+More product and crit all still compose in `UBreakerAttributeSet` and the
+damage library exactly as before. Fire rate, magazine and reserve are also
+unchanged. This pass fixed the multiplicand only.
+
 ## Runtime flow
 
 1. Input starts or stops the trigger on the weapon component.
