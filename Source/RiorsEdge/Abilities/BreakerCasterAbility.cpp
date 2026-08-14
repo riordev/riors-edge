@@ -35,28 +35,14 @@ float UBreakerCasterAbility::GetResourceCostMultiplier() const
     const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
     if (!Attributes) return 1.0f;
 
-    // BRIDGE, and it is meant to be short-lived. The Items/ lane owns
-    // EBreakerAggregatedAttribute::ResourceCostMultiplier and the attribute
-    // that carries it; this lane owns the CONSUMER and had to land first. The
-    // attribute is resolved by reflection so that this code is correct both
-    // before the attribute exists (no property found -> 1.0, every cost is the
-    // authored one, nothing changes) and the moment it does, with no second
-    // commit needed to switch it on.
+    // Read live per cast, never cached: the player re-gears mid-fight and a
+    // cached efficiency would keep charging the old price.
     //
-    // WHEN THE ATTRIBUTE LANDS this whole body collapses to
-    //     return FMath::Max(MinimumResourceCostMultiplier, Attributes->GetResourceCostMultiplier());
-    // and the lookup below should be deleted. Leaving it would be a slow,
-    // reflective read of something with a generated accessor.
-    static const FStructProperty* CostMultiplierProperty = CastField<FStructProperty>(
-        UBreakerAttributeSet::StaticClass()->FindPropertyByName(TEXT("ResourceCostMultiplier")));
-    if (!CostMultiplierProperty || CostMultiplierProperty->Struct != FGameplayAttributeData::StaticStruct())
-    {
-        return 1.0f;
-    }
-    const FGameplayAttributeData* Data = CostMultiplierProperty->ContainerPtrToValuePtr<FGameplayAttributeData>(Attributes);
-    // Floored here as well as on the aggregator's side: a cost of exactly zero
-    // reached by gear would delete the class's only pacing mechanism.
-    return Data ? FMath::Max(MinimumResourceCostMultiplier, Data->GetCurrentValue()) : 1.0f;
+    // Floored here as well as on the aggregator's side. Two independent clamps
+    // on one invariant is not redundancy worth deleting: Casters have NO
+    // cooldowns because Mana is the cooldown, so a cost reaching zero does not
+    // make a strong build, it deletes the only pacing mechanism the class has.
+    return FMath::Max(MinimumResourceCostMultiplier, Attributes->GetResourceCostMultiplier());
 }
 
 bool UBreakerCasterAbility::CanCastAt(float CurrentMana, float Cost, float Floor)
