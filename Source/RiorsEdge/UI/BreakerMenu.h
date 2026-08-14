@@ -38,7 +38,12 @@ public:
     // it. Every menu in this project has been authored, reworked and shipped
     // without anyone looking at it, which is how the skill tree reached the
     // owner clipping its own numbers.
-    void ShowScreenForCapture(EBreakerMenuScreen Screen) { Rebuild(Screen); }
+    // A screen is not one picture. The skill matrix alone has a Class board,
+    // a Core board and a COMPARE ALL view, and only the first was ever
+    // reachable from the harness — so the other two shipped unlooked-at for
+    // the same reason everything else did. `-BreakerCaptureBoard=CORE` or
+    // `=COMPARE` selects the sub-view; absent, nothing changes.
+    void ShowScreenForCapture(EBreakerMenuScreen Screen);
 
 private:
     void Rebuild(EBreakerMenuScreen NewScreen);
