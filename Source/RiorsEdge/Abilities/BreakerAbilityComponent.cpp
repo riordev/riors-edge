@@ -93,6 +93,125 @@ UBreakerAbilityDefinition* UBreakerAbilityComponent::ResolveDefinition(EBreakerC
     return UBreakerAbilityDefinition::FindFallback(UBreakerAbilityDefinition::DefaultAbilityIdForSlot(ClassId, Slot));
 }
 
+EBreakerAbilitySelectionResult UBreakerAbilityComponent::ValidateSelection(
+    EBreakerClassId ClassId, EBreakerAbilitySlot Slot, FName AbilityId,
+    FName EquippedOne, FName EquippedTwo, FName EquippedUltimate)
+{
+    if (ClassId == EBreakerClassId::None) return EBreakerAbilitySelectionResult::NoClassChosen;
+
+    const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(AbilityId);
+    if (!Definition) return EBreakerAbilitySelectionResult::UnknownAbility;
+    if (Definition->ClassId != ClassId) return EBreakerAbilitySelectionResult::WrongClass;
+    if (!Definition->CanOccupySlot(Slot)) return EBreakerAbilitySelectionResult::WrongSlot;
+
+    // Re-selecting what is already in THIS slot is allowed and is a no-op; only
+    // a collision with a DIFFERENT slot is a duplicate. A picker that redraws
+    // its own selection must not have to special-case its current state.
+    const FName Occupants[] = {EquippedOne, EquippedTwo, EquippedUltimate};
+    const EBreakerAbilitySlot OccupantSlots[] = {
+        EBreakerAbilitySlot::ClassAbilityOne,
+        EBreakerAbilitySlot::ClassAbilityTwo,
+        EBreakerAbilitySlot::Ultimate
+    };
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Occupants); ++Index)
+    {
+        if (OccupantSlots[Index] != Slot && Occupants[Index] == AbilityId)
+        {
+            return EBreakerAbilitySelectionResult::AlreadyEquipped;
+        }
+    }
+    return EBreakerAbilitySelectionResult::Allowed;
+}
+
+FText UBreakerAbilityComponent::DescribeSelectionResult(EBreakerAbilitySelectionResult Result)
+{
+    switch (Result)
+    {
+    case EBreakerAbilitySelectionResult::Allowed:        return FText::GetEmpty();
+    case EBreakerAbilitySelectionResult::NoClassChosen:  return NSLOCTEXT("Breaker", "SelectNoClass", "Choose a class before equipping abilities.");
+    case EBreakerAbilitySelectionResult::UnknownAbility: return NSLOCTEXT("Breaker", "SelectUnknown", "That ability does not exist.");
+    case EBreakerAbilitySelectionResult::WrongClass:     return NSLOCTEXT("Breaker", "SelectWrongClass", "That ability belongs to another class.");
+    case EBreakerAbilitySelectionResult::WrongSlot:      return NSLOCTEXT("Breaker", "SelectWrongSlot", "That ability cannot go in this slot.");
+    case EBreakerAbilitySelectionResult::AlreadyEquipped:return NSLOCTEXT("Breaker", "SelectDuplicate", "That ability is already equipped.");
+    default:                                             return NSLOCTEXT("Breaker", "SelectRefused", "That ability cannot be equipped.");
+    }
+}
+
+TArray<FName> UBreakerAbilityComponent::GetSelectableAbilityIds(EBreakerAbilitySlot Slot) const
+{
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    const EBreakerClassId ClassId = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    return UBreakerAbilityDefinition::GetClassAbilityIds(ClassId, Slot);
+}
+
+FName UBreakerAbilityComponent::GetEquippedAbilityId(EBreakerAbilitySlot Slot) const
+{
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    if (!Progression) return NAME_None;
+    const FBreakerAbilityLoadout& Loadout = Progression->GetProgressionState().AbilityLoadout;
+    switch (Slot)
+    {
+    case EBreakerAbilitySlot::ClassAbilityOne: return Loadout.ClassAbilityOne;
+    case EBreakerAbilitySlot::ClassAbilityTwo: return Loadout.ClassAbilityTwo;
+    case EBreakerAbilitySlot::Ultimate:        return Loadout.Ultimate;
+    default:                                   return NAME_None;
+    }
+}
+
+EBreakerAbilitySelectionResult UBreakerAbilityComponent::PreviewSelection(EBreakerAbilitySlot Slot, FName AbilityId) const
+{
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    if (!Progression) return EBreakerAbilitySelectionResult::NoClassChosen;
+    const FBreakerProgressionState& State = Progression->GetProgressionState();
+    return ValidateSelection(State.PermanentClass, Slot, AbilityId,
+        State.AbilityLoadout.ClassAbilityOne, State.AbilityLoadout.ClassAbilityTwo, State.AbilityLoadout.Ultimate);
+}
+
+bool UBreakerAbilityComponent::TryEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason)
+{
+    const AActor* Owner = GetOwner();
+    if (Owner && !Owner->HasAuthority())
+    {
+        OutFailureReason = NSLOCTEXT("Breaker", "SelectNoAuthority", "Ability loadout changes are server-authoritative.");
+        return false;
+    }
+    UBreakerProgressionComponent* Progression = GetProgression();
+    if (!Progression)
+    {
+        OutFailureReason = DescribeSelectionResult(EBreakerAbilitySelectionResult::NoClassChosen);
+        return false;
+    }
+
+    const EBreakerAbilitySelectionResult Result = PreviewSelection(Slot, AbilityId);
+    if (Result != EBreakerAbilitySelectionResult::Allowed)
+    {
+        OutFailureReason = DescribeSelectionResult(Result);
+        return false;
+    }
+    // Already in this slot: allowed, and deliberately not routed through the
+    // write. Re-equipping would broadcast OnProgressionChanged, which would
+    // re-grant the spec and clobber a live cooldown for no reason.
+    if (GetEquippedAbilityId(Slot) == AbilityId)
+    {
+        OutFailureReason = FText::GetEmpty();
+        return true;
+    }
+
+    // ONE writer. Progression owns the state and the unlock rules; this
+    // component owns the registry rules the checks above enforce. If
+    // progression refuses (the ability is not unlocked yet), its own reason is
+    // what the player sees — restating that rule here is how two copies drift.
+    if (!Progression->EquipAbility(Slot, AbilityId, OutFailureReason))
+    {
+        return false;
+    }
+    // The poll would pick this up within LoadoutPollInterval anyway; doing it
+    // now means the key is live on the frame the player pressed Equip.
+    RefreshGrants();
+    OutFailureReason = FText::GetEmpty();
+    return true;
+}
+
 void UBreakerAbilityComponent::RefreshGrants()
 {
     AActor* Owner = GetOwner();
