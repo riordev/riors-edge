@@ -158,7 +158,16 @@ void ABreakerCharacter::BeginPlay()
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
     PlaytestSpawnTransform = GetActorTransform();
     FallKillZ = PlaytestSpawnTransform.GetLocation().Z - 4000.0f;
+    // A weapon ITEM decides which gun its slot holds. Bound before the save
+    // loads so a restored loadout arms the right archetypes, and called once
+    // directly afterwards because the equipment component does not broadcast
+    // for state it was constructed with.
+    if (Weapon && Equipment)
+    {
+        Equipment->OnEquipmentChanged.AddDynamic(Weapon, &UBreakerWeaponComponent::SyncArchetypesToEquipment);
+    }
     if (HasAuthority()) LoadGameState();
+    if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
     float SavedFOV = 90.0f;
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);

@@ -424,7 +424,7 @@ namespace
                 // bursts, so ammunition is counted in bursts and a reload
                 // never strands the player mid-burst.
                 Definition->WeaponId = TEXT("BurstRifle");
-                Definition->DisplayName = FText::FromString(TEXT("Volley"));
+                Definition->DisplayName = FText::FromString(TEXT("Burst Rifle"));
                 Definition->Damage = 29.0f;
                 Definition->WeakPointMultiplier = 1.9f;
                 Definition->RoundsPerMinute = 720.0f;   // WITHIN a burst only.
@@ -454,7 +454,7 @@ namespace
                 // to. Per-round damage is the lowest in the table; sustained
                 // DPS is the highest, and only while planted.
                 Definition->WeaponId = TEXT("Machinegun");
-                Definition->DisplayName = FText::FromString(TEXT("Bulwark"));
+                Definition->DisplayName = FText::FromString(TEXT("Machinegun"));
                 Definition->Damage = 11.0f;
                 Definition->WeakPointMultiplier = 1.4f;
                 Definition->RoundsPerMinute = 700.0f;
@@ -484,7 +484,7 @@ namespace
                 // actually fights in, which is what keeps it relevant rather
                 // than charitable.
                 Definition->WeaponId = TEXT("Sidearm");
-                Definition->DisplayName = FText::FromString(TEXT("Mark"));
+                Definition->DisplayName = FText::FromString(TEXT("Sidearm"));
                 Definition->Damage = 21.0f;
                 Definition->WeakPointMultiplier = 1.8f;
                 Definition->RoundsPerMinute = 420.0f;
@@ -552,11 +552,9 @@ const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() con
 int32 UBreakerWeaponComponent::GetEquippedItemLevel() const
 {
     // The loadout slot number and the equipment slot correspond POSITIONALLY:
-    // weapon slot 1 is the Primary equipment slot, slot 2 the Secondary. That
-    // is the only correspondence that exists today — an FBreakerItemInstance
-    // carries no weapon archetype, so which of the five guns a Primary item IS
-    // remains unanswered and is deliberately not invented here. Item level is
-    // the part the two layers already agree on, so item level is what crosses.
+    // weapon slot 1 is the Primary equipment slot, slot 2 the Secondary.
+    // FBreakerItemInstance now also carries WeaponArchetype, so both halves of
+    // "which gun am I holding" cross the boundary; see SyncArchetypesToEquipment.
     const AActor* Owner = GetOwner();
     const UBreakerEquipmentComponent* Equipment = Owner ? Owner->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
     if (Equipment)
@@ -894,6 +892,36 @@ void UBreakerWeaponComponent::ServerEquipSlot_Implementation(int32 SlotNumber)
     EquipSlot(SlotNumber);
 }
 
+void UBreakerWeaponComponent::SyncArchetypesToEquipment()
+{
+    // Equipping a weapon ITEM is what arms its archetype. Before this, a
+    // dropped Primary supplied an item level and a list of affixes while the
+    // loadout screen independently decided which gun you were holding, so a
+    // shotgun drop and a sniper drop were the same object wearing different
+    // numbers.
+    //
+    // The loadout screen still works and still writes SetSlotArchetype; this
+    // simply means an equipped item OVERRIDES it, which is the direction the
+    // owner asked for ("we can keep the loadout system for now but in the
+    // future thats what its supposed to be"). An empty slot changes nothing,
+    // so a player with no weapon items keeps whatever they picked.
+    const AActor* Owner = GetOwner();
+    if (!Owner || !Owner->HasAuthority()) return;
+    const UBreakerEquipmentComponent* Equipment = Owner->FindComponentByClass<UBreakerEquipmentComponent>();
+    if (!Equipment) return;
+
+    const EBreakerEquipSlot Slots[2] = { EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary };
+    for (int32 Index = 0; Index < 2; ++Index)
+    {
+        FBreakerItemInstance Item;
+        if (!Equipment->GetEquippedItem(Slots[Index], Item) || !Item.IsValid()) continue;
+        // SetSlotArchetype early-outs when the archetype is unchanged, so this
+        // is safe to call every time equipment changes: it will not reset a
+        // magazine the player is halfway through.
+        SetSlotArchetype(Index + 1, Item.WeaponArchetype);
+    }
+}
+
 void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponArchetype NewArchetype)
 {
     SlotNumber = FMath::Clamp(SlotNumber, 1, 2);
@@ -937,19 +965,45 @@ void UBreakerWeaponComponent::ServerSetSlotArchetype_Implementation(int32 SlotNu
     SetSlotArchetype(SlotNumber, NewArchetype);
 }
 
+float UBreakerWeaponComponent::GetFireRateMultiplier() const
+{
+    // Read live rather than cached: the player equips and unequips mid-fight,
+    // and a cached cadence would keep firing at the old gun's rate until
+    // something happened to invalidate it.
+    const AActor* Owner = GetOwner();
+    if (!Owner) return 1.0f;
+    if (const IAbilitySystemInterface* AbilityOwner = Cast<const IAbilitySystemInterface>(Owner))
+    {
+        if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
+        {
+            if (const UBreakerAttributeSet* Attributes = ASC->GetSet<UBreakerAttributeSet>())
+            {
+                // Floored for the same reason PreAttributeChange floors it: a
+                // multiplier at zero turns the fire interval into an infinity,
+                // which hangs the weapon rather than slowing it.
+                return FMath::Max(0.05f, Attributes->GetFireRateMultiplier());
+            }
+        }
+    }
+    return 1.0f;
+}
+
+// Effective rounds per minute: the archetype's authored cadence times whatever
+// the Fire Rate affix and any future tree node have composed. Every fire-timing
+// call site goes through here, so a cadence stat can never apply to some of
+// them and not others -- which is exactly how a "50% fire rate" line ends up
+// making a weapon fire faster but reload-lock at the old rate.
+float UBreakerWeaponComponent::GetEffectiveRoundsPerMinute(const UBreakerWeaponDefinition* Definition) const
+{
+    if (!Definition) return 0.0f;
+    return Definition->RoundsPerMinute * GetFireRateMultiplier();
+}
+
 FString UBreakerWeaponComponent::GetArchetypeName() const
 {
-    switch (CurrentArchetype)
-    {
-        case EBreakerWeaponArchetype::SMG: return TEXT("SMG");
-        case EBreakerWeaponArchetype::Sniper: return TEXT("SNIPER");
-        case EBreakerWeaponArchetype::Shotgun: return TEXT("SHOTGUN");
-        case EBreakerWeaponArchetype::Rocket: return TEXT("ROCKET");
-        case EBreakerWeaponArchetype::BurstRifle: return TEXT("VOLLEY");
-        case EBreakerWeaponArchetype::Machinegun: return TEXT("BULWARK");
-        case EBreakerWeaponArchetype::Sidearm: return TEXT("MARK");
-        default: return TEXT("RIFLE");
-    }
+    // One name table, in BreakerWeaponArchetype.h, shared with dropped items
+    // and the loadout screen. A gun named in three places gets renamed in two.
+    return BreakerWeaponArchetypeNames::Short(CurrentArchetype);
 }
 
 void UBreakerWeaponComponent::StartFire()
@@ -975,12 +1029,12 @@ void UBreakerWeaponComponent::StartFire()
         // exact cadence, while a chain re-arms from the callback and would shed
         // a callback's latency off every shot.
         ScheduleBurstFire(RoundsInFireBurst >= Definition->ShotsPerBurst
-            ? FMath::Max(Definition->BurstCycleSeconds, FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute))
-            : FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute));
+            ? FMath::Max(Definition->BurstCycleSeconds, FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition)))
+            : FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition)));
         return;
     }
     GetWorld()->GetTimerManager().SetTimer(AutomaticFireTimer, this, &ThisClass::FireOnceTimer,
-        FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute), true);
+        FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition)), true);
 }
 
 void UBreakerWeaponComponent::ScheduleBurstFire(float DelaySeconds)
@@ -1003,7 +1057,7 @@ void UBreakerWeaponComponent::AdvanceBurstFire()
     const bool bFired = FireOnce();
     if (bFired) ++RoundsInFireBurst;
 
-    const float Interval = FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute);
+    const float Interval = FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition));
     // Not firing (reloading, swapping, dry) re-checks at the fire interval
     // rather than giving up, so the trigger stays live across a reload.
     if (!bFired) { ScheduleBurstFire(Interval); return; }
@@ -1081,7 +1135,7 @@ bool UBreakerWeaponComponent::CanFire() const
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition || bReloading || bSwapping || MagazineAmmo <= 0 || !GetWorld()) return false;
-    return GetWorld()->GetTimeSeconds() - LastShotTime + UE_KINDA_SMALL_NUMBER >= FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute);
+    return GetWorld()->GetTimeSeconds() - LastShotTime + UE_KINDA_SMALL_NUMBER >= FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition));
 }
 
 bool UBreakerWeaponComponent::FireOnce()

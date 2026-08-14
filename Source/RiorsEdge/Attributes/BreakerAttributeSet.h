@@ -75,6 +75,12 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_DashCooldownReduction, Category="Movement") FGameplayAttributeData DashCooldownReduction;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DashCooldownReduction)
 
+    // Rounds per minute multiplier. Base 1.0. Consumed by the weapon
+    // component's fire timing, so a Fire Rate affix changes cadence rather
+    // than being a number on a card.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FireRateMultiplier, Category="Weapon") FGameplayAttributeData FireRateMultiplier;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, FireRateMultiplier)
+
     // --- Unified attribute application path -------------------------------
     // This attribute set is the ONE owner of the true base value for every
     // attribute in EBreakerAggregatedAttribute. Equipment and progression (and
@@ -160,6 +166,7 @@ protected:
     UFUNCTION() void OnRep_SlideSpeedMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_AirControlMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DashCooldownReduction(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_FireRateMultiplier(const FGameplayAttributeData& OldValue) const;
 
 private:
     FBreakerAttributeAggregator Aggregator;

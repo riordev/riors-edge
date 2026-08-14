@@ -52,6 +52,16 @@ enum class EBreakerAggregatedAttribute : uint8
     SlideSpeedMultiplier,
     AirControlMultiplier,
     DashCooldownReduction,
+    // Rate of fire, as a multiplier on rounds per minute. Base 1.0, same shape
+    // as DamageMultiplier and for the same reason: the owner asked for an SMG
+    // that leans toward fire rate, and a cadence stat that composed
+    // multiplicatively across gear and trees would break the one-additive-
+    // bucket rule the moment a tree node authored one.
+    //
+    // A MULTIPLIER on RPM rather than an interval, because an interval cannot
+    // share an additive bucket -- two layers each folding a percentage into a
+    // duration do not add. Consumed by UBreakerWeaponComponent's fire timing.
+    FireRateMultiplier,
     Count
 };
 

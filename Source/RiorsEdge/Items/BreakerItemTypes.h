@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Progression/BreakerBuildConditions.h"
+#include "Weapons/BreakerWeaponArchetype.h"
 #include "BreakerItemTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -93,6 +94,12 @@ enum class EBreakerStatTarget : uint8
     WallRideDamage,
     RedlineDamage,
     RecentlyDashedDamage,
+    // Cadence. Appended like everything above it. Authored as an Increased
+    // percentage on rounds per minute, so +10% is 10% more shots per second
+    // and therefore ~10% more sustained DPS -- deliberately a peer of
+    // WeaponDamage rather than a strictly better version of it, because it
+    // does nothing for a single-shot burst and everything for held fire.
+    FireRate,
     Count UMETA(Hidden)
 };
 
@@ -147,7 +154,29 @@ struct RIORSEDGE_API FBreakerItemInstance
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerRolledAffix> Affixes;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
 
+    // WHICH GUN THIS IS. Meaningful only on Primary and Secondary; ignored on
+    // armour, where it stays at its default and nothing reads it.
+    //
+    // Before this field, an item instance carried an item level and a list of
+    // affixes and nothing else, so a dropped Primary had no answer to "which
+    // of the eight archetypes am I" — the loadout screen chose the gun and the
+    // item supplied only numbers. Power-Curve.md flagged that as the open
+    // boundary between Items/ and Weapons/, and this closes it: a weapon drop
+    // is now a WEAPON, not a stat sheet that happens to be equipped in a
+    // weapon slot.
+    //
+    // Defaults to Rifle rather than Count so that every item saved before this
+    // field existed loads as a rifle instead of as an invalid archetype.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerWeaponArchetype WeaponArchetype = EBreakerWeaponArchetype::Rifle;
+
     bool IsValid() const { return ItemId.IsValid(); }
+    // The two slots where WeaponArchetype means anything. Static so callers
+    // can ask about a slot before an item exists (the loot roll needs this).
+    static bool IsWeaponSlot(EBreakerEquipSlot Slot)
+    {
+        return Slot == EBreakerEquipSlot::Primary || Slot == EBreakerEquipSlot::Secondary;
+    }
+    bool IsWeapon() const { return IsWeaponSlot(Slot); }
 };
 
 // Which way one affix line moves the player relative to the piece it would

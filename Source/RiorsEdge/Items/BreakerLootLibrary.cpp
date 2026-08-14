@@ -2,6 +2,23 @@
 
 #include "Items/BreakerAffixLibrary.h"
 
+namespace
+{
+    // The lean, resolved for one candidate line on one item. Armour returns
+    // exactly 1.0 and never consults the table, so every non-weapon roll is
+    // bit-identical to what it was before archetypes existed — which is what
+    // keeps the existing loot tests meaningful.
+    //
+    // Named with the file's subject rather than something generic: this
+    // project has twice shipped a unity-build collision between identically
+    // named helpers in two anonymous namespaces.
+    float BreakerLootArchetypeAffixWeight(const FBreakerItemInstance& Item, FName AffixId)
+    {
+        if (!Item.IsWeapon()) return 1.0f;
+        return UBreakerAffixLibrary::ArchetypeAffixWeightMultiplier(Item.WeaponArchetype, AffixId);
+    }
+}
+
 EBreakerItemRarity UBreakerLootLibrary::RollRarity(int32 RandomSeed, float DropChanceBonusPercent)
 {
     // Prototype weights; retune after a real time-to-kill exists. Drop
@@ -40,6 +57,21 @@ FBreakerItemInstance UBreakerLootLibrary::RollItem(FName DefinitionId, EBreakerE
     Item.Rarity = Rarity;
     Item.ItemLevel = FMath::Clamp(ItemLevel, 1, 50);
 
+    // A weapon drop decides WHICH GUN IT IS before it decides its affixes,
+    // because the archetype bends the affix odds (owner: "certain guns have
+    // certain leans towards affixes"). Rolled from the same deterministic
+    // stream, so a seed still reproduces an item exactly.
+    //
+    // Uniform across archetypes on purpose: a weighted table here would be a
+    // rarity system for gun CLASSES, which is a separate design nobody has
+    // ruled on. Every archetype is equally likely; what varies is what rolls
+    // ON it.
+    if (FBreakerItemInstance::IsWeaponSlot(Slot))
+    {
+        Item.WeaponArchetype = static_cast<EBreakerWeaponArchetype>(
+            Random.RandRange(0, static_cast<int32>(EBreakerWeaponArchetype::Count) - 1));
+    }
+
     int32 MinimumAffixes = 1;
     int32 MaximumAffixes = 1;
     UBreakerAffixLibrary::AffixCountRangeForRarity(Rarity, MinimumAffixes, MaximumAffixes);
@@ -64,7 +96,11 @@ FBreakerItemInstance UBreakerLootLibrary::RollItem(FName DefinitionId, EBreakerE
             if (Affix.Category == EBreakerAffixCategory::Prefix && PrefixCount >= 4) continue;
             if (Affix.Category == EBreakerAffixCategory::Suffix && SuffixCount >= 4) continue;
             Candidates.Add(&Affix);
-            TotalWeight += Affix.RollWeight;
+            // The archetype lean rides the EXISTING roll weight rather than
+            // replacing it, so a rare line stays relatively rare on the gun
+            // that likes it. On armour, and on any pairing with no authored
+            // opinion, this is exactly 1.0 and the arithmetic is unchanged.
+            TotalWeight += Affix.RollWeight * BreakerLootArchetypeAffixWeight(Item, Affix.AffixId);
         }
         if (Candidates.IsEmpty()) break;
 
@@ -72,7 +108,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollItem(FName DefinitionId, EBreakerE
         float WeightRoll = Random.FRand() * TotalWeight;
         for (const FBreakerAffixDefinition* Candidate : Candidates)
         {
-            if ((WeightRoll -= Candidate->RollWeight) < 0.0f) { Chosen = Candidate; break; }
+            if ((WeightRoll -= Candidate->RollWeight * BreakerLootArchetypeAffixWeight(Item, Candidate->AffixId)) < 0.0f) { Chosen = Candidate; break; }
         }
 
         // Tier roll: worst available tier is most likely, each step toward

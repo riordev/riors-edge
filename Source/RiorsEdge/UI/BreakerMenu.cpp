@@ -688,9 +688,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
         // O27 breadth pass. A row here is the ONLY way an archetype is
         // reachable from the loadout screen; a new weapon with no row is
         // content that exists and cannot be picked.
-        { EBreakerWeaponArchetype::BurstRifle, TEXT("VOLLEY"),  TEXT("3-ROUND BURST  |  27 ROUNDS  |  MID-LONG, DISCIPLINE") },
-        { EBreakerWeaponArchetype::Machinegun, TEXT("BULWARK"), TEXT("AUTOMATIC  |  120 ROUNDS  |  SUSTAINED, PLANTED") },
-        { EBreakerWeaponArchetype::Sidearm,    TEXT("MARK"),    TEXT("SEMI-AUTOMATIC  |  14 ROUNDS  |  FAST SWAP, DEEP RESERVE") },
+        { EBreakerWeaponArchetype::BurstRifle, TEXT("BURST RIFLE"),  TEXT("3-ROUND BURST  |  27 ROUNDS  |  MID-LONG, DISCIPLINE") },
+        { EBreakerWeaponArchetype::Machinegun, TEXT("MACHINEGUN"), TEXT("AUTOMATIC  |  120 ROUNDS  |  SUSTAINED, PLANTED") },
+        { EBreakerWeaponArchetype::Sidearm,    TEXT("SIDEARM"),    TEXT("SEMI-AUTOMATIC  |  14 ROUNDS  |  FAST SWAP, DEEP RESERVE") },
     };
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
@@ -799,6 +799,22 @@ namespace
             case EBreakerEquipSlot::Secondary: return TEXT("SECONDARY");
             default: return TEXT("SLOT");
         }
+    }
+
+    // What to print on an item card's slot line. For armour that is the slot;
+    // for a weapon it is the GUN, because "PRIMARY" tells the player nothing
+    // they did not already know from where the card sits, while "SIDEARM" is
+    // the entire reason they are looking at it. Weapon drops randomise their
+    // archetype, so this is the only place the class is visible before
+    // equipping.
+    FString ItemSlotLabel(const FBreakerItemInstance& Item)
+    {
+        if (Item.IsWeapon())
+        {
+            return FString::Printf(TEXT("%s · %s"),
+                *SlotName(Item.Slot), *BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype));
+        }
+        return SlotName(Item.Slot);
     }
 
     FString ClassDisplayName(EBreakerClassId ClassId)
@@ -1235,7 +1251,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                                 [
-                                    MenuText(FText::FromString(SlotName(Item.Slot)), BreakerUI::TypeCaption, Muted, true)
+                                    MenuText(FText::FromString(ItemSlotLabel(Item)), BreakerUI::TypeCaption, Muted, true)
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [

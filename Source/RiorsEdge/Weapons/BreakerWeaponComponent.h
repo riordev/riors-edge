@@ -3,29 +3,13 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Combat/BreakerCombatTypes.h"
+#include "Weapons/BreakerWeaponArchetype.h"
 #include "Weapons/BreakerWeaponFeel.h"
 #include "BreakerWeaponComponent.generated.h"
 
 class UBreakerAttributeSet;
 class UBreakerWeaponDefinition;
 
-UENUM(BlueprintType)
-enum class EBreakerWeaponArchetype : uint8
-{
-    Rifle,
-    SMG,
-    Sniper,
-    Shotgun,
-    Rocket,
-    // O27 breadth pass. APPENDED, never inserted: the archetype is stored as a
-    // uint8 in UBreakerSaveGame and replicated as one, so renumbering the
-    // existing five would silently rearm every saved loadout with a different
-    // gun. New archetypes go on the end, forever.
-    BurstRifle,
-    Machinegun,
-    Sidearm,
-    Count UMETA(Hidden)
-};
 
 // ---------------------------------------------------------------------------
 // One pellet's worth of a shot.
@@ -151,7 +135,14 @@ public:
     // Seconds since the last swap completed. Secondary "damage on swap-in"
     // affixes read this to decide whether their window is open.
     UFUNCTION(BlueprintPure, Category="Weapon") float GetSecondsSinceSwapIn() const;
+    // Reads the equipped Primary/Secondary items and arms their archetypes.
+    // Call after anything that changes equipment; an empty slot is left alone.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon") void SyncArchetypesToEquipment();
     UFUNCTION(BlueprintPure, Category="Weapon") FString GetArchetypeName() const;
+    // Composed cadence. The Fire Rate affix (Weapon.FireRate, the line the SMG
+    // leans toward) reaches gameplay through these two and nowhere else.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetFireRateMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetEffectiveRoundsPerMinute(const UBreakerWeaponDefinition* Definition) const;
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") const FBreakerShotResult& GetLastShot() const { return LastShot; }
     UFUNCTION(BlueprintPure, Category="Weapon|Debug") float GetSecondsSinceLastShot() const;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Playtest") void ResetAmmunition();

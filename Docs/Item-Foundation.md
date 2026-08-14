@@ -377,3 +377,103 @@ inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
   means a conditional bonus lands on the frame AFTER the state changes. If a
   one-frame lag on entering a slide ever reads as mushy, the fix is an event
   from the movement component rather than a faster poll.
+
+## Weapon drops carry their archetype (2026-08-13)
+
+Owner: *"weapons should also be randomized on drop … when primaries and
+secondaries drop they should be different weapon classes with their respective
+affixes … make sure certain guns have certain leans towards affixes — like smg
+fire rate, lmg damage, sidearm slide speed — **not required stats** but they can
+drop more likely with those affixes."*
+
+`Docs/Design/Power-Curve.md` §3 had already flagged this as the open boundary:
+an item instance carried an item level and crossed nothing else, so which of
+the eight guns a Primary drop actually *was* had no answer. The loadout screen
+picked the weapon and the item supplied only numbers, which made a shotgun drop
+and a sniper drop the same object wearing different affixes.
+
+### What changed
+
+- `FBreakerItemInstance::WeaponArchetype`, meaningful on Primary and Secondary
+  only. It defaults to Rifle rather than to `Count`, so an item saved before
+  the field existed loads as a rifle instead of as an invalid archetype.
+- `EBreakerWeaponArchetype` moved into its own tiny header
+  (`Weapons/BreakerWeaponArchetype.h`) so `Items/` can name a gun without
+  pulling in the weapon component, the combat types and the feel layer.
+- `RollItem` draws the archetype **before** the affixes, from the same
+  deterministic stream, so a seed still reproduces an item exactly. The draw is
+  uniform on purpose: a weighted table here would be a rarity system for gun
+  *classes*, which is a separate design nobody has ruled on.
+- Equipping a weapon item arms its archetype
+  (`UBreakerWeaponComponent::SyncArchetypesToEquipment`, bound to
+  `OnEquipmentChanged`). The loadout screen still works; an equipped item simply
+  overrides it, which is the direction the owner asked for.
+- Item cards print the gun, not the slot: `PRIMARY · SIDEARM`. "Primary" tells
+  the player nothing the card's position did not.
+- The three archetypes added in the O27 breadth pass are now called what they
+  are — **Burst Rifle**, **Machinegun**, **Sidearm** — and one name table in
+  `BreakerWeaponArchetype.h` serves the HUD, the loadout screen and item cards.
+  A gun named in three places gets renamed in two. (`Rocket` also became
+  `Rocket Launcher` everywhere as a consequence; two tests pinned the old
+  short name and were updated.)
+
+### Leans are weights, never filters
+
+`UBreakerAffixLibrary::ArchetypeAffixWeightMultiplier` multiplies an affix's
+existing roll weight. It is clamped so a lean may only ever make a line **more**
+likely — making one less likely is a different feature whose failure mode is a
+stat that quietly cannot be found, and nobody asked for it. Every affix legal
+on a weapon slot stays reachable on every archetype.
+
+That distinction is the whole design. A hard restriction would make an SMG with
+a huge damage roll impossible, and the item you were *not* supposed to get is
+the one that makes a looter interesting. Setting every multiplier to 1.0
+switches the feature off without making any item unrollable.
+
+Each archetype leans toward what it already *is* mechanically, so the lean
+reinforces the niche the weapon table authored rather than inventing a second,
+contradictory identity:
+
+| Archetype | Leans toward |
+|---|---|
+| SMG | Fire Rate ×3.0, Crit Chance, Added Damage |
+| Machinegun | Weapon Damage ×3.0, Added Damage, Health |
+| Sidearm | Slide Speed ×3.0, Move Speed, Dash Cooldown, Sliding Damage |
+| Sniper | Crit Damage ×3.0, Crit Chance, Weapon Damage |
+| Shotgun | Added Damage, Health, Sliding Damage |
+| Rocket Launcher | Weapon Damage, Airborne Damage |
+| Burst Rifle | Crit Chance, Crit Damage, Fire Rate |
+| Rifle | The flattest row in the table, deliberately — the rifle's identity is that it has no sharp edge |
+
+Multipliers top out at ×3.0. Much above ×4 starts to read as a filter.
+All are `O2 PLACEHOLDER`.
+
+### Two supporting changes the leans forced
+
+**Fire Rate did not exist.** The owner named the SMG's lean specifically, so
+`Weapon.FireRate` is a new affix with a real consumer rather than a card
+number: `EBreakerStatTarget::FireRate` →
+`EBreakerAggregatedAttribute::FireRateMultiplier` (base 1.0, replicated,
+floored at 0.05 because a zero multiplier turns the fire interval into an
+infinity and hangs the weapon) → `GetEffectiveRoundsPerMinute`, through which
+**every** fire-timing call site now runs. That last part matters: a cadence stat
+that applied to some timing sites and not others is how a weapon ends up firing
+faster while its burst gap stays at the old rate. It rolls on the two weapon
+slots only, because fire rate is a property of the gun.
+
+**Slide Speed and Dash Cooldown now roll on weapon slots** as well as their
+armour homes. Not breadth for its own sake: a lean toward a line that cannot
+roll on the slot at all is a comment rather than a feature, and the first
+version of this shipped with the sidearm's headline lean measurably doing
+nothing. It also gives the Secondary slot a movement identity, which pairs with
+the sidearm's fast swap.
+
+### Coverage
+
+`RiorsEdge.Items.WeaponDrops.Archetype` (every archetype drops; a seed
+reproduces the item; armour is untouched) and
+`RiorsEdge.Items.WeaponDrops.Leans`, which pins both halves of the design
+against each other: the lean must be **visible** in real rolls, and it must
+**not** be a filter. Measured across 120 drops per archetype — SMG 70 fire-rate
+lines against Sniper 36, Sidearm 74 slide-speed lines against Rifle 42 — with
+the off-lean roll asserted to still happen.

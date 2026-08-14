@@ -314,14 +314,14 @@ bool FBreakerWeaponArchetypeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("SMG can be equipped"), Weapon->GetArchetypeName(), FString(TEXT("SMG")));
     TestEqual(TEXT("SMG receives its thirty-five round magazine"), Weapon->GetMagazineAmmo(), 35);
     Weapon->EquipArchetype(EBreakerWeaponArchetype::Rocket);
-    TestEqual(TEXT("Rocket launcher can be equipped"), Weapon->GetArchetypeName(), FString(TEXT("ROCKET")));
+    TestEqual(TEXT("Rocket launcher can be equipped"), Weapon->GetArchetypeName(), FString(TEXT("ROCKET LAUNCHER")));
     TestEqual(TEXT("Rocket receives its four-round magazine"), Weapon->GetMagazineAmmo(), 4);
     UBreakerWeaponComponent* Loadout = NewObject<UBreakerWeaponComponent>();
     Loadout->EquipSlot(2);
     TestEqual(TEXT("Players can equip the secondary slot"), Loadout->GetCurrentSlot(), 2);
     TestEqual(TEXT("The prototype secondary slot carries the shotgun"), Loadout->GetArchetypeName(), FString(TEXT("SHOTGUN")));
     Loadout->SetSlotArchetype(2, EBreakerWeaponArchetype::Rocket);
-    TestEqual(TEXT("Slot archetypes are assignable"), Loadout->GetArchetypeName(), FString(TEXT("ROCKET")));
+    TestEqual(TEXT("Slot archetypes are assignable"), Loadout->GetArchetypeName(), FString(TEXT("ROCKET LAUNCHER")));
     TestEqual(TEXT("Reassignment grants the new weapon's magazine"), Loadout->GetMagazineAmmo(), 4);
     Loadout->SetSlotArchetype(2, EBreakerWeaponArchetype::Shotgun);
     Loadout->EquipSlot(1);

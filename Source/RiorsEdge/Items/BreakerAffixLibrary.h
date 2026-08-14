@@ -40,6 +40,27 @@ public:
     // Docs/Item-Foundation.md.
     static const TArray<FBreakerAffixDefinition>& GetSliceAffixPool();
 
+    // ---- Per-archetype affix leans ----------------------------------------
+    // Owner's instruction, verbatim: "make sure certain guns have certain
+    // leans towards affixes -- like smg fire rate, lmg damage, sidearm slide
+    // speed and so on -- NOT REQUIRED STATS but they can drop more likely
+    // with those affixes."
+    //
+    // So this is a WEIGHT MULTIPLIER, never a filter. Every affix legal on a
+    // weapon slot stays legal on every archetype; a lean only bends the odds.
+    // That distinction is the whole design: a hard restriction would make an
+    // SMG with a huge damage roll impossible, and the item you were not
+    // supposed to get is the one that makes a looter interesting. It also
+    // means a lean can be retuned to 1.0 to switch the whole feature off
+    // without any item becoming unrollable.
+    //
+    // Returns 1.0 for any pairing with no authored opinion, and for every
+    // non-weapon slot, so armour rolls exactly as it did before this existed.
+    //
+    // O2 PLACEHOLDER: the multipliers are shape, not balance.
+    UFUNCTION(BlueprintPure, Category="Items|Affixes")
+    static float ArchetypeAffixWeightMultiplier(EBreakerWeaponArchetype Archetype, FName AffixId);
+
     // True when the affix moves outgoing damage in any bucket or under any
     // condition. The content test uses it to assert that no slot is
     // structurally incapable of raising damage; the UI can use it to group.

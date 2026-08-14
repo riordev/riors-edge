@@ -27,6 +27,7 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitSlideSpeedMultiplier(1.0f);
     InitAirControlMultiplier(1.0f);
     InitDashCooldownReduction(1.0f);
+    InitFireRateMultiplier(1.0f);
 }
 
 void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -49,6 +50,7 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(SlideSpeedMultiplier);
     BREAKER_REPLICATE(AirControlMultiplier);
     BREAKER_REPLICATE(DashCooldownReduction);
+    BREAKER_REPLICATE(FireRateMultiplier);
 #undef BREAKER_REPLICATE
 }
 
@@ -79,6 +81,9 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     // than a clamp at zero, because a hostile or badly-rolled -100% would
     // otherwise be a divide by zero rather than a very long cooldown.
     else if (Attribute == GetDashCooldownReductionAttribute()) NewValue = FMath::Max(0.05f, NewValue);
+    // Floored well above zero: a fire rate multiplier at or near 0 would turn
+    // the fire interval into an infinity and hang the weapon rather than slow it.
+    else if (Attribute == GetFireRateMultiplierAttribute()) NewValue = FMath::Max(0.05f, NewValue);
 }
 
 void UBreakerAttributeSet::CaptureAttributeBases()
@@ -96,6 +101,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::SlideSpeedMultiplier)] = GetSlideSpeedMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = GetFireRateMultiplier();
     Aggregator.CaptureBases(Values);
 }
 
@@ -181,6 +187,7 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetSlideSpeedMultiplierAttribute(), SlideSpeedMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::SlideSpeedMultiplier));
     WriteAttributeValue(GetAirControlMultiplierAttribute(), AirControlMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::AirControlMultiplier));
     WriteAttributeValue(GetDashCooldownReductionAttribute(), DashCooldownReduction, Aggregator.Compose(EBreakerAggregatedAttribute::DashCooldownReduction));
+    WriteAttributeValue(GetFireRateMultiplierAttribute(), FireRateMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
@@ -228,4 +235,5 @@ BREAKER_ON_REP(MoveSpeed)
 BREAKER_ON_REP(SlideSpeedMultiplier)
 BREAKER_ON_REP(AirControlMultiplier)
 BREAKER_ON_REP(DashCooldownReduction)
+BREAKER_ON_REP(FireRateMultiplier)
 #undef BREAKER_ON_REP
