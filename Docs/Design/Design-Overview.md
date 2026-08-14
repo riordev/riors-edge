@@ -9,7 +9,8 @@ Status: synthesis pass 1. This document does not author new systems. It reads th
 
 It closes with a build-order recommendation and a single deduplicated, ranked list of the decisions that need the project owner.
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 **AUTHORITY — CORRECTED BY O28, READ THIS BEFORE THE REST.** The line below is
 how this document was written and it is **no longer true**:
@@ -29,14 +30,17 @@ Where this document disagrees with one of the design docs, this document still
 wins, because it can see the others. Where it disagrees with `Decisions.md`,
 `Decisions.md` wins without argument.
 
-**⚠ THE O-NUMBERS IN §7 ARE NOT THE O-NUMBERS IN `Decisions.md`.** §7 was
-written before the ledger existed and numbers its own questions O1–O25. Those
-labels coincide with the ledger for O1–O17 and then **diverge**: this
-document's O18 asks whether the slice ships three or five weapons, while ledger
-O18 sets the TTK targets; this document's O19 asks whether the slice
-legendaries are Anomalous or Aberrant, while ledger O19 rules the element
-collisions. **Always say which file an O-number is from.** A citation to "O19"
-with no file is ambiguous and has to be resolved by reading both.
+**THE §7 ID COLLISION IS FIXED (this pass).** §7 was originally written before
+the ledger existed and numbered its own open questions O1–O25. Those labels
+coincided with the ledger for O1–O17 (same topics, same numbers — left as-is
+below) and then **diverged**: this document's old "O18" asked whether the
+slice ships three or five weapons, while ledger O18 sets the TTK targets; this
+document's old "O19" asked whether the slice legendaries are Anomalous or
+Aberrant, while ledger O19 rules the element collisions. **The fix:** the
+diverging items are renumbered **Q18–Q25** below, so a bare O-number is never
+ambiguous again — O1–O25 always means `Decisions.md`, Q18–Q25 always means
+this section's own open questions. S1–S4 were never in the ledger's numbering
+and keep their letters, now with RULED/OPEN status markers of their own.
 
 **Corpus read for this pass:** Master-Sheet-Import.txt, Core-Constellations.md, Class-Kits.md, XP-And-Pacing.md, Encounter-Design.md, Game-Modes.md, Save-Architecture.md, UI-UX-Spec.md, Art-And-Modelling-Plan.md, plus `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`, `Docs/Item-Foundation.md`, `Docs/Roadmap.md`.
 
@@ -90,6 +94,47 @@ These are not gaps in a document. They are gaps in the *set* of documents, and s
 
 ---
 
+## 1a. The identity stack [O33]
+
+O33 rules that character identity and power live in **four independently
+expandable avenues**, and that class is only one of them:
+
+| # | Avenue | Ideology (one sentence) |
+|---|---|---|
+| 1 | **Class** | How you act — the verbs and the resource you spend to use them. |
+| 2 | **Core-tree axes** (O30) | What you amplify — class-agnostic, built on the axes a build is actually built on (guns / abilities / minions). |
+| 3 | **Gear affixes**, including conditional lines | What you stack — the raw material of a build, expandable without touching class or tree. |
+| 4 | **Legendaries and Anomalous rewrites** | Which rule you break — the avenue that changes what the game lets you do, not just by how much. |
+
+**Class must never be the sole trunk.** The Core tree and gear must each be
+able to carry a build-defining identity with no class synergy required — a
+Core-tree build or a gear build has to be a real, viable answer to "what is
+your character," not a supporting layer under a class choice.
+
+**Owner directive, quoted:** *"i want character identity to not be just based
+in the class system as well[;] players should find power and build diversity
+in other areas and avenues as well … we need simple ideologies that players
+can extensively expand on to find power … destiny 2 meets path of exile in a
+comfortable way that rewards innovation and barrier for entry isnt
+impossible."*
+
+**The comfortable-entry principle.** Each avenue states one simple ideology
+that expands to real depth — simple to say, deep to master. The flat baseline
+curve (the same one that anchors O27's content scaling and O36's at-cap band)
+is what makes a baseline player viable **understanding none of the four
+avenues at all**: that flatness IS the comfortable barrier to entry.
+Innovation — combining avenues, chasing conditions, hunting rewrites — is
+rewarded on top of that floor. It is never required for viability, only for
+the ceiling.
+
+This governs how every other document in this corpus should read its own
+layer: a class-kit document, a Core-tree document, an affix document, and a
+legendary/Anomalous document are each documenting one full avenue, not a tier
+subordinate to class. See `Core-Tree-Redesign.md` for how O30 already applies
+this to the Core tree specifically.
+
+---
+
 ## 2. The ten highest-leverage decisions now locked
 
 These are decisions the seven documents made that resolve real ambiguity, are internally validated, and should be treated as settled unless the owner objects. Each carries the cost of reversing it.
@@ -105,7 +150,7 @@ These are decisions the seven documents made that resolve real ambiguity, are in
 | 7 | **Elites are modifier-driven, not stat-driven: ten modifiers, three pressure kinds, forbidden pairs, a required-diversity rule, and a reduced stat chassis (1.25× scale / 2.0× health / 1.5× damage).** | Encounter §1 | Directly implements Master §11.2's "do not scale only health" at the elite level, and converts `ConfigureElite`'s fixed multipliers into content. Every modifier has a graybox tell and a movement counterplay, which is what keeps the movement pillar load-bearing in combat. | Medium — replaces a shipped function signature |
 | 8 | **Party scaling is count-first: 3.8× enemy count against 1.2× enemy health at five players, plus a role-pressure ladder (extra Lattice slot → second Warden → overlapping packs → flanking spawns).** | Encounter §6.2–6.3 | The clearest available implementation of Master §11.2. The role-pressure ladder is the part that matters: it makes each additional player add a *kind* of problem, not a quantity. | Low (table-driven) |
 | 9 | **The Anomaly modifier system has three classes and four inviolable rules: no modifier grants the player anything; no modifier creates a player-side damage multiplier; no modifier adds or subtracts a percentage from a player stat; no modifier requires a verb the player may not own. Reward multipliers are additive.** | Game-Modes §4.4 | Keeps the entire endgame modifier system *outside* the flat/Increased/More pipeline. This is the discipline that lets an infinite-replay mode exist without reopening the multiplicative-explosion risk. | Low now, very high after modifier content exists |
-| 10 | **Save is three-tier (account / character / session) with atomic write + rotating backups + a header hash, an append-only run journal, two-phase item transit, and load-time validation that enforces the Aberrant/Anomalous equip limits.** | Save §2–6 | Item duplication is the one bug that destroys a loot economy, and equip limits *are* the endgame decision (Master §9.2) — if the save layer does not enforce them they are advisory. All of this is cheap before there is an economy and impossible after. | Low now; unbounded after players have items |
+| 10 | **Save is three-tier (account / character / session) with atomic write + rotating backups + a header hash, an append-only run journal, two-phase item transit, and load-time validation that enforces the Aberrant/Anomalous/legendary equip limits.** | Save §2–6 | Item duplication is the one bug that destroys a loot economy, and equip limits *are* the endgame decision (Master §9.2) — if the save layer does not enforce them they are advisory. All of this is cheap before there is an economy and impossible after. **O37 adds a third axis**: exactly 1 legendary, 1 non-legendary Anomalous, 3 Aberrant — three separate caps, not one shared cap (a legendary does not consume the Anomalous slot). | Low now; unbounded after players have items |
 
 **Honourable mentions**, locked but narrower: no item score number anywhere in the UI, ever (UI §5.4); damage numbers on by default with a mandatory 120 ms per-target aggregation window (UI §4.4); Class Tree and Core Tree are never merged into one view (UI §6.2); dodge and block produce reactive feedback with **zero world-position delta** and no triggered animation (Art §3.5); the blockout → playtest → author gate on all bespoke art (Art §7.1).
 
@@ -371,11 +416,12 @@ The order below follows both, and preserves the project rule that every mileston
 
 ## 7. OPEN QUESTIONS — the owner-decision list, deduplicated and ranked
 
-**STATUS, reconciled against `Decisions.md` through O32.** O28 keeps this
+**STATUS, reconciled against `Decisions.md` through O40.** O28 keeps this
 section as the **question** list and requires it to be reconciled against the
 ledger rather than answering anything on its own. Most of it is now answered.
-**Numbering caution repeats: these O-numbers are this document's, not the
-ledger's, and they diverge from O18 onward.**
+**The old numbering collision is fixed as of this pass: items 18–25 below are
+now labelled Q18–Q25 (not O18–O25), so a bare O-number always means the
+ledger. S1–S4 keep their letters.**
 
 | §7 question | Status against the ledger |
 |---|---|
@@ -393,17 +439,17 @@ ledger's, and they diverge from O18 onward.**
 | O12 crafting currencies | **RULED** — ledger O12. Scalar. **No UI, no save wallet.** |
 | O13 rocket self-damage | **RULED** — ledger O13. |
 | O14 player as a person | **RULED** — ledger O14. |
-| O15 branch nodes vs gates | **RULED** — ledger O15. Freely mixed — **and this is what subclass commitment still collides with.** |
+| O15 branch nodes vs gates | **RULED** — ledger O15. Freely mixed. **O37 resolves the once-open collision with subclass commitment:** committing to a branch unlocks that branch's keystone tier and empowers rather than excludes; ordinary nodes of every branch stay freely purchasable, so the O15 collision dissolves. |
 | O16 hardcore | **RULED** — ledger O16. No. |
 | O17 account stash | **RULED** — ledger O17. |
-| O18 three or five slice weapons | **ANSWERED BY THE CODE, not by a ruling.** Five exist (Rifle, SMG, Sniper, Shotgun, Rocket). Ledger O18 is a different question entirely. |
-| O19 are the slice legendaries Anomalous or Aberrant | **RULED — ledger O32, and the question's framing was wrong.** They are neither-or-rather-both-and-more: **Anomalous is a rarity**, and **legendary is a separate field** naming an authored item. Every legendary rolls Anomalous; most Anomalous drops are not legendaries. Aberrant does not enter into it. |
-| O20 party loot distribution | **STILL OPEN.** No party code exists. |
-| O21 Frontier tiers infinite or capped | **STILL OPEN.** |
-| O22 elite loot floor vs modifier count | **PARTIALLY ANSWERED by the drop pipeline.** The elite Exceptional floor survives but now COMPOSES with the rarity gates rather than competing with them — it can only lift a drop to a rarity the drop's item level actually unlocks. Whether it should additionally scale with modifier count is **still open**. |
-| O23 stagger / flinch | **STILL OPEN.** Nothing built. |
-| O24 XP in endgame | **STILL OPEN — and now blocking.** There is no XP system at all, which is why the third-jump gate keyed to `CharacterLevel` was unreachable by construction. |
-| O25 keystone respec friction | **STILL OPEN.** |
+| Q18 (was O18) three or five slice weapons | **OPEN.** Not a ledger ruling — answered in practice by the code, not by the owner. Five archetypes exist (Rifle, SMG, Sniper, Shotgun, Rocket). Ledger O18 is a different question entirely (TTK targets). |
+| Q19 (was O19) are the slice legendaries Anomalous or Aberrant | **RULED (O32).** The question's own framing was wrong — it's neither-or-rather-both-and-more: **Anomalous is a rarity**, and **legendary is a separate field** naming an authored item. Every legendary rolls Anomalous; most Anomalous drops are not legendaries. Aberrant does not enter into it. Equip caps are further clarified by **O37**: 1 legendary, 1 non-legendary Anomalous, 3 Aberrant — separate axes, not one shared cap. |
+| Q20 (was O20) party loot distribution | **OPEN.** No party code exists. |
+| Q21 (was O21) Frontier tiers infinite or capped | **OPEN.** |
+| Q22 (was O22) elite loot floor vs modifier count | **OPEN.** Partially answered by the drop pipeline — the elite Exceptional floor survives but now COMPOSES with the rarity gates rather than competing with them; it can only lift a drop to a rarity the drop's item level actually unlocks. Whether it should additionally scale with modifier count remains unruled. |
+| Q23 (was O23) stagger / flinch | **OPEN.** Nothing built. |
+| Q24 (was O24) XP in endgame | **OPEN — and blocking.** There is no XP system at all, which is why the third-jump gate keyed to `CharacterLevel` was unreachable by construction; **O40(b)** now makes this a general rule (no CharacterLevel gate until an XP loop exists), not just this one symptom. |
+| Q25 (was O25) keystone respec friction | **OPEN.** Distinct from **O37**'s subclass-commitment ruling — O37 governs class-branch commitment, not Core Point keystone respec friction; the two are adjacent, not the same question. |
 
 **Questions the ledger has since raised that this section never asked**, and
 which now outrank most of what is above: the O29 power band (~15x measured
@@ -411,6 +457,16 @@ against an authored 8–10x, holding two tests red); O30's Core-tree redesign
 around build axes and the `EBreakerBuildCondition` widening it needs; O31's
 requirement that no encounter have a build that cannot participate; and O32's
 legendary pool, ruled to grow and still at three items. See `CONTEXT.md`.
+
+**And since that pass, O33–O40 (2026-08-14)** added: the four-avenue identity
+stack (**O33**, §1a above); the Damage-Pipeline multiplier canon and single
+More ceiling (**O34**); ability damage scaling by the equipped weapon's item
+level (**O35**); two power bands, at-cap and endgame, each pinned (**O36**);
+per-axis equip caps and an empowering (not exclusionary) subclass commitment
+(**O37**); Elements ruled post-slice, designed-not-cut — this closes **S1**
+below (**O38**); slice class honesty — only Swift and Caster are offered
+outside dev mode (**O39**); and three hygiene rulings, including the freeze on
+`CharacterLevel` gates until an XP loop exists (**O40**). See `Decisions.md`.
 
 Original text follows. Ranked by how much downstream work each blocks. Every item carries a recommended default, so a decision can be a single word.
 
@@ -543,56 +599,56 @@ Original text follows. Ranked by how much downstream work each blocks. Every ite
 
 ---
 
-**O18. Does the slice ship three finished weapons or five?**
+**Q18 (was O18). Does the slice ship three finished weapons or five?**
 *Raised by:* Art OQ4; Master §12.3 vs `CONTEXT.md` (five archetypes shipped).
 *Blocks:* Art Phase D scope and roughly two weeks of authoring.
 *Recommended:* **three authored, two kitbashed.**
 
 ---
 
-**O19. Are the three slice build-defining legendaries Anomalous or Aberrant?**
+**Q19 (was O19). Are the three slice build-defining legendaries Anomalous or Aberrant?**
 *Raised by:* Art OQ9; Master §12.5 ("are unique weapons and Anomalous items the same system?").
 *Blocks:* roughly a week of art (bespoke mesh vs attachment plus emissive mark), and the loot pipeline's unbuilt step 6.
 *Recommended:* **one Anomalous and two Aberrant.** It exercises both signature paths, respects the max-1-equipped rule so the player actually feels the constraint, and costs one bespoke mesh instead of three.
 
 ---
 
-**O20. Loot distribution in parties: instanced, shared, or need/greed?**
+**Q20 (was O20). Loot distribution in parties: instanced, shared, or need/greed?**
 *Raised by:* Master §11.3; Save §7 (assumes instanced); Encounter OQ7; Game-Modes OQ8.
 *Blocks:* every party mode's reward section, the save transaction model's complexity, and whether elites should drop more or better at higher party sizes.
 *Recommended:* **instanced per player.** It is the only option that keeps the two-phase item transit simple, and it removes social friction that a solo-primary game gains nothing from.
 
 ---
 
-**O21. Are Anomaly/Frontier tiers infinite or capped at 30?**
+**Q21 (was O21). Are Anomaly/Frontier tiers infinite or capped at 30?**
 *Raised by:* Game-Modes OQ5; Master §9.4.
 *Blocks:* endgame content shape and, arguably, the spirit of the level-50 hard stop — infinite tiers are a soft paragon track even when they grant no power.
 *Recommended:* **cap at 30**, then let modifier count and pack density be the ceiling.
 
 ---
 
-**O22. Does the elite loot floor scale with modifier count?**
+**Q22 (was O22). Does the elite loot floor scale with modifier count?**
 *Raised by:* Encounter OQ8.
 *Blocks:* elite reward tuning; a 3-modifier elite is meaningfully harder than a 1-modifier one and currently pays identically.
 *Recommended:* **yes** — floor rises one rarity step at 3 modifiers only, so the common case stays simple.
 
 ---
 
-**O23. Does a stagger/flinch system exist?**
+**Q23 (was O23). Does a stagger/flinch system exist?**
 *Raised by:* Encounter OQ9 (elites are assigned 2× stagger resistance, presupposing a model that does not exist); Bulwark B6 ("cannot be staggered while your shield is intact"); Master §3.8's Stagger/Knockback Resistance affix; Encounter's Relentless modifier.
 *Blocks:* one affix line, one Bulwark node, one elite modifier, and the boss's stagger immunity.
 *Recommended:* **yes, minimal** — a binary interrupt state with a resistance stat and a per-enemy immunity flag. Four systems already assume it.
 
 ---
 
-**O24. Does XP exist at all in endgame content?**
+**Q24 (was O24). Does XP exist at all in endgame content?**
 *Raised by:* XP OQ7; Master §7.1.
 *Blocks:* whether the kill-value tables mean anything at cap, and whether a clean crafting-currency sink exists.
 *Recommended:* **no XP at cap, no conversion.** A conversion is a post-cap progression track wearing a currency costume, and Master §7.1 is unambiguous. Use a separate, explicit currency drop instead.
 
 ---
 
-**O25. Should Core Point respec carry friction at the keystone tier?**
+**Q25 (was O25). Should Core Point respec carry friction at the keystone tier?**
 *Raised by:* Master §7.8; Core-Constellations OQ11.
 *Blocks:* nothing structural; it is a playtest question.
 *Recommended:* **free, as locked**, and revisit only if keystone-swapping per encounter becomes a real behaviour.
@@ -601,10 +657,10 @@ Original text follows. Ranked by how much downstream work each blocks. Every ite
 
 ### Questions this synthesis raises that no document asked
 
-**S1. Does the game ship with five constellations or six?** Elements is blocked, the UI is instructed to hide it in shipping builds, and no document treats "ship without it" as a scenario. If the resistance model is not on the near roadmap, five constellations against a ~65-point budget changes the two-full-plus-one-partial validation.
+**S1. Does the game ship with five constellations or six?** **RULED (O38).** Elements is designed-not-cut; the slice and first release ship five constellations, and Elements lands when the resistance model does. Original question, preserved for context: Elements is blocked, the UI is instructed to hide it in shipping builds, and no document treated "ship without it" as a scenario before this ruling. Five constellations against a ~65-point budget changes the two-full-plus-one-partial validation — see `Core-Constellations.md` §2.2a, which re-validates exactly this and confirms the two-keystone conclusion still holds.
 
-**S2. Who owns audio?** Nine telegraphs, one closing ritual, and the entire dodge/block feedback model depend on an audio channel with no owner, no palette, and no document.
+**S2. Who owns audio?** **OPEN.** Nine telegraphs, one closing ritual, and the entire dodge/block feedback model depend on an audio channel with no owner, no palette, and no document.
 
-**S3. What is the replication topology?** The Anchor is non-instanced and shared, parties go to five, Conquest matchmakes nine. `Save-Architecture.md` §7 covers storage authority only. Nothing covers the network.
+**S3. What is the replication topology?** **OPEN.** The Anchor is non-instanced and shared, parties go to five, Conquest matchmakes nine. `Save-Architecture.md` §7 covers storage authority only. Nothing covers the network. A **DRAFT** recommendation now exists at `Docs/Design/Replication-Position.md` (proposed 2026-08-14); it does **not** close O22 and is not law until the owner signs off.
 
-**S4. Who enumerates the rule-rewrite hooks?** `Class-Kits.md` §7 correctly identifies that rule-rewriting nodes need code-side hooks and asks for them to be enumerated before authoring. Across the class and core trees there are roughly forty distinct hook types. That enumeration is the real engineering specification for the progression system, and it is the largest unwritten technical document in the project.
+**S4. Who enumerates the rule-rewrite hooks?** **OPEN.** `Class-Kits.md` §7 correctly identifies that rule-rewriting nodes need code-side hooks and asks for them to be enumerated before authoring. Across the class and core trees there are roughly forty distinct hook types. That enumeration is the real engineering specification for the progression system, and it is the largest unwritten technical document in the project.
