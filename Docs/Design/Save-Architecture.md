@@ -1,8 +1,22 @@
 # Save / State Architecture
 
+**Last reconciled against: O32**
+
 Status: design target, with one slice as-built. Nothing below is implemented
 EXCEPT what §11 records: quest state, write-through persistence on flag change,
 and save versioning/migration.
+
+**O29 does NOT invalidate saves, and the reason is worth stating here because
+it is the first real test of this format's shape.** Item level ran to 120 and
+the affix tier ladder widened to T12..T-1 with roughly doubled values. That
+touched none of the save contract: affix tier values are save-relevant only
+through `Tier` and `Value` on a rolled affix, and **both are already stored per
+item**. Widening the ladder therefore needs no migration. The consequence is
+that **every item rolled before O29 keeps the values it rolled and will read as
+weak. That is correct and must not be migrated** — the roll is a historical
+fact, not a derived quantity, and re-deriving it would make an old item silently
+become a new one. The general rule this establishes: **store the outcome, not
+the recipe**, and content retunes cost nothing at load.
 Owner layer: C++ (save formats are a durable-rules concern per `Docs/Architecture.md`).
 
 This document defines what is saved, where it lives, how it survives a crash,
@@ -52,8 +66,13 @@ Known defects in the current shape, in severity order:
    Unreal writes the `.sav` in place. There is no rotation and no checksum.
 4. **`EndPlay` is not a crash-safe cadence.** A hard crash or power loss loses
    the entire session. Rift clears, level-ups, and drops all evaporate.
-5. **The three `SaveVersion` fields are declared but never read.** There is no
-   migration function anywhere. They are currently decoration.
+5. ~~**The three `SaveVersion` fields are declared but never read.**~~
+   **PARTIALLY FIXED — see §11.3.** `UBreakerSaveGame::SaveVersion` is now read:
+   `CurrentSaveVersion` is **2**, `MigrateToCurrent` steps one version at a time
+   and **refuses a newer file rather than repairing it**, and unknown flags are
+   preserved verbatim. The other two — `FBreakerProgressionState::SaveVersion`
+   and `FBreakerItemInstance::SaveVersion` — are **still read by nothing** and
+   are still decoration.
 6. **Load does not validate.** `RestoreState` trusts the file. A hand-edited
    save can equip five Anomalous items or set level 90.
 
