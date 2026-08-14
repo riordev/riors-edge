@@ -190,15 +190,57 @@ namespace BreakerUI
 
     inline constexpr float HudCrosshairBox = 80.0f;
 
+    // --- Minimap (UI-HUD-Spec section 6) -----------------------------------
+    // LANDSCAPE, and that is the whole design decision. Level-Design section 5
+    // gives the field a 25000 cm long axis against roughly 8000 cm of occupied
+    // width, with every station strung along the spawn-forward axis. A square
+    // minimap over that field spends most of its area on empty flank, so the
+    // plate is 320x176 — a 1.82:1 window whose long side is the field's long
+    // side, and the map is FIELD-ALIGNED (forward = right) rather than
+    // rotating, because a rotating map throws that alignment away every time
+    // the player turns.
+    //
+    // Both dimensions are on the 8px grid (40 and 22 cells).
+    inline constexpr float HudMinimapWidth = 320.0f;
+    inline constexpr float HudMinimapHeight = 176.0f;
+    // Centimetres of world per SPEC pixel. 56 puts the half-window at 8960 cm
+    // forward and 4928 cm lateral, which is chosen so the encounter pocket
+    // (8500 cm out) is on the map from the safe ring rather than one pixel off
+    // its edge, and so one 8px grid step is 448 cm — near enough a combat
+    // pocket's quarter-radius to be a usable unit.
+    inline constexpr float HudMinimapCmPerPixel = 56.0f;
+    // Graticule pitch, in world cm. The combat pocket radius, so the grid is a
+    // statement about fighting distance rather than an arbitrary ruler.
+    inline constexpr float HudMinimapGridCm = 2000.0f;
+    inline constexpr float HudMinimapBlipSize = 5.0f;
+    inline constexpr float HudMinimapPlayerSize = 9.0f;
+
     // Damage number sizes, section 4 of the HUD spec.
     // The spec's 40/64/80 were authored for a 1920x1080 mock viewed at desk
     // distance. In the game they cover the target you are shooting at, which
     // is worse than illegible — the owner called them too big on sight. Cut
     // ~35% while keeping the crit/weak-point/body HIERARCHY intact, since the
     // relative sizes are what carry the information.
+    //
+    // HELD HERE, deliberately, on the SECOND "too large" report (2026-08-14).
+    // These three are the only thing that separates a body shot from a weak
+    // point from a crit at a glance, and they had already been cut once. What
+    // changed between the two reports was not the type — it was O29, which put
+    // item level at 120 and roughly doubled affix values, so a number that was
+    // three digits when these sizes were chosen is now five or six. A six-digit
+    // number carrying two THIN SPACES is eight glyphs wide; at the crit size
+    // that is most of the target. The problem is WIDTH, and width is a
+    // formatting question, so the fix is FormatDamage below rather than a third
+    // cut that would eventually collapse the hierarchy into one size.
     inline constexpr float DamageBodyPixels = 26.0f;   // SPEC: 40
     inline constexpr float DamageCritPixels = 52.0f;   // SPEC: 80
     inline constexpr float DamageWeakPointPixels = 40.0f; // SPEC: 64
+
+    // How much of a hit has to disappear into mitigation before the number
+    // says so. Below this it is ordinary armour shaving and saying so every
+    // frame would be noise; at or above it the player is hitting the wrong
+    // part of something and needs to be told, which is the whole Warden read.
+    inline constexpr float DamageAbsorbedThreshold = 0.20f;
 
     // Ultimate frame, section 5.
     inline constexpr float UltimateFrameInset = 8.0f;
@@ -231,5 +273,40 @@ namespace BreakerUI
             Digits.InsertAt(Index, TCHAR(0x2009));  // THIN SPACE
         }
         return Whole < 0 ? FString(TEXT("-")) + Digits : Digits;
+    }
+
+    // --- Damage numbers abbreviate; every other ticker does not -------------
+    // FormatTicker is right for a readout in a FIXED column — the magazine, a
+    // health pool, a reserve — where the space is reserved whatever the value
+    // does and the player may want the exact figure. A floating damage number
+    // is the opposite: it is drawn over the thing being shot, its width is
+    // whatever the value makes it, and nobody reads the units digit of a crit.
+    //
+    // Under O29 the values run to six digits, and FormatTicker's thin spaces
+    // make that EIGHT glyphs — the correct answer for a column and the wrong
+    // one for a number sitting on a target's chest. Abbreviation holds every
+    // damage number to at most five glyphs at any magnitude, which is what the
+    // authored sizes were chosen against.
+    //
+    // The banding keeps the precision where it is legible: three significant
+    // figures up to 100k, then whole units, so "12.4k" and "148k" are both
+    // four-to-five glyphs and neither lies about its magnitude.
+    inline constexpr float DamageAbbreviateAt = 10000.0f;
+
+    inline FString FormatDamage(float Value)
+    {
+        const float Magnitude = FMath::Abs(Value);
+        if (Magnitude < DamageAbbreviateAt) return FormatTicker(Value);
+
+        const TCHAR* Sign = Value < 0.0f ? TEXT("-") : TEXT("");
+        if (Magnitude < 100000.0f)                                  // 12.4k
+            return FString::Printf(TEXT("%s%.1fk"), Sign, Magnitude / 1000.0f);
+        if (Magnitude < 1000000.0f)                                 // 148k
+            return FString::Printf(TEXT("%s%.0fk"), Sign, Magnitude / 1000.0f);
+        if (Magnitude < 10000000.0f)                                // 1.24M
+            return FString::Printf(TEXT("%s%.2fM"), Sign, Magnitude / 1000000.0f);
+        if (Magnitude < 100000000.0f)                               // 12.4M
+            return FString::Printf(TEXT("%s%.1fM"), Sign, Magnitude / 1000000.0f);
+        return FString::Printf(TEXT("%s%.0fM"), Sign, Magnitude / 1000000.0f);
     }
 }

@@ -28,7 +28,22 @@ struct FBreakerHUDDamageNumber
     float Value = 0.0f;
     bool bCritical = false;
     bool bWeakPoint = false;
+    // How much of the hit disappeared into mitigation, 0..1, taken from
+    // FBreakerDamageResult at the moment the shot resolved: 1 - Mitigated/Raw.
+    // Latched rather than looked up, because the number outlives the hit and
+    // the target's armour is a facing-dependent value that has already moved
+    // by the time this is drawn.
+    float MitigatedFraction = 0.0f;
     double Time = -1000.0;
+};
+
+// One enemy, reduced to what the minimap needs. Collected during the enemy
+// health-bar pass so the minimap costs no second actor iteration.
+struct FBreakerHUDMapBlip
+{
+    FVector World = FVector::ZeroVector;
+    bool bElite = false;
+    bool bBoss = false;
 };
 
 // Which edge carries a plate's 3px rail. Left is identity — which system owns
@@ -77,6 +92,10 @@ private:
     static BreakerHUD::FResourceRow ResolveResourceRow(const ABreakerCharacter* Character);
     void DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height);
     void DrawWaveBanner(const FVector2D& Center);
+    // Top-right field plate. Cheap by construction: it consumes EnemyBlips,
+    // which DrawEnemyHealthBars has already filled from the one enemy
+    // iteration the HUD was making anyway, and allocates nothing per frame.
+    void DrawMinimap(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
     // Rounds in flight are no longer drawn here at all. The HUD records the
     // shot and hands it to a world-space pooled renderer, spawned lazily on
     // the first shot and never replicated; see BreakerTracerRenderer.h.
@@ -132,6 +151,27 @@ private:
     TArray<FBreakerHUDDamageNumber> DamageNumbers;
     int32 NextDamageNumberIndex = 0;
 
+    // How much of the last landed shot was absorbed, latched in the shot
+    // handler. Drives the crosshair's third tick state — the read the owner is
+    // missing when a Warden's frontal armour eats a hit.
+    float LastShotMitigatedFraction = 0.0f;
+    double LastShotHitTime = -1000.0;
+
+    // Filled once per frame by DrawEnemyHealthBars, consumed by DrawMinimap.
+    // A member rather than a local so the allocation happens on the first few
+    // frames and never again: DrawHUD runs every frame and a TArray built in
+    // it is a per-frame allocation by definition.
+    TArray<FBreakerHUDMapBlip> EnemyBlips;
+
+    // -BreakerCaptureHUD. Dev-only, command-line, and the reason it exists is
+    // that the states this HUD gets WRONG are the states a headless capture run
+    // cannot reach: nothing presses F4 to start a wave and nothing pulls a
+    // trigger, so the wave banner and every damage number were unphotographable
+    // and both shipped broken. Resolved once, never per frame.
+    bool IsCapturePreview() const;
+    void TickCapturePreview(const ABreakerCharacter* Character);
+    double LastPreviewSpawnTime = -1000.0;
+
     // --- FIELDPLATE drawing primitives -----------------------------------
     // Every geometry value in this class is authored in the spec's 1920x1080
     // pixels and passed through S() once, so the HUD holds its proportions at
@@ -169,6 +209,12 @@ private:
     void DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
     void DrawSpecTextCentered(const FString& Text, float CenterX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha = 1.0f);
     FVector2D MeasureSpecText(const FString& Text, float SpecPixels);
+    // The largest size at or below DesiredPixels at which Text measures no
+    // wider than MaxWidth, never below MinPixels. MaxWidth is derived from the
+    // MEASUREMENT of a different string, never from this widget's own
+    // arrangement, so — like every other measured fit in this codebase — it is
+    // a pure function of inputs known before layout and cannot oscillate.
+    float FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels);
 
     // Outline + weight pass for numbers that sit over the world. The outline
     // is tinted toward the number's own hue so it never reads as grey mud.

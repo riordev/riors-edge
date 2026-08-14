@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "UI/BreakerHUDResourceRow.h"
+#include "UI/BreakerUIStyle.h"
 #include "Engine/Font.h"
 #include "Fonts/SlateFontInfo.h"
 
@@ -145,6 +146,59 @@ bool FBreakerHUDFontContractTest::RunTest(const FString& Parameters)
         TestNotNull(*FString::Printf(TEXT("%s resolves to a UFont, so canvas text draws"), Typeface),
             Cast<const UFont>(Info.FontObject));
     }
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// Damage numbers abbreviate. The thing worth asserting is not the glyphs, it
+// is the WIDTH BUDGET: the authored 26/40/52 sizes were chosen against numbers
+// that fitted, and O29 (item level to 120, affix values roughly doubled) moved
+// every damage figure two orders of magnitude without moving the type. This
+// test is the guard that the format holds its width at any magnitude the power
+// curve can produce, so the next content retune cannot silently re-break the
+// thing the owner reported twice.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDamageFormatTest,
+    "RiorsEdge.UI.DamageNumberFormat",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDamageFormatTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerUI;
+
+    // Small numbers are untouched: exact, and the spec's thin space.
+    TestEqual(TEXT("A two-digit hit is exact"), FormatDamage(42.0f), FString(TEXT("42")));
+    TestEqual(TEXT("Under the threshold keeps the ticker format"),
+        FormatDamage(9999.0f), FormatTicker(9999.0f));
+
+    // The bands.
+    TestEqual(TEXT("Ten thousand abbreviates"), FormatDamage(12400.0f), FString(TEXT("12.4k")));
+    TestEqual(TEXT("Past 100k drops the decimal"), FormatDamage(148200.0f), FString(TEXT("148k")));
+    TestEqual(TEXT("Millions"), FormatDamage(1240000.0f), FString(TEXT("1.24M")));
+    TestEqual(TEXT("Tens of millions"), FormatDamage(12400000.0f), FString(TEXT("12.4M")));
+
+    // Exactly at the boundary, so the branch cannot drift.
+    TestEqual(TEXT("The threshold itself abbreviates"),
+        FormatDamage(DamageAbbreviateAt), FString(TEXT("10.0k")));
+
+    // THE ACTUAL CONTRACT. Five glyphs, whatever the power curve does. A
+    // six-digit FormatTicker string is eight characters wide; that is what this
+    // exists to prevent coming back.
+    const float Magnitudes[] = {
+        1.0f, 99.0f, 999.0f, 9999.0f, 10000.0f, 84500.0f, 250000.0f,
+        999999.0f, 1000000.0f, 9990000.0f, 45000000.0f, 900000000.0f };
+    for (const float Magnitude : Magnitudes)
+    {
+        const FString Text = FormatDamage(Magnitude);
+        TestTrue(*FString::Printf(TEXT("%.0f formats to at most five glyphs (got '%s')"), Magnitude, *Text),
+            Text.Len() <= 5);
+    }
+
+    // Sign survives abbreviation. Nothing deals negative damage today; the
+    // formatter is shared and a dropped sign would be a silent lie if anything
+    // ever does.
+    TestEqual(TEXT("Negative abbreviates with its sign"), FormatDamage(-12400.0f), FString(TEXT("-12.4k")));
     return true;
 }
 
