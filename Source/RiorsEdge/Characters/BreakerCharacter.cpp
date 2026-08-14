@@ -32,6 +32,9 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Save/BreakerQuestJournal.h"
+#include "Save/BreakerQuestContent.h"
+#include "Combat/BreakerEnemy.h"
+#include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerLootPickup.h"
 #include "Game/BreakerGameMode.h"
@@ -202,6 +205,8 @@ void ABreakerCharacter::BeginPlay()
     if (Quests && HasAuthority())
     {
         Quests->OnPersistRequested.AddWeakLambda(this, [this]() { SaveGameState(); });
+        Quests->OnFlagSet.AddWeakLambda(this, [this](FName Flag) { GrantQuestRewardForFlag(Flag); });
+        if (Combat) Combat->OnKillDealt.AddDynamic(this, &ThisClass::HandleQuestKill);
     }
     if (HasAuthority()) LoadGameState();
     if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
@@ -1152,6 +1157,41 @@ const TArray<FName>& ABreakerCharacter::GetQuestFlags() const
 void ABreakerCharacter::SetQuestFlags(const TArray<FName>& NewFlags)
 {
     if (Quests) Quests->RestoreFrom(NewFlags, TMap<FName, int32>());
+}
+
+void ABreakerCharacter::HandleQuestKill(const FBreakerHitContext& Hit)
+{
+    if (!Quests || !HasAuthority()) return;
+    // Rank, not archetype: O27 made rank the flag for what an elite is, so the
+    // objective reads the same number the chassis does. Anything above elite
+    // (a boss) counts for an elite objective too.
+    const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Hit.Target);
+    if (!Enemy) return;
+    const bool bEliteOrAbove = Enemy->GetMonsterRank() != EBreakerMonsterRank::Trash;
+    UBreakerQuestLibrary::NotifyEnemyKilled(*Quests, bEliteOrAbove);
+}
+
+void ABreakerCharacter::GrantQuestRewardForFlag(FName Flag)
+{
+    if (!Equipment || !HasAuthority()) return;
+    FBreakerQuestDefinition Paid;
+    bool bFound = false;
+    for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+    {
+        if (Quest.TurnedInFlag == Flag) { Paid = Quest; bFound = true; break; }
+    }
+    if (!bFound) return;
+
+    for (int32 Index = 0; Index < Paid.Reward.ItemCount; ++Index)
+    {
+        // Deterministic seed per (quest, index) so a reward is reproducible in
+        // a bug report rather than a different item every time the case is
+        // reproduced. Slot rotates so a multi-item reward is not eight helmets.
+        const int32 Seed = GetTypeHash(Paid.QuestId) + Index * 7919;
+        const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>((GetTypeHash(Paid.QuestId) + Index) % static_cast<int32>(EBreakerEquipSlot::Count));
+        Equipment->AddToBackpack(UBreakerLootLibrary::RollItem(TEXT("QuestReward"), Slot, Paid.Reward.MinimumRarity, Paid.Reward.ItemLevel, Seed));
+    }
+    UE_LOG(LogTemp, Log, TEXT("Quest '%s' turned in; %d reward item(s) granted"), *Paid.QuestId.ToString(), Paid.Reward.ItemCount);
 }
 
 void ABreakerCharacter::TogglePauseMenu()

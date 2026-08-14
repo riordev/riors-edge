@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Characters/BreakerViewmodelRig.h"
 #include "BreakerCharacter.generated.h"
 
@@ -262,6 +263,14 @@ private:
     void OpenMenuScreenForCapture(const FString& ScreenName);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void HandlePlayerDeath();
+    // The campaign's only non-dialogue flag source today: a kill advances the
+    // counted objectives of whichever quest is active. Bound to the combat
+    // component's attacker-side OnKillDealt.
+    UFUNCTION() void HandleQuestKill(const FBreakerHitContext& Hit);
+    // Pays a quest out exactly once. Flags are monotonic and the journal
+    // broadcasts a flag only on the transition, so "exactly once" is a
+    // property of the flag rather than a bookkeeping field that can drift.
+    void GrantQuestRewardForFlag(FName Flag);
     void EndShotCosmetics();
 
     FTransform PlaytestSpawnTransform;

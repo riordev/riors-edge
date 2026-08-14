@@ -328,7 +328,12 @@ void SBreakerMenu::ShowInventory()
 void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
 {
     DialogueNPC = NPC;
-    DialogueNodeId = NPC ? NPC->GetStartNodeId() : NAME_None;
+    // Per-NPC entry state: which node an NPC opens on depends on what the
+    // player has done. This used to be an unconditional GetStartNodeId(), so
+    // every NPC greeted the player identically forever.
+    const UBreakerQuestJournal* Journal = Character.IsValid() ? Character->GetQuestJournal() : nullptr;
+    static const FBreakerQuestFlagSet EmptyFlags;
+    DialogueNodeId = NPC ? NPC->ResolveStartNodeId(Journal ? Journal->GetState() : EmptyFlags) : NAME_None;
     RootScreen = EBreakerMenuScreen::Pause;
     Rebuild(EBreakerMenuScreen::Dialogue);
 }
@@ -3844,8 +3849,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
             PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16))
     ];
 
+    // Gated entries: a choice can require a flag or be hidden by one. Iterating
+    // Node.Choices unconditionally is what made flags invisible to the player.
+    const UBreakerQuestJournal* Journal = Character.IsValid() ? Character->GetQuestJournal() : nullptr;
+    static const FBreakerQuestFlagSet EmptyFlags;
+    TArray<FBreakerDialogueChoice> VisibleChoices;
+    NPC->GetVisibleChoices(Node, Journal ? Journal->GetState() : EmptyFlags, VisibleChoices);
+
     int32 ChoiceNumber = 0;
-    for (const FBreakerDialogueChoice& Choice : Node.Choices)
+    for (const FBreakerDialogueChoice& Choice : VisibleChoices)
     {
         ++ChoiceNumber;
         const FName NextNodeId = Choice.NextNodeId;
