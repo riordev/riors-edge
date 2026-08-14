@@ -1,24 +1,68 @@
 # Weapon foundation
 
+Last reconciled against: O32
+
 The first weapon pipeline is a server-authoritative hitscan prototype with a Data Asset definition and a built-in fallback rifle so clean clones can fire without editor-authored content.
 
 ## Playable archetypes
 
 The player carries two weapons. Keys 1-2 select the equipped primary and
-secondary slots; the current gym loadout is rifle / scattergun. **Eight**
-clean-clone fallback archetypes now exist — rifle, SMG, marksman, scattergun,
-rocket, and the O27 breadth additions Volley, Bulwark and Mark — all available
-to the loadout screen and the future pickup system, but only two may be
-equipped at once. These remain prototype values rather than balance
+secondary slots; the gym's default loadout is Rifle / Shotgun. **Eight**
+clean-clone fallback archetypes exist, and they are named by exactly one table
+(`BreakerWeaponArchetypeNames` in `Weapons/BreakerWeaponArchetype.h`) that
+serves the HUD, the loadout screen and item cards — a gun named in three places
+gets renamed in two:
+
+| Enum | Display name | Older names still in this document |
+|---|---|---|
+| `Rifle` | Rifle | — |
+| `SMG` | SMG | — |
+| `Sniper` | Sniper | marksman |
+| `Shotgun` | Shotgun | scattergun |
+| `Rocket` | Rocket Launcher | rocket |
+| `BurstRifle` | Burst Rifle | **Volley** |
+| `Machinegun` | Machinegun | **Bulwark** |
+| `Sidearm` | Sidearm | **Mark** |
+
+The three O27 breadth additions were designed under the codenames Volley,
+Bulwark and Mark and shipped under the plain names; the design sections below
+keep the codenames in their headings because that is what the reasoning was
+written against, but **the code, the UI and every other document use the
+right-hand column.**
+
+All eight are available to the loadout screen and to weapon drops, but only two
+may be equipped at once. These remain prototype values rather than balance
 commitments.
 
 `EBreakerWeaponArchetype` is stored as a uint8 in `UBreakerSaveGame` and
 replicated as one, so new archetypes are **appended, never inserted**:
-renumbering the existing five would silently rearm every saved loadout with a
-different gun. The prototype-name table in `BreakerWeaponComponent.cpp` is
-indexed by the enum and carries a `static_assert` on the count, because a
-missing row is an out-of-bounds read on first equip rather than a compile
-error.
+renumbering the existing eight would silently rearm every saved loadout with a
+different gun. The prototype table in `BreakerWeaponComponent.cpp` is indexed by
+the enum and carries a `static_assert` on the count, because a missing row is an
+out-of-bounds read on first equip rather than a compile error.
+
+### The table, at a glance
+
+Every number is `O2 PLACEHOLDER`, per pellet where pellets exist, and measured
+at item level 1 (the anchor of the damage curve below).
+
+| | Damage | Weak pt | RPM | Mag / reserve | Pellets | Hip / ADS spread | Falloff (m) | Floor | Reload | Swap-in |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Rifle | 24 | 1.75x | 600 auto | 30 / 120 | 1 | 1.2 / 0.25 | 28 - 70 | 0.72 | 1.8 s | 0.50 s |
+| SMG | 13 | 1.5x | 900 auto | 35 / 175 | 1 | 2.0 / 0.9 | 18 - 45 | 0.58 | 1.5 s | 0.35 s |
+| Sniper | 72 | 2.0x | 150 semi | 8 / 40 | 1 | 2.0 / 0.05 | 50 - 110 | 0.88 | 2.3 s | 0.70 s |
+| Shotgun | 10 | 1.35x | 85 semi | 8 / 40 | **8** | 4.5 / 3.0 | 11 - 28 | 0.40 | 2.2 s | 0.50 s |
+| Rocket Launcher | 90 | — | 55 semi | 4 / 16 | projectile | 0.6 / 0.2 | rifle curve | 0.72 | 2.8 s | 0.80 s |
+| Burst Rifle | 29 | 1.9x | 720 in burst | 27 / 108 | 1 | 1.6 / 0.12 | 36 - 85 | 0.80 | 2.0 s | 0.55 s |
+| Machinegun | 11 | 1.4x | 700 auto | **120** / 300 | 1 | 3.2 / 0.8 | 22 - 90 | 0.55 | **4.2 s** | **0.95 s** |
+| Sidearm | 21 | 1.8x | 420 semi | 14 / 210 | 1 | 1.1 / 0.30 | 16 - 40 | 0.52 | 1.1 s | **0.18 s** |
+
+Two entries are inherited rather than authored and are worth knowing before
+tuning: the **Rocket Launcher never overrides its falloff**, so it uses the
+rifle curve, and the **Shotgun never overrides `SwapInDuration`**, so it sits at
+the rifle's 0.50 s despite swap tempo being an explicit axis in the table.
+`ArmorPenetration` is 0.0 on every archetype — nothing in the game penetrates
+armour today.
 
 ### Rifle
 
@@ -107,9 +151,13 @@ chain rather than the repeating timer the other automatics use, because their
 interval alternates; non-burst weapons keep the repeating timer untouched so
 their cadence cannot shed a callback's latency per shot.
 
-**Known content gap:** `ABreakerCharacter::ApplyWeaponPresentation` has no case
-for the three new archetypes, so they all wear the rifle's placeholder
-proportions. That is a Characters/ change and a placeholder either way.
+~~**Known content gap:** `ApplyWeaponPresentation` has no case for the three new
+archetypes.~~ **CLOSED.** The viewmodel moved into
+`Characters/BreakerViewmodelRig.{h,cpp}`, a per-archetype layout table with a
+part pool, and all eight archetypes have their own silhouette: the Burst Rifle
+carries a tall optic on a riser, the Machinegun a drum and a bipod, the Sidearm
+the smallest silhouette in the game. Still blockout geometry, but the player can
+now tell which gun they are holding.
 
 The composite placeholder model changes proportions per archetype and provides muzzle flash, procedural kick, ADS alignment, ammunition state, and hit/weak-point feedback. Authored meshes, animation, VFX, and audio remain Blueprint presentation work.
 
@@ -185,7 +233,8 @@ One knob per playtest complaint, highest leverage first:
 | Weak points feel stingy | `WeakPointToleranceCm` (component) | 14 | Wider forgiveness halo. 0 = old exact test |
 | Falloff is too high | `MinimumFalloffMultiplier` (per definition) | rifle 0.72 | Raises the floor without moving where the curve starts |
 | Hip fire is the worse option | `AimMoveSpreadMultiplier` (per profile) | 2.2 | Widens aimed movement further, growing hip fire's band |
-| ADS still has no cost | `AimMoveSpeedMultiplier` (per profile) | rifle 0.72 | LOWERING it slows an aimed player further — **inert until Movement/ consumes it**, see the two-sided gap below |
+| ADS still has no cost | `AimMoveSpeedMultiplier` (per profile) | rifle 0.72 | LOWERING it slows an aimed player further. **Live** — the movement component reads it on the grounded cap |
+| The gun feels slow / fast | `Weapon.FireRate` affix, or the archetype's `RoundsPerMinute` | — | Cadence is a real stat now; see the fire rate section |
 | A spread reads as one round | `MaxSpreadStreaks` (renderer) | 4 | More sub-streaks per blast, out of a 12-slot pool |
 
 Feel is not verifiable by automation. The tests prove the maths — accumulation,
@@ -298,12 +347,12 @@ the moving opener while ADS still wins sustained fire. Per archetype the sniper
 must be planted (1.10 / 3.0x), the shotgun barely cares (0.25 / 2.0x), the SMG
 is the one legitimate run-and-gun ADS weapon (0.30 / 1.8x).
 
-### The ADS movement-speed penalty: a TWO-SIDED gap, weapons side now closed
+### The ADS movement-speed penalty: CLOSED END TO END
 
-The third item on the ADS bill is movement SPEED, and it has never been
-charged. This is deliberately recorded as a two-sided gap because that is what
-it is: one half is a weapon-authoring question and the other is a movement
-question, and they are owned by different layers.
+The third item on the ADS bill is movement SPEED. It was recorded here as a
+two-sided gap — one half a weapon-authoring question, the other a movement
+question, owned by different layers. **Both halves are now built and the trade
+is charged in play.**
 
 **Side one — the weapon publishes the penalty. BUILT.**
 
@@ -335,23 +384,28 @@ question, and they are owned by different layers.
 Setting every one of these to 1.0 reproduces today's behaviour exactly, which
 is the A/B that makes this safe to land before the other side exists.
 
-**Side two — something has to READ it. NOT BUILT, and outside this layer.**
-`Source/RiorsEdge/Movement/` still has no aim awareness whatsoever:
-`UBreakerCharacterMovementComponent::GetMaxSpeed()` composes walk/sprint speed
-with the gear multiplier and the temporary-multiplier stack, and nothing in
-that chain has ever heard of the weapon. Exactly one consumer is missing: that
-function must multiply its grounded cap by `GetAimMoveSpeedMultiplier()` from
-the owner's weapon component, or `ABreakerCharacter` must push it as a keyed
-temporary multiplier on aim state changes (`PushSpeedMultiplier` already
-exists). Sliding and the boosted-speed ceiling deliberately have no opinion
-here; whether an aimed slide is slowed is a movement-feel ruling, not a weapon
-one.
+**Side two — something has to READ it. BUILT.**
+`UBreakerCharacterMovementComponent::GetAimSpeedMultiplier()` finds the owner's
+weapon component **per call** (never cached, so a mid-movement weapon swap
+cannot apply the outgoing archetype's penalty) and clamps the published value
+to [0,1] a second time — two independent clamps on the same invariant, because
+an archetype authored above 1.0 by mistake would turn aiming into a speed BUFF
+and invert the whole trade rather than merely mistuning it.
 
-**Until that lands the query returns an honest number that nobody reads**,
-which is a visible gap rather than a silent one.
+It is applied to the **grounded speed cap only**. Sliding and the boosted-speed
+ceiling deliberately have no opinion: whether an aimed slide is slowed is a
+movement-feel ruling, not a weapon one. Note the one asymmetry that follows —
+`TryRedirect`'s minimum-speed floor does **not** include the aim term, so while
+fully sighted with a rooted archetype the grounded cap can sit below the speed a
+redirect requires.
+
 `RiorsEdge.Weapons.AimMoveSpeed` proves the ramp, the clamp, the 1.0-is-a-no-op
-property and the archetype ordering; it cannot prove that anything consumes it,
-and it does not pretend to.
+property and the archetype ordering; `RiorsEdge.Movement.AimSpeedPenalty` proves
+the movement layer consumes it.
+
+**Three code comments still say this is unbuilt** — in
+`BreakerWeaponComponent.h`, `BreakerWeaponComponent.cpp` and
+`BreakerWeaponFeel.h`. They are stale; the consumer and its test both exist.
 
 All values above are O2 PLACEHOLDER and **none of this has been playtested**.
 `RiorsEdge.Weapons.ArchetypeFalloff`, `.WeakPointTolerance` and `.HipFireTrade`
@@ -631,12 +685,23 @@ shotgun blast cannot straddle an equipment change.
 accessor — no change to `Items/` was required. Weapon loadout slot 1 reads the
 `Primary` equipment slot and slot 2 reads `Secondary`.
 
-**That correspondence is positional, and it is the only link the two layers
-have.** `FBreakerItemInstance` carries no weapon archetype, so *which of the
-five guns* a Primary item is remains unanswered: the component's slot
-archetypes and the equipped items are still independent. Item level is the one
-thing both layers already agree on, so item level is what crosses, and the
-archetype question is left as the design question it is.
+**That correspondence used to be the ONLY link the two layers had**, and the
+archetype question — *which of the eight guns is this Primary item?* — was left
+open here as a design question. **It is answered.**
+`FBreakerItemInstance::WeaponArchetype` is drawn on a weapon drop before its
+affixes (from the same deterministic stream, uniformly across archetypes, so a
+seed still reproduces an item exactly), and
+`UBreakerWeaponComponent::SyncArchetypesToEquipment` — bound to
+`OnEquipmentChanged` — arms it. The loadout screen still works; an equipped item
+simply overrides it. Weapon drops also carry per-archetype affix leans, which
+are weights and never filters; the table is in `Docs/Item-Foundation.md`.
+
+**The item level ceiling is 120** (`FBreakerWeaponMath::MaxSupportedItemLevel`),
+and it must equal `UBreakerAffixLibrary::MaxItemLevel` — `RiorsEdge.Items
+.TierLadder` pins that they agree, because a weapon clamping lower than the item
+system rolls would cap base damage while the affixes on the same item kept
+climbing. Note that no enemy currently drops above item level 50; that clamp is
+on `ABreakerEnemy` and is recorded in `Docs/Design/Power-Curve.md`.
 
 ### An unequipped weapon is item level 1
 
@@ -651,8 +716,42 @@ measurement taken in it.
 
 The multiplier layers are untouched: the single additive Increased bucket, the
 More product and crit all still compose in `UBreakerAttributeSet` and the
-damage library exactly as before. Fire rate, magazine and reserve are also
-unchanged. This pass fixed the multiplicand only.
+damage library exactly as before. Fire rate, magazine and reserve were also
+unchanged by it — fire rate became a real stat in a later pass, below.
+
+## Fire rate is a real stat with a live consumer
+
+`Weapon.FireRate` (the affix the SMG leans toward, per the owner's "smg fire
+rate") is not a card number. The chain is:
+
+    EBreakerStatTarget::FireRate
+      -> EBreakerAggregatedAttribute::FireRateMultiplier   (base 1.0, replicated)
+      -> UBreakerWeaponComponent::GetFireRateMultiplier()   (floored at 0.05)
+      -> GetEffectiveRoundsPerMinute(Definition)
+
+**Every fire-timing call site runs through `GetEffectiveRoundsPerMinute`** —
+the automatic timer, the burst chain's in-burst interval, its end-of-burst
+interval, and `CanFire`'s cadence gate. That last part is the whole point: a
+cadence stat that applied to some timing sites and not others is how a weapon
+ends up firing faster while its burst gap stays at the old rate.
+
+Two deliberate exclusions:
+
+- **`BurstCycleSeconds` is not scaled.** The end-of-burst wait is
+  `max(BurstCycleSeconds, FireInterval(effective RPM))`, so fire rate can shrink
+  the in-burst interval and never the cycle gap. The Burst Rifle's identity is a
+  cadence you cannot shorten.
+- **The multiplier is floored at 0.05** because a zero turns the fire interval
+  into an infinity and hangs the weapon.
+
+One thing does read the raw, unmultiplied RPM: the tracer cadence
+(`TracerRoundsPerTracer` in the HUD). That is cosmetic — a fire-rate affix does
+not change how many rounds leave a visible streak.
+
+It rolls on the two weapon slots only, because fire rate is a property of the
+gun. The **CADENCE** legendary bends this: half of Fire Rate also becomes
+Increased Damage, which is the first reason in the game to stack cadence past
+the point the gun already feels fast.
 
 ## Runtime flow
 
@@ -674,3 +773,32 @@ The current server accepts the owning controller's view point. Before competitiv
 ## Target dummy
 
 `ABreakerTargetDummy` includes GAS attributes, combat resolution, a body hitbox, a tagged weak-point sphere, replicated damage state, and delayed cleanup after death. A Blueprint child can add meshes, damage numbers, reset behavior, and presentation without changing combat rules.
+
+## FOR THE OWNER — open in this layer (2026-08-14)
+
+1. **The Rocket Launcher is not on the shared projectile base.**
+   `Combat/BreakerProjectileBase` was built to be the one reusable replicated
+   projectile and `ABreakerRocketProjectile` still derives from `AActor`,
+   duplicating collision, movement, lifetime and multicast plumbing, and
+   missing the carried-status list. The base's own header says the fold was
+   deferred because the explosion and the detonation-flash lifetime would make
+   it a behaviour change disguised as a refactor. Either it folds (and the
+   explosion is re-expressed deliberately) or the base stops claiming to be the
+   one projectile.
+2. **The rocket's blast query is a full-world actor scan.** `Explode` calls
+   `GetAllActorsOfClass(AActor::StaticClass())` and filters by distance, rather
+   than an overlap query, and measures to actor origins rather than to the
+   nearest point of a collider. Correct today at gym scale; it is the shape that
+   does not survive a real level.
+3. **Two archetypes inherit values they probably should author**: the Rocket
+   Launcher's falloff curve and the Shotgun's swap-in duration are both the
+   rifle's, unmarked. Swap tempo is an explicit axis of the table, so the
+   shotgun's is the one worth a decision.
+4. **O13's rocket self-damage design is unimplemented.** The rocket skips its
+   own instigator entirely — no self-damage, no self-knockback. O13 rules
+   "strong self-damage reduction, full self-knockback control, never immunity",
+   and immunity is what ships.
+5. **`ArmorPenetration` is authored 0 on all eight archetypes.** The field is
+   consumed (as a flat subtraction inside the mitigation curve), so it works;
+   nothing uses it. Either it becomes an archetype axis or a stat, or it is
+   noise on the definition.
