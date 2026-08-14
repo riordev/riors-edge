@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "Items/BreakerForgeLibrary.h"
 #include "Items/BreakerItemTypes.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "Weapons/BreakerWeaponComponent.h"
@@ -27,15 +28,25 @@ public:
     // such property, so deserialization leaves it empty, which is exactly the
     // correct value for a save written before any objective could be counted.
     UPROPERTY() TMap<FName, int32> QuestCounters;
+    // The Forge's scalar crafting currencies (Items/BreakerForgeLibrary.h;
+    // O12). Additive since version 2, the same discipline QuestCounters used
+    // going into version 2: a v2 file has no such property, so it
+    // deserializes to the struct's own default-constructed zero wallet, which
+    // is exactly correct for a save written before wallet persistence
+    // existed. Replicated on UBreakerEquipmentComponent but never round-
+    // tripped through this save before version 3 — every Slag/Flux/Sigil
+    // balance a player had earned was gone the moment the process restarted.
+    UPROPERTY() FBreakerForgeWallet ForgeWallet;
     // Version 1 shipped. Version 2 renamed the first-contract flag into the
-    // Quest.FirstContract.* family and added QuestCounters.
+    // Quest.FirstContract.* family and added QuestCounters. Version 3 added
+    // ForgeWallet.
     //
     // Before this pass the field was DECORATION: declared here and in two other
     // structs, read by nothing, with no migration branch anywhere. That is
     // worse than having no version at all, because it implies a guarantee that
     // does not exist — the first additive change would have been misread in
     // silence. MigrateToCurrent is what makes the number mean something.
-    static constexpr int32 CurrentSaveVersion = 2;
+    static constexpr int32 CurrentSaveVersion = 3;
 
     UPROPERTY() int32 SaveVersion = 1;
 

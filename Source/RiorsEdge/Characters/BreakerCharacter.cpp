@@ -254,6 +254,7 @@ void ABreakerCharacter::SaveGameState()
     Save->Progression = Progression->GetProgressionState();
     Save->EquippedItems = Equipment->GetEquipped();
     Save->BackpackItems = Equipment->GetBackpack();
+    Save->ForgeWallet = Equipment->GetForgeWallet();
     Save->SlotOneArchetype = Weapon->GetSlotArchetype(1);
     Save->SlotTwoArchetype = Weapon->GetSlotArchetype(2);
     if (Quests)
@@ -285,6 +286,7 @@ void ABreakerCharacter::LoadGameState()
     if (!MigrationNote.IsEmpty()) UE_LOG(LogTemp, Log, TEXT("BreakerSave: %s"), *MigrationNote);
     Progression->LoadProgressionState(Save->Progression);
     Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
+    Equipment->RestoreForgeWallet(Save->ForgeWallet);
     Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
     Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
     if (Quests) Quests->RestoreFrom(Save->QuestFlags, Save->QuestCounters);

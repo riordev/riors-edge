@@ -133,6 +133,29 @@ FBreakerWaveComposition UBreakerWaveBudgetLibrary::SolveWave(int32 Wave, int32 P
         Bodies += Out.Elites;
     }
 
+    // 3b. Non-elite modifier carriers (O27's kill-bucket producer — see the
+    //    header note and Playtest/BreakerKillBuckets.h). Exactly the elite
+    //    promotion pattern above: a promoted Skitter body, counted in
+    //    Skitters and not added to the body count on its own. Zero on a REST
+    //    wave for the same reason elites are zero there — the beat exists so
+    //    the player stops reading, and a modifier set is more reading.
+    const int32 WantedCarriers = (Out.Kind != EBreakerWaveKind::Rest && Wave >= Params.ModifierCarrierFromWave)
+        ? FMath::Clamp(Wave / FMath::Max(Params.ModifierCarrierWaveDivisor, 1), 0, FMath::Max(Params.MaximumModifierCarriers, 0))
+        : 0;
+    if (WantedCarriers > 0)
+    {
+        // Reuses EliteModifierCost: both an elite promotion and a carrier
+        // promotion are buying the same thing from the budget's point of
+        // view — one modifier's worth of reading — so a carrier's single
+        // modifier costs exactly what an elite's first one does.
+        const int32 CarrierCostEach = Params.SkitterCost + Params.EliteModifierCost;
+        const int32 Affordable = CarrierCostEach > 0 ? Remaining / CarrierCostEach : 0;
+        Out.ModifierCarriers = FMath::Max(FMath::Min3(WantedCarriers, Affordable, MaximumBodies - Bodies), 0);
+        Remaining -= Out.ModifierCarriers * CarrierCostEach;
+        Out.Skitters += Out.ModifierCarriers;
+        Bodies += Out.ModifierCarriers;
+    }
+
     // 4. Fill with Skitters, against BOTH ceilings.
     if (Params.SkitterCost > 0)
     {
@@ -207,9 +230,9 @@ bool UBreakerWaveBudgetLibrary::IsCompositionLegal(const FBreakerWaveComposition
         OutReason = FString::Printf(TEXT("spent %d of a %d budget"), Composition.SpentBudget, Composition.Budget);
         return false;
     }
-    if (Composition.Elites > Composition.Skitters)
+    if (Composition.Elites + Composition.ModifierCarriers > Composition.Skitters)
     {
-        OutReason = TEXT("more elite promotions than bodies to promote");
+        OutReason = TEXT("more elite/modifier-carrier promotions than bodies to promote");
         return false;
     }
     if (Composition.Wave >= Params.VarietyEnforcedFromWave && Composition.Kind == EBreakerWaveKind::Standard
@@ -236,9 +259,9 @@ FString UBreakerWaveBudgetLibrary::DescribeComposition(const FBreakerWaveComposi
         Composition.Kind == EBreakerWaveKind::Boss ? TEXT("BOSS") :
         Composition.Kind == EBreakerWaveKind::Rest ? TEXT("REST") : TEXT("standard");
     return FString::Printf(
-        TEXT("wave %d [%s] budget %d (spent %d, unspent %d) | skitter %d (elite %d x %d mods) | lattice %d | skirmisher %d | warden %d | boss %d | loot %s"),
+        TEXT("wave %d [%s] budget %d (spent %d, unspent %d) | skitter %d (elite %d x %d mods, carrier %d) | lattice %d | skirmisher %d | warden %d | boss %d | loot %s"),
         Composition.Wave, KindName, Composition.Budget, Composition.SpentBudget, Composition.UnspentBudget,
-        Composition.Skitters, Composition.Elites, Composition.ModifiersPerElite,
+        Composition.Skitters, Composition.Elites, Composition.ModifiersPerElite, Composition.ModifierCarriers,
         Composition.Lattices, Composition.Skirmishers, Composition.Wardens, Composition.bBoss ? 1 : 0,
         Composition.bDropsLoot ? TEXT("yes") : TEXT("no"));
 }

@@ -470,6 +470,13 @@ int32 UBreakerEquipmentComponent::DiscardBackpackBelowRarity(EBreakerItemRarity 
 // console exec, and from automation, and not yet from the inventory screen.
 // The mechanic is real; the button is not.
 
+void UBreakerEquipmentComponent::RestoreForgeWallet(const FBreakerForgeWallet& NewWallet)
+{
+    if (!HasAttributeAuthority()) return;
+    ForgeWallet = NewWallet;
+    OnEquipmentChanged.Broadcast();
+}
+
 void UBreakerEquipmentComponent::GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount)
 {
     if (!HasAttributeAuthority()) return;

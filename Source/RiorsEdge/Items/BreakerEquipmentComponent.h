@@ -139,6 +139,12 @@ public:
     // arithmetic lives in UBreakerForgeLibrary as pure functions; this is the
     // authority-checked, wallet-owning wrapper.
     UFUNCTION(BlueprintPure, Category="Equipment|Forge") const FBreakerForgeWallet& GetForgeWallet() const { return ForgeWallet; }
+    // Save/load path only: replaces the wallet wholesale, exactly like
+    // RestoreState does for Equipped/Backpack. No RecalculateStats — currency
+    // does not feed the attribute aggregation, only the Forge's own
+    // affordability checks — so this is a plain assignment plus the usual
+    // change broadcast.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void RestoreForgeWallet(const FBreakerForgeWallet& NewWallet);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount);
     // Destroys a backpack item and pays its salvage value into the wallet. This
     // is the ONLY currency source, which is what gives the discard pile a

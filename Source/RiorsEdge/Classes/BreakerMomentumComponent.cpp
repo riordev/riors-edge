@@ -48,6 +48,13 @@ void UBreakerMomentumComponent::BeginPlay()
     CachedState = StateForFraction(GetMomentumFraction());
 }
 
+void UBreakerMomentumComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
+{
+    Attributes = InAttributes;
+    HandleProgressionChanged();
+    CachedState = StateForFraction(GetMomentumFraction());
+}
+
 EBreakerMomentumState UBreakerMomentumComponent::StateForFraction(float Fraction)
 {
     if (Fraction >= 2.0f / 3.0f) return EBreakerMomentumState::Redline;
@@ -277,7 +284,11 @@ void UBreakerMomentumComponent::TryPhantomStep()
 void UBreakerMomentumComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    AdvanceLoop(DeltaTime);
+}
 
+void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
+{
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
     if (!IsActiveForOwner())

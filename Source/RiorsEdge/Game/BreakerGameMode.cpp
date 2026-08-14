@@ -1023,6 +1023,34 @@ void ABreakerGameMode::SpawnCombatEncounter()
         }
     }
 
+    // NON-ELITE MODIFIER CARRIERS (O27's kill-bucket producer). Until this,
+    // modifiers only ever landed on the elite below, and GrantModifiers
+    // restores the authored rank afterwards — correct for an elite, since
+    // ModifierBearing (x2.5) would otherwise DEMOTE it from Elite (x3.0) — so
+    // rank ModifierBearing never existed at kill time. Playtest/
+    // BreakerKillBuckets.h calls that bucket "the one number that says
+    // whether [O27] worked"; it was structurally empty. These plain trash
+    // bodies KEEP the promotion instead (O9 keeps Rank and Modifiers
+    // separate, so this does not contradict the elite's own tell).
+    const float CarrierLateralOffsets[] = { -250.0f, 250.0f };
+    for (int32 Index = 0; Index < GymModifierCarrierCount; ++Index)
+    {
+        const FVector SpawnLocation = Frame.At(
+            EncounterPocketDistance - CombatPocketRadius * 0.2f,
+            CarrierLateralOffsets[Index % 2], 120.0f);
+        FActorSpawnParameters CarrierParams;
+        CarrierParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        if (ABreakerEnemy* Carrier = World->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, CarrierParams))
+        {
+            Carrier->ConfigureEncounter(SpawnLocation, 2.1f + Index * 0.6f);
+            Carrier->SetAreaLevel(GymAreaLevel);
+            // Offset well clear of the elite's own ModifierSeedBase draw so
+            // the two rolls never share a stream position.
+            GrantModifierCarrier(Carrier, ModifierSeedBase + 500 + Index * 97);
+            UBreakerKillTelemetryComponent::AttachTo(Carrier);
+        }
+    }
+
     // One elite anchors the back of the pack: tougher, harder-hitting, and
     // guaranteed Exceptional-or-better drops. It is also the first enemy in the
     // gym to CARRY MODIFIERS — O27 puts difficulty in modifiers rather than
@@ -1136,6 +1164,18 @@ void ABreakerGameMode::GrantModifiers(ABreakerEnemy* Enemy, int32 Seed) const
             Modifiers->SetModifiers(Granted);
         }
     }
+}
+
+void ABreakerGameMode::GrantModifierCarrier(ABreakerEnemy* Enemy, int32 Seed) const
+{
+    if (!bGrantModifiers || !Enemy) return;
+
+    // No capture-and-restore: ConfigureWithModifiers's unconditional
+    // promotion to rank ModifierBearing is exactly what a carrier is for —
+    // see Playtest/BreakerKillBuckets.h. If the roll grants zero (a legal
+    // outcome of RollAndApplyModifiers for a pathological family/params
+    // combination), the body simply stays rank Trash; nothing else to do.
+    Enemy->ConfigureWithModifiers(Seed);
 }
 
 void ABreakerGameMode::SpawnWorldDressing()
@@ -1793,6 +1833,15 @@ void ABreakerGameMode::StartNextWave()
             // compares. The solver decided HOW MANY modifiers it could afford;
             // the roll decides which, subject to §1.3's composition rules.
             GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
+        }
+        else if (Index < Composition.Elites + Composition.ModifierCarriers)
+        {
+            // Non-elite modifier carriers (O27's kill-bucket producer): KEEP
+            // rank ModifierBearing rather than restoring an authored rank, the
+            // same distinction GrantModifierCarrier draws against GrantModifiers
+            // above. Seeded the same way, offset past the elite slots so the
+            // two draws never collide.
+            GrantModifierCarrier(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
         }
         SetEnemyDropsLoot(Enemy, Composition.bDropsLoot);
         UBreakerKillTelemetryComponent::AttachTo(Enemy);

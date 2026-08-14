@@ -197,4 +197,107 @@ bool FBreakerWaveBudgetCollisionTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// MODIFIER CARRIERS — O27's kill-bucket producer (Playtest/BreakerKillBuckets.h).
+// Non-elite bodies promoted to rank ModifierBearing and KEPT there, exactly
+// like the elite promotion is folded into Skitters rather than counted as an
+// extra body — the Lattice precedent: taken OUT OF the melee budget, so
+// density is unchanged.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWaveModifierCarrierTest,
+    "RiorsEdge.Game.Waves.ModifierCarriers",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWaveModifierCarrierTest::RunTest(const FString& Parameters)
+{
+    using ELib = UBreakerWaveBudgetLibrary;
+    const FBreakerWaveBudgetParams Params;
+
+    // From wave 4 — nothing before it.
+    TestEqual(TEXT("No modifier carrier before wave 4"), ELib::SolveWave(3, 1, Params).ModifierCarriers, 0);
+
+    // A carrier is a PROMOTION: it must never add to the body count on its
+    // own, exactly like an elite. Swept across the whole repeating cycle.
+    for (int32 Wave = 1; Wave <= 40; ++Wave)
+    {
+        const FBreakerWaveComposition Composition = ELib::SolveWave(Wave, 1, Params);
+        TestTrue(FString::Printf(TEXT("Wave %d: carriers are folded into Skitters, not added on top"), Wave),
+            Composition.Elites + Composition.ModifierCarriers <= Composition.Skitters);
+        TestTrue(FString::Printf(TEXT("Wave %d: carriers never exceed the cap of 2"), Wave),
+            Composition.ModifierCarriers <= 2);
+        // Density is unchanged: the cap this checks is the SAME 5.3 ceiling
+        // every other wave already has to respect.
+        TestTrue(FString::Printf(TEXT("Wave %d stays legal with carriers included"), Wave),
+            Composition.TotalEnemies() <= ELib::GetMaximumLiveEnemies(1, Params));
+    }
+
+    // Rest waves take no carriers, for the same reason they take no elites —
+    // the beat exists so the player stops reading.
+    TestEqual(TEXT("A rest wave carries no modifier carrier"), ELib::SolveWave(6, 1, Params).ModifierCarriers, 0);
+
+    // At the wave everything else is already competing hard for budget
+    // (Warden + Skirmisher + Lattice + the first elite), the carrier may
+    // legitimately be budget-starved to zero — which is the SAME §4.2/§5.3
+    // collision this file already documents for the Skitter fill, not a bug
+    // in this feature. It must recover once the budget curve outpaces the
+    // fixed body cap.
+    TestTrue(TEXT("Modifier carriers become affordable once the curve catches up"),
+        ELib::SolveWave(8, 1, Params).ModifierCarriers > 0);
+
+    return true;
+}
+
+// O40c: REACHABILITY IS PART OF DEFINITION-OF-DONE, in the
+// RiorsEdge.Movement.JumpGrantMatrix mold — read the SHIPPED default
+// FBreakerWaveBudgetParams and confirm a representative wave's SOLVED
+// composition actually contains every archetype the wave's own introduction
+// thresholds claim to have unlocked by then, rather than asserting a fact
+// about the design doc. §4.2/§5.3 already document that the budget curve and
+// the density caps contradict from about wave 8 onward and the solver
+// REPORTS the shortfall rather than choosing silently — this is the test
+// that would have caught an eligible archetype silently landing at zero.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWaveArchetypeReachabilityTest,
+    "RiorsEdge.Game.Waves.ArchetypeReachability",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWaveArchetypeReachabilityTest::RunTest(const FString& Parameters)
+{
+    using ELib = UBreakerWaveBudgetLibrary;
+    const FBreakerWaveBudgetParams Params;   // the shipped defaults, not hand-picked numbers
+
+    // Wave 8: past every archetype's introduction threshold (Lattice from 2,
+    // Warden from 3, Skirmisher from 4, the first elite at wave 4, and the
+    // modifier carrier from wave 4) and comfortably inside the variety rule's
+    // enforcement window (from wave 4).
+    const int32 RepresentativeWave = 8;
+    TestTrue(TEXT("The representative wave has introduced Lattices"), RepresentativeWave >= Params.LatticeFromWave);
+    TestTrue(TEXT("The representative wave has introduced Wardens"), RepresentativeWave >= Params.WardenFromWave);
+    TestTrue(TEXT("The representative wave has introduced Skirmishers"), RepresentativeWave >= Params.SkirmisherFromWave);
+    TestTrue(TEXT("The representative wave has introduced modifier carriers"), RepresentativeWave >= Params.ModifierCarrierFromWave);
+    TestTrue(TEXT("The representative wave has introduced elites"), RepresentativeWave >= Params.WavesPerElite);
+
+    const FBreakerWaveComposition Composition = ELib::SolveWave(RepresentativeWave, /*PartySize=*/1, Params);
+
+    FString Reason;
+    if (!ELib::IsCompositionLegal(Composition, 1, Params, Reason))
+    {
+        AddError(FString::Printf(TEXT("Wave %d is illegal: %s (%s)"),
+            RepresentativeWave, *Reason, *ELib::DescribeComposition(Composition)));
+    }
+
+    TestTrue(TEXT("Skitters (melee trash) claimed at this wave are present"), Composition.Skitters > 0);
+    TestTrue(TEXT("Lattices (ranged trash) claimed at this wave are present"), Composition.Lattices > 0);
+    TestTrue(TEXT("Skirmishers (ranged trash) claimed at this wave are present"), Composition.Skirmishers > 0);
+    TestTrue(TEXT("Wardens claimed at this wave are present"), Composition.Wardens > 0);
+    TestTrue(TEXT("Elite promotions claimed at this wave are present"), Composition.Elites > 0);
+    TestTrue(TEXT("Modifier-carrier promotions claimed at this wave are present — O27's kill-bucket producer"),
+        Composition.ModifierCarriers > 0);
+    // Carriers and elites are promoted Skitters, exactly like the Lattice
+    // precedent: they must not inflate the body count.
+    TestTrue(TEXT("Elites and carriers are folded into the Skitter count, not added on top"),
+        Composition.Elites + Composition.ModifierCarriers <= Composition.Skitters);
+
+    return true;
+}
+
 #endif

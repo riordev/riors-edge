@@ -149,8 +149,8 @@ public:
     // them would silently rewrite a dozen branch nodes. The re-weighting the
     // ruling asks for is done at the CAP below instead: one number, and every
     // relative rate the acceptance criteria measure is preserved.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeaponHitGain = 1.5f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeakPointGain = 4.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeaponHitGain = 1.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeakPointGain = 4.0f;   // O2 PLACEHOLDER
     // O2 PLACEHOLDER 6.0/s, was 20.0/s. This is the re-weight: it is the
     // ceiling on how much CONDITIONAL income can arrive per second, and at par
     // with PassiveRegenPerSecond it says exactly what the ruling asks — a
@@ -189,10 +189,18 @@ private:
     // new floor.
     void SyncClassResourceFloor();
     // Re-reads the owner's permanent class and re-syncs everything that depends
-    // on it. Bound to OnProgressionChanged AND polled from the tick, because
-    // UBreakerProgressionComponent::DevForceClass changes the class without
-    // broadcasting — a dev class swap out of Caster must not leave the floor
-    // open on a Swift.
+    // on it. Bound to OnProgressionChanged AND polled from the tick as a
+    // DEFENSIVE BACKSTOP — NOT because DevForceClass fails to broadcast: it
+    // has called OnProgressionChanged.Broadcast() since
+    // BreakerProgressionComponent.cpp introduced it (this comment used to say
+    // otherwise; that was stale). The poll earns its keep for two real
+    // reasons instead: (1) a component wired up through BindAttributes alone
+    // (no BeginPlay — the automation suite's pattern, and any future non-
+    // world caller) never registers for the delegate in the first place, so
+    // the poll is the ONLY mechanism that reaches it; and (2) nothing in the
+    // type system guarantees every future mutator of PermanentClass
+    // broadcasts, so the poll is what keeps a class change out-of-band from
+    // silently stranding the Overcast floor open on a Swift.
     void RefreshClassOwnership();
     // Pushes or pops the Overcast incoming-damage penalty on the owner's combat
     // component. Called from exactly one place (RefreshOvercastState) so the
