@@ -116,11 +116,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="0")) float TwoJumpGap = 1400.0f;   // O2 PLACEHOLDER
     // Swift's third jump (O25) adds a third 0.485 s rise and a 0.669 s fall
     // from 532 cm: 2.124 s -> 2336 cm. A Swift-only gap must clear the 1670
-    // comfortable double and stay inside 2336. NOTE: with
-    // SwiftThirdJumpUnlockLevel at its O2 placeholder of 20 and nothing raising
-    // CharacterLevel, this gap is UNCROSSABLE in the gym today — that is
-    // deliberate, it is the one piece of geometry that will visibly change the
-    // day the third jump becomes reachable.
+    // comfortable double and stay inside 2336. This gap USED TO BE UNCROSSABLE
+    // in the gym: SwiftThirdJumpUnlockLevel was 20 and nothing writes
+    // CharacterLevel, so no Swift character could ever reach a third jump
+    // (owner: "i never could do a 3rd jump"). The gate now defaults to
+    // reachable, so this is the piece of geometry that tells a Swift player
+    // apart from everyone else — and the piece that will silently become
+    // impassable again if that gate is ever raised past a level the game can
+    // produce.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="0")) float SwiftThreeJumpGap = 2100.0f;   // O2 PLACEHOLDER
     // Tallest step the mantle accepts (Movement-Design: 35-150 cm). A stair of
     // steps at this height is climbable without jumping at all, which is the
@@ -187,6 +190,21 @@ public:
     // Probe ring radius: outside the template's 350 cm plinth, inside its
     // 1800 cm wall face.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="100")) float GroundProbeRadius = 1500.0f;
+
+    // COPLANARITY. Owner: "a lot of the textures on the ground were tearing."
+    // The apron's top face is at the probed ground plane exactly, and anything
+    // else authored with a top face at that same height is COPLANAR with it —
+    // the depth test then has no winner and the pair stipples and flickers.
+    // This is the separation every slab laid ON the apron must use. It is
+    // centimetres on purpose: far under MantleStepHeight and far under the
+    // engine's step-up, so nothing trips on it and no gap reads as a ledge.
+    // Zero re-creates the bug; that is deliberate, so an A/B is one field edit.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="0")) float GroundOverlayLift = 6.0f;   // O2 PLACEHOLDER (was 0 — coplanar)
+    // Tint-patch placements ATTEMPTED. Overlapping placements are rejected —
+    // two plates authored at the same height that overlap are coplanar, which
+    // was the second and larger half of the same tearing report — so the field
+    // settles at rather fewer patches than this. Attempts, not patches.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="0")) int32 FieldPatchAttempts = 420;   // O2 PLACEHOLDER (was a flat 200 placements, unrejected)
 
     // --- THE FIELD MARSHAL (Encounter-Design §3) ---------------------------
     // Spawns the boss at the elite arena and teleports nothing: the player

@@ -271,6 +271,38 @@ breach and the arena carries shoulder ruins at G1 × 0.45 intervals.
 | Camp had a redundant back wall 200 cm inside the template parapet | two walls, 40 m room | removed |
 | Watchtowers were inside the courtyard | ±2100 lateral vs 1800 wall | on the range shoulders |
 
+### 6.5 The ground was coplanar with itself (owner: "a lot of the textures on the ground were tearing")
+
+Photographed before and after, from a new grazing-angle capture vantage added
+for the purpose — this defect is invisible from a plan view and invisible from
+head height facing a wall, which is why every existing vantage missed it.
+
+The apron's top face sits at exactly the probed ground plane. Three separate
+things were then authored at, or effectively at, that same height:
+
+| Source | What it was | Why it tears |
+|---|---|---|
+| Tint patches vs **each other** | 200 plates placed by rejection-free random sampling, all at one fixed height | ~18% area coverage means dozens of overlapping pairs, and two overlapping plates whose top faces share a z are coplanar. The depth test has no winner. |
+| Tint patch **lips** | each plate was a 4 cm-thick cube that also cast a shadow | At 150–200 m both the cast shadow and the lip's own shaded side face are sub-pixel and alias into a **stippled dashed line tracing every patch outline** — the dark dotted seams in the before-shot. This was the visible majority of the report. |
+| Jump-gap **trench floor** | `SpawnFieldSlab(..., TopZ = 0.0f, ...)`, lying on the apron | Its top face was at exactly the apron's top face, over the whole trench. |
+
+Fixes, all in `SpawnExpandedField` / `SpawnJumpGapRun`:
+
+- Patch placements are **rejected when their rotated footprints overlap**, so
+  no two patches ever share a surface. 196 placed from 420 attempts, so the
+  density is unchanged and the double-tinted blotches are gone as a bonus.
+- Patches are **planes, not cubes**, cast **no shadow**, and are lifted clear of
+  the apron. A plane has no lip to shade and none to alias.
+- The trench floor sits on the new `GroundOverlayLift` (6 cm, `EditAnywhere`,
+  O2 placeholder). Set it to 0 to reproduce the bug for an A/B.
+
+`GroundOverlayLift` is the rule going forward: **anything laid ON the apron is
+separated from it.** Six centimetres is far under `MantleStepHeight` and far
+under the engine's step-up, so nothing trips on it and no seam reads as a
+ledge. The template `Floor` is *not* affected — the apron is authored as the
+rectangle around it and abuts without overlapping, which the runtime log
+confirms (frame origin (0,0), forward (1,0), `Floor` −2000…2000).
+
 ---
 
 ## 7. Movement recommendations — NOT applied (O26)

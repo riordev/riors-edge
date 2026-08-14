@@ -41,6 +41,11 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // one value moved this pass, so the next report attributes cleanly.
     // If it is STILL heavy, drop FallGravityMultiplier next, then set
     // LandingMinimumSpeedScale to 1.0 to remove the landing cost outright.
+    // THAT NEXT STEP HAS NOW BEEN TAKEN: a fourth report ("gravity needs to be
+    // tuned down just a little bit") moved FallGravityMultiplier 1.80 -> 1.55
+    // and left this value alone. Do not chase it with GravityScale as well —
+    // 1.38 is already a hair above the 1.35 the project started at, and moving
+    // two dials for one report makes the fifth report unattributable.
     GravityScale = 1.38f; // WAS 1.45f, 1.60f AT THE WEIGHT PASS, 1.35f ORIGINALLY
     // Explicit rather than inherited: JumpHoldWindow makes the engine's jump
     // force window non-zero, and gravity must keep applying inside it. False
@@ -260,7 +265,35 @@ void UBreakerCharacterMovementComponent::RefreshJumpGrant()
     }
     ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     ObservedLevel = Progression ? Progression->GetProgressionState().CharacterLevel : 0;
+    const int32 PreviousGrant = GrantedJumpCount;
     GrantedJumpCount = ResolveJumpCount(ObservedClass, ObservedLevel, BaseJumpCount, bSwiftThirdJumpEnabled, SwiftThirdJumpUnlockLevel);
+    // Say the budget out loud whenever it changes. The third jump was
+    // unreachable for its whole life and left NO trace anywhere — no warning,
+    // no log line, no failing test — so the only instrument was a player
+    // noticing they could not do it. A class swap now prints what it granted.
+    if (GrantedJumpCount != PreviousGrant)
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMovement] jump budget %d -> %d (class %d, level %d, O25 base %d, Swift unlock %d)"),
+            PreviousGrant, GrantedJumpCount, static_cast<int32>(ObservedClass), ObservedLevel,
+            BaseJumpCount, SwiftThirdJumpUnlockLevel);
+    }
+
+    // The failure this exists for: the third jump shipped gated at level 20
+    // while nothing in the project writes CharacterLevel, so a Swift player
+    // could never reach it and the only report was "i never could do a 3rd
+    // jump". A gate above the level the game can actually reach is a DISABLED
+    // feature, and it must say so out loud rather than be discovered by
+    // playing. One shot per component; harmless in the reachable case.
+    if (!bWarnedUnreachableThirdJump && bSwiftThirdJumpEnabled &&
+        ObservedClass == EBreakerClassId::Swift && ObservedLevel < SwiftThirdJumpUnlockLevel)
+    {
+        bWarnedUnreachableThirdJump = true;
+        UE_LOG(LogTemp, Warning,
+            TEXT("[BreakerMovement] Swift's third jump (O25) is gated at character level %d and this character is level %d. ")
+            TEXT("Nothing raises CharacterLevel yet — there is no XP loop — so this grant is UNREACHABLE, not merely locked. ")
+            TEXT("Set SwiftThirdJumpUnlockLevel to 1 until an XP loop exists."),
+            SwiftThirdJumpUnlockLevel, ObservedLevel);
+    }
 
     if (!CharacterOwner)
     {

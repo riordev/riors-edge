@@ -30,7 +30,7 @@ the whole pass can be A/B'd and reverted in the editor without a rebuild.
 | Value | Old | New | Why |
 |---|---:|---:|---|
 | `GravityScale` | 1.35 | **1.60** | Single strongest lever. Shortens the rise and lowers the apex at the same time. |
-| `FallGravityMultiplier` | — (1.0) | **1.80** | A symmetric arc is the classic floaty read; a real-feeling jump falls faster than it rises. |
+| `FallGravityMultiplier` | — (1.0) | **1.55** | A symmetric arc is the classic floaty read; a real-feeling jump falls faster than it rises. Was 1.80; eased once — see "Gravity, fourth report" below. |
 | `ApexGravityMultiplier` | — (1.0) | **1.50** | Time spent near zero vertical velocity is felt directly as hang. Blended into 1.0 upward and into the fall multiplier downward, so the curve is continuous. |
 | `ApexBandSpeed` | — | **220 cm/s** | Half-width of the apex band. |
 | `MaxFallSpeed` | — (volume 4000) | **2400 cm/s** | Terminal velocity, so the heavier fall does not turn a long drop into a bullet. |
@@ -76,13 +76,54 @@ To revert to exactly the old feel: `GravityScale` 1.35, `FallGravityMultiplier`
 1800, `GroundFriction` 7.5.
 
 Tuning order if it is still wrong: **still floaty** → raise
-`FallGravityMultiplier` (1.80 → 2.10) first, then `GravityScale`, then lower
-`JumpZVelocity`. **Too heavy** → lower `GravityScale` (1.60 → 1.45) first, then
-`FallGravityMultiplier`, then raise `LandingMinimumSpeedScale` toward 1.0.
+`FallGravityMultiplier` first, then `GravityScale`, then lower `JumpZVelocity`.
+**Too heavy** → lower `GravityScale` first, then `FallGravityMultiplier`, then
+raise `LandingMinimumSpeedScale` toward 1.0. Both of the first two steps of the
+"too heavy" branch have now been taken, in that order, one per report:
+`GravityScale` 1.60 → 1.45 → 1.38, then `FallGravityMultiplier` 1.80 → 1.55.
+**Exactly one value moves per report**, which is what makes the next report
+attributable.
 
 None of this has been playtested. It is verified by automation and by the
 arithmetic above only; floatiness is a feeling and the numbers cannot confirm
 it landed.
+
+## Gravity, fourth report (owner: "gravity needs to be tuned down just a little bit... needs to make the character slightly more floaty")
+
+Four reports now, and they are not contradictory — they are about **different
+halves of the arc**. 1.35 read floaty. 1.60 and 1.45 both read too heavy, and
+the heaviness is the RISE, which is paid on every single jump. `GravityScale`
+was therefore walked back to 1.38, a hair above the 1.35 the project started
+at, and left there. The DESCENT was never eased: it still ran at 1.80x on top
+of that rise.
+
+So this report moves the descent. **`FallGravityMultiplier` 1.80 → 1.55, and
+nothing else** — the tuning order below named this dial for exactly this
+report, and O26 makes this an owner request executed, not a movement pass
+opened. Moving `GravityScale` as well would put the rise under its original
+value and make the fifth report unattributable.
+
+| | Before (1.80) | After (1.55) |
+|---|---:|---:|
+| Rise time | 0.518 s | **0.518 s** (untouched) |
+| Apex height | 181 cm | **181 cm** (untouched) |
+| Fall time | 0.386 s | **0.416 s** |
+| Total airtime | 0.903 s | **0.933 s** |
+| Landing speed | 939 cm/s | **871 cm/s** |
+
+Apex is untouched **by construction**: nothing on the rise moved, so no ledge,
+gap or wall-ride approach in the field changes reach. The whole delta is +7.8%
+descent time, +3.3% airtime, and a landing that arrives 68 cm/s softer — still
+under `LandingHeavyFallSpeed` (950), so routine jumping is still untaxed, now
+with more margin. `ApexGravityMultiplier` stays 1.50, which keeps the invariant
+that the apex is never heavier than a settled fall.
+
+Arithmetic uses the same flat model as the weight-pass table (`g = 980 ×
+GravityScale`, apex band ignored), so the two are comparable.
+
+**If it is still too heavy, the next dial is `LandingMinimumSpeedScale` → 1.0**,
+which deletes the landing speed cost outright. After that, `GravityScale`.
+Nobody has playtested this; the numbers cannot say whether it feels right.
 
 ## Wall ride was dead (owner: "wall riding doesnt work but jumping does and its awkward")
 
@@ -295,7 +336,7 @@ open — and it is flagged `O2 PLACEHOLDER` at the code.
 |---|---:|---|
 | `BaseJumpCount` | **2** | O25 base kit, every class, every level. Written onto `ACharacter::JumpMaxCount` at runtime, so a Blueprint override is deliberately overwritten: O25 is a rule, not a per-Blueprint preference. |
 | `bSwiftThirdJumpEnabled` | **true** | Master switch. False restores exactly the pre-O25 behaviour. |
-| `SwiftThirdJumpUnlockLevel` | **20** | **O2 PLACEHOLDER, awaiting a ruling.** Free — no resource cost, no cooldown, no point spend. 20 was chosen only so the grant reads as a *later* unlock rather than part of the starting kit; it carries no design authority. |
+| `SwiftThirdJumpUnlockLevel` | **1** | **O2 PLACEHOLDER, still awaiting a ruling.** Free — no resource cost, no cooldown, no point spend. Was **20**, which made the feature unreachable; see "The third jump was unreachable" below. |
 | `SwiftThirdJumpRedirectAlpha` | **0.55** | **O2 PLACEHOLDER.** How far the third jump turns horizontal velocity onto input. 0 makes it identical to the second jump. |
 
 **Rules, all tested by `RiorsEdge.Movement.JumpGrant`:**
@@ -323,11 +364,50 @@ verb already (Skim is the same idea) and Master 5.4 forbids self-acceleration,
 so a speed-preserving turn is the restrained version. O26 says movement gets no
 further dedicated passes, so this executes O25 and adds nothing else.
 
-**Known gap for a playtest:** nothing raises `CharacterLevel` yet — there is no
-XP loop — so at the shipped threshold of 20 the third jump is **unreachable in
-the gym**. Set `SwiftThirdJumpUnlockLevel` to 1 on `BP_BreakerCharacter`'s
-movement component to feel it. Never playtested; automation proves the matrix
-and the speed-preservation guardrail, not the feel.
+### The third jump was unreachable (owner: "i never could do a 3rd jump")
+
+**The grant was never broken.** Every link in the chain was checked, not
+assumed, and every one of them was correct: the permanent class is read from
+`UBreakerProgressionComponent`, `OnProgressionChanged` is bound (late-bound
+from `RefreshJumpGrant`, because component BeginPlay order is not guaranteed),
+the tick poll re-runs it as a backstop, `DevForceClass` does broadcast, and a
+swap away from Swift clamps `JumpCurrentCount` so a jump banked against three
+cannot survive onto a budget of two.
+
+What was wrong is one level up. The gate read
+`FBreakerProgressionState::CharacterLevel`, and **nothing in the project writes
+that field.** It is declared with a default of 1, there is no XP loop, no
+level-up path, and a repository-wide search for an assignment to it returns the
+declaration and nothing else. Against a threshold of 20 the condition
+`CharacterLevel >= UnlockLevel` was therefore false for every character that
+has ever existed. The feature was not late — it was **disabled, behind a
+plausible-looking excuse**, and the excuse is what let it pass review, pass a
+green suite, and reach a playtest.
+
+The repair is not a smaller number picked to clear today's level. It is the
+rule: **a gate must key off something that actually moves, and until an XP loop
+exists nothing does — so the gate defaults to reachable.** Raise it again on
+the day `CharacterLevel` starts moving.
+
+Three things now make that failure unable to recur silently:
+
+- `SwiftThirdJumpUnlockLevel` defaults to **1**.
+- `RefreshJumpGrant` logs a **warning, once**, if a Swift character's gate sits
+  above the level it observes, naming the missing XP loop.
+- **`RiorsEdge.Movement.JumpGrantMatrix`** asserts the *shipped configuration*
+  against a **default-constructed `FBreakerProgressionState`** — the state
+  every character in the gym, in a playtest and in a fresh save actually runs
+  in — rather than against a hypothetical level. Swift gets three, every other
+  class gets exactly two, a `DevForceClass` swap moves the budget in both
+  directions, and the banked-jump clamp never hands out a jump. The existing
+  `RiorsEdge.Movement.JumpGrant` proves the *rule* and passed the entire time
+  the feature was dead; that is precisely the gap this closes.
+
+The jump budget is also logged whenever it changes, so an owner can confirm the
+third jump from the log instead of by failing to perform it.
+
+Never playtested; automation proves the matrix and the speed-preservation
+guardrail, not the feel.
 
 ## Base kit
 

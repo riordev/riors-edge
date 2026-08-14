@@ -307,6 +307,15 @@ void ABreakerGameMode::BuildCaptureTour()
         //    point at open ground or into the pocket's ruin arc is a question
         //    only a picture answers.
         { Frame.At(ArenaDistance - CombatPocketRadius * 1.6f, -CombatPocketRadius * 1.3f, 2200.0f), FRotator(-24.0f, Frame.Forward.Rotation().Yaw + 34.0f, 0.0f) },
+        // 8. THE GROUND ITSELF, at a grazing angle (owner: "a lot of the
+        //    textures on the ground were tearing"). Z-fighting is invisible in a
+        //    plan view and invisible from head height facing a wall; it needs a
+        //    shallow angle across a large flat, and it gets worse with distance
+        //    as depth precision falls off. This vantage stands over the jump-gap
+        //    trench — whose floor was authored at the SAME top height as the
+        //    apron under it — and looks out along 150 m of tint-patched apron,
+        //    so both coplanar populations are in one frame.
+        { Frame.At(EncounterPocketDistance + CombatPocketRadius + 2400.0f, 0.0f, 700.0f), FRotator(-11.0f, Frame.Forward.Rotation().Yaw, 0.0f) },
     };
 
     for (const FVantage& Vantage : Vantages)
@@ -517,6 +526,13 @@ namespace
     const TCHAR* ShapeSphere   = TEXT("/Engine/BasicShapes/Sphere.Sphere");
     const TCHAR* ShapeCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
     const TCHAR* ShapeCone     = TEXT("/Engine/BasicShapes/Cone.Cone");
+    // A single upward quad with NO side walls. Ground tinting has to be laid
+    // above the apron to avoid coplanarity, and a lifted CUBE pays for that
+    // with a vertical lip whose shaded face is sub-pixel at field distances and
+    // aliases into a dashed dark line tracing every patch outline — which is
+    // most of what the ground-tearing report was looking at. A plane has no lip
+    // to alias.
+    const TCHAR* ShapePlane    = TEXT("/Engine/BasicShapes/Plane.Plane");
 
     // The stock basic-shape material exposes a single "Color" vector param, so
     // one dynamic instance per primitive is all the palette needs — no assets.
@@ -807,8 +823,14 @@ void ABreakerGameMode::SpawnJumpGapRun()
     // well under the LandingHeavyFallSpeed threshold, so a failed jump costs
     // the climb back out and nothing else. Falling out of the world is not a
     // teaching tool.
+    // Top at GroundOverlayLift, NOT at 0. It was 0, which is exactly the apron's
+    // top height, and this slab sits ON the apron — two coplanar surfaces over
+    // the whole trench, i.e. guaranteed z-fighting (owner: "a lot of the
+    // textures on the ground were tearing"). The lift is centimetres: the drop
+    // off the take-off platform goes 220 -> 214 cm, which changes no jump and
+    // no landing band.
     SpawnFieldSlab(World, Frame, TrenchFwd, TrenchFwd + SwiftThreeJumpGap,
-        -PlatformWidth * 2.6f, PlatformWidth * 2.6f, 0.0f, 30.0f, PaletteStone, TEXT("Runtime_JumpGap"));
+        -PlatformWidth * 2.6f, PlatformWidth * 2.6f, GroundOverlayLift, 30.0f, PaletteStone, TEXT("Runtime_JumpGap"));
     // Ramp out of the trench so a miss is recoverable without a jump.
     SpawnFieldRamp(World, Frame, TrenchFwd + SwiftThreeJumpGap, 0.0f, TrenchFwd + SwiftThreeJumpGap + 900.0f, 220.0f,
         PlatformWidth * 2.0f, 700.0f, 40.0f, PaletteEarth, TEXT("Runtime_JumpGap"));
@@ -1467,19 +1489,75 @@ void ABreakerGameMode::SpawnExpandedField()
     // pocket is a landmark, not a texture, and it lies about the scale of the
     // thing next to it. Scrub-sized plates give the eye optical flow to judge
     // speed against without ever being mistaken for geometry.
-    for (int32 Patch = 0; Patch < 200; ++Patch)
+    //
+    // TWO THINGS HERE ARE BUG FIXES, not dressing (owner: "a lot of the
+    // textures on the ground were tearing"). Both were the same mistake in two
+    // forms — a flat plate laid on a flat plane with nothing separating them:
+    //
+    //  1. The patches were placed by pure rejection-free random sampling, so
+    //     they OVERLAPPED each other, and every patch is authored at the same
+    //     height. Two overlapping plates whose top faces are at exactly the
+    //     same z are coplanar, and coplanar is z-fighting by construction: the
+    //     depth test has no winner and the pair stipples. At ~18% area coverage
+    //     over 200 plates that is dozens of overlapping pairs scattered across
+    //     the whole field, which is exactly what "a lot of" describes. The
+    //     footprints are now tracked and an overlapping placement is REJECTED,
+    //     so no two patches ever share a surface. Rejection also removes the
+    //     double-tinted blotches, which is a second, smaller win.
+    //  2. The patches were 4 cm-thick CUBES that CAST SHADOWS. At 150-200 m
+    //     both the shadow of that lip and the lip's own shaded side face are
+    //     sub-pixel, and both alias into a stippled dashed line tracing the
+    //     patch outline — the dark dotted seams along every patch edge in the
+    //     before-capture. Killing the shadow removed most of it and left the
+    //     side face still drawing a fainter one, which is measured, not
+    //     assumed: it is visible in the intermediate capture. So the patches are
+    //     now PLANES — one upward quad, no lip to shade and none to alias —
+    //     lifted clear of the apron, casting nothing.
+    //
+    // The attempt count is raised because rejection now throws placements away;
+    // it is attempts, not patches, and the field settles at rather fewer.
+    struct FPatchFootprint { float MinFwd, MaxFwd, MinRgt, MaxRgt; };
+    TArray<FPatchFootprint> Placed;
+    Placed.Reserve(FieldPatchAttempts);
+    for (int32 Patch = 0; Patch < FieldPatchAttempts; ++Patch)
     {
         const float Fwd = Stream.FRandRange(Back, Front);
         const float Rgt = Stream.FRandRange(-Side, Side);
         if (FMath::Abs(Fwd) < Shell && FMath::Abs(Rgt) < Shell) continue;
         const float SizeX = Stream.FRandRange(320.0f, 1100.0f);
         const float SizeY = Stream.FRandRange(320.0f, 1100.0f);
-        SpawnShape(World, ShapeCube, Frame.At(Fwd, Rgt, 2.0f),
-            FVector(SizeX / 100.0f, SizeY / 100.0f, 0.04f),
-            FRotator(0.0f, Stream.FRandRange(0.0f, 360.0f), 0.0f),
+        const float Yaw = Stream.FRandRange(0.0f, 360.0f);
+        // Axis-aligned bound of the ROTATED plate, so the rejection is a true
+        // separation test rather than one that passes on a corner overlap.
+        const float CosYaw = FMath::Abs(FMath::Cos(FMath::DegreesToRadians(Yaw)));
+        const float SinYaw = FMath::Abs(FMath::Sin(FMath::DegreesToRadians(Yaw)));
+        const float HalfFwd = 0.5f * (SizeX * CosYaw + SizeY * SinYaw);
+        const float HalfRgt = 0.5f * (SizeX * SinYaw + SizeY * CosYaw);
+        const FPatchFootprint Footprint{ Fwd - HalfFwd, Fwd + HalfFwd, Rgt - HalfRgt, Rgt + HalfRgt };
+        bool bOverlaps = false;
+        for (const FPatchFootprint& Other : Placed)
+        {
+            if (Footprint.MinFwd < Other.MaxFwd && Footprint.MaxFwd > Other.MinFwd &&
+                Footprint.MinRgt < Other.MaxRgt && Footprint.MaxRgt > Other.MinRgt)
+            {
+                bOverlaps = true;
+                break;
+            }
+        }
+        if (bOverlaps) continue;
+        Placed.Add(Footprint);
+        AStaticMeshActor* PatchActor = SpawnShape(World, ShapePlane, Frame.At(Fwd, Rgt, GroundOverlayLift * 0.5f),
+            FVector(SizeX / 100.0f, SizeY / 100.0f, 1.0f),
+            FRotator(0.0f, Yaw, 0.0f),
             FMath::Lerp(PaletteEarth, Stream.FRand() < 0.3f ? PaletteDryGrass : PaletteMoss, Stream.FRandRange(0.35f, 1.0f)),
             false, TEXT("Runtime_FieldPatch"));
+        if (PatchActor)
+        {
+            PatchActor->GetStaticMeshComponent()->SetCastShadow(false);
+        }
     }
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] tint patches: %d placed from %d attempts (overlaps rejected; a coplanar pair is z-fighting by construction)"),
+        Placed.Num(), FieldPatchAttempts);
 
     // --- 2. The forward route ---------------------------------------------
     // Shoulder ruins flanking the axis from the breach exit to the arena. They
