@@ -81,6 +81,13 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FireRateMultiplier, Category="Weapon") FGameplayAttributeData FireRateMultiplier;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, FireRateMultiplier)
 
+    // Ability cost scale. Base 1.0; Resource Efficiency drives it down. Floored
+    // in PreAttributeChange well above zero, because a cost of zero would make
+    // every ability free and silently delete the resource loop that is the
+    // entire ergonomic of the Caster class.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ResourceCostMultiplier, Category="Resource") FGameplayAttributeData ResourceCostMultiplier;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ResourceCostMultiplier)
+
     // --- Unified attribute application path -------------------------------
     // This attribute set is the ONE owner of the true base value for every
     // attribute in EBreakerAggregatedAttribute. Equipment and progression (and
@@ -167,6 +174,7 @@ protected:
     UFUNCTION() void OnRep_AirControlMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DashCooldownReduction(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_FireRateMultiplier(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_ResourceCostMultiplier(const FGameplayAttributeData& OldValue) const;
 
 private:
     FBreakerAttributeAggregator Aggregator;

@@ -74,6 +74,16 @@ enum class EBreakerAggregatedAttribute : uint8
     // RecomputeAggregatedAttributes never runs on them. ABreakerTargetDummy
     // keeps writing Armor directly and keeps meaning it.
     Armor,
+    // Ability cost SCALE. Base 1.0; a Resource Efficiency roll drives it DOWN,
+    // so 0.85 is a 15% cheaper cast.
+    //
+    // Stored as the scale rather than as "percent reduction" for the same
+    // reason DashCooldownReduction is stored as its divisor: only one of the
+    // two shapes can share a single additive bucket across gear and trees,
+    // because two layers each folding a percentage into a cost do not add. The
+    // affix authors an Increased percentage OF THE REDUCTION; this is what the
+    // ability cost path multiplies by.
+    ResourceCostMultiplier,
     Count
 };
 

@@ -727,6 +727,13 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, AirControlPercent);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DashCooldownReduction)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::FireRate)]);
+        // Efficiency is authored as a percentage of cost REMOVED, and the
+        // attribute is the cost SCALE, so the sign flips exactly once, here.
+        // Negating at the contribution keeps both gear and any future tree node
+        // in the same additive bucket -- which is the whole reason the attribute
+        // stores a scale rather than a reduction.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ResourceCostMultiplier,
+            -IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::ResourceEfficiency)]);
         // Weapon Damage used to reach the weapon on its own private path
         // (GearWeaponDamageMultiplier, multiplied against the DamageMultiplier
         // attribute), which meant gear damage and tree damage would have

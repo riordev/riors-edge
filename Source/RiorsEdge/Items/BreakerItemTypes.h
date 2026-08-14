@@ -129,6 +129,15 @@ enum class EBreakerStatTarget : uint8
     // Cleave, Rot, Fracture). Skill nodes already bid on it; no affix did, so
     // a Bleed build could be built in the tree and not in the stash.
     DamageOverTime,
+    // Ability cost reduction, authored as an Increased percentage OF THE
+    // REDUCTION (12.0 == casts cost 12% less). Owner ruling 2026-08-14, the
+    // same one inverting the Mana bar to start full and drain: once a resource
+    // is spent down rather than banked up, EFFICIENCY and REGENERATION are the
+    // two stats that decide how often a caster gets to act, and only
+    // regeneration existed. A spend-down resource with no efficiency axis makes
+    // Maximum Resource the only interesting resource stat, which is one line
+    // holding up a whole class's gearing.
+    ResourceEfficiency,
     Count UMETA(Hidden)
 };
 

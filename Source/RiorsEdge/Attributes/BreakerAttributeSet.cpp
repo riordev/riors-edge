@@ -28,6 +28,7 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitAirControlMultiplier(1.0f);
     InitDashCooldownReduction(1.0f);
     InitFireRateMultiplier(1.0f);
+    InitResourceCostMultiplier(1.0f);
 }
 
 void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -51,6 +52,7 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(AirControlMultiplier);
     BREAKER_REPLICATE(DashCooldownReduction);
     BREAKER_REPLICATE(FireRateMultiplier);
+    BREAKER_REPLICATE(ResourceCostMultiplier);
 #undef BREAKER_REPLICATE
 }
 
@@ -84,6 +86,11 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     // Floored well above zero: a fire rate multiplier at or near 0 would turn
     // the fire interval into an infinity and hang the weapon rather than slow it.
     else if (Attribute == GetFireRateMultiplierAttribute()) NewValue = FMath::Max(0.05f, NewValue);
+    // Floored at 0.25 rather than at some epsilon: a cost driven to nearly zero
+    // is not a strong build, it is the resource loop deleted. Casters have no
+    // cooldowns because Mana IS the cooldown, so free casts remove the only
+    // limiter the class has.
+    else if (Attribute == GetResourceCostMultiplierAttribute()) NewValue = FMath::Clamp(NewValue, 0.25f, 2.0f);
 }
 
 void UBreakerAttributeSet::CaptureAttributeBases()
@@ -102,6 +109,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = GetFireRateMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::ResourceCostMultiplier)] = GetResourceCostMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::Armor)] = GetArmor();
     Aggregator.CaptureBases(Values);
 }
@@ -196,6 +204,7 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     // stripped point of authored armour are the same point.
     WriteAttributeValue(GetArmorAttribute(), Armor, Aggregator.Compose(EBreakerAggregatedAttribute::Armor));
     WriteAttributeValue(GetFireRateMultiplierAttribute(), FireRateMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier));
+    WriteAttributeValue(GetResourceCostMultiplierAttribute(), ResourceCostMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::ResourceCostMultiplier));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
@@ -244,4 +253,5 @@ BREAKER_ON_REP(SlideSpeedMultiplier)
 BREAKER_ON_REP(AirControlMultiplier)
 BREAKER_ON_REP(DashCooldownReduction)
 BREAKER_ON_REP(FireRateMultiplier)
+BREAKER_ON_REP(ResourceCostMultiplier)
 #undef BREAKER_ON_REP

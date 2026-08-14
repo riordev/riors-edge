@@ -80,6 +80,16 @@ namespace
         TArray<FBreakerAffixDefinition> Pool;
         Pool.Add(MakeAffix(TEXT("Core.Health"), TEXT("Health"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Health, EBreakerStatBucket::Flat, AllSlots, 25.0f, 180.0f));
         Pool.Add(MakeAffix(TEXT("Core.ResourceRegen"), TEXT("Resource Regeneration"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceRegen, EBreakerStatBucket::Flat, AllSlots, 0.5f, 3.0f));
+        // Ability cost reduction. Owner ruling 2026-08-14, alongside inverting
+        // the Mana bar to start full and drain: with a spend-down resource,
+        // efficiency and regeneration decide how often a caster gets to act,
+        // and Maximum Resource was carrying that whole axis on its own.
+        // Suffix, all slots, and deliberately a peer of Resource Regeneration
+        // rather than a better version of it -- efficiency pays most to a build
+        // casting expensive spells rarely, regeneration to one casting cheap
+        // spells constantly, so they are different decisions.
+        // O2 PLACEHOLDER: 2% (T8) -> 12% (T1) of cost removed.
+        Pool.Add(MakeAffix(TEXT("Core.ResourceEfficiency"), TEXT("Resource Efficiency"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceEfficiency, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 12.0f, 55.0f));
         Pool.Add(MakeAffix(TEXT("Core.MaxResource"), TEXT("Maximum Resource"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::MaxResource, EBreakerStatBucket::Flat, AllSlots, 8.0f, 45.0f));
         Pool.Add(MakeAffix(TEXT("Core.MoveSpeed"), TEXT("Movement Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::MoveSpeed, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 8.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Core.DropChance"), TEXT("Drop Chance"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::DropChance, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 14.0f, 60.0f));
