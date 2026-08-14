@@ -13,6 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHitDealt, const FBreakerHitC
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerKillDealt, const FBreakerHitContext&, Hit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealEvent, const FBreakerHealResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealDealt, const FBreakerHealContext&, Heal);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerVitalsRestored);
 
 // One push/pop-able outgoing damage modifier. Keyed so the pusher (an ability
 // window, a node) can remove exactly its own entry; expiry is a safety net for
@@ -163,6 +164,13 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDamageReceived OnDamageReceived;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDeathEvent OnDeath;
+    // Raised by RestoreVitals — spawn, respawn, and the F1 playtest reset.
+    // Combat deliberately does NOT refill class resources itself: filling a
+    // Swift's Momentum bar on reset would hand out a resource the class exists
+    // to make you earn. The class-resource loop that owns the mechanic listens
+    // and decides for itself, which is how a Caster starts full (owner ruling
+    // 2026-08-14) without Combat/ knowing what a Caster is.
+    UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerVitalsRestored OnVitalsRestored;
     // Attacker-side (SI-8): raised on the component of whoever dealt the hit.
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerHitDealt OnHitDealt;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerKillDealt OnKillDealt;

@@ -93,6 +93,28 @@ public:
     // Shipped Data Assets take precedence once authored.
     static UBreakerAbilityDefinition* FindFallback(FName AbilityId);
     static const TArray<UBreakerAbilityDefinition*>& GetFallbackRegistry();
-    // Default Swift loadout used until a class definition supplies a catalogue.
+    // The DEFAULT loadout for a class — what a character is handed before they
+    // choose. It is not the catalogue and it is not the only answer: an
+    // equipped id on the progression state wins over it in ResolveDefinition,
+    // and GetClassAbilityIds below is what a player actually picks from.
+    //
+    // This distinction was invisible for a while and cost the project real
+    // content: with six Caster abilities implemented against three keys, the
+    // default table was the only thing anything read, so exactly one of the
+    // five class abilities was reachable at a time and moving Rot into slot two
+    // made Closequarter dead content.
     static FName DefaultAbilityIdForSlot(EBreakerClassId ClassId, EBreakerAbilitySlot Slot);
+
+    // THE CATALOGUE: every ability this class grants that can occupy this slot,
+    // in registry order. Derived from the registry rather than from a
+    // hand-maintained list, so an ability cannot be implemented, registered,
+    // and still be unpickable — which is precisely the state the Caster kit was
+    // in. A UI enumerates this to build its picker.
+    static TArray<UBreakerAbilityDefinition*> GetClassAbilities(EBreakerClassId ClassId, EBreakerAbilitySlot Slot);
+    // Id-only form, for callers that only need to name the choices.
+    static TArray<FName> GetClassAbilityIds(EBreakerClassId ClassId, EBreakerAbilitySlot Slot);
+    // Does this class grant this ability at all, for any slot? The first gate a
+    // selection has to pass: a Swift may not equip Cleave however the id got
+    // into the request.
+    static bool ClassGrantsAbility(EBreakerClassId ClassId, FName AbilityId);
 };

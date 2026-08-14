@@ -322,6 +322,41 @@ UBreakerAbilityDefinition* UBreakerAbilityDefinition::FindFallback(FName InAbili
     return nullptr;
 }
 
+TArray<UBreakerAbilityDefinition*> UBreakerAbilityDefinition::GetClassAbilities(EBreakerClassId ClassId, EBreakerAbilitySlot Slot)
+{
+    TArray<UBreakerAbilityDefinition*> Result;
+    if (ClassId == EBreakerClassId::None) return Result;
+    for (UBreakerAbilityDefinition* Definition : GetFallbackRegistry())
+    {
+        // CanOccupySlot is the slot rule in one place: an ultimate may only sit
+        // in the ultimate slot, and a class ability may sit in either of the
+        // two. Reading it here means the picker and the equip validation cannot
+        // disagree about what fits where.
+        if (Definition && Definition->ClassId == ClassId && Definition->CanOccupySlot(Slot))
+        {
+            Result.Add(Definition);
+        }
+    }
+    return Result;
+}
+
+TArray<FName> UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId ClassId, EBreakerAbilitySlot Slot)
+{
+    TArray<FName> Ids;
+    for (const UBreakerAbilityDefinition* Definition : GetClassAbilities(ClassId, Slot))
+    {
+        Ids.Add(Definition->AbilityId);
+    }
+    return Ids;
+}
+
+bool UBreakerAbilityDefinition::ClassGrantsAbility(EBreakerClassId ClassId, FName AbilityId)
+{
+    if (ClassId == EBreakerClassId::None || AbilityId.IsNone()) return false;
+    const UBreakerAbilityDefinition* Definition = FindFallback(AbilityId);
+    return Definition && Definition->ClassId == ClassId;
+}
+
 FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId, EBreakerAbilitySlot Slot)
 {
     // This is the whole reachability chain for a class with no authored class
@@ -342,14 +377,13 @@ FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId
     case EBreakerClassId::Caster:
         switch (Slot)
         {
-        // Class-Kits §2.2 names Cleave and Rot as the Caster STARTERS, and the
-        // zone system that Rot needs now exists, so slot two is Rot as
-        // designed. Closequarter, Siphon, Fracture and Resonance are all built
-        // and all in this registry; with three keys and no ability-loadout UI
-        // for Caster, exactly one of them can be reached at a time, and the
-        // starter is the one the design names. Changing this line is how a
-        // playtest reaches a different one until the loadout screen can author
-        // Caster ability ids.
+        // Class-Kits §2.2 names Cleave and Rot as the Caster STARTERS, so they
+        // are what an unchosen loadout is handed. This is now a DEFAULT and no
+        // longer the only answer: GetClassAbilities is the catalogue,
+        // UBreakerAbilityComponent::TryEquipAbility is how a choice is made,
+        // and ResolveDefinition prefers the chosen id over this row. Editing
+        // this line changes what a fresh character starts with — it no longer
+        // decides which four abilities are unreachable.
         case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Caster.Cleave");
         case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Caster.Rot");
         case EBreakerAbilitySlot::Ultimate:        return TEXT("Caster.Unmake");
