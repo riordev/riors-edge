@@ -1,9 +1,61 @@
 # Encounter Design — Vertical Slice
 
-Owner: encounter systems. Status: design, not implemented.
+**Last reconciled against: O32** (2026-08-14).
+
+Owner: encounter systems. Status: design, **substantially implemented** — see
+the `AS BUILT — 2026-08-14` section at the end, which is the authority on what
+exists. Ten modifiers, two new archetypes and a boss are built.
 Scope: elite modifiers, three normal enemy archetypes, the slice boss, the gym wave/arena mode, spawn pacing, and 1-5 player scaling.
 
-This document sits under the master sheet (`Docs/Design/Master-Sheet-Import.txt`). Where it goes beyond the sheet it is labelled **EXTENDS**; where it disagrees with a written line it is labelled **CONFLICT** and states the resolution I recommend.
+~~This document sits under the master sheet (`Docs/Design/Master-Sheet-Import.txt`).~~
+**SUPERSEDED [O28].** The master sheet is a raw import and has lost its
+standing; it is historical source material, never authority. The chain is
+`Decisions.md` -> `Design-Overview.md` (map, not law) -> this document. Every
+"master sheet N.N" citation below records where an idea came from, not what
+rules. Where a Master citation disagrees with the ledger, the ledger wins.
+Where this document goes beyond a source it is labelled **EXTENDS**; where it disagrees it is labelled **CONFLICT** and states the resolution recommended.
+
+### O31 — every build must be able to make an impact
+
+**Ruling O31** (`Docs/Design/Decisions.md`): *content shape is a cross between
+Destiny and Path of Exile. Raids are **puzzles rewarded for team play** — many
+distinct encounters that force players into different situations. Builds may
+excel in some situations and be weak in others, but **every build must be able
+to make an impact and feel player power**. No encounter may have a build that
+cannot participate.*
+
+This is a **hard constraint on every encounter in this document and every
+encounter added after it**, and it is stated here rather than at the bottom
+because it changes what a mechanic is allowed to be.
+
+**The distinction that does the work: WEAK is allowed, EXCLUDED is not.** An
+encounter may cut a build's output in half. It may not reduce it to nothing.
+Three shapes are therefore forbidden outright:
+
+1. **A damage check that only one damage delivery mechanism can pass.** A burst
+   window shorter than a sustained build's ramp, or a sustained phase longer
+   than a burst build's window, excludes rather than disfavours. Every damage
+   check needs at least one alternative lane — a second window, an extended
+   phase, or a mechanic that converts one into the other.
+2. **A single-target-only or multi-target-only phase with no other
+   contribution.** `Core-Constellations.md` §9's O31 audit names the three
+   keystones this bites hardest: **FIXATION** sets off-target Critical Chance to
+   zero, **TERMINAL** delivers nothing until a target dies or takes a
+   weak-point hit, and **PERPETUAL** cannot burst at all. Those are the three
+   builds every new encounter must be checked against.
+3. **A mechanic answerable only by a tree-granted verb.** Already forbidden by
+   §0 for Parry and Air Jump; O31 widens it — no mechanic may be answerable only
+   by a class ability, a resource state, or a movement discipline either.
+
+**What O31 does NOT require:** equal output. A raid encounter is allowed to be a
+Bulwark build's finest hour and a Kinesis build's worst. It is allowed to reward
+team play — that is O31's own framing. The floor is *participation and felt
+power*, not parity.
+
+**Not audited yet:** no encounter in this document was designed against O31, and
+the boss's phases (§3.4) in particular were authored before it. **§3.5 and §6.6
+need an O31 criterion added; that is a design pass, not a doc edit, and it is
+recorded in OPEN QUESTIONS rather than performed here.**
 
 ---
 
@@ -418,6 +470,60 @@ Wave budget: `Budget(n) = 6 + 4n` for wave n, capped at 90 (reached at wave 21).
 
 Then the cycle repeats with budget continuing to climb until the cap.
 
+### 4.2.1 CONFLICT — the budget curve and the density caps cannot both hold
+
+**Found 2026-08-14 by working the arithmetic; not previously recorded. This is
+the single largest unresolved item in this document, because the budget solver
+in `Game/` has not been written yet and would have to pick a side silently.**
+
+`Budget(n) = 6 + 4n` climbs to 90. §5.3's hard caps bound how many enemies may
+be alive at once. **Above a certain wave, a solo player's wave budget cannot be
+spent**, because there is nothing legal left to buy.
+
+**The maximum legal solo spend, derived from §5.3 and §4.2's own costs:**
+
+| Legal composition at the caps | Count | Budget cost |
+|---|---|---|
+| Wardens (cap: 1 per player) | 1 | 6 |
+| Lattices (cap: 3, any party size) | 3 | 9 |
+| Skitters (filling the 12-enemy solo cap) | 8 | 8 |
+| **Base total, 12 live enemies** | **12** | **23** |
+| Elite promotion (cap: 1 elite solo, at the §1.3 maximum of 3 modifiers) | — | +12 |
+| **Maximum legal solo spend** | | **35** |
+
+`Budget(n) = 6 + 4n` passes 35 at **wave 8 (budget 38)**. From wave 8 onward a
+solo wave is over-funded, and by the wave-21 cap of 90 it is over-funded by
+**more than two and a half times**. The curve climbs to 90; the caps stop it in
+the mid thirties.
+
+**It is worse than a single mismatch — the §4.2 table contradicts §5.3 directly
+at the same wave.** The table sets `elite count = floor(wave/4)` for waves 7-11,
+so **wave 8 asks for 2 elites while §5.3 caps solo elites at 1.** The two rules
+disagree on the same line of the same document.
+
+**Three ways out, with their costs. None is taken here — this is an owner call,
+and picking one would author the tuning O2 freezes.**
+
+| Option | What it means | Cost |
+|---|---|---|
+| **A. The caps win; the curve flattens.** | Re-derive `Budget(n)` so it asymptotes at the legal maximum per party size — roughly 35 solo, higher with more players since the enemy and elite caps are per-player. | Wave mode stops escalating around wave 8 solo, which defeats §4.1's purpose: an instrument that plateaus measures nothing past the plateau. |
+| **B. The curve wins; difficulty moves into modifiers and area level.** | Keep the caps. Spend surplus budget on **modifier depth and area level** rather than on more bodies. This is what **O27** actually asks for — *"difficulty lives entirely in elites, bosses, and monsters carrying modifiers"*, and *"trash exists to be trivialized"*. The chassis is already a curve in area level (`BreakerMonsterChassis`), so the lever exists. | Needs the elite cap raised or the elite/modifier costs re-derived, and §1.3's 3-modifier maximum becomes the new ceiling on escalation. Also needs a decision on whether area level climbs *within* a wave cycle or only across them. |
+| **C. Both, split by role.** | Budget buys bodies up to the caps; area level and modifiers carry everything above. | Two curves to tune instead of one, and the report has to attribute a TTK change to the right one. |
+
+**B is the option that agrees with a ruling** — O27 is explicit that difficulty
+lives in modifiers rather than trash health or trash count, and the caps in §5.3
+exist for a reason this document argues at length (a movement player must be
+able to find a lane). **That is a recommendation, not a resolution.** The
+recommendation is recorded so the budget solver's author does not have to guess;
+the ruling is the owner's.
+
+**Until it is ruled, the solver must not silently clamp.** A solver that spends
+what it can and drops the remainder will produce waves that look identical from
+wave 8 onward while the report claims the budget rose — which is exactly the
+class of silent failure this project has shipped before. If B is not ruled
+before the solver lands, it should **log the unspent budget per wave** so the
+divergence is visible in the instrument rather than invisible in the arena.
+
 ### 4.3 Rules
 
 - **Rest waves every 6.** Without them, wave mode measures endurance instead of combat.
@@ -550,7 +656,26 @@ A downed player should not remove a lane permanently. Recommend: downed state wi
 7. Loot distribution in parties (instanced / shared / need-greed) is open per 11.3, and it changes whether elites should drop more or better at higher party sizes.
 8. Does the elite loot floor of Exceptional scale with modifier count? A 3-modifier elite is meaningfully harder than a 1-modifier one and currently pays identically.
 9. Do enemies get stagger/flinch as a system at all? §1.1 assigns elites stagger resistance, which presupposes a stagger model that does not currently exist.
-10. ~~Self-damage from the Rocket archetype~~ **CLOSED by O13** — strong self-damage reduction, full self-knockback control, never immunity; rocket-jumping tolerated, never required. Volatile and Cascading are costed against that in §1.2. The general weapon self-damage *rate* remains unauthored and is frozen by O2.
+10a. **Which side wins, the wave budget curve or the density caps?** (§4.2.1,
+    found 2026-08-14.) `Budget(n) = 6 + 4n` climbs to 90; §5.3's caps stop a
+    solo wave at a legal maximum of 35, so from **wave 8** the budget is
+    unspendable, and the §4.2 table's own `floor(wave/4)` elite count breaks
+    §5.3's solo elite cap at that same wave. Three options are tabulated at
+    §4.2.1; **B (surplus goes to modifiers and area level) is the one that
+    agrees with O27** and is recommended, not ruled. **This blocks the wave
+    budget solver**, which does not exist yet and would otherwise pick a side
+    silently.
+10b. **Has any encounter been audited against O31?** No. The boss phases (§3.4)
+    predate the ruling. §3.5's and §6.6's acceptance criteria need an O31
+    clause — *no build may be reduced to zero contribution* — and the three
+    keystones named in §0 (FIXATION, TERMINAL, PERPETUAL) are the test cases.
+    A design pass, not a doc edit.
+10c. **Does O29's item level 120 change the elite loot floor?** §1.1 sets an
+    Exceptional floor for Veteran+. O29 widens the tier ladder to T12..T-1 and
+    tunes the whole ladder up with a back-loaded high end, so "Exceptional
+    floor" now describes a materially different reward than when it was
+    written. Interacts with open question 8.
+11. ~~Self-damage from the Rocket archetype~~ **CLOSED by O13** — strong self-damage reduction, full self-knockback control, never immunity; rocket-jumping tolerated, never required. Volatile and Cascading are costed against that in §1.2. The general weapon self-damage *rate* remains unauthored and is frozen by O2.
 
 ---
 
@@ -849,9 +974,16 @@ touched. Everything below is exposed and ready; it needs spawning:
    and §4.2's wave 12 boss wave. It needs `SetAreaLevel()` and room: its default
    alcove offsets are +/-1700 cm and galleries +/-1900 cm from its own location.
    Bind `OnBossDefeated` for the encounter-end.
-5. **Wave-mode budget (§4.2).** The budget solver (Skitter 1 / Lattice 3 /
-   Warden 6 / +4 per elite modifier), rest waves every 6, loot only on rest and
-   boss waves. None of it exists; wave mode still spawns a flat count.
+5. **Wave-mode budget (§4.2). BLOCKED — do not write this solver yet.** The
+   solver (Skitter 1 / Lattice 3 / Warden 6 / +4 per elite modifier), rest waves
+   every 6, loot only on rest and boss waves. None of it exists; wave mode still
+   spawns a flat count. **§4.2.1 (added 2026-08-14) records why it is blocked:
+   the budget curve and §5.3's density caps contradict each other from wave 8,
+   and the §4.2 table's own elite count breaks §5.3's solo elite cap at that
+   same wave.** A solver written today has to pick a side, and picking silently
+   produces waves that look identical from wave 8 while the report claims the
+   budget rose. If it must ship before the ruling, **log the unspent budget per
+   wave** so the divergence is visible in the instrument.
 6. **Playtest report.** TTK is bucketed melee/ranged/elite. There is no bucket
    for boss or for modifier-bearing enemies, so a Champion's kill time pollutes
    the elite average. `Playtest/` is not this lane.
