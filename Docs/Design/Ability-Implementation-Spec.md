@@ -1,5 +1,7 @@
 # Ability Implementation Spec — engineering design for every class ability
 
+**Last reconciled against: O32** (2026-08-14).
+
 Status: engineering design. **No balance values are authored here.** Every number in this
 document is quoted from `Docs/Design/Class-Kits.md` or `Docs/Design/Core-Constellations.md`.
 Where an ability cannot be built without a number that neither document supplies, the gap is
@@ -302,6 +304,46 @@ Nothing in §3 onward can start until these land. This is the critical path.
 | **SI-10** | Ability data asset (`UBreakerAbilityDefinition`) | new | Cost/CD/duration values must live in data (Class-Kits §7: "All tuning must live here, not in C++"). |
 
 ### 2.1 SI-1 / SI-2 — `UBreakerAbilityComponent` and granting
+
+> **BUILT, AND WIDER THAN SPEC'D. ABILITY SELECTION IS A REAL API.** Verified
+> against `Abilities/BreakerAbilityComponent.h` on 2026-08-14. The sketch below
+> describes granting only; the shipped component also owns the **player's
+> choice** of two class abilities plus an ultimate, replacing the hardcoded
+> fallback table this spec was written against.
+>
+> The public surface, in call order, is the whole contract a UI needs:
+>
+> | Call | Purpose |
+> |---|---|
+> | `GetSelectableAbilityIds(Slot)` | the choices to draw for that slot |
+> | `GetEquippedAbilityId(Slot)` | which one to draw as selected — the *choice*, not the resolved fallback |
+> | `PreviewSelection(Slot, Id)` | side-effect-free "would this be allowed?", safe every frame |
+> | `TryEquipAbility(Slot, Id, Out)` | commit; false with player-facing text on refusal |
+>
+> Three engineering decisions in it are worth carrying forward:
+>
+> 1. **`ValidateSelection` is a world-free static** taking the loadout as three
+>    ids rather than reading it — the precedent of `BreakerRangedBehavior.h` and
+>    `BreakerMonsterChassis.h`, so the whole rule set is testable with no
+>    components. It checks class, slot occupancy and duplicate-equip;
+>    re-selecting what is already in the same slot is a legal no-op.
+> 2. **ONE writer.** `TryEquipAbility` validates and then delegates the write to
+>    `UBreakerProgressionComponent::EquipAbility`, so progression stays the sole
+>    owner of the state and of the unlock rules. That is also what makes the
+>    choice persist — the loadout is a field of `FBreakerProgressionState` and
+>    `UBreakerSaveGame` stores that struct whole.
+> 3. **Refusal text is centralised** in `DescribeSelectionResult`, so the UI
+>    never authors its own copy of a rule's wording.
+>
+> **BLOCKER — the API refuses every Caster equip, and the cause is not in this
+> layer.** `EquipAbility` asks `IsAbilityUnlocked`, which reads
+> `ClassDefinition->StartingClassAbilityIds` / `BaseUltimateId`, and
+> `UBreakerProgressionLibrary::GetFallbackClassDefinition` **returns `nullptr`
+> for every class but Swift.** A Caster therefore has a null class definition,
+> nothing reads as unlocked, and the default table (Cleave / Rot / Unmake) is
+> still what a Caster plays. The fix is a Caster row in that fallback
+> definition — `Progression/`, another lane — with §5's Tier-3 grant nodes
+> supplying the rest. Annotated at the code.
 
 ```cpp
 // Source/RiorsEdge/Abilities/BreakerAbilityComponent.h
@@ -921,6 +963,77 @@ escalate rather than adding one silently.
 Resource: `ClassResource` gated by `Class.Caster`. **No cooldowns on any Caster ability** — cost
 only (Class-Kits §2.1). Do not author cooldown GEs for this class.
 
+> ## THE MANA LOOP IS INVERTED — owner ruling 2026-08-14
+>
+> *"Caster's mana bar should be full and go down when using spells, and affixes
+> like resource efficiency and resource regeneration should exist."*
+>
+> **Everything in this section that describes Mana as an accumulating bank is
+> superseded.** The bar now **starts FULL, spends DOWN, and REGENERATES**.
+> Passive regeneration is the **primary** recovery path; weapon hits, weak
+> points, kills, status applications and reloads are **accelerators** on top of
+> it, not the income. Verified against
+> `Source/RiorsEdge/Classes/BreakerManaComponent.{h,cpp}`:
+>
+> | Rule | Value | Was |
+> |---|---|---|
+> | Passive regeneration | **6.0/s**, O2 PLACEHOLDER | +2.0/s |
+> | Conditional generation cap | **6.0/s**, O2 PLACEHOLDER | 20.0/s |
+> | `WeaponHitGain` / `WeakPointGain` | 1.5 / 4.0 — **deliberately unchanged** | same |
+> | Overcast floor / doubling / damage | −20 / ×2 / +15% — unchanged | same |
+>
+> **The re-weighting was done at the CAP, not at the per-source rates.** That is
+> the load-bearing engineering decision: every relative rate the acceptance
+> criteria measure — including the anti-Multishot 1/n ratio, which lives
+> *between* `WeaponHitGain` and `WeakPointGain` — is preserved exactly, and one
+> number carries the whole ruling.
+>
+> **Three implementation facts a ticket against this section must not get
+> wrong**, all of them in `AdvanceLoop`:
+>
+> 1. **Regeneration runs ABOVE the safe-zone gate.** The gate is an anti-*farm*
+>    rule aimed at target-dependent income. A Caster who could not refill in
+>    camp would have to leave camp to become able to fight.
+> 2. **Regeneration is OUTSIDE the generation budget.** The cap is the ceiling
+>    on *conditional* income. Metering the baseline through it would make every
+>    accelerator a no-op whenever regeneration alone had already filled the
+>    frame's allowance.
+> 3. **Suspension is checked BEFORE regeneration.** Unmake suspends "Mana
+>    generation" (§5.7) and regeneration is now the bulk of it — if regeneration
+>    ran through the free window, Unmake would hand back most of its own 80-Mana
+>    price while it was being spent.
+>
+> **The code comment block in the `MISSING HOOK` sketch below still says
+> "Global cap 20/s." That line is stale; read 6.0/s.** It is left in place
+> because the sketch is a historical proposal, not a description of the shipped
+> component.
+>
+> **What this section still owes.** **Resource efficiency and resource
+> regeneration affixes** are named by the ruling and half-landed: cost
+> composition exists (`UBreakerCasterAbility::ComposeResourceCost` reads
+> `cost = AuthoredCost × ResourceCostMultiplier × UnmakeWindowScalar` live on
+> every cast, floored so gear may reduce a cost and never eliminate it, because
+> Mana *is* the cooldown). **`PassiveRegenPerSecond` has no affix or node
+> consumer at all** — it is an `EditAnywhere` constant, so the "resource
+> regeneration" half of the ruling is not yet reachable by gear. That is the one
+> outstanding hook this inversion creates and it is not tracked anywhere else.
+>
+> **Deterrent note for whoever tunes Overcast.** With regeneration at 6.0/s and
+> the Overcast doubling applying to it, a full 20-deep debt repays in **under
+> two seconds of standing still**. The mechanism is unchanged and §5's
+> acceptance criterion that Overcast cannot produce a net-positive loop still
+> holds — the debt is repaid, never profited from — but Overcast's cost is now
+> almost entirely the 15% damage window rather than the recovery time. Three
+> dials exist (deepen the floor, outlast the debt with the penalty, exempt
+> regeneration from the doubling); **none is taken, because that is a tuning
+> ruling.**
+>
+> **Nine authored Caster nodes are invalidated by this and are marked
+> `NEEDS-RE-SITING [Mana inversion]` in `Class-Kits.md` §2.1.1 and at their own
+> rows: VW3, SB1, SB3, VW1, MS1, MS6, MS11, VW2, MS3.** Do not implement a
+> generation-rate node from §5's branch tables without reading that section
+> first — the magnitudes there are pre-inversion.
+
 > **IMPLEMENTATION STATUS (this section is now partly built).**
 > Shipped: `UBreakerCasterAbility` (the shared base carrying the two class-wide rules — no
 > cooldowns ever, and Unmake's cost rewrite), **C1 Cleave**, **C2 Closequarter**, and the
@@ -934,9 +1047,14 @@ only (Class-Kits §2.1). Do not author cooldown GEs for this class.
 > on top of them; see the as-built notes on §5.3–§5.6.
 > Still not built: the Edgework-on-Closequarter and Cascade keystone halves, VW7's conditional
 > second armour strip, MS2's advance-on-hit, and the HUD cycle readout (`UI/`).
-> **Reachability caveat:** the Caster has three keys and no ability-loadout UI, so
-> `DefaultAbilityIdForSlot` decides which of the five class abilities is playable. It now
-> returns Cleave + Rot, the starters Class-Kits names.
+> **Reachability caveat — UPDATED 2026-08-14, and the cause has moved.** The Caster has three
+> keys, so at most two class abilities plus the ultimate are playable at once. **An ability
+> selection API now exists** (§2.1) and would let the player choose which two — but it
+> **refuses every Caster equip**, because `UBreakerProgressionLibrary::GetFallbackClassDefinition`
+> returns `nullptr` for every class but Swift, so a Caster has no unlocked abilities to validate
+> against. `DefaultAbilityIdForSlot` therefore still decides, returning Cleave + Rot, the
+> starters Class-Kits names. **The gap is no longer "no UI"; it is one missing row in a fallback
+> class definition in `Progression/`.**
 >
 > **D8 IS RESOLVED — OVERCAST IS REACHABLE.** `ClassResourceFloor` (default 0) landed on the
 > attribute set, `PreAttributeChange` clamps `ClassResource` to `[Floor, Max]`, the Mana
@@ -1736,6 +1854,36 @@ Risk key: **L** = existing systems only · **M** = one new hook or a bounded new
 
 All fifteen use the D1 tag-driven variant pattern. All fifteen depend on SI-7 (the `MoreMultiplier`
 array) for their More.
+
+> **BUILT STATUS, verified 2026-08-14. One of fifteen resolves in play; a
+> second is built and unreachable.** All six Swift and Caster keystone tags
+> exist in `Abilities/BreakerAbilityTags.h` and all six are rows in Overdrive's
+> and Unmake's variant tables, so every one of them *resolves* if the owner
+> carries the tag. The question is whether any node grants the tag.
+>
+> | Keystone | Variant row | Node grants the tag? | Reachable in play? |
+> |---|---|---|---|
+> | **Bloodrhythm** | yes | **yes** — `Swift.Frenzy.Bloodrhythm` | **YES** |
+> | Terminal Velocity | yes | **no** — the shipped Kinetic keystone is **Overpressure**, which carries no keystone tag | no |
+> | Standing Wave | yes | **no** — the shipped Marksman keystone is **Culling**, which carries no keystone tag | no |
+> | **Long Dark** | yes, fully parametric | no Caster tree is authored at all | **BUILT, unreachable** |
+> | Edgework | yes | no Caster tree | Cleave half built; **Closequarter half NOT built** |
+> | Cascade | yes | no Caster tree | **NOT built** — needs status *application* to be interceptable |
+>
+> Two distinct failure shapes, worth separating because they need different
+> fixes:
+>
+> - **Swift's two are a NAMING/TAG mismatch, not missing work.** The rewrites
+>   are spec'd, the rows exist, and the branches shipped different keystones
+>   under different names (`Class-Kits.md` §6.1.1 tabulates the divergence).
+>   Either Overpressure and Culling adopt the existing tags, or the rewrites
+>   are re-sited onto them. **Cheap; needs a decision, not engineering.**
+> - **Caster's three are blocked on there being no Caster branch trees.** Long
+>   Dark's 12s-at-50% rewrite is fully implemented and parametric and simply
+>   has no node to grant it. Edgework and Cascade are genuinely unbuilt.
+>
+> The nine Gunsmith / Tank / Support rows below are one-page treatments for
+> classes that grant nothing at all, and none of their hooks exists.
 
 | Keystone | Class | Rewrite mechanism | Extra hook |
 |---|---|---|---|
