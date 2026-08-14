@@ -1,8 +1,52 @@
 # Game Modes — Content Type Design
 
+**Last reconciled against: O32** (2026-08-14).
+
 Domain: Local Rifts, Frontiers, Dungeons (4), Raids (7), Conquest (9).
 Status: Local Rifts and Frontiers are full designs. Dungeon/Raid/Conquest are one-page treatments.
-Authority: subordinate to `Docs/Design/Master-Sheet-Import.txt`. Every LOCKED decision there is law here.
+~~Authority: subordinate to `Docs/Design/Master-Sheet-Import.txt`. Every LOCKED decision there is law here.~~
+**SUPERSEDED [O28].** The master sheet is a raw import and has **lost its
+standing** — it is historical source material, not law, and is not to be cited
+as authority again. The chain is `Decisions.md` -> `Design-Overview.md` (map,
+not law) -> this document. Bare parenthesised section numbers throughout
+(`(7.1)`, `(11.1)`, `(9.2)`) are master-sheet references and read as
+provenance, never as rules. Where one disagrees with the ledger, the ledger
+wins.
+
+> **VOCABULARY CORRECTION [O32]. This document conflates a rarity with an item
+> type, in the exact way O32's implementation note forbids.** O32 rules:
+> **Anomalous is a RARITY** — the fifth tier, gating affix count and tier
+> ceiling, carrying one *rolled* rule rewrite from a generic pool of four.
+> **Legendary is a separate field** (`FBreakerItemInstance::LegendaryId`) naming
+> a specific authored item with a fixed slot, guaranteed affixes and a
+> *hand-authored* rule. Every legendary rolls at Anomalous rarity; **most
+> Anomalous drops are not legendaries.**
+>
+> §1's vocabulary table says every remaining use of "Anomalous" in this document
+> is a rarity reference and is correct as written. **That is no longer true.**
+> Three lines describe *legendaries* and call them Anomalous:
+>
+> - **§2's mode map, Raid row** — "unique Anomalous". A rarity is not unique.
+> - **§6 Function** — "Raid-exclusive Anomalous items that each imply a whole
+>   build". An item that implies a whole build is a hand-authored rule, which
+>   is the definition of a legendary.
+> - **§6 Rewards** and **Open Question 6** — "Raid-exclusive Anomalous items at
+>   a low rate". Same conflation; the open question inherits it.
+>
+> **Read all four as LEGENDARY.** They are not corrected in place because the
+> substitution changes what the mode promises — a Raid-exclusive legendary is a
+> named item on the O32 pool-growth list, and O32 explicitly rules that the fix
+> for legendary cadence is **authoring more legendaries**, not raising the drop
+> rate. So "Raid-exclusive legendaries" is a *content commitment* against that
+> list, and committing to it is an owner call. **The other uses in this document
+> — §2's Frontier row, §4.3's tier band, §4.6's rarity weights, §4.8's
+> acceptance criterion — are genuine rarity references and are correct.**
+>
+> **Bearing on O32's arithmetic:** O32 records ~57 hours per legendary at area
+> level 50, falling to ~21 with a full set, because three authored legendaries
+> cover only Boots, Primary and Waist. Helmet, Body Armour, Gloves, Necklace and
+> Secondary have none. **Any mode in this document that promises legendaries is
+> promising content off that unwritten list.**
 
 All numbers in this document are PLACEHOLDER until the Playtest Gym establishes a real time-to-kill, per master sheet 3.0.
 
@@ -479,6 +523,61 @@ The Frontier reward package, per completed run:
 
 ## 6. RAIDS — one-page treatment
 
+> **RULED [O31] — this section's brief has changed and the treatment below
+> predates it.** O31: *content shape is a cross between **Destiny and Path of
+> Exile**. Raids are **puzzles rewarded for team play** — many distinct
+> encounters that force players into different situations. Builds may excel in
+> some situations and be weak in others, but **every build must be able to make
+> an impact and feel player power**. No encounter may have a build that cannot
+> participate.*
+>
+> **Four things O31 changes about the treatment below.**
+>
+> 1. **"Puzzle" is now the primary noun, not a segment type.** The structure
+>    diagram has one "traversal/puzzle" leg between two encounters. Under O31
+>    the *encounters themselves* are the puzzles; a raid is many distinct
+>    problems, and combat is how a solved problem is executed rather than the
+>    thing the puzzle interrupts. The four-checkpoint shape survives; what sits
+>    inside each checkpoint does not.
+> 2. **"Many distinct encounters" raises the count.** The diagram authors two
+>    encounters, a gauntlet and a final boss. That is a Destiny raid's skeleton
+>    at its thinnest. O31 asks for a roster of situations, which is a content
+>    volume question this treatment does not cost. **Not costed here.**
+> 3. **The seven-player split becomes the delivery mechanism, not a flavour
+>    note.** The "seven is deliberately awkward" paragraph below already
+>    proposes asymmetric 3/4 and 2/2/3 splits. Under O31 that stops being a
+>    signature and becomes the *structural answer* to "rewarded for team play" —
+>    the reward is for the split being solved, not for damage dealt.
+> 4. **A fifth encounter constraint is added, and it is the strictest one in
+>    this document.** See below.
+>
+> **THE PARTICIPATION FLOOR.** No raid encounter may reduce any legal build's
+> contribution to zero. **Weak is allowed and is explicitly endorsed by O31;
+> excluded is not.** The distinction is testable: if there is no action a build
+> can take that advances the encounter, the encounter is illegal, however
+> flavourful the reason.
+>
+> `Core-Constellations.md` §9 and `Encounter-Design.md` §0 name the same three
+> hardest cases, and a raid encounter must be checked against all three:
+>
+> | Build | Excluded by |
+> |---|---|
+> | **FIXATION** (Precision keystone) | Any phase where damage must land on more than one target at once. Off-target Critical Chance is **zero**, not reduced. |
+> | **TERMINAL** (Affliction keystone) | Any phase where the target does not die and has no reachable weak point. Banked damage is delivered on death, expiry, or a weak-point hit — otherwise nothing is delivered at all. |
+> | **PERPETUAL** (Volley keystone) | Any short burst window. It cannot reload; a four-second damage window opening once per phase excludes it structurally. |
+>
+> **The cheap general fix, recorded as a design pattern rather than a rule:**
+> give every encounter at least two lanes that advance it — typically a damage
+> lane and a mechanic lane (carry, interrupt, position, solve) — and let a build
+> weak in one be strong in the other. That is also what makes "puzzles rewarded
+> for team play" and "every build participates" the *same* design rather than
+> two constraints in tension. **It is a pattern, not a ruling; the owner may
+> want a different answer.**
+>
+> **Not audited:** no encounter in this section or in `Encounter-Design.md` has
+> been checked against the floor, and the slice boss's phases predate O31
+> entirely. Recorded in OPEN QUESTIONS.
+
 **7 players. Handcrafted. Instanced. Checkpointed.**
 
 **Function:** the game's ceiling. The most reliable T-1 source and the home of a small set of Raid-exclusive Anomalous items that each imply a whole build (4.6).
@@ -502,6 +601,11 @@ The Frontier reward package, per completed run:
 - No encounter requires air jump or parry — those are tree verbs and the group cannot assume anyone has them.
 - No encounter requires a specific class. A raid that needs a Tank is a raid that cannot be matchmade or scheduled.
 - Boss DoT and armour-reduction caps apply, per 7.10 risk 5.
+- **[O31] No encounter reduces any legal build's contribution to zero.** The
+  four constraints above forbid *requiring* something; this one forbids
+  *excluding* something, which is the failure mode they do not cover. A build
+  may be weak; it may not be a passenger. Test against FIXATION, TERMINAL and
+  PERPETUAL — see the O31 block at the top of this section.
 
 **Rewards:** guaranteed T-1 affix from the final boss (one per character per lockout), Raid-exclusive Anomalous items at a low rate, and the largest crafting material payout in the game. **Raids must not be a required stop for build completion** — everything a Raid drops must have a slower path elsewhere, or 11.1's solo balance target is a lie.
 
@@ -551,10 +655,13 @@ Blocking prerequisites from the master sheet that this document depends on: item
 3. **Solo death budget in Frontiers.** §4.7 gives solo 1 death and a 5-player party 3. Per capita this is harsher on groups but in aggregate harsher on solo. Does this survive the solo-primary balance target, or does solo need 2?
 4. **Does Conquest's contribution-weighted reward create a griefing or kill-stealing dynamic** at 9 matchmade players? Needs a scoring model before implementation.
 5. **Are Frontier tiers infinite or capped at 30?** (9.4 open item, restated for this mode.) Infinite tiers are a soft paragon track and arguably contradict the 7.1 hard stop in spirit even though they grant no power. Recommendation: **cap at 30**, then let modifier count and pack density be the ceiling.
-6. **Do Raid-exclusive Anomalous items have a slower non-Raid path?** §6 asserts they must, for 11.1. If they do not, group content gates build completion and the solo balance target is violated. Needs an explicit yes.
+6. **Do Raid-exclusive *legendaries* have a slower non-Raid path?** §6 asserts they must, for 11.1. If they do not, group content gates build completion and the solo balance target is violated. Needs an explicit yes. **[O32] Re-read: this question was written as "Anomalous items" and means LEGENDARIES** — see the vocabulary correction at the top. That makes it a bigger question than it looks: O32 rules that the fix for legendary cadence is authoring more legendaries, and only three exist (Boots, Primary, Waist). **Committing to Raid-exclusive legendaries commits to authoring named items off a list that has five empty slots and no owner.**
 7. **How many tile modules does the Frontier assembler need before layouts stop feeling repetitive?** Estimate 25-35 per tileset. This is a content-cost question with a large budget implication and it should be answered with a prototype, not an estimate.
 8. **Loot distribution in party content** (11.3, unresolved upstream). This document assumes instanced-per-player throughout. If that assumption is wrong, every party mode's reward section changes.
 9. **Does Anchor defense exist as a content type?** (10.3 open.) Not designed here. It would most naturally be a Conquest variant with an inverted objective, which is cheap — but it competes with Conquest for the same player time.
 10. **Do modifiers persist per-account as unlocks, or roll from a global pool?** §4.4 assumes global pool. Unlockable modifiers would give the endgame a progression texture without granting power, which is attractive — but it is close to a horizontal post-cap unlock, which 9.3 explicitly holds in reserve and says not to build.
 11. **Elite modifier list** (10.3 open). §4.3 assumes elites exist with authored behaviour beyond stat multiples. That list is a separate design pass and Severed/Frontier packs are blocked on it.
 12. **Does the ~2% silhouette in the Act III+ closing ritual (§3.5) survive a "no unexplained content" review?** It is deliberately never acknowledged. Confirm this is wanted before it is built, because it is the kind of thing that gets cut in QA as a bug.
+13. **[O31] Has any encounter, in this document or in `Encounter-Design.md`, been audited against the participation floor?** No. §6's four inherited constraints all forbid *requiring* something and none of them forbids *excluding* something, which is the failure O31 names. The slice boss's phases predate the ruling entirely. Needs a design pass with FIXATION, TERMINAL and PERPETUAL as the test cases — see §6's O31 block.
+14. **[O31] Is "many distinct encounters" a content-volume commitment, and how many?** §6's structure diagram authors two encounters plus a gauntlet plus a boss. O31 asks for many distinct situations, Destiny-style. That is a volume question with a real budget behind it and this treatment does not cost it.
+15. **[O29] Does item level 120 change the mode reward tables?** §3.7's rift tiering, §4.6's Frontier rewards and §6's guaranteed T-1 were all authored against a T8..T-1 ladder and a 50-ish item level ceiling. O29 runs item level to **120** and widens the ladder to **T12..T-1** with values tuned up and back-loaded at the high end. **A guaranteed T-1 means something different now**, and which mode supplies which *item level* band is unauthored anywhere. This interacts with open question 2, which is already named as the largest blocker here.
