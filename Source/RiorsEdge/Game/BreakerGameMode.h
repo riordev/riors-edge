@@ -303,6 +303,14 @@ public:
     // Deterministic in the seed, so two runs of the same wave meet the same
     // Champions and a screenshot of wave 4 is comparable with the last one.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") int32 ModifierSeedBase = 20260814;   // O2 PLACEHOLDER
+    // NON-elite modifier carriers in the standing gym encounter (O27's
+    // kill-bucket producer — see Playtest/BreakerKillBuckets.h). Elites keep
+    // their current behaviour (GrantModifiers restores rank Elite); these
+    // plain trash bodies KEEP the promotion to rank ModifierBearing instead,
+    // which is the only thing that makes that TTK bucket non-empty. O9 keeps
+    // Rank and Modifiers as separate fields, so this is not a contradiction of
+    // the elite's own modifier tell.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers", meta=(ClampMin="0")) int32 GymModifierCarrierCount = 2;   // O2 PLACEHOLDER
 
     // --- Ammo economy (O2 placeholders) ------------------------------------
     // Third and last resupply channel alongside kill drops and wave-clear:
@@ -412,6 +420,13 @@ private:
     // re-derive-after-the-chassis order ConfigureWithModifiers itself uses, and
     // for the same reason.
     void GrantModifiers(class ABreakerEnemy* Enemy, int32 Seed) const;
+    // Grants modifiers to a NON-elite enemy that must KEEP rank
+    // ModifierBearing at kill time. Unlike GrantModifiers, this does NOT
+    // capture-and-restore an authored rank: ConfigureWithModifiers's
+    // unconditional promotion to ModifierBearing IS the desired outcome for a
+    // carrier. See Playtest/BreakerKillBuckets.h for why this bucket existed
+    // and was never reachable before this pair of functions.
+    void GrantModifierCarrier(class ABreakerEnemy* Enemy, int32 Seed) const;
     // §4.3's "loot only on rest and boss waves". Reaches a protected property
     // by reflection because adding a setter would mean editing Combat/ — see
     // the note at the implementation.

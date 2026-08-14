@@ -1,7 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "GameFramework/Actor.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -150,6 +153,84 @@ bool FBreakerClassLockNotifiesLoopTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A dev swap to Swift wakes the loop"), DevMomentum->IsActiveForOwner());
     DevProgression->DevForceClass(EBreakerClassId::Caster);
     TestFalse(TEXT("A dev swap away from Swift puts the loop back to sleep"), DevMomentum->IsActiveForOwner());
+    return true;
+}
+
+// THE SAME WORLD-FREE TESTABILITY UBreakerManaComponent::AdvanceLoop ALREADY
+// HAS. TickComponent's body is now mechanically split into AdvanceLoop (no
+// value or behaviour change) for exactly the reason Mana's already was:
+// UActorComponent::TickComponent asserts on an unregistered component, which
+// every component built in this suite is, so nothing in the old body was
+// reachable from automation at all. This proves AdvanceLoop is real and
+// reachable, not merely that it compiles — through the decay branch and the
+// decay-suspension branch, both real paths a live playtest actually runs.
+//
+// NOTE ON A DIVERGENCE DELIBERATELY NOT UNIFIED: unlike Mana's AdvanceLoop,
+// this one does NOT poll class ownership every tick as a defensive backstop —
+// it relies solely on the bound OnProgressionChanged delegate (proven by
+// RiorsEdge.Classes.ClassLockNotifiesLoop above). That is a real mechanism
+// difference between the two class-resource loops, left as-is per this
+// lane's scope.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumAdvanceLoopTest,
+    "RiorsEdge.Classes.MomentumAdvanceLoop",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumAdvanceLoopTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>(Owner);
+    UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>(Owner);
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    // Found by AdvanceLoop through Owner->FindComponentByClass, never called
+    // directly here — its presence is what lets the ground/decay branches run
+    // at all instead of AdvanceLoop bailing out on a null GetBreakerMovement().
+    TestNotNull(TEXT("The movement component attaches to the rig"), Movement);
+
+    // Same rig order as the Mana Overcast helpers: lock the class BEFORE
+    // binding, so BindAttributes' internal HandleProgressionChanged finds the
+    // sibling UBreakerProgressionComponent already holding Swift.
+    Progression->DevForceClass(EBreakerClassId::Swift);
+    Momentum->BindAttributes(Attributes);
+    TestTrue(TEXT("A Swift-locked rig runs the Momentum loop"), Momentum->IsActiveForOwner());
+
+    Attributes->ApplyClassResource(50.0f);
+    TestEqual(TEXT("The bank holds what it was given"), Momentum->GetMomentum(), 50.0f);
+
+    // Zero velocity (the movement component's untouched default) is well
+    // under SettledSpeed, so AdvanceLoop's decay branch runs once the grace
+    // period elapses — exactly the old TickComponent body's behaviour.
+    for (int32 Step = 0; Step < 15; ++Step)
+    {
+        Momentum->AdvanceLoop(0.1f);
+    }
+    TestTrue(TEXT("AdvanceLoop decays a standing bank with no world"), Momentum->GetMomentum() < 50.0f);
+
+    // A decay-suspending loop override (Overdrive's shape) reaches the SAME
+    // branch and turns it off, proving AdvanceLoop reads loop overrides too.
+    Attributes->ApplyClassResource(50.0f);
+    Momentum->PushLoopOverride(TEXT("Test.SuspendDecay"), /*bSuspendDecay=*/true, /*GenerationMultiplier=*/1.0f, /*Duration=*/-1.0f);
+    for (int32 Step = 0; Step < 15; ++Step)
+    {
+        Momentum->AdvanceLoop(0.1f);
+    }
+    TestEqual(TEXT("A decay-suspending override reaches AdvanceLoop and holds the bank"), Momentum->GetMomentum(), 50.0f);
+    Momentum->PopLoopOverride(TEXT("Test.SuspendDecay"));
+
+    // A non-Swift owner's AdvanceLoop is a no-op, exactly like the old
+    // TickComponent's early-out for !IsActiveForOwner().
+    AActor* TankOwner = NewObject<AActor>();
+    UBreakerProgressionComponent* TankProgression = NewObject<UBreakerProgressionComponent>(TankOwner);
+    UBreakerCharacterMovementComponent* TankMovement = NewObject<UBreakerCharacterMovementComponent>(TankOwner);
+    UBreakerMomentumComponent* TankMomentum = NewObject<UBreakerMomentumComponent>(TankOwner);
+    UBreakerAttributeSet* TankAttributes = NewObject<UBreakerAttributeSet>();
+    TestNotNull(TEXT("The Tank rig's movement component attaches too"), TankMovement);
+    TankProgression->DevForceClass(EBreakerClassId::Tank);
+    TankMomentum->BindAttributes(TankAttributes);
+    TankAttributes->ApplyClassResource(30.0f);
+    TankMomentum->AdvanceLoop(5.0f);
+    TestEqual(TEXT("A Tank's AdvanceLoop touches nothing"), TankMomentum->GetMomentum(), 30.0f);
     return true;
 }
 

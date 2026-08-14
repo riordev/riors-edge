@@ -341,10 +341,14 @@ void UBreakerManaComponent::AdvanceLoop(float DeltaTime)
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
 
-    // Class changes that do not broadcast (DevForceClass, and any future path
-    // that mutates the progression state directly) would otherwise leave this
-    // component publishing a Caster floor for a non-Caster. Cheap comparison,
-    // and it is the safety net that guarantees the floor cannot be stranded.
+    // Defensive backstop, not a workaround for a broadcast that never fires:
+    // DevForceClass DOES call OnProgressionChanged.Broadcast(). This poll
+    // covers what the broadcast alone cannot — a component bound via
+    // BindAttributes with no BeginPlay never registers for the delegate at
+    // all, and no future mutator of PermanentClass is guaranteed to
+    // broadcast — so it is what would otherwise leave this component
+    // publishing a Caster floor for a non-Caster. Cheap comparison, and it is
+    // the safety net that guarantees the floor cannot be stranded.
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     const EBreakerClassId LiveClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     if (LiveClass != ObservedClass) RefreshClassOwnership();

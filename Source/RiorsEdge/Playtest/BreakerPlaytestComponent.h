@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Playtest/BreakerKillBuckets.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "BreakerPlaytestComponent.generated.h"
@@ -35,6 +36,16 @@ struct RIORSEDGE_API FBreakerPlaytestStats
     // number O18's re-anchor reads by more than a hundred trash kills could.
     UPROPERTY(BlueprintReadOnly) TArray<float> ModifierTimeToKillSamples;
     UPROPERTY(BlueprintReadOnly) TArray<float> BossTimeToKillSamples;
+
+    // TTD instrumentation — the unmeasured half of O18 ("TTD: 4-5 seconds
+    // with no resources/sustain"). The F2 report used to print that target
+    // and measure nothing. Same engagement-gapped discipline as the TTK
+    // arrays above, applied to the PLAYER's own incoming damage instead of an
+    // enemy's (Combat/BreakerEnemy.cpp is the pattern this reproduces;
+    // READ-ONLY to this lane). Deliberately NOT wiped by ResetStats(): see
+    // UBreakerPlaytestComponent::ResetStats for why.
+    UPROPERTY(BlueprintReadOnly) int32 Deaths = 0;
+    UPROPERTY(BlueprintReadOnly) TArray<float> TimeToDeathSamples;
 
     // Read-only routing so nothing outside this struct has to know which array
     // is which. Non-const twin below for the writer.
@@ -93,13 +104,46 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest") bool AreDiagnosticsVisible() const { return bDiagnosticsVisible; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetSecondsSinceReportCopy() const;
 
+    // --- TTD instrumentation (O18's unmeasured half) ------------------------
+    // Pure world-free maths: one step of the SAME engagement-gapped
+    // accumulation discipline Combat/BreakerEnemy.cpp uses for its TTK sample
+    // (that file is READ-ONLY to this lane; this reproduces the rule rather
+    // than editing it there) — gaps between damage events longer than
+    // GapCapSeconds are disengagement, not fighting, and are capped rather
+    // than counted in full. Precedent for pure, static, world-free,
+    // unit-testable rule maths living on the owning component: this mirrors
+    // UBreakerMomentumComponent/UBreakerManaComponent's own static rule
+    // functions (GroundSpeedRate, HitGeneration, ...) and, one domain over,
+    // Combat/BreakerRangedBehavior.h.
+    UFUNCTION(BlueprintPure, Category="Playtest|Engagement")
+    static float AccumulateEngagedSeconds(double Now, double LastEventTime, float AccumulatedSeconds, float GapCapSeconds);
+
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
     UFUNCTION() void HandleReload(bool bReloading);
+    // Bound to the owner's UBreakerCombatComponent. Mirrors
+    // ABreakerEnemy::HandleDamageReceived / HandleDeath exactly: damage
+    // accumulates engaged seconds, death consumes them into one sample and
+    // clears the accumulator, and OnVitalsRestored (F1, fall-out-of-map, any
+    // non-death reset) clears the accumulator WITHOUT recording a sample, so
+    // a manual reset mid-fight cannot leak a stale partial engagement into
+    // the next life's number.
+    UFUNCTION() void HandleIncomingDamageForTTD(const FBreakerDamageResult& Result);
+    UFUNCTION() void HandleDeathForTTD();
+    UFUNCTION() void HandleVitalsRestoredForTTD();
 
     UPROPERTY() FBreakerPlaytestStats Stats;
     bool bDiagnosticsVisible = true;
     mutable double LastReportCopyTime = -1000.0;
     EBreakerKillBucket PendingKillBucket = EBreakerKillBucket::Count;
     double PendingKillBucketTime = -1000.0;
+
+    // Same cap the enemy TTK sampler uses (Combat/BreakerEnemy.cpp, 1.5s).
+    // Named rather than a bare literal so a retune of the MEASUREMENT
+    // discipline is one field, not a grep; not O2-flagged because it is a
+    // sampling-methodology constant, not a balance value.
+    UPROPERTY(EditAnywhere, Category="Playtest|Engagement", meta=(ClampMin="0")) float EngagementGapCapSeconds = 1.5f;
+    double FirstEngagementTime = -1.0;
+    double LastIncomingDamageTime = -1.0;
+    float EngagedSecondsThisLife = 0.0f;
 };

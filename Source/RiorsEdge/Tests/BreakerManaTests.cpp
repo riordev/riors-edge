@@ -301,8 +301,12 @@ bool FBreakerOvercastFloorClosesTest::RunTest(const FString& Parameters)
     Rig.Mana->TrySpendMana(45.0f);
     TestTrue(TEXT("The Caster is in debt before the change"), Rig.Mana->IsOvercast());
 
-    // DevForceClass deliberately does NOT broadcast OnProgressionChanged, so
-    // this exercises the tick-side poll, which is the real safety net.
+    // DevForceClass itself DOES broadcast OnProgressionChanged
+    // (BreakerProgressionComponent.cpp) — but this rig built Mana through
+    // BindAttributes alone, the same as a component wired up outside
+    // BeginPlay, so it never registered for that delegate in the first
+    // place. That is what makes this exercise the tick-side poll, which is
+    // the real safety net for exactly that case.
     Rig.Progression->DevForceClass(EBreakerClassId::Swift);
     RunFor(Rig.Mana, 0.1f);
 

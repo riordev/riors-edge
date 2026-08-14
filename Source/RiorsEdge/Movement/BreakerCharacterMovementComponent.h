@@ -98,8 +98,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement|Jump") int32 GetGrantedJumpCount() const { return GrantedJumpCount; }
     UFUNCTION(BlueprintCallable, Category="Movement|Jump") void RefreshJumpGrant();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 700.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1100.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 700.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1100.0f;   // O2 PLACEHOLDER
 
     // --- Weight (owner report: "movement should be less floaty") ---------
     // Everything in this category is new; the OLD behaviour is "no curve at
@@ -127,24 +127,24 @@ public:
     // attributes cleanly (O26: this executes an owner request, it does not open
     // a movement pass). If it is STILL heavy, the next dial is
     // LandingMinimumSpeedScale to 1.0, which deletes the landing cost outright.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float FallGravityMultiplier = 1.55f; // WAS 1.80f AT THE WEIGHT PASS (1.0 = no curve at all)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float FallGravityMultiplier = 1.55f; // WAS 1.80f AT THE WEIGHT PASS (1.0 = no curve at all) — O2 PLACEHOLDER
     // Gravity multiplier exactly at the apex, where vertical velocity is near
     // zero and hang time is felt directly. Blended into 1.0 on the way up and
     // into FallGravityMultiplier on the way down, so the curve is continuous.
     // OLD: 1.0 (no apex treatment existed).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float ApexGravityMultiplier = 1.50f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float ApexGravityMultiplier = 1.50f;   // O2 PLACEHOLDER
     // Half-width of the apex band, in cm/s of vertical speed. OLD: n/a.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float ApexBandSpeed = 220.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float ApexBandSpeed = 220.0f;   // O2 PLACEHOLDER
     // Terminal velocity, so the heavier fall curve cannot turn a long drop into
     // a bullet. Binds well before the physics volume's 4000. 0 disables.
     // OLD: 0 (only the volume's 4000 cm/s applied).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float MaxFallSpeed = 2400.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float MaxFallSpeed = 2400.0f;   // O2 PLACEHOLDER
     // Variable jump height: releasing jump while still rising scales the
     // remaining rise by this. Authority over the arc reads as control rather
     // than drift. 1.0 restores the old fixed-height jump. OLD: 1.0.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float JumpCutMultiplier = 0.55f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float JumpCutMultiplier = 0.55f;   // O2 PLACEHOLDER
     // Below this rise speed a cut is not worth the discontinuity. OLD: n/a.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float JumpCutMinimumRiseSpeed = 50.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float JumpCutMinimumRiseSpeed = 50.0f;   // O2 PLACEHOLDER
     // Written onto ACharacter::JumpMaxHoldTime at BeginPlay. The engine clears
     // bPressedJump one frame after the press when this is 0, which leaves the
     // movement layer with no way to see a release; this window keeps the flag
@@ -152,15 +152,15 @@ public:
     // time (~0.45 s) or a held jump would read as a release and self-cut. The
     // engine's own hold-to-rise is suppressed in DoJump. OLD: 0 (engine
     // default; the character never authored it).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float JumpHoldWindow = 0.60f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float JumpHoldWindow = 0.60f;   // O2 PLACEHOLDER
     // Landing impact. Below LandingHeavyFallSpeed a landing costs nothing (a
     // full-height jump lands at about 920 cm/s, so ordinary jumping is never
     // taxed); from there to LandingMaxFallSpeed the horizontal speed kept on
     // arrival ramps down to LandingMinimumSpeedScale. A queued slide owns its
     // own landing and is exempt. OLD: no landing behaviour whatsoever.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float LandingHeavyFallSpeed = 950.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float LandingMaxFallSpeed = 2400.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float LandingMinimumSpeedScale = 0.78f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float LandingHeavyFallSpeed = 950.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float LandingMaxFallSpeed = 2400.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float LandingMinimumSpeedScale = 0.78f;   // O2 PLACEHOLDER
 
     // --- Jump budget (ruling O25) ------------------------------------------
     // "TWO JUMPS are base kit for everyone and Swift innately unlocks a third
@@ -218,25 +218,25 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Air Movement", meta=(ClampMin="0")) float AirSteerRate = 4.2f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Air Movement", meta=(ClampMin="-1", ClampMax="1")) float AirSteerMinimumAlignment = -0.2f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedFloor = 1500.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedBonus = 200.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashVerticalFloor = 80.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashCooldown = 4.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float MomentumHardCap = 4200.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedFloor = 1500.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashSpeedBonus = 200.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashVerticalFloor = 80.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashCooldown = 4.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float MomentumHardCap = 4200.0f;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 550.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoost = 120.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoostDuration = 0.35f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBoostCooldown = 1.2f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideExitSpeed = 450.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideGroundFriction = 1.2f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBrakingDeceleration = 350.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideSlopeAcceleration = 900.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideMaxDuration = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 550.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoost = 120.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoostDuration = 0.35f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBoostCooldown = 1.2f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideExitSpeed = 450.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideGroundFriction = 1.2f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBrakingDeceleration = 350.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideSlopeAcceleration = 900.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideMaxDuration = 1.0f;   // O2 PLACEHOLDER
 
     // Short wall ride: preserves traversal flow without generating speed or
     // replacing combat.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMaxDuration = 0.85f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMaxDuration = 0.85f;   // O2 PLACEHOLDER
     // BUG FIX (owner: "wall riding doesnt work"). This gate is read AFTER the
     // engine has already deflected the approach velocity along the wall, so it
     // must be sized for the along-wall speed that SURVIVES contact, not for the
@@ -248,16 +248,16 @@ public:
     // this component already follows: an entry threshold sits strictly BELOW
     // the speed it gates (slide enters at 550, under the 700 walk speed).
     // Covered by RiorsEdge.Movement.WallRideEntry.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMinimumSpeed = 450.0f; // OLD: 700.0f (== WalkSpeed, unreachable)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideGravityScale = 0.55f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideTraceDistance = 85.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpAwaySpeed = 650.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpUpSpeed = 650.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideCooldown = 0.3f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMinimumSpeed = 450.0f; // OLD: 700.0f (== WalkSpeed, unreachable) — O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideGravityScale = 0.55f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideTraceDistance = 85.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpAwaySpeed = 650.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpUpSpeed = 650.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideCooldown = 0.3f;   // O2 PLACEHOLDER
     // The wall jump keeps its own exit floor. It used to borrow
     // WallRideMinimumSpeed, so lowering the entry gate above would silently
     // have made every wall jump weaker — two different jobs, two values.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpMinimumSpeed = 700.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpMinimumSpeed = 700.0f;   // O2 PLACEHOLDER
     // FEEL, not a bug fix. Two jumps are base kit (O25) and are spent by the
     // time most players reach a wall, so a wall jump used to launch you with
     // nothing left and no way to correct — which is most of what "awkward"

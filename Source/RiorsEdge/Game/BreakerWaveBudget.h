@@ -92,6 +92,29 @@ struct RIORSEDGE_API FBreakerWaveBudgetParams
     // is §1.3's ceiling and the composition rules stop it being a sponge.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Introduction", meta=(ClampMin="1")) int32 WavesPerExtraEliteModifier = 8;   // O2 PLACEHOLDER
 
+    // --- Modifier carriers (O27's kill-bucket producer) --------------------
+    // NON-elite bodies that are promoted to rank ModifierBearing and KEEP it —
+    // see Playtest/BreakerKillBuckets.h: today modifiers only ever land on the
+    // elite promotion above, which is captured-and-restored back to rank Elite
+    // after rolling (correctly, for an elite), so rank ModifierBearing never
+    // existed at kill time and the ModifierBearing TTK bucket, "the one number
+    // that says whether [O27] worked", was structurally empty. A carrier is the
+    // fix: it is a promoted Skitter body exactly like the elite above (folded
+    // into Out.Skitters, not counted separately), so introducing it spends more
+    // of the SAME melee budget rather than adding bodies — the Lattice
+    // precedent (taken OUT OF the melee budget so density is unchanged).
+    // From wave 4 — the same wave the Skirmisher and the first elite both
+    // arrive on, so budget is already tight there and a carrier may not
+    // actually be affordable until a few waves later; that is the budget
+    // curve and the density caps colliding exactly as documented above, not a
+    // bug in this feature.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Introduction", meta=(ClampMin="1")) int32 ModifierCarrierFromWave = 4;   // O2 PLACEHOLDER
+    // Wave/Divisor, so the count ramps the same shape the Lattice count does.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Introduction", meta=(ClampMin="1")) int32 ModifierCarrierWaveDivisor = 3;   // O2 PLACEHOLDER
+    // Capped at 2: enough to make the bucket measurable without turning every
+    // wave's whole Skitter fill into modifier reading.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Introduction", meta=(ClampMin="0")) int32 MaximumModifierCarriers = 2;   // O2 PLACEHOLDER
+
     // §5.3's hard caps. Every one of them has a reason written beside it in the
     // document, which is why they win against the budget curve when the two
     // disagree.
@@ -128,6 +151,11 @@ struct RIORSEDGE_API FBreakerWaveComposition
     // upgraded. Counting it separately would double it into the density cap.
     UPROPERTY(BlueprintReadOnly) int32 Elites = 0;
     UPROPERTY(BlueprintReadOnly) int32 ModifiersPerElite = 0;
+
+    // Non-elite modifier carriers — also PROMOTIONS, also folded into the
+    // Skitters count above, exactly like Elites. The kill-bucket producer for
+    // rank ModifierBearing (Playtest/BreakerKillBuckets.h).
+    UPROPERTY(BlueprintReadOnly) int32 ModifierCarriers = 0;
 
     // §4.3: loot only on rest and boss waves, or the gym becomes a farm and the
     // drop-rate data it exists to collect is worthless.

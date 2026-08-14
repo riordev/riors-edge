@@ -73,6 +73,13 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // QuestCounters is additive; an empty map is the correct value for
             // a file written before any objective could be counted.
             break;
+        case 2:
+            // ForgeWallet is additive, exactly like QuestCounters at the v1 ->
+            // v2 step: a v2 file has no such property, so deserialization
+            // already left it at the struct's own default-constructed zero
+            // wallet, which is exactly correct for a save written before
+            // wallet persistence existed. Nothing to transform.
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its
