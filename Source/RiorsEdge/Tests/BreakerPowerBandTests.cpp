@@ -295,6 +295,41 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
         Optimized.EffectiveCrit / Baseline.EffectiveCrit,
         Ratio));
 
+    // ---- O29 MOVED THIS BAND, and the deviation is deliberately not papered
+    // over. Two things happened, and only the first is arithmetic.
+    //
+    // 1. The tier ladder is back-loaded now, so the DISTANCE between a mediocre
+    //    roll and a perfect one grew. The two loadouts below are authored at T5
+    //    and T1. On the old linear ladder T1/T5 was 180/91.4 = 1.97x; on the
+    //    back-loaded ladder it is 400/120.9 = 3.31x. That 1.68x widening of the
+    //    gear layer compounds through the flat lane and the crit lane, and the
+    //    composed band goes 8.74x -> ~23.7x.
+    //
+    // 2. More importantly, THE FIXTURE NOW DESCRIBES A CHARACTER THAT CANNOT
+    //    EXIST. Both loadouts are built at item level 50, and under O29 item
+    //    level 50 is mid-ladder: BestTierForItemLevel(50) is T8, so neither a
+    //    T5 nor a T1 roll is obtainable there at any rarity. The 8-10x band was
+    //    measured on a pairing the loot pipeline could produce before O29 and
+    //    cannot produce after it.
+    //
+    // Which means the honest reading of the failure is not "the band broke". It
+    // is that O29 MOVED WHERE THE BAND LIVES: the spread between a decent item
+    // and a perfect one is no longer available at the character cap, it is
+    // available in the endgame, which is exactly what "all endgame character
+    // power comes from gear" is supposed to mean.
+    //
+    // This is left FAILING rather than retuned. O27's band is the owner's
+    // subject and the fixture's item level is a design question, not a test
+    // maintenance one: either the band widens because the endgame is longer, or
+    // the fixture moves to ilvl 120 with tiers the ladder can actually produce
+    // (T3 vs T1 reproduces roughly the old 1.97x gear spread), or the ceiling
+    // anchors come back down. All three are rulings.
+    AddInfo(FString::Printf(
+        TEXT("O29: band %.2fx against the authored %.0f-%.0fx. Fixture is ilvl 50 at T5/T1; ")
+        TEXT("BestTierForItemLevel(50) is now T%d, so neither tier is rollable at that item level. ")
+        TEXT("See the comment above before retuning anything."),
+        Ratio, PowerBandMinimum, PowerBandMaximum, UBreakerAffixLibrary::BestTierForItemLevel(50)));
+
     // The assertion O27 is actually about.
     TestTrue(*FString::Printf(TEXT("Composed band %.2fx is at least %.1fx"), Ratio, PowerBandMinimum), Ratio >= PowerBandMinimum);
     TestTrue(*FString::Printf(TEXT("Composed band %.2fx is at most %.1fx"), Ratio, PowerBandMaximum), Ratio <= PowerBandMaximum);
@@ -348,7 +383,12 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
 // moved.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerRuleBandImpactTest,
-    "RiorsEdge.Progression.PowerBand.RuleImpact",
+    // RENAMED off "RiorsEdge.Progression.PowerBand.RuleImpact". UE's automation
+    // tree cannot hold a leaf test at a node that is also a PARENT, so this
+    // test's path was silently swallowing RiorsEdge.Progression.PowerBand
+    // itself: the 8-10x band assertion was not enumerated and had not run since
+    // this test was added. Found while measuring O29's effect on the band.
+    "RiorsEdge.Progression.RuleBandImpact",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)

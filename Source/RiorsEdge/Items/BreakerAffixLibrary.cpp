@@ -2,28 +2,48 @@
 
 float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, int32 Tier)
 {
-    const int32 ClampedTier = FMath::Clamp(Tier, -1, 8);
-    if (ClampedTier == 0) return Affix.ValueAtT1 * 1.4f;
-    if (ClampedTier == -1) return Affix.ValueAtT1 * 1.8f;
-    // T8..T1 interpolates linearly; Alpha 0 at T8, 1 at T1.
-    const float Alpha = (8.0f - static_cast<float>(ClampedTier)) / 7.0f;
-    return FMath::Lerp(Affix.ValueAtT8, Affix.ValueAtT1, Alpha);
+    const int32 ClampedTier = FMath::Clamp(Tier, TopTier, WorstTier);
+    if (ClampedTier == 0) return Affix.ValueAtT1 * TierSpikeT0Multiplier;
+    if (ClampedTier == TopTier) return Affix.ValueAtT1 * TierSpikeTopMultiplier;
+
+    // Position along the ladder: 0 at the worst tier, 1 at the best normal one.
+    const float Span = static_cast<float>(WorstTier - BestNormalTier);
+    const float Position = (static_cast<float>(WorstTier - ClampedTier)) / Span;
+    const float Shaped = FMath::Pow(FMath::Clamp(Position, 0.0f, 1.0f), TierCurveExponent);
+
+    // Geometric between the two authored anchors — see the derivation on the
+    // declaration. The geometric form needs a positive floor and a ceiling
+    // above it; an affix authored with a zero or inverted band falls back to a
+    // shaped LERP, which is still monotonic and still back-loaded rather than
+    // producing a NaN in the damage pipeline. Nothing in the slice pool takes
+    // that branch, and RiorsEdge.Items.TierLadder covers it so the first affix
+    // that does is not a silent zero.
+    if (Affix.ValueAtT12 <= UE_KINDA_SMALL_NUMBER || Affix.ValueAtT1 <= Affix.ValueAtT12)
+    {
+        return FMath::Lerp(Affix.ValueAtT12, Affix.ValueAtT1, Shaped);
+    }
+    return Affix.ValueAtT12 * FMath::Pow(Affix.ValueAtT1 / Affix.ValueAtT12, Shaped);
 }
 
 int32 UBreakerAffixLibrary::BestTierForItemLevel(int32 ItemLevel)
 {
-    // Levels 1-50 map onto T8..T1: one tier unlocked roughly every 7 levels.
-    const int32 Clamped = FMath::Clamp(ItemLevel, 1, 50);
-    return FMath::Clamp(8 - (Clamped - 1) / 7, 1, 8);
+    // Levels 1-120 map onto T12..T1: one tier unlocked every 10 levels.
+    // 120 / 12 tiers is exact, so T1's band is ilvl 111-120 and every other
+    // tier owns a full ten levels — the old ladder gave T1 the single level 50
+    // and nothing else, which made the top tier a threshold rather than a band.
+    const int32 Clamped = FMath::Clamp(ItemLevel, 1, MaxItemLevel);
+    const int32 LevelsPerTier = MaxItemLevel / WorstTier;   // 10
+    return FMath::Clamp(WorstTier - (Clamped - 1) / LevelsPerTier, BestNormalTier, WorstTier);
 }
 
 int32 UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity Rarity)
 {
+    // Re-derived for the 12-tier ladder; the derivation is on the declaration.
     switch (Rarity)
     {
-    case EBreakerItemRarity::Standard: return 3;
-    case EBreakerItemRarity::Uncommon: return 1;
-    default: return -1;
+    case EBreakerItemRarity::Standard: return 4;   // O2 PLACEHOLDER
+    case EBreakerItemRarity::Uncommon: return 2;   // O2 PLACEHOLDER
+    default: return TopTier;
     }
 }
 
@@ -49,7 +69,7 @@ namespace
         EBreakerStatTarget StatTarget,
         EBreakerStatBucket StatBucket,
         std::initializer_list<EBreakerEquipSlot> Slots,
-        float ValueAtT8,
+        float ValueAtT12,
         float ValueAtT1,
         float RollWeight = 100.0f,
         EBreakerBuildCondition Condition = EBreakerBuildCondition::Always)
@@ -61,7 +81,7 @@ namespace
         Affix.StatTarget = StatTarget;
         Affix.StatBucket = StatBucket;
         Affix.AllowedSlots = Slots;
-        Affix.ValueAtT8 = ValueAtT8;
+        Affix.ValueAtT12 = ValueAtT12;
         Affix.ValueAtT1 = ValueAtT1;
         Affix.RollWeight = RollWeight;
         Affix.Condition = Condition;
@@ -77,9 +97,28 @@ namespace
             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary
         };
 
+        // O29 UPLIFT. Every ceiling anchor below went up ~2.2x with the
+        // widened ladder; every FLOOR anchor is untouched. That combination is
+        // deliberate and it is what makes the change safe to ship:
+        //
+        //  - The floor is the item level 1 value, so a level-1 drop is
+        //    bit-identical to what it was before O29 and the only content
+        //    anybody has played does not silently move.
+        //  - The pool scales UNIFORMLY, so no line becomes stronger relative
+        //    to another. The per-slot identity table, the archetype leans and
+        //    the offensive/defensive balance are all preserved exactly; what
+        //    changed is how much a deep item level is worth, which is the
+        //    entire subject of O29.
+        //
+        // Every number here remains an O2 PLACEHOLDER and EditAnywhere on the
+        // definition. NOTE FOR THE MOVEMENT LAYER: Move.* and Core.MoveSpeed
+        // inherited the same 2.2x, so the composed movement band in
+        // Docs/Movement-Design.md is now reachable from gear alone at high item
+        // level. That is a balance question for Movement/, which this lane does
+        // not own; it is called out rather than pre-emptively retuned.
         TArray<FBreakerAffixDefinition> Pool;
-        Pool.Add(MakeAffix(TEXT("Core.Health"), TEXT("Health"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Health, EBreakerStatBucket::Flat, AllSlots, 25.0f, 180.0f));
-        Pool.Add(MakeAffix(TEXT("Core.ResourceRegen"), TEXT("Resource Regeneration"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceRegen, EBreakerStatBucket::Flat, AllSlots, 0.5f, 3.0f));
+        Pool.Add(MakeAffix(TEXT("Core.Health"), TEXT("Health"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Health, EBreakerStatBucket::Flat, AllSlots, 25.0f, 400.0f));
+        Pool.Add(MakeAffix(TEXT("Core.ResourceRegen"), TEXT("Resource Regeneration"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceRegen, EBreakerStatBucket::Flat, AllSlots, 0.5f, 7.0f));
         // Ability cost reduction. Owner ruling 2026-08-14, alongside inverting
         // the Mana bar to start full and drain: with a spend-down resource,
         // efficiency and regeneration decide how often a caster gets to act,
@@ -88,21 +127,21 @@ namespace
         // rather than a better version of it -- efficiency pays most to a build
         // casting expensive spells rarely, regeneration to one casting cheap
         // spells constantly, so they are different decisions.
-        // O2 PLACEHOLDER: 2% (T8) -> 12% (T1) of cost removed.
-        Pool.Add(MakeAffix(TEXT("Core.ResourceEfficiency"), TEXT("Resource Efficiency"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceEfficiency, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 12.0f, 55.0f));
-        Pool.Add(MakeAffix(TEXT("Core.MaxResource"), TEXT("Maximum Resource"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::MaxResource, EBreakerStatBucket::Flat, AllSlots, 8.0f, 45.0f));
-        Pool.Add(MakeAffix(TEXT("Core.MoveSpeed"), TEXT("Movement Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::MoveSpeed, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 8.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Core.DropChance"), TEXT("Drop Chance"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::DropChance, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 14.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Core.PhysicalDR"), TEXT("Physical Damage Reduction"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::PhysicalDamageReduction, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 8.0f));
+        // O2 PLACEHOLDER: 2% (T12) -> 26% (T1) of cost removed.
+        Pool.Add(MakeAffix(TEXT("Core.ResourceEfficiency"), TEXT("Resource Efficiency"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceEfficiency, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 26.0f, 55.0f));
+        Pool.Add(MakeAffix(TEXT("Core.MaxResource"), TEXT("Maximum Resource"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::MaxResource, EBreakerStatBucket::Flat, AllSlots, 8.0f, 100.0f));
+        Pool.Add(MakeAffix(TEXT("Core.MoveSpeed"), TEXT("Movement Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::MoveSpeed, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 18.0f, 60.0f));
+        Pool.Add(MakeAffix(TEXT("Core.DropChance"), TEXT("Drop Chance"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::DropChance, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 31.0f, 60.0f));
+        Pool.Add(MakeAffix(TEXT("Core.PhysicalDR"), TEXT("Physical Damage Reduction"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::PhysicalDamageReduction, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 18.0f));
         // Slide Speed and Dash Cooldown now roll on the two WEAPON slots as
         // well as their armour homes. That is not breadth for its own sake:
         // the owner's sidearm lean is "sidearm slide speed", and a lean toward
         // a line that cannot roll on the slot at all is a comment, not a
         // feature. It also gives the Secondary slot a movement identity, which
         // pairs with the sidearm's fast swap.
-        Pool.Add(MakeAffix(TEXT("Move.SlideSpeed"), TEXT("Slide Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlideSpeed, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 5.0f, 20.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Move.AirControl"), TEXT("Air Control"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirControl, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace}, 5.0f, 22.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Move.DashCooldown"), TEXT("Dash Cooldown Reduction"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DashCooldownReduction, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 4.0f, 18.0f, 60.0f));
+        Pool.Add(MakeAffix(TEXT("Move.SlideSpeed"), TEXT("Slide Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlideSpeed, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 5.0f, 44.0f, 60.0f));
+        Pool.Add(MakeAffix(TEXT("Move.AirControl"), TEXT("Air Control"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirControl, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace}, 5.0f, 48.0f, 60.0f));
+        Pool.Add(MakeAffix(TEXT("Move.DashCooldown"), TEXT("Dash Cooldown Reduction"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DashCooldownReduction, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 4.0f, 40.0f, 60.0f));
 
         // --- Critical, both directions ------------------------------------
         // Crit is a genuine third axis in the variance band (Power-Curve §4),
@@ -120,8 +159,8 @@ namespace
             EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace,
             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary
         };
-        Pool.Add(MakeAffix(TEXT("Crit.Chance"), TEXT("Critical Chance"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat, CritChanceSlots, 1.0f, 4.0f, 60.0f));   // O2 PLACEHOLDER
-        Pool.Add(MakeAffix(TEXT("Crit.Damage"), TEXT("Critical Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat, CritDamageSlots, 5.0f, 18.0f, 60.0f));    // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Crit.Chance"), TEXT("Critical Chance"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat, CritChanceSlots, 1.0f, 9.0f, 60.0f));   // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Crit.Damage"), TEXT("Critical Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat, CritDamageSlots, 5.0f, 40.0f, 60.0f));    // O2 PLACEHOLDER
 
         // --- Unconditional damage, on every slot ---------------------------
         // Was gloves/neck/weapons only, which made helmet, body, boots and
@@ -129,24 +168,24 @@ namespace
         // options in every avenue"). It rolls everywhere now, and its per-line
         // value came down as the pool widened: eight small lines that add up,
         // not four large ones you either find or do not.
-        // O2 PLACEHOLDER: 3% (T8) -> 16% (T1); T-1 spikes to 28.8%.
-        Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 16.0f, 80.0f));
+        // O2 PLACEHOLDER: 3% (T12) -> 35% (T1); T-1 spikes to 126%.
+        Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 35.0f, 80.0f));
         // The flat half. Lands before the Increased bucket, so it is worth most
         // to a build that already has a large bucket to multiply it by — the
         // opposite scaling shape to the line above, which is the point.
-        // O2 PLACEHOLDER: 1 -> 5 percentage points of base weapon damage.
+        // O2 PLACEHOLDER: 1 -> 11 percentage points of base weapon damage.
         Pool.Add(MakeAffix(TEXT("Offense.AddedDamage"), TEXT("Added Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::AddedDamage, EBreakerStatBucket::Flat,
-            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 1.0f, 5.0f, 70.0f));
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 1.0f, 11.0f, 70.0f));
 
         // Cadence. Rolls only on the two WEAPON slots, deliberately: fire rate
         // is a property of the gun, and putting it on boots would make the
         // per-slot identity table meaningless. This is the line the SMG leans
         // toward (owner: "smg fire rate").
-        // O2 PLACEHOLDER: 2% (T8) -> 11% (T1). Smaller than Weapon Damage
+        // O2 PLACEHOLDER: 2% (T12) -> 24% (T1). Smaller than Weapon Damage
         // because it multiplies sustained output the same way while ALSO
         // shortening time-to-empty, so it is not a strictly cheaper peer.
         Pool.Add(MakeAffix(TEXT("Weapon.FireRate"), TEXT("Fire Rate"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::FireRate, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 11.0f, 60.0f));
+            {EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 24.0f, 60.0f));
 
         // --- Conditional damage: the movement pillar as a build axis --------
         // Each rolls roughly twice the unconditional line because it is off
@@ -156,15 +195,15 @@ namespace
         // armour is the grounded-traversal piece. Two players hunting damage on
         // boots and on a necklace are hunting different lines.
         Pool.Add(MakeAffix(TEXT("Offense.AirborneDamage"), TEXT("Damage while Airborne"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirborneDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::Airborne));   // O2 PLACEHOLDER
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 48.0f, 45.0f, EBreakerBuildCondition::Airborne));   // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.SlidingDamage"), TEXT("Damage while Sliding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlidingDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Secondary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::Sliding));  // O2 PLACEHOLDER
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Secondary}, 5.0f, 48.0f, 45.0f, EBreakerBuildCondition::Sliding));  // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.WallRideDamage"), TEXT("Damage while Wall Riding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WallRideDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::BodyArmour}, 6.0f, 26.0f, 40.0f, EBreakerBuildCondition::WallRiding));  // O2 PLACEHOLDER
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::BodyArmour}, 6.0f, 57.0f, 40.0f, EBreakerBuildCondition::WallRiding));  // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.RedlineDamage"), TEXT("Damage at Redline"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RedlineDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary}, 4.5f, 20.0f, 45.0f, EBreakerBuildCondition::Redline));  // O2 PLACEHOLDER
+            {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary}, 4.5f, 44.0f, 45.0f, EBreakerBuildCondition::Redline));  // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.DashDamage"), TEXT("Damage after Dashing"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RecentlyDashedDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::RecentlyDashed)); // O2 PLACEHOLDER
+            {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary}, 5.0f, 48.0f, 45.0f, EBreakerBuildCondition::RecentlyDashed)); // O2 PLACEHOLDER
 
         // --- The non-damage breadth pass [O27] -----------------------------
         // The first breadth pass took offence from one line to nine and left
@@ -182,10 +221,10 @@ namespace
         // formula. Armour rolls on the FIVE armour pieces and nowhere else:
         // the necklace and the two weapons are the offence/utility slots in
         // the per-slot identity table, and armour on a gun reads as filler.
-        // O2 PLACEHOLDER: 6 (T8) -> 34 (T1). Deliberately meaningful against
+        // O2 PLACEHOLDER: 6 (T12) -> 75 (T1). Deliberately meaningful against
         // the target dummy's 100 without approaching the boss armour cap.
         Pool.Add(MakeAffix(TEXT("Core.Armour"), TEXT("Armour"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Armour, EBreakerStatBucket::Flat,
-            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 6.0f, 34.0f, 90.0f));
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 6.0f, 75.0f, 90.0f));
 
         // Sustain, paid at an event rather than over time. Consumer:
         // UBreakerEquipmentComponent binds UBreakerCombatComponent::OnKillDealt
@@ -198,19 +237,19 @@ namespace
         // game, while on-kill scales with how well the build is already doing
         // and pays nothing at all against a boss. That is the correct shape for
         // a game whose difficulty lives in elites and bosses (O27).
-        // O2 PLACEHOLDER: 8 (T8) -> 42 (T1) health per kill.
+        // O2 PLACEHOLDER: 8 (T12) -> 92 (T1) health per kill.
         Pool.Add(MakeAffix(TEXT("Core.LifeOnKill"), TEXT("Health on Kill"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::LifeOnKill, EBreakerStatBucket::Flat,
             {EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace,
-             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 8.0f, 42.0f, 70.0f));
+             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 8.0f, 92.0f, 70.0f));
 
         // The resource half of the same hook. Consumer: AddClassResource, which
         // both live class loops (Swift's Momentum, Caster's Mana) read as their
         // bank. It is the line that lets a Caster pay for the next cast by
         // landing the last kill, which the flat regen trickle cannot express.
-        // O2 PLACEHOLDER: 2 (T8) -> 11 (T1).
+        // O2 PLACEHOLDER: 2 (T12) -> 24 (T1).
         Pool.Add(MakeAffix(TEXT("Core.ResourceOnKill"), TEXT("Resource on Kill"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceOnKill, EBreakerStatBucket::Flat,
             {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Waist,
-             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 11.0f, 70.0f));
+             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 24.0f, 70.0f));
 
         // Damage over time. Consumer: the DamageOverTimeMultiplier attribute,
         // snapshotted at application by every DoT in the game (the SMG's Bleed,
@@ -219,10 +258,10 @@ namespace
         // stash — the same one-sided gap the damage pass found on the other
         // side. Its own bucket, not the weapon-damage bucket: DoTs snapshot
         // separately and always have.
-        // O2 PLACEHOLDER: 5% (T8) -> 26% (T1). Larger than Weapon Damage
+        // O2 PLACEHOLDER: 5% (T12) -> 57% (T1). Larger than Weapon Damage
         // because it moves only the DoT portion of a build's output.
         Pool.Add(MakeAffix(TEXT("Offense.DoTDamage"), TEXT("Damage over Time"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DamageOverTime, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 26.0f, 55.0f));
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 57.0f, 55.0f));
         return Pool;
     }
 }

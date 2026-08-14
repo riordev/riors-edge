@@ -29,6 +29,8 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitDashCooldownReduction(1.0f);
     InitFireRateMultiplier(1.0f);
     InitResourceCostMultiplier(1.0f);
+    // Flat-shaped, not multiplier-shaped: 0 is "nothing contributed".
+    InitClassResourceRegen(0.0f);
 }
 
 void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -53,6 +55,7 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(DashCooldownReduction);
     BREAKER_REPLICATE(FireRateMultiplier);
     BREAKER_REPLICATE(ResourceCostMultiplier);
+    BREAKER_REPLICATE(ClassResourceRegen);
 #undef BREAKER_REPLICATE
 }
 
@@ -91,6 +94,9 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     // cooldowns because Mana IS the cooldown, so free casts remove the only
     // limiter the class has.
     else if (Attribute == GetResourceCostMultiplierAttribute()) NewValue = FMath::Clamp(NewValue, 0.25f, 2.0f);
+    // Never negative: a "regeneration" that drains would be a second, hidden
+    // cost path that no ability affordability check knows about.
+    else if (Attribute == GetClassResourceRegenAttribute()) NewValue = FMath::Max(0.0f, NewValue);
 }
 
 void UBreakerAttributeSet::CaptureAttributeBases()
@@ -111,6 +117,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::FireRateMultiplier)] = GetFireRateMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::ResourceCostMultiplier)] = GetResourceCostMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::Armor)] = GetArmor();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::ClassResourceRegen)] = GetClassResourceRegen();
     Aggregator.CaptureBases(Values);
 }
 
@@ -205,6 +212,7 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     WriteAttributeValue(GetArmorAttribute(), Armor, Aggregator.Compose(EBreakerAggregatedAttribute::Armor));
     WriteAttributeValue(GetFireRateMultiplierAttribute(), FireRateMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::FireRateMultiplier));
     WriteAttributeValue(GetResourceCostMultiplierAttribute(), ResourceCostMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::ResourceCostMultiplier));
+    WriteAttributeValue(GetClassResourceRegenAttribute(), ClassResourceRegen, Aggregator.Compose(EBreakerAggregatedAttribute::ClassResourceRegen));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
@@ -254,4 +262,5 @@ BREAKER_ON_REP(AirControlMultiplier)
 BREAKER_ON_REP(DashCooldownReduction)
 BREAKER_ON_REP(FireRateMultiplier)
 BREAKER_ON_REP(ResourceCostMultiplier)
+BREAKER_ON_REP(ClassResourceRegen)
 #undef BREAKER_ON_REP

@@ -45,11 +45,23 @@ public:
     //
     // Growth is a FRACTION per level (0.09 is +9%/level), not a percentage.
 
-    // Item levels below 1 clamp to 1; the ceiling exists only so a garbage
-    // input cannot produce an infinity in the damage pipeline. Area level (and
-    // therefore drop item level) is expected to climb past 50 in endgame tiers,
-    // so this is not a design cap.
-    static constexpr int32 MaxSupportedItemLevel = 200;
+    // Item levels below 1 clamp to 1. The ceiling is now the DESIGN ceiling
+    // rather than a garbage guard: O29 rules that item level runs to 120, which
+    // is what makes "all endgame character power comes from gear" function
+    // rather than merely be stated. It must equal
+    // UBreakerAffixLibrary::MaxItemLevel, and RiorsEdge.Items.TierLadder pins
+    // that the two agree -- a weapon clamping lower than the item system rolls
+    // would silently cap base damage while the affixes on the same item kept
+    // climbing, which is the same class of split the 74x endgame gap was.
+    //
+    // It is a constant here rather than an EditAnywhere property because this
+    // is a static maths class with no instance. O2 PLACEHOLDER.
+    //
+    // Not duplicated as an include of Items/ on purpose: BreakerWeaponMath is
+    // deliberately dependency-free pure maths, in the precedent of
+    // BreakerRangedBehavior.h and BreakerMonsterChassis.h, so it stays
+    // unit-testable with no world and no item system. The test is the seam.
+    static constexpr int32 MaxSupportedItemLevel = 120;
 
     /**
      * (1 + Growth)^(ItemLevel - 1). Exactly 1.0 at item level 1 for any growth,

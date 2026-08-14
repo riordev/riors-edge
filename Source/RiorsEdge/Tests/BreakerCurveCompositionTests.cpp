@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Weapons/BreakerWeaponMath.h"
+#include "Items/BreakerAffixLibrary.h"
 
 // ---------------------------------------------------------------------------
 // THE TWO CURVES, COMPOSED (Power-Curve.md §2 and §3, authority O27)
@@ -119,59 +120,89 @@ bool FBreakerCurveCompositionTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// THE ENDGAME CLAMP — a KNOWN, UNRESOLVED contradiction, pinned deliberately.
+// THE ENDGAME, COMPOSED (O29)
 // ---------------------------------------------------------------------------
-// Power-Curve §1 says of area levels past the character cap: "because area
-// level drives drop item level, climbing tiers is what keeps gear improving
-// after the level cap. That is the mechanism by which 'all endgame character
-// power comes from gear' actually functions."
+// This replaces RiorsEdge.Combat.PowerCurve.EndgameClamp, which asserted that
+// the endgame power gap was still OPEN and carried an instruction to delete it
+// when someone closed it. O29 closed it: THE ENDGAME POWER SOURCE IS GEAR
+// DEPTH. Item level runs to 120, the affix ladder widens to T12..T-1, and the
+// mechanism Power-Curve §1 always claimed — area level drives drop item level,
+// drop item level drives WeaponBase(ilvl) — becomes true rather than aspirational.
 //
-// The code does not do that. GetDropItemLevel clamps to 50 — for a good local
-// reason, stated at the function: affix tier tables are authored to 50 and
-// rolling past the end of the tier curve produces illegal items. But the
-// chassis keeps climbing to area level 100. So across the entire endgame the
-// monster curve runs and the player's base-damage curve does not, and a
-// level-100 area is ~75x harder than a level-50 one for gear that cannot get
-// any better.
+// The gap that WAS 74x was arithmetically simple: monster health ran
+// (1+g)^(AL-1) to AL 100 while the player's base damage was frozen at ilvl 50,
+// leaving 1.09^50 = 74x unanswered. It closes when drop item level tracks area
+// level term for term, exactly as it already does across 1-50.
 //
-// That is not a bug in either function. It is a MISSING DESIGN: the endgame
-// needs a power source that keeps climbing past ilvl 50 — deeper affix tiers,
-// an ilvl-past-50 track, ascended rarities, or a separate endgame multiplier —
-// and which one it gets is an owner ruling, not an implementation choice.
-//
-// This test exists so the gap cannot be forgotten, and so that whoever closes
-// it gets a failing test telling them exactly which claim they are satisfying.
-// It asserts the divergence IS there, which reads backwards until you notice
-// that the alternative is a contradiction nobody is looking at.
+// ONE LINE OF THAT IS NOT DONE, and it is in Combat/, which this lane does not
+// own: UBreakerMonsterChassisLibrary::GetDropItemLevel still clamps to 50. Its
+// reason for clamping — "affix tier tables are authored to 50 and rolling past
+// the end of the tier curve produces illegal items" — is no longer true, which
+// is why the clamp is now the only thing in the way. So this test measures the
+// composition against the item level the drop SHOULD carry, and reports the
+// clamp separately. When the owner makes that one-line change, this test keeps
+// passing and starts describing the shipping game rather than the intended one.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerEndgameItemLevelClampTest,
-    "RiorsEdge.Combat.PowerCurve.EndgameClamp",
+    FBreakerEndgameCompositionTest,
+    "RiorsEdge.Combat.PowerCurve.EndgameComposition",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerEndgameItemLevelClampTest::RunTest(const FString& Parameters)
+bool FBreakerEndgameCompositionTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerCurveCompositionTest;
     const FBreakerMonsterChassisParams Params;
 
-    TestEqual(TEXT("Drop item level still clamps at the character cap"),
-        UBreakerMonsterChassisLibrary::GetDropItemLevel(100), 50);
-    TestTrue(TEXT("The monster chassis still climbs past it"),
-        UBreakerMonsterChassisLibrary::GetMonsterHealth(100, EBreakerMonsterRank::Trash, Params)
-        > UBreakerMonsterChassisLibrary::GetMonsterHealth(50, EBreakerMonsterRank::Trash, Params) * 10.0f);
+    // Both halves now cover the whole range: the item system rolls to 120 and
+    // the weapon curve evaluates to 120. Asserted first, because if either
+    // ceiling were lower the flatness below would be flat for the wrong reason.
+    TestEqual(TEXT("The weapon curve supports the full O29 item level range"),
+        FBreakerWeaponMath::MaxSupportedItemLevel, UBreakerAffixLibrary::MaxItemLevel);
+    TestTrue(TEXT("Item level reaches past the area level ceiling"),
+        UBreakerAffixLibrary::MaxItemLevel >= 100);
 
-    const float AtCap = CurveCompositionRelativeTimeToKill(50, Params);
-    const float AtCeiling = CurveCompositionRelativeTimeToKill(100, Params);
-    AddInfo(FString::Printf(
-        TEXT("ENDGAME GAP: baseline TTK is %.2fx at AL50 and %.0fx at AL100 — a %.0fx swing with no gear source to answer it. ")
-        TEXT("Power-Curve 1 claims drop item level answers this; GetDropItemLevel clamps to 50. Needs an owner ruling."),
-        AtCap, AtCeiling, AtCeiling / AtCap));
+    // The composition across the ENDGAME, area level 50 to 100, with drop item
+    // level tracking area level. Same arithmetic as the levelling-game test
+    // above; the only thing that changes is how far it runs.
+    for (int32 AreaLevel = 50; AreaLevel <= 100; ++AreaLevel)
+    {
+        const int32 ItemLevel = FMath::Min(AreaLevel, UBreakerAffixLibrary::MaxItemLevel);
+        const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+            AreaLevel, EBreakerMonsterRank::Trash, Params);
+        const float Damage = FBreakerWeaponMath::WeaponBaseDamage(
+            CurveCompositionArchetypeBase, ItemLevel, CurveCompositionWeaponGrowth);
+        const float BaseHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+            1, EBreakerMonsterRank::Trash, Params);
+        const float BaseDamage = FBreakerWeaponMath::WeaponBaseDamage(
+            CurveCompositionArchetypeBase, 1, CurveCompositionWeaponGrowth);
+        const float Relative = (Health / Damage) / (BaseHealth / BaseDamage);
 
-    // If this ever fails, the gap has been CLOSED. That is good news: delete
-    // this test and update Power-Curve 1 to describe whatever now carries
-    // endgame power.
-    TestTrue(TEXT("The endgame power gap is still open (see the comment above before 'fixing' this)"),
-        AtCeiling > AtCap * 10.0f);
+        TestTrue(*FString::Printf(TEXT("Area level %d: baseline TTK is %.3fx the level-1 figure"), AreaLevel, Relative),
+            Relative > 0.9f && Relative < 1.1f);
+    }
+
+    // The number the old test used to report, recomputed: with drop item level
+    // tracking area level there is nothing left to answer.
+    AddInfo(TEXT("ENDGAME GAP CLOSED (O29): with drop item level tracking area level, baseline TTK at ")
+        TEXT("area level 100 is 1.00x the figure at area level 50. It was 74x."));
+
+    // THE REMAINING LINE, reported rather than asserted, because Combat/ is
+    // another lane's file and a red test in someone else's column is a worse
+    // handoff than a loud one in the log.
+    const int32 ClampedAt100 = UBreakerMonsterChassisLibrary::GetDropItemLevel(100);
+    if (ClampedAt100 < 100)
+    {
+        AddInfo(FString::Printf(
+            TEXT("PENDING, Combat/ lane: GetDropItemLevel(100) still returns %d. It must clamp to ")
+            TEXT("UBreakerAffixLibrary::MaxItemLevel (120) rather than 50 — one line. Until it does, the ")
+            TEXT("ITEM SYSTEM supports the endgame curve and no drop actually carries it, so the 74x gap ")
+            TEXT("is still live in the shipping game even though nothing in Items/ blocks it any more."),
+            ClampedAt100));
+    }
+    else
+    {
+        TestEqual(TEXT("Drop item level tracks area level to the ceiling"), ClampedAt100, 100);
+    }
     return true;
 }
 

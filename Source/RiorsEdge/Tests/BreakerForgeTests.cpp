@@ -187,9 +187,15 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
     }
 
     TestEqual(TEXT("T-1 IS REACHABLE — the top of the value curve is no longer a comment"), Item.Affixes[0].Tier, -1);
-    // And it is worth what the curve says it is: T-1 is 1.8x T1.
-    TestEqual(TEXT("A tempered T-1 is worth the authored 1.8x spike"),
-        Item.Affixes[0].Value, UBreakerAffixLibrary::ValueForTier(*Definition, 1) * 1.8f, 0.01f);
+    // And it is worth what the curve says it is. RE-SITED by O29: the spike was
+    // 1.8x T1 against a linear ladder whose top step was +14%; against the
+    // back-loaded ladder's +36.5% top step it is 3.6x, which keeps the spike
+    // about four ordinary steps above T1 rather than letting it collapse into
+    // one. Read from the constant, not from a literal, so the next re-siting
+    // moves one number.
+    TestEqual(TEXT("A tempered T-1 is worth the authored spike"),
+        Item.Affixes[0].Value,
+        UBreakerAffixLibrary::ValueForTier(*Definition, 1) * UBreakerAffixLibrary::TierSpikeTopMultiplier, 0.01f);
 
     // Nowhere left to go, and the refusal is explicit rather than a silent
     // no-op that takes the currency.
@@ -201,11 +207,19 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
 
     // RARITY STILL CAPS CRAFTING. Otherwise crafting would erase rarity's
     // meaning in the same session this pass gave it one.
-    FBreakerItemInstance Standard = BreakerForgeMakeItem(EBreakerItemRarity::Standard, 4, {TEXT("Offense.WeaponDamage")});
+    // Built exactly one tier BELOW the rarity's cap, derived rather than
+    // written down, so the fixture cannot silently start at the ceiling the day
+    // the caps are re-derived again — which is what O29 just did to it.
+    FBreakerItemInstance Standard = BreakerForgeMakeItem(EBreakerItemRarity::Standard,
+        UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity::Standard) + 1, {TEXT("Offense.WeaponDamage")});
     FBreakerForgeWallet Rich = BreakerForgeRichWallet();
-    TestEqual(TEXT("A Standard item's temper ceiling is its rarity's T3"),
-        UBreakerForgeLibrary::TemperCeilingForItem(Standard), 3);
-    TestEqual(TEXT("Tempering it to T3 works"),
+    // T4 rather than T3 since O29 re-derived the rarity caps against 11 ladder
+    // steps instead of 7. Read from the library so crafting and dropping can
+    // never disagree about what a rarity is allowed to reach.
+    TestEqual(TEXT("A Standard item's temper ceiling is its rarity's cap"),
+        UBreakerForgeLibrary::TemperCeilingForItem(Standard),
+        UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity::Standard));
+    TestEqual(TEXT("Tempering it up to that cap works"),
         static_cast<int32>(UBreakerForgeLibrary::Temper(Standard, 0, Rich, true)), static_cast<int32>(EBreakerForgeResult::Success));
     TestEqual(TEXT("No amount of currency takes a Standard past its rarity cap"),
         static_cast<int32>(UBreakerForgeLibrary::Temper(Standard, 0, Rich, true)),
