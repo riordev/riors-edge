@@ -1,5 +1,28 @@
 # Decisions Ledger — append-only
 
+## How to use this file
+
+This is the **only** ruling ledger (O28). It is append-only: rulings are never
+edited or deleted, only superseded by a later O-number that says so.
+
+- **To check whether something is decided**, search this file for the topic. If
+  it is not here, it is not ruled — no matter what any other document implies.
+- **Superseded rulings stay put.** O25 supersedes the air-jump line in the
+  locked-decisions paragraph; O27 supersedes the reading of O18 as a global
+  invariant; O28 supersedes the master sheet's standing. The original text
+  remains so the reasoning is auditable.
+- **Pending questions live at the bottom** under "Owner choices currently
+  pending". A question there has been presented and not answered.
+
+| Range | Theme |
+|---|---|
+| O1-O23 | The design sprint: stamina deletion, elements, budgets, TTK targets |
+| O24 | World aesthetic (overgrown Earth) |
+| O25-O26 | Jump kit; movement priority |
+| O27 | The power curve — content scaling, the build band, choices over accumulation |
+| O28 | Documentation authority (this section) |
+
+
 THE canonical decisions log. O-numbers are permanent IDs. Every entry gets
 a date, a ruling, and the files it was propagated to. Design docs reference
 O-numbers instead of restating rulings; a reversal touches this file first,
@@ -90,6 +113,17 @@ Implementation notes tied to this ruling:
   monster health was the literal constant 220 at every level; and `Weapons/`
   contained no reference to `ItemLevel` at all, so weapon base damage was an
   archetype constant and item level touched only affix tier values.
+
+## 2026-08-13 — O28 (documentation authority)
+
+| # | Decision |
+|---|----------|
+| O28 | **This file is the only ledger, and the authority chain is three links, not four.** `Master-Sheet-Import.txt` is a raw import and is **superseded** — it is historical source material, not law; where it disagrees with this file, this file wins and the master sheet is not to be cited as authority again. **`CONTEXT.md`'s next-actions list is the operative plan.** `Roadmap.md`'s five milestones and `Design-Overview.md` §6's Tier 0-6 build order are both retired to historical: they describe a plan the project no longer follows, which is playtest -> report -> fix. Design-Overview §7 remains the *question* list and must be reconciled against this ledger rather than answering questions on its own. Every design document carries a `Last reconciled against:` marker so drift is visible instead of silent. |
+
+Implementation notes tied to this ruling:
+- O28: authority chain is now `Decisions.md` -> `Design-Overview.md` (map, not law)
+  -> the per-domain docs. `Master-Sheet-Import.txt` retains its content for
+  history and loses its standing.
 
 ## Owner choices currently pending (presented, not ruled)
 

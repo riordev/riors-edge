@@ -20,6 +20,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
@@ -706,6 +708,18 @@ void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bo
 
 void ABreakerCharacter::ShowInitialMenu()
 {
+    // -BreakerAutoPlay skips the title menu and drops straight into the gym.
+    // This exists so the game can be SMOKE-TESTED without a human at the
+    // keyboard: a standalone run that stops on the title screen proves only
+    // that startup works, and never executes the gym, the enemy spawns, the
+    // HUD or anything else a change is likely to break. Dev-only by
+    // construction — it is a command-line switch, so a shipped build cannot
+    // reach it unless someone deliberately passes it.
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")))
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; entering the gym directly."));
+        return;
+    }
     OpenMenu(true);
 }
 

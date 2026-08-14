@@ -39,6 +39,10 @@ public:
     // recompile. Area level also drives drop item level, which is the mechanism
     // that makes rising item level correspond to gameplay.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 10;   // O2 PLACEHOLDER
+
+    // Logs what the gym built, so a headless smoke run can prove the
+    // encounter spawned rather than merely that the process started.
+    void LogGymSummary() const;
     // Per-wave escalation, unchanged from the shipping wave mode's
     // "10 + CurrentWave * 2": later waves climb in level so drops and TTK data
     // climb with them. Now it climbs the CHASSIS too, which is the whole point.

@@ -52,6 +52,29 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     SpawnCombatEncounter(NewPlayer->GetPawn());
     SpawnWorldDressing(NewPlayer->GetPawn());
     SpawnExpandedField(NewPlayer->GetPawn());
+    LogGymSummary();
+}
+
+// One line stating what the gym actually built. This exists for the
+// headless smoke run (-BreakerAutoPlay): a log with no gym line means the
+// encounter never spawned, which is otherwise indistinguishable from a
+// system that simply logs nothing. It is also the fastest way for the owner
+// to confirm the area level a session was actually played at.
+void ABreakerGameMode::LogGymSummary() const
+{
+    const UWorld* World = GetWorld();
+    if (!World) return;
+    int32 Melee = 0;
+    int32 Ranged = 0;
+    for (TActorIterator<ABreakerEnemy> It(const_cast<UWorld*>(World)); It; ++It)
+    {
+        if (It->IsRangedForTelemetry()) ++Ranged; else ++Melee;
+    }
+    int32 Targets = 0;
+    for (TActorIterator<ABreakerTargetDummy> It(const_cast<UWorld*>(World)); It; ++It) ++Targets;
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | target dummies %d"),
+        GymAreaLevel, Melee, Ranged, Targets);
 }
 
 namespace
