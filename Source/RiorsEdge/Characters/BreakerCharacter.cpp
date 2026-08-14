@@ -731,6 +731,13 @@ void ABreakerCharacter::ShowInitialMenu()
     if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")))
     {
         UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; entering the gym directly."));
+        // ...unless a capture run asked for a specific screen, in which case
+        // the whole point is to be sitting on it.
+        FString CaptureScreen;
+        if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureMenu="), CaptureScreen) && !CaptureScreen.IsEmpty())
+        {
+            OpenMenuScreenForCapture(CaptureScreen);
+        }
         return;
     }
     OpenMenu(true);
@@ -759,6 +766,24 @@ void ABreakerCharacter::OpenMenu(bool bInitialMenu)
     InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
     InputMode.SetHideCursorDuringCapture(false);
     PC->SetInputMode(InputMode);
+}
+
+void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
+{
+    OpenMenu(true);
+    if (!MenuWidget.IsValid()) return;
+
+    const FString Wanted = ScreenName.ToUpper();
+    EBreakerMenuScreen Screen = EBreakerMenuScreen::Main;
+    if (Wanted == TEXT("INVENTORY")) Screen = EBreakerMenuScreen::Inventory;
+    else if (Wanted == TEXT("SKILLTREES") || Wanted == TEXT("SKILLS")) Screen = EBreakerMenuScreen::SkillTrees;
+    else if (Wanted == TEXT("LOADOUT")) Screen = EBreakerMenuScreen::Loadout;
+    else if (Wanted == TEXT("SETTINGS")) Screen = EBreakerMenuScreen::Settings;
+    else if (Wanted == TEXT("CLASS") || Wanted == TEXT("CLASSSELECT")) Screen = EBreakerMenuScreen::ClassSelect;
+    else if (Wanted == TEXT("PAUSE")) Screen = EBreakerMenuScreen::Pause;
+
+    MenuWidget->ShowScreenForCapture(Screen);
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] menu screen '%s'"), *Wanted);
 }
 
 void ABreakerCharacter::ResumeFromMenu()

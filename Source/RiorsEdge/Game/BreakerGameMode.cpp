@@ -18,6 +18,13 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "EngineUtils.h"
 #include "UObject/UObjectGlobals.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "UnrealClient.h"
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/Paths.h"
 
 ABreakerGameMode::ABreakerGameMode()
 {
@@ -53,6 +60,50 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     SpawnWorldDressing(NewPlayer->GetPawn());
     SpawnExpandedField(NewPlayer->GetPawn());
     LogGymSummary();
+    ScheduleScreenshots();
+}
+
+void ABreakerGameMode::ScheduleScreenshots()
+{
+    int32 Count = 0;
+    if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshots="), Count) || Count <= 0) return;
+    ScreenshotsRemaining = FMath::Clamp(Count, 1, 60);
+    ScreenshotIndex = 0;
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first at %.1fs, every %.1fs after."),
+        ScreenshotsRemaining, ScreenshotFirstDelaySeconds, ScreenshotIntervalSeconds);
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(ScreenshotTimer, this, &ABreakerGameMode::CaptureScreenshot,
+            FMath::Max(0.1f, ScreenshotIntervalSeconds), true, FMath::Max(0.1f, ScreenshotFirstDelaySeconds));
+    }
+}
+
+void ABreakerGameMode::CaptureScreenshot()
+{
+    // FScreenshotRequest rather than the HighResShot console command: under
+    // -unattended the console exec produced no file and no error, which is the
+    // worst possible outcome for a verification tool -- it would have reported
+    // success while capturing nothing. bShowUI TRUE is the load-bearing
+    // argument; without it the capture omits Slate, and the menus are half of
+    // what needs looking at.
+    const FString Path = FPaths::ProjectSavedDir() / TEXT("Screenshots") /
+        FString::Printf(TEXT("breaker_%02d.png"), ScreenshotIndex);
+    FScreenshotRequest::RequestScreenshot(Path, /*bShowUI*/ true, /*bAddFilenameSuffix*/ false);
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] shot %d -> %s"), ScreenshotIndex, *Path);
+    ++ScreenshotIndex;
+    if (--ScreenshotsRemaining > 0) return;
+
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(ScreenshotTimer);
+    // Quit on a short delay so the last shot finishes writing to disk.
+    FTimerHandle QuitTimer;
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(QuitTimer, []()
+        {
+            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] done."));
+            FPlatformMisc::RequestExit(false);
+        }, 2.0f, false);
+    }
 }
 
 // One line stating what the gym actually built. This exists for the

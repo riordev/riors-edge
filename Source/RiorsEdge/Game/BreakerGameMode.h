@@ -43,6 +43,26 @@ public:
     // Logs what the gym built, so a headless smoke run can prove the
     // encounter spawned rather than merely that the process started.
     void LogGymSummary() const;
+
+    // -BreakerScreenshots=N captures N frames, one per ScreenshotIntervalSeconds,
+    // then quits. It exists because the standing gap on every UI change in this
+    // project is the same sentence -- "nobody has looked at this on a screen."
+    // Automation proves arithmetic and cannot see a layout, which is exactly how
+    // two bad visual passes shipped and how a whole HUD's worth of text once
+    // rendered as nothing while every test stayed green.
+    //
+    // Dev-only by construction: it is a command-line switch, so a shipped build
+    // cannot reach it. Shots land in Saved/Screenshots.
+    void ScheduleScreenshots();
+    void CaptureScreenshot();
+    FTimerHandle ScreenshotTimer;
+    int32 ScreenshotsRemaining = 0;
+    int32 ScreenshotIndex = 0;
+    // First shot waits this long so the gym has spawned, the HUD has ticked and
+    // the viewport is not still mid-fade. A screenshot of a black frame passes
+    // every check a human is not making.
+    UPROPERTY(EditAnywhere, Category="Playtest|Capture") float ScreenshotFirstDelaySeconds = 6.0f;
+    UPROPERTY(EditAnywhere, Category="Playtest|Capture") float ScreenshotIntervalSeconds = 2.0f;
     // Per-wave escalation, unchanged from the shipping wave mode's
     // "10 + CurrentWave * 2": later waves climb in level so drops and TTK data
     // climb with them. Now it climbs the CHASSIS too, which is the whole point.

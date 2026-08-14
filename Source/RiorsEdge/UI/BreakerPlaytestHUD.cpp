@@ -492,7 +492,16 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         DrawSpecText(Row.Label, InnerX, Y + Pad, Row.StateColor, 11.0f);
         // The state word is a confirmation, never the carrier: colour, fill
         // height and block texture do the work below.
-        DrawSpecText(Row.StateWord, InnerX + S(84.0f), Y + Pad - S(3.0f), Row.StateColor, 17.0f);
+        //
+        // Offset MEASURED from the label rather than a fixed gutter. The fixed
+        // 84px this used to be was narrower than "MOMENTUM" renders at 11px, so
+        // Swift's HUD read "MOMENTUMSETTLED" with the two words touching --
+        // found by looking at a screenshot, because no test can see a
+        // collision. Measuring also keeps Caster's shorter "MANA" from leaving
+        // a hole, which a wider fixed gutter would have.
+        const FVector2D ResourceLabelSize = MeasureSpecText(Row.Label, 11.0f);
+        DrawSpecText(Row.StateWord, InnerX + ResourceLabelSize.X + S(BreakerUI::Space8),
+            Y + Pad - S(3.0f), Row.StateColor, 17.0f);
         DrawSpecTextRight(FString::Printf(TEXT("%.0f M/S"), Character->GetHorizontalSpeed() / 100.0f),
             InnerRight, Y + Pad, BreakerUI::TextMuted, 11.0f);
 
@@ -1811,5 +1820,9 @@ void ABreakerPlaytestHUD::DrawAbilitySlot(const ABreakerCharacter* Character, co
 
     // Key hint bottom-right, inheriting the state colour: a glance at the
     // letter also reports the state.
-    DrawSpecTextRight(KeyHint, X + Size - S(BreakerUI::Space4), Y + Size - S(16.0f), GlyphColor, 11.0f);
+    // Inset from the square's inner edge, not its outer one: at Space4 the
+    // hint sat ON the 2px ready border and read as a rendering fault. The
+    // vertical inset carries the text height plus the border so the glyph
+    // clears it at every scale.
+    DrawSpecTextRight(KeyHint, X + Size - S(BreakerUI::Space8), Y + Size - S(19.0f), GlyphColor, 11.0f);
 }

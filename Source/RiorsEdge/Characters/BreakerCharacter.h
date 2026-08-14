@@ -193,6 +193,9 @@ private:
     void ActivateUltimate();
     void ShowInitialMenu();
     void OpenMenu(bool bInitialMenu);
+    // Dev capture only (-BreakerCaptureMenu=<name>): opens the front end on a
+    // named screen so a screenshot run can photograph it.
+    void OpenMenuScreenForCapture(const FString& ScreenName);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void HandlePlayerDeath();
     void EndShotCosmetics();

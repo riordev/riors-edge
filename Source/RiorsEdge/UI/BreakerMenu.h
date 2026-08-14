@@ -34,6 +34,11 @@ public:
     void ShowInventory();
     void ShowDialogue(class ABreakerNPC* NPC);
     void HandleEscape();
+    // Dev capture only: jump straight to a screen so a screenshot run can see
+    // it. Every menu in this project has been authored, reworked and shipped
+    // without anyone looking at it, which is how the skill tree reached the
+    // owner clipping its own numbers.
+    void ShowScreenForCapture(EBreakerMenuScreen Screen) { Rebuild(Screen); }
 
 private:
     void Rebuild(EBreakerMenuScreen NewScreen);
