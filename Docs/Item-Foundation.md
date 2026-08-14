@@ -69,7 +69,7 @@ clamp is the guard rail for the next thing that tries.
 ## Item instances
 
 `FBreakerItemInstance` (`BreakerItemTypes.h`) carries a GUID, a definition id
-(FName, never a pointer), slot, rarity, **item level (1-50)**, rolled affixes,
+(FName, never a pointer), slot, rarity, **item level (1-120)**, rolled affixes,
 and a save version. Definitions stay immutable content; instances are save
 data.
 
@@ -88,22 +88,94 @@ Zone-based sourcing is no longer an open question. The gym keeps the
 **enemy-level fallback** (`ABreakerEnemy::EnemyLevel`) for when no zone Data
 Asset is in play, so the zero-setup gym continues to work unchanged.
 
-GAP [O6]: the ZoneLevel-per-zone table, the mapping from content difficulty
-to a specific TierBonus, and the final clamp against the 1-50 item level
-range are not authored here. Value authoring is frozen under O2 — owner to
+The clamp is now **1-120** (O29), not 1-50. That is the endgame: item level
+runs past the character cap and past the area-level ceiling of 100, and it is
+what makes "all endgame character power comes from gear" function rather than
+merely be stated. `UBreakerAffixLibrary::MaxItemLevel` is the one number, and
+`FBreakerWeaponMath::MaxSupportedItemLevel` must equal it -
+`RiorsEdge.Items.TierLadder` pins that they do, because a weapon clamping lower
+than the item system rolls would cap base damage while the affixes on the same
+item kept climbing.
+
+OPEN [O29]: **item level 101-120 has no source yet.** Drop item level derives
+from area level and area level ceilings at 100, so the top twenty item levels
+are reachable only through the TierBonus above (0..+5 does not cover it) or the
+Forge. That headroom is worth 1.09^20 = **5.6x base damage** over on-level
+content, so it is not a rounding error - it is either the reward at the end of
+the chase or it is 20 levels of dead ladder, and which one is an owner ruling.
+
+GAP [O6]: the ZoneLevel-per-zone table and the mapping from content difficulty
+to a specific TierBonus are not authored here. Value authoring is frozen under O2 — owner to
 backfill after the wave-mode instrumentation reports.
 
-## Tier scale
+## Tier scale - WIDENED AND BACK-LOADED [O29 2026-08-14]
 
-Ten tiers, T8 worst to T-1 best, stored as printed (8..1, 0, -1).
+**Fourteen tiers, T12 worst to T-1 best**, stored as printed (12..1, 0, -1).
+It was ten (T8..T-1) against an item level ceiling of 50; O29 rules that the
+endgame power source is gear depth, so the ladder widened with the item level
+range rather than a new multiplier lane being invented. Affix magnitudes still
+live strictly inside tier ranges, which is what keeps O3 intact.
+
+The curve is **no longer linear**. It is geometric between the two authored
+anchors, bent once more by an exponent, so the step grows toward the top:
+
+    p(T)     = (12 - T) / 11
+    Value(T) = ValueAtT12 * (ValueAtT1 / ValueAtT12) ^ (p ^ 1.25)
+
+On the pool's flagship line, Core.Health (25 -> 400):
+
+| Tier | Value | Step | Tier | Value | Step |
+|---|---|---|---|---|---|
+| T12 | 25.00 | - | T6 | 91.70 | x1.303 |
+| T11 | 28.71 | x1.148 | T5 | 120.87 | x1.318 |
+| T10 | 34.75 | x1.210 | T4 | 160.93 | x1.331 |
+| T9 | 43.18 | x1.243 | T3 | 216.23 | x1.344 |
+| T8 | 54.70 | x1.267 | T2 | 292.97 | x1.355 |
+| T7 | 70.36 | x1.286 | T1 | 400.00 | x1.365 |
+
+- T1 is **16.0x** T12 (a property of the authored anchors, not of the curve).
+- The bottom step is **+14.8%** / +3.71 absolute; the top step is **+36.5%** /
+  +107.03 absolute. The top step is **2.46x** the bottom in relative terms and
+  **28.8x** in absolute terms. That is what "a materially bigger jump between
+  the high tiers" has to mean on a ladder whose values are themselves growing.
+- Two failure modes are avoided at once. A LINEAR ladder over 11 steps makes a
+  top-tier roll arithmetically just one more step, which O29 forbids. A pure
+  `p^k` lerp back-loads so hard over 11 steps that the bottom four tiers become
+  indistinguishable - a cliff with a flat approach.
+- Tier for tier against the old ladder: T8 2.19x, T7 1.49x, T6 1.32x, T5 1.32x,
+  T4 1.42x, T3 1.59x, T2 1.86x, T1 2.22x. Every tier number is materially up
+  and the top is up most.
+- **T12 is deliberately the old T8 value, unchanged.** An item level 1 drop is
+  bit-identical to what it was before O29 - the same anchoring
+  `FBreakerWeaponMath::ItemLevelDamageScalar` uses at ilvl 1, so the curve is
+  opt-in by content rather than a silent retune of the only content anybody has
+  played. The ceiling anchors went up ~2.2x pool-wide and uniformly, so no line
+  became stronger relative to another and the per-slot identity table, the
+  archetype leans and the offence/defence balance are all preserved exactly.
+
+**T0 and T-1 are RE-SITED, not carried over: 2.2x and 3.6x T1**, up from 1.4x
+and 1.8x. Against a linear ladder whose top step was +14%, 1.4x was about 2.9
+ordinary steps and read as a spike. Against a +36.5% top step it would be barely
+one step - the spike would have been demoted into "one more step", which is
+precisely what O29 rules out. At 2.2x/3.6x they sit ~2.5 and ~4.1 top-steps
+above T1, preserving what the spike MEANT rather than what it measured.
+
 `UBreakerAffixLibrary`:
 
-- `ValueForTier` — linear T8→T1, then the deliberate spike: T0 = 1.4x T1,
-  T-1 = 1.8x T1.
-- `BestTierForItemLevel` — one tier roughly every 7 levels; level 50 opens T1.
-  T0/T-1 never come from item level — they are crafting/boss territory.
-- `TierCapForRarity` — Standard caps at T3, Uncommon at T1, the rest reach
-  T-1 (ceiling only; item level still gates what actually rolls).
+- `ValueForTier` - the curve above.
+- `BestTierForItemLevel` - **1-120 onto T12..T1, one tier per 10 levels.**
+  Level 1 rolls only T12; **the character cap of 50 reaches only T8**; the
+  area-level ceiling of 100 reaches T3; T1 opens at ilvl 111. Reaching 50 is no
+  longer the end of gear progression, which is the whole of O29 in one line.
+  T0/T-1 still never come from item level - crafting or a rule rewrite only.
+- `TierCapForRarity` - **RE-DERIVED against 11 steps rather than 7.** Standard
+  caps at **T4** (it used to be denied the top 2 of 7 steps, 29% of the ladder;
+  29% of 11 steps is 3.1), Uncommon at **T2**, the rest reach T-1. The
+  Standard/Uncommon gap stays exactly two tiers. Uncommon moves off T1
+  deliberately: on the old ladder T1 was only +14% over T2 and cost little to
+  hand out, but on a back-loaded ladder T1 is +36.5% over T2 and O29 wants it to
+  be an event - a rarity that drops from every third kill cannot be the thing
+  that hands it out.
 
 **T0 and T-1 are now reachable.** They were not, by any means, until the Forge
 landed: `BestTierForItemLevel` stops at T1 at level 50, the comment there says
@@ -169,8 +241,14 @@ fully deterministic from a seed:
 2. Affix count from the rarity range.
 3. Affix selection — slot-legal, weighted, no duplicates, max 4 prefixes and
    4 suffixes.
-4. Tier per affix — item level gated, rarity capped, halving odds per step up
-   so T1+ feels earned.
+4. Tier per affix - item level gated, rarity capped, **0.64 odds per step up**
+   so the top tiers feel earned. RE-DERIVED for 11 steps [O29]: the walk used
+   to continue at one half over 7 steps, so a full climb was 0.5^7 = 1/128. At
+   one half over eleven steps it would be 1/2048, which is not rarity, it is a
+   tier nobody sees. Solving q^11 = 1/128 gives 0.64, and 0.64^11 = 1/136 -
+   the rarity of a top roll survives the ladder tripling in length, while each
+   individual step gets likelier, which is correct now that the low tiers are
+   worth proportionally less.
 5. Value within the tier band.
 
 Step 6 (Aberrant/Anomalous fixed signatures) is not built; signatures need
@@ -595,7 +673,11 @@ Design notes worth keeping:
   to a build that had already invested in it.
 - **PROLIFIC scales by the tier RATIO** rather than re-deriving at the better
   tier, so a lucky in-band roll is carried upward instead of flattened to the new
-  tier's floor. T1 → T0 is the authored 1.4x spike. It is resolved **per item**,
+  tier's floor. T1 → T0 is the authored spike, **2.2x since O29**. NOTE: PROLIFIC
+  got materially stronger without anybody editing it, because its whole value IS
+  the size of a tier step and the steps grew. Measured at x1.462 on an optimized
+  build against an authored ceiling of x1.35 - `RiorsEdge.Progression`
+  `.RuleBandImpact` fails on it deliberately rather than the ceiling being widened. It is resolved **per item**,
   not per wearer — folding it into the wearer-wide rule set would leak the uplift
   onto every other equipped piece, and there is a test for that.
 - **PROLIFIC is the non-Forge route to T0/T-1**, and its printed temper ceiling
@@ -731,7 +813,7 @@ place you go" is one rule rather than two.
 
 | Currency | Source | Buys |
 |---|---|---|
-| **Slag** | Every rarity, scaled by item level | Reforges; tempers into T8..T4 |
+| **Slag** | Every rarity, scaled by item level | Reforges; tempers into T12..T5 |
 | **Flux** | Uncommon and above, rarity-pure | Attunes; tempers into T3..T1 |
 | **Sigil** | **Aberrant and above only**, rarity-pure | **T0 and T-1, and nothing else** |
 

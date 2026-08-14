@@ -43,10 +43,41 @@ preserves the loop; player-scaling destroys it, because a build that changes
 nothing observable is not a build.
 
 Character level caps at 50 with no post-cap power (locked). Area level does not
-stop there — endgame tiers keep climbing, and because area level drives drop
-item level, climbing tiers is what keeps gear improving after the level cap.
-That is the mechanism by which "all endgame character power comes from gear"
-actually functions.
+stop there: it climbs to 100.
+
+**What carries endgame power is GEAR DEPTH, ruled by O29 on 2026-08-14.** This
+paragraph used to claim the mechanism and the code did not implement it, which
+is what produced the 74x gap recorded at the end of this document. The claim is
+now true, and it is true in three specific places:
+
+1. **Item level runs to 120**, past the character cap of 50 and past the
+   area-level ceiling of 100. `UBreakerAffixLibrary::MaxItemLevel` is the single
+   authority and `FBreakerWeaponMath::MaxSupportedItemLevel` equals it by test.
+2. **Drop item level tracks area level**, so an on-level character's
+   `WeaponBase(ilvl)` climbs at exactly the rate `MonsterHealth(AL)` does and
+   the two cancel term for term across the whole game rather than only across
+   the first fifty levels.
+3. **The affix tier ladder widened from T8..T-1 to T12..T-1** and stopped being
+   linear. Item level 50 now reaches only T8; T1 opens at item level 111. The
+   curve is back-loaded so the step grows from +14.8% at the bottom to +36.5% at
+   the top, which is what makes a top-tier roll an event rather than one more
+   step. Full derivation and the value table are in `Docs/Item-Foundation.md`.
+
+Three properties of that choice are worth stating, because each was a live
+alternative O29 rejected:
+
+- **No new multiplier lane.** Affix magnitudes stay strictly inside tier ranges,
+  so O3's cap of three More multipliers is untouched. Endgame power is the same
+  arithmetic, deeper.
+- **No post-cap character power.** A paragon-style tree was rejected outright:
+  it collides with the locked no-post-cap rule and is pure accumulation against
+  O27's "choices beat accumulation".
+- **Existing items are not migrated.** A rolled affix stores its `Tier` and
+  `Value`, so widening the ladder cannot invalidate one. Items rolled before O29
+  keep the values they rolled and read as weak - a pre-O29 T1 is worth about
+  what a post-O29 T4 is. That is correct, it is what a deeper ladder MEANS, and
+  `RiorsEdge.Items.LegacyItemsSurviveTheWiderLadder` verifies it rather than
+  assuming it.
 
 ### 2. Monster chassis — health and damage as functions of area level
 
@@ -336,45 +367,130 @@ cut to 0.25%/point, the affix pool is 18 lines with damage on all eight slots,
 and `RiorsEdge.Progression.PowerBand` pins the ratio so a future tuning pass
 cannot flatten builds silently.
 
-## OPEN: the endgame item-level clamp
+## CLOSED: the endgame power source is gear depth [O29 2026-08-14]
 
-Found while writing `RiorsEdge.Combat.PowerCurve.Composition`, which is the
-first test to compose the two curves rather than checking each half alone.
-Across the levelling game the composition is **exact**: an unmodified character
-in on-level gear has an identical baseline TTK at area level 1, 10, 25 and 50,
-because `w` and `g` are both 0.09 and cancel term for term. That is §3's
-prediction, confirmed.
+This section recorded the biggest open problem in the project. It is answered;
+the history is kept because the arithmetic is what made the answer derivable.
 
-Past the character cap it breaks, and the contradiction is between this
-document and the code:
+### What the gap was
 
-- **§1 claims**: "because area level drives drop item level, climbing tiers is
-  what keeps gear improving after the level cap. That is the mechanism by which
-  'all endgame character power comes from gear' actually functions."
-- **The code does not do that.** `GetDropItemLevel` clamps to 50, for a sound
-  local reason stated at the function: affix tier tables are authored to 50 and
-  rolling past the end of the tier curve produces illegal items. Meanwhile the
-  chassis keeps climbing to area level 100.
+Found while writing `RiorsEdge.Combat.PowerCurve.Composition`, the first test to
+compose the two curves rather than checking each half alone. Across the levelling
+game the composition was **exact**: an unmodified character in on-level gear had
+an identical baseline TTK at area level 1, 10, 25 and 50, because `w` and `g`
+are both 0.09 and cancel term for term.
 
-So across the whole endgame the monster curve runs and the player's base-damage
-curve does not. Measured: baseline TTK is **1.00x at area level 50 and 74x at
-area level 100**. Nothing in the game answers that 74x. The build variance band
-is 8.7x, which does not come close, and it is the same band a level-50 player
-already has — it is not endgame progression, it is the price of entry.
+Past the character cap it broke, and the contradiction was between this document
+and the code. Section 1 claimed drop item level was what kept gear improving
+after the cap; `GetDropItemLevel` clamped to 50, for a sound local reason stated
+at the function - affix tier tables were authored to 50 and rolling past the end
+of the tier curve produces illegal items. Meanwhile the chassis kept climbing to
+area level 100. Measured: baseline TTK **1.00x at area level 50 and 74x at area
+level 100**, with nothing in the game to answer it. The build variance band was
+8.7x, which does not come close, and it is the same band a level-50 player
+already has - it was not endgame progression, it was the price of entry.
 
-This is not a bug in either function. Both are correct in isolation; what is
-missing is a **design**. The endgame needs a power source that keeps climbing
-past item level 50, and which one it gets is an owner ruling:
+`1.09^50 = 74.4`. The gap was exactly the monster curve running for fifty levels
+while the player's stood still.
 
-| Option | Shape | Cost |
-|---|---|---|
-| Extend the affix tier table past 50 | Fewest moving parts; §3's mechanism works as written | Tier authoring to whatever the ceiling becomes; the T0/T-1 spike needs re-siting |
-| An item level track above 50 with a separate value curve | Keeps the 1-50 tier table untouched | A second curve to author and keep aligned with `g` |
-| Ascended rarities above Anomalous | Rarity is already a strong felt axis | Rarity currently gates affix COUNT, not magnitude — a new rule |
-| A separate endgame multiplier (paragon-like) | Familiar, easy to tune | Collides with the locked "no post-cap character power" rule; would need O-ledger amendment |
-| Cap area level at 50 | Free; the contradiction disappears | Deletes the endgame tier ladder, and with it the reason to keep playing past 50 |
+### What closed it
 
-Until one is ruled, `RiorsEdge.Combat.PowerCurve.EndgameClamp` asserts the gap
-is **still open**, so it cannot be quietly forgotten. That test failing is good
-news; it means someone closed it, and the instruction at the test is to delete
-it and rewrite §1 to describe whatever now carries endgame power.
+O29 chose "extend the affix tier table past 50" from the five tabulated options,
+and extended item level with it. The reason the clamp existed is no longer true,
+so the clamp is the only thing left in the way:
+
+    GetDropItemLevel(AL) = Clamp(ClampAreaLevel(AL), 1, UBreakerAffixLibrary::MaxItemLevel)
+
+Since `ClampAreaLevel` already bounds area level to 1-100 and `MaxItemLevel` is
+120, that is the **identity across the whole area-level range**, which is
+precisely the property the composition needs: item level equals area level, so
+`(1+w)^(ilvl-1)` and `(1+g)^(AL-1)` cancel at every point rather than only up to
+50. It is one line in `Combat/BreakerMonsterChassis.cpp`.
+
+### The composition, measured
+
+`RiorsEdge.Combat.PowerCurve.EndgameComposition` walks area level 50 to 100 with
+drop item level tracking area level. Baseline TTK is **1.00x at every step** -
+flat to within a thousandth, because the cancellation is algebraic rather than
+approximate. The 74x is gone, not reduced.
+
+| Area level | Trash health | Item level | Weapon base | Relative baseline TTK |
+|---|---|---|---|---|
+| 1 | 220 | 1 | 13.0 | 1.000x |
+| 25 | 1 740 | 25 | 102.8 | 1.000x |
+| 50 | 15 008 | 50 | 886.8 | 1.000x |
+| 75 | 129 415 | 75 | 7 647 | 1.000x |
+| 100 | 1 115 953 | 100 | 65 943 | 1.000x |
+
+**The growth rates do NOT need to differ above 50.** `w = g = 0.09` holds the
+whole range on its own; the only thing that was ever wrong was the clamp. Any
+divergence introduced above 50 would be a deliberate design choice about whether
+the endgame should get gradually easier or harder, not a correction.
+
+### What this does and does not fix
+
+**Fixed, in `Items/` and `Weapons/`:** the item system supports the endgame
+curve end to end. Items roll to level 120, the tier ladder covers it, the weapon
+damage curve evaluates it, the Forge prices it, and every clamp to 50 is gone.
+
+**NOT fixed, and it is one line in another lane:** `GetDropItemLevel` still
+clamps to 50, so no drop actually carries the endgame curve yet. Until the owner
+makes that change the 74x gap is still live in the shipping game even though
+nothing in the item system blocks it any more. `EndgameComposition` reports the
+clamp in its log rather than failing on it, because a red test in another lane's
+column is a worse handoff than a loud line in the log.
+
+**OPEN: item level 101-120 has no source.** Drop item level derives from area
+level and area level stops at 100, so the top twenty item levels are reachable
+only through O6's TierBonus (authored 0..+5, which does not cover it) or the
+Forge. Those twenty levels are worth `1.09^20 = 5.6x` base damage over on-level
+content - either the reward at the end of the chase, or twenty levels of dead
+ladder. Owner ruling.
+
+**OPEN: the build variance band moved, and O27 is its subject.**
+`RiorsEdge.Progression.PowerBand` now measures **23.70x** against the authored
+8-10x, and fails deliberately rather than being retuned. Two things happened:
+
+- The back-loaded ladder widened the distance between a mediocre roll and a
+  perfect one. The fixture's T1/T5 ratio went from 180/91.4 = 1.97x to
+  400/120.9 = 3.31x, and that compounds through the flat and crit lanes.
+- More importantly, **the fixture now describes a character that cannot exist.**
+  It builds item level 50 gear at T5 and T1, and `BestTierForItemLevel(50)` is
+  now T8 - neither tier is obtainable at that item level at any rarity. The
+  8-10x band was measured on a pairing the loot pipeline could produce before
+  O29 and cannot produce after it.
+
+So the honest reading is not that the band broke. **O29 moved where the band
+lives**: the spread between a decent item and a perfect one is no longer
+available at the character cap, it is available in the endgame, which is exactly
+what "all endgame character power comes from gear" is supposed to mean. Three
+rulings would each resolve it - the band widens because the endgame is longer,
+the fixture moves to item level 120 with tiers the ladder can produce (T3 vs T1
+reproduces roughly the old 1.97x gear spread), or the ceiling anchors come back
+down.
+
+Two smaller consequences, both reported rather than retuned:
+
+- **PROLIFIC got stronger without being edited.** Its whole value is the size of
+  a tier step, and T1 -> T0 went from 1.4x to 2.2x. Measured at x1.462 on an
+  optimized build against an authored ceiling of x1.35;
+  `RiorsEdge.Progression.RuleBandImpact` fails on it.
+- **The movement affixes inherited the pool-wide 2.2x uplift.** Move Speed,
+  Slide Speed, Air Control and Dash Cooldown all scaled with everything else, so
+  the composed movement band in `Docs/Movement-Design.md` is now reachable from
+  gear alone at high item level. That is a balance question for `Movement/`,
+  called out rather than pre-emptively retuned.
+
+### The five options, kept for the record
+
+| Option | Shape | Cost | Outcome |
+|---|---|---|---|
+| Extend the affix tier table past 50 | Fewest moving parts; the mechanism works as written | Tier authoring to whatever the ceiling becomes; the T0/T-1 spike needs re-siting | **CHOSEN (O29).** The spike was re-sited to 2.2x/3.6x |
+| An item level track above 50 with a separate value curve | Keeps the 1-50 tier table untouched | A second curve to author and keep aligned with `g` | Rejected |
+| Ascended rarities above Anomalous | Rarity is already a strong felt axis | Rarity gates affix COUNT, not magnitude - a new rule | Rejected |
+| A separate endgame multiplier (paragon-like) | Familiar, easy to tune | Collides with the locked "no post-cap character power" rule | **Rejected explicitly by O29** - also pure accumulation against O27 |
+| Cap area level at 50 | Free; the contradiction disappears | Deletes the endgame tier ladder, and the reason to play past 50 | Rejected |
+
+`RiorsEdge.Combat.PowerCurve.EndgameClamp` asserted the gap was still open and
+carried an instruction to delete it when someone closed it. It is deleted, and
+`RiorsEdge.Combat.PowerCurve.EndgameComposition` stands in its place.
