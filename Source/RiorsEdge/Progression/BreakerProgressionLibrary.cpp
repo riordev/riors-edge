@@ -1,5 +1,6 @@
 #include "Progression/BreakerProgressionLibrary.h"
 
+#include "Abilities/BreakerAbilityTags.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -57,6 +58,29 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_Overpressure, "Progression.Node.Swift.Kinetic.Overpressure");
     UE_DEFINE_GAMEPLAY_TAG(Node_Deadeye, "Progression.Node.Swift.Marksman.Deadeye");
     UE_DEFINE_GAMEPLAY_TAG(Node_Culling, "Progression.Node.Swift.Marksman.Culling");
+
+    // FRENZY. Its Trigger Discipline shares a DISPLAY name with Volley's
+    // gateway and nothing else: separate node id, separate tag, separate
+    // currency. Both names are transcribed from their design documents and
+    // renaming either to avoid the collision would put the code and the
+    // authority document out of step, which is the worse failure.
+    UE_DEFINE_GAMEPLAY_TAG(Node_FrenzyTrigger, "Progression.Node.Swift.Frenzy.TriggerDiscipline");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Loaded, "Progression.Node.Swift.Frenzy.Loaded");
+    UE_DEFINE_GAMEPLAY_TAG(Node_ShortLeash, "Progression.Node.Swift.Frenzy.ShortLeash");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Rhythm, "Progression.Node.Swift.Frenzy.Rhythm");
+    UE_DEFINE_GAMEPLAY_TAG(Node_DryFire, "Progression.Node.Swift.Frenzy.DryFire");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Feed, "Progression.Node.Swift.Frenzy.Feed");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Overrev, "Progression.Node.Swift.Frenzy.Overrev");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SlipcutMastery, "Progression.Node.Swift.Frenzy.SlipcutMastery");
+    UE_DEFINE_GAMEPLAY_TAG(Node_AmmunitionEconomy, "Progression.Node.Swift.Frenzy.AmmunitionEconomy");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Bloodrhythm, "Progression.Node.Swift.Frenzy.Bloodrhythm");
+
+    UE_DEFINE_GAMEPLAY_TAG(Node_Conductive, "Progression.Node.Core.Conductive");
+    UE_DEFINE_GAMEPLAY_TAG(Node_ChargeUp, "Progression.Node.Core.ChargeUp");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Threshold, "Progression.Node.Core.Threshold");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Catalyst, "Progression.Node.Core.Catalyst");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Penetrance, "Progression.Node.Core.Penetrance");
+    UE_DEFINE_GAMEPLAY_TAG(Node_ReactionChain, "Progression.Node.Core.ReactionChain");
 }
 
 namespace
@@ -346,6 +370,93 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     RedlineDoctrine->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
     Tree->Nodes.Add(RedlineDoctrine);
 
+    // --- Elements ----------------------------------------------------------
+    // O5 (renamed by O19): the elements are RIFT / ENTROPY / VOID. The Core
+    // board rendered this cluster as a sealed placeholder because the roster was
+    // empty, not because the constellation was cut — Core-Constellations §6 is
+    // explicit that Elements is "a designed-but-unshipped sixth, not a cut one".
+    //
+    // WHAT IS AND IS NOT AUTHORED HERE, and why. Elements' own grammar is
+    // buildup, thresholds and reactions, and NONE of those three quantities
+    // exists: there is no elemental resistance step in the damage order, no
+    // buildup track, and no reaction matrix. `ElementalDamageReduction` is
+    // still the one inert stat target in the project and is deliberately left
+    // alone. So every node below is authored in the constellation's PHYSICAL-
+    // ONLY pre-resistance form, exactly as §6 instructs ("no node requires an
+    // element to function"): the elemental half of each node is carried as a
+    // tag for the resistance model to pick up, and the half that pays TODAY is
+    // authored against damage-over-time, critical chance and damage — all three
+    // of which have live consumers. A node whose only content was an
+    // unconsumed elemental tag would be the same failure as the damage-less
+    // damage node this project already shipped once.
+    //
+    // Consequence stated plainly: pre-resistance, Elements reads as a second
+    // status-pressure constellation and overlaps Affliction. That is the
+    // honest cost of shipping it early, and it resolves the moment the
+    // resistance step lands and the tags start paying their own half.
+    //
+    // NO MORE MULTIPLIER IS AUTHORED HERE. §2.4 reserves E9 Reaction Chain as
+    // Elements' compliant More slot, and it stays EMPTY: a More's condition
+    // here would have to be "a reaction fired", and `EBreakerBuildCondition`
+    // has only movement states, so the node could only be written unconditional
+    // — a strictly-better generalist than Fixate and Barrage, bought with a
+    // theme it cannot enforce. The slot is reserved, not spent.
+    UBreakerProgressionNode* Conductive = MakeNode(TEXT("Core.Elements.Conductive"), TEXT("Conductive"),
+        TEXT("Elements gateway. Elemental buildup decays more slowly, and everything you leave on a target burns longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+    AddEffect(Conductive, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Conductive->GrantedTags.AddTag(BreakerNodeTags::Node_Conductive.GetTag());
+    Tree->Nodes.Add(Conductive);
+
+    UBreakerProgressionNode* ChargeUp = MakeNode(TEXT("Core.Elements.ChargeUp"), TEXT("Charge Up"),
+        TEXT("Lane A. The buildup you apply grows with every rank, and damage over time grows with it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+    AddPrerequisite(ChargeUp, TEXT("Core.Elements.Conductive"));
+    AddEffect(ChargeUp, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 7.0f); // O2 PLACEHOLDER
+    ChargeUp->GrantedTags.AddTag(BreakerNodeTags::Node_ChargeUp.GetTag());
+    Tree->Nodes.Add(ChargeUp);
+
+    UBreakerProgressionNode* Threshold = MakeNode(TEXT("Core.Elements.Threshold"), TEXT("Threshold"),
+        TEXT("Notable. Crossing a status threshold resets the bar halfway instead of emptying it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2);
+    AddPrerequisite(Threshold, TEXT("Core.Elements.Conductive"));
+    AddEffect(Threshold, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
+    Threshold->GrantedTags.AddTag(BreakerNodeTags::Node_Threshold.GetTag());
+    Tree->Nodes.Add(Threshold);
+
+    // A reaction is a burst, so the half that can pay today is crit chance
+    // rather than another DoT ladder. This is what stops Lane B reading as a
+    // duplicate of Lane A while the reaction matrix does not exist.
+    UBreakerProgressionNode* Catalyst = MakeNode(TEXT("Core.Elements.Catalyst"), TEXT("Catalyst"),
+        TEXT("Lane B. Reactions come off cooldown sooner, and the shots that set them up find the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+    AddPrerequisite(Catalyst, TEXT("Core.Elements.Conductive"));
+    AddEffect(Catalyst, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
+    Catalyst->GrantedTags.AddTag(BreakerNodeTags::Node_Catalyst.GetTag());
+    Tree->Nodes.Add(Catalyst);
+
+    // Penetrance is resistance penetration once a resistance exists. Until it
+    // does, the only honest expression of "your damage is resisted less" is
+    // Increased Damage, and the tag is what upgrades it in place later.
+    UBreakerProgressionNode* Penetrance = MakeNode(TEXT("Core.Elements.Penetrance"), TEXT("Penetrance"),
+        TEXT("Lane C. Your damage is turned aside less. Becomes true elemental penetration when resistances exist."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+    AddPrerequisite(Penetrance, TEXT("Core.Elements.Conductive"));
+    AddEffect(Penetrance, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+    Penetrance->GrantedTags.AddTag(BreakerNodeTags::Node_Penetrance.GetTag());
+    Tree->Nodes.Add(Penetrance);
+
+    // Convergence. Carries the constellation's largest single payout and,
+    // deliberately, no More — see the block comment above.
+    UBreakerProgressionNode* ReactionChain = MakeNode(TEXT("Core.Elements.ReactionChain"), TEXT("Reaction Chain"),
+        TEXT("Convergence. A reaction can set off one more, once. Everything you leave burning hurts considerably more."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+    AddPrerequisite(ReactionChain, TEXT("Core.Elements.ChargeUp"));
+    AddEffect(ReactionChain, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 25.0f); // O2 PLACEHOLDER
+    AddEffect(ReactionChain, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f);          // O2 PLACEHOLDER
+    ReactionChain->GrantedTags.AddTag(BreakerNodeTags::Node_ReactionChain.GetTag());
+    Tree->Nodes.Add(ReactionChain);
+
+    // E10 RESONANCE (the keystone) is DELIBERATELY NOT AUTHORED. Its rewrite is
+    // "you may carry only one element" plus a guaranteed threshold fill; the
+    // cost half is unexpressible with no elements in the pipeline, so shipping
+    // it now would be a pure-upside keystone — and O19 already flags its cost
+    // basis for re-examination independently. It lands with the resistance step.
+
     return Tree;
 }
 
@@ -515,12 +626,130 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     return Tree;
 }
 
+// Class-Kits §1.3. Frenzy is "trigger discipline and cadence — the branch that
+// wants a full magazine and a target that stays in front of it", and the LEAST
+// mobile Swift branch on purpose. That gives the three branches three distinct
+// build conditions and makes the branch strip a real choice under O27:
+// Kinetic owns Airborne / WallRiding / Sliding, Marksman owns unconditional
+// output, and Frenzy owns REDLINE — the state you have to work to hold and can
+// hold with both feet on the ground.
+UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
+{
+    static UBreakerProgressionTree* Tree = nullptr;
+    if (Tree) return Tree;
+
+    Tree = MakeTree(TEXT("Swift.Frenzy"), TEXT("Swift — Frenzy"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift);
+
+    // Every Frenzy node in the design document is a Momentum-LOOP rewrite, and
+    // the Momentum loop is not a node stat target — so transcribed verbatim the
+    // whole branch would have been ten tags and nothing else. Each node
+    // therefore carries its design-document rule as a tag AND a stat line that
+    // states the same intent in a currency that reaches gameplay today. The
+    // stat lines are authored, not transcribed; the doc's implementation-status
+    // section names each one.
+
+    // --- Tier 1 ------------------------------------------------------------
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Frenzy.TriggerDiscipline"), TEXT("Trigger Discipline"),
+        TEXT("Weak-point hits pay Momentum with your feet on the ground, and you find weak points more often."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 3.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_FrenzyTrigger.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Swift.Frenzy.Loaded"), TEXT("Loaded"),
+        TEXT("Reloading at Redline returns the rounds you just spent, and a loaded magazine hits harder at Redline."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Loaded.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Short Leash delays decay below the walking threshold, so raising the
+    // threshold speed itself is the same node said in a stat: a faster Frenzy
+    // spends less of its time under the line it is being paid to stay above.
+    Node = MakeNode(TEXT("Swift.Frenzy.ShortLeash"), TEXT("Short Leash"),
+        TEXT("Momentum decay waits longer when you slow down, and you move quicker on the ground."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_ShortLeash.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 2 ------------------------------------------------------------
+    Node = MakeNode(TEXT("Swift.Frenzy.Rhythm"), TEXT("Rhythm"),
+        TEXT("Every fifth consecutive hit pays Momentum outside the cap, and a maintained rhythm finds weak points."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.TriggerDiscipline"));
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 3.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Rhythm.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Swift.Frenzy.DryFire"), TEXT("Dry Fire"),
+        TEXT("Firing the last round of a magazine pays Momentum. Emptying rather than tapping is rewarded at Redline."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.Loaded"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_DryFire.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Frenzy is the branch that stands its ground while the other two leave it,
+    // so its loop node pays in the currency standing still actually costs.
+    Node = MakeNode(TEXT("Swift.Frenzy.Feed"), TEXT("Feed"),
+        TEXT("Kills refund part of the Momentum you last spent, and holding the line leaves you with more to lose."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
+    AddEffect(Node, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 45.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Feed.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Frenzy's offensive spine and the largest conditional ladder in the
+    // branch, the counterpart to Kinetic's Downforce and Grind. Redline is
+    // harder to hold than airborne is to enter but easier than a wall ride, and
+    // it is priced between them.
+    Node = MakeNode(TEXT("Swift.Frenzy.Overrev"), TEXT("Overrev"),
+        TEXT("Shots fired at Redline Momentum land significantly harder. Worth nothing the moment the bar drops."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overrev.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 3 ------------------------------------------------------------
+    // F7 grants S2 Cadence Break in Class-Kits §1.3. NO ability grant is
+    // authored: `Swift.CadenceBreak` does not exist in the ability fallback
+    // registry, and a node that unlocks a loadout entry resolving to nothing is
+    // the "node that lies" failure mode. The rule half ships as a tag; the
+    // grant goes in the same line the day the ability does.
+    Node = MakeNode(TEXT("Swift.Frenzy.SlipcutMastery"), TEXT("Slipcut Mastery"),
+        TEXT("Slipcut's window widens for each ability cooldown running. Its cadence window bites deeper."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.Rhythm"));
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 20.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SlipcutMastery.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Swift.Frenzy.AmmunitionEconomy"), TEXT("Ammunition Economy"),
+        TEXT("Ammunition returned on a kill also pays Momentum. The branch's one unconditional increase to damage."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.DryFire"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_AmmunitionEconomy.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // The branch keystone O3 permits, and the only one of Swift's three that
+    // ALSO rewrites the ultimate: `Keystone.Swift.Bloodrhythm` is already a row
+    // in Overdrive's variant table, and the progression component now publishes
+    // node tags onto the ability system component, so owning this node really
+    // does resolve Overdrive to its Bloodrhythm row. Class-Kits §1.3 prices the
+    // keystone at 4; the implemented branch grammar uses 3 (Overpressure,
+    // Culling) and the cost curve is kept internally consistent instead.
+    Node = MakeNode(TEXT("Swift.Frenzy.Bloodrhythm"), TEXT("Bloodrhythm"),
+        TEXT("Branch keystone. A MORE multiplier to all damage dealt at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
+    AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Bloodrhythm.GetTag());
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Swift_Bloodrhythm.GetTag());
+    Tree->Nodes.Add(Node);
+
+    return Tree;
+}
+
 const TArray<UBreakerProgressionTree*>& UBreakerProgressionLibrary::GetAllFallbackTrees()
 {
     static TArray<UBreakerProgressionTree*> Trees;
     if (Trees.Num() == 0)
     {
         Trees.Add(GetCoreSliceTree());
+        Trees.Add(GetSwiftFrenzyTree());
         Trees.Add(GetSwiftKineticTree());
         Trees.Add(GetSwiftMarksmanTree());
     }
@@ -558,6 +787,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // seeded from them resolves to nothing.
     Swift->StartingClassAbilityIds = {TEXT("Swift.Skim"), TEXT("Swift.Lead")};
     Swift->BaseUltimateId = TEXT("Swift.Overdrive");
+    // Class-Kits §1.3-1.5 order: Frenzy, Kinetic, Marksman. The branch strip
+    // reads this list, so it now shows the three chips the design names.
+    Swift->BranchTrees.Add(GetSwiftFrenzyTree());
     Swift->BranchTrees.Add(GetSwiftKineticTree());
     Swift->BranchTrees.Add(GetSwiftMarksmanTree());
     Swift->BranchTrees.Add(GetCoreSliceTree());

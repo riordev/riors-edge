@@ -48,6 +48,28 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_PierceDiscipline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Sightline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Lead);
+
+    // Swift / FRENZY (Class-Kits §1.3). The branch the design document has
+    // always named and the library never authored, which is why the skill
+    // matrix's branch strip showed two chips where the design says three.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FrenzyTrigger);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Loaded);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ShortLeash);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Rhythm);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_DryFire);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Feed);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Overrev);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SlipcutMastery);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AmmunitionEconomy);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Bloodrhythm);
+
+    // Core / ELEMENTS (Core-Constellations §6, O5 + O19: Rift / Entropy / Void).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Conductive);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ChargeUp);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Threshold);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Catalyst);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Penetrance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ReactionChain);
 }
 
 // Zero-setup fallback skill-tree content, the same convention the weapon
@@ -70,6 +92,8 @@ public:
     static UBreakerProgressionTree* GetSwiftKineticTree();
     // Swift MARKSMAN branch, tiers 1-3 (Class-Kits §1.5).
     static UBreakerProgressionTree* GetSwiftMarksmanTree();
+    // Swift FRENZY branch, tiers 1-3 (Class-Kits §1.3).
+    static UBreakerProgressionTree* GetSwiftFrenzyTree();
 
     // Core tree plus every class tree. The UI enumerates from here.
     UFUNCTION(BlueprintPure, Category="Progression|Content")
