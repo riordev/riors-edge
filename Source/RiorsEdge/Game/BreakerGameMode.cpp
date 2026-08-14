@@ -5,6 +5,11 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerModifierComponent.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -811,7 +816,10 @@ void ABreakerGameMode::SpawnCombatEncounter()
     }
 
     // One elite anchors the back of the pack: tougher, harder-hitting, and
-    // guaranteed Exceptional-or-better drops.
+    // guaranteed Exceptional-or-better drops. It is also the first enemy in the
+    // gym to CARRY MODIFIERS — O27 puts difficulty in modifiers rather than
+    // trash health, and until this call existed that ruling was implemented in
+    // Combat/ and unreachable from a controller.
     const FVector EliteLocation = Frame.At(EncounterPocketDistance + CombatPocketRadius * 0.5f, 0.0f, 120.0f);
     FActorSpawnParameters EliteParams;
     EliteParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -820,6 +828,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
         Elite->ConfigureEncounter(EliteLocation, 0.9f);
         Elite->SetAreaLevel(GymAreaLevel);
         Elite->ConfigureElite();
+        GrantModifiers(Elite, ModifierSeedBase);
     }
 
     // Two LATTICE ranged enemies (Encounter-Design §2.2) flank the pack wide.
@@ -844,6 +853,33 @@ void ABreakerGameMode::SpawnCombatEncounter()
         {
             Ranged->ConfigureEncounter(SpawnLocation, 0.4f + Index * 1.1f);
             Ranged->SetAreaLevel(GymAreaLevel);
+        }
+    }
+}
+
+void ABreakerGameMode::GrantModifiers(ABreakerEnemy* Enemy, int32 Seed) const
+{
+    if (!bGrantModifiers || !Enemy) return;
+
+    // The rank the CONTENT authored. ConfigureWithModifiers overwrites it with
+    // ModifierBearing, which is a demotion for anything ranked above that, so
+    // it is captured and put back. Rank is the single source of truth for what
+    // an elite is worth (O27); a modifier roll must not become a second one.
+    const EBreakerMonsterRank AuthoredRank = Enemy->GetMonsterRank();
+    if (Enemy->ConfigureWithModifiers(Seed) <= 0) return;
+
+    if (Enemy->GetMonsterRank() != AuthoredRank)
+    {
+        Enemy->SetMonsterRank(AuthoredRank);
+        // SetMonsterRank rebuilt the chassis, so max health moved, so the
+        // Warded ward is now sized against a number that no longer exists.
+        // Re-publishing the same set re-runs ApplyPersistentModifiers against
+        // the new health. Copied into a local first because SetModifiers
+        // assigns over the very array it would otherwise be reading.
+        if (UBreakerEnemyModifierComponent* Modifiers = Enemy->GetModifierComponent())
+        {
+            const TArray<EBreakerEnemyModifier> Granted = Modifiers->GetModifiers();
+            Modifiers->SetModifiers(Granted);
         }
     }
 }
@@ -1333,7 +1369,13 @@ void ABreakerGameMode::StartNextWave()
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
             // Later waves climb in level so drops and TTK data climb too.
             Enemy->ConfigureWave(GetAreaLevelForWave(CurrentWave));
-            if (bEliteWave && Index == 0) Enemy->ConfigureElite();
+            if (bEliteWave && Index == 0)
+            {
+                Enemy->ConfigureElite();
+                // Seeded on the WAVE, so wave 3 is the same Champion every run
+                // and a TTK sample taken across two sessions compares.
+                GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919);
+            }
             WaveEnemies.Add(Enemy);
         }
     }

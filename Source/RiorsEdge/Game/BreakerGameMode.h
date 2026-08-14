@@ -240,6 +240,20 @@ public:
     // The area level of wave N. Pure, so a test can walk the escalation.
     UFUNCTION(BlueprintPure, Category="Playtest|Area") int32 GetAreaLevelForWave(int32 WaveIndex) const;
 
+    // --- The modifier layer reaching a player (O27) -------------------------
+    // Ten modifiers, a component and a legality system shipped and NOTHING
+    // called ConfigureWithModifiers, so O27's "difficulty lives in bosses,
+    // elites and monsters with MODIFIERS, not in trash health" was true of the
+    // code and false of the game. This is the switch that makes it true of both.
+    //
+    // Off turns the gym back into the pre-modifier instrument, which matters
+    // because the TTK baseline every earlier session recorded was measured
+    // without them.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") bool bGrantModifiers = true;
+    // Deterministic in the seed, so two runs of the same wave meet the same
+    // Champions and a screenshot of wave 4 is comparable with the last one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") int32 ModifierSeedBase = 20260814;   // O2 PLACEHOLDER
+
     // --- Ammo economy (O2 placeholders) ------------------------------------
     // Third and last resupply channel alongside kill drops and wave-clear:
     // an amber supply crate in the Anchor camp. Standing next to it for
@@ -301,6 +315,18 @@ private:
     void SpawnPlaytestTargets();
     void SpawnMovementCourse();
     void SpawnCombatEncounter();
+    // Rolls a legal modifier set onto an enemy and then RESTORES the rank it
+    // was authored with.
+    //
+    // ABreakerEnemy::ConfigureWithModifiers promotes the rank to
+    // ModifierBearing unconditionally, which is correct for trash and wrong for
+    // an elite: ModifierBearing is x2.5/x1.25 against Elite's x3.0/x1.5, so
+    // calling it on the arena elite would quietly DEMOTE it. Restoring the rank
+    // afterwards rebuilds the chassis, which invalidates the Warded ward
+    // (sized off max health), so the set is re-published last — the same
+    // re-derive-after-the-chassis order ConfigureWithModifiers itself uses, and
+    // for the same reason.
+    void GrantModifiers(class ABreakerEnemy* Enemy, int32 Seed) const;
     void SpawnSafeZone();
     void SpawnAnchorCamp();
     // Overgrown-Earth dressing (O24): vegetation, ruins, and scattered tech.
