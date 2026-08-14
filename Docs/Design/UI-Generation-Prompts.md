@@ -1,8 +1,20 @@
 # UI Generation Prompts
 
+**Last reconciled against: O32**
+
 Self-contained prompts for generating UI design concepts (Claude, or any
 design/image tool). Each carries the full context so it can be pasted
 alone. Shared canon is repeated deliberately.
+
+**These prompts are HISTORICAL and are not a spec.** They produced the mocks
+that FIELDPLATE was transcribed from. The canon repeated inside them was
+current when they were written and has since moved — item level now runs to
+120, the rarity ramp gained gated unlocks, Mana inverted, and the HUD gained a
+minimap and an absorbed-damage read that no prompt here describes. **Do not
+build from this file and do not update code to match it.** The visual authority
+is `UI-Style-Guide-Fieldplate.md` and the four screen specs. Keep this file for
+the record of how the mocks were produced; regenerate from the current specs if
+more concepts are wanted.
 
 ---
 

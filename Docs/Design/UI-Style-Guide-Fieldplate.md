@@ -1,5 +1,7 @@
 # FIELDPLATE — Rior's Edge UI specification v1.0
 
+**Last reconciled against: O32**
+
 Owner-authored design canvas, transcribed from `Form decisions pending.zip`
 (`Style Guide.dc.html`) on 2026-08-13. This is the visual authority for every
 screen and for the combat HUD. Companion documents: `UI-HUD-Spec.md`,
@@ -262,3 +264,29 @@ screenshot harness (`-BreakerCaptureMenu=<SCREEN>`) and READ: `SKILLTREES`
   still deliberately so.
 - `SETTINGS` and `PAUSE` were captured and need no changes: both read cleanly
   at 1080p with no collision, clipping or contrast problem.
+
+### What the harness can never verify (stated once, for the whole corpus)
+
+Every `UI-*.md` implementation-status section makes claims about what has been
+seen. The boundary is the same for all of them and is worth stating in the
+style guide rather than five times over.
+
+**The capture harness has no mouse and no trigger.** It can open a screen, pick
+a board and photograph a resting composition. It cannot hover, click, drag,
+scroll by gesture, zoom, fire a weapon or press F4. Therefore:
+
+| Structurally unverifiable | Where it bites |
+|---|---|
+| **Every hover state** | Skill-tree node detail cards and the before/after projection; the inventory's equip-limit outline, per-affix deltas and doomed-piece disclosure; the loot popup's look-at behaviour |
+| **Every gesture** | Skill-board wheel zoom, cursor anchoring, drag pan, and the zoom range |
+| **Every modal reached by a click** | The discard confirmation |
+| **Any state a headless run cannot enter** | Ability cooldown/window/unaffordable overlays; the Overcast debt track; a populated backpack; anything at a rarity the drop gates make impossible at the gym's area level |
+
+The last row is the dangerous one, and the project has already paid for it
+twice: **the wave banner and every damage number shipped broken, and they were
+exactly the two readouts a capture run could not reach.** `-BreakerCaptureHUD`
+is the answer pattern — fabricate the EVENT, send it through the identical
+drawing paths, photograph the real thing. Extending it to ability states and to
+a granted backpack is the obvious next work and is not done.
+
+Rows one to three cannot be closed this way. They need a human at a mouse.
