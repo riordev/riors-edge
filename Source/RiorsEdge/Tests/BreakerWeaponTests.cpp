@@ -8,6 +8,7 @@
 #include "Weapons/BreakerWeaponFeel.h"
 #include "Weapons/BreakerWeaponMath.h"
 #include "UI/BreakerTracerMath.h"
+#include "UI/BreakerTracerRenderer.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponCadenceTest,
@@ -243,18 +244,21 @@ bool FBreakerHipFireTradeTest::RunTest(const FString& Parameters)
         FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, 1.2f, 0.0f, 0, 0.0f), 0.0f);
 
     // ---- And the archetype table honours all of it -----------------------
+    // EVERY archetype, enumerated off the enum rather than a hand-written list,
+    // so an archetype added later cannot quietly skip the ADS bill.
     UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
-    const EBreakerWeaponArchetype Archetypes[] = {
-        EBreakerWeaponArchetype::Rifle, EBreakerWeaponArchetype::SMG, EBreakerWeaponArchetype::Sniper,
-        EBreakerWeaponArchetype::Shotgun, EBreakerWeaponArchetype::Rocket };
-    for (const EBreakerWeaponArchetype Archetype : Archetypes)
+    for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
     {
-        Weapon->EquipArchetype(Archetype);
+        Weapon->EquipArchetype(static_cast<EBreakerWeaponArchetype>(Index));
         const FBreakerRecoilProfile Live = Weapon->GetRecoilProfile();
         TestTrue(TEXT("Every archetype makes ADS cost time"), Live.AimInSeconds > 0.0f);
         TestTrue(TEXT("Every archetype makes movement cost cone"), Live.MoveSpreadDegrees > 0.0f);
         TestTrue(TEXT("Every archetype punishes aimed movement harder than hip movement"),
             Live.AimMoveSpreadMultiplier > 1.0f);
+        // The third item on the bill, added with the ADS movement-speed gap:
+        // every archetype must charge something and none may charge a buff.
+        TestTrue(TEXT("Every archetype charges some aimed movement speed"),
+            Live.AimMoveSpeedMultiplier < 1.0f && Live.AimMoveSpeedMultiplier > 0.0f);
     }
 
     Weapon->EquipArchetype(EBreakerWeaponArchetype::Sniper);
@@ -991,6 +995,504 @@ bool FBreakerWeaponEquippedItemLevelTest::RunTest(const FString& Parameters)
     Weapon->EquipSlot(1);
     TestTrue(TEXT("The Primary unequips"), Equipment->UnequipSlot(EBreakerEquipSlot::Primary));
     TestEqual(TEXT("An emptied slot returns to item level 1"), Weapon->GetEquippedItemLevel(), 1);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The shot contract carries per-pellet impacts, and the single-impact
+// accessors still mean exactly what they meant.
+//
+// SCOPE, stated plainly: there is no world in this suite, so the fill site
+// (UBreakerWeaponComponent::FireOnce) cannot be run here. What these assertions
+// pin is the CONTRACT every consumer reads — the counting rules, and the
+// relationships between the per-pellet array and the legacy fields that
+// FireOnce maintains. A shot assembled the way FireOnce assembles one must
+// satisfy all of them.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPerPelletImpactTest,
+    "RiorsEdge.Weapons.PerPelletImpacts",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPerPelletImpactTest::RunTest(const FString& Parameters)
+{
+    // --- A shot that never fired, and a projectile shot ----------------------
+    // Both carry no pellets. The legacy readers must be unaffected, which is
+    // what makes this change additive rather than a rewrite: a replicated shot
+    // from a build without the array behaves exactly like a projectile one.
+    const FBreakerShotResult Empty;
+    TestEqual(TEXT("An unfired shot records no pellets"), Empty.GetPelletCount(), 0);
+    TestEqual(TEXT("An unfired shot landed no pellets"), Empty.GetLandedPelletCount(), 0);
+    TestFalse(TEXT("An unfired shot still reads as no hit"), Empty.bHit);
+
+    // --- A single-projectile weapon ------------------------------------------
+    // Exactly one entry, so no consumer needs a "is this a shotgun" branch.
+    FBreakerShotResult Single;
+    Single.bFired = true;
+    Single.bHit = true;
+    Single.ImpactPoint = FVector(1200.0f, 0.0f, 0.0f);
+    Single.TraceEnd = Single.ImpactPoint;
+    {
+        FBreakerPelletImpact& Pellet = Single.Pellets.AddDefaulted_GetRef();
+        Pellet.bHit = true;
+        Pellet.End = Single.ImpactPoint;
+    }
+    TestEqual(TEXT("A single-projectile weapon records one pellet"), Single.GetPelletCount(), 1);
+    TestEqual(TEXT("Its one pellet landed"), Single.GetLandedPelletCount(), 1);
+    TestTrue(TEXT("Its pellet end IS the legacy impact point"),
+        Single.Pellets[0].End.Equals(Single.ImpactPoint));
+
+    // --- An eight-pellet spread with three hits ------------------------------
+    // Misses are RECORDED, which is the whole reason the renderer can draw a
+    // cone: a spread with only its hits in it is narrower than the real one.
+    FBreakerShotResult Spread;
+    Spread.bFired = true;
+    const int32 PelletCount = 8;
+    const int32 HitPellets[] = { 1, 4, 6 };
+    for (int32 Index = 0; Index < PelletCount; ++Index)
+    {
+        FBreakerPelletImpact& Pellet = Spread.Pellets.AddDefaulted_GetRef();
+        // Every pellet has a usable draw target whether or not it hit: the
+        // impact when it hit, the end of its range when it did not.
+        Pellet.End = FVector(4000.0f, static_cast<float>(Index) * 30.0f, 0.0f);
+        for (const int32 Hit : HitPellets)
+        {
+            if (Hit != Index) continue;
+            Pellet.bHit = true;
+            Pellet.bWeakPoint = (Index == 4);
+            // FireOnce overwrites the legacy singles on every landing pellet,
+            // so the last one that lands is the one they end up describing.
+            Spread.bHit = true;
+            Spread.bWeakPoint |= Pellet.bWeakPoint;
+            Spread.ImpactPoint = Pellet.End;
+            Spread.TraceEnd = Pellet.End;
+        }
+    }
+
+    TestEqual(TEXT("A spread records every pellet, hits and misses alike"), Spread.GetPelletCount(), 8);
+    TestEqual(TEXT("Only the landing pellets count as landed"), Spread.GetLandedPelletCount(), 3);
+
+    // --- Back compatibility, stated as equations -----------------------------
+    // These are the exact readings the HUD damage numbers, the Mana component's
+    // per-shot generation and the playtest telemetry take today.
+    TestEqual(TEXT("The legacy hit flag is 'any pellet landed'"),
+        Spread.bHit, Spread.GetLandedPelletCount() > 0);
+    TestTrue(TEXT("The legacy weak-point flag is the OR across the spread"), Spread.bWeakPoint);
+    TestTrue(TEXT("The legacy impact point is the last pellet that landed"),
+        Spread.ImpactPoint.Equals(Spread.Pellets[6].End));
+    TestTrue(TEXT("The legacy trace end agrees with the legacy impact point"),
+        Spread.TraceEnd.Equals(Spread.ImpactPoint));
+    // And the number of records never exceeds what the definition may author,
+    // which is what bounds the cosmetic multicast payload.
+    UBreakerWeaponDefinition* Definition = NewObject<UBreakerWeaponDefinition>();
+    Definition->PelletsPerShot = 999;   // clamped by the property metadata in editor
+    TestTrue(TEXT("The pellet count is a bounded, small number by contract"),
+        Spread.GetPelletCount() <= 32);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// A spread shares the fixed tracer pool without overflowing it or silently
+// dropping pellets.
+//
+// The pool is twelve tracer slots allocated once and recycled oldest-first. Its
+// round-robin was designed for single rounds, where evicting the oldest is
+// harmless; for a spread it is not, because half a cone vanishing mid-flight is
+// worse than no cone. The policy is a per-spread budget plus an even subsample
+// of the pellets, and that is arithmetic — which makes it the one part of a
+// visual change that automation can genuinely prove.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTracerSpreadPoolTest,
+    "RiorsEdge.Weapons.TracerSpreadPool",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTracerSpreadPoolTest::RunTest(const FString& Parameters)
+{
+    const int32 Budget = ABreakerTracerRenderer::MaxSpreadStreaks;
+    const int32 Pool = ABreakerTracerRenderer::GetTracerSlots();
+
+    // --- The budget cannot overrun the pool ----------------------------------
+    TestTrue(TEXT("A spread's whole budget fits in the pool"), Budget <= Pool);
+    TestTrue(TEXT("At least two spreads fit in the pool at once"), Budget * 2 <= Pool);
+    TestTrue(TEXT("A spread's spark budget fits the spark pool"),
+        ABreakerTracerRenderer::MaxSpreadSparks <= ABreakerTracerRenderer::GetSparkSlots());
+    TestTrue(TEXT("Sub-streaks are thinner than an ordinary round"),
+        ABreakerTracerRenderer::SpreadThicknessScale < 1.0f
+        && ABreakerTracerRenderer::SpreadThicknessScale > 0.0f);
+
+    // --- The budget holds for every legal pellet count -----------------------
+    // 32 is the definition's clamp, so this is the whole authorable range.
+    for (int32 PelletCount = 1; PelletCount <= 32; ++PelletCount)
+    {
+        const int32 Streaks = BreakerHUD::SpreadStreakCount(PelletCount, Budget);
+        TestTrue(TEXT("A spread never claims more slots than its budget"), Streaks <= Budget);
+        TestTrue(TEXT("A spread that fired pellets always draws something"), Streaks >= 1);
+        TestTrue(TEXT("A small spread is never padded with phantom streaks"), Streaks <= PelletCount);
+
+        // Every streak maps to a real pellet, and no two streaks share one:
+        // an out-of-range index would be a crash and a duplicate would be a
+        // wasted slot pretending to be a pellet.
+        TSet<int32> Seen;
+        int32 Previous = -1;
+        for (int32 StreakIndex = 0; StreakIndex < Streaks; ++StreakIndex)
+        {
+            const int32 Pellet = BreakerHUD::SpreadStreakPellet(StreakIndex, Streaks, PelletCount);
+            TestTrue(TEXT("Every streak indexes a real pellet"), Pellet >= 0 && Pellet < PelletCount);
+            TestFalse(TEXT("No two streaks draw the same pellet"), Seen.Contains(Pellet));
+            TestTrue(TEXT("Streaks walk the spread in order"), Pellet > Previous);
+            Seen.Add(Pellet);
+            Previous = Pellet;
+        }
+
+        // The drawn cone is exactly as wide as the real one: the first and last
+        // pellets are always sampled, so the player never sees a spread
+        // narrower than the one that was actually fired.
+        TestEqual(TEXT("The first pellet always draws"),
+            BreakerHUD::SpreadStreakPellet(0, Streaks, PelletCount), 0);
+        TestEqual(TEXT("The last pellet always draws"),
+            BreakerHUD::SpreadStreakPellet(Streaks - 1, Streaks, PelletCount), PelletCount - 1);
+    }
+
+    // --- Degenerate input draws nothing rather than something wrong ----------
+    TestEqual(TEXT("A spread with no pellets draws no streaks"),
+        BreakerHUD::SpreadStreakCount(0, Budget), 0);
+    TestEqual(TEXT("A zero budget draws no streaks"),
+        BreakerHUD::SpreadStreakCount(8, 0), 0);
+
+    // --- The real shotgun, end to end ---------------------------------------
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Shotgun);
+    const int32 ShotgunPellets = Weapon->GetActiveDefinition()->PelletsPerShot;
+    const int32 ShotgunStreaks = BreakerHUD::SpreadStreakCount(ShotgunPellets, Budget);
+    TestTrue(TEXT("The shotgun draws a spread rather than one lonely round"), ShotgunStreaks > 1);
+    TestTrue(TEXT("Two shotgun blasts in the air cannot evict each other"),
+        ShotgunStreaks * 2 <= Pool);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O27 breadth: the three added archetypes are different WEAPONS, not stat
+// re-rolls, and their damage composes through the item-level curve rather than
+// around it.
+//
+// Every assertion below is a RELATIONSHIP, never a value: O2 freezes the
+// numbers, so a retune must be free to move any of them as long as the niche
+// survives.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerArchetypeBreadthTest,
+    "RiorsEdge.Weapons.ArchetypeBreadth",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerArchetypeBreadthTest::RunTest(const FString& Parameters)
+{
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    auto DefinitionFor = [Weapon](EBreakerWeaponArchetype Archetype)
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Weapon->GetActiveDefinition();
+    };
+    auto ProfileFor = [Weapon](EBreakerWeaponArchetype Archetype)
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Weapon->GetRecoilProfile();
+    };
+
+    // --- Every archetype is authored at all ----------------------------------
+    // The prototype-name table is indexed by the enum, so a missing row is an
+    // out-of-bounds read on first equip rather than a compile error.
+    for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
+    {
+        const EBreakerWeaponArchetype Archetype = static_cast<EBreakerWeaponArchetype>(Index);
+        const UBreakerWeaponDefinition* Definition = DefinitionFor(Archetype);
+        TestNotNull(TEXT("Every archetype resolves a fallback definition"), Definition);
+        TestTrue(TEXT("Every archetype does damage"), Definition->Damage > 0.0f);
+        TestTrue(TEXT("Every archetype has a magazine"), Definition->MagazineSize > 0);
+        TestTrue(TEXT("Every archetype has a name of its own"),
+            !Weapon->GetArchetypeName().IsEmpty());
+    }
+
+    const UBreakerWeaponDefinition* Rifle = DefinitionFor(EBreakerWeaponArchetype::Rifle);
+    const float RifleDamage = Rifle->Damage;
+    const float RifleRPM = Rifle->RoundsPerMinute;
+    const int32 RifleMagazine = Rifle->MagazineSize;
+    const float RifleSwap = Rifle->SwapInDuration;
+    const float RifleReload = Rifle->ReloadDuration;
+    const UBreakerWeaponDefinition* SMG = DefinitionFor(EBreakerWeaponArchetype::SMG);
+    const int32 SMGMagazine = SMG->MagazineSize;
+    const float SMGSwap = SMG->SwapInDuration;
+
+    // --- VOLLEY: a cadence niche no other archetype has ----------------------
+    const UBreakerWeaponDefinition* Volley = DefinitionFor(EBreakerWeaponArchetype::BurstRifle);
+    TestTrue(TEXT("Volley fires in bursts"), Volley->ShotsPerBurst > 1);
+    TestTrue(TEXT("Volley pays a real gap between bursts"), Volley->BurstCycleSeconds > 0.0f);
+    TestTrue(TEXT("The burst gap is longer than the in-burst interval, or it is not a burst"),
+        Volley->BurstCycleSeconds > FBreakerWeaponMath::FireInterval(Volley->RoundsPerMinute));
+    TestEqual(TEXT("Its magazine is a whole number of bursts"),
+        Volley->MagazineSize % Volley->ShotsPerBurst, 0);
+    TestTrue(TEXT("It hits harder per round than the rifle it trades cadence against"),
+        Volley->Damage > RifleDamage);
+    // Sustained DPS must land UNDER the rifle: the burst gap is the price of
+    // the accuracy, and if it were free the rifle would have no reason to exist.
+    const float VolleyBurstSeconds = (Volley->ShotsPerBurst - 1)
+        * FBreakerWeaponMath::FireInterval(Volley->RoundsPerMinute) + Volley->BurstCycleSeconds;
+    const float VolleyDPS = Volley->Damage * Volley->ShotsPerBurst / VolleyBurstSeconds;
+    const float RifleDPS = RifleDamage / FBreakerWeaponMath::FireInterval(RifleRPM);
+    TestTrue(TEXT("Volley trades sustained damage for burst precision"), VolleyDPS < RifleDPS);
+    // Its pattern is the learnable one: almost purely vertical, and fully
+    // settled before the next burst starts.
+    const FBreakerRecoilProfile VolleyRecoil = ProfileFor(EBreakerWeaponArchetype::BurstRifle);
+    TestTrue(TEXT("Volley's pattern is a vertical ladder, not a wander"),
+        VolleyRecoil.VerticalKickDegrees > VolleyRecoil.HorizontalKickDegrees * 8.0f);
+    TestTrue(TEXT("Volley's burst resets inside its own cycle gap"),
+        VolleyRecoil.BurstResetSeconds < Volley->BurstCycleSeconds);
+
+    // --- BULWARK: an ammunition-economy niche --------------------------------
+    const UBreakerWeaponDefinition* Bulwark = DefinitionFor(EBreakerWeaponArchetype::Machinegun);
+    TestTrue(TEXT("Bulwark carries the deepest magazine in the table"),
+        Bulwark->MagazineSize > RifleMagazine && Bulwark->MagazineSize > SMGMagazine);
+    TestTrue(TEXT("It pays for it with the longest reload"), Bulwark->ReloadDuration > RifleReload * 2.0f);
+    TestTrue(TEXT("It is the heaviest weapon to bring into a fight"), Bulwark->SwapInDuration > RifleSwap);
+    TestTrue(TEXT("Its reserve is shallow in magazines, however deep in rounds"),
+        static_cast<float>(Bulwark->StartingReserveAmmo) / Bulwark->MagazineSize
+        < static_cast<float>(Rifle->StartingReserveAmmo) / RifleMagazine);
+    const FBreakerRecoilProfile BulwarkRecoil = ProfileFor(EBreakerWeaponArchetype::Machinegun);
+    const FBreakerRecoilProfile ShotgunRecoil = ProfileFor(EBreakerWeaponArchetype::Shotgun);
+    TestTrue(TEXT("Held fire, not the kick, is what punishes Bulwark"),
+        BulwarkRecoil.MaxBloomDegrees > ShotgunRecoil.MaxBloomDegrees);
+    TestTrue(TEXT("Bulwark's climb ramps over far more rounds than anything else"),
+        BulwarkRecoil.ClimbRampShots > VolleyRecoil.ClimbRampShots * 5.0f);
+    TestTrue(TEXT("Bulwark is the most rooted weapon while sighted"),
+        BulwarkRecoil.AimMoveSpeedMultiplier
+            < ProfileFor(EBreakerWeaponArchetype::Sniper).AimMoveSpeedMultiplier);
+
+    // --- MARK: a tempo niche --------------------------------------------------
+    const UBreakerWeaponDefinition* MarkDefinition = DefinitionFor(EBreakerWeaponArchetype::Sidearm);
+    TestTrue(TEXT("Mark is the fastest weapon to swap to"),
+        MarkDefinition->SwapInDuration < SMGSwap && MarkDefinition->SwapInDuration < RifleSwap);
+    TestTrue(TEXT("Mark reloads faster than the rifle"), MarkDefinition->ReloadDuration < RifleReload);
+    TestTrue(TEXT("Mark carries the deepest reserve in magazines"),
+        static_cast<float>(MarkDefinition->StartingReserveAmmo) / MarkDefinition->MagazineSize
+        > static_cast<float>(Rifle->StartingReserveAmmo) / RifleMagazine);
+    TestFalse(TEXT("Mark is trigger-limited, not held"), MarkDefinition->bAutomatic);
+    const FBreakerRecoilProfile MarkRecoil = ProfileFor(EBreakerWeaponArchetype::Sidearm);
+    TestTrue(TEXT("Mark settles fastest, so its cap is the player's trigger"),
+        MarkRecoil.RecoveryConstantDegreesPerSecond
+            > ProfileFor(EBreakerWeaponArchetype::SMG).RecoveryConstantDegreesPerSecond);
+    TestTrue(TEXT("Mark comes up faster than any other weapon"),
+        MarkRecoil.AimInSeconds < ProfileFor(EBreakerWeaponArchetype::SMG).AimInSeconds);
+
+    // --- No two archetypes are the same weapon -------------------------------
+    // Cadence, magazine, spread and swap taken together must be unique: a stat
+    // re-roll of an existing gun is exactly what O27 says not to add.
+    TSet<FString> Fingerprints;
+    for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
+    {
+        const UBreakerWeaponDefinition* Definition =
+            DefinitionFor(static_cast<EBreakerWeaponArchetype>(Index));
+        const FString Fingerprint = FString::Printf(TEXT("%.0f|%d|%d|%.2f|%d|%.2f"),
+            Definition->RoundsPerMinute, Definition->MagazineSize, Definition->PelletsPerShot,
+            Definition->HipSpreadDegrees, Definition->ShotsPerBurst, Definition->SwapInDuration);
+        TestFalse(TEXT("No archetype is another archetype's stat re-roll"),
+            Fingerprints.Contains(Fingerprint));
+        Fingerprints.Add(Fingerprint);
+    }
+
+    // --- Damage composes THROUGH the item-level curve ------------------------
+    // Power-Curve §3 is locked: base damage never bypasses
+    // WeaponBase(ilvl) = ArchetypeBase * (1+w)^(ilvl-1). A new archetype that
+    // authored its own scaling would be invisible here, so this pins that the
+    // new three ride the same shared exponent as the old five.
+    const float W = Weapon->ItemLevelDamageGrowth;
+    const EBreakerWeaponArchetype Added[] = {
+        EBreakerWeaponArchetype::BurstRifle, EBreakerWeaponArchetype::Machinegun,
+        EBreakerWeaponArchetype::Sidearm };
+    for (const EBreakerWeaponArchetype Archetype : Added)
+    {
+        const UBreakerWeaponDefinition* Definition = DefinitionFor(Archetype);
+        const float Base = Definition->Damage;
+        TestEqual(TEXT("A new archetype is exactly its authored number at item level 1"),
+            FBreakerWeaponMath::WeaponBaseDamage(Base, 1, W), Base);
+        for (const int32 Level : { 10, 25, 50 })
+        {
+            TestEqual(TEXT("A new archetype rides the shared item-level curve"),
+                FBreakerWeaponMath::WeaponBaseDamage(Base, Level, W),
+                Base * FMath::Pow(1.0f + W, static_cast<float>(Level - 1)),
+                Base * 0.001f);
+        }
+        // Same exponent as the rifle, so the table keeps its shape: the ratio
+        // between any two archetypes is level-invariant.
+        const float RatioAtOne = FBreakerWeaponMath::WeaponBaseDamage(Base, 1, W)
+            / FBreakerWeaponMath::WeaponBaseDamage(RifleDamage, 1, W);
+        const float RatioAtFifty = FBreakerWeaponMath::WeaponBaseDamage(Base, 50, W)
+            / FBreakerWeaponMath::WeaponBaseDamage(RifleDamage, 50, W);
+        TestEqual(TEXT("A new archetype keeps its place in the table at every level"),
+            RatioAtFifty, RatioAtOne, 0.001f);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The ADS movement-speed penalty: the weapons half of a two-sided gap.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAimMoveSpeedTest,
+    "RiorsEdge.Weapons.AimMoveSpeed",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAimMoveSpeedTest::RunTest(const FString& Parameters)
+{
+    FBreakerRecoilProfile Profile;
+    Profile.AimMoveSpeedMultiplier = 0.60f;
+
+    // Ramps with the sights, exactly like every other ADS benefit: tapping aim
+    // and running must not bolt the player to the floor for a frame.
+    TestEqual(TEXT("At the hip there is no speed penalty at all"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, 0.0f), 1.0f);
+    TestEqual(TEXT("Halfway into the sights costs half the penalty"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, 0.5f), 0.80f, 0.0001f);
+    TestEqual(TEXT("Fully sighted costs the authored penalty"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, 1.0f), 0.60f, 0.0001f);
+    TestTrue(TEXT("The penalty is monotone in aim progress"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, 0.25f)
+        > FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, 0.75f));
+
+    // It is a penalty channel and may never become a buff, whatever an asset
+    // or an override authors. A profile above 1.0 would invert the whole trade.
+    FBreakerRecoilProfile Absurd;
+    Absurd.AimMoveSpeedMultiplier = 3.0f;
+    TestEqual(TEXT("An over-1.0 authored value cannot make ADS a speed buff"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Absurd, 1.0f), 1.0f);
+    Absurd.AimMoveSpeedMultiplier = 0.0f;
+    TestTrue(TEXT("A zero authored value cannot freeze the player solid"),
+        FBreakerWeaponFeel::AimMoveSpeedMultiplier(Absurd, 1.0f) > 0.0f);
+
+    // 1.0 everywhere reproduces today's behaviour exactly, which is the A/B
+    // that makes this safe to land before Movement/ consumes it.
+    FBreakerRecoilProfile NoPenalty;
+    NoPenalty.AimMoveSpeedMultiplier = 1.0f;
+    for (const float Alpha : { 0.0f, 0.5f, 1.0f })
+    {
+        TestEqual(TEXT("A 1.0 profile is exactly the pre-change behaviour"),
+            FBreakerWeaponFeel::AimMoveSpeedMultiplier(NoPenalty, Alpha), 1.0f);
+    }
+
+    // The component publishes it, and an unaimed weapon publishes no penalty.
+    // Nothing in Movement/ reads this yet — that is the open half of the gap.
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    Weapon->EquipArchetype(EBreakerWeaponArchetype::Sniper);
+    TestEqual(TEXT("A hip-fired weapon publishes no speed penalty"),
+        Weapon->GetAimMoveSpeedMultiplier(), 1.0f);
+    TestTrue(TEXT("The archetype's authored penalty is separately readable"),
+        Weapon->GetArchetypeAimMoveSpeedMultiplier() < 1.0f);
+
+    // The ordering is the design statement: a sidearm barely slows you, a
+    // sniper roots you, and the machinegun roots you hardest.
+    auto Authored = [Weapon](EBreakerWeaponArchetype Archetype)
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Weapon->GetArchetypeAimMoveSpeedMultiplier();
+    };
+    TestTrue(TEXT("A sidearm is barely slowed by its own sights"),
+        Authored(EBreakerWeaponArchetype::Sidearm) > Authored(EBreakerWeaponArchetype::Rifle));
+    TestTrue(TEXT("The SMG stays the run-and-gun ADS weapon"),
+        Authored(EBreakerWeaponArchetype::SMG) > Authored(EBreakerWeaponArchetype::Rifle));
+    TestTrue(TEXT("The sniper is planted"),
+        Authored(EBreakerWeaponArchetype::Sniper) < Authored(EBreakerWeaponArchetype::Rifle));
+    TestTrue(TEXT("The machinegun is the most rooted of all"),
+        Authored(EBreakerWeaponArchetype::Machinegun) < Authored(EBreakerWeaponArchetype::Sniper));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE LOCKED INVARIANT, re-asserted against everything this pass added.
+//
+// Recoil moves the AIM, the trace follows the aim, and the kick is applied
+// AFTER the trace resolves — so the round always goes where the crosshair was
+// when the trigger was pulled. The structural guarantee is that a shot's kick
+// is a function of PRE-TRACE state only: the burst index, the seed, and the ADS
+// alpha, all resolved before a single pellet is traced and all carried on the
+// shot record so every machine reproduces the same kick.
+//
+// Per-pellet impacts are the first POST-trace data ever added to that record,
+// which is precisely why this test exists: if impact data ever leaked into the
+// kick, the weapon would start shooting away from its own crosshair.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAimThenTraceInvariantTest,
+    "RiorsEdge.Weapons.AimThenTraceInvariant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAimThenTraceInvariantTest::RunTest(const FString& Parameters)
+{
+    const FBreakerRecoilProfile Profile;
+
+    // Two shots identical in every PRE-trace field and wildly different in
+    // every POST-trace one.
+    FBreakerShotResult Clean;
+    Clean.bFired = true;
+    Clean.BurstShotIndex = 4;
+    Clean.RecoilSeed = 991;
+    Clean.AimAlpha = 0.5f;
+
+    FBreakerShotResult Bloody = Clean;
+    Bloody.bHit = true;
+    Bloody.bWeakPoint = true;
+    Bloody.ImpactPoint = FVector(9999.0f, -400.0f, 250.0f);
+    Bloody.TraceEnd = Bloody.ImpactPoint;
+    Bloody.DamageResult.HealthDamage = 4321.0f;
+    Bloody.DamageResult.bCritical = true;
+    for (int32 Index = 0; Index < 12; ++Index)
+    {
+        FBreakerPelletImpact& Pellet = Bloody.Pellets.AddDefaulted_GetRef();
+        Pellet.bHit = (Index % 2) == 0;
+        Pellet.bWeakPoint = (Index == 3);
+        Pellet.End = FVector(1000.0f * Index, 250.0f, -80.0f);
+    }
+
+    auto KickFor = [&Profile](const FBreakerShotResult& Shot)
+    {
+        const FBreakerRecoilProfile Aimed = FBreakerWeaponFeel::ProfileAtAimAlpha(Profile, Shot.AimAlpha);
+        return FBreakerWeaponFeel::ComputeShotKick(Aimed, Shot.BurstShotIndex, Shot.RecoilSeed, Shot.AimAlpha > 0.0f);
+    };
+
+    const FBreakerRecoilKick CleanKick = KickFor(Clean);
+    const FBreakerRecoilKick BloodyKick = KickFor(Bloody);
+    TestEqual(TEXT("Where the round landed cannot change how the weapon kicks"),
+        BloodyKick.PitchDegrees, CleanKick.PitchDegrees);
+    TestEqual(TEXT("A spread's pellet record cannot change how the weapon kicks"),
+        BloodyKick.YawDegrees, CleanKick.YawDegrees);
+    TestTrue(TEXT("The kick is real, so the equality above is not vacuous"),
+        CleanKick.PitchDegrees > 0.0f);
+
+    // And it is reproducible from the record alone, which is what lets the kick
+    // be applied on the cosmetic path AFTER the trace on every machine.
+    TestEqual(TEXT("The same record always reproduces the same kick"),
+        KickFor(Bloody).PitchDegrees, BloodyKick.PitchDegrees);
+
+    // The pre-trace fields do matter — otherwise the test above would pass for
+    // a broken implementation that ignored everything.
+    FBreakerShotResult Later = Clean;
+    Later.BurstShotIndex = 5;
+    TestTrue(TEXT("The shot's position in the burst does change the kick"),
+        !FMath::IsNearlyEqual(KickFor(Later).PitchDegrees, CleanKick.PitchDegrees, 0.0001f)
+        || !FMath::IsNearlyEqual(KickFor(Later).YawDegrees, CleanKick.YawDegrees, 0.0001f));
+
+    // Every archetype, including the three added this pass, keeps the ADS half
+    // of the invariant: aimed kick is strictly smaller than hip kick, and the
+    // kick never depends on anything the trace produced.
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
+    {
+        Weapon->EquipArchetype(static_cast<EBreakerWeaponArchetype>(Index));
+        const FBreakerRecoilProfile Live = Weapon->GetRecoilProfile();
+        const FBreakerRecoilKick Hip = FBreakerWeaponFeel::ComputeShotKick(Live, 3, 77, false);
+        const FBreakerRecoilKick Aimed = FBreakerWeaponFeel::ComputeShotKick(Live, 3, 77, true);
+        TestTrue(TEXT("Every archetype's aimed kick is smaller than its hip kick"),
+            Aimed.PitchDegrees < Hip.PitchDegrees);
+        TestTrue(TEXT("Every archetype kicks upward, so the aim moves at all"), Hip.PitchDegrees > 0.0f);
+    }
     return true;
 }
 

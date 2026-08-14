@@ -1161,15 +1161,16 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     // top of it drew a second, faster, ghost round every time the rocket fired.
     const UBreakerWeaponDefinition* FiredDefinition = BoundWeapon ? BoundWeapon->GetActiveDefinition() : nullptr;
     const bool bProjectileShot = FiredDefinition && FiredDefinition->bProjectile;
-    // A shotgun's OnShot carries ONE impact point for a whole spread — the
-    // shot contract has no per-pellet record and that contract belongs to the
-    // weapon layer, not here. Drawing one streak for eight pellets is a lie
-    // about where the pellets went, and it was ALSO the inconsistency the
-    // owner would have been looking at: one lone round leaving a shotgun.
-    // Pellet weapons therefore get the impact flash and no streak. Doing it
-    // properly needs FBreakerShotResult to carry per-pellet impacts; noted in
-    // Docs/Weapon-Foundation.md rather than forced through from the HUD.
+    // A pellet weapon used to get no streak at all, because the shot contract
+    // carried ONE impact for a whole spread and drawing one line for eight
+    // pellets is a lie about where they went. That gap is CLOSED:
+    // FBreakerShotResult now carries a per-pellet record, and the renderer owns
+    // the policy for how a spread shares its fixed pool (a budgeted, thinner
+    // subsample — see the note in BreakerTracerRenderer.h). The old branch
+    // survives only as the fallback for a spread with no per-pellet record,
+    // which is what a replicated shot from before this change looks like.
     const bool bPelletShot = FiredDefinition && FiredDefinition->PelletsPerShot > 1;
+    const bool bDrawSpread = bPelletShot && Shot.Pellets.Num() > 1;
 
     const double ShotTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 
@@ -1193,7 +1194,19 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
             !bPelletShot && BreakerHUD::ShouldTraceRound(RoundsFired, RoundsPerTracer);
         ++RoundsFired;
 
-        if (bVisibleRound)
+        if (bDrawSpread)
+        {
+            // The whole blast in one call: the renderer draws the budgeted
+            // subsample of streaks AND a flash on every landed pellet, so the
+            // spread is never traced by the single-impact path below. Spreads
+            // are exempt from the tracer cadence — a shell is one event, and
+            // skipping two shells in three would read as the gun misfiring.
+            if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
+            {
+                Renderer->AddSpread(Start, Shot.Pellets);
+            }
+        }
+        else if (bVisibleRound)
         {
             if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
             {
@@ -1202,8 +1215,9 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
         }
         // The flash fires on every hit whether or not the round was traced:
         // hit confirmation is feedback the player acts on, tracer density is
-        // decoration.
-        if (Shot.bHit)
+        // decoration. A spread already flashed every landed pellet inside
+        // AddSpread, so it must not also flash its last-pellet summary here.
+        if (Shot.bHit && !bDrawSpread)
         {
             if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
             {

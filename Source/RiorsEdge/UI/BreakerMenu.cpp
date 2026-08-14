@@ -685,6 +685,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
         { EBreakerWeaponArchetype::Sniper,  TEXT("SNIPER"),  TEXT("SEMI-AUTOMATIC  |  8 ROUNDS  |  LONG-RANGE") },
         { EBreakerWeaponArchetype::Shotgun, TEXT("SHOTGUN"), TEXT("SEMI-AUTOMATIC  |  8 SHELLS  |  CLOSE-RANGE") },
         { EBreakerWeaponArchetype::Rocket,  TEXT("ROCKET"),  TEXT("PROJECTILE  |  4 ROCKETS  |  AREA DAMAGE") },
+        // O27 breadth pass. A row here is the ONLY way an archetype is
+        // reachable from the loadout screen; a new weapon with no row is
+        // content that exists and cannot be picked.
+        { EBreakerWeaponArchetype::BurstRifle, TEXT("VOLLEY"),  TEXT("3-ROUND BURST  |  27 ROUNDS  |  MID-LONG, DISCIPLINE") },
+        { EBreakerWeaponArchetype::Machinegun, TEXT("BULWARK"), TEXT("AUTOMATIC  |  120 ROUNDS  |  SUSTAINED, PLANTED") },
+        { EBreakerWeaponArchetype::Sidearm,    TEXT("MARK"),    TEXT("SEMI-AUTOMATIC  |  14 ROUNDS  |  FAST SWAP, DEEP RESERVE") },
     };
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
