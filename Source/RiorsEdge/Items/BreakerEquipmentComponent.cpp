@@ -484,6 +484,24 @@ void UBreakerEquipmentComponent::GrantForgeCurrency(EBreakerForgeCurrency Curren
     OnEquipmentChanged.Broadcast();
 }
 
+void UBreakerEquipmentComponent::CreditForgeCurrency(const FBreakerForgeWallet& Yield)
+{
+    if (!HasAttributeAuthority()) return;
+    bool bChanged = false;
+    for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
+    {
+        const EBreakerForgeCurrency Id = static_cast<EBreakerForgeCurrency>(Currency);
+        const int32 Amount = Yield.Get(Id);
+        // Zero-amount entries are common (a Trash kill's wallet has Flux and
+        // Sigil at zero) and skipped rather than added, so
+        // FBreakerForgeWallet::Add's own clamp is never exercised on a no-op.
+        if (Amount == 0) continue;
+        ForgeWallet.Add(Id, Amount);
+        bChanged = true;
+    }
+    if (bChanged) OnEquipmentChanged.Broadcast();
+}
+
 bool UBreakerEquipmentComponent::SalvageFromBackpack(const FGuid& ItemId)
 {
     if (!HasAttributeAuthority()) return false;

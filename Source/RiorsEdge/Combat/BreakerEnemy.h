@@ -228,6 +228,11 @@ protected:
     // Items/BreakerDropTable.h for the full derivation and the owner report it
     // answers.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Loot") FBreakerDropTableParams DropTable;
+    // Crafting currency, on the same per-actor tuning pattern as DropTable.
+    // Owner: "resources for crafting should drop from mobs at a reasonable
+    // rate" — before this the Forge wallet's ONLY income was salvaging loot the
+    // player already had, so the economy could not grow, only recycle.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Loot") FBreakerCurrencyDropParams CurrencyDropTable;
     // Per-archetype ratios ON TOP of rank, so two trash monsters in the same
     // area can differ. Encounter-Design §2.2's 1.6x Lattice is the first user.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area", meta=(ClampMin="0")) float ArchetypeHealthMultiplier = 1.0f;   // O2 PLACEHOLDER

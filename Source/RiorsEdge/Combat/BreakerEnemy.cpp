@@ -722,6 +722,15 @@ void ABreakerEnemy::GrantLoot()
     ++KillCount;
     const int32 Seed = HashCombine(GetTypeHash(GetActorLocation()), KillCount);
 
+    // CRAFTING CURRENCY PAYS BEFORE THE ITEM ROLL, and deliberately outside it.
+    // Most trash kills drop no item at all by design (the rank drop-chance step
+    // below), so crediting currency after that early-return would have made the
+    // Forge economy inherit loot's sparsity — the player would fight for
+    // minutes and see the wallet move only on the kills that already paid them
+    // an item. Currency is the steady income; items are the spiky one.
+    Equipment->CreditForgeCurrency(UBreakerDropTableLibrary::RollCurrencyDrop(
+        Seed, EnemyLevel, MonsterRank, CurrencyDropTable));
+
     // THE DROP PIPELINE (Items/BreakerDropTable.h). This used to be a bare
     // RollRarity call, which meant every death produced an item and the flat
     // rarity table was the whole system — the owner's playtest report from both
