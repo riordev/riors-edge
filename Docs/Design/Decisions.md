@@ -191,3 +191,21 @@ Implementation notes tied to these rulings:
 - O30: minions/deployables do not exist in any form. The Gunsmith kit designs
   them; nothing is built.
 
+## 2026-08-14 — O32 (legendary cadence)
+
+| # | Decision |
+|---|----------|
+| O32 | **Legendary drop rate stays where it is; the legendary POOL grows instead.** The measured ~57 hours per legendary at area level 50 is mostly an artefact of there being three legendaries covering three of eight slots — the same arithmetic with a full set gives ~21 hours, which is a reasonable cadence for a named item against O4's 300–400 hour horizon. So `LegendaryChanceWithinAnomalous` is NOT raised. Authoring more legendaries is the fix, and the effective wait falls on its own as the pool fills. For playtesting a legendary before the pool is full, use the existing dev grant rather than bending the drop rate. |
+
+Implementation notes tied to this ruling:
+- O32: legendary and Anomalous are different axes and the docs must stop
+  conflating them. **Anomalous is a RARITY** (the fifth tier; gates affix count
+  and tier ceiling, and carries one ROLLED rule rewrite from a generic pool of
+  four). **Legendary is a separate field** (`FBreakerItemInstance::LegendaryId`)
+  naming a specific authored item with a fixed slot, guaranteed affixes and a
+  HAND-AUTHORED rule. Every legendary rolls at Anomalous rarity; most Anomalous
+  drops are not legendaries.
+- O32: the three authored legendaries occupy Boots, Primary and Waist.
+  Helmet, Body Armour, Gloves, Necklace and Secondary have none, which is what
+  makes the current wait 57 hours rather than 21.
+
