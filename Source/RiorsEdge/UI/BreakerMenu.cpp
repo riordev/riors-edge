@@ -510,18 +510,15 @@ namespace
         FOnBoardViewChanged OnViewChanged;
     };
 
-    // The zoom a board OPENS on: 1:1 unless it is wider than the window it has
-    // been given, in which case it opens showing all of itself. COMPARE ALL is
-    // the case that needs it — three branches side by side are wider than the
-    // board column at any window size, and a comparison view whose third
-    // column starts off-screen is not a comparison. Derived from the viewport
-    // width read once at the top of the screen build, never from an
-    // arrangement, so it cannot feed back into layout.
-    float FitZoomForBoard(float BoardWidth, float ViewWidth)
-    {
-        if (BoardWidth <= 1.0f) return 1.0f;
-        return FMath::Clamp(ViewWidth / BoardWidth, SBreakerBoardViewport::MinZoom, 1.0f);
-    }
+    // A board always OPENS at 1:1, even when it is wider than the window.
+    //
+    // Opening at a fit-to-width zoom was tried and photographed: COMPARE ALL
+    // is about 2600px of board in a 1300px column, so fitting it means 0.5x,
+    // and 0.5x of the 11px caption floor is 5px of unreadable type — FIELDPLATE
+    // 02 says never below 11px and it means it. Zooming out to find your
+    // bearings is a deliberate act the player takes; it is not a state to hand
+    // them on arrival. RESET VIEW returns here.
+    inline constexpr float BoardOpeningZoom = 1.0f;
 
     // The board's view controls. The wheel and the drag are the real verbs;
     // these exist because a gesture nobody knows about is not a feature, and
@@ -3623,7 +3620,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         TSharedPtr<SBreakerBoardViewport> Viewport;
         SAssignNew(Viewport, SBreakerBoardViewport)
             .BoardSize(FVector2D(BoardWidth, BoardHeight + StripHeight))
-            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : FitZoomForBoard(BoardWidth, Metrics.BoardViewWidth))
+            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : BoardOpeningZoom)
             .InitialPan(SkillBoardPan)
             .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
             [
@@ -3876,7 +3873,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         TSharedPtr<SBreakerBoardViewport> Viewport;
         SAssignNew(Viewport, SBreakerBoardViewport)
             .BoardSize(FVector2D(BoardWidth, BoardHeight))
-            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : FitZoomForBoard(BoardWidth, Metrics.BoardViewWidth))
+            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : BoardOpeningZoom)
             .InitialPan(SkillBoardPan)
             .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
             [
