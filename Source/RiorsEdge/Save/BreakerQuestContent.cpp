@@ -56,7 +56,12 @@ const TArray<FBreakerQuestDefinition>& UBreakerQuestLibrary::GetFallbackQuests()
         Thin.Text = TEXT("Thin the spill past the pad");
         Thin.CompletionFlag = BreakerQuestFlags::FirstContractSpillThinned;
         Thin.ProgressCounter = BreakerQuestFlags::FirstContractKillCounter;
-        Thin.RequiredCount = 8; // O2 PLACEHOLDER — the gym encounter spawns more than this.
+        // O2 PLACEHOLDER, but not an arbitrary one: the encounter the contract
+        // NAMES ("the spill out past the pad") spawns exactly three melee and
+        // two LATTICE ranged alongside its elite. An objective the named
+        // encounter cannot satisfy in one pass would send the player to wave
+        // mode to finish a story beat.
+        Thin.RequiredCount = 5;
         Contract.Objectives.Add(Thin);
 
         FBreakerQuestObjective Elite;

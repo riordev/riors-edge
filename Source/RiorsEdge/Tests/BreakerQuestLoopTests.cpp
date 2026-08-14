@@ -120,15 +120,18 @@ bool FBreakerQuestLoopTest::RunTest(const FString& Parameters)
     Journal->SetFlag(Contract.AcceptedFlag);
     TestEqual(TEXT("Taken"), State(), EBreakerQuestState::Active);
 
-    // Trash kills close the first objective and only the first.
-    for (int32 i = 0; i < 8; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
-    TestTrue(TEXT("Eight trash kills thin the spill"), Journal->HasFlag(FirstContractSpillThinned));
+    // Trash kills close the first objective and only the first. The count is
+    // read from the definition rather than hardcoded, so retuning an O2
+    // placeholder does not turn into a failing test.
+    const int32 TrashRequired = Contract.Objectives[0].RequiredCount;
+    for (int32 i = 0; i < TrashRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
+    TestTrue(TEXT("Enough trash kills thin the spill"), Journal->HasFlag(FirstContractSpillThinned));
     TestFalse(TEXT("Trash does not count as the elite"), Journal->HasFlag(FirstContractEliteDown));
     TestEqual(TEXT("Still active with an objective open"), State(), EBreakerQuestState::Active);
 
     // Over-killing does not push the counter past the threshold once closed.
     UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, false);
-    TestEqual(TEXT("A closed objective stops counting"), Journal->GetCounter(FirstContractKillCounter), 8);
+    TestEqual(TEXT("A closed objective stops counting"), Journal->GetCounter(FirstContractKillCounter), TrashRequired);
 
     UBreakerQuestLibrary::NotifyEnemyKilled(*Journal, true);
     TestTrue(TEXT("The elite kill closes the second objective"), Journal->HasFlag(FirstContractEliteDown));
