@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Save/BreakerQuestJournal.h"
 #include "BreakerNPC.generated.h"
 
 class UCapsuleComponent;
@@ -16,8 +17,14 @@ struct RIORSEDGE_API FBreakerDialogueChoice
     // NAME_None ends the conversation.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName NextNodeId = NAME_None;
     // Optional quest flag set on the character when this choice is picked.
-    // The groundwork for vendors and quest states: flags persist in the save.
+    // The character's journal persists it write-through.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName SetsQuestFlag = NAME_None;
+    // Conditions. Required is ALL, blocked is ANY, empty passes. This is what
+    // makes a flag matter to a player: before it, flags could be written and
+    // never read, so an NPC said the same thing forever no matter what the
+    // player had done (Campaign-And-Story.md 6.3 #1).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> RequiredFlags;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> BlockedByFlags;
 };
 
 USTRUCT(BlueprintType)
@@ -28,6 +35,24 @@ struct RIORSEDGE_API FBreakerDialogueNode
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName NodeId = NAME_None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString SpeakerLine;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerDialogueChoice> Choices;
+    // Same conditions at node scope, for gating a whole branch rather than one
+    // line. A node that fails its conditions is never entered.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> RequiredFlags;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> BlockedByFlags;
+};
+
+// Per-NPC entry state. ShowDialogue used to always open on StartNodeId, so an
+// NPC greeted the player identically forever and no returning-visit beat could
+// exist (Campaign-And-Story.md 6.3 #2). Evaluated FIRST MATCH WINS, so the
+// most-progressed entry is authored first.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerDialogueEntry
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> RequiredFlags;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> BlockedByFlags;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName StartNodeId = NAME_None;
 };
 
 // A friendly, talkable actor: the groundwork for vendors, the Forge Keeper,
@@ -46,6 +71,14 @@ public:
     UFUNCTION(BlueprintPure, Category="NPC") bool FindDialogueNode(FName NodeId, FBreakerDialogueNode& OutNode) const;
     UFUNCTION(BlueprintPure, Category="NPC") float GetInteractionRange() const { return InteractionRange; }
 
+    // Which node this NPC opens on for a given player state. Falls back to
+    // StartNodeId when no override matches, so an NPC with no entries behaves
+    // exactly as it did before entries existed.
+    FName ResolveStartNodeId(const FBreakerQuestFlagSet& Flags) const;
+    // The choices this player may actually see on a node. The UI iterates this
+    // instead of Node.Choices.
+    void GetVisibleChoices(const FBreakerDialogueNode& Node, const FBreakerQuestFlagSet& Flags, TArray<FBreakerDialogueChoice>& OutChoices) const;
+
     // Every NextNodeId must resolve to a node in the list; automation
     // verifies the fallback conversations against this.
     bool ValidateDialogue(FString& OutError) const;
@@ -53,9 +86,17 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FText DisplayName;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FName StartNodeId = TEXT("Start");
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") TArray<FBreakerDialogueNode> DialogueNodes;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") TArray<FBreakerDialogueEntry> EntryOverrides;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC", meta=(ClampMin="50")) float InteractionRange = 300.0f;
 
-    // Zero-setup placeholder conversations for the gym camp.
+    // Zero-setup placeholder conversations for the gym camp. The content is
+    // split out of the spawners so automation can validate and walk it with no
+    // world — a conversation that needs an actor cannot be unit-tested.
+    static TArray<FBreakerDialogueNode> MakeForgeKeeperDialogue();
+    static TArray<FBreakerDialogueEntry> MakeForgeKeeperEntries();
+    static TArray<FBreakerDialogueNode> MakeQuartermasterDialogue();
+    static TArray<FBreakerDialogueEntry> MakeQuartermasterEntries();
+
     static ABreakerNPC* SpawnForgeKeeper(UWorld* World, const FVector& Location, const FRotator& Rotation);
     static ABreakerNPC* SpawnQuartermaster(UWorld* World, const FVector& Location, const FRotator& Rotation);
 
