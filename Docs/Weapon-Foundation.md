@@ -1,6 +1,7 @@
 # Weapon foundation
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 The first weapon pipeline is a server-authoritative hitscan prototype with a Data Asset definition and a built-in fallback rifle so clean clones can fire without editor-authored content.
 
@@ -17,9 +18,9 @@ gets renamed in two:
 |---|---|---|
 | `Rifle` | Rifle | — |
 | `SMG` | SMG | — |
-| `Sniper` | Sniper | marksman |
-| `Shotgun` | Shotgun | scattergun |
-| `Rocket` | Rocket Launcher | rocket |
+| `Sniper` | Sniper | — |
+| `Shotgun` | Shotgun | — |
+| `Rocket` | Rocket Launcher | — |
 | `BurstRifle` | Burst Rifle | **Volley** |
 | `Machinegun` | Machinegun | **Bulwark** |
 | `Sidearm` | Sidearm | **Mark** |
@@ -29,6 +30,14 @@ Bulwark and Mark and shipped under the plain names; the design sections below
 keep the codenames in their headings because that is what the reasoning was
 written against, but **the code, the UI and every other document use the
 right-hand column.**
+
+**Reconciliation note (O40 pass).** The code enum `EBreakerWeaponArchetype` is
+canonical: **Rifle, SMG, Sniper, Shotgun, Rocket** (the original five, which is
+what the vertical slice ships against — see `Vertical-Slice.md`), plus
+**BurstRifle, Machinegun, Sidearm** from the O27 breadth pass. This document's
+prior **Scattergun** and **Marksman** naming (below) has been aligned to the
+code names **Shotgun** and **Sniper**. This is a code-alignment fix made during
+the O40 reconciliation pass, not a numbered ruling in its own right.
 
 All eight are available to the loadout screen and to weapon drops, but only two
 may be equipped at once. These remain prototype values rather than balance
@@ -75,7 +84,7 @@ armour today.
 - Full damage through 28m, linear falloff to 72% at 70m.
 - 120m maximum trace range.
 
-### Scattergun
+### Shotgun
 
 - Eight deterministic pellets at 10 base physical damage each.
 - 85 rounds per minute, semi-automatic.
@@ -83,7 +92,7 @@ armour today.
 - Wide close-range spread and aggressive falloff after 11m, bottoming at 40%
   by 28m. Still by far the steepest curve in the table.
 
-### Marksman
+### Sniper
 
 - 72 base physical damage and 2.0x weak-point multiplier.
 - 150 rounds per minute, semi-automatic.
@@ -377,7 +386,7 @@ is charged in play.**
 | Shotgun | 0.85 | Strafing into contact is its whole job |
 | Rifle | 0.72 | The baseline |
 | Volley | 0.70 | Between the rifle and the sniper, like everything else about it |
-| Rocket | 0.65 | Mass |
+| Rocket Launcher | 0.65 | Mass |
 | Sniper | 0.50 | Scoped and moving is nearly standing still, which is the point |
 | Bulwark | 0.45 | Most rooted in the table: its answer to being rushed is to keep firing |
 

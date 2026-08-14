@@ -1,6 +1,7 @@
 # Damage Pipeline — canonical resolution spec
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Status: Tier 0 spec (Directive Task 3). Supersedes Master-Sheet-Import §6.1's
 seven steps. Four documents previously guessed at this ordering; they now
@@ -17,8 +18,9 @@ in exactly this order:
    unordered product (O3). DoTs use their application snapshot, including
    the tick interval (O10).
 2. **Weak-point multiplier**, when applicable.
-3. **Critical roll**, or the previously snapshotted critical result. Crit
-   remains the only multiplier of its kind.
+3. **Critical roll**, or the previously snapshotted critical result. **Amended
+   by O34** — see §4a: crit and weak point are the two site multipliers; the
+   old "only multiplier of its kind" wording is superseded.
 4. **Passive dodge roll** (full evasion) then **passive block roll**
    (partial reduction) — O1. Neither applies to damage over time.
    **AS BUILT, a deviation worth knowing:** both are *rolled* here, but the
@@ -91,8 +93,13 @@ branch keystone, and at most two from constellations (the 26-point cost
 structure makes a third constellation keystone unreachable). Class-Kits
 caps its keystone More at 1.30x.
 
-- GAP [O2/O3]: whether the 1.30x cap extends to constellation Mores is
-  unruled. ASSUMING it does, the composed ceiling is 1.30^3 ≈ **2.20x**.
+- **RULED by O34** (was GAP [O2/O3]): yes — there is **ONE** More ceiling,
+  and it applies across every source without exception: class branch
+  keystone, constellation Convergence/Keystone, and **temporary ability
+  windows, which ARE Mores and count within the same budget** (this resolves
+  Overdrive's self-flagged 4th-More — it now competes for headroom with the
+  tree Mores, which is the choice O27 wants). The ceiling is derived from the
+  aggregator: 1.30^3 ≈ **2.197**. See §4a for the full canon table.
 - ~~Tier 1 engineering hook: an automated test must assert the composed
   product of all active Mores never exceeds the ceiling constant.~~
   **BUILT, and it is a clamp rather than only an assertion.** Two enforcement
@@ -106,18 +113,46 @@ caps its keystone More at 1.30x.
     else. A layer arriving second cannot buy its way past O3.
   - The outgoing-modifier chain in `UBreakerCombatComponent` clamps separately
     at its own `ComposedMoreCeiling` and warning-logs when it bites.
-- **DRIFT, flagged rather than fixed:** the aggregator computes its ceiling as
-  `SingleMoreCeiling^MaxComposedMoreSources` = 1.30³ = **2.197**, precisely so
-  the number is derived from the two constants that define it; the combat
-  component restates it as a literal **2.20f**. The two clamps therefore differ
-  by 0.003 and sit in different stages. Harmless today; it is exactly the
-  "third constant that can drift" the aggregator's own comment says it avoids.
+- **DRIFT — now a ruled fix, not an accepted deviation.** The aggregator
+  computes its ceiling as `SingleMoreCeiling^MaxComposedMoreSources` = 1.30³ =
+  **2.197**; `UBreakerCombatComponent::ComposedMoreCeiling` still restates a
+  separate literal **2.20f** (verified in code as of this reconciliation
+  pass — `Source/RiorsEdge/Combat/BreakerCombatComponent.h:132`). **O34 rules
+  there is one ceiling, derived from the aggregator, and this separate
+  constant is deleted; its product counts against the same 2.197 budget.**
+  The 0.003 gap is no longer "harmless today" — it is an open implementation
+  GAP against a ruled decision, not an open design question, and belongs on a
+  code lane's list.
 
 **Aberrant exclusion (O3 extension, per directive):** Aberrant signature
 affixes may rewrite rules but may NOT author a More multiplier. Anomalous
 items remain the only item-layer source of one. Otherwise three equipped
 Aberrants × 2 signatures reopens at the item layer exactly what the tree
 layer's one-per-keystone rule closed.
+
+## 4a. The multiplier canon (O34)
+
+O34 rules that this document carries the canonical list of every lane
+permitted to touch outgoing player damage. **A new lane requires a canon row
+in the table below plus a conformance test before it may merge** — this
+section is a standing discipline, not a one-time cleanup.
+
+| Lane | Owner system | Bucket / cap | Status |
+|---|---|---|---|
+| **Flat** | Base damage, flat affix lines | Summed first, step 1 | Conforming |
+| **Increased (additive)** | Affixes, tree Minor/Notable nodes | One additive percentage bucket per stat, no cap of its own | Conforming |
+| **More (budget)** | Class branch keystone (≤1) + Core constellation Convergence/Keystone (≤2) + **temporary ability windows** — O34: ability windows ARE Mores | **ONE ceiling**, unordered product, 1.30³ ≈ 2.197 (O3, amended O34) | Conforming by ruling — see §4's DRIFT note above for the pending code-side cleanup (the combat chain's separate 2.20f constant is not yet deleted) |
+| **Crit** | Crit chance / crit multiplier system | Site multiplier, **build-gated** — one of exactly two multipliers permitted at the hit site (O34 amended wording) | Conforming |
+| **Weak point** | Aim-skill hit detection | Site multiplier, **skill-gated**, archetype-bounded **[1.0, 2.0]**, explicitly **outside** the O3 More budget (O34) | Conforming by ruling (explicit carve-out) |
+| **Distance / edge falloff** | Per-pellet weapon geometry | Geometric falloff curve, evaluated per pellet — not a stat-layer multiplier | Conforming |
+| **Fire rate** | Weapon cadence, ability haste, affixes (e.g. Volley's Cyclic) | **Named, watched, currently uncapped** (O34) | Conforming — no cap is ruled for this lane today; flagged so it is watched rather than allowed to drift into a de facto More |
+| **DoT composition** | Status / DoT application | **CURRENT:** `DamageOverTimeMultiplier × SourcePower` — multiplies rather than joining the additive Increased bucket | **Deviating, with an open owner Q.** O34, verbatim: "whether Increased Damage and Increased DoT share one additive bucket for DoT ticks, or keep multiplying, is deliberately NOT ruled today. Currently they multiply." Recorded as the one deliberate multiplicative deviation in the canon, pending the owner call. (`Class-Kits.md`'s VW12 node is already blocked on this question.) |
+
+**Amended wording, per O34.** The locked line that "crit is the only
+multiplier of its kind" (§1 step 3, §7's AS BUILT table) is superseded. It now
+reads: **crit and weak point are the two site multipliers — crit is
+build-gated, weak point is skill-gated, and nothing else may multiply at the
+site.**
 
 ## 5. Replication pointer (O22)
 
@@ -147,7 +182,7 @@ incoming-damage multiplier chain before handing the request down.
 |---|---|
 | 1 Base and source scaling | **Built.** Flat lane, one additive Increased bucket, More product, all clamped as §4 describes. DoTs snapshot `SourcePower`, crit chance/multiplier, `DamageOverTimeMultiplier` and the tick interval at application (O10); a reapplication adds a stack and refreshes duration but **keeps the original snapshot**. |
 | 2 Weak point | **Built**, plus a world-space forgiveness halo (`WeakPointToleranceCm`, 14 cm) so acceptance has a felt edge. Set it to 0 for a measuring run — it inflates damage per hit by 8-14%. |
-| 3 Critical | **Built**, including the snapshot path. Crit is still the only multiplier of its kind. |
+| 3 Critical | **Built**, including the snapshot path. **Amended by O34** — see §4a: crit and weak point are now the two site multipliers, not crit alone. |
 | 4 Dodge / block | **Built.** See the deviation note in §1: the block *reduction* lands after armour. |
 | 5 Armour | **Built except fractional bypass and the boss cap** — see §2's as-built table. |
 | 6 Element resistance | **NOT BUILT.** `EBreakerDamageFamily` is `Physical / Elemental / TrueDamage` and there is no per-element split, no resistance attribute and no consumer. `EBreakerStatTarget::ElementalDamageReduction` is reserved and deliberately absent from the affix pool, so it lies to nobody. GAP [O5]. |

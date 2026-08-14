@@ -1,6 +1,7 @@
 # Encounter Design — Vertical Slice
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40** (2026-08-14).
 
 Owner: encounter systems. Status: design, **substantially implemented** — see
 the `AS BUILT — 2026-08-14` section at the end, which is the authority on what

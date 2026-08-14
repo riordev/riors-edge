@@ -1,6 +1,7 @@
 # Item Foundation
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 The first pass at the itemization prerequisites the master sheet calls out as
 "cheap now, miserable to retrofit": item instances, item level, the roll
@@ -99,12 +100,16 @@ merely be stated. `UBreakerAffixLibrary::MaxItemLevel` is the one number, and
 than the item system rolls would cap base damage while the affixes on the same
 item kept climbing.
 
-OPEN [O29]: **item level 101-120 has no source yet.** Drop item level derives
-from area level and area level ceilings at 100, so the top twenty item levels
-are reachable only through the TierBonus above (0..+5 does not cover it) or the
-Forge. That headroom is worth 1.09^20 = **5.6x base damage** over on-level
-content, so it is not a rounding error - it is either the reward at the end of
-the chase or it is 20 levels of dead ladder, and which one is an owner ruling.
+**RULED [O36]** (was OPEN [O29]): **item level 101-120 is sourced from the
+endgame tier bonus.** Drop item level derives from area level, which ceilings
+at 100 (O36 reaffirms this explicitly), so the top twenty item levels are
+reached by extending TierBonus past its current +5 cap — Frontier tiers push
+it further as the primary source, the Forge as the secondary source. Pushing
+tiers IS pushing the ladder, per O36. That headroom is worth 1.09^20 = **5.6x
+base damage** over on-level content, so it is not a rounding error — it is the
+reward at the end of the chase, ruled. GAP: the specific TierBonus curve past
++5 (how many Frontier tiers reach +20) is not authored here and remains frozen
+under O2.
 
 GAP [O6]: the ZoneLevel-per-zone table and the mapping from content difficulty
 to a specific TierBonus are not authored here. Value authoring is frozen under O2 — owner to
@@ -587,33 +592,44 @@ Afterburn +8%/rank x3 (recently dashed), Swift Kinetic Downforce +11%/rank x2
 x1.22, Culling x1.18 (all unconditional), Terminal Velocity x1.30 (airborne),
 Overpressure x1.20 (sliding), Redline Doctrine x1.20 (at Redline).
 
-**The band test is the guard rail, and it is RED [O29].**
+**The band test is the guard rail, and O36 already answers the question it was
+RED about — the fixture just has not caught up yet.**
 `RiorsEdge.Progression.PowerBand` (`Tests/BreakerPowerBandTests.cpp`) composes a
 baseline and an optimized character out of the real affix pool and the real
-trees, through the real `FBreakerAttributeAggregator`, and asserts the composed
-ratio lands in Power-Curve §4's 8-10x band. It logs the ratio layer by layer, so
-a tuning pass can see WHICH layer moved rather than only that the band broke.
+trees, through the real `FBreakerAttributeAggregator`. **RULED [O36]: the band
+is authored at TWO points, not one** — **AT-CAP** (level 50, tiers a level-50
+drop can produce): **8-10x stands**, unchanged. **ENDGAME** (ilvl 120,
+producible tiers): **seed rails 12-20x** (O2 PLACEHOLDER — the back-loaded
+ladder currently measures ~15x, accepted pending playtest, not re-tuned to
+fit). `PowerBand` is meant to split into a pinned at-cap fixture and a pinned
+endgame fixture. **Verified in code this pass: it has not split yet** —
+`PowerBandMinimum`/`PowerBandMaximum` are still the single `8.0f`/`10.0f` pair,
+asserted against the ilvl-120 fixture
+(`Source/RiorsEdge/Tests/BreakerPowerBandTests.cpp:62-63`). That is a pending
+code change now, not an open design question.
 
-O29 moved where the band lives, and the fixture moved with it: both characters
-are now built at **item level 120**, baseline **T3** against optimized **T1**
-(constants `PowerBandItemLevel`, `PowerBandBaselineTier`,
-`PowerBandOptimizedTier`). At the old ilvl 50 / T5 / T1 fixture the pairing was
-one the loot pipeline can no longer produce — `BestTierForItemLevel(50)` is T6,
-so neither T5 nor T1 is rollable there at any rarity.
+O29 moved where that single fixture lives: both characters are built at **item
+level 120**, baseline **T3** against optimized **T1** (constants
+`PowerBandItemLevel`, `PowerBandBaselineTier`, `PowerBandOptimizedTier`). At the
+old ilvl 50 / T5 / T1 fixture the pairing was one the loot pipeline can no
+longer produce — `BestTierForItemLevel(50)` is T6, so neither T5 nor T1 is
+rollable there at any rarity.
 
-**The band is left FAILING rather than retuned**, on the same precedent as the
-old `PowerCurve.EndgameClamp`: a red test that states an open decision is more
-honest than a green one that hides it by moving the goalposts. The test's own
-note records the post-O29 figure at around **15x** against the authored 8-10x.
-The extra did not come from the gear spread (T3-vs-T1 at ilvl 120 is ~1.85x,
-close to the old fixture's 1.97x) — it came from absolute affix values roughly
-doubling, which moves flat crit chance and the additive bucket into a different
-part of their own curves for the optimized build specifically.
+**The measured ~15x was never a failure — it is the endgame fixture being
+graded against the wrong (at-cap) band.** Read against O36's actual endgame
+seed rails (12-20x), ~15x sits comfortably inside them; it only reads RED
+because the code still asserts the at-cap range (8-10x) against an
+endgame-item-level fixture. The mechanism explanation stands regardless of
+which band the number is read against: the extra over the old flat quote did
+not come from the gear spread (T3-vs-T1 at ilvl 120 is ~1.85x, close to the
+old fixture's 1.97x) — it came from absolute affix values roughly doubling,
+which moves flat crit chance and the additive bucket into a different part of
+their own curves for the optimized build specifically.
 
-**Do not "fix" this by widening the asserted range.** Two ways out, both owner
-rulings: the band target moves (8-10x was authored before the endgame existed,
-and a longer ladder arguably should separate builds further), or the content
-retunes so crit and the additive bucket land the composed band back at 8-10x.
+**What remains is implementation, not a decision.** Split the fixture into a
+pinned at-cap pair (level 50, tiers a level-50 drop can produce, 8-10x) and a
+pinned endgame pair (ilvl 120, 12-20x seed rails), per O36's own note that the
+suite should return to fully green meaningfully once this lands.
 
 The pre-O29 measurement this document used to quote — flat 1.16x, increased
 2.35x, more 1.93x, crit 1.66x, composed 8.74x — was taken against the old
@@ -881,7 +897,7 @@ Anomalous rule rewrites") without anything implementing it.
 | Uncommon | 2-3 | T2 | — |
 | Exceptional | 3-5 | T-1 | — |
 | **Aberrant** | 4-6 | T-1 | **FOCUSED** — one affix rolls a tier better |
-| **Anomalous** | 5-6 | T-1 | **A ROLLED RULE REWRITE**, exactly one. Equip cap 1 |
+| **Anomalous** | 5-6 | T-1 | **A ROLLED RULE REWRITE**, exactly one. Equip cap 1 non-legendary — legendaries carry their own separate 1-equip cap [O37] |
 
 The tier caps are the O29 re-derivation (T4 / T2, not the pre-O29 T3 / T1); see
 the tier scale section for why Uncommon moved off T1.
@@ -895,7 +911,9 @@ Every legendary rolls AT Anomalous rarity; **most Anomalous drops are not
 legendaries.** The two are stored separately (`Rule` and `LegendaryId`) because
 a rule is a mechanic and a legendary is an identity — two legendaries could one
 day share a rewrite, and the display name, the signature and the drop table all
-key off the identity.
+key off the identity. **Equip caps split the same way [O37]:** exactly one
+equipped legendary and, separately, one non-legendary Anomalous piece (plus
+three Aberrant, O11) — a legendary does not draw against the Anomalous cap.
 
 **ABERRANT IS FOCUSED.** Its first affix rolls against a ceiling one tier above
 what item level alone allows, and never *worse* than the ordinary ceiling — a
@@ -907,8 +925,10 @@ the focused slot is the seat those will occupy when they land. This pass does no
 guess at what they are.
 
 **ANOMALOUS CARRIES A RULE.** One rewrite, drawn deterministically from a pool of
-four, on top of its affixes. Its equip cap of 1 is unchanged, so a character
-holds at most one rewrite at a time — which is what makes finding a *different*
+four, on top of its affixes. Its equip cap of 1 is unchanged **and applies to
+non-legendary Anomalous pieces only** — legendaries carry their own separate
+1-equip cap and never draw against this one [O37] — so a character holds at
+most one ROLLED rewrite at a time — which is what makes finding a *different*
 Anomalous a decision rather than an accumulation.
 
 ### The constraint that shaped every rewrite: none of them is a More
@@ -983,10 +1003,20 @@ at higher volume.** So every effect below was checked against a live consumer
 *before* it was designed, and every one has a test that drives the number rather
 than the card.
 
-A legendary is always **Anomalous**, which means the existing equip cap of one
-Anomalous piece is also the cap on legendaries. That is the design, not a side
-effect: "build-defining" means the build is defined by the one you chose, and
-three that stack would be a set bonus.
+**LEGENDARY AND ANOMALOUS ARE DIFFERENT AXES, NOT ONE SHARED CAP [O32, O37].**
+Anomalous is a RARITY — the fifth tier, gating affix count and the tier
+ceiling, and carrying one rule rewrite ROLLED from the generic pool of four.
+Legendary is a separate field (`FBreakerItemInstance::LegendaryId`) naming one
+of these three specific authored items, with a fixed slot, guaranteed affixes
+and a HAND-AUTHORED rule that is never rolled. Every legendary still rolls AT
+Anomalous rarity (O32), but equip caps are per axis (O37): exactly **one
+equipped legendary**, separately from **one non-legendary Anomalous** piece
+(and three Aberrant, O11) — a legendary does **not** consume the Anomalous
+cap, so a player could in principle hold one legendary and one different
+non-legendary Anomalous piece equipped at the same time. What actually keeps
+these three legendaries from stacking is the dedicated one-legendary cap, not
+a shared Anomalous cap: "build-defining" means the build is defined by the one
+you chose, and three that stack would be a set bonus.
 
 ### DEADFALL — boots — bends the CONDITION system
 
@@ -1274,27 +1304,38 @@ what each would cost.
    checks the library function, which is now correct, and never touches the
    actor.
 
-2. **The build variance band, `RiorsEdge.Progression.PowerBand`, is RED.** The
-   authored target is 8-10x; the test's own note records ~15x after O29. The
-   test refuses to widen its own range because that would choose an answer
-   silently. *Reading A*: the band moves — a longer ladder should separate
-   builds further, and 8-10x was authored before the endgame existed. Cost: two
-   constants and an amended Power-Curve §4. *Reading B*: the content retunes —
-   crit and the additive bucket come down until the composed band lands back at
-   8-10x on the new ladder. Cost: a pass over the pool's ceiling anchors and the
-   crit lines, and every measured figure in this document moves with it.
+2. ~~The build variance band, `RiorsEdge.Progression.PowerBand`, is RED. The
+   authored target is 8-10x; the test's own note records ~15x after O29.~~
+   **RULED [O36] — Reading A, in substance: the band moves, because it is now
+   two bands.** AT-CAP (level 50): 8-10x stands unchanged. ENDGAME (ilvl 120):
+   seed rails **12-20x** (O2 PLACEHOLDER — the back-loaded ladder's measured
+   ~15x is accepted pending playtest, not retuned to fit). What is left is
+   implementation, not decision: `PowerBand` needs to split into a pinned
+   at-cap fixture and a pinned endgame fixture instead of asserting one range
+   (still `8.0f`/`10.0f` in code as of this pass) against the ilvl-120 build.
+   Cost: two fixtures and two pinned ranges instead of one; `Power-Curve.md`
+   §4 needs the same two-band split written into it.
 
-3. **PROLIFIC breaches the rewrite ceiling.** Last measured x1.462 against the
-   authored x1.35, because its value IS a tier step and O29 grew the steps.
-   *Reading A*: the ceiling was authored against a linear ladder and should
-   rise. *Reading B*: PROLIFIC is re-specified (a fractional uplift, or the T0
-   spike re-sited). Cost is small either way; the point is that it is a balance
-   ruling, not a test fix.
+3. ~~PROLIFIC breaches the rewrite ceiling. Last measured x1.462 against the
+   authored x1.35, because its value IS a tier step and O29 grew the steps.~~
+   **RULED [O36] — Reading A: the ceiling rises, because it is now per-band.**
+   Rewrite-impact ceilings re-anchor per band under O36; **PROLIFIC's endgame
+   ceiling is seeded at x1.5** (O2 PLACEHOLDER). The last measured x1.462 no
+   longer breaches anything — it sits under the new endgame ceiling with room
+   to spare. As with item 2, what remains is implementation: `MaximumRuleStep`
+   is still the pre-O36 **1.35f** in code as of this pass
+   (`Tests/BreakerPowerBandTests.cpp:453`) and needs its own at-cap/endgame
+   split to match.
 
-4. **Item levels 101-120 still have no source.** Unchanged from the note in the
-   item-level section, restated here because it composes with item 1: if the
-   enemy clamp is lifted to 120, drops still stop at area level 100, so the top
-   twenty levels remain Forge-only. Worth `1.09^20 = 5.6x` base damage.
+4. ~~Item levels 101-120 still have no source.~~ **RULED [O36]:** sourced from
+   the endgame tier bonus — Frontier tiers extend O6's TierBonus past its
+   current +5 cap as the primary source, the Forge as secondary. Restated here
+   because it composes with item 1: if the enemy clamp is lifted to 120, drops
+   still stop at area level 100 (O36 reaffirms the 100 ceiling explicitly), so
+   the top twenty item levels are reached through TierBonus/Frontier progress,
+   not through a higher enemy level. Worth `1.09^20 = 5.6x` base damage — the
+   figure stands; only the "no source" framing is retired. GAP: the specific
+   TierBonus curve past +5 is not authored (frozen under O2).
 
 5. **Two code comments in `Items/` are stale and would mislead the next reader**
    (not fixable from this lane — `Source/` is off limits to this pass):

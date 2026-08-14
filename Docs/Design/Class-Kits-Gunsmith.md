@@ -1,6 +1,7 @@
 # Class Kit — GUNSMITH (Scrap) — full treatment
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 > ## NOTHING IN THIS DOCUMENT IS BUILT. Not one line of it reaches a player.
 >
@@ -714,11 +715,14 @@ single damage instance for proc-coefficient purposes must not be read as merging
 rolls into one. Each charge rolls crit independently; only the *proc coefficient* is
 merged. That distinction is a test, not a comment.
 
-### 7.2 Verb ownership (Master 5.2 / 7.6, O1)
+### 7.2 Verb ownership (Master 5.2 / 7.6, O1, O25)
 
-No Gunsmith node grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, air
-jump, or Parry. Air Jump (Kinesis) and Parry (Bulwark) remain the only tree-granted verbs
-in the game and neither is here.
+No Gunsmith node grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, or
+Parry. **[O25-SUPERSEDED]** the line here used to read "Air Jump (Kinesis) and Parry (Bulwark)
+remain the only tree-granted verbs" — **O25** (2026-08-13) rules two jumps base kit for every
+character (`JumpMaxCount = 2`, not a tree grant) and makes Swift's third jump a class-innate
+Swift-kit unlock (unimplemented at O25's ruling), not a Core Tree or Gunsmith grant. **Parry
+(Bulwark) is now the only tree-granted verb in the game, and it is not here.**
 
 **Closest calls, both examined and cleared:**
 

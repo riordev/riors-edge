@@ -1,6 +1,7 @@
 # The power curve
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Authority: ruling **O27** in `Decisions.md`. This document is the architecture
 behind it. Every constant here is an `O2 PLACEHOLDER` shape, not a balance

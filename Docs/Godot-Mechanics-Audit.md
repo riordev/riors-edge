@@ -1,5 +1,13 @@
 # Godot mechanics audit
 
+**Historical.** This document audits the pre-Unreal Godot prototype
+(`riors-arena`); it predates the current Unreal build. O40(a) closes its Dash
+section specifically — the current Unreal single-dash-on-cooldown model is
+FINAL, and the Godot dual-charge model is historical. The rest of the audit is
+broader than dash and is retained for reference only; none of it describes
+current, live design.
+**Last reconciled against: O40**
+
 Source reviewed: `riors-arena-v0.1.132-src.zip`. Its internal files identify it as Rior's Arena v0.1.128/114-era source. The lightweight extracted reference is ignored by Git under `References/GodotArena`.
 
 This records behavior supported by source code. It is not a recommendation to copy the Godot architecture line for line.
@@ -158,7 +166,7 @@ Affixes will work fundamentally differently in the Unreal ARPG. Do not infer the
 ## Product decisions still needed
 
 - The exact 13/35/42 m/s scale is rejected; begin with grounded shooter values and tune through combat playtests.
-- Universal double jump, skill-tree unlock, or discipline-specific?
+- ~~Universal double jump, skill-tree unlock, or discipline-specific?~~ **ANSWERED — O25.** Universal: two jumps are base kit for everyone; Swift's third jump, if built, is class-innate, not a skill-tree unlock.
 - Keep the 110 ms slide-cancel test, widen it, or make it build-dependent?
 - Universal dash, or an ability with charges?
 - Grapple is excluded from current scope.

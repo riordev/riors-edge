@@ -1,6 +1,7 @@
 # UI Generation Prompts
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Self-contained prompts for generating UI design concepts (Claude, or any
 design/image tool). Each carries the full context so it can be pasted

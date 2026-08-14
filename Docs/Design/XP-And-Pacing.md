@@ -5,7 +5,8 @@ act breakpoints, XP sources, catch-up mechanics, the ~15 world-content Core
 Points, the vertical slice's compressed level-10 curve, and the enemy-level /
 item-level relationship.
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 > **O29 INVALIDATES §8's ITEM-LEVEL ARITHMETIC. Read §8.1 before using any tier
 > number in this document.** O29 runs item level to **120**, past the character
@@ -672,11 +673,20 @@ Named/guaranteed chests: TierBonus = +2
 The boss's advantage over trash is one tier band plus a far better rarity roll.
 That is the correct ratio.
 
-**Endgame note.** In Rior's Frontier, `ZoneLevel` is pinned at 50 for all
-content and the entire progression axis moves to rarity, affix tier via
-crafting, and the T-1 / Anomalous chase. Item level stops being a progression
-axis at cap, by design — 9.1 says gear is the endgame and the master sheet's
-`BestTierForItemLevel` already caps natural rolls at T1 for level 50.
+**Endgame note [CORRECTED — O29, O36; full derivation in §8.1].** This
+paragraph originally claimed `ZoneLevel` is pinned at 50 for all endgame
+content and that "item level stops being a progression axis at cap, by
+design" — the exact inverse of the ruled model, corrected in place here.
+**Item level running to 120 — past the character cap of 50 — IS the endgame
+progression axis** [O29]: cap is where it starts being the only progression
+axis, not where it stops mattering. Endgame content is CONTENT-scaled, never
+player-scaled [O27], and carries **area level up to a ceiling of 100** [O27,
+O36] — not "everything is level 50." Item levels 101–120 are sourced from the
+**endgame tier bonus**: Frontier tiers extend O6's `TierBonus` past its
+campaign +0..+5 span [O36], so pushing Frontier tiers pushes the ladder;
+**the Forge is the secondary source**. Rarity, affix tier depth (now
+T12..T-1 — see §8.1), and the Anomalous chase remain the shape of the endgame
+loop; that much of the original note held.
 
 **RESOLVED [O6] — was CONFLICT with `Docs/Item-Foundation.md` and
 `Game-Modes.md` §3.7.** `Item-Foundation.md` records item level source as
@@ -745,10 +755,11 @@ campaign band.** Whether that is acceptable — §8's own argument was that the
 bonus should be "bounded and small," and it is now smaller than bounded — is an
 owner call. **No value is re-authored here (O2).**
 
-**The endgame note in §8 is now backwards and must be read as superseded.** It
-reads: *"In Rior's Frontier, `ZoneLevel` is pinned at 50 for all content and the
-entire progression axis moves to rarity, affix tier via crafting, and the T-1 /
-Anomalous chase. Item level stops being a progression axis at cap, by design."*
+**The endgame note in §8 was backwards; it has been corrected in place above
+[O29, O36].** It originally read: *"In Rior's Frontier, `ZoneLevel` is pinned
+at 50 for all content and the entire progression axis moves to rarity, affix
+tier via crafting, and the T-1 / Anomalous chase. Item level stops being a
+progression axis at cap, by design."*
 
 **O29 rules the exact opposite.** Item level running to 120 — past the character
 cap of 50 and past the area-level ceiling — **is** the endgame power source, and
@@ -771,14 +782,20 @@ progression axis at cap; **cap is where it starts being the only one.**
    readout wants an average or best equipped tier, or an item-level average.
    **Not authored here**; it is a UI decision and belongs to `UI-UX-Spec.md`.
 
-**What is NOT resolved, and needs the owner:** §8 authors `ZoneLevel` capped at
-50 for endgame content. O27 introduced **area level**, authored 1-100 on the
-content, and O29 runs item level to 120. **There are now three ceilings —
-zone level 50, area level 100, item level 120 — and no document says how they
-relate.** `GetDropItemLevel` currently returns area level unchanged, which makes
-area level and item level the same number and leaves `ZoneLevel` with no
-defined relationship to either. That is a real gap and it is the largest one
-this section leaves open.
+**RESOLVED [O36] — was "what is NOT resolved, and needs the owner."** §8
+originally authored `ZoneLevel` capped at 50 for endgame content, against
+O27's **area level** (authored 1-100 on the content) and O29's item level
+(120) — three ceilings with no stated relationship. O36 closes the gap:
+**area level stays capped at 100** (not 50) for endgame content, and the
+remaining ilvl 101–120 range does not come from area level at all — it is
+**sourced from the endgame tier bonus**, Frontier tiers extending O6's
+`TierBonus` past its campaign +0..+5 span, with **the Forge as the secondary
+source**. `GetDropItemLevel` returning area level unchanged is therefore the
+area-level component of a roll, not the whole of it; the tier-bonus component
+carries a drop the rest of the way to 120. One narrow question survives: O36
+does not say whether `ZoneLevel` as an authored field is retired in favour of
+O27's area level, or continues alongside it under a different name — a naming
+question, not a progression-design one, and not resolved here.
 
 ### Enemy level scaling curve — EXTENDS
 
@@ -793,8 +810,18 @@ EnemyLevel = ZoneLevel + PackModifier, where PackModifier is in [-1, +3].
 Enemies never scale to player level in campaign zones. Combined with the level
 difference falloff in §5.2, this means an over-levelled player gets reduced XP
 but keeps a real power fantasy, and an under-levelled player gets a bonus and
-a real threat. In endgame Frontier content, everything is level 50 and
-difficulty is expressed through modifiers, not levels.
+a real threat. **In endgame Frontier content this still holds — content is
+CONTENT-scaled, never player-scaled [O27].** What changes is the ceiling:
+Frontier area level climbs to **100**, not "everything is level 50" [O27,
+O36], and difficulty is expressed through area level and modifiers together,
+not through `CharacterLevel`, which stays capped at 50.
+
+**Level-gate hygiene [O40(b)].** Nothing above should be read as licensing a
+new `CharacterLevel` check to gate Frontier/endgame access or any other
+content. **Until an XP loop exists, no system may gate on `CharacterLevel`**
+[O40(b)] — this is literally the bug class that made Swift's third jump's
+level gate unreachable. The day a loop lands, `CharacterLevel` gates re-open
+by ruling.
 
 ---
 
@@ -1080,14 +1107,16 @@ Recorded here only because this document's numbers assume them:
    the kill-value tables meaningful at cap, but it edges toward a post-cap
    progression track and needs an explicit ruling against 7.1.
 
-8. **[O29] Which ceiling governs where — zone level 50, area level 100, or item
-   level 120?** Raised by §8.1. `ZoneLevel` is authored per zone and capped at
-   50 by §8; O27 authored **area level** on the content at 1-100; O29 runs
-   **item level** to 120. `GetDropItemLevel` currently returns area level
-   unchanged, so area level and item level are the same number and `ZoneLevel`
-   has no defined relationship to either. **This is the largest unresolved item
-   in this document** and it blocks any endgame reward-band authoring, here or
-   in `Game-Modes.md`.
+8. ~~**[O29] Which ceiling governs where — zone level 50, area level 100, or
+   item level 120?**~~ **RESOLVED [O36]**, corrected in §8.1. Area level stays
+   capped at **100** (not 50) for endgame content; item levels 101–120 are
+   sourced from the **endgame tier bonus** (Frontier tiers extending O6's
+   `TierBonus` past its campaign +0..+5 span), with **the Forge as the
+   secondary source**. `GetDropItemLevel` returning area level unchanged is
+   the area-level component of a roll, not the whole of it. Whether
+   `ZoneLevel` as an authored field is retired in favour of area level, or
+   continues alongside it under a different name, is a naming question and
+   still open — but it no longer blocks endgame reward-band authoring.
 
 9. **[O29] Has the tier bonus become inert in the campaign band?** §8's Rank
    TierBonus table spans +0 to +5 item levels. The shipped campaign slope is

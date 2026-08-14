@@ -1,7 +1,13 @@
 # Class Kits — Resource Loops, Abilities, and Branch Trees
 
-**Last reconciled against: O32** (2026-08-14). Authority chain per O28:
-`Decisions.md` -> `Design-Overview.md` (map, not law) -> this document.
+**Scope:** slice (see `Vertical-Slice.md`). Swift and Caster are authored
+end-to-end as the slice's class story (O39); Gunsmith, Tank, and Support
+appear here only as one-page treatments and remain designed-only and
+post-slice — their full treatments live in their own class-kit files.
+**Last reconciled against: O40**
+
+Authority chain per O28: `Decisions.md` -> `Design-Overview.md` (map, not
+law) -> this document.
 
 Status: design draft. Numbers are placeholder and must be re-anchored after the Playtest Gym TTK pass, exactly as the affix tables are.
 
@@ -56,7 +62,7 @@ branch content below.**
 | Solo is the primary balance target | Master 11.1 | Every resource loop generates solo. Every Support branch has a self path. |
 | Crit is the only multiplier of its kind | Master 6.3 | No node grants "chance to deal double damage", "chance to double-hit for full", or any parallel roll-and-multiply. |
 | Affixes scale verbs, trees rewrite rules, classes own the fantasy | Layer-Ownership | **No node in this document is a flat percentage.** Every node is a rule rewrite or a resource-loop modifier. |
-| Air jump (Kinesis) and Parry (Bulwark) are the only tree-granted verbs | Master 5.2 / 7.6 | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
+| **Parry (Bulwark) is the only tree-granted verb.** Air jump is base kit for everyone (two jumps); Swift's third jump, if built, is class-innate, not tree-granted. | **O25** (was Master 5.2 / 7.6) | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
 | No grapple / tether | Master 5.1 | Kinetic and Demolitionist reposition with impulses and dashes only. |
 | Flat sums -> one additive Increased bucket -> More reserved for trees/Anomalous | Item-Foundation | Class nodes may author More multipliers, but each class gets a **hard budget of three** (see 0.1). |
 | More multipliers are an unordered product | **O3** | UNBLOCKED: the More-multiplier budget below is ratified — one More per branch keystone, build-wide cap 3, Aberrant signatures may not author a More. Remaining stat-aggregation-bucket work (Master 3.15 / 6.6) no longer gates it. |
@@ -563,7 +569,7 @@ Identity: damage over time, sustain, and controlled zones. The attrition branch 
 | VW9 — Snapshot Discipline | 4 | 1 | 2 | DoTs applied while the caster is standing inside their own zone snapshot as if the caster's Critical Chance were 25 points higher. Reads Master 6.4's snapshot contract directly. Does not create a second multiplier. |
 | VW10 — Terminal | 4 | 1 | 2 | DoTs applied by this Caster do not expire on targets below 25% health; they persist until death or cleanse. |
 | VW11 — Long Debt | 4 | 1 | 2 | While Mana is negative, all Caster DoTs tick at double frequency and the caster takes 25% increased damage instead of 15%. **RESOLVED [O10] — tick interval is snapshotted with discrete steps, so this node applies at application time only (a DoT applied while Overcast keeps double frequency for its lifetime). Unblocked.** |
-| VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. |
+| VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. **[O34 — OPEN, not redesigned]** This node's More targets DamageOverTime specifically, and the aggregator's More lane is currently authored only for the general Damage target (verified: `BreakerProgressionComponent::AggregateStats` composes a More-bucket effect into the product only when `StatTarget == Damage`) — a DoT-targeted More is presently un-authorable, and silently contributes nothing rather than multiplying anything. Whether Increased Damage and Increased DoT should share one additive bucket for DoT ticks, or keep multiplying, is the explicit open owner question under O34 (`Damage-Pipeline.md` §4a's canon table already flags this exact node as blocked on it). Recorded here pending that call — not redesigned, not retargeted to plain Damage, not moved to a different bucket. |
 
 ## 2.5 Caster branch — MULTISPELL
 
@@ -709,7 +715,7 @@ Decay: none. Global cap 18/s. Spending: abilities cost Charge, 4-10s cooldowns.
 | Swift | Kinetic | 1.25x weapon damage | Airborne |
 | Swift | Marksman | 1.25x | Beyond 40 m |
 | Caster | Spellblade | 1.30x melee | Melee only |
-| Caster | Void Whisperer | 1.30x DoT | DoT only |
+| Caster | Void Whisperer | 1.30x DoT | DoT only — **[O34 — OPEN]** un-authorable today as specified, see §2.4 VW12 |
 | Caster | Multispell | 1.25x | Target has 3+ distinct statuses |
 | Gunsmith / Tank / Support | one per branch | TBD | To be authored with the full treatments |
 

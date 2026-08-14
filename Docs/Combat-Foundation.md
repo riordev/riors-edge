@@ -1,6 +1,7 @@
 # Combat foundation
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Source: `Source/RiorsEdge/Combat/`. The canonical resolution spec is
 `Docs/Design/Damage-Pipeline.md`; where this file and that one disagree, that
@@ -344,6 +345,11 @@ Solo is the balance baseline. Party policy supports up to five players with plac
 4. **`ProcCoefficient` has exactly one consumer** (Mana generation). The
    multishot-0 / ricochet-0.5 / depth-2 law in Damage-Pipeline §3 is unenforced
    — unbroken only because neither multishot nor ricochet exists yet.
-5. **The composed More ceiling exists twice**: 1.30³ = 2.197 computed in the
+5. ~~The composed More ceiling exists twice: 1.30³ = 2.197 computed in the
    attribute aggregator, and a literal 2.20 in the combat component's outgoing
-   chain. One of them should be derived from the other.
+   chain. One of them should be derived from the other.~~ **ANSWERED [O34]:**
+   there is **ONE** ceiling, derived from the aggregator (1.30³ ≈ 2.197); the
+   combat component's separate 2.20 literal is deleted, its product counting
+   against the same budget. The code fix — `BreakerCombatComponent.h`'s
+   hardcoded `2.20f` — is in flight this session. Full canon at
+   `Damage-Pipeline.md` §4a.

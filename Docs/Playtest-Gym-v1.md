@@ -1,6 +1,7 @@
 # Playtest Gym v1
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 The existing First Person map now becomes a zero-setup combat and movement test whenever `BreakerGameMode` is active.
 

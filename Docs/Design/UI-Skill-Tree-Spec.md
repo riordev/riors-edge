@@ -1,6 +1,7 @@
 # FIELDPLATE — Skill matrix spec
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Owner-authored design canvas, transcribed from `Skill Tree v2.dc.html` on
 2026-08-13 (`Skill Tree.dc.html` is the superseded first pass). Reads on top of

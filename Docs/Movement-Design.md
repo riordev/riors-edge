@@ -1,6 +1,7 @@
 # Movement design
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 ## Product intent
 

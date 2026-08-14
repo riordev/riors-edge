@@ -1,6 +1,7 @@
 # Game Modes — Content Type Design
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** mixed — slice: arena + wave-mode content only; post-slice: dungeons, raids, Conquest, and Anomaly/Frontier tiered content (see `Vertical-Slice.md`).
+**Last reconciled against: O40** (2026-08-14).
 
 Domain: Local Rifts, Frontiers, Dungeons (4), Raids (7), Conquest (9).
 Status: Local Rifts and Frontiers are full designs. Dungeon/Raid/Conquest are one-page treatments.
@@ -56,12 +57,12 @@ All numbers in this document are PLACEHOLDER until the Playtest Gym establishes 
 
 Inherited and non-negotiable:
 
-- Level cap 50, hard stop. No mode grants power outside gear. (7.1)
+- Level cap 50, hard stop. No mode grants power outside gear. (7.1) **Gear itself is not capped at 50** — item level runs to **120**, past both the character level cap and the area-level ceiling of **100**, via affix tiers widened to **T12..T-1** and back-loaded at the top [O29, O36].
 - Gear is the entire endgame. Mode rewards are loot, materials, and access — never stats. (9.1)
 - Solo is the primary balance target; co-op supports up to five. (11.1)
 - Crit is the only multiplier of its kind. No mode modifier may create a second one. (6.3)
 - Flat sums -> one additive Increased bucket -> More reserved for trees/Anomalous. Mode modifiers that touch the player use the same pipeline; enemy-side modifiers are authored on the enemy, not the player.
-- Affixes scale verbs, never grant them. No mode grants a verb either. Air jump and parry remain the only tree-granted verbs.
+- Affixes scale verbs, never grant them. No mode grants a verb either. **Two jumps are base kit for everyone (not tree-granted); Swift's third jump is class-innate (not a Core-tree purchase); Parry remains the only tree-granted verb** [O25 — supersedes the earlier "air jump and parry are the only tree-granted verbs" line].
 - No grapple, no tether. Level design must not require one.
 - Dodge and block are passive/stance defensive layers, not player-input dodges. Encounter design must never require a timed dodge input. This is the single largest encounter-design constraint in this document and it is easy to violate by accident.
 - Closing a rift erases the timeline behind it. The player does not know this initially. (1.6)
@@ -227,9 +228,11 @@ Tier is a single integer on the rift instance. It drives three things and nothin
 
 | Knob | Formula | Notes |
 |---|---|---|
-| Enemy level | `min(50, 3 + tier * 1.6)` rounded | Caps at 50; past that, tier drives density and modifiers only |
+| Enemy level | `min(100, 3 + tier * 1.6)` rounded **[O2 PLACEHOLDER]** | Caps at the area-level ceiling of 100 (O36), not 50; past that, tier drives density and modifiers only |
 | Item level of drops | `enemy level + tier_bonus` where tier_bonus = 0 below T20, +1 per 5 tiers above | Item level gates affix TIER (4.2) |
 | Modifier count | `floor(tier / 4)`, cap 4 | See 4.3 modifier system |
+
+**Clamp corrected to the area-level ceiling [O36].** The enemy-level formula's clamp target moves from 50 to **100**, matching O36's ruling that area level stays capped at 100 (a separate ceiling from O29's item-level-120 endgame ladder). The formula shape is unchanged — `3 + tier * 1.6` — only the clamp target is corrected. **O2 PLACEHOLDER:** across this section's existing tier 1-30 range the clamp still never binds (tier 30 -> ~51), so no currently-described rift's enemy level changes value; the 100 ceiling is unmeasured until wave-mode instrumentation reports and exists for future tier-range headroom.
 
 **Tier 1-15 is campaign.** The rift tier available to a player is capped at their level, so tiering is invisible during levelling.
 
@@ -377,7 +380,7 @@ Three modifier classes:
 | Sealed | Shields do not recharge inside the Frontier | +20% |
 | Dry | Ammo Returned on Kill does not function | +14% |
 | Exposed | Block and Dodge do not reduce or evade damage, but still generate class resource | +22% |
-| Grounded | Air jump does not function | +18% |
+| Grounded **[O25-SWEEP]** | Above-base air mobility does not function — Swift's third jump and any tree-granted mobility; the universal two-jump base kit is unaffected | +18% |
 | Bare | No healing from Life on Hit or Life on Kill; regeneration only | +20% |
 
 **Class C audit against class resource generation (O1).** Every Class C modifier
@@ -415,18 +418,23 @@ checked against the generation tables in `Docs/Design/Class-Kits.md`:
   two largest Charge sources (healing done to allies, healing or shielding done
   to self) and gut Medic. **The narrow affix-only reading must be the normative
   one.** Owner call; not resolved here.
-- **Grounded — no generation collision.** Swift's *Airborne (+8/s)* source is
-  credited from any airborne state, and the base kit's jump, dash, and slide
-  remain. Air jump is a tree verb; per the fourth FORBIDDEN line, disabling a
-  verb some players never bought is acceptable and intentional. Reduces Swift's
-  air-time ceiling; does not remove the source.
+- **Grounded — no generation collision. [O25-SWEEP]** Swift's *Airborne (+8/s)*
+  source is credited from any airborne state, and the base kit's jump, dash,
+  and slide remain untouched. **Two jumps are base kit for everyone, not a
+  tree verb (O25)** — disabling them would strip something every player owns
+  outright, which the fourth FORBIDDEN line does not sanction. Grounded is
+  corrected to disable only Swift's third jump and any tree-granted mobility
+  (today that is just the unimplemented third jump; Parry is the only
+  tree-granted verb and it is not mobility). Reduces Swift's air-time ceiling
+  once the third jump ships; does not remove the Airborne generation source
+  and does not touch the base two-jump kit.
 
 **FORBIDDEN in the modifier system — these lines must never be crossed:**
 
 - **No modifier may grant the player anything.** Not a verb, not damage, not a resource. A modifier that helps the player is a reward, and rewards are loot. This closes the whole "modifier as build enabler" design space and it should stay closed.
 - **No modifier may create a damage multiplier of any kind on the player side.** Crit is the only multiplier of its kind (6.3). "Enemies take double damage from behind" is a second multiplier wearing a costume. Rejected.
 - **No modifier may add a percentage to a player stat.** Class C is subtractive/rule-based only. This is what keeps the modifier system entirely outside the flat/Increased/More pipeline.
-- **No modifier may require a verb the player might not own.** "Grounded" disables air jump for everyone including players who never bought it — that is a flat reward bonus for Bulwark players and that is acceptable and intentional. But no modifier may *require* air jump or parry to complete.
+- **No modifier may require a verb the player might not own.** **[O25-SWEEP]** "Grounded" is scoped to disable only Swift's third jump and any tree-granted mobility — verbs a player might genuinely not have — never the base two-jump kit every player owns outright (O25 makes the two-jump kit base kit, not a tree purchase, so disabling it is no longer a defensible "never bought it" reward). But no modifier may *require* air jump or parry to complete.
 - **No modifier may disable a class resource generation source.** (O1.) Class
   resource loops are the class layer, not the affix layer, and a modifier that
   switches one off is not a difficulty knob — it is a class ban wearing a
@@ -445,7 +453,7 @@ Every Frontier ends with a map boss. Requirements:
 
 - **3-4 bosses per tileset**, rolled per instance. The player should not know which one they are running until Ingress.
 - **2-4 minutes at appropriate gear.** Longer than this and it becomes the run's bottleneck; players will optimise by re-rolling for the fast boss, which is a failure state.
-- **Fought with base kit only.** No arena mechanic may require air jump, parry, a timed dodge, or a grapple. (§0.) A boss may *reward* mobility — a phase where a wall-ride line reaches a weak point 25% faster — but never require it.
+- **Fought with base kit only.** No arena mechanic may require Parry, Swift's third jump, a timed dodge, or a grapple. **[O25-SWEEP]** — the universal two-jump air-jump kit is base kit under O25, not a verb some players lack, so requiring it is no longer forbidden by this line; what remains genuinely optional is Parry (tree-gated) and Swift's third jump (class-gated). (§0.) A boss may *reward* mobility — a phase where a wall-ride line reaches a weak point 25% faster — but never require anything gated.
 - **Boss caps on DoT stacking and armour reduction** per 7.10 risk 5, without making status builds feel disabled. Recommended shape: DoT stacks from a single source cap at their normal maximum but boss armour reduction caps at 60% of applied value rather than being immune.
 - **The boss owns a dedicated T-1 table.** This is one of the three legal T-1 sources (3.1). A map boss should have a small, per-boss list of 3-5 T-1 affixes it can drop directly, so the community learns "you farm Boss X for the T-1 Slide Momentum Retention." This is the single most effective way to make an infinite mode feel targeted.
 - No boss may be immune to a damage type. Immunity invalidates builds; caps constrain them.
@@ -472,6 +480,8 @@ The Frontier reward package, per completed run:
 **Access:** Frontiers are entered with an access token, dropped from Frontier completion caches and from Local Rifts at T10+. A completed Frontier yields slightly more than one token on average (~1.15), so the mode is self-sustaining with a small surplus and a bad run streak cannot lock a player out. **Do not make tokens tradeable or the surplus large enough to hoard.**
 
 **Tier progression:** completing an Frontier at tier N drops tokens for tier N+1 at ~40%, N at ~50%, N-1 at ~10%. Players climb by playing, not by grinding a currency.
+
+**Endgame item level source [O36].** Frontier tiers grant the O36 extension of O6's TierBonus: `ItemLevel = ZoneLevel + TierBonus(0..+5) + Variance` (O6) continues past +5 for endgame Frontier content, so climbing Frontier tiers is itself a source of item level 101–120. The Forge is the secondary ilvl-101–120 source.
 
 ### 4.7 Death and retry — HARSHER THAN LOCAL RIFTS
 
@@ -598,7 +608,7 @@ The Frontier reward package, per completed run:
 
 **Encounter design constraints (inherited, restated because raids are where they get violated):**
 - No encounter requires a timed dodge input. Dodge is passive. (§0.)
-- No encounter requires air jump or parry — those are tree verbs and the group cannot assume anyone has them.
+- No encounter requires Parry or Swift's third jump — those remain tree/class-gated verbs and the group cannot assume anyone has them. **[O25-SWEEP]** Air jump itself (the base two-jump kit) is universal under O25 and may be assumed of every player.
 - No encounter requires a specific class. A raid that needs a Tank is a raid that cannot be matchmade or scheduled.
 - Boss DoT and armour-reduction caps apply, per 7.10 risk 5.
 - **[O31] No encounter reduces any legal build's contribution to zero.** The
@@ -651,7 +661,7 @@ Blocking prerequisites from the master sheet that this document depends on: item
 ## 9. OPEN QUESTIONS
 
 1. ~~**Naming.**~~ **CLOSED by O8** — the content type is **Frontier**. See §1. One residual gap remains: the §4.3 "Frontier pack" rarity tier now shares the content type's name and needs its own owner naming decision (flagged in §1).
-2. **Intended time from level 50 to a finished build** (9.4, unresolved upstream). Every drop rate, token rate, and reward multiplier in §3.7 and §4.6 is unanchorable until this number exists. This is the single largest blocker on this document.
+2. **Intended time from level 50 to a finished build** (9.4, unresolved upstream). Every drop rate, token rate, and reward multiplier in §3.7 and §4.6 is unanchorable until this number exists. This is the single largest blocker on this document. **RULED by O4** — 300–400 hours to a finished build, but builds must be viable and playable well before that (by mid-campaign, ~level 25; the long chase is optimization, not viability). The anchor number this question was blocked on now exists; the specific per-tier drop/token/reward-multiplier values it unblocks remain §3.7/§4.6's own placeholders pending O2.
 3. **Solo death budget in Frontiers.** §4.7 gives solo 1 death and a 5-player party 3. Per capita this is harsher on groups but in aggregate harsher on solo. Does this survive the solo-primary balance target, or does solo need 2?
 4. **Does Conquest's contribution-weighted reward create a griefing or kill-stealing dynamic** at 9 matchmade players? Needs a scoring model before implementation.
 5. **Are Frontier tiers infinite or capped at 30?** (9.4 open item, restated for this mode.) Infinite tiers are a soft paragon track and arguably contradict the 7.1 hard stop in spirit even though they grant no power. Recommendation: **cap at 30**, then let modifier count and pack density be the ceiling.

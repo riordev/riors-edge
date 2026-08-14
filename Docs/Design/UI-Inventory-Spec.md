@@ -1,6 +1,7 @@
 # FIELDPLATE — Loadout / inventory screen spec
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Owner-authored design canvas, transcribed from `Inventory.dc.html` on
 2026-08-13. Reads on top of `UI-Style-Guide-Fieldplate.md`.
@@ -8,9 +9,16 @@ Owner-authored design canvas, transcribed from `Inventory.dc.html` on
 ## Zones (1920×1080)
 
 - **Header** 1920×88 at `bg/raised`: title `Loadout` (h1), meta line
-  `BREAKER · SWIFT · LV 42 · GEAR SCORE 1 284` in mono caption, then the two
+  `BREAKER · SWIFT · LV 42 · GEAR SCORE 1 284` in mono caption, then the
   equip-limit counters as railed chips (Aberrant 3/3 red rail, Anomalous 1/1
   teal rail and teal border), then the bulk-discard button at the right.
+  **[O37 — SPEC-ONLY, NOT YET IMPLEMENTED]** The owner's transcribed canvas
+  draws two chips; O37 (2026-08-14, after this transcription) rules equip
+  caps as three separate axes, not two — add a third chip, **Legendary 1/1**,
+  alongside the existing pair (a legendary does not consume the Anomalous
+  cap, so all three chips can independently read "at limit"). This line is a
+  spec addition pending its own owner-drawn treatment, not a correction to
+  the transcription.
 - **Character column** 560 wide: full-body render slot on top (560×660
   silhouette placeholder), gear totals pinned beneath it at 20 rows so the
   numbers are always on screen with the doll.
@@ -72,7 +80,13 @@ Landed in `SBreakerMenu::BuildInventoryScreen`:
   colour at the limit. Both the counts and the caps now come from
   `UBreakerEquipmentComponent` (`CountEquippedOfRarity` /
   `EquipLimitForRarity`); the screen holds no second opinion about a rule that
-  decides which of the player's items gets ejected.
+  decides which of the player's items gets ejected. **[O37 GAP — SPEC-ONLY,
+  NOT YET IMPLEMENTED]** This is two counters, both keyed off rarity; O37
+  rules a third, separate axis (exactly one equipped legendary, keyed off
+  `LegendaryId` rather than rarity) that has no chip and no enforcement
+  described here. The header's spec note above adds the missing chip on
+  paper; this bullet records that nothing here — spec or code — currently
+  counts or displays it.
 - **Character column, 560 wide**: the render-slot placeholder fills the top,
   gear totals pinned beneath it as aligned label/value rows in a fixed 104px
   value column. The value carries its function family's colour — player/system
