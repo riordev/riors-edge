@@ -265,7 +265,18 @@ void UBreakerCharacterMovementComponent::RefreshJumpGrant()
     }
     ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
     ObservedLevel = Progression ? Progression->GetProgressionState().CharacterLevel : 0;
+    const int32 PreviousGrant = GrantedJumpCount;
     GrantedJumpCount = ResolveJumpCount(ObservedClass, ObservedLevel, BaseJumpCount, bSwiftThirdJumpEnabled, SwiftThirdJumpUnlockLevel);
+    // Say the budget out loud whenever it changes. The third jump was
+    // unreachable for its whole life and left NO trace anywhere — no warning,
+    // no log line, no failing test — so the only instrument was a player
+    // noticing they could not do it. A class swap now prints what it granted.
+    if (GrantedJumpCount != PreviousGrant)
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMovement] jump budget %d -> %d (class %d, level %d, O25 base %d, Swift unlock %d)"),
+            PreviousGrant, GrantedJumpCount, static_cast<int32>(ObservedClass), ObservedLevel,
+            BaseJumpCount, SwiftThirdJumpUnlockLevel);
+    }
 
     // The failure this exists for: the third jump shipped gated at level 20
     // while nothing in the project writes CharacterLevel, so a Swift player

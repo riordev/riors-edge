@@ -126,3 +126,51 @@ F-pickup, inventory tabs with dev gear grants.
 
 **Unreproduced:** the "buggy report" — F2 output needs a paste next
 session to diagnose.
+
+## 2026-08-14 — Movement + ground pass (third jump, gravity, tearing)
+
+**Owner findings:** "i never could do a 3rd jump"; "gravity needs to be tuned
+down just a little bit (needs to make the character slightly more floaty)";
+"a lot of the textures on the ground were tearing".
+
+**Third jump — the real cause was not a bug in the grant.** Every link in the
+chain was verified and every one was correct: the class read, the
+`OnProgressionChanged` bind, the tick-poll backstop, `DevForceClass`'s
+broadcast, and the clamp that stops a jump banked against three surviving a
+swap to two. The gate read `FBreakerProgressionState::CharacterLevel` against
+a threshold of 20, and **nothing in the project writes that field** — it is
+declared with a default of 1, there is no XP loop, and a repository-wide search
+for an assignment returns the declaration alone. The feature was unreachable by
+construction, not late. `SwiftThirdJumpUnlockLevel` now defaults to **1**
+(a gate must key off something that moves; until an XP loop exists nothing
+does, so it defaults to reachable), `RefreshJumpGrant` warns once if it is ever
+set above a level the game can produce, the budget is logged whenever it
+changes, and `RiorsEdge.Movement.JumpGrantMatrix` asserts the shipped
+configuration against a default-constructed progression state — the state the
+game actually runs in. The pre-existing `JumpGrant` test proved the rule and
+passed for the whole time the feature was dead.
+
+**Gravity — one value, on the descent.** `FallGravityMultiplier` 1.80 → 1.55;
+`GravityScale` deliberately untouched at 1.38. Four reports now, and they are
+about different halves of the arc: the rise has already been walked back to a
+hair above its original 1.35, while the fall still ran 1.80x on top of it.
+Apex height is unchanged **by construction** at 181 cm, so no ledge, gap or
+wall-ride approach changes reach; airtime 0.90 → 0.93 s and landing speed
+939 → 871 cm/s, still under `LandingHeavyFallSpeed`. Next dial if it is still
+heavy: `LandingMinimumSpeedScale` → 1.0.
+
+**Ground tearing — confirmed by capture, before and after.** Three coplanar
+populations, all on the apron: the 200 tint patches overlapped **each other**
+at one fixed height (dozens of pairs); each patch was a 4 cm cube that cast a
+shadow, and at 150–200 m both the shadow and the lip's own shaded side face are
+sub-pixel and alias into a stippled dashed line tracing every patch outline —
+that was the visible majority of it; and the jump-gap trench floor was authored
+with its top at exactly the apron's top. Now: overlapping placements are
+rejected against the rotated footprint (196 placed from 420 attempts, so the
+density holds), patches are shadowless planes with no lip, and the trench floor
+sits on the new `GroundOverlayLift`. A grazing-angle capture vantage was added,
+because this defect is invisible from every vantage the harness already had.
+The dashed seams are gone in the after-capture.
+
+**Not playtested.** A screenshot shows composition; it cannot say whether the
+arc feels right. The gravity change in particular is unverified as a feeling.

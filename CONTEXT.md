@@ -103,11 +103,16 @@ Next actions, in priority order:
      branch field on the progression state or tree, a one-way setter with a
      permanence-or-Forge rule, save versioning, and a ruling on whether
      unselected branches become unpurchasable — which collides with O15.
-   - **Swift's third jump** (O25) is BUILT as a mechanism; the THRESHOLD is
-     still the open ruling. `SwiftThirdJumpUnlockLevel` is an EditAnywhere
-     O2 PLACEHOLDER at character level 20, free. Nothing raises
-     `CharacterLevel` yet, so at 20 it is unreachable in the gym — set it to 1
-     to feel it. Decisions.md still records the third jump as unbuilt; that
+   - **Swift's third jump** (O25) is built AND now REACHABLE; the THRESHOLD is
+     still the open ruling. It shipped gated at character level 20 and the
+     owner reported "i never could do a 3rd jump" — the grant was never broken,
+     but nothing in the project writes `CharacterLevel` (no XP loop), so the
+     gate was unreachable BY CONSTRUCTION. `SwiftThirdJumpUnlockLevel` now
+     defaults to **1**: a gate must key off something that moves, and until an
+     XP loop exists nothing does. Raise it again the day `CharacterLevel`
+     starts moving — `RefreshJumpGrant` warns once if it is ever set above a
+     level the game can produce, and `RiorsEdge.Movement.JumpGrantMatrix` fails
+     the same day. Decisions.md still records the third jump as unbuilt; that
      file is append-only and owner-only, so it needs an entry from you.
    - Overdrive's +25% damage window is a 4th More against the O3 budget of 3
      (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
@@ -298,6 +303,27 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
   see the screen, which is exactly the limit that let two visual passes ship.
   See the second-pass section of `Docs/Weapon-Foundation.md`.
 - The gym has an overgrown-Earth dressing pass (O24) in BreakerGameMode: seeded vegetation/ruins/tech props via dynamic material instances, saturated teal on exactly two suppression objects per the object-chroma law. Cosmetic only.
+- THE GROUND WAS COPLANAR WITH ITSELF (owner: "a lot of the textures on the
+  ground were tearing"), and it was found and fixed BY LOOKING — a new
+  grazing-angle capture vantage, because the defect is invisible from every
+  vantage the harness already had. Three populations, all on the apron whose
+  top face is exactly the probed ground plane: the 200 tint patches were placed
+  by rejection-free random sampling at ONE fixed height, so overlapping pairs
+  shared a surface exactly; each patch was a 4 cm-thick cube that CAST A SHADOW,
+  and at 150-200 m both that shadow and the lip's own shaded side face are
+  sub-pixel and alias into a stippled dashed line tracing every patch outline
+  (the visible majority of the report); and the jump-gap trench floor was
+  authored with `TopZ = 0.0f`, which is the apron's own top, over the whole
+  trench. Now: overlapping placements are REJECTED against the rotated
+  footprint (196 placed from 420 attempts, density unchanged, double-tinted
+  blotches gone as a bonus), patches are shadowless PLANES with no lip at all,
+  and the trench floor sits on the new `GroundOverlayLift` (EditAnywhere, O2
+  PLACEHOLDER 6 cm — the rule is that anything laid ON the apron is separated
+  from it; 0 reproduces the bug for an A/B). The template `Floor` is not
+  involved: the apron is authored as the rectangle around it and the runtime
+  log confirms the frame is axis-aligned at the origin. Before/after captures
+  read honestly: the dashed seams are gone. Full derivation in
+  `Docs/Design/Level-Design.md` §6.5.
 - A parallel design sprint produced nine docs under `Docs/Design/` (class kits, constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, synthesis overview). `Design-Overview.md` §7 is the ranked owner-decision list; consult it before authoring content in any of those domains.
 - `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.
 - Five weapon archetypes exist (Rifle, SMG, Sniper, Shotgun, Rocket); Rocket is a replicated projectile (`ABreakerRocketProjectile`) with radial falloff damage that ignores its instigator pending the self-damage design pass. Loadout slots carry assignable archetypes (`SetSlotArchetype`), picked from the loadout screen.
@@ -323,17 +349,23 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - SWIFT'S THIRD JUMP EXISTS (O25). Two jumps stay base kit for every class
   (`BaseJumpCount`, written onto `ACharacter::JumpMaxCount` at runtime); Swift
   alone gets a third, gated on `SwiftThirdJumpUnlockLevel` (EditAnywhere,
-  **O2 PLACEHOLDER 20, free** — the threshold is still an open owner ruling; the
-  MECHANISM is what shipped). The grant reads the permanent class from
+  **O2 PLACEHOLDER 1, free** — the threshold is still an open owner ruling; the
+  MECHANISM is what shipped). It was 20, which made the whole feature
+  UNREACHABLE BY CONSTRUCTION — nothing writes `CharacterLevel` — and the only
+  symptom was the owner saying "i never could do a 3rd jump". The grant reads the permanent class from
   `UBreakerProgressionComponent`, recomputes on `OnProgressionChanged` AND polls
   the live state from the tick as a backstop (the Mana component's pattern), and
   a swap away from Swift returns two jumps and clamps `JumpCurrentCount`
   immediately. The third jump is a course correction, not a repeat: it rotates
   horizontal velocity partway onto input with magnitude preserved exactly
   (`SwiftThirdJumpRedirectAlpha`, O2 PLACEHOLDER 0.55), vertical untouched.
-  Nothing raises `CharacterLevel`, so at threshold 20 it is unreachable in the
-  gym — set it to 1 to feel it. Covered by `RiorsEdge.Movement.JumpGrant`,
-  `RiorsEdge.Movement.AdditiveComposition`, `RiorsEdge.Movement.ComposedAttributes`.
+  Covered by `RiorsEdge.Movement.JumpGrant` (the RULE) and
+  `RiorsEdge.Movement.JumpGrantMatrix` (the SHIPPED CONFIGURATION, asserted
+  against a default-constructed progression state — the state the game actually
+  runs in. JumpGrant alone passed for the entire time the feature was
+  unreachable, because it fed the rule a level the game cannot produce; that is
+  the gap the second test closes), plus
+  `RiorsEdge.Movement.AdditiveComposition` and `RiorsEdge.Movement.ComposedAttributes`.
 - MOVEMENT WEIGHT PASS (owner: "movement should be less floaty"): the jump arc is now asymmetric and the character has landing consequence. `GravityScale` 1.35 -> 1.60, a continuous gravity curve (`ApexGravityMultiplier` 1.50 at the apex, `FallGravityMultiplier` 1.80 once falling) applied inside `NewFallVelocity`, a 2400 cm/s terminal velocity, variable jump height (release cuts the rise to 55%, driven by `JumpHoldWindow` written onto `ACharacter::JumpMaxHoldTime` at BeginPlay with the engine's hold-to-rise suppressed in `DoJump`), a landing horizontal-speed ramp in `ProcessLanded` with an `OnLandingImpact` presentation delegate, and quicker ground stops (braking 1800 -> 2400, friction 7.5 -> 8.5). No verb changed. Wall ride is exempt from the fall curve; dash clears the cut; a queued slide is exempt from the landing cost. Jump impulse, air control and air steer rate are deliberately unchanged. All values are `EditAnywhere` under the **Weight** category with old values in comments; the before/after table, the revert list and the tuning order live in `Docs/Movement-Design.md`. NOT PLAYTESTED — automation and arithmetic only.
 - Save/resume exists: `UBreakerSaveGame` (slot `BreakerSave0`) stores progression state, equipped items, backpack, and weapon slot archetypes; autoloaded in character BeginPlay, autosaved in EndPlay and on class lock.
 - Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
@@ -380,7 +412,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Weapons have a mechanical feel layer (`Weapons/BreakerWeaponFeel.h`, pure maths so it is unit-testable): per-archetype recoil with a learnable pattern and a settle that lands on exactly zero, player compensation credited against the recovery budget, ADS tightening four axes, first-shot accuracy with bloom, and a substepped viewmodel spring. The round goes where the crosshair was when fired; the kick moves the aim for the NEXT one, and that invariant is tested. Weak points carry a world-space forgiveness halo (`WeakPointToleranceCm`, 14 cm) after a geometry bug left the bottom of the head unhittable from the front. Falloff is softened per archetype with the ORDERING pinned by test rather than the values. ADS pays aim-in time and a movement spread penalty, so hip fire is the mobile close option rather than strictly worse; it has no ADS movement-speed penalty yet because `Movement/` has no aim awareness.
 - `ABreakerRangedEnemy` (LATTICE) holds a 9-19 m band, strafes while firing, has no contact attack, and throws a real replicated projectile at 1100 cm/s against a 950 cm/s sprint with a 0.85 s telegraph and 0.35 lead — enough that holding a lane is punished and any direction change beats it. It SUBCLASSES `ABreakerEnemy`, so loot, waves, health bars and TTK sampling work unchanged; it declares itself through `IsRangedForTelemetry()` so its kills get their own TTK bucket instead of polluting the melee average.
 - Rounds are drawn by `ABreakerTracerRenderer` (UI/), a pooled client-side world actor — 12 tracers plus 24 impact sparks allocated once and recycled, nothing spawned per bullet. Additive unlit material so it still depth-tests against the world, which the previous canvas approach could not. The shotgun deliberately draws no streak, because the shot result carries one impact for a whole spread.
-- Movement carries weight without floatiness: gravity 1.38 on the rise (eased twice from playtest), a 1.80x fall multiplier, a blended apex band, terminal velocity, variable jump height, a landing speed cost, tighter braking. Wall ride was BROKEN — its entry gate equalled walk speed and is read after wall contact, so it never entered at any angle — now 450 with a regression test. Dash broadcasts `OnDashStarted` for an FOV punch scaled by speed and a direction-signed camera roll.
+- Movement carries weight without floatiness: gravity 1.38 on the rise (eased twice from playtest), a **1.55x** fall multiplier (eased once, from 1.80, for the "slightly more floaty" report — the rise and the fall are tuned separately and ONE value moves per report, so the next one attributes), a blended apex band, terminal velocity, variable jump height, a landing speed cost, tighter braking. Wall ride was BROKEN — its entry gate equalled walk speed and is read after wall contact, so it never entered at any angle — now 450 with a regression test. Dash broadcasts `OnDashStarted` for an FOV punch scaled by speed and a direction-signed camera roll.
 - Damage scaling is real and unified: `EBreakerNodeStatTarget::Damage` exists, `DamageMultiplier` is an aggregated attribute rather than a permanently-1.0 constant, and gear plus tree plus a per-spent-point baseline (`IncreasedDamagePerSpentPoint`, EditAnywhere, zeroable) all land in ONE additive Increased bucket. Before this, a skill node was structurally incapable of raising weapon damage.
 - The skill matrix sizes from the measured viewport once per rebuild, scrolls in both axes, and leads each node card with what a point BUYS (`DAMAGE 1.06x -> 1.10x`) projected through a copy of the live aggregator so it cannot drift from the real numbers. A branch strip browses subclasses; committing to one does not exist in the data model.
 - The FIELDPLATE UI system is implemented. `Source/RiorsEdge/UI/BreakerUIStyle.h` is the single token header (sRGB palette, rarity ramp, 4/8/16/24/40/64 spacing scale, rail and border widths, type scale, HUD geometry) and both the canvas HUD and the Slate front end read from it — a colour authored twice is a bug. `ABreakerPlaytestHUD` is rebuilt to `Docs/Design/UI-HUD-Spec.md`: one 440x184 bottom-right cluster on a 3px orange rail, notched momentum track whose block texture changes per state, 56px ability squares with ready/window/cooldown-wedge/unaffordable states, 420-wide vitals plate with fixed 84px value column and armour chips, top-centre wave banner, spec'd damage-number scale with cluster stacking, 180x8 enemy bars, and the violet ultimate frame with edge bands and step-down. All HUD geometry is authored in the spec's 1080p pixels and scaled by `ViewportHeight/1080`. Two known gaps, both content not code: the three OFL faces (Saira Condensed / Barlow / JetBrains Mono) are not imported, so the type *scale* is honoured and the *faces* are not; and no ability glyphs exist, so each square falls back to the ability's short name in its state colour.

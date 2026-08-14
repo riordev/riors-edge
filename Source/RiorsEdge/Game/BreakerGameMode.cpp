@@ -526,6 +526,13 @@ namespace
     const TCHAR* ShapeSphere   = TEXT("/Engine/BasicShapes/Sphere.Sphere");
     const TCHAR* ShapeCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
     const TCHAR* ShapeCone     = TEXT("/Engine/BasicShapes/Cone.Cone");
+    // A single upward quad with NO side walls. Ground tinting has to be laid
+    // above the apron to avoid coplanarity, and a lifted CUBE pays for that
+    // with a vertical lip whose shaded face is sub-pixel at field distances and
+    // aliases into a dashed dark line tracing every patch outline — which is
+    // most of what the ground-tearing report was looking at. A plane has no lip
+    // to alias.
+    const TCHAR* ShapePlane    = TEXT("/Engine/BasicShapes/Plane.Plane");
 
     // The stock basic-shape material exposes a single "Color" vector param, so
     // one dynamic instance per primitive is all the palette needs — no assets.
@@ -1497,11 +1504,15 @@ void ABreakerGameMode::SpawnExpandedField()
     //     footprints are now tracked and an overlapping placement is REJECTED,
     //     so no two patches ever share a surface. Rejection also removes the
     //     double-tinted blotches, which is a second, smaller win.
-    //  2. A 4 cm plate CAST A SHADOW. At 150-200 m the shadow of a 4 cm lip is
-    //     sub-pixel, so the cascade renders it as a stippled dashed line
-    //     tracing the patch outline — the dark dotted seams visible along every
-    //     patch edge in the before-capture. Ground tinting has no business
-    //     casting anything; shadows are off.
+    //  2. The patches were 4 cm-thick CUBES that CAST SHADOWS. At 150-200 m
+    //     both the shadow of that lip and the lip's own shaded side face are
+    //     sub-pixel, and both alias into a stippled dashed line tracing the
+    //     patch outline — the dark dotted seams along every patch edge in the
+    //     before-capture. Killing the shadow removed most of it and left the
+    //     side face still drawing a fainter one, which is measured, not
+    //     assumed: it is visible in the intermediate capture. So the patches are
+    //     now PLANES — one upward quad, no lip to shade and none to alias —
+    //     lifted clear of the apron, casting nothing.
     //
     // The attempt count is raised because rejection now throws placements away;
     // it is attempts, not patches, and the field settles at rather fewer.
@@ -1535,8 +1546,8 @@ void ABreakerGameMode::SpawnExpandedField()
         }
         if (bOverlaps) continue;
         Placed.Add(Footprint);
-        AStaticMeshActor* PatchActor = SpawnShape(World, ShapeCube, Frame.At(Fwd, Rgt, 2.0f),
-            FVector(SizeX / 100.0f, SizeY / 100.0f, 0.04f),
+        AStaticMeshActor* PatchActor = SpawnShape(World, ShapePlane, Frame.At(Fwd, Rgt, GroundOverlayLift * 0.5f),
+            FVector(SizeX / 100.0f, SizeY / 100.0f, 1.0f),
             FRotator(0.0f, Yaw, 0.0f),
             FMath::Lerp(PaletteEarth, Stream.FRand() < 0.3f ? PaletteDryGrass : PaletteMoss, Stream.FRandRange(0.35f, 1.0f)),
             false, TEXT("Runtime_FieldPatch"));
