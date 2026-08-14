@@ -1,6 +1,17 @@
 # The elements — Rift, Entropy, Void
 
-Last reconciled against: O28
+**Last reconciled against: O32** (2026-08-14).
+
+**Verified against code on 2026-08-14.** Every implementation claim in this
+document reads true: `EBreakerStatTarget::ElementalDamageReduction` exists at
+`Items/BreakerItemTypes.h:67`, is reserved with a comment saying so, has no
+aggregated field and no consumer, and is absent from the slice affix pool.
+`EBreakerDamageFamily` is still the three-way `Physical / Elemental /
+TrueDamage` with no per-element split. Status consumption is real
+(`Combat/BreakerStatusComponent.h` — `ConsumeStatus`, `ConsumeAllStatuses`,
+`GetDistinctStatusTypeCount`, `OnStatusConsumed`). The Elements constellation's
+six nodes are authored physical-only exactly as §5 of the blocker list
+describes.
 
 Authority: **O5** (per-element resistances, applied after armour and before
 shields) and **O19** (the elements are Rift / Entropy / Void; "Time" is
@@ -181,8 +192,9 @@ BLOCKED and none of them lists the blockers in one place:
 1. **The resistance model.** O5 places per-element resistance after armour and
    before shields in the damage order. `EBreakerStatTarget::ElementalDamageReduction`
    exists, is inert, and is deliberately kept out of the affix pool so it lies
-   to nobody. It needs to become per-element, and `Docs/Damage-Pipeline.md`
-   needs the step inserted at the ruled position.
+   to nobody. It needs to become per-element, and `Docs/Design/Damage-Pipeline.md`
+   (**path corrected** — that file is under `Docs/Design/`, not `Docs/`) needs
+   the step inserted at the ruled position.
 2. **A damage family per element.** Today `EBreakerDamageFamily::Elemental` is
    one bucket. Rift/Entropy/Void need to be distinguishable at the request, or
    resistances have nothing to key on.
@@ -195,6 +207,49 @@ BLOCKED and none of them lists the blockers in one place:
 5. **The Elements constellation's nodes are authored physical-only** and carry
    the elemental rule as a tag, so they light up when the above lands without
    being rewritten. That was deliberate; do not re-author them.
+6. **`EBreakerBuildCondition` must be widened past movement.** Added
+   2026-08-14. It carries only movement states, so **no node anywhere can key
+   off "a reaction fired", "the target is Severed", or any other elemental or
+   status condition.** This is why the Elements constellation ships with its
+   O3-compliant More slot deliberately EMPTY (`Core-Constellations.md` §6): the
+   only authorable form of an Elements More today is unconditional, which would
+   make it a strictly better generalist than Precision's Fixate bought with a
+   theme it cannot enforce. **O30 names this the same blocker** — its ailment,
+   crit and stacking axes all need the widening before they can be authored
+   honestly — and CONTEXT.md records that it has now blocked content twice. It
+   is cheap and it unblocks a whole axis.
+
+## What O30 and O31 ask of this document
+
+**O30** puts ailment/element on both of its build axes — GUNS (ailment/element,
+poison, bleed) and ABILITIES (poison, bleed). This document is the design for
+what those axes *are*, and it is the only place in the corpus where an element
+owns a verb rather than a damage number. **That framing is worth defending
+through the redesign**: O30's own stated intent is that three knobs become
+several, and three elements that each do something different are three knobs,
+where three tinted damage types would be one knob painted three ways. The rule
+at the top of this document — *an element must be a rule, not a percentage* —
+is the same argument O27 makes about choices beating accumulation.
+
+**O31** — every build must be able to make an impact, and no encounter may have
+a build that cannot participate — bears on this document in one specific place,
+and it is a trap worth naming now rather than after an encounter is built:
+
+> **No encounter may key on an element.** A phase that requires Void to strip a
+> property, or Entropy to accelerate a timer, excludes every build that did not
+> bring that element — and under O19's "masters one" pole, RESONANCE builds
+> carry exactly one element **by rule**. An element-gated mechanic is therefore
+> not merely unkind to some builds; it is unpassable for a keystone the game
+> deliberately sells.
+>
+> The safe shape is the inverse: an encounter may **reward** an element for
+> solving a problem faster or more cleanly, and must always have a
+> non-elemental path. This is the elemental case of the participation floor in
+> `Game-Modes.md` §6 and `Encounter-Design.md` §0, and it is stated here because
+> the elements are where the temptation is strongest.
+
+Open question 3 below (do enemies use elements against the player?) is the other
+half of this and is still unanswered.
 
 ## OPEN QUESTIONS
 
