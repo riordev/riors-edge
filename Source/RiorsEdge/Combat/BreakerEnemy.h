@@ -59,6 +59,12 @@ public:
     // layer needing to know the class list.
     virtual bool IsRangedForTelemetry() const { return false; }
     UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyStateLabel() const;
+    // The ANNOUNCEMENT half — family banner and modifier banner, newline
+    // separated, empty for a plain Vestige. Separate from the state so a HUD
+    // can print what the player must know (Encounter-Design §1.2's 1.5s
+    // modifier read) without the per-frame status chatter that made a crowd's
+    // labels overlap into mush.
+    UFUNCTION(BlueprintPure, Category="Enemy") FString GetEnemyModifierBanner() const;
 
     // --- The modifier layer (Encounter-Design §1, O27) ---------------------
     // Every enemy carries the component; the overwhelmingly common case is an

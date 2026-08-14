@@ -349,6 +349,32 @@ void ABreakerEnemy::ConfigureElite()
     StateLabel = TEXT("ELITE PATROL");
 }
 
+FString ABreakerEnemy::GetEnemyModifierBanner() const
+{
+    // The announcement half of GetEnemyStateLabel, split out so a HUD pass can
+    // print it WITHOUT the state line. Both are needed and they have different
+    // budgets: Encounter-Design §1.2 requires a modifier to be identifiable
+    // within 1.5s of the enemy entering view, so this always prints — whereas
+    // the state line is restating a telegraph the world already shows, which
+    // is what made six enemies' labels overlap into mush.
+    //
+    // The ALTERED family banner rides here rather than with the state for the
+    // same reason: Story-Source §1.5's severance stage is meant to be readable
+    // on sight, and it is the exception rather than the baseline, so it is an
+    // announcement and not a status.
+    TArray<FString> Parts;
+    if (Family == EBreakerEnemyFamily::Altered)
+    {
+        Parts.Add(UBreakerEnemyFamilyLibrary::GetFamilyBanner(Family, SeveranceStage));
+    }
+    if (ModifierComponent)
+    {
+        const FString Banner = ModifierComponent->GetBanner();
+        if (!Banner.IsEmpty()) Parts.Add(Banner);
+    }
+    return FString::Join(Parts, TEXT("\n"));
+}
+
 FString ABreakerEnemy::GetEnemyStateLabel() const
 {
     // The modifier banner rides on the state label the HUD already prints over
@@ -358,24 +384,17 @@ FString ABreakerEnemy::GetEnemyStateLabel() const
     // rather than a challenge. Reusing the existing readout means the
     // announcement cannot be forgotten by a UI pass that does not know about
     // modifiers, and an unmodified enemy's label is byte-identical to before.
-    FString Label = StateLabel;
-    if (ModifierComponent)
-    {
-        const FString Banner = ModifierComponent->GetBanner();
-        if (!Banner.IsEmpty()) Label = Banner + TEXT("\n") + Label;
-    }
-    // The family line is printed only for the ALTERED. A Vestige is the
-    // baseline and labelling every trash mob "VESTIGE" would be noise; an
-    // Altered is the exception, and Story-Source §1.5's severance stage is
-    // meant to be READABLE, so the stage rides where the player is already
-    // looking. This is also the only place the militia's engage-on-sight
-    // tragedy is visible in gameplay: the readout says what stage it is, and
-    // the player still has to kill it.
-    if (Family == EBreakerEnemyFamily::Altered)
-    {
-        Label = UBreakerEnemyFamilyLibrary::GetFamilyBanner(Family, SeveranceStage) + TEXT("\n") + Label;
-    }
-    return Label;
+    // THE STATE, AND ONLY THE STATE. The modifier and family banners used to be
+    // prefixed here, and moving them to GetEnemyModifierBanner is not merely a
+    // presentation split — the concatenation was a live BUG well outside the
+    // HUD. BreakerGameMode's wave alive-count asked `GetEnemyStateLabel() !=
+    // "DEAD"`, so a dead enemy carrying any modifier answered
+    // "WARDED | VOLATILE\nDEAD", compared unequal, and was counted ALIVE
+    // FOREVER — a wave containing a modifier-bearing enemy could never clear.
+    // That call site now asks IsDeadEnemy() instead, which is the question it
+    // was actually trying to ask, but this function staying honest about its
+    // own name is what stops the next caller repeating it.
+    return StateLabel;
 }
 
 void ABreakerEnemy::Tick(float DeltaSeconds)

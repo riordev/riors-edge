@@ -95,6 +95,17 @@ namespace BreakerHUD
 
     // Enemy bar visibility rules.
     static constexpr float EnemyBarMaxDistance = 5000.0f;
+    // Aim cone for "the enemy I am asking about". Presentation, not balance:
+    // it decides which enemy gets a verbose label, never anything about damage
+    // or aim. Roughly matches the loot focus cone so the two agree about what
+    // the player is pointing at.
+    static constexpr float EnemyFocusMinimumDot = 0.985f;
+    // How long a damage number stays open to absorb further hits on the same
+    // target. Long enough to swallow a shotgun's pellets and a burst, short
+    // enough that two deliberate shots read as two numbers. Presentation, not
+    // balance — it changes nothing about damage, only how it is counted on
+    // screen. O2 PLACEHOLDER.
+    static constexpr float DamageNumberMergeWindow = 0.18f;
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
     static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
 
@@ -1122,6 +1133,35 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     if (!World || !Character) return;
     const FVector ViewerLocation = Character->GetActorLocation();
 
+    // Which enemy the player is actually asking about. Only this one gets the
+    // verbose state line; see the label block below for the split. Same
+    // aim-cone shape DrawLootPickups already uses to pick its focused pickup,
+    // so "what am I pointing at" means one thing across the whole HUD.
+    const ABreakerEnemy* FocusedEnemy = nullptr;
+    if (PlayerOwner && PlayerOwner->PlayerCameraManager)
+    {
+        const FVector CameraLocation = PlayerOwner->PlayerCameraManager->GetCameraLocation();
+        const FVector CameraForward = PlayerOwner->PlayerCameraManager->GetCameraRotation().Vector();
+        float BestDot = BreakerHUD::EnemyFocusMinimumDot;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            const ABreakerEnemy* Candidate = *It;
+            if (!Candidate || Candidate->IsDeadEnemy()) continue;
+            const FVector ToEnemy = (Candidate->GetActorLocation() - CameraLocation);
+            if (ToEnemy.IsNearlyZero()) continue;
+            const float Dot = FVector::DotProduct(CameraForward, ToEnemy.GetSafeNormal());
+            if (Dot > BestDot)
+            {
+                BestDot = Dot;
+                FocusedEnemy = Candidate;
+            }
+        }
+    }
+
+    // Reset per frame: these are screen-space rectangles, and last frame's are
+    // meaningless the moment the camera moves.
+    DrawnLabelBounds.Reset();
+
     for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
     {
         const ABreakerEnemy* Enemy = *It;
@@ -1185,12 +1225,67 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             DrawBorder(BarX, BarY, BarW, BarH, BreakerUI::Gold, S(1.0f) * DistanceScale);
         }
 
-        // The name line the spec asks for. Enemies carry no display name or
-        // level yet, so it states the two facts that do exist.
-        DrawSpecTextCentered(FString::Printf(TEXT("%s · %s"),
-            bElite ? TEXT("ELITE") : TEXT("HOSTILE"), *Enemy->GetEnemyStateLabel()),
-            Projected.X, BarY + BarH + S(3.0f),
-            bElite ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f * DistanceScale);
+        // ---- The label, and how much of it -----------------------------
+        // Owner: "theres a lot of text bloat on enemies". Every enemy printed
+        // ELITE/HOSTILE plus the whole of GetEnemyStateLabel(), which is up to
+        // THREE stacked lines (family banner, modifier banner, state) — and
+        // nothing checked whether two enemies' labels landed on the same
+        // pixels. Six enemies in a pocket produced the overlapping mush in the
+        // report: "WARDED | VOLATILE" printed through "HOSTILE · WIND-UP"
+        // printed through "CHASE".
+        //
+        // What survives, and why that split:
+        //  - The MODIFIER banner is load-bearing and always prints.
+        //    Encounter-Design §1.2's first acceptance test is that a modifier
+        //    is identifiable within 1.5s of the enemy entering view, and an
+        //    unannounced modifier is an unfair death rather than a challenge.
+        //    Culling it to declutter would trade legibility for legibility.
+        //  - The STATE line (CHASE / CLOSING / WIND-UP) prints only for the
+        //    enemy under the crosshair. It was the loudest line and the least
+        //    informative: the enemy's own telegraph already shows a wind-up as
+        //    a scaling, brightening emitter, so the text was restating in
+        //    words, six times over, something the world was already saying.
+        //  - ELITE prints; HOSTILE does not. "HOSTILE" on every hostile is not
+        //    information — the health bar already says it is an enemy.
+        const bool bFocused = (Enemy == FocusedEnemy);
+        const FString ModifierBanner = Enemy->GetEnemyModifierBanner();
+        TArray<FString> Lines;
+        if (bElite) Lines.Add(TEXT("ELITE"));
+        if (!ModifierBanner.IsEmpty()) Lines.Add(ModifierBanner);
+        if (bFocused) Lines.Add(Enemy->GetEnemyStateLabel());
+
+        if (Lines.Num() > 0)
+        {
+            const FString Label = FString::Join(Lines, TEXT("\n"));
+            const float LabelY = BarY + BarH + S(3.0f);
+            // Screen-space overlap suppression. Two enemies standing in line
+            // with the camera project to nearly the same point, and the second
+            // label lands on top of the first — unreadable, and worse than
+            // showing one. The focused enemy is drawn regardless, because it is
+            // the one the player is deliberately asking about.
+            const float LineCount = static_cast<float>(Lines.Num());
+            const float LabelH = S(13.0f) * DistanceScale * LineCount;
+            const float LabelW = BarW;
+            bool bOccluded = false;
+            if (!bFocused)
+            {
+                for (const FVector4& Taken : DrawnLabelBounds)
+                {
+                    if (FMath::Abs(Projected.X - Taken.X) < (LabelW + Taken.Z) * 0.5f
+                        && FMath::Abs(LabelY - Taken.Y) < (LabelH + Taken.W) * 0.5f)
+                    {
+                        bOccluded = true;
+                        break;
+                    }
+                }
+            }
+            if (!bOccluded)
+            {
+                DrawnLabelBounds.Emplace(Projected.X, LabelY, LabelW, LabelH);
+                DrawSpecTextCentered(Label, Projected.X, LabelY,
+                    bElite ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f * DistanceScale);
+            }
+        }
     }
 }
 
@@ -1303,8 +1398,23 @@ void ABreakerPlaytestHUD::EnsureDamageBinding(const ABreakerCharacter* Character
 {
     UBreakerCombatComponent* Combat = Character ? Character->GetCombat() : nullptr;
     if (!Combat || BoundCombat == Combat) return;
-    if (BoundCombat) BoundCombat->OnDamageReceived.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+    if (BoundCombat)
+    {
+        BoundCombat->OnDamageReceived.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+        BoundCombat->OnHitDealt.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerHitDealt);
+    }
     Combat->OnDamageReceived.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerDamageReceived);
+    // EVERY damage the player deals, not just the ones a gun dealt. Owner:
+    // "there is no damage indicators for anything but bullet damage" — and
+    // that was exactly true, because the floating numbers had a single feed,
+    // the weapon's OnShot. Cleave, Rot, every ability, every Bleed tick and
+    // every chain detonation applied real damage through the ordinary contract
+    // and produced no number at all, so half the damage in the game was
+    // invisible. OnHitDealt is the attacker-side event the whole combat layer
+    // already raises, so this is one subscription rather than one per source —
+    // and a future damage path is numbered the day it is written, without
+    // anyone remembering to wire it.
+    Combat->OnHitDealt.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerHitDealt);
     BoundCombat = Combat;
 }
 
@@ -1664,18 +1774,67 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
         LastShotHitTime = ShotTime;
     }
 
-    // Same event feeds the floating numbers: one subscription, two readouts.
-    const float Applied = Shot.DamageResult.ShieldDamage + Shot.DamageResult.HealthDamage;
-    const float Shown = Applied > 0.0f ? Applied : Shot.DamageResult.MitigatedDamage;
-    if (!Shot.bHit || Shown <= 0.0f) return;
+    // The floating number is NOT pushed from here any more. It is pushed from
+    // HandlePlayerHitDealt, which sees every damage the player deals rather
+    // than only the ones a weapon dealt. Pushing from both would double every
+    // bullet. This handler keeps the two readouts that are genuinely about the
+    // SHOT — the mitigation fraction above and the tracer below — which the
+    // hit event cannot provide because it knows nothing about a muzzle.
+}
+
+void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
+{
+    const float Applied = Hit.Result.ShieldDamage + Hit.Result.HealthDamage;
+    const float Shown = Applied > 0.0f ? Applied : Hit.Result.MitigatedDamage;
+    if (Shown <= 0.0f) return;
+
+    const UWorld* World = GetWorld();
+    const float Now = World ? World->GetTimeSeconds() : 0.0f;
+    const float Raw = Hit.Result.RawDamage;
+    const float Mitigated = Raw > UE_SMALL_NUMBER
+        ? FMath::Clamp(1.0f - Hit.Result.MitigatedDamage / Raw, 0.0f, 1.0f) : 0.0f;
+
+    // MERGE rather than spawn. A shotgun resolves eight pellets as eight hits,
+    // and a Bleed on three targets ticks on its own cadence forever — one
+    // number each would bury the screen and push every other number out of the
+    // 24-slot ring within a frame. Same target, same kind, inside the merge
+    // window: add to the existing number and refresh it, so a spread reads as
+    // the one number the player actually wants (what did that shot do) and a
+    // DoT reads as a steady accumulating tick.
+    //
+    // Crit and weak point do NOT merge into a body hit: those are the reads the
+    // whole damage-number system exists to make legible, and averaging them
+    // into a plain number would be the same as not showing them.
+    for (FBreakerHUDDamageNumber& Existing : DamageNumbers)
+    {
+        if (Existing.Target != Hit.Target) continue;
+        if (Existing.bCritical != Hit.Result.bCritical) continue;
+        if (Existing.bWeakPoint != (Hit.bWeakPoint || Hit.Result.bWeakPoint)) continue;
+        if (Existing.bFromDoT != Hit.bFromDoT) continue;
+        if (Now - Existing.Time > BreakerHUD::DamageNumberMergeWindow) continue;
+
+        Existing.Value += Shown;
+        Existing.Time = Now;
+        // Deliberately NOT moving Existing.World: a merged number that chased
+        // each pellet's impact point would jitter, and the first impact is as
+        // honest a location as any for the sum.
+        return;
+    }
 
     FBreakerHUDDamageNumber Number;
-    Number.World = Shot.ImpactPoint;
+    // The hit context carries the world location for every path — an ability's
+    // sweep, a DoT tick, a detonation — which is what makes one feed possible.
+    // Falls back to the target's own location if a path ever leaves it unset.
+    Number.World = Hit.WorldLocation.IsNearlyZero() && Hit.Target
+        ? Hit.Target->GetActorLocation()
+        : Hit.WorldLocation;
+    Number.Target = Hit.Target;
     Number.Value = Shown;
-    Number.bCritical = Shot.DamageResult.bCritical;
-    Number.bWeakPoint = Shot.bWeakPoint || Shot.DamageResult.bWeakPoint;
+    Number.bCritical = Hit.Result.bCritical;
+    Number.bWeakPoint = Hit.bWeakPoint || Hit.Result.bWeakPoint;
+    Number.bFromDoT = Hit.bFromDoT;
     Number.MitigatedFraction = Mitigated;
-    Number.Time = ShotTime;
+    Number.Time = Now;
 
     if (DamageNumbers.Num() < MaxDamageNumbers)
     {

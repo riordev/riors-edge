@@ -35,6 +35,12 @@ struct FBreakerHUDDamageNumber
     // by the time this is drawn.
     float MitigatedFraction = 0.0f;
     double Time = -1000.0;
+    // Who was hit, so repeated hits on the same target inside the merge window
+    // accumulate into one number instead of spawning eight for one shotgun
+    // spread or one per DoT tick per target.
+    TWeakObjectPtr<AActor> Target;
+    // A DoT tick reads differently from a strike and must not merge into one.
+    bool bFromDoT = false;
 };
 
 // One enemy, reduced to what the minimap needs. Collected during the enemy
@@ -74,6 +80,8 @@ private:
     // record of a hitscan line, and polling GetLastShot() would miss every
     // shot fired faster than one per frame.
     UFUNCTION() void HandlePlayerShot(const FBreakerShotResult& Shot);
+    // The universal damage feed: every hit the player deals, from any source.
+    UFUNCTION() void HandlePlayerHitDealt(const struct FBreakerHitContext& Hit);
     void EnsureWeaponBinding(const ABreakerCharacter* Character);
 
     // Activations are instantaneous and leave no polled state (Skim in
@@ -169,6 +177,10 @@ private:
     // frames and never again: DrawHUD runs every frame and a TArray built in
     // it is a per-frame allocation by definition.
     TArray<FBreakerHUDMapBlip> EnemyBlips;
+    // Screen-space rectangles (CentreX, TopY, Width, Height) already claimed by
+    // an enemy label this frame, so a second enemy projecting to nearly the
+    // same point does not print through the first. Rebuilt every frame.
+    TArray<FVector4> DrawnLabelBounds;
 
     // -BreakerCaptureHUD. Dev-only, command-line, and the reason it exists is
     // that the states this HUD gets WRONG are the states a headless capture run

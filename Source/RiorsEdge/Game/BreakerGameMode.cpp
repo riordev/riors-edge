@@ -1965,7 +1965,14 @@ int32 ABreakerGameMode::GetWaveEnemiesAlive() const
     int32 Alive = 0;
     for (const TObjectPtr<ABreakerEnemy>& Enemy : WaveEnemies)
     {
-        if (IsValid(Enemy) && Enemy->GetEnemyStateLabel() != TEXT("DEAD")) ++Alive;
+        // IsDeadEnemy(), not a string comparison against a PRESENTATION label.
+        // This asked `GetEnemyStateLabel() != "DEAD"`, and that label carried
+        // the modifier banner prefixed onto it — so any dead enemy with a
+        // modifier answered "WARDED | VOLATILE\nDEAD", compared unequal, and
+        // counted as alive permanently. A wave containing a modifier-bearing
+        // enemy could not clear. Asking the enemy whether it is dead cannot
+        // drift when someone edits a label.
+        if (IsValid(Enemy) && !Enemy->IsDeadEnemy()) ++Alive;
     }
     return Alive;
 }
