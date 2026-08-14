@@ -1,6 +1,38 @@
 # Playtest Feedback Log
 
-**Last reconciled against: O32**
+**Last reconciled against: O40**
+
+## 2026-08-14 — Session 4 (class identity, the Forge economy, the skill matrix)
+
+Seven findings. Two of them turned out to be one bug, and three of the UI
+findings were confirmed or corrected by CAPTURE rather than by reading code.
+
+| Finding (owner's words) | Root cause | Response |
+|---|---|---|
+| "when selecting a different class i can only see the swift nodes" | `DevForceClass` set `State.PermanentClass` but deliberately KEPT the held `UBreakerClassDefinition`. `GetAvailableTrees` unions `ClassDefinition->BranchTrees`. | Re-fetch on class MISMATCH (answers the recorded objection about stomping an authored Data Asset), plus the class filter on the reader. |
+| "i dont see proper ability selection based on what character im at" | **The same bug.** `IsAbilityUnlocked` answers from the same stale definition. | Same fix. Three new identity tests — `RecalculateStats` re-derived from state, so every NUMBER was right while the whole front end was wrong, and no attribute test could ever have caught it. |
+| "the forge should be at the forge npc" | **NOT DONE this session.** The `bIsAtForge` gate already exists on Temper/Reforge/Attune/Respec; the menu passes `true` unconditionally. | Open. The plumbing is there; it needs an NPC-proximity source and a UI tell. |
+| "resources for crafting should drop from mobs at a reasonable rate" | The Forge wallet's only income was SALVAGE, so the economy could recycle but never grow. | `RollCurrencyDrop` on the item pipeline's shape, credited before the item roll's early-return. Its simulation-vs-projection test immediately caught a real defect: the roll scaled the SAMPLE and the projection scaled the MEAN, so at ilvl 10 a trash mob paid 0 or 2 Slag and never 1. |
+| "i dont see keystones in the skill trees" | Drawn, but the word "KEYSTONE" lived only in the hover card, and a tier-gated keystone printed the EMPTY status line. Separately, the screen's private purchase mirror never implemented O37, so keystones painted purchasable and the click then failed. | Amber KEYSTONE caption, always-stated lock reason, and the mirror now checks commitment and the cornerstone investment gate. |
+| "the constellations dont expand like they should / I dont see any layers or details to them" | No expand code existed — it had never been built. Plates were anonymous chip rows with no name, tier, cost or effect. | OPEN CONSTELLATION expands to the node list banded by TIER, reusing the class board's vocabulary. |
+| "the skill tree is hard to read when text or numbers are cut off" | NOT a recurrence at the old marker sites (those are correctly fixed). New sites, same mechanism: non-Fill alignment arranges a text block at its measured width and Slate clips the run to that box. | Value columns and `MakeButton` now fill and justify. |
+
+**Found while looking, not reported:** ELEMENTS is sealed with six authored
+nodes, and both sealed lines sat inside the "no nodes" branch — it rendered in
+sealed-hardware teal and never said SEALED or named Rift / Entropy / Void.
+
+**Photographed for the first time:** the node detail rail. It is hover-only and
+the harness has no mouse, so no agent had ever seen it; it now survives the
+rebuild a purchase triggers, which is what made it visible to capture.
+
+**Residuals, both visible in the capture and both left open deliberately:**
+BACK is still clipped in the header — the trailing group is right-anchored by a
+fill spacer and overflows the panel by a fixed amount, so shortening upstream
+tabs moved everything except the overflow. And the ELEMENTS plate sits below the
+viewport fold, which is the same structural "the board is taller than its
+viewport" problem that puts tier-3 keystones off-screen below 1080p. That one
+wants a layout decision, not another nudge.
+
 
 Owner playtest findings and the actions taken, **newest first**. This is the
 gym's paper trail — wave-mode reports and re-anchoring decisions cite it. Append
