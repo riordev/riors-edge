@@ -298,12 +298,40 @@ question, exactly as O27 says it should be.
 `GymAreaLevel` defaults to 10 to preserve today's drop item level; set it to 1
 to recover today's exact combat feel while the second curve is built.
 
-### §3 Player offence — NOT BUILT here
+### §3 multiplicand — built
 
-Weapon base damage by item level is a separate task in `Weapons/`. Nothing in
-the chassis work touched it, and the two compose multiplicatively.
+`WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1)` lives in
+`FBreakerWeaponMath::ItemLevelDamageScalar` / `WeaponBaseDamage` as a pure,
+world-free function, and every damage path in `UBreakerWeaponComponent` reads
+it: the hitscan pellet loop, the rocket projectile's payload, and the Bleed
+DoT's base per tick.
 
-### §4 and the affix/node breadth — NOT BUILT
+- **`w` = 0.09/level**, chosen equal to the `g` this document proposes, so a
+  baseline build's TTK is level-invariant and all felt progression comes from
+  the multiplier band. It is `EditAnywhere` and O2 PLACEHOLDER, and 0 restores
+  the flat pre-curve behaviour for A/B.
+- **`g` is assumed, not read.** The monster chassis is another layer's work
+  this same session. The relationship, not the value, is what the tests pin: if
+  `w < g` baseline TTK climbs with level, if `w > g` it falls. **If the Combat
+  layer lands a different `g`, `w` should be moved to match it** — that is one
+  editable property, not a code change.
+- Item level 1 is the anchor (scalar exactly 1.0), so no previously measured
+  TTK moves and the zero-setup gym is unaffected. An unequipped weapon is item
+  level 1 for the same reason.
+- One shared exponent means the archetype table keeps its shape: a sniper
+  out-hits an SMG per shot at every level by the same ratio.
+- Item level reaches the weapon through the owner's equipment component, weapon
+  slot 1 <-> `Primary` and slot 2 <-> `Secondary`. OPEN: an item instance
+  carries no weapon archetype, so which of the five guns a Primary item *is*
+  is still unanswered; only item level crosses the boundary today.
 
-The build variance band, the `IncreasedDamagePerSpentPoint` cutback, and the
-affix pool breadth are all still open.
+Details and the full rationale are in `Docs/Weapon-Foundation.md`; coverage is
+`RiorsEdge.Weapons.ItemLevelCurve`, `.ItemLevelTracksMonsterHealth`,
+`.ArchetypeOrderingAcrossLevels` and `.EquippedItemLevel`.
+
+### §4 and the affix/node breadth — BUILT
+
+See the §4 entry above: the band measures 8.74x, the accumulation baseline is
+cut to 0.25%/point, the affix pool is 18 lines with damage on all eight slots,
+and `RiorsEdge.Progression.PowerBand` pins the ratio so a future tuning pass
+cannot flatten builds silently.
