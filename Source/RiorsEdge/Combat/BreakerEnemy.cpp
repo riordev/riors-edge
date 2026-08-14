@@ -142,8 +142,45 @@ void ABreakerEnemy::BeginPlay()
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
     if (LeashOrigin.IsNearlyZero()) LeashOrigin = GetActorLocation();
-    Attributes->SetMaxHealth(220.0f);
-    Combat->RestoreVitals();
+    // Health was the literal constant 220 here at every level until O27. It is
+    // now a function of the area level this monster belongs to.
+    ApplyChassis();
+}
+
+void ABreakerEnemy::ApplyChassis()
+{
+    AreaLevel = UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel);
+    EnemyLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel)
+        + (IsElite() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
+    EnemyLevel = FMath::Clamp(EnemyLevel, 1, 50);
+
+    AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
+        AreaLevel, MonsterRank, Chassis, ArchetypeDamageMultiplier);
+
+    if (Attributes)
+    {
+        Attributes->SetMaxHealth(UBreakerMonsterChassisLibrary::GetMonsterHealth(
+            AreaLevel, MonsterRank, Chassis, ArchetypeHealthMultiplier));
+        if (Combat) Combat->RestoreVitals();
+    }
+}
+
+void ABreakerEnemy::SetAreaLevel(int32 NewAreaLevel)
+{
+    AreaLevel = UBreakerMonsterChassisLibrary::ClampAreaLevel(NewAreaLevel);
+    ApplyChassis();
+}
+
+void ABreakerEnemy::SetMonsterRank(EBreakerMonsterRank NewRank)
+{
+    MonsterRank = NewRank;
+    ApplyChassis();
+}
+
+void ABreakerEnemy::ConfigureWave(int32 NewAreaLevel)
+{
+    bRespawns = false;
+    SetAreaLevel(NewAreaLevel);
 }
 
 UAbilitySystemComponent* ABreakerEnemy::GetAbilitySystemComponent() const { return AbilitySystem; }
@@ -156,18 +193,16 @@ void ABreakerEnemy::ConfigureEncounter(const FVector& NewLeashOrigin, float NewP
 
 void ABreakerEnemy::ConfigureElite()
 {
-    // Canonical elite (Veteran+) chassis per Encounter-Design §1.1:
-    // 1.25x scale, 2.0x health, 1.5x damage.
-    bIsElite = true;
+    // The elite's health and damage numbers used to live right here — a
+    // hardcoded 440 health and a *= 1.5f damage, a second source of truth
+    // sitting alongside the base chassis' hardcoded 220. Both are gone: rank
+    // is now a row in the chassis rank table, and ApplyChassis composes it.
+    // What stays here is what is genuinely elite PRESENTATION and BEHAVIOUR:
+    // the bigger silhouette, the slower implacable advance, the loot floor.
+    MonsterRank = EBreakerMonsterRank::Elite;
     SetActorScale3D(GetActorScale3D() * 1.25f);
-    AttackDamage *= 1.5f;
     MoveSpeed *= 0.85f;
-    EnemyLevel = FMath::Min(EnemyLevel + 5, 50);
-    if (Attributes)
-    {
-        Attributes->SetMaxHealth(440.0f);
-        if (Combat) Combat->RestoreVitals();
-    }
+    ApplyChassis();
     StateLabel = TEXT("ELITE PATROL");
 }
 
@@ -282,7 +317,7 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     // (b) Strafe weave: a lateral sinusoid folded into the chase vector.
     // Elites are exempt — the identity is that an elite advances
     // implacably and does not juke (Encounter-Design §1.1 chassis).
-    if (!bIsElite && Distance > AttackRange)
+    if (!IsElite() && Distance > AttackRange)
     {
         WeaveTime += DeltaSeconds;
         const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();
@@ -373,7 +408,7 @@ void ABreakerEnemy::HandleDeath()
             // Engagement-gapped TTK: idle stretches between damage events are
             // capped, so target-switching doesn't inflate the sample the way
             // wall-clock first-damage-to-death did (session 3 finding).
-            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), bIsElite, IsRangedForTelemetry());
+            Playtest->AddTimeToKillSample(FMath::Max(EngagedSeconds, 0.05f), IsElite(), IsRangedForTelemetry());
         }
         FirstDamageTime = -1.0;
         LastDamageEventTime = -1.0;
@@ -406,7 +441,7 @@ void ABreakerEnemy::GrantLoot()
     ++KillCount;
     const int32 Seed = HashCombine(GetTypeHash(GetActorLocation()), KillCount);
     EBreakerItemRarity Rarity = UBreakerLootLibrary::RollRarity(Seed, Equipment->GetStats().DropChancePercent);
-    if (bIsElite && Rarity < EBreakerItemRarity::Exceptional) Rarity = EBreakerItemRarity::Exceptional;
+    if (IsElite() && Rarity < EBreakerItemRarity::Exceptional) Rarity = EBreakerItemRarity::Exceptional;
     const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
 
@@ -436,7 +471,7 @@ void ABreakerEnemy::GrantAmmo()
         ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
     if (UBreakerWeaponComponent* Weapon = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
     {
-        Weapon->AddReserveAmmoFraction(bIsElite ? EliteKillFraction : NormalKillFraction);
+        Weapon->AddReserveAmmoFraction(IsElite() ? EliteKillFraction : NormalKillFraction);
     }
 }
 

@@ -33,14 +33,17 @@ namespace
 ABreakerRangedEnemy::ABreakerRangedEnemy()
 {
     // --- Chassis (O2 PLACEHOLDER) ------------------------------------------
-    // Health is NOT set here: the base chassis' 220 is inherited deliberately.
-    // Encounter-Design §2.2 wants a Lattice at 1.6x a Skitter, but trash and
-    // elite health are mid-re-anchor and awaiting an owner ruling, and adding
-    // a 1.6x enemy now would make the measured TTK overshoot worse. This
-    // archetype's difficulty is its behaviour, which is what §1.1 asks for.
+    // This archetype used to ship at the base chassis' flat 220 deliberately,
+    // because trash and elite health were mid-re-anchor. O27 landed, so
+    // Encounter-Design §2.2's 1.6x Lattice ratio is applied — and it is
+    // applied through the SAME chassis composition every other monster uses
+    // (area level ^ growth, times rank, times archetype) rather than as a
+    // second hardcoded health number.
     DetectionRange = 3200.0f;   // it sees you well before you are in its band
     MoveSpeed = 320.0f;
-    AttackDamage = 16.0f;       // carried by the projectile; ConfigureElite still scales it
+    ArchetypeHealthMultiplier = 1.6f;   // O2 PLACEHOLDER, Encounter-Design §2.2
+    // Damage at area level 1; the curve and the rank table take it from here.
+    Chassis.BaseDamage = 16.0f;   // O2 PLACEHOLDER, carried by the projectile
     AttackRange = 0.0f;         // no contact attack — the base melee path is disabled
     AttackCooldown = 0.0f;
 

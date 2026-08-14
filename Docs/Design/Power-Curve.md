@@ -216,3 +216,94 @@ does not scale with item level. Until those land, the band is a statement about
 the multiplier stack only — an optimized character deals 8.74x a baseline
 character's damage, against an enemy whose health does not yet know what level
 the area is.
+### §2 Monster chassis — BUILT
+
+`Source/RiorsEdge/Combat/BreakerMonsterChassis.{h,cpp}` is the curve, as pure
+world-free maths in the precedent of `BreakerRangedBehavior.h` and
+`BreakerWeaponMath.h`. It takes an area level, a rank, and an authored
+parameter block, and it is *structurally* incapable of reading a player —
+there is no world, no actor and no player pointer within reach of any function
+in it. That is the guarantee, not a convention.
+
+```
+Health(AL) = BaseHealth * (1 + g)^(AL - 1) * Rank * Archetype
+Damage(AL) = BaseDamage * (1 + d)^(AL - 1) * Rank * Archetype
+```
+
+| Constant | Value | Note |
+|---|---|---|
+| `BaseHealth` | 220 | The chassis session 5 actually measured, so area level 1 is bit-identical to the shipping enemy |
+| `BaseDamage` | 14 (melee) / 16 (Lattice) | The archetype's authored damage at area level 1 |
+| `g` `HealthGrowthPerLevel` | 0.09 | ×68.2 over 50 levels |
+| `d` `DamageGrowthPerLevel` | 0.055 | ×13.8 over 50 levels — materially below `g` |
+| Elite rank | ×3.0 health, ×1.5 damage | |
+| Modifier-bearing rank | ×2.5 health, ×1.25 damage | |
+| Boss rank | ×25 health, ×2.0 damage | |
+| Lattice archetype | ×1.6 health | Encounter-Design §2.2, applied now that O27 has landed |
+
+All are `O2 PLACEHOLDER` and all are `EditAnywhere` on
+`FBreakerMonsterChassisParams`, which every enemy carries.
+
+The rank ratios are **derived from O18's targets rather than guessed**, which
+is the point of the document. Trash under ~1s and elite ~3s *is* an elite
+health ratio of 3. A boss at 20–45s against a 1s trash *is* a ratio inside
+20–45; 25 was picked at the low end. The shipping `ConfigureElite` used ×2.0
+health and still measured 3.01s only because trash was simultaneously 1.81×
+too slow — the two errors were cancelling.
+
+`ConfigureElite`'s hardcoded 440 health and `AttackDamage *= 1.5f` are gone,
+folded into that rank table so there is one source of truth for what an elite
+is. `bIsElite` is gone too: rank is the flag.
+
+**Area level is authored on the content.** `ABreakerEnemy::AreaLevel`
+(EditAnywhere, 1–100 — deliberately past the character cap of 50, because
+endgame tiers keep climbing and that is what keeps drop item level improving
+after the cap) and `ABreakerGameMode::GymAreaLevel` / `AreaLevelPerWave`, so a
+playtest walks the curve by turning a number up rather than by levelling a
+character. Wave escalation is the same arithmetic it always was
+(`10 + wave × 2`), now expressed through those two properties.
+
+`EnemyLevel` still drives loot item level and now follows area level, clamped
+to 50 because affix tiers are authored to 50 while the chassis keeps climbing.
+
+Three automation tests (`RiorsEdge.Combat.Chassis.*`) cover monotonicity and
+the geometric identity, the rank table and its ordering, and the ruling
+itself: the same area level produces the same chassis every time, and the drop
+item level follows area level.
+
+### The shape of the curve, for an unchanged player
+
+Session 5 measured melee trash at 1.81s against 220 health, i.e. ~121.5 hp/s
+effective (weak-point halo included), and elite at 3.01s against 440, i.e.
+~146 hp/s. Holding those numbers fixed — **no weapon change at all** — the
+chassis produces:
+
+| Area level | Trash health | Trash TTK | Elite health | Elite TTK | Trash hit |
+|---|---|---|---|---|---|
+| 1 | 220 | 1.81s | 660 | 4.5s | 14 |
+| 5 | 311 | 2.56s | 932 | 6.4s | 17 |
+| 10 | 478 | 3.93s | 1 434 | 9.8s | 23 |
+| 20 | 1 131 | 9.3s | 3 394 | 23.2s | 39 |
+| 30 | 2 678 | 22.0s | 8 034 | 55.0s | 66 |
+| 50 | 15 003 | 123.4s | 45 010 | 308s | 193 |
+
+That table is deliberately alarming and is **not** a balance failure: it is
+one half of a ratio. The other half is §3's `WeaponBase(ilvl)` curve, which is
+a separate task. With `w = g`, a baseline build's TTK is *flat* at 1.81s at
+every area level, and the whole table collapses to its first row — at which
+point the remaining 1.81× to O18's <1s target is a weapon-side anchor
+question, exactly as O27 says it should be.
+
+**Until the weapon curve lands, the gym is only playable at low area level.**
+`GymAreaLevel` defaults to 10 to preserve today's drop item level; set it to 1
+to recover today's exact combat feel while the second curve is built.
+
+### §3 Player offence — NOT BUILT here
+
+Weapon base damage by item level is a separate task in `Weapons/`. Nothing in
+the chassis work touched it, and the two compose multiplicatively.
+
+### §4 and the affix/node breadth — NOT BUILT
+
+The build variance band, the `IncreasedDamagePerSpentPoint` cutback, and the
+affix pool breadth are all still open.
