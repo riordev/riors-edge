@@ -18,7 +18,14 @@ enum class EBreakerMenuScreen : uint8
     Inventory,
     ClassSelect,
     SkillTrees,
-    Dialogue
+    Dialogue,
+    // Reach items (Docs/Design/Decisions.md O37/O39/O40c): built systems that
+    // had no UI path. Both are peers of Inventory/SkillTrees in the shared
+    // EQUIPMENT | SKILL TREES | FORGE | ABILITIES tab strip (BuildScreenTabs),
+    // not sub-modes of one screen — same reason SkillTrees is its own value
+    // rather than a tab flag on Inventory.
+    Forge,
+    Abilities
 };
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
@@ -56,8 +63,16 @@ private:
     TSharedRef<SWidget> BuildClassSelectScreen();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
-    // Shared EQUIPMENT | SKILL TREES tab strip; both character screens live
-    // behind it so the I-key flow reaches trees in one click.
+    // Reach: Items/BreakerForgeLibrary.h's three crafting verbs plus salvage,
+    // wired to a wallet readout. See the FORGE tab note on EBreakerMenuScreen.
+    TSharedRef<SWidget> BuildForgeScreen();
+    // Reach: a picker over UBreakerAbilityComponent's selection API
+    // (GetSelectableAbilityIds / PreviewSelection / TryEquipAbility), which
+    // shipped with zero callers. See the ABILITIES tab note on EBreakerMenuScreen.
+    TSharedRef<SWidget> BuildAbilitiesScreen();
+    // Shared EQUIPMENT | SKILL TREES | FORGE | ABILITIES tab strip; all four
+    // character screens live behind it so the I-key flow reaches any of them
+    // in one click.
     TSharedRef<SWidget> BuildScreenTabs(EBreakerMenuScreen ActiveScreen);
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     // Zoned screen shell for the two wide screens (Loadout / Skill matrix):
@@ -146,6 +161,16 @@ private:
     TSharedPtr<SBox> SkillDetailHost;
     EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
     bool bRebuildScheduled = false;
+    // Forge tab: which held item (equipped or backpack, found by id in either
+    // container on every rebuild) the three verbs and salvage act on, and the
+    // result line echoed under them. Invalid/consumed ids just resolve to "no
+    // selection" on the next rebuild rather than needing an explicit clear.
+    FGuid ForgeSelectedItemId;
+    FText ForgeStatus;
+    // Abilities tab: result line echoed under the slot that was last clicked,
+    // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
+    // stays readable after the rebuild it triggers.
+    FText AbilityStatus;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;
     FName DialogueNodeId = NAME_None;
     EBreakerMenuScreen RootScreen = EBreakerMenuScreen::Main;
