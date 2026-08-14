@@ -1,6 +1,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemTypes.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponFeel.h"
@@ -771,6 +773,224 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
         if (BreakerHUD::ShouldTraceRound(Round, SniperCadence)) ++Traced;
     }
     TestEqual(TEXT("Every slow round leaves a streak"), Traced, 8);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Power-Curve.md §3 — base weapon damage as a function of item level.
+//
+// The owner's report was that full level 50 gear does not feel significant.
+// The confirmed cause: Weapons/ contained no reference to ItemLevel at all, so
+// the multiplicand every affix, node and crit multiplies was an archetype
+// constant. These tests pin the SHAPE of the fix, never its balance numbers:
+// the curve is geometric, item level 1 is exactly the authored archetype
+// number, and the five archetypes stay five different weapons at every level.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponItemLevelCurveTest,
+    "RiorsEdge.Weapons.ItemLevelCurve",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponItemLevelCurveTest::RunTest(const FString& Parameters)
+{
+    const float W = 0.09f;
+
+    // Item level 1 is the anchor: the archetype table's numbers keep meaning
+    // exactly what they mean today, for any growth rate at all.
+    TestEqual(TEXT("Item level 1 is exactly the authored base"), FBreakerWeaponMath::ItemLevelDamageScalar(1, W), 1.0f);
+    TestEqual(TEXT("A zero growth restores the flat pre-curve behaviour"), FBreakerWeaponMath::ItemLevelDamageScalar(50, 0.0f), 1.0f);
+
+    // Geometric, not linear: (1 + w)^(ilvl - 1), checked against the closed form.
+    for (const int32 Level : { 2, 10, 25, 50 })
+    {
+        TestEqual(*FString::Printf(TEXT("The curve is (1+w)^(ilvl-1) at level %d"), Level),
+            FBreakerWeaponMath::ItemLevelDamageScalar(Level, W),
+            FMath::Pow(1.0f + W, static_cast<float>(Level - 1)),
+            0.001f);
+    }
+
+    // Strictly monotone across the whole authored 1-50 range, so a higher item
+    // level is never a downgrade.
+    float Previous = FBreakerWeaponMath::ItemLevelDamageScalar(1, W);
+    for (int32 Level = 2; Level <= 50; ++Level)
+    {
+        const float Current = FBreakerWeaponMath::ItemLevelDamageScalar(Level, W);
+        TestTrue(TEXT("Every item level is a strict improvement"), Current > Previous);
+        Previous = Current;
+    }
+
+    // At w = 9% the fifty-level climb is roughly 67x, matching the monster
+    // health curve's own stated span. This is the number the doc's "baseline
+    // TTK holds constant" claim rests on.
+    TestTrue(TEXT("Fifty levels is a large multiple, not a rounding error"),
+        FBreakerWeaponMath::ItemLevelDamageScalar(50, W) > 50.0f);
+
+    // Garbage in cannot produce garbage out: sub-1 levels clamp to the anchor
+    // and the ceiling keeps an absurd input finite.
+    TestEqual(TEXT("Item level 0 clamps to the level 1 anchor"), FBreakerWeaponMath::ItemLevelDamageScalar(0, W), 1.0f);
+    TestEqual(TEXT("A negative item level clamps to the level 1 anchor"), FBreakerWeaponMath::ItemLevelDamageScalar(-40, W), 1.0f);
+    TestTrue(TEXT("An absurd item level stays finite"), FMath::IsFinite(FBreakerWeaponMath::ItemLevelDamageScalar(1000000, W)));
+
+    // The base-damage wrapper is the scalar times the archetype constant.
+    TestEqual(TEXT("Base damage is the archetype number at level 1"), FBreakerWeaponMath::WeaponBaseDamage(72.0f, 1, W), 72.0f);
+    TestEqual(TEXT("Base damage rides the scalar"),
+        FBreakerWeaponMath::WeaponBaseDamage(72.0f, 30, W), 72.0f * FBreakerWeaponMath::ItemLevelDamageScalar(30, W), 0.01f);
+    TestEqual(TEXT("A negative archetype base clamps to zero"), FBreakerWeaponMath::WeaponBaseDamage(-10.0f, 30, W), 0.0f);
+    return true;
+}
+
+// The reason `w` exists at all: it is chosen to track the monster health growth
+// `g` from the same document. This test states the consequence rather than the
+// value — with w == g a baseline build's shots-to-kill is level-invariant, and
+// any divergence between them is a drift in baseline TTK per level.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponItemLevelTracksMonsterHealthTest,
+    "RiorsEdge.Weapons.ItemLevelTracksMonsterHealth",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponItemLevelTracksMonsterHealthTest::RunTest(const FString& Parameters)
+{
+    // `g`, the monster health growth, is owned by Combat/ and is not read from
+    // here on purpose: this test asserts the RELATIONSHIP, so it keeps its
+    // meaning whatever the two layers are eventually tuned to.
+    const float G = 0.09f;
+    const float W = 0.09f;
+    const float BaseHealth = 220.0f;   // the current flat trash health
+    const float BaseDamage = 13.0f;    // the rifle's archetype constant
+
+    auto ShotsToKill = [&](int32 Level)
+    {
+        const float Health = BaseHealth * FMath::Pow(1.0f + G, static_cast<float>(Level - 1));
+        return Health / FBreakerWeaponMath::WeaponBaseDamage(BaseDamage, Level, W);
+    };
+
+    const float AtOne = ShotsToKill(1);
+    TestEqual(TEXT("Baseline shots-to-kill holds at level 25"), ShotsToKill(25), AtOne, AtOne * 0.01f);
+    TestEqual(TEXT("Baseline shots-to-kill holds at level 50"), ShotsToKill(50), AtOne, AtOne * 0.01f);
+
+    // And the failure modes, stated as tests so a future retune cannot drift
+    // one curve without noticing what it does to the other. If w < g the game
+    // outruns the player and a baseline build slowly stops being able to kill
+    // anything; if w > g baseline TTK falls with level and the multiplier band
+    // has nothing left to add.
+    auto ShotsToKillWith = [&](int32 Level, float LocalW)
+    {
+        const float Health = BaseHealth * FMath::Pow(1.0f + G, static_cast<float>(Level - 1));
+        return Health / FBreakerWeaponMath::WeaponBaseDamage(BaseDamage, Level, LocalW);
+    };
+    TestTrue(TEXT("w below g makes baseline TTK climb with level"), ShotsToKillWith(50, G - 0.02f) > AtOne);
+    TestTrue(TEXT("w above g makes baseline TTK fall with level"), ShotsToKillWith(50, G + 0.02f) < AtOne);
+    return true;
+}
+
+// The archetypes must remain five different weapons at every point on the
+// curve. A single shared exponent guarantees it, and this pins that: a common
+// ratio preserves ordering, so a sniper out-hits an SMG per shot at level 1 and
+// at level 50 by the same factor.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponArchetypeOrderingAcrossLevelsTest,
+    "RiorsEdge.Weapons.ArchetypeOrderingAcrossLevels",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponArchetypeOrderingAcrossLevelsTest::RunTest(const FString& Parameters)
+{
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+    const float W = Weapon->ItemLevelDamageGrowth;
+
+    // Per SHOT, not per pellet: the shotgun's 10 is eight pellets of it, and
+    // comparing pellet to bullet would be comparing the wrong things.
+    auto DamagePerShot = [Weapon, W](EBreakerWeaponArchetype Archetype, int32 Level)
+    {
+        Weapon->EquipArchetype(Archetype);
+        const UBreakerWeaponDefinition* Definition = Weapon->GetActiveDefinition();
+        return FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, Level, W)
+            * static_cast<float>(FMath::Max(1, Definition->PelletsPerShot));
+    };
+
+    for (int32 Level = 1; Level <= 50; ++Level)
+    {
+        const float Rifle = DamagePerShot(EBreakerWeaponArchetype::Rifle, Level);
+        const float SMG = DamagePerShot(EBreakerWeaponArchetype::SMG, Level);
+        const float Sniper = DamagePerShot(EBreakerWeaponArchetype::Sniper, Level);
+        const float Shotgun = DamagePerShot(EBreakerWeaponArchetype::Shotgun, Level);
+        const float Rocket = DamagePerShot(EBreakerWeaponArchetype::Rocket, Level);
+
+        TestTrue(TEXT("A sniper out-hits an SMG per shot at every item level"), Sniper > SMG);
+        TestTrue(TEXT("A sniper out-hits a rifle per shot at every item level"), Sniper > Rifle);
+        TestTrue(TEXT("A shotgun blast out-hits a rifle round at every item level"), Shotgun > Rifle);
+        TestTrue(TEXT("A rocket out-hits an SMG round at every item level"), Rocket > SMG);
+        TestTrue(TEXT("Every archetype does more damage than it did at level 1"),
+            Level == 1 || SMG > DamagePerShot(EBreakerWeaponArchetype::SMG, 1));
+    }
+
+    // The ratio is level-invariant, which is the actual property: a shared
+    // exponent scales the table without reshaping it.
+    const float RatioAtOne = DamagePerShot(EBreakerWeaponArchetype::Sniper, 1) / DamagePerShot(EBreakerWeaponArchetype::SMG, 1);
+    const float RatioAtFifty = DamagePerShot(EBreakerWeaponArchetype::Sniper, 50) / DamagePerShot(EBreakerWeaponArchetype::SMG, 50);
+    TestEqual(TEXT("The archetype table keeps its shape across fifty levels"), RatioAtFifty, RatioAtOne, 0.001f);
+    return true;
+}
+
+// How item level actually reaches the weapon, and what an unequipped weapon is.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWeaponEquippedItemLevelTest,
+    "RiorsEdge.Weapons.EquippedItemLevel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWeaponEquippedItemLevelTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>();
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>(Owner);
+    const float SlotOneBase = Weapon->GetActiveDefinition()->Damage;
+
+    // No equipment component at all — the clean-clone, zero-setup case. A
+    // weapon with nothing equipped is a level 1 weapon, so the archetype
+    // numbers are unchanged and every previously measured TTK still holds.
+    TestEqual(TEXT("An unequipped weapon is item level 1"), Weapon->GetEquippedItemLevel(), 1);
+    TestEqual(TEXT("An unequipped weapon deals exactly its archetype damage"), Weapon->GetScaledBaseDamage(), SlotOneBase);
+
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+
+    // An equipment component with empty weapon slots is still the level 1 case.
+    TestEqual(TEXT("An empty Primary slot is still item level 1"), Weapon->GetEquippedItemLevel(), 1);
+
+    auto MakeWeaponItem = [](EBreakerEquipSlot Slot, int32 ItemLevel)
+    {
+        FBreakerItemInstance Item;
+        Item.ItemId = FGuid::NewGuid();
+        Item.Slot = Slot;
+        Item.Rarity = EBreakerItemRarity::Exceptional;
+        Item.ItemLevel = ItemLevel;
+        return Item;
+    };
+
+    // Weapon loadout slot 1 reads the Primary equipment slot, slot 2 the
+    // Secondary. That correspondence is positional and is the only link the two
+    // layers have today.
+    TestTrue(TEXT("A Primary weapon equips"), Equipment->EquipItem(MakeWeaponItem(EBreakerEquipSlot::Primary, 50)));
+    TestTrue(TEXT("A Secondary weapon equips"), Equipment->EquipItem(MakeWeaponItem(EBreakerEquipSlot::Secondary, 20)));
+
+    TestEqual(TEXT("Weapon slot 1 reads the Primary item's level"), Weapon->GetEquippedItemLevel(), 50);
+    TestEqual(TEXT("A level 50 weapon hits far harder than a level 1 one"),
+        Weapon->GetScaledBaseDamage(),
+        SlotOneBase * FBreakerWeaponMath::ItemLevelDamageScalar(50, Weapon->ItemLevelDamageGrowth),
+        0.01f);
+    TestTrue(TEXT("Full level 50 gear is a large, felt base increase"), Weapon->GetScaledBaseDamage() > SlotOneBase * 10.0f);
+
+    // Swapping to the second loadout slot reads the second item, so the two
+    // guns are not silently the same power.
+    Weapon->EquipSlot(2);
+    TestEqual(TEXT("Weapon slot 2 reads the Secondary item's level"), Weapon->GetEquippedItemLevel(), 20);
+    TestEqual(TEXT("The stowed weapon's item level is genuinely its own"),
+        Weapon->GetItemLevelDamageScalar(),
+        FBreakerWeaponMath::ItemLevelDamageScalar(20, Weapon->ItemLevelDamageGrowth),
+        0.01f);
+
+    // Unequipping falls back to the archetype's own level, not to the last
+    // item's, so a stale reading cannot survive an empty slot.
+    Weapon->EquipSlot(1);
+    TestTrue(TEXT("The Primary unequips"), Equipment->UnequipSlot(EBreakerEquipSlot::Primary));
+    TestEqual(TEXT("An emptied slot returns to item level 1"), Weapon->GetEquippedItemLevel(), 1);
     return true;
 }
 

@@ -8,6 +8,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
@@ -311,6 +312,42 @@ void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 const UBreakerWeaponDefinition* UBreakerWeaponComponent::ResolveDefinition() const
 {
     return WeaponDefinition ? WeaponDefinition.Get() : GetPrototypeDefinition(CurrentArchetype);
+}
+
+int32 UBreakerWeaponComponent::GetEquippedItemLevel() const
+{
+    // The loadout slot number and the equipment slot correspond POSITIONALLY:
+    // weapon slot 1 is the Primary equipment slot, slot 2 the Secondary. That
+    // is the only correspondence that exists today — an FBreakerItemInstance
+    // carries no weapon archetype, so which of the five guns a Primary item IS
+    // remains unanswered and is deliberately not invented here. Item level is
+    // the part the two layers already agree on, so item level is what crosses.
+    const AActor* Owner = GetOwner();
+    const UBreakerEquipmentComponent* Equipment = Owner ? Owner->FindComponentByClass<UBreakerEquipmentComponent>() : nullptr;
+    if (Equipment)
+    {
+        const EBreakerEquipSlot Slot = (CurrentSlot == 2) ? EBreakerEquipSlot::Secondary : EBreakerEquipSlot::Primary;
+        FBreakerItemInstance Item;
+        if (Equipment->GetEquippedItem(Slot, Item) && Item.IsValid())
+        {
+            return FMath::Max(1, Item.ItemLevel);
+        }
+    }
+    // Nothing equipped: the archetype table's own level. A clean clone with no
+    // loadout is a level-1 weapon, which is a scalar of exactly 1.0.
+    return FMath::Max(1, UnequippedItemLevel);
+}
+
+float UBreakerWeaponComponent::GetItemLevelDamageScalar() const
+{
+    return FBreakerWeaponMath::ItemLevelDamageScalar(GetEquippedItemLevel(), ItemLevelDamageGrowth);
+}
+
+float UBreakerWeaponComponent::GetScaledBaseDamage() const
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (!Definition) return 0.0f;
+    return FBreakerWeaponMath::WeaponBaseDamage(Definition->Damage, GetEquippedItemLevel(), ItemLevelDamageGrowth);
 }
 
 FBreakerRecoilProfile UBreakerWeaponComponent::ResolveRecoilProfile() const
@@ -695,7 +732,10 @@ void UBreakerWeaponComponent::StopFire()
         return;
     }
     bTriggerHeld = false;
-    GetWorld()->GetTimerManager().ClearTimer(AutomaticFireTimer);
+    // Guarded like every other timer touch in this component: an owned but
+    // worldless component (a test fixture, a CDO) has no timer manager, and
+    // StopFire was the one place that assumed it did.
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutomaticFireTimer);
 }
 
 void UBreakerWeaponComponent::StartReload()
@@ -812,6 +852,12 @@ void UBreakerWeaponComponent::FireOnce()
     const AActor* MarkedTarget = (AbilityState && AbilityState->GetMarkRemaining() > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
     const float LeadMinimumRangeCm = UBreakerAbility_Lead::DefaultMinimumRangeCm();
 
+    // Item level, read once per trigger pull. Every pellet of a shotgun blast
+    // and any bleed those pellets apply share this one reading, so a shot can
+    // never straddle an equipment change.
+    const float LevelScalar = GetItemLevelDamageScalar();
+    const float ScaledBaseDamage = FMath::Max(0.0f, Definition->Damage) * LevelScalar;
+
     const int32 PelletCount = FMath::Max(1, Definition->PelletsPerShot);
     for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
@@ -843,7 +889,9 @@ void UBreakerWeaponComponent::FireOnce()
                 if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
             }
             FBreakerDamageRequest Damage;
-            Damage.BaseDamage = Definition->Damage * FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, Hit.Distance);
+            // The multiplicand: archetype base carried up the item-level curve,
+            // then falloff. Per pellet, exactly as before.
+            Damage.BaseDamage = ScaledBaseDamage * FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, Hit.Distance);
             Damage.DamageFamily = EBreakerDamageFamily::Physical;
             Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
             Damage.ArmorPenetration = Definition->ArmorPenetration;
@@ -877,7 +925,7 @@ void UBreakerWeaponComponent::FireOnce()
             Shot.DamageResult.bShieldBroken |= PelletDamage.bShieldBroken;
             Shot.DamageResult.bKilled |= PelletDamage.bKilled;
 
-            ApplyBleedOnHit(Definition, Hit.GetActor(), SourceAttributes);
+            ApplyBleedOnHit(Definition, Hit.GetActor(), SourceAttributes, LevelScalar);
         }
     }
     MulticastShotCosmetics(Shot);
@@ -914,7 +962,7 @@ bool UBreakerWeaponComponent::ResolveWeakPointHit(const FHitResult& Hit, const F
     return false;
 }
 
-void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes)
+void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar)
 {
     if (!Definition || !Target || Definition->BleedChance <= 0.0f || Definition->BleedDamagePerTick <= 0.0f || Definition->BleedDuration <= 0.0f) return;
     UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>();
@@ -927,7 +975,11 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
 
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
-    Spec.BaseDamagePerTick = Definition->BleedDamagePerTick;
+    // The DoT's base is a weapon base damage number like any other, so it rides
+    // the same item-level curve. Leaving it flat would make bleed a smaller and
+    // smaller fraction of an SMG's output as the game went on, which is a
+    // silent nerf to the archetype's identity rather than a design choice.
+    Spec.BaseDamagePerTick = Definition->BleedDamagePerTick * FMath::Max(0.0f, LevelScalar);
     Spec.Duration = Definition->BleedDuration;
     Spec.TickInterval = FMath::Max(0.05f, Definition->BleedTickInterval);
     Spec.Snapshot.SourcePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
@@ -950,7 +1002,9 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
         if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
     }
     FBreakerDamageRequest Damage;
-    Damage.BaseDamage = Definition->Damage;
+    // Same multiplicand as the hitscan path: the rocket's payload is a weapon
+    // base damage number and scales with item level identically.
+    Damage.BaseDamage = FMath::Max(0.0f, Definition->Damage) * GetItemLevelDamageScalar();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;
