@@ -112,7 +112,22 @@ public:
     // ApexBandSpeed downward. A jump that falls faster than it rises is the
     // single strongest "this body has mass" cue; a symmetric arc is the
     // classic floaty read. OLD: 1.0 (no fall multiplier existed).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float FallGravityMultiplier = 1.80f;
+    //
+    // EASED (owner: "gravity needs to be tuned down just a little bit... needs
+    // to make the character slightly more floaty"). This is the dial the
+    // GravityScale comment in the constructor named for exactly this report,
+    // and it is named rather than GravityScale because the rise has already
+    // been walked back to 1.38 — a hair over its original 1.35 — while the
+    // DESCENT still ran at 1.80x on top of it. Floatiness and heaviness live in
+    // different halves of the arc, so the half that is still heavy is the half
+    // that moves. Apex height is untouched by construction (the rise is
+    // untouched); airtime goes 0.90 -> 0.93 s and the landing arrives at
+    // 871 cm/s instead of 939, still under LandingHeavyFallSpeed so routine
+    // jumping stays untaxed. ONE value moved this pass, so the next report
+    // attributes cleanly (O26: this executes an owner request, it does not open
+    // a movement pass). If it is STILL heavy, the next dial is
+    // LandingMinimumSpeedScale to 1.0, which deletes the landing cost outright.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0.1")) float FallGravityMultiplier = 1.55f; // WAS 1.80f AT THE WEIGHT PASS (1.0 = no curve at all)
     // Gravity multiplier exactly at the apex, where vertical velocity is near
     // zero and hang time is felt directly. Blended into 1.0 on the way up and
     // into FallGravityMultiplier on the way down, so the curve is continuous.
@@ -162,15 +177,32 @@ public:
     // Master switch. False restores exactly the pre-O25 behaviour (two jumps
     // for everyone including Swift) with no other change.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump") bool bSwiftThirdJumpEnabled = true;
-    // O2 PLACEHOLDER — THE THRESHOLD IS AWAITING AN OWNER RULING. CONTEXT.md
-    // lists "when it unlocks and whether it is free" as open. 20 and free (no
-    // resource cost, no cooldown, no point spend) is a stand-in chosen so the
-    // grant is visibly a LATER unlock rather than part of the starting kit; it
-    // carries no design authority. What this change delivers is the mechanism:
-    // a class-gated, level-gated jump budget that reacts to a class change.
-    // NOTE for a playtest: nothing raises CharacterLevel yet, so at the shipped
-    // 20 the third jump is unreachable in the gym. Set it to 1 to feel it.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1", ClampMax="50")) int32 SwiftThirdJumpUnlockLevel = 20;
+    // O2 PLACEHOLDER — THE THRESHOLD IS STILL AWAITING AN OWNER RULING, and the
+    // number below is NOT that ruling.
+    //
+    // WHY IT IS 1 (owner: "i never could do a 3rd jump"). It was 20, and the
+    // grant was not broken — it was UNREACHABLE BY CONSTRUCTION. This gate
+    // reads `FBreakerProgressionState::CharacterLevel`, and nothing in the
+    // project writes that field: it is declared with a default of 1, there is
+    // no XP loop, no level-up path, and a repository-wide search for an
+    // assignment to it returns the declaration and nothing else. A feature
+    // gated behind a stat that no code moves is not a late unlock, it is a
+    // disabled feature with a plausible-looking excuse — and the excuse is what
+    // made it survive a green suite and a playtest.
+    //
+    // The honest repair is not to quietly pick a smaller number that happens to
+    // clear today's level. It is that the gate must key off something that
+    // actually moves, and until an XP loop exists nothing does — so the gate
+    // DEFAULTS TO REACHABLE. Raise it again on the same day CharacterLevel
+    // starts moving, and not before; RefreshJumpGrant logs once if this is ever
+    // set above a level the game can reach, so the failure cannot be silent a
+    // second time. `RiorsEdge.Movement.JumpGrantMatrix` asserts the reachable
+    // case specifically: Swift gets three and every other class gets two in the
+    // progression state the game ACTUALLY runs in, not in a hypothetical one.
+    //
+    // Still free: no resource cost, no cooldown, no point spend (O25 makes it
+    // innate to the class, not a purchase).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1", ClampMax="50")) int32 SwiftThirdJumpUnlockLevel = 1; // WAS 20 — unreachable, nothing writes CharacterLevel
     // O2 PLACEHOLDER. The third jump must not read as "the second jump again".
     // It blends horizontal velocity toward the current input direction while
     // PRESERVING its magnitude, so it is a course correction, not a speed
@@ -340,6 +372,11 @@ private:
     EBreakerClassId ObservedClass = EBreakerClassId::None;
     int32 ObservedLevel = 0;
     bool bBoundProgression = false;
+    // One-shot, so the "unreachable gate" failure can never be silent again.
+    // The third jump shipped gated on level 20 with nothing in the project
+    // writing CharacterLevel, and the only symptom was an owner saying "i never
+    // could do a 3rd jump" — no warning, no failing test, no log line.
+    bool bWarnedUnreachableThirdJump = false;
     // Applies the third jump's course correction, if this jump is one.
     void ApplyBonusJumpRedirect();
 

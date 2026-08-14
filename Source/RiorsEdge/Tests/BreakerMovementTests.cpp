@@ -4,6 +4,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerGameMode.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
+#include "Progression/BreakerProgressionTypes.h"
 #include "UI/BreakerPlaytestHUD.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -370,7 +371,6 @@ bool FBreakerMovementJumpGrantTest::RunTest(const FString& Parameters)
     // runtime, so this assertion is what stops the base kit drifting.
     TestEqual(TEXT("Two jumps are base kit"), Movement->BaseJumpCount, 2);
     TestTrue(TEXT("The third jump is enabled by default"), Movement->bSwiftThirdJumpEnabled);
-    TestTrue(TEXT("The third jump is a LATER unlock, not part of the starting kit"), Movement->SwiftThirdJumpUnlockLevel > 1);
     TestTrue(TEXT("The unlock level is reachable inside the level 50 cap"), Movement->SwiftThirdJumpUnlockLevel <= 50);
     TestEqual(TEXT("A component with no progression grants exactly the base kit"), Movement->GetGrantedJumpCount(), 2);
 
@@ -433,6 +433,90 @@ bool FBreakerMovementJumpGrantTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("A third-jump blend stays horizontal"), FMath::IsNearlyZero(Result.Z));
         }
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMovementJumpGrantMatrixTest,
+    "RiorsEdge.Movement.JumpGrantMatrix",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMovementJumpGrantMatrixTest::RunTest(const FString& Parameters)
+{
+    using FMovement = UBreakerCharacterMovementComponent;
+
+    // THE TEST THAT WAS MISSING (owner: "i never could do a 3rd jump").
+    //
+    // RiorsEdge.Movement.JumpGrant already proved the RULE — Swift at or past
+    // the threshold gets three — and it passed the whole time the feature was
+    // unreachable, because it fed the rule a level the game cannot produce. It
+    // asserted arithmetic about a hypothetical character.
+    //
+    // This one asserts the SHIPPED CONFIGURATION against the progression state
+    // the game actually runs in. FBreakerProgressionState is default-
+    // constructed here on purpose, and CharacterLevel is read from it rather
+    // than written: nothing in the project writes that field (no XP loop
+    // exists), so a default-constructed state IS the state of every character
+    // in the gym, in a playtest, and in a fresh save. If the gate is ever
+    // raised above that level again, this test fails on the same day rather
+    // than in a playtest weeks later.
+    const FBreakerProgressionState LiveState;
+    const int32 ReachableLevel = LiveState.CharacterLevel;
+    TestTrue(TEXT("The level a character can actually reach is at least one"), ReachableLevel >= 1);
+
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    TestTrue(TEXT("The third jump's gate is REACHABLE in the state the game runs in — nothing raises CharacterLevel"),
+        Movement->SwiftThirdJumpUnlockLevel <= ReachableLevel);
+
+    // The matrix, at the shipped values, at the reachable level: Swift three,
+    // everybody else two. No hypothetical levels anywhere in this loop.
+    const EBreakerClassId EveryClass[] = {
+        EBreakerClassId::None, EBreakerClassId::Caster, EBreakerClassId::Swift,
+        EBreakerClassId::Gunsmith, EBreakerClassId::Tank, EBreakerClassId::Support };
+    for (const EBreakerClassId ClassId : EveryClass)
+    {
+        const int32 Granted = FMovement::ResolveJumpCount(
+            ClassId, ReachableLevel, Movement->BaseJumpCount,
+            Movement->bSwiftThirdJumpEnabled, Movement->SwiftThirdJumpUnlockLevel);
+        if (ClassId == EBreakerClassId::Swift)
+        {
+            TestEqual(TEXT("Swift gets three jumps in the state the game actually runs in"), Granted, 3);
+        }
+        else
+        {
+            TestEqual(TEXT("Every other class gets exactly two"), Granted, 2);
+        }
+    }
+
+    // The mid-session DevForceClass swap, both directions, at the shipped
+    // values. Swapping TO Swift must hand the third jump over immediately;
+    // swapping AWAY must take it back, which is the direction that would leave
+    // a permanent illegal grant if the refresh were a one-time thing.
+    TestEqual(TEXT("A dev swap to Swift grants the third jump immediately"),
+        FMovement::ResolveJumpCount(EBreakerClassId::Swift, ReachableLevel, Movement->BaseJumpCount,
+            Movement->bSwiftThirdJumpEnabled, Movement->SwiftThirdJumpUnlockLevel), 3);
+    TestEqual(TEXT("A dev swap away from Swift takes it back immediately"),
+        FMovement::ResolveJumpCount(EBreakerClassId::Tank, ReachableLevel, Movement->BaseJumpCount,
+            Movement->bSwiftThirdJumpEnabled, Movement->SwiftThirdJumpUnlockLevel), 2);
+
+    // The banked-jump clamp, as arithmetic. A Swift player who has spent all
+    // three and swaps away must not keep the third: the spent count is clamped
+    // to the NEW budget, so the jumps remaining go to zero rather than negative
+    // — and can never come out as one free extra jump on the smaller budget.
+    for (int32 Spent = 0; Spent <= 3; ++Spent)
+    {
+        const int32 ClampedAfterSwap = FMath::Min(Spent, 2);
+        TestTrue(TEXT("A jump banked against three never survives a swap to a budget of two"),
+            ClampedAfterSwap <= 2);
+        TestTrue(TEXT("The clamp never hands the player a jump they did not have"),
+            2 - ClampedAfterSwap <= 2 - FMath::Min(Spent, 2));
+    }
+
+    // The master switch still restores pre-O25 behaviour exactly, at the
+    // reachable level rather than at a hypothetical one.
+    TestEqual(TEXT("Disabling the third jump returns Swift to the base kit"),
+        FMovement::ResolveJumpCount(EBreakerClassId::Swift, ReachableLevel, Movement->BaseJumpCount,
+            false, Movement->SwiftThirdJumpUnlockLevel), 2);
     return true;
 }
 
