@@ -166,7 +166,7 @@ Affixes will work fundamentally differently in the Unreal ARPG. Do not infer the
 ## Product decisions still needed
 
 - The exact 13/35/42 m/s scale is rejected; begin with grounded shooter values and tune through combat playtests.
-- Universal double jump, skill-tree unlock, or discipline-specific?
+- ~~Universal double jump, skill-tree unlock, or discipline-specific?~~ **ANSWERED — O25.** Universal: two jumps are base kit for everyone; Swift's third jump, if built, is class-innate, not a skill-tree unlock.
 - Keep the 110 ms slide-cancel test, widen it, or make it build-dependent?
 - Universal dash, or an ability with charges?
 - Grapple is excluded from current scope.
