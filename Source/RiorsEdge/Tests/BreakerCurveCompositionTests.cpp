@@ -4,6 +4,7 @@
 #include "Combat/BreakerMonsterChassis.h"
 #include "Weapons/BreakerWeaponMath.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Combat/BreakerEnemy.h"
 
 // ---------------------------------------------------------------------------
 // THE TWO CURVES, COMPOSED (Power-Curve.md §2 and §3, authority O27)
@@ -203,6 +204,56 @@ bool FBreakerEndgameCompositionTest::RunTest(const FString& Parameters)
     {
         TestEqual(TEXT("Drop item level tracks area level to the ceiling"), ClampedAt100, 100);
     }
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// THE CURVE MUST REACH AN ACTUAL ENEMY (O29)
+// ---------------------------------------------------------------------------
+// The composition test above proves the LIBRARY functions cancel. It says
+// nothing about whether the shipping game reads them, and for a while it did
+// not: GetDropItemLevel was opened to 120 and ABreakerEnemy::ApplyChassis
+// re-clamped the result to 50 on the very next line. EnemyLevel is what
+// GrantLoot hands to the drop pipeline, so no drop in the game carried the
+// deeper ladder -- and the suite stayed green throughout, because every test
+// exercised the library and none of them touched an actor.
+//
+// This is the second time that exact shape has bitten: Swift's third jump was
+// also correct one layer up and dead where the game read it, and also had a
+// passing test proving the rule rather than the configuration.
+//
+// So this test instantiates a REAL enemy and reads the field the loot path
+// actually uses.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEnemyDropLevelReachesTheCurveTest,
+    "RiorsEdge.Combat.PowerCurve.EnemyDropLevel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEnemyDropLevelReachesTheCurveTest::RunTest(const FString& Parameters)
+{
+    ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>();
+    if (!Enemy)
+    {
+        AddError(TEXT("Could not construct an enemy to read its drop level from."));
+        return false;
+    }
+
+    // Past the old clamp, and past the character cap, which is the whole point
+    // of O29: area level keeps climbing after the player stops levelling and
+    // gear is what answers it.
+    for (const int32 AreaLevel : {10, 50, 75, 100})
+    {
+        Enemy->SetAreaLevel(AreaLevel);
+        const int32 Expected = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
+        TestEqual(*FString::Printf(TEXT("An area-level-%d enemy drops at item level %d"), AreaLevel, Expected),
+            Enemy->GetEnemyLevel(), Expected);
+    }
+
+    // The specific regression: an enemy deep in the endgame must not be pinned
+    // at the character cap.
+    Enemy->SetAreaLevel(100);
+    TestTrue(TEXT("A deep-endgame enemy drops ABOVE the character cap of 50"), Enemy->GetEnemyLevel() > 50);
     return true;
 }
 

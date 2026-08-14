@@ -175,6 +175,11 @@ void UBreakerAttributeSet::ApplyShield(float NewValue)
     WriteAttributeValue(GetShieldAttribute(), Shield, NewValue);
 }
 
+void UBreakerAttributeSet::ApplyMaxHealth(float NewValue)
+{
+    WriteAttributeValue(GetMaxHealthAttribute(), MaxHealth, NewValue);
+}
+
 void UBreakerAttributeSet::RecomputeAggregatedAttributes()
 {
     // Health and class resource ride their maximum by fraction/clamp so a
@@ -220,11 +225,25 @@ UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() con
     // UAttributeSet::GetOwningAbilitySystemComponent() CastChecked's the outer
     // to an AActor, which is fatal for a standalone attribute set (a test, a
     // tool). Resolve it defensively instead; in game the outer is the actor.
-    if (const AActor* OwningActor = Cast<AActor>(GetOuter()))
-    {
-        return UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor);
-    }
-    return nullptr;
+    const AActor* OwningActor = Cast<AActor>(GetOuter());
+    if (!OwningActor) return nullptr;
+
+    UAbilitySystemComponent* Found = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(OwningActor);
+    // EXISTING IS NOT THE SAME AS INITIALISED. An actor constructs its ability
+    // system component in its own constructor but only calls
+    // InitAbilityActorInfo in BeginPlay, so between those two points the
+    // component is non-null and its OWNER is not set -- and
+    // SetNumericAttributeBase ensures on exactly that, with a message about an
+    // invalid owner rather than a missing component.
+    //
+    // That window is where every worldless test lives, which is why an enemy
+    // could not be constructed in automation at all: ApplyChassis runs from the
+    // constructor path and writes MaxHealth. Falling through to the direct
+    // write here is not a workaround -- an uninitialised ability system has
+    // nothing to notify and no prediction to keep in step, so the direct write
+    // IS the correct behaviour for that state.
+    if (Found && !Found->GetOwnerActor()) return nullptr;
+    return Found;
 }
 
 void UBreakerAttributeSet::WriteAttributeValue(const FGameplayAttribute& Attribute, FGameplayAttributeData& Data, float NewValue)

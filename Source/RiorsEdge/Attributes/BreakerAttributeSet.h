@@ -147,6 +147,13 @@ public:
     // outside the combat component may call these.
     void ApplyHealth(float NewValue);
     void ApplyShield(float NewValue);
+    // Same reason, for the monster chassis. ABreakerEnemy::ApplyChassis wrote
+    // MaxHealth through the generated setter, so constructing an enemy outside
+    // a world ensured — which meant the chassis curve could only ever be tested
+    // through the pure library, never on the actor that reads it. An O29
+    // regression then pinned every drop in the game at the character cap while
+    // the suite stayed green, because nothing could see the actor's own field.
+    void ApplyMaxHealth(float NewValue);
 
     // Publishes an authored base that this class cannot know on its own.
     // MoveSpeed is the case that forced it: WalkSpeed is EditAnywhere on

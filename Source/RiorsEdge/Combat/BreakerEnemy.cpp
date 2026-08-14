@@ -1,5 +1,7 @@
 #include "Combat/BreakerEnemy.h"
 
+#include "Items/BreakerAffixLibrary.h"
+
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -164,9 +166,18 @@ void ABreakerEnemy::BeginPlay()
 void ABreakerEnemy::ApplyChassis()
 {
     AreaLevel = UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel);
+    // O29. This clamp was 50 and it silently undid the whole endgame ruling:
+    // GetDropItemLevel was opened to 120, and then this line put it straight
+    // back. EnemyLevel is what GrantLoot hands to the drop pipeline, so NO DROP
+    // IN THE SHIPPING GAME carried the deeper ladder - while the automation
+    // suite stayed green, because the composition test exercises the library
+    // function and never touches an actor.
+    //
+    // That is the same failure shape as the third jump: a rule that was correct
+    // one layer up and dead where the game actually reads it.
     EnemyLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel)
         + (IsElite() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
-    EnemyLevel = FMath::Clamp(EnemyLevel, 1, 50);
+    EnemyLevel = FMath::Clamp(EnemyLevel, 1, UBreakerAffixLibrary::MaxItemLevel);
 
     AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
         AreaLevel, MonsterRank, Chassis, ArchetypeDamageMultiplier);
@@ -179,7 +190,10 @@ void ABreakerEnemy::ApplyChassis()
         // worth, and the count step is Encounter-Design §1.1's "+0.35x per
         // modifier beyond the first". Three inputs, one product, no second
         // source of truth for any of them.
-        Attributes->SetMaxHealth(UBreakerMonsterChassisLibrary::GetMonsterHealth(
+        // ApplyMaxHealth, not SetMaxHealth: the generated setter ensures with no
+        // owning ASC, which made an enemy untestable outside a world. Live
+        // behaviour is identical -- both run PreAttributeChange.
+        Attributes->ApplyMaxHealth(UBreakerMonsterChassisLibrary::GetMonsterHealth(
             AreaLevel, MonsterRank, Chassis, ArchetypeHealthMultiplier * ModifierCountHealthMultiplier));
         if (Combat) Combat->RestoreVitals();
     }

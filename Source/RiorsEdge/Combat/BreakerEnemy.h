@@ -43,6 +43,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="Enemy") void SetAreaLevel(int32 NewAreaLevel);
     UFUNCTION(BlueprintCallable, Category="Enemy") void SetMonsterRank(EBreakerMonsterRank NewRank);
     UFUNCTION(BlueprintPure, Category="Enemy") int32 GetAreaLevel() const { return AreaLevel; }
+    // The item level this monster's drop rolls at. Public because the loot path
+    // reads it and NOTHING COULD ASSERT IT: an O29 regression pinned every drop
+    // in the game at the character cap while the whole suite stayed green,
+    // because every test exercised the library function and none could see the
+    // field the game actually uses.
+    UFUNCTION(BlueprintPure, Category="Enemy") int32 GetEnemyLevel() const { return EnemyLevel; }
     UFUNCTION(BlueprintPure, Category="Enemy") EBreakerMonsterRank GetMonsterRank() const { return MonsterRank; }
     // Rank IS the elite flag now; there is no separate bool to drift from it.
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsElite() const { return MonsterRank == EBreakerMonsterRank::Elite; }
@@ -229,9 +235,11 @@ protected:
 
     // Item level of the drop. Kept in sync with AreaLevel by ApplyChassis —
     // area level driving drop item level is exactly the mechanism that makes
-    // rising item level correspond to gameplay (O27). Clamped to the character
-    // cap of 50 because affix tiers are authored to 50 while the chassis curve
-    // keeps climbing past it.
+    // rising item level correspond to gameplay (O27), and under O29 it is the
+    // mechanism that makes gear the ENDGAME power source rather than a
+    // statement about one. It follows area level to 120 now; the old clamp to
+    // the character cap of 50 was written when affix tiers stopped there, and
+    // it outlived that reason by exactly one ruling.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy") int32 EnemyLevel = 10;
     // Elites drop richer loot than their area level alone would give. This is
     // a LOOT bonus only and deliberately does not touch the chassis, which
