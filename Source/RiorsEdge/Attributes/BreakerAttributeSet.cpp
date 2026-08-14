@@ -143,6 +143,16 @@ void UBreakerAttributeSet::ApplyClassResource(float NewValue)
     WriteAttributeValue(GetClassResourceAttribute(), ClassResource, NewValue);
 }
 
+void UBreakerAttributeSet::ApplyHealth(float NewValue)
+{
+    WriteAttributeValue(GetHealthAttribute(), Health, NewValue);
+}
+
+void UBreakerAttributeSet::ApplyShield(float NewValue)
+{
+    WriteAttributeValue(GetShieldAttribute(), Shield, NewValue);
+}
+
 void UBreakerAttributeSet::RecomputeAggregatedAttributes()
 {
     // Health and class resource ride their maximum by fraction/clamp so a

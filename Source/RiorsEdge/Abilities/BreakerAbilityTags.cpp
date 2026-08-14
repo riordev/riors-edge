@@ -23,11 +23,18 @@ namespace BreakerAbilityTags
 
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Cleave, "Ability.Class.Caster.Cleave");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Closequarter, "Ability.Class.Caster.Closequarter");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Rot, "Ability.Class.Caster.Rot");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Siphon, "Ability.Class.Caster.Siphon");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Fracture, "Ability.Class.Caster.Fracture");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Resonance, "Ability.Class.Caster.Resonance");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Caster_Unmake, "Ability.Class.Caster.Unmake");
 
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Cleave, "State.Ability.Cleave");
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Closequarter, "State.Ability.Closequarter");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Siphon, "State.Ability.Siphon");
     UE_DEFINE_GAMEPLAY_TAG(State_Ultimate_Unmake, "State.Ultimate.Unmake");
+
+    UE_DEFINE_GAMEPLAY_TAG(Zone_Caster_Rot, "Zone.Caster.Rot");
 
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Caster_Edgework, "Keystone.Caster.Edgework");
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Caster_LongDark, "Keystone.Caster.LongDark");

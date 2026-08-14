@@ -11,6 +11,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerDamageReceived, const FBreak
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerDeathEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHitDealt, const FBreakerHitContext&, Hit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerKillDealt, const FBreakerHitContext&, Hit);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealEvent, const FBreakerHealResult&, Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealDealt, const FBreakerHealContext&, Heal);
 
 // One push/pop-able outgoing damage modifier. Keyed so the pusher (an ability
 // window, a node) can remove exactly its own entry; expiry is a safety net for
@@ -36,6 +38,13 @@ public:
     UBreakerCombatComponent();
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+    // Normally resolved from the owner's ability system in BeginPlay. Exposed
+    // for the same reason UBreakerEquipmentComponent and
+    // UBreakerProgressionComponent expose it: a component that can only find
+    // its attributes through a live actor in a live world cannot be tested at
+    // all, and the vitals paths are exactly the ones that must be.
+    void BindAttributes(UBreakerAttributeSet* InAttributes);
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") FBreakerDamageResult ReceiveDamage(const FBreakerDamageRequest& Request);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat") bool SpendClassResource(float Cost);
@@ -75,6 +84,49 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Combat|Incoming") float GetComposedIncomingDamageMultiplier() const;
 
+    // Flat armour reduction, keyed (Ability-Implementation-Spec §5.3). Rot
+    // strips 40 armour and VW7 strips another 40 against a target already
+    // affected by a DoT; Gunsmith's Disruptor strips more.
+    //
+    // Two rules are load-bearing here and both exist to stop a known bug:
+    //  * FLAT, never percentage — Class-Kits VW7 is explicit that this is what
+    //    protects the boss armour cap (Master 7.10.5).
+    //  * KEYED, so two overlapping Rots do not double-strip. A naive additive
+    //    −40 GameplayEffect stacks with itself and drives armour negative,
+    //    which under the mitigation formula becomes a damage BONUS.
+    // Effective armour is clamped at zero at the point of use, so no
+    // combination of strippers can ever invert mitigation.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Armor")
+    void PushArmorReduction(FName Key, float FlatAmount);
+
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Armor")
+    void PopArmorReduction(FName Key);
+
+    UFUNCTION(BlueprintPure, Category="Combat|Armor") float GetComposedArmorReduction() const;
+    UFUNCTION(BlueprintPure, Category="Combat|Armor") float GetEffectiveArmor() const;
+
+    // --- Healing ---------------------------------------------------------
+    // The one healing path (Ability-Implementation-Spec §5.4). Every heal in
+    // the game routes through here for the same reason every hit routes through
+    // ReceiveDamage: an ability that writes Health directly is invisible to
+    // overheal rules, to healing-modifier affixes, and to every listener.
+    //
+    // Authority-only, and it will NOT resurrect: a dead actor is dead, and
+    // healing is not the revive system.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Healing")
+    FBreakerHealResult ApplyHealing(const FBreakerHealRequest& Request);
+
+    // Convenience form matching the spec's signature, for callers with nothing
+    // to say beyond "heal this much".
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Healing")
+    FBreakerHealResult ApplyHealingAmount(float Amount, AActor* Healer, FGameplayTag SourceTag);
+
+    // Raised on the HEALED actor.
+    UPROPERTY(BlueprintAssignable, Category="Combat|Healing") FBreakerHealEvent OnHealed;
+    // Raised on the HEALER, the twin of OnHitDealt. Support's Charge loop binds
+    // this one.
+    UPROPERTY(BlueprintAssignable, Category="Combat|Healing") FBreakerHealDealt OnHealingDealt;
+
     // Damage-Pipeline §4: at most three More multipliers, each capped at 1.30x.
     static constexpr float ComposedMoreCeiling = 2.20f;
 
@@ -99,6 +151,9 @@ private:
     // responsible for removing it, and a silently expiring defence is worse
     // than one that is visibly stuck.
     TMap<FName, float> IncomingDamageModifiers;
+    // Keyed for the same reason, and summed rather than multiplied because
+    // armour reduction is authored FLAT.
+    TMap<FName, float> ArmorReductions;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     bool bDeathBroadcast = false;
     double LastDamageTime = -1000.0;

@@ -3,7 +3,11 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerAbility_Cleave.h"
 #include "Abilities/BreakerAbility_Closequarter.h"
+#include "Abilities/BreakerAbility_Fracture.h"
 #include "Abilities/BreakerAbility_Lead.h"
+#include "Abilities/BreakerAbility_Resonance.h"
+#include "Abilities/BreakerAbility_Rot.h"
+#include "Abilities/BreakerAbility_Siphon.h"
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
@@ -197,6 +201,60 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Closequarter->CooldownSeconds = 0.0f;
     Registry.Add(Closequarter);
 
+    // C3 Rot — Class-Kits §2.2 row C3: 25 Mana, no cooldown, 4 m / 6 s.
+    UBreakerAbilityDefinition* Rot = MakeFallback(TEXT("FallbackAbility_Caster_Rot"));
+    Rot->AbilityId = TEXT("Caster.Rot");
+    Rot->ClassId = EBreakerClassId::Caster;
+    Rot->DisplayName = FText::FromString(TEXT("Rot"));
+    Rot->Description = FText::FromString(TEXT("A 4 m zone that poisons and strips armour from everything standing in it."));
+    Rot->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Rot->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Rot;
+    Rot->AbilityClass = UBreakerAbility_Rot::StaticClass();
+    Rot->ResourceCost = 25.0f;
+    Rot->CooldownSeconds = 0.0f;
+    Rot->WindowDuration = 6.0f; // the puddle's lifetime, for the HUD
+    Registry.Add(Rot);
+
+    // C4 Siphon — Class-Kits §2.2 row C4: 30 Mana, no cooldown, 5 s channel.
+    UBreakerAbilityDefinition* Siphon = MakeFallback(TEXT("FallbackAbility_Caster_Siphon"));
+    Siphon->AbilityId = TEXT("Caster.Siphon");
+    Siphon->ClassId = EBreakerClassId::Caster;
+    Siphon->DisplayName = FText::FromString(TEXT("Siphon"));
+    Siphon->Description = FText::FromString(TEXT("Channel on one target: Void damage over time that heals you for a portion."));
+    Siphon->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Siphon->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Siphon;
+    Siphon->AbilityClass = UBreakerAbility_Siphon::StaticClass();
+    Siphon->ResourceCost = 30.0f;
+    Siphon->CooldownSeconds = 0.0f;
+    Siphon->WindowDuration = 5.0f;
+    Registry.Add(Siphon);
+
+    // C5 Fracture — Class-Kits §2.2 row C5: 30 Mana, no cooldown.
+    UBreakerAbilityDefinition* Fracture = MakeFallback(TEXT("FallbackAbility_Caster_Fracture"));
+    Fracture->AbilityId = TEXT("Caster.Fracture");
+    Fracture->ClassId = EBreakerClassId::Caster;
+    Fracture->DisplayName = FText::FromString(TEXT("Fracture"));
+    Fracture->Description = FText::FromString(TEXT("Projectile applying the next status in your cycle."));
+    Fracture->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Fracture->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Fracture;
+    Fracture->AbilityClass = UBreakerAbility_Fracture::StaticClass();
+    Fracture->ResourceCost = 30.0f;
+    Fracture->CooldownSeconds = 0.0f;
+    Registry.Add(Fracture);
+
+    // C6 Resonance — Class-Kits §2.2 row C6: 40 Mana, no cooldown.
+    UBreakerAbilityDefinition* Resonance = MakeFallback(TEXT("FallbackAbility_Caster_Resonance"));
+    Resonance->AbilityId = TEXT("Caster.Resonance");
+    Resonance->ClassId = EBreakerClassId::Caster;
+    Resonance->DisplayName = FText::FromString(TEXT("Resonance"));
+    Resonance->Description = FText::FromString(TEXT("Detonates every status on the target, consuming them."));
+    Resonance->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Resonance->AbilityTag = BreakerAbilityTags::Ability_Class_Caster_Resonance;
+    Resonance->AbilityClass = UBreakerAbility_Resonance::StaticClass();
+    Resonance->ResourceCost = 40.0f;
+    Resonance->CooldownSeconds = 0.0f;
+    Registry.Add(Resonance);
+
     // UNMAKE — Class-Kits §2.2 ultimate: 80 Mana, no cooldown, 6s base window.
     UBreakerAbilityDefinition* Unmake = MakeFallback(TEXT("FallbackAbility_Caster_Unmake"));
     Unmake->AbilityId = TEXT("Caster.Unmake");
@@ -284,12 +342,16 @@ FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId
     case EBreakerClassId::Caster:
         switch (Slot)
         {
-        // Class-Kits §2.2 names Cleave and Rot as the Caster starters. Rot needs
-        // the zone actor system, which does not exist, so slot two ships
-        // Closequarter — the other Spellblade ability and the one buildable
-        // without new Combat/ systems. Swap it for Rot when zones land.
+        // Class-Kits §2.2 names Cleave and Rot as the Caster STARTERS, and the
+        // zone system that Rot needs now exists, so slot two is Rot as
+        // designed. Closequarter, Siphon, Fracture and Resonance are all built
+        // and all in this registry; with three keys and no ability-loadout UI
+        // for Caster, exactly one of them can be reached at a time, and the
+        // starter is the one the design names. Changing this line is how a
+        // playtest reaches a different one until the loadout screen can author
+        // Caster ability ids.
         case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Caster.Cleave");
-        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Caster.Closequarter");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Caster.Rot");
         case EBreakerAbilitySlot::Ultimate:        return TEXT("Caster.Unmake");
         default: return NAME_None;
         }

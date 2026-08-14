@@ -97,3 +97,36 @@ FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerS
     Request.RandomSeed = TickIndex;
     return Request;
 }
+
+FBreakerHealResult UBreakerDamageLibrary::ResolveHealing(const FBreakerHealRequest& Request, const FBreakerVitalsState& Vitals)
+{
+    FBreakerHealResult Result;
+    Result.RemainingHealth = Vitals.Health;
+    Result.RemainingShield = Vitals.Shield;
+    Result.bWasAtFullHealth = Vitals.MaxHealth > 0.0f && Vitals.Health >= Vitals.MaxHealth;
+
+    // A negative heal is NOT damage. Damage has exactly one entry point and
+    // this is not it; turning a sign error into a hit here would route around
+    // armour, shields and the passive dodge/block layer entirely.
+    const float Requested = FMath::Max(0.0f, Request.Amount) * FMath::Max(0.0f, Request.HealingMultiplier);
+    Result.RequestedAmount = Requested;
+    if (Requested <= 0.0f) return Result;
+
+    const float MissingHealth = FMath::Max(0.0f, Vitals.MaxHealth - Vitals.Health);
+    Result.HealthHealed = FMath::Min(Requested, MissingHealth);
+    Result.RemainingHealth = Vitals.Health + Result.HealthHealed;
+    Result.Overheal = Requested - Result.HealthHealed;
+
+    if (Request.bOverhealToShield && Result.Overheal > 0.0f && Vitals.MaxShield > 0.0f)
+    {
+        const float ShieldCap = Vitals.MaxShield * FMath::Clamp(Request.OverhealToShieldFraction, 0.0f, 1.0f);
+        const float Headroom = FMath::Max(0.0f, ShieldCap - Vitals.Shield);
+        Result.ShieldGranted = FMath::Min(Result.Overheal, Headroom);
+        Result.RemainingShield = Vitals.Shield + Result.ShieldGranted;
+        // Overheal is still REPORTED at its full value even when some of it
+        // became shield. Support's Charge loop reads Overheal and must generate
+        // nothing from it (Class-Kits §5, criterion 4); netting the shield out
+        // here would quietly hand Support a generation source the design bans.
+    }
+    return Result;
+}
