@@ -1,0 +1,3976 @@
+# Story Source — the owner's Master Sheet (imported 2026-08-14)
+
+**Source:** the owner's Google Doc, imported verbatim below. Re-import it
+rather than editing it here; local edits will be lost and, worse, will make
+this copy disagree with the document the owner is actually writing in.
+
+## SCOPE — read this before citing anything below
+
+The owner's instruction, verbatim: *"the doc is a master doc but it is NOT
+updated with the latest decisions and what not, mostly just used for story
+and enemy architecture."*
+
+So this file is **authoritative for two things only**:
+
+- **STORY** — premise, terminology, the antagonist, world state, what closing
+  a rift does, the collectible, and the campaign's fiction.
+- **ENEMY ARCHITECTURE** — the two families (Vestiges and the Altered),
+  Severance and its stages, militia policy, and the art direction that
+  follows from them.
+
+For **everything else it is HISTORICAL and frequently out of date.** Its
+systems sections predate most of the O-ledger: it still describes item level
+as not existing, stat aggregation as unresolved and blocking, and the
+Rift/Time/Void split under the old "Time" name that O19 renamed to Entropy.
+Several of its numbers were superseded by O18 and O27.
+
+**The authority chain is unchanged** (O28): `Decisions.md` first, then
+`CONTEXT.md`, then `Design-Overview.md`, then the per-domain docs. This file
+sits alongside the per-domain docs for story and enemy fiction, and BELOW all
+of them for anything mechanical. Where this document and a ruling disagree
+about a system, the ruling wins and this document is simply stale.
+
+---
+
+# Fundamentals  
+
+\================================================================================
+
+RIOR'S EDGE — MASTER SHEET
+
+\================================================================================
+
+  
+
+Working codename: Project Breaker
+
+Engine: Unreal Engine 5.8
+
+Last structural update: this import
+
+ 
+
+TAB ORDER
+
+  1  Fundamentals
+
+  2  Gear
+
+  3  Affixes
+
+  4  Loot
+
+  5  Movement
+
+  6  Scaling
+
+  7  Progression
+
+  8  Generic Story
+
+  9  End-Game
+
+  10 Types of Content
+
+  11 Party Play
+
+  12 Weapon Design
+
+  13 NPCS
+
+ 
+
+\================================================================================
+
+1  FUNDAMENTALS
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.1  PREMISE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Rior's Edge is a first-person looter shooter with ARPG progression and MMO
+
+social structure.
+
+ 
+
+Setting: an alternate Earth, roughly one century forward. Interdimensional
+
+rifts have opened across the planet. What comes through them is hostile.
+
+ 
+
+The player is a Breaker: a member of an elite militia that fights what comes
+
+out of the rifts and closes them by entering and clearing what is inside.
+
+ 
+
+The rifts were opened by one person. He is not in this timeline.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.2  TERMINOLOGY — LOCKED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+BREAKER
+
+  A member of the militia. Can be human or Effigy.
+
+ 
+
+EFFIGY
+
+  A machine Breaker. Originally built by Rior as caretakers to inherit the
+
+  planet after humanity. The militia captured a shipment and repurposed
+
+  them. Every Effigy is a machine working against its designed purpose.
+
+ 
+
+VESTIGE
+
+  Formal military term for rift-origin hostiles. Remnants of somewhere else.
+
+ 
+
+SPILL
+
+  Breaker field slang for the same thing, and for the event of a rift
+
+  producing them. "We've got spill in sector four."
+
+ 
+
+THE ALTERED
+
+  Refugees from erased timelines. Hostile only once severed.
+
+ 
+
+SEVERANCE
+
+  Degradation caused by separation from a destroyed timeline. Halted by
+
+  Anchor suppression hardware.
+
+ 
+
+ANCHOR
+
+  A settlement built on rift-suppression hardware. Humanity clusters inside
+
+  the suppression radius. Anchors are the only safe ground.
+
+ 
+
+RIFT
+
+  A breach to another timeline. Closing one requires entering it and
+
+  clearing what holds it open.
+
+ 
+
+THE ORDER
+
+  What they call themselves.
+
+ 
+
+HERETICS
+
+  What everyone else calls them. The naming split is the tell that they are
+
+  not a cult: they chose a plain word and let other people supply the
+
+  insult.
+
+ 
+
+NAMING CONSTRAINTS
+
+  Do not use "Bastion" for settlements. It is already the Tank branch name.
+
+  Do not use "Aberrant" or "Anomalous" for enemies. They are rarity tier
+
+  names and players will conflate them with enemy types.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.3  WORLD STATE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Humanity is not extinct and not thriving. It is holding.
+
+ 
+
+Anchors are small — cities, not nations. Infrastructure exists inside the
+
+suppression radius and degrades rapidly outside it. Global coordination
+
+exists but is thin: the Breakers are the coordination.
+
+ 
+
+Ordinary life continues inside an Anchor. Markets, work, families. The
+
+suppression hardware is visible from everywhere in the city and nobody looks
+
+at it anymore.
+
+ 
+
+Design consequence: the player returns to a functioning place. Vendors,
+
+Forge, and social space are diegetically justified without pretending the
+
+world is fine.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.4  THE ANTAGONIST
+
+\--------------------------------------------------------------------------------
+
+ 
+
+RIOR — scientist, activist, not present.
+
+ 
+
+WHAT HE BUILT
+
+  Rift technology, intended as salvation. Reach into an uninhabited
+
+  timeline, take what a dying biosphere needs, come back. No one has to
+
+  die.
+
+ 
+
+WHAT HAPPENED
+
+  Humanity used it exactly as designed, and then used it more. Dead worlds
+
+  were stripped until the dead worlds were not dead. He watched his species
+
+  do to a hundred other Earths what it had already done to his own.
+
+ 
+
+WHAT HE CONCLUDED
+
+  The problem was never scarcity. He had handed appetite a larger plate.
+
+  Humanity cannot be permitted to reach further than one world.
+
+ 
+
+WHAT HE IS DOING
+
+  Erasing humanity from timelines, sequentially. Not all at once. One at a
+
+  time, working outward.
+
+ 
+
+  This timeline is next. That is what "Rior's Edge" means: the leading edge
+
+  of his advance.
+
+ 
+
+WHY HE CANNOT BE REACHED
+
+  He does not operate from inside this timeline. Rifts are the only
+
+  direction he can be attacked from. This is why Breakers enter them.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.5  WHAT COMES THROUGH — TWO FAMILIES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Rior opened the doors. He did not build what came through them.
+
+ 
+
+FAMILY 1 — VESTIGES
+
+  Genuinely alien. Rift-native. No design intent, no readable anatomy, no
+
+  tactics that resemble a military.
+
+  Art direction: unreadable, non-humanoid, wrong.
+
+ 
+
+FAMILY 2 — THE ALTERED
+
+  Refugees. Survivors of timelines Rior has already erased, who came
+
+  through the rifts ahead of him.
+
+ 
+
+  They are not inherently hostile. What makes them hostile is SEVERANCE.
+
+ 
+
+SEVERANCE
+
+  Being cut off from a timeline that no longer exists. Recent arrivals are
+
+  lucid. The longer a refugee is severed, the further they degrade, until
+
+  nothing is left but the shape.
+
+ 
+
+  Severance is REVERSIBLE inside a functioning Anchor. Suppression hardware
+
+  halts the decay.
+
+ 
+
+  Design consequence: the player fights the ones too far gone and meets the
+
+  ones who are not. This is not an atrocity loop — it is what is left after
+
+  the person is gone.
+
+ 
+
+STAGE AS ART DIRECTION
+
+  How long an Altered has been severed should be readable from the model.
+
+  Early stage still wears insignia, still uses cover, still flinches. Late
+
+  stage does none of these.
+
+ 
+
+MILITIA POLICY
+
+  Stage cannot be reliably identified during a firefight. The standing
+
+  order is therefore engage on sight.
+
+ 
+
+  This is a defensible policy and a horrifying one. It is the specific
+
+  thing the Order attacks.
+
+ 
+
+WHAT THE MILITIA BELIEVES
+
+  Official line: the Altered are caused by an unknown force. From where the
+
+  militia is standing this is true — no lucid Altered has ever survived
+
+  long enough inside an Anchor to explain otherwise.
+
+ 
+
+  The player is the first Breaker to meet one in time.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.6  WHAT CLOSING A RIFT ACTUALLY DOES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Closing a rift does not seal a door. It closes a gap in time. The timeline
+
+behind it, and everyone in it, never existed.
+
+ 
+
+This is the most important fact in the setting and the player does not learn
+
+it at the start.
+
+ 
+
+RETROACTIVITY — BOUNDED
+
+  Erasure removes the timeline going forward and severs the connection.
+
+  Events that already happened in THIS timeline remain happened. Altered
+
+  who already came through still came through. Breakers who died fighting
+
+  them still died.
+
+ 
+
+  Rior's method is surgical, not clean. Do not extend erasure into full
+
+  retroactivity — it is a paradox engine and it will eat the fiction.
+
+ 
+
+WHO KNOWS
+
+  Rior knows. It is why he uses the method.
+
+  Kess may know.
+
+  Vosk almost certainly worked it out and said nothing.
+
+  Command's position on this is deliberately unresolved. See NPCS.
+
+ 
+
+DESIGN CONSEQUENCE
+
+  The player has been closing rifts since level one. Every closure erased a
+
+  world. The question stops being "who is Rior" and becomes "how am I
+
+  different from him."
+
+ 
+
+  He erases timelines to protect one world. So does the militia. He is
+
+  simply the only one who says so.
+
+ 
+
+  Nobody should state this out loud in the game.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.7  THE COLLECTIBLE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Story progression is driven by recovering fragments of Rior's technology.
+
+ 
+
+Each reconstructed fragment unlocks a real player capability: deeper rift
+
+access, a Forge capability, a traversal tool.
+
+ 
+
+Design consequence: every step toward understanding Rior is a step toward
+
+being able to do what he does. The player is reassembling the machine that
+
+ended a hundred Earths. The game should never state this out loud.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+1.8  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] One primary Anchor, or a network? Network is truer to the fiction and
+
+    worse for MMO population density. Recommend one primary with the rest
+
+    as lore and fast-travel destinations.
+
+ 
+
+\[ \] Does the player character have a voice and a history, or are they a
+
+    cipher? Cipher is the MMO default; a responsive character serves the
+
+    Survivor NPC and the final choice substantially better.
+
+ 
+
+\[ \] What does Rior want with the player specifically? He should notice
+
+    them at some point in Act III. If he never does, he is scenery.
+
+ 
+
+\[ \] Do Effigies have legal personhood inside an Anchor?
+
+ 
+
+\[ \] What powers an Anchor's suppression field, and can it fail?
+
+ 
+
+\[ \] DEFERRED — Anchor refugee capacity as a real system. Recorded, not
+
+    designed. Do not build before the campaign is being constructed.
+
+ 
+
+ 
+
+\================================================================================
+
+2  GEAR
+
+\================================================================================  
+
+# Gear  
+
+\================================================================================
+
+2  GEAR
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.1  SLOT LIST
+
+\--------------------------------------------------------------------------------
+
+ 
+
+8 equipment slots. 6 armour/accessory + 2 weapons.
+
+ 
+
+  HELMET          Perception, targeting, ability uptime, find
+
+  BODY ARMOUR     Raw survivability, shields, mitigation
+
+  GLOVES          Handling, attack speed, crit, melee
+
+  BOOTS           Movement — the deepest pool in the game
+
+  NECKLACE        Wildcard amplifier, skill points, elemental
+
+  WAIST           Ammo, resource, sustain, consumables
+
+  PRIMARY         Commitment — sustained output, magazine, range
+
+  SECONDARY       Tempo — burst, swap speed, on-swap triggers
+
+ 
+
+Slot codes used throughout: HELM, BODY, GLOV, BOOT, NECK, WAIST, P1, P2.
+
+ALL = rolls on every slot.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.2  THE THREE BINDING RULES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+RULE 1 — UNIVERSAL CORE
+
+  Seven affixes roll on every slot: Health, Resource, Maximum Resource,
+
+  Movement Speed, Drop Chance, Physical Damage Reduction, Elemental Damage
+
+  Reduction.
+
+  Purpose: no slot is ever dead for any build.
+
+ 
+
+RULE 2 — SLOT EXCLUSIVES
+
+  Each slot owns 3-5 affixes nothing else can roll. This is the main lever
+
+  for build identity. A player chasing a specific build knows exactly which
+
+  slot to farm.
+
+ 
+
+RULE 3 — NECKLACE IS THE WILDCARD
+
+  Necklace can roll from any pool, but capped one tier below the ceiling
+
+  (max T0, never T-1). Waist is the secondary flex slot — resource, ammo
+
+  and sustain from any source, no tier penalty.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.3  SLOT EXCLUSIVES — QUICK REFERENCE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  HELMET      Headshot Damage %
+
+              Cooldown Reduction %
+
+              Accuracy While Airborne % (shared exclusive with GLOV)
+
+ 
+
+  BODY        Shield Capacity
+
+ 
+
+  GLOVES      Accuracy While Airborne % (shared exclusive with HELM)
+
+ 
+
+  BOOTS       Slide-into-Slide (chain window)
+
+ 
+
+  NECKLACE    (no exclusives — wildcard access instead)
+
+ 
+
+  WAIST       Ammo Reserve %
+
+ 
+
+  PRIMARY     Damage Ramp / Magazine Size % / Effective Range %
+
+              Sustained Fire Accuracy % / Pierce
+
+ 
+
+  SECONDARY   Weapon Swap Speed % / Damage on Swap-In
+
+              Sprint-to-Fire Time % / Reload on Swap-Out
+
+              Ammo Returned on Kill
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.4  PRIMARY vs SECONDARY DESIGN INTENT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+PRIMARY = COMMITMENT
+
+  Rewards staying on one gun. Ramping damage, large magazines, range,
+
+  accuracy under sustained fire. Peak sustained DPS lives here.
+
+  Weakness: dead time during reloads, no burst windows.
+
+ 
+
+SECONDARY = TEMPO
+
+  Rewards cycling weapons. Swap speed, on-swap damage windows, free
+
+  reloads. Highest burst in the game.
+
+  Weakness: never reaches Primary's sustained ceiling.
+
+ 
+
+KEYSTONE INTERACTION
+
+  Reload on Swap-Out at T-1 refunds 100% of the magazine. Combined with
+
+  Damage on Swap-In this creates a genuine two-weapon rotation rather than
+
+  one gun with a backup.
+
+ 
+
+Neither archetype strictly dominates. That is the intent.
+
+ 
+
+BLOCKED: no weapon swap system exists yet. Secondary exclusives are
+
+unbuildable until one does.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.5  PREFIX / SUFFIX SPLIT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Every affix is tagged PREFIX or SUFFIX.
+
+ 
+
+  PREFIX  = Offense, movement, handling, utility
+
+  SUFFIX  = Defense, resource, sustain, find
+
+ 
+
+Maximum 4 prefixes and 4 suffixes on any item, within the 7 affix ceiling.
+
+ 
+
+Purpose: stops 7-affix items from being pure glass cannons, and gives
+
+crafting a clean grammar — "I need a suffix slot open."
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+2.6  LAYER OWNERSHIP — READ BEFORE ADDING ANY AFFIX
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Class trees, the Core Tree, and affixes can all express "the player is
+
+better at something." Without a rule they become three competing ways to
+
+author the same modifier.
+
+ 
+
+  CLASS LAYER    Resource loops and identity mechanics.
+
+  TREE LAYER     Grants the few remaining verbs, and rewrites rules.
+
+  AFFIX LAYER    Scales verbs the player already owns.
+
+ 
+
+THE BASE KIT — available to every character from level one:
+
+  Walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, block,
+
+  dodge.
+
+ 
+
+  No class or constellation unlocks these. They only improve them.
+
+ 
+
+TREE-GRANTED VERBS — the complete current list:
+
+  Air jump (Kinesis)
+
+  Parry (Bulwark)
+
+ 
+
+THE TEST
+
+  For any proposed affix: does this do anything if the player has not
+
+  bought the corresponding tree node? If the affix grants the capability
+
+  rather than scaling it, it belongs in a tree.
+
+ 
+
+DIVIDING THE DEFENSIVE SPACE
+
+  Affixes own raw percentages and stamina economy.
+
+  Trees own rule changes and quality — i-frames, parry, dodge refunds.
+
+  Classes own the fantasy — Tank converts mitigation to Grit, Swift
+
+  converts evasion to Momentum.
+
+ 
+
+FORBIDDEN
+
+  Affixes must not grant air jump, parry, or any future verb.
+
+  Affixes must not scale the shared stamina pool without a cap.
+
+  Core Tree nodes must not outperform the class branch they overlap.
+
+  Class mechanics must not be reproducible through affix stacking.
+
+ 
+
+CONSEQUENCE FOR THE TREE LAYER
+
+  With almost no verbs left to grant, constellations must earn their weight
+
+  through rule rewrites. A node that reads as a flat percentage is doing
+
+  the affix layer's job.
+
+  
+  
+
+# Affixs  
+
+\================================================================================
+
+3  AFFIXES
+
+\================================================================================
+
+ 
+
+Value notation: T8 -\> T1 -\> T-1. Interpolate intermediate tiers along the
+
+curve in section 3.1.
+
+ 
+
+ALL VALUES ARE PLACEHOLDER. They were authored before a real time-to-kill
+
+existed. Re-anchor them after the Playtest Gym feedback pass.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.1  TIER SCALE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Ten tiers. T8 is worst, T-1 is best.
+
+ 
+
+  T8 - T5     Leveling. Drops everywhere.
+
+  T4 - T2     Mid / late campaign. Item-level gated.
+
+  T1          Endgame drops. Common crafting target.
+
+  T0          Rare natural roll. Visibly marked on the item.
+
+  T-1         NEVER DROPS NATURALLY. Sources: corrupting or exalting an
+
+              existing T0, boss-specific reward tables, or a consumable.
+
+ 
+
+Why T-1 cannot drop: it keeps T0 items valuable as raw material rather than
+
+making them a consolation prize.
+
+ 
+
+VALUE CURVE
+
+  Roughly linear from T8 to T1, then a deliberate spike:
+
+    T0  = \~1.40x the T1 value
+
+    T-1 = \~1.80x the T1 value
+
+  The spike is what makes players care about the last two tiers.
+
+ 
+
+TIER GATING
+
+  Item level gates which tiers can roll.
+
+  Rarity soft-caps the tier ceiling. See the Loot tab.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.2  UNIVERSAL CORE — rolls on ALL slots
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  AFFIX                            T8 -\> T1 -\> T-1              TYPE
+
+  ------------------------------------------------------------------------
+
+  Health                           +25 -\> +180 -\> +320          SUFFIX
+
+  Resource (regen /s)              +0.5 -\> +3 -\> +5.5           SUFFIX
+
+  Maximum Resource                 +8 -\> +45 -\> +80             SUFFIX
+
+  Movement Speed %                 2% -\> 8% -\> 13%              PREFIX
+
+  Drop Chance %                    3% -\> 14% -\> 25%             SUFFIX
+
+  Physical Damage Reduction %      2% -\> 8% -\> 14%              SUFFIX
+
+  Elemental Damage Reduction %     2% -\> 8% -\> 14%              SUFFIX
+
+ 
+
+BLOCKED: Elemental Damage Reduction cannot ship until a resistance model
+
+exists in the damage pipeline. Combat-Foundation currently has Armor only.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.3  MOVEMENT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+The genre pillar. Deepest pool in the game. All PREFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Air Control %                    BOOT, NECK         5% -\> 22% -\> 38%
+
+  Air Acceleration %               BOOT               4% -\> 18% -\> 32%
+
+  Slide Speed %                    BOOT, WAIST        5% -\> 20% -\> 35%
+
+  Slide Momentum Retention %       BOOT               6% -\> 28% -\> 48%
+
+  Slide Duration %                 BOOT, WAIST        5% -\> 22% -\> 38%
+
+  Slide-into-Slide Window          BOOT (excl)        +0.1s -\> +0.4s -\> +0.7s
+
+  Dash Charges                     BOOT, NECK         +1 (T2-T0), +2 (T-1)
+
+  Dash Cooldown Reduction %        BOOT, GLOV         4% -\> 18% -\> 30%
+
+  Dash Distance %                  BOOT               5% -\> 20% -\> 34%
+
+  Jump Height %                    BOOT, BODY         4% -\> 16% -\> 28%
+
+  Wall-Run Duration %              BOOT, GLOV         6% -\> 26% -\> 45%
+
+  Mantle / Vault Speed %           GLOV, BOOT         6% -\> 25% -\> 42%
+
+  Strafe Speed % (while firing)    BOOT, P1, P2       4% -\> 18% -\> 30%
+
+  Sprint-to-Fire Time %            GLOV, WAIST        5% -\> 22% -\> 38%
+
+  Fall Damage Reduction %          BOOT, BODY         10% -\> 50% -\> 100%
+
+  Air Jump Speed Retention %       BOOT, NECK         5% -\> 22% -\> 38%
+
+ 
+
+REMOVED — Additional Air Jump. Air jump is a Kinesis verb unlock, not an
+
+affix. The retention affix above scales it for players who own it.
+
+ 
+
+REMOVED — Momentum -\> Damage Conversion. Reintroduces the Godot velocity
+
+economy the project deliberately walked away from.
+
+ 
+
+CONFLICT — Slide Momentum Retention
+
+  Movement-Design states wall riding must not generate speed and forward
+
+  movement must not self-accelerate beyond sprint. High retention values
+
+  approach chained-slide perpetual motion.
+
+  Decide: cap below the chaining threshold on all rarities, or allow only
+
+  Anomalous to exceed it as a designed exception recorded in Movement.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.4  WEAPON HANDLING
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Reload Speed %                   GLOV, WAIST, P1,P2 6% -\> 26% -\> 45%
+
+  ADS Speed %                      GLOV, P1, P2       6% -\> 25% -\> 42%
+
+  Recoil Control %                 GLOV, P1, P2       5% -\> 22% -\> 38%
+
+  Accuracy While Airborne %        GLOV, HELM (excl)  8% -\> 40% -\> 70%
+
+  Projectile Speed %               P1, P2             6% -\> 25% -\> 42%
+
+  Ricochet Chance %                P1, P2, GLOV       3% -\> 12% -\> 20%
+
+  Ammo Reserve %                   WAIST (excl)       8% -\> 35% -\> 60%
+
+  Maximum Ammo                     WAIST, P1, P2      +2 -\> +12 -\> +20
+
+ 
+
+DESIGN NOTE — Accuracy While Airborne
+
+  The single affix that most sells "movement FPS". It is what lets a player
+
+  build for fighting off the ground instead of stopping to shoot. Treat as
+
+  a marquee stat and make it visually obvious on the item.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.5  OFFENSE — DIRECT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Weapon Damage %                  GLOV, NECK, P1,P2  4% -\> 22% -\> 40%
+
+  Melee Damage %                   GLOV, NECK, WAIST  5% -\> 26% -\> 46%
+
+  Flat Damage                      GLOV, P1, P2       +2 -\> +14 -\> +26
+
+  Attack Speed %                   GLOV, NECK, P1,P2  3% -\> 13% -\> 22%
+
+  Multishot                        P1, P2             +1 (T8-T3)
+
+                                                      +2 (T2-T0)
+
+                                                      +3 (T-1)
+
+  Area of Effect %                 NECK, HELM, P1,P2  5% -\> 20% -\> 35%
+
+  Ability Duration %               HELM, NECK         4% -\> 18% -\> 30%
+
+ 
+
+DESIGN NOTE — Multishot
+
+  Deliberately NOT a smooth curve. Discrete jumps make it a build pivot
+
+  rather than a stat stick. Weapons only. Should multiply with nothing.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.6  CRIT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Crit Chance %                    GLOV, NECK, P1,P2  2% -\> 10% -\> 18%
+
+  Crit Damage %                    GLOV, NECK, P1,P2  8% -\> 35% -\> 60%
+
+  Headshot Damage %                HELM (excl), P1,P2 6% -\> 30% -\> 52%
+
+  Crit Chance vs Ailing Enemies    GLOV, NECK         3% -\> 14% -\> 24%
+
+  Guaranteed Crit After Reload     P1, P2 (rare)      1 shot (T1-T0)
+
+                                                      2 shots (T-1)
+
+ 
+
+RESOLVED — Chance to Deal Double Damage is CUT.
+
+  Combat-Foundation already ships CriticalChance and CriticalMultiplier.
+
+  A second independent multiplier duplicates the crit mechanic and is the
+
+  multiplicative-explosion risk listed first in the progression
+
+  architecture. Do not reintroduce it.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.7  AILMENTS / SUSTAINED DAMAGE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Damage Over Time %               NECK, GLOV, P1,P2  6% -\> 30% -\> 55%
+
+  Tick Frequency %                 NECK, HELM         4% -\> 18% -\> 32%
+
+  Bleed Chance %                   GLOV, P1, P2       4% -\> 18% -\> 30%
+
+  Bleed Damage %                   GLOV, NECK, P1,P2  6% -\> 28% -\> 50%
+
+  Ignite Chance %                  NECK, P1, P2       4% -\> 18% -\> 30%
+
+  Chill / Slow Potency %           NECK, BOOT         5% -\> 22% -\> 38%
+
+  Shock Chance %                   NECK, P1, P2       4% -\> 18% -\> 30%
+
+  Poison Stacks                    NECK, P1, P2       +1 -\> +4 -\> +7
+
+  Ailment Duration %               NECK, HELM         5% -\> 24% -\> 42%
+
+  Ailment Spreads on Kill          NECK (rare)        20% -\> 60% -\> 100%
+
+ 
+
+BLOCKED: every elemental line (Ignite, Chill, Shock) waits on a resistance
+
+model. Bleed and Poison are physical and can ship earlier.
+
+ 
+
+DESIGN NOTE — Tick Frequency
+
+  The most dangerous affix in the game. It multiplies with Damage Over Time
+
+  and doubles as a raw DPS stat.
+
+  Mitigation: hard cap total Tick Frequency at \~40%, or round to discrete
+
+  tick intervals so stacking has diminishing steps.
+
+  Also unresolved: is tick interval part of the DoT snapshot, or read live
+
+  per tick? Snapshot is more consistent with the existing contract.
+
+ 
+
+DESIGN NOTE — Bleed
+
+  Pairs naturally with melee and crit. Bleed SOURCES live on Gloves and
+
+  weapons; bleed SCALING lives on Necklace. This creates a clean two-piece
+
+  requirement for the archetype.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.8  DEFENSE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All SUFFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Shield Capacity                  BODY (excl), NECK  +20 -\> +140 -\> +250
+
+  Shield Recharge Rate %           BODY, WAIST        6% -\> 28% -\> 48%
+
+  Shield Recharge Delay Reduction  BODY, WAIST        5% -\> 25% -\> 42%
+
+  Armour                           BODY, HELM         +15 -\> +100 -\> +180
+
+  Block %                          BODY, GLOV, WAIST  2% -\> 9% -\> 15%
+
+  Dodge %                          BOOT, GLOV, WAIST  2% -\> 9% -\> 15%
+
+  Damage Reduction While Airborne  BODY, BOOT         3% -\> 14% -\> 24%
+
+  Damage Reduction While Sliding   BOOT, WAIST        3% -\> 14% -\> 24%
+
+  Stagger / Knockback Resistance   BODY, WAIST        8% -\> 35% -\> 60%
+
+  Thorns / Reflect                 BODY, GLOV         +3 -\> +20 -\> +36
+
+ 
+
+MOVED TO TREE-ONLY — Dodge I-Frame Duration.
+
+  Highest-leverage defensive quantity in the game. A random roll on it
+
+  makes survivability unpredictable for encounter design.
+
+ 
+
+DESIGN NOTE — Separating DR / Block / Dodge
+
+  These three overlap heavily. Give each a different failure mode:
+
+    DR     — passive, always on, no counterplay, lowest ceiling
+
+    BLOCK  — requires a shield or stance, works FRONTALLY only
+
+    DODGE  — full negation roll, also refunds a small amount of resource
+
+  Without differentiation players stack whichever has the best numbers.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.9  SUSTAIN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All SUFFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Health Regen /s                  BODY, WAIST        +1 -\> +7 -\> +13
+
+  Life on Hit                      GLOV, NECK         +1 -\> +6 -\> +11
+
+  Life on Kill                     WAIST, NECK        +5 -\> +35 -\> +62
+
+  Resource on Kill                 HELM, WAIST        +2 -\> +12 -\> +21
+
+  Resource on Damage Taken         BODY, WAIST        +1 -\> +8 -\> +14
+
+  Resource Cost Reduction %        HELM, NECK         3% -\> 14% -\> 24%
+
+  Ammo Returned on Kill            WAIST, P1, P2      +1 -\> +4 -\> +7
+
+ 
+
+BLOCKED: any affix touching the shared stamina pool or its regeneration
+
+needs a cap defined first. Universal block and dodge mean every character
+
+spends from the pool, so uncapped gear scaling erases the intended
+
+Bulwark/Kinesis tradeoff.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.10  UTILITY & FIND
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Cooldown Reduction and Skill Point are PREFIX. Remainder SUFFIX.
+
+ 
+
+  AFFIX                            SLOTS              T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Cooldown Reduction %             HELM (excl), NECK  3% -\> 15% -\> 26%
+
+  Pickup Radius %                  HELM, WAIST        10% -\> 45% -\> 80%
+
+  Currency / Material Find %       HELM, NECK         3% -\> 14% -\> 25%
+
+  Experience Gain %                HELM, NECK         3% -\> 14% -\> 25%
+
+  Interaction & Revive Speed %     GLOV, WAIST        8% -\> 35% -\> 60%
+
+  Skill Point                      NECK, HELM         +1 (T2-T0)
+
+                                                      +2 (T-1 ONLY)
+
+ 
+
+DESIGN NOTE — Skill Point
+
+  Should NOT have ten tiers. Two-state affix existing only at the top of
+
+  the range. Same logic as Multishot.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.11  PRIMARY EXCLUSIVES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX.
+
+ 
+
+  AFFIX                            T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Damage Ramp                      0.5% -\> 2% -\> 3.5% per stack
+
+    (per consecutive hit,           Maximum 10 stacks
+
+     resets on swap)
+
+  Magazine Size %                  8% -\> 35% -\> 60%
+
+  Effective Range %                5% -\> 22% -\> 38%
+
+  Sustained Fire Accuracy %        4% -\> 18% -\> 30%
+
+  Pierce                           +1 (T4-T0), +2 (T-1)
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.12  SECONDARY EXCLUSIVES — BLOCKED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All PREFIX. None of these can ship until a weapon swap system exists.
+
+ 
+
+  AFFIX                            T8 -\> T1 -\> T-1
+
+  ------------------------------------------------------------------------
+
+  Weapon Swap Speed %              6% -\> 28% -\> 48%
+
+  Damage on Swap-In (first 2s)     8% -\> 35% -\> 60%
+
+  Sprint-to-Fire Time %            5% -\> 22% -\> 38%
+
+  Reload on Swap-Out (% of mag)    10% -\> 45% -\> 100%
+
+  Ammo Returned on Kill            +1 -\> +4 -\> +7
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.13  SHARED WEAPON POOL — P1 and P2 both
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  Weapon Damage %          Crit Chance %            Bleed Chance %
+
+  Flat Damage              Crit Damage %            Ignite Chance %
+
+  Attack Speed %           Headshot Damage %        Shock Chance %
+
+  Multishot                Recoil Control %         Bleed Damage %
+
+  Projectile Speed %       ADS Speed %              Ailment Damage %
+
+  Reload Speed %           Strafe Speed %           Ammo Reserve %
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.14  THE VERTICAL SLICE SUBSET — BUILD THIS FIRST
+
+\--------------------------------------------------------------------------------
+
+ 
+
+The roadmap asks for one movement-affecting affix per weapon archetype.
+
+Twelve affixes is enough to prove the entire pipeline. If it works at
+
+twelve it works at ninety.
+
+ 
+
+  The universal core seven (section 3.2, minus Elemental DR until
+
+  resistances exist — six for now)
+
+  Three movement affixes, one per weapon archetype
+
+  Crit Chance and Crit Damage, to exercise the path that already exists
+
+ 
+
+Do not author the full pool before the pipeline runs.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+3.15  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Stat aggregation buckets — additive vs multiplicative, and GAS modifier
+
+    ordering. Must be decided BEFORE authoring affix content.
+
+\[ \] Tick Frequency cap — hard percentage, or discrete intervals
+
+\[ \] Is tick interval part of the DoT snapshot?
+
+\[ \] Slide Momentum Retention threshold, and whether Anomalous may cross it
+
+\[ \] Whether Block requires a shield item or is a stance
+
+\[ \] Stamina pool scaling cap
+
+\[ \] Whether Necklace's one-tier penalty applies to universal core affixes
+
+    or only to borrowed slot-exclusive rolls
+
+ 
+
+  
+  
+  
+
+# Loot  
+
+\================================================================================
+
+4  LOOT
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.1  RARITY TIERS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  1  STANDARD      White
+
+  2  UNCOMMON      Blue
+
+  3  EXCEPTIONAL   Purple
+
+  4  ABERRANT      Red      — maximum 3 equipped
+
+  5  ANOMALOUS     Teal     — maximum 1 equipped
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.2  RARITY -\> AFFIX BUDGET
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Hard ceiling of 7 affixes on any item. The budget is the rarity fantasy.
+
+ 
+
+  RARITY        ROLLED   FIXED           TIER CAP   ROLE
+
+  ------------------------------------------------------------------------
+
+  Standard      1-2      —               T3         Crafting fodder
+
+  Uncommon      2-3      —               T1         Early progression
+
+  Exceptional   3-5      —               T-1        The real endgame base
+
+  Aberrant      4-6      1 signature     T-1        Max 3 equipped
+
+  Anomalous     5-6      1-2 defining    T-1        Max 1 equipped
+
+ 
+
+TWO SEPARATE KNOBS
+
+  Rarity gates AFFIX COUNT.
+
+  Item level gates AFFIX TIER.
+
+  Rarity ALSO soft-caps the tier ceiling, per the column above.
+
+ 
+
+Why cap low rarities: without it, white items become lottery tickets and
+
+undercut the colour hierarchy. Standard and Uncommon must stay fodder.
+
+ 
+
+Exceptional is deliberately uncapped and can reach 7 affixes through
+
+crafting. It is the item players are actually farming.
+
+ 
+
+Aberrant and Anomalous spend part of their budget on fixed signatures. They
+
+are not "more affixes" — they are rule-changers with an equip cost.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.3  ROLL PIPELINE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  STEP 1   Roll rarity -\> affix count range and tier cap
+
+  STEP 2   Roll affix count within that range
+
+  STEP 3   Roll each affix from the slot's valid pool
+
+             no duplicates, weighted, respect prefix/suffix cap of 4 each
+
+  STEP 4   Roll tier per affix
+
+             item level gated, rarity cap applied, weighted toward the low
+
+             end so T1+ feels earned
+
+  STEP 5   Roll value within the tier band
+
+  STEP 6   Apply fixed signature affixes (Aberrant / Anomalous only)
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.4  AFFIX WEIGHT CLASSES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+COMMON      Core stats — Health, Weapon Damage, Resource, DR, Flat Damage,
+
+            Max Resource, Max Ammo, Melee Damage, DoT %.
+
+ 
+
+UNCOMMON    Specialised but broadly useful — Attack Speed, AoE, Ability
+
+            Duration, Block, Dodge, Movement Speed, Drop Chance, most
+
+            handling and movement affixes.
+
+ 
+
+RARE        High leverage, tightly controlled — Tick Frequency, Ailment
+
+            Spread, Guaranteed Crit After Reload.
+
+ 
+
+EXOTIC      Build pivots. Discrete values, not curves — Multishot, Skill
+
+            Point, Dash Charges. Lowest weight in the game.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.5  ABERRANT (RED) — SIGNATURE AFFIXES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Maximum 3 equipped. Each carries one fixed signature that appears in no
+
+random pool.
+
+ 
+
+Signatures should combine two systems rather than amplify one:
+
+ 
+
+  "Swapping weapons refunds a dash charge."
+
+  "Sliding applies Bleed to enemies you pass through."
+
+  "Air jumps reload your Secondary."
+
+  "Crits reduce all cooldowns by 0.5s."
+
+  "Dodging leaves a slow field at your origin point."
+
+ 
+
+Signature affixes are NOT tiered. Binary — you have it or you don't.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.6  ANOMALOUS (TEAL) — BUILD DEFINING
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Maximum 1 equipped. Carries 1-2 fixed affixes that REWRITE A RULE rather
+
+than modify a number.
+
+ 
+
+Design test: if the affix could be expressed as a percentage, it does not
+
+belong on an Anomalous.
+
+ 
+
+  "You cannot regenerate shields. Your maximum health is doubled."
+
+  "Slide momentum retention is uncapped."
+
+  "Your Primary has no magazine. It never reloads. Damage is halved."
+
+  "Damage over time ticks once. It deals its full duration instantly."
+
+  "You have no Secondary slot. Your Primary rolls two additional affixes."
+
+ 
+
+Because only one may be equipped, each Anomalous should imply an entire
+
+build rather than slot into an existing one.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.7  CRAFTING TOUCHPOINTS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Crafting closes the gap between a good drop and a finished item. All
+
+crafting is Forge-gated, consistent with the locked respec decision.
+
+ 
+
+  ADD AFFIX        Fill an empty slot. Respects prefix/suffix caps.
+
+  REROLL VALUE     Reroll within the existing tier band. Cheap.
+
+  UPGRADE TIER     Move one affix up one tier. Expensive, escalating.
+
+                   Cannot reach T-1.
+
+  EXALT / CORRUPT  The ONLY route to T-1. Consumes a T0 affix. Should carry
+
+                   a failure or downside chance so T0 items retain material
+
+                   value.
+
+  DIVINE ORDER     Reroll which affixes are present, keeping the count.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.8  PREREQUISITES BEFORE ANY LOOT WORK
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Three things do not exist yet and are cheap now, miserable to retrofit:
+
+ 
+
+  ITEM LEVEL
+
+    One integer on generated instances, a source (enemy level, zone, or
+
+    both), and an ilvl -\> available tier mapping. The entire tier-gating
+
+    scheme assumes this exists. It does not.
+
+ 
+
+  STAT AGGREGATION BUCKETS
+
+    Additive vs multiplicative, and GAS modifier ordering. This is where
+
+    the multiplicative-explosion risk is actually managed.
+
+ 
+
+  ITEM INSTANCE + EQUIPMENT
+
+    Weapon-Foundation gestures at it: a generated item instance referencing
+
+    a definition and carrying rolled affixes separately. Needs building,
+
+    plus 8 equipment slots and a stat recalculation path.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+4.9  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Item level source — enemy level, zone, or both
+
+\[ \] Whether Aberrant's 3-equipped limit is global or per-slot-chosen
+
+\[ \] Drop rate targets, which cannot be set before a real TTK exists
+
+\[ \] Whether crafting materials are a separate currency or item-derived
+
+  
+  
+
+# Movement  
+
+\================================================================================
+
+5  MOVEMENT
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.1  PRODUCT INTENT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Movement gives players expressive positioning, recovery, and route choice
+
+without becoming the entire challenge or invalidating weapons, enemies, and
+
+arenas.
+
+ 
+
+A player using ordinary run, sprint, jump, and cover remains viable.
+
+Advanced movement rewards awareness without being mandatory for baseline
+
+combat effectiveness.
+
+ 
+
+Grapple and tether mechanics are excluded from scope.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.2  BASE KIT — LOCKED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Every character has these from level one. No class or constellation unlocks
+
+them.
+
+ 
+
+  Walk, sprint, jump, crouch
+
+  Dash
+
+  Slide
+
+  Wall ride and wall jump
+
+  Block
+
+  Dodge
+
+ 
+
+Trees and affixes scale these actions. Affixes own raw percentages and
+
+stamina economy; trees own rule changes and quality such as i-frame
+
+duration and parry.
+
+ 
+
+TREE-GRANTED VERBS — the complete list:
+
+  Air jump (Kinesis)
+
+  Parry (Bulwark)
+
+ 
+
+Dash is base kit. Swift and Kinesis improve it; neither unlocks it.
+
+Block and Dodge are universal. Certain classes use them better.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.3  CURRENT BASELINE VALUES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Initial editor-test values, not promises. Tune in the context of aiming,
+
+incoming attacks, encounter distances, and readable enemy behavior.
+
+ 
+
+  Walk           650 cm/s
+
+  Sprint         950 cm/s
+
+  Jump           700 cm/s, slightly increased gravity
+
+  Air control    Moderate and forgiving; not Quake-style speed generation
+
+  Dash           Redirects momentum, 1250 cm/s floor plus small bonus,
+
+                 2.5s prototype cooldown
+
+  Slide          Requires 750 cm/s, small deterministic entry push, brakes
+
+                 naturally, restrained downhill acceleration
+
+  Wall ride      0.85s maximum, minimum 700 cm/s, reduced gravity, no
+
+                 passive speed gain, loss-of-contact exit, controlled wall
+
+                 jump
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.4  GUARDRAILS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  Ordinary forward movement must not self-accelerate beyond sprint speed.
+
+  Wall riding preserves flow but must not generate speed.
+
+  Dash should solve a positioning problem, not become the fastest way to
+
+    travel everywhere.
+
+  Sliding should have a clear beginning and end on flat ground.
+
+  Advanced movement cannot be required to land routine weapon shots or
+
+    avoid every baseline enemy attack.
+
+  Camera roll, FOV changes, and shake must be subtle and configurable.
+
+  Level design should offer movement opportunities without punishing
+
+    players who use conventional routes.
+
+ 
+
+KNOWN TENSION
+
+  Slide Momentum Retention as an affix approaches chained-slide perpetual
+
+  motion at high values. Either cap it below the chaining threshold on all
+
+  rarities, or allow only Anomalous to exceed it — and if so, record that
+
+  exception here as a designed choice rather than a contradiction.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.5  UNRESOLVED — DASH MODEL
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Two models are recorded in project documentation and they disagree.
+
+ 
+
+  Godot audit          2 charges, 7s recharge, redirects velocity, output
+
+                       speed max(current, 21 m/s) + 2 m/s, refreshes air
+
+                       jumps
+
+  Current Unreal       1 dash, 2.5s cooldown
+
+ 
+
+Dash is scheduled to move into GAS. Move the FINAL model, not the
+
+placeholder. Decide after the Playtest Gym feedback pass, because this is a
+
+feel question.
+
+ 
+
+Note: Dash Charges is now a legal affix, which means the base charge count
+
+matters for affix scaling.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+5.6  TESTING QUESTIONS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  Can a new player fight effectively using only standard FPS controls?
+
+  Does advanced movement create tactical choices rather than mandatory
+
+    repetition?
+
+  Can the player track targets while sprinting, sliding, and immediately
+
+    after dashing?
+
+  Do rooms retain meaningful cover and distance when traversal abilities
+
+    are available?
+
+  Is movement still readable from an enemy or observer perspective?
+
+  
+  
+
+# Scaling  
+
+\================================================================================
+
+6  SCALING
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.1  DAMAGE RESOLUTION ORDER
+
+\--------------------------------------------------------------------------------
+
+ 
+
+All weapons, abilities, statuses, hazards, and enemies submit the same
+
+damage request contract.
+
+ 
+
+  1. Base damage and source scaling
+
+  2. Weak-point multiplier when applicable
+
+  3. Critical roll, or previously snapshotted critical result
+
+  4. Armour mitigation and penetration
+
+  5. Shield routing unless explicitly bypassed
+
+  6. Remaining damage to health
+
+  7. Shield-break, damage, and death events
+
+ 
+
+True Damage bypasses armour but does not automatically bypass shields.
+
+Shield bypass is an independent rule so status and ability behavior stays
+
+explicit.
+
+ 
+
+MISSING STEP: there is no elemental resistance step. Combat-Foundation has
+
+Armor only. This blocks every elemental affix and the Elements
+
+constellation.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.2  ARMOUR
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Mitigation uses EffectiveArmor / (EffectiveArmor + 100), capped at 80%.
+
+Flat armour penetration reduces effective armour before the formula.
+
+ 
+
+Prototype values. Should move into a combat policy Data Asset.
+
+ 
+
+Physical shield-bypassing DoTs — currently Bleed and Poison — receive half
+
+the normal armour mitigation. This implements "ignore shields, halved
+
+versus armour" without a second damage pipeline.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.3  CRITICAL POLICY
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Critical hits are the only damage multiplier of their kind. CriticalChance
+
+and CriticalMultiplier are the single source of truth.
+
+ 
+
+An earlier itemization draft proposed a separate "chance to deal double
+
+damage" affix. CUT. A second independent multiplier duplicates the critical
+
+mechanic and stacking two of them is the first-listed balance risk in the
+
+progression architecture.
+
+ 
+
+Do not reintroduce a parallel multiplier through affixes, nodes, or class
+
+mechanics without revisiting this section.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.4  DOT SNAPSHOTS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+When a snapshotting DoT is applied it captures source power, critical
+
+chance and multiplier, DoT multiplier, source tags, and one critical result.
+
+Every tick uses that stored result and does not change when the source
+
+equips another item or receives a temporary buff.
+
+ 
+
+An individual application either critically ticks for its full lifetime or
+
+does not.
+
+ 
+
+DoT ticks carry a proc coefficient. They must not trigger arbitrary on-hit
+
+effects unless those effects declare DoT compatibility.
+
+ 
+
+OPEN: is tick interval part of the snapshot, or read live per tick?
+
+Snapshot is more consistent with the existing contract.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.5  ITEM LEVEL — DOES NOT EXIST YET
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Required before any loot work.
+
+ 
+
+  One integer on generated item instances
+
+  A source: enemy level, zone, or both
+
+  A mapping from item level to available affix tiers
+
+ 
+
+The entire tier-gating scheme in the Affixes and Loot tabs assumes this
+
+exists.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.6  STAT AGGREGATION — UNRESOLVED, BLOCKING
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Additive vs multiplicative buckets, and GAS modifier ordering, must be
+
+decided before affix content is authored. Retrofitting this is extremely
+
+expensive.
+
+ 
+
+This is where the multiplicative-explosion risk is actually managed. Every
+
+proc needs a coefficient and a recursion rule.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+6.7  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Elemental resistance model — one stat or per-element
+
+\[ \] Enemy level scaling curve
+
+\[ \] Whether enemies scale to player level in open zones
+
+\[ \] Boss caps on DoT stacking and armour reduction, without making status
+
+    builds feel disabled
+
+  
+  
+
+# Progression  
+
+  
+
+\================================================================================
+
+7  PROGRESSION
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.1  LEVEL CAP
+
+\--------------------------------------------------------------------------------
+
+ 
+
+LEVEL CAP: 50
+
+TYPE: Hard stop. No post-cap power progression.
+
+ 
+
+No paragon track, no infinite stat trickle, no post-cap level substitute.
+
+Once a character reaches 50, all further power comes from gear.
+
+ 
+
+Rationale: the rarity / tier / affix system IS the endgame. A parallel
+
+infinite level track would compete with it for the same design space and
+
+worsen the multiplicative-stacking risk.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.2  CURRENCY GRANT SCHEDULE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+CLASS POINTS
+
+  Source        1 per level
+
+  Levels        1 - 30
+
+  Total         30
+
+ 
+
+CORE POINTS
+
+  Source        1 per level
+
+  Levels        1 - 50
+
+  Subtotal      50
+
+ 
+
+  Source        World content rewards
+
+  Subtotal      \~15
+
+ 
+
+  Total         \~65
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.3  WHY THE SCHEDULES DIVERGE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Class identity completes at level 30. The player has finished their branch
+
+build and knows what their class is.
+
+ 
+
+Levels 31 - 50 are pure universal specialization. This is the stretch where
+
+the Core Tree's cross-class expression does the work.
+
+ 
+
+Class points are spent early, while the player is still learning what the
+
+class does. Core points are spent late, once the player understands the
+
+combat systems well enough for a Precision-versus-Affliction decision to be
+
+a real choice rather than a coin flip.
+
+ 
+
+The act structure in the Generic Story tab is built on these breakpoints.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.4  CORE POINT BUDGET TARGET
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\~65 Core Points is intended to fully develop two constellations and
+
+partially develop a third.
+
+ 
+
+This ratio validates the schedule. If constellation node costs change,
+
+re-check that 65 still produces "two full plus one partial" — otherwise
+
+either the schedule or the costs must move.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.5  CLASSES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Five classes, three branches each, class-specific resource, one ultimate.
+
+Class selection is permanent per character. A character equips exactly two
+
+class abilities plus one ultimate.
+
+ 
+
+  CASTER      Mana      Spellblade / Void Whisperer / Multispell
+
+  SWIFT       Momentum  Frenzy / Kinetic / Marksman
+
+  GUNSMITH    Scrap     Armory / Field Tech / Tinkerer
+
+  TANK        Grit      Leech / Bastion / Demolitionist
+
+  SUPPORT     Charge    Medic / Conductor / Warden
+
+ 
+
+PROTOTYPING ORDER — do not build all five first.
+
+  First:  Swift. Kinetic tests the movement boundary; Marksman tests the
+
+          projectile framework.
+
+  Second: Caster. Multispell and Void Whisperer validate statuses and
+
+          reactions; Spellblade tests ability-driven close combat.
+
+  Later:  Gunsmith, Tank, Support — they depend on deployables, threat/AI,
+
+          shielding, healing, and team behavior.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.6  UNIVERSAL CORE TREE — SIX CONSTELLATIONS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  PRECISION   Critical hits, weak points, executions, sustained
+
+              single-target accuracy
+
+  VOLLEY      Projectile count, cadence, magazine/reload, ricochet
+
+  AFFLICTION  Physical damage over time and spread
+
+  ELEMENTS    Status buildup and cross-element reactions
+
+  BULWARK     Armour, mitigation, stamina efficiency, parry
+
+  KINESIS     Dodge quality, movement efficiency, slide handling, aerial
+
+ 
+
+Bulwark does NOT grant Block. Kinesis does NOT grant dodge, slide, dash, or
+
+wall ride. All are base kit. These constellations improve them.
+
+ 
+
+Air jump (Kinesis) and Parry (Bulwark) are the only tree-granted verbs in
+
+the game.
+
+ 
+
+CONSEQUENCE
+
+  With almost no verbs left to grant, constellations must earn their weight
+
+  through rule rewrites rather than unlocks. A node that reads as a flat
+
+  percentage is doing the affix layer's job and should be reconsidered.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.7  SHARED STAMINA
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Block and dodge share a 100-point stamina pool, regenerating at 20 per
+
+second after 1.2 seconds without spending. Implemented as a replicated GAS
+
+attribute with Gameplay Effects for costs and regeneration delay.
+
+ 
+
+This creates a real Bulwark/Kinesis hybrid tradeoff.
+
+ 
+
+CAP REQUIRED: gear must not scale the pool and regeneration without caps or
+
+diminishing returns, or equipment erases the constraint. This risk is
+
+larger now that block and dodge are universal, because every character
+
+spends from the pool.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.8  RESPEC
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Class Points: free respec at a Forge.
+
+Core Points: free respec, unless playtesting establishes a reason for
+
+friction.
+
+ 
+
+Respecs require Forge interaction. Class selection remains permanent.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.9  IMPLEMENTATION RULES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Cap and curve live in a Data Asset. C++ reads the curve; it does not
+
+hardcode 50, 30, or 65.
+
+ 
+
+Saved builds store stable IDs and ranks, not UObject pointers or calculated
+
+attribute totals. On load, the progression subsystem resolves IDs and
+
+rebuilds granted state. This supports balance changes and save migrations.
+
+ 
+
+VERTICAL SLICE OVERRIDE
+
+  The slice ships approximately 15 skill nodes. 80 points cannot be spent
+
+  across 15 nodes.
+
+    SLICE CAP: 10, compressed curve.
+
+  Slice value only. Not a balance signal. The Data Asset makes the override
+
+  cheap.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.10  BALANCE RISKS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  1. Multiplicative explosions. Multishot, independent crits, status
+
+     applications, reactions, and affixes can multiply each other. Every
+
+     proc needs a coefficient and recursion rule.
+
+  2. Universal-tree identity theft. Kinesis must not make non-Swift
+
+     characters the best movers; Elements must not make non-Casters the
+
+     best reaction specialists.
+
+  3. Mandatory cornerstones. If one is universally superior, the six-way
+
+     choice collapses.
+
+  4. Defensive invulnerability loops. Parry refunds, dodge refunds, leech,
+
+     overshields, block, and free respec can combine into permanent safety.
+
+  5. Boss invalidation. DoT stacking and percent mitigation need boss caps
+
+     without making status builds feel disabled.
+
+  6. Solo support viability. Charge generation cannot depend on allies.
+
+  7. Movement tax. Do not balance ordinary encounters around Kinetic or
+
+     Kinesis traversal mastery.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+7.11  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Are branch nodes freely mixed with investment gates, or mutually
+
+    exclusive at major tiers?
+
+\[ \] What dedicated input slots do Block and Dodge use? Dodge should use a
+
+    dedicated action rather than double-tap detection, which conflicts with
+
+    precise strafing and accessibility.
+
+\[ \] Can snapshot DoTs trigger ordinary on-hit effects per tick, or only
+
+    explicitly DoT-compatible effects?
+
+\[ \] Exact world-content sources for the \~15 non-level Core Points
+
+\[ \] Experience curve shape — flat, accelerating, or plateauing near 30
+
+\[ \] Intended hours to level 50 solo  
+
+# Generic Story  
+
+\================================================================================
+
+8  GENERIC STORY
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.1  ACT STRUCTURE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+The act breaks are dictated by the locked progression schedule. Class
+
+Points stop at 30; Core Points run to 50. Do not fight this — use it.
+
+ 
+
+ACT I        Levels 1 - 15
+
+  Player question:  What am I?
+
+  Location:         One Anchor and its local rifts
+
+  Mechanical arc:   Class kit, resource loop, first branch commitment
+
+ 
+
+ACT II       Levels 16 - 30
+
+  Player question:  What are the rifts, really?
+
+  Location:         Wider region, first stable large rift
+
+  Mechanical arc:   Branch completion. Class Points exhausted at 30.
+
+ 
+
+ACT III      Levels 31 - 50
+
+  Player question:  Who is Rior, and what do I owe him?
+
+  Location:         Inside erased timelines
+
+  Mechanical arc:   Pure Core Tree specialization
+
+ 
+
+The mechanical and narrative arcs complete simultaneously, twice.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.2  THE ACT II TURN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Everything before this point is Vestiges. Alien, unreadable, a natural
+
+disaster with no author.
+
+ 
+
+Then something comes through wearing a uniform. Not the player's uniform,
+
+but close enough to read. Rank markings. A field repair on the shoulder.
+
+ 
+
+This is the moment the rifts stop being weather and become a direction that
+
+someone is coming from.
+
+ 
+
+Requirements for the beat to land:
+
+  No Altered enemy appears anywhere before it, including in optional
+
+    content and Anchor lore.
+
+  The first one should not be a boss. A single, ordinary, badly wounded
+
+    Altered is stronger than a spectacle.
+
+  Command should not have an explanation ready.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.3  LOCATIONS
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  TYPE              FUNCTION                        INSTANCED
+
+  ------------------------------------------------------------------------
+
+  The Anchor        Social hub, vendors, Forge      No — MMO layer
+
+  Local rifts       Standard dungeon content        Yes
+
+  The Breach        Act II gate, first large rift   Yes, gated
+
+  Erased Earths     Act III zones                   Semi-open, shared
+
+  Rior's frontier   Endgame, timelines in progress  Yes, scaling
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.4  ERASED EARTHS — THE CONTENT ENGINE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Every Act III zone is Earth. Same continents, same gravity, unrecognizable
+
+outcome. Each is a timeline that ended differently.
+
+ 
+
+Why this is the strongest structural idea available:
+
+  Enormous art variety with total thematic coherence
+
+  Every zone silently argues Rior's case; the player walks through a
+
+    century of consequence without being lectured
+
+  Infinite endgame justification — there are always more timelines
+
+  Cheap recognizable landmarks. The player knows what that building was.
+
+ 
+
+INITIAL SPREAD
+
+  1. An Earth that never industrialized, and was taken by Vestiges anyway.
+
+     Undercuts the simple reading of Rior's argument.
+
+ 
+
+  2. An Earth that solved everything, and was strip-mined by other
+
+     timelines using his technology. This is the one that proves him right.
+
+ 
+
+  3. An Earth where Rior lost.
+
+     The player meets a version of themselves here. Not evidence of them —
+
+     the actual person, alive, in a world that won.
+
+     Act III climax location, not a mid-act stop. It is the clearest
+
+     available argument that the player's timeline is not special and was
+
+     never guaranteed.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.5  STORY DELIVERY
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Rior is never present and always recent.
+
+ 
+
+Recovered fragments play as working notes, not confessions. He is not
+
+explaining himself to the player. The player is reading over his shoulder.
+
+ 
+
+Avoid: audio logs addressed to no one, villain monologues, a final
+
+conversation that summarizes the theme. The player should have assembled
+
+the argument themselves before anyone states it.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.6  THE FINAL CHOICE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+The assembled technology presents one decision.
+
+ 
+
+SEAL    Close every rift permanently. This timeline is safe forever.
+
+        Every timeline behind the rifts is erased, and everyone in them
+
+        never existed — including every refugee not yet inside an Anchor.
+
+ 
+
+HOLD    Keep the doors open. The refugees can still be reached and still be
+
+        saved. Rior's method remains intact and usable, including by the
+
+        people who misused it the first time.
+
+ 
+
+Neither option is the safe one. SEAL is not "abandon them" — it is "unmake
+
+them." HOLD is the merciful choice with an unacceptable risk attached.
+
+ 
+
+WHY THIS WORKS
+
+  Erasure-on-closure removed the earlier incentive problem. SEAL is no
+
+  longer the cautious ending and HOLD is no longer the greedy one. Both
+
+  cost something the player has been shown directly.
+
+ 
+
+IMPLEMENTATION
+
+  Narrative epilogue only. Does not gate content. Changes Anchor dialogue,
+
+  NPC standing, and epilogue text.
+
+ 
+
+  Deliberate: a choice that removes endgame content punishes the player for
+
+  the reading of the story they arrived at.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.7  VERTICAL SLICE PLACEMENT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+The slice boss should NOT be Rior.
+
+ 
+
+Recommended: an Act II Altered commander — the first humanoid that
+
+demonstrably gives orders. It proves the rifts are directed rather than
+
+natural, which is the single most important story fact the slice can carry.
+
+ 
+
+Fits the slice's stated scope of three normal enemies, one elite modifier,
+
+and one boss without requiring the erased-Earth art pipeline.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+8.8  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+RESOLVED
+
+  Player meets the version of themselves. Yes, Zone 3.
+
+  Rift closure has a cost. Yes: it erases the timeline.
+
+  What the Order is called, and by whom.
+
+ 
+
+STILL OPEN
+
+\[ \] Act III pacing across levels 31-50 is long for three zones. Accepted as
+
+    a known problem; resolve during campaign construction, not now.
+
+\[ \] Does the Order know rift closure erases timelines before the player
+
+    does? Likely yes, and likely why they formed.
+
+\[ \] Does Command know severance is reversible? Recommend yes, for years.
+
+    His position is then a defensible choice between his people and other
+
+    people rather than ignorance.
+
+\[ \] Where the first lucid Altered is met, and whether it is scripted or a
+
+    world encounter.  
+
+# End-Game  
+
+\===============================================================================
+
+9  END-GAME
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+9.1  THE CORE CLAIM
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Level 50 is a hard stop. Gear is the entire endgame.
+
+ 
+
+This is a deliberate bet. There is no parallel progression track absorbing
+
+pressure if the loot chase turns out to be too short.
+
+ 
+
+CONSEQUENCE
+
+  The T-1 tier and the Anomalous slot carry the whole endgame. Before
+
+  tuning drop rates, decide the intended time to "build complete." If T-1
+
+  acquisition is fast, players arrive at a finished build with nothing
+
+  behind it.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+9.2  THE CHASE STRUCTURE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  EXCEPTIONAL   The real farm target. Can reach 7 affixes through crafting.
+
+  T0            Rare natural roll. Also the raw material for T-1.
+
+  T-1           Never drops. Only from exalt/corrupt, boss tables, or a
+
+                consumable.
+
+  ABERRANT      Signature affixes. Max 3 equipped — the equip limit IS the
+
+                decision.
+
+  ANOMALOUS     Rule rewrites. Max 1 equipped. Each should imply an entire
+
+                build.
+
+ 
+
+The equip limits on Aberrant and Anomalous are what keep the endgame from
+
+becoming pure accumulation. Finding a second Anomalous is a question, not
+
+an upgrade.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+9.3  HELD IN RESERVE — NOT BUILT
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Horizontal post-cap unlocks: alternate loadouts, ability variants, expanded
+
+Forge capability. These add breadth rather than power, so they remain
+
+available later without contradicting the hard stop.
+
+ 
+
+Do not build unless the loot chase proves too short in testing.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+9.4  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Intended time from level 50 to a finished build
+
+\[ \] Whether "Rior's frontier" endgame content scales infinitely or has
+
+    discrete difficulty tiers
+
+\[ \] Seasonal or ladder structure — deferred entirely
+
+\[ \] Whether crafting materials gate T-1 acquisition, and how they are
+
+    earned
+
+ 
+
+ 
+
+ 
+
+\================================================================================
+
+10  TYPES OF CONTENT
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+10.1  CONFIRMED CONTENT TYPES
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ANCHOR — social hub
+
+  Not instanced. Vendors, Forge, NPCs, other players. The MMO layer.
+
+ 
+
+LOCAL RIFTS — standard instanced content
+
+  The core loop. Enter, clear, close. Closing erases the timeline behind
+
+  it, which the player does not initially know.
+
+ 
+
+THE BREACH — gated large rift
+
+  Act II gate. First rift stable enough to hold open.
+
+ 
+
+ERASED EARTHS — Act III zones
+
+  Semi-open, shared. Each is a timeline that ended differently.
+
+ 
+
+RIOR'S FRONTIER — endgame
+
+  Timelines he is working on now. Scaling difficulty.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+10.2  ENCOUNTER STRUCTURE — SLICE SCOPE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+One graybox biome, three normal enemies, one elite modifier, one boss,
+
+reward drops, death/retry, save/resume.
+
+ 
+
+Slice boss: an Act II Altered commander. See the Generic Story tab.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+10.3  OPEN — MOSTLY UNDESIGNED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Rift tiering — how difficulty and reward scale per rift
+
+\[ \] Whether rifts are procedural, handcrafted, or hybrid
+
+\[ \] Elite modifier list
+
+\[ \] World events inside erased Earths
+
+\[ \] Whether Anchor defense is a content type
+
+\[ \] Repeatable versus one-time content ratio
+
+  
+  
+
+# Types of content  
+
+Anomalies - think tilesets of maps (different modded versions from the base game)   
+This will be the primary end game farm   
+Relatively open map to go through and kill lots of packs of mobs with different rarities that drop gear with a map boss at the end   
+  
+Raids - think large scale map with progression through it naturally with checkpoints bosses or difficult puzzles to solve with 7 players that all would work together to solve encounters and move forward to a final boss with really good loot   
+  
+Dungeon - Smaller raids with parties of 4   
+  
+Conquest - Reclaiming land (giant warzone of up to 9 players at a time all matchmade) where thousands of mobs mini bosses etc are in a giant warzone  
+  
+  
+  
+
+# Party Play  
+
+\================================================================================
+
+11  PARTY PLAY
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+11.1  BALANCE POSITION — LOCKED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Solo is the primary balance target. Cooperative parties support up to five
+
+players.
+
+ 
+
+Every class must be solo-viable. Support in particular needs a self-use or
+
+offensive conversion path in every branch; group effects remain its
+
+efficiency advantage, not its requirement.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+11.2  SCALING POLICY
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Placeholder scaling exists for enemy health, damage, and elite frequency.
+
+ 
+
+DO NOT SCALE ONLY HEALTH. Five-player encounters need enemy-count and
+
+role-pressure adjustments or enemies become passive damage sponges.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+11.3  OPEN — MOSTLY UNDESIGNED
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Does multiplayer scale enemy count, enemy health, elite density, or a
+
+    mixture? Current values are placeholders.
+
+\[ \] Loot distribution — instanced per player, shared, or need/greed
+
+\[ \] Whether party content has separate progression
+
+\[ \] Matchmaking versus premade only
+
+\[ \] Party-play contact NPC, if group content has its own progression
+
+ 
+
+ 
+
+  
+  
+  
+
+# Weapon Design  
+
+\================================================================================
+
+12  WEAPON DESIGN
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+12.1  CURRENT PROTOTYPE RIFLE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Scaffolding values, not balance commitments.
+
+ 
+
+  24 base physical damage
+
+  600 RPM, automatic
+
+  30-round magazine, 120 reserve
+
+  1.8s reload
+
+  1.2 degree hip spread, 0.25 degree aimed spread
+
+  1.75x weak-point multiplier
+
+  Full damage through 20m, linear falloff to 55% at 60m
+
+  120m maximum trace range
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+12.2  RUNTIME FLOW
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  1. Input starts or stops the trigger on the weapon component
+
+  2. Server validates cadence, ammunition, and reload state
+
+  3. Deterministic cone direction generated from the shot sequence
+
+  4. A dedicated WeaponTrace channel performs the hit test
+
+  5. Components tagged WeakPoint set the weak-point flag
+
+  6. Range falloff and source GAS attributes build a shared damage request
+
+  7. Target's combat component resolves armour, shields, health, death
+
+  8. Multicast cosmetic event provides trace/impact data to Blueprint
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+12.3  THREE ARCHETYPES — SLICE SCOPE
+
+\--------------------------------------------------------------------------------
+
+ 
+
+  1. Hitscan rifle or sidearm — baseline aiming and damage. DONE.
+
+  2. Shotgun or burst weapon — multi-shot behavior. NOT BUILT.
+
+  3. Rocket or similar — movement interaction. NOT BUILT.
+
+ 
+
+Archetype 3 is the highest-risk of the three: it interacts with movement
+
+and with Tank/Demolitionist self-knockback. It wants a design pass before
+
+implementation.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+12.4  DATA BOUNDARY
+
+\--------------------------------------------------------------------------------
+
+ 
+
+UBreakerWeaponDefinition owns immutable base content. A generated item
+
+instance references a definition and carries rolled affixes separately.
+
+ 
+
+Do not mutate definition assets at runtime. Do not encode affix rolls into
+
+Blueprint subclasses.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+12.5  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Weapon swap system — does not exist. Blocks all Secondary exclusive
+
+    affixes.
+
+\[ \] Self-damage and self-knockback rules for archetype 3
+
+\[ \] Whether weapons have their own progression or rarity is the only axis
+
+\[ \] Unique weapons versus Anomalous items — are they the same system?
+
+  
+  
+
+# NPCS  
+
+\================================================================================
+
+13  NPCS
+
+\================================================================================
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.1  HOW TO READ THIS TAB
+
+\--------------------------------------------------------------------------------
+
+ 
+
+Each entry is split into two parts:
+
+ 
+
+  ROLE        The mechanical and structural function. Load-bearing.
+
+              Changing it changes the campaign.
+
+ 
+
+  CHARACTER   Name, background, ideology, voice. PLACEHOLDER — rewrite
+
+              freely. Nothing downstream depends on these specifics.
+
+ 
+
+Design rule: every named NPC owns a system. An NPC without a mechanical
+
+function is a lore dispenser and players skip lore dispensers.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.2  THE FORGE KEEPER
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ROLE
+
+  Owns the Forge. Respec is Forge-gated by locked product decision, so this
+
+  NPC is the face of every build change the player ever makes. Highest
+
+  interaction count of any NPC in the game.
+
+  Also owns: crafting, tier upgrades, and the T-1 exalt/corrupt path.
+
+ 
+
+CHARACTER — PLACEHOLDER: "Kess"
+
+  An Effigy. Has run the Forge since before the militia captured the
+
+  caretaker shipment, which means she remembers being manufactured.
+
+ 
+
+  She is the only character in the game who has met Rior.
+
+ 
+
+  She will not say what he was like. That refusal is a slow-burn thread
+
+  across the whole campaign and should not resolve before Act III.
+
+ 
+
+WHY THIS PAIRING WORKS
+
+  The player visits her constantly for mechanical reasons, so the withheld
+
+  answer accumulates weight without any quest structure. She is also
+
+  living proof of Rior's plan for the world after humanity — the player
+
+  reforges their build inside the thing he built to replace them.
+
+ 
+
+SWAPPABLE
+
+  Everything except: is an Effigy, met Rior, will not discuss it.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.3  BREAKER COMMAND
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ROLE
+
+  Contract giver. Gates acts. Runs the militia and therefore owns mission
+
+  structure, difficulty tiers, and Anchor defense content.
+
+ 
+
+CHARACTER — PLACEHOLDER: "Commander Aluko"
+
+  His pressure is triage. He cannot save everyone and stopped pretending
+
+  otherwise some years ago. Competent, tired, not cruel.
+
+ 
+
+IDEOLOGICAL POSITION
+
+  The argument FOR the final choice's SEAL option.
+
+ 
+
+  He is not arguing for cruelty. Anchors have finite suppression capacity.
+
+  Admitting more refugees than the field can hold does not save them — it
+
+  collapses the Anchor and loses everyone inside.
+
+ 
+
+  He is choosing his people over other people. That is the oldest
+
+  defensible-horrible decision there is, and he should be right about the
+
+  arithmetic.
+
+ 
+
+  He should know severance is reversible, and should have known for years.
+
+ 
+
+  If the player can dismiss him, the ending has no weight.
+
+ 
+
+  NOTE: Command arrives at Rior's argument honestly, without ever hearing
+
+  Rior's name. Do not have anyone point this out.
+
+ 
+
+SWAPPABLE
+
+  Everything except: gates acts, and argues for SEAL.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.4  THE RESEARCHER
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ROLE
+
+  Reconstructs recovered Rior fragments. The progression NPC for the story
+
+  collectible and, by extension, for every capability the fragments unlock.
+
+ 
+
+CHARACTER — PLACEHOLDER: "Dr. Imani Vosk"
+
+  Rior's former colleague. She was present when the technology was built.
+
+  She understood what it could do. She did not stop it.
+
+ 
+
+  She almost certainly worked out what rift closure actually does, and said
+
+  nothing.
+
+ 
+
+WHY THIS PAIRING WORKS
+
+  She is the player's mirror. The player is currently reassembling the same
+
+  technology for good reasons, exactly as she once did.
+
+ 
+
+  Her guilt should never be stated by her directly. It should be visible in
+
+  what she refuses to reconstruct.
+
+ 
+
+SWAPPABLE
+
+  Everything except: knew Rior professionally, was complicit, reconstructs
+
+  fragments.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.5  THE SURVIVOR
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ROLE
+
+  The emotional load-bearing structure of the final choice, and the
+
+  player's proof that severance is survivable.
+
+ 
+
+  Introduced early in Act III. Should be the first friendly face the player
+
+  meets inside an erased Earth.
+
+ 
+
+CHARACTER — PLACEHOLDER: name them after their timeline
+
+  A refugee from an Earth Rior already finished. Lucid, because the player
+
+  found them in time.
+
+ 
+
+  Lucidity is not permanent. They are on a clock. Keeping them lucid means
+
+  getting them inside an Anchor.
+
+ 
+
+  They should not accuse the player of anything about the Altered the
+
+  player has killed. They should simply be fine with it, which is worse.
+
+ 
+
+SWAPPABLE
+
+  Everything except: refugee from an erased timeline, lucid, on a clock,
+
+  met before the final choice.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.6  RIOR
+
+\--------------------------------------------------------------------------------
+
+ 
+
+ROLE
+
+  Antagonist. Never physically present in the campaign. Delivered entirely
+
+  through recovered fragments and the state of the worlds he has finished.
+
+ 
+
+CHARACTER
+
+  Fragments read as working notes, not confessions. He is not explaining
+
+  himself. The player is reading over his shoulder.
+
+ 
+
+  Technically precise, unsentimental, and occasionally correct about
+
+  something the player has just seen with their own eyes.
+
+ 
+
+  He should never be witty. Wit invites the player to enjoy him.
+
+ 
+
+OPEN
+
+  Does he ever notice the player? Recommend once, late in Act III, briefly,
+
+  and not as a threat. If he never notices them, he is scenery.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.7  ROLES NOT YET CAST
+
+\--------------------------------------------------------------------------------
+
+ 
+
+VENDOR / QUARTERMASTER
+
+  Gear, ammunition, consumables. Can be minor. Consider making this the
+
+  Anchor's most ordinary person — someone with no opinion about rifts at
+
+  all. Grounds the hub.
+
+ 
+
+ANCHOR CIVILIAN AUTHORITY
+
+  Someone who runs the city rather than the militia, and does not report to
+
+  Command. Creates friction over resource allocation and Effigy
+
+  personhood.
+
+ 
+
+THE ORDER
+
+  Not preachers. Logistics. They run unauthorized refugee intake — moving
+
+  lucid Altered through gaps in the suppression field and housing them
+
+  wherever partial suppression exists.
+
+ 
+
+  "Heretic" is what you call someone whose position is unanswerable. Their
+
+  claim is not that Rior was right. It is that the militia is running a
+
+  smaller version of the same program and has stopped counting.
+
+ 
+
+  DEFERRED: whether the Order holds a suppression source of their own. If
+
+  yes they are a faction with territory and a second hub. If no they are
+
+  desperate and the player is their only leverage.
+
+ 
+
+PARTY-PLAY CONTACT
+
+  If group content has its own progression it needs a face separate from
+
+  Command. Deferred until party systems are designed.
+
+ 
+
+ 
+
+\--------------------------------------------------------------------------------
+
+13.8  OPEN
+
+\--------------------------------------------------------------------------------
+
+ 
+
+\[ \] Are any of these NPCs killable, losable, or absent depending on player
+
+    action? Recommend no for the slice; it doubles writing cost.
+
+\[ \] Does the Forge Keeper's withheld answer ever resolve, and does the
+
+    player have to earn it?
+
+\[ \] Full voice acting, partial, or text only? Determines how much of the
+
+    characterization above survives contact with budget.
+
+\[ \] Does the Survivor come back to the Anchor, or stay in their timeline?
+
+  
