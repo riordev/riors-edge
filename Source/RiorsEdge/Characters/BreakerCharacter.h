@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Weapons/BreakerWeaponComponent.h"
+#include "Characters/BreakerViewmodelRig.h"
 #include "BreakerCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -96,12 +97,57 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mana") TObjectPtr<UBreakerManaComponent> Mana;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UBreakerAbilityComponent> Abilities;
+    // THE RIG ROOT. Historically this was the weapon body itself, a single grey
+    // cube; it is now an EMPTY transform that every proxy part and both arms
+    // hang from. Keeping the name and the type is deliberate: it is the
+    // component the viewmodel spring writes to (UpdateViewmodelKick) and the
+    // one BP_BreakerCharacter inherits, and renaming it would silently drop the
+    // Blueprint's override without a compile error. It carries no mesh, so the
+    // recoil, ADS and dash work all move the whole assembly at once.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponVisual;
+    // Pool slots 0 and 1, kept under their original names for the same
+    // Blueprint-inheritance reason. They no longer mean "barrel" and "sight" —
+    // BreakerViewmodelRig's layout table decides what every slot is.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponBarrel;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> PrototypeWeaponSight;
+    // The recycled primitive pool. Allocated once in the constructor and never
+    // grown: switching weapons re-poses existing components and hides the
+    // remainder, so a swap costs no allocation. Same discipline as the pooled
+    // tracer renderer.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TArray<TObjectPtr<UStaticMeshComponent>> ViewmodelParts;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UPointLightComponent> PrototypeMuzzleFlash;
+    // Forearms and gloves. These hang off the RIG, not off the camera: the
+    // hands hold the gun, so they must ride the recoil spring with it. Before
+    // this pass both arms were camera-parented at transforms that projected to
+    // y=1283 and y=1384 on a 1080-tall frame — entirely below the viewport.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> LeftArmVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> RightArmVisual;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> LeftGloveVisual;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation") TObjectPtr<UStaticMeshComponent> RightGloveVisual;
+
+    // --- Viewmodel blockout tuning (O2) ---------------------------------
+    // The default layout table lives in BreakerViewmodelRig.cpp; this map
+    // replaces any archetype's row on the instance with no recompile, which is
+    // the same escape hatch UBreakerWeaponComponent::RecoilOverrides gives the
+    // feel layer. O2 PLACEHOLDER: every value in the default table is frozen
+    // and unplaytested.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel")
+    TMap<EBreakerWeaponArchetype, FBreakerViewmodelLayout> ViewmodelLayoutOverrides;
+    // Uniform scale on the whole rig. The one knob that answers "the gun is too
+    // big / too small in frame" without touching a single proportion.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel", meta=(ClampMin="0.2", ClampMax="3.0"))
+    float ViewmodelScale = 0.9f;  // O2 PLACEHOLDER
+    // Where the arms enter frame, in CAMERA space. Behind and below the camera
+    // on purpose: the near plane clips the shoulder end, so the limbs read as
+    // coming from the player's body rather than as floating sticks.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel")
+    FVector SupportShoulderAnchorCm = FVector(30.0f, -22.0f, -29.0f);  // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel")
+    FVector FiringShoulderAnchorCm = FVector(10.0f, 19.0f, -33.0f);    // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel", meta=(ClampMin="1"))
+    float ForearmWidthCm = 6.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation|Viewmodel", meta=(ClampMin="1"))
+    float GloveSizeCm = 9.5f;      // O2 PLACEHOLDER
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Playtest") TObjectPtr<UBreakerPlaytestComponent> Playtest;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UBreakerInputConfig> InputConfig;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleReach = 90.0f;
@@ -168,8 +214,21 @@ private:
     void EquipPrimaryWeapon();
     void EquipSecondaryWeapon();
     void ApplyWeaponPresentation();
-    // Rest pose of the placeholder weapon mesh, before the weapon component's
-    // per-shot kick offset is added on top of it in Tick.
+    // The layout for an archetype: the instance override if one exists, the
+    // shared default table otherwise.
+    FBreakerViewmodelLayout ResolveViewmodelLayout(EBreakerWeaponArchetype Archetype) const;
+    // Poses every pooled primitive and both arms from the active layout. Called
+    // only when the archetype actually changes, never per frame.
+    void RebuildViewmodelParts();
+    // Dev capture only (-BreakerCycleWeapons=<seconds>): walks the equipped
+    // archetype through the enum so a screenshot run can photograph all eight.
+    void StartViewmodelCaptureCycle();
+    void PoseArm(UStaticMeshComponent* Forearm, UStaticMeshComponent* Glove,
+        const FVector& AnchorCm, const FVector& HandRigCm);
+    // Rest pose of the viewmodel rig, before the weapon component's per-shot
+    // kick offset is added on top of it in Tick. The ADS pose is DERIVED from
+    // the layout's sight height rather than authored, so every archetype puts
+    // its own sight on the crosshair.
     FVector GetWeaponRestLocation() const;
     void UpdateViewmodelKick();
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
@@ -225,4 +284,17 @@ private:
     float DashFeedbackRollSign = 0.0f;
     FVector LastDashDirection = FVector::ZeroVector;
     bool bDashRollApplied = false;
+
+    // The layout currently posed onto the pool, and the archetype it came from.
+    // Tick compares the live archetype against this: the weapon can change from
+    // the loadout screen, an item equip or a dev swap, and none of those route
+    // through EquipPrimary/EquipSecondary — which is exactly why the proxy used
+    // to keep the previous gun's proportions after a loadout change.
+    FBreakerViewmodelLayout ActiveLayout;
+    FVector PosedArmRestLocation = FVector(FLT_MAX);
+    FTimerHandle ViewmodelCycleTimer;
+    FTimerHandle ViewmodelFireTimer;
+    int32 ViewmodelCycleIndex = 0;
+    bool bViewmodelBuilt = false;
+    EBreakerWeaponArchetype PresentedArchetype = EBreakerWeaponArchetype::Count;
 };

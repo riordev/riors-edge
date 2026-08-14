@@ -28,7 +28,7 @@ The master sheet already fixes most of the art brief. Restated as production law
 | No grapple | No hardpoint, hook, or launcher geometry anywhere on the arms, gear, or level kit. Do not tease a verb that does not exist. |
 | Dodge/block are passive chance layers, not inputs (**RULED [O1]**; stamina pool removed; Parry is the only defensive input, on its own cooldown) | **They must not have a triggered player animation that reads as a dodge roll.** See §3.5. This is the single most likely art mistake in the project. |
 
-CONFLICT — the vertical slice as scoped in `CONTEXT.md` names three weapon archetypes, while five archetypes now exist in code (Rifle, SMG, Sniper, Shotgun, Rocket). This document plans art for all five because the code shipped them, but marks two as **P2 art** so the slice can close on three finished weapons. See §5.
+CONFLICT — the vertical slice as scoped in `CONTEXT.md` names three weapon archetypes, while **eight** now exist in code (Rifle, SMG, Sniper, Shotgun, Rocket, Burst Rifle, Machinegun, Sidearm — the last three added by the O27 breadth pass). This document plans art for all eight because the code shipped them, but marks five as **P1/P2 art** so the slice can still close on three finished weapons. §5 is written for the original five; **§5.1 is the live eight-archetype contract** and supersedes it where they disagree. All eight already have a distinct code blockout — see §3.0.
 
 ---
 
@@ -195,7 +195,61 @@ Requirements for the beat, as art:
 
 ## 3. The Breaker — player silhouette and first-person presentation
 
-Current state (`CONTEXT.md`): `BP_BreakerCharacter` carries blockout first-person arms and weapon geometry, explicitly flagged as replaceable presentation. Recommended next action #5 in `CONTEXT.md` is exactly this replacement.
+### 3.0 STATUS — what exists, what needs an artist, what the owner has to do
+
+Read this before anything else in §3. It is the honest division of labour, and
+it is the reason the rest of §3 is written as a commission brief rather than as
+a plan.
+
+**What is CODE BLOCKOUT and already in the build (no assets, works on a clean
+clone).** `Source/RiorsEdge/Characters/BreakerViewmodelRig.{h,cpp}` is a data
+table of composed engine primitives — `/Engine/BasicShapes` cube, cylinder and
+cone painted with dynamic instances of `BasicShapeMaterial`, the same asset-free
+technique the gym dressing uses. `ABreakerCharacter` allocates a pool of twelve
+mesh components plus four limb components once in its constructor and re-poses
+them whenever the equipped archetype changes. It delivers:
+
+- a distinct proxy for **all eight** archetypes, with proportions read off each
+  weapon's real cadence, magazine and swap time (see the table in §5.1);
+- first-person arms that are actually **in frame** — two forearms and two
+  gloves, stretched from a shoulder anchor to per-archetype hand positions;
+- correct attachment: every part and both arms hang off the one transform the
+  recoil spring drives, so the viewmodel kick, the ADS transition and the dash
+  camera work all read on the whole assembly;
+- an ADS pose **derived** from each weapon's own sight height, so each archetype
+  puts its own sight on the crosshair;
+- the muzzle flash light at the actual muzzle, so it moves with the recoil.
+
+Covered by six automation tests (`RiorsEdge.Characters.Viewmodel*`) that pin the
+ORDERING and the palette law, never the values (O2). Verified by reading
+screenshots from the capture harness — see the honest assessment in §3.6.
+
+**What NEEDS AN ARTIST.** Everything in §3.2 and §3.6. The blockout is a
+stand-in whose only job is "the player can name the gun in their hands and can
+see the recoil". It is not art, it does not have a hand, it does not have a
+silhouette anyone would recognise at 20 m, and it will not survive contact with
+a real level. It exists so the commission below can be written against something
+concrete instead of against nothing.
+
+**What the OWNER personally has to do, in the editor, and nobody else can.**
+The project rule is absolute: `.uasset` and `.umap` are never hand-edited, so
+none of this can be done from code or by an agent.
+
+1. Import the authored FBX meshes and skeleton and set up the material
+   instances. Everything in §3.6's asset list is editor work.
+2. Create `BP_BreakerViewmodel` (or extend `BP_BreakerCharacter`) to swap the
+   authored `SK_` arms in for the code pool, keeping the code pool as the
+   fallback per the architecture rule.
+3. Author the animation assets and the anim blueprint. Retargeting a bought
+   pack onto a Manny-compatible rig is editor work.
+4. Confirm the FP FOV and the near-clip behaviour on the authored geometry;
+   the blockout's proportions were tuned against FOV 90 at 16:9.
+5. Verify LFS coverage for any new binary extension before the first import.
+
+Current state per `CONTEXT.md`: `BP_BreakerCharacter` is the active pawn and
+remains a child of the C++ `ABreakerCharacter`; its first-person geometry is
+explicitly replaceable presentation. Recommended next action #2 in `CONTEXT.md`
+names character and weapon meshes as a binding constraint on feel.
 
 ### 3.1 What a Breaker is, visually
 
@@ -211,18 +265,149 @@ Militia, not military. Equipped by an organisation that has money for the things
 - Caretaker origin should be visible in the hands: too gentle, too many fine joints, designed to handle things carefully. The militia bolted a weapon onto something built to carry a child.
 - Effigy hands are the strongest single art idea available for the setting. Worth building the day a second arms set is affordable.
 
-### 3.2 First-person arms — the replacement spec
+### 3.2 First-person arms — the commission brief
 
-This is the asset the player looks at for 100% of playtime. It gets the highest per-triangle scrutiny in the project.
+This is the asset the player looks at for 100% of playtime. It gets the highest
+per-triangle scrutiny in the project. Everything below is written so an external
+artist could quote and deliver it without another conversation.
+
+#### 3.2.1 Silhouette rules — binding
+
+1. **The support forearm is the largest single shape on screen and must be the
+   quietest.** It crosses the frame diagonally from the lower corner. If it is
+   the brightest or the most detailed thing in the composition, it competes with
+   the weapon, which is the object carrying the information. Value it darker
+   than the receiver.
+2. **The gun's outline must survive a 4-pixel blur.** A player firing while
+   sliding never resolves surface detail. The read is: one long horizontal mass,
+   one break in the top line (the optic), one break in the bottom line (the
+   magazine). Three shapes. Anything that does not contribute to those three is
+   texture, not geometry.
+3. **One dominant feature per archetype, and no archetype may borrow another's.**
+   The list is fixed in §5 and restated concretely in §5.1: the sniper's
+   oversized cylindrical optic, the shotgun's under-barrel tube, the rocket's
+   shoulder tube, the machinegun's drum and bipod, the burst rifle's tall
+   dedicated optic, the SMG's absent stock, the sidearm's absence of everything.
+4. **No hardpoint, hook, launcher, tether, or grapple mount anywhere** — on the
+   weapon, the gloves, the sleeve, or the sling. Do not tease a verb that does
+   not exist.
+5. **Nothing crosses the screen centre at rest.** The crosshair region stays
+   clear at hip; the sight occupies it only when aiming.
+6. **The gun's mass sits low-right, the muzzle points up-left.** The blockout's
+   framing is the reference: the assembly occupies roughly the lower-right
+   quarter at FOV 90 / 16:9, and the barrel runs toward, not across, the centre.
+
+#### 3.2.2 Proportions — the numbers the blockout already commits to
+
+`BreakerViewmodelRig.cpp` authors every part in **centimetres**, so the authored
+mesh can be modelled to the same real-world scale and dropped in without a
+rescale pass. The anchors an artist needs:
+
+| Quantity | Value | Note |
+|---|---|---|
+| Rig origin | The firing hand / trigger group | Everything is authored relative to it; stocks are negative X, barrels positive |
+| Axes | X forward, Y right, Z up | Matches Unreal, matches the code |
+| Rifle overall length | ~80 cm | The reference. Every other weapon's length is stated against it in §5.1 |
+| Rifle receiver | 34 × 5 × 7 cm | |
+| Sighting line above rig origin | 4.4 cm (sidearm) → 15 cm (rocket) | Per weapon. Drives the ADS pose, so it must be modelled accurately |
+| Rig origin from camera, hip | 40–72 cm forward, 9–19 cm right, 7–22 cm below | Per weapon; bigger weapons sit further out and lower |
+| Forearm | ~6 cm across | Anything thicker eats the frame |
+| Glove | ~9.5 cm cube-ish | |
+| Camera FOV the framing assumes | 90°, 16:9 | Settings persist FOV, so the arms must not fall apart at 70 or 120 |
+
+**O2 applies:** every one of these is a PLACEHOLDER, is unplaytested, and can be
+retuned on the character instance (`ViewmodelLayoutOverrides`, `ViewmodelScale`,
+the shoulder anchors) with no recompile. Model to them, but expect a pass.
+
+#### 3.2.3 Palette — from the Fieldplate style guide
+
+The player's kit is **militia hardware** and takes its values from §3.1's layer
+grammar and Pillar 3, not from the UI ramp. The UI tokens in
+`UI-Style-Guide-Fieldplate.md` govern the *interface*; the two rules that cross
+over into the world are the teal object law and the function-accent hues.
+
+| Surface | Direction | Blockout stand-in (linear) |
+|---|---|---|
+| Receiver, hard parts | Gunmetal, uniform matte, factory finish | `0.022, 0.024, 0.026` |
+| Barrel, shroud, tube | Darker gunmetal, near-black | `0.010, 0.011, 0.012` |
+| Polymer furniture (stock, grip, magazine) | Desaturated olive-slate, the militia colourway (`#4A5049`) | `0.018, 0.022, 0.017` |
+| Cheap / mass-produced polymer (SMG only) | Lighter, visibly stamped | `0.040, 0.043, 0.037` |
+| Working mechanism (shotgun pump, sidearm sights) | Bright steel — the one place value contrast is spent on purpose | `0.075, 0.080, 0.082` |
+| Field-fabricated markings (rocket only) | Hazard amber (`#D89A2E`), hand-painted | `0.300, 0.170, 0.030` |
+| Personal marks (sniper dope card) | Warm off-white (`#D8CFBA`) | `0.160, 0.150, 0.125` |
+| Glove | Olive, darker than the sleeve | `0.014, 0.017, 0.013` |
+| Sleeve | Slate, low chroma | `0.028, 0.032, 0.034` |
+
+**Teal object law, verbatim from the style guide: "teal is a noun, never an
+adjective."** Saturated teal (`#08B8A8` suppression hardware, `#26F2D9`
+Anomalous) belongs to rift and suppression OBJECTS. **The player's body, arms,
+gloves and weapons may never carry it**, with exactly one exception already
+written into §3.3: an Anomalous-rarity item, which is rift-derived in fiction.
+This is enforced in code by `RiorsEdge.Characters.ViewmodelChromaLaw`.
+
+Second rule, learned from a screenshot rather than argued: **the gym is bright
+concrete under a bright sky and its floor is authored at linear 0.33.** A
+first-pass proxy at linear 0.08 came back mid-grey and disappeared into the
+floor. The player's kit is the darkest thing in a normal frame, and the *spread*
+between its own values (about 7x) is what separates its parts.
+
+#### 3.2.4 What reads at speed, in first person
+
+The game is judged at 15–40 m, in motion, at 1/60th of a second, while the
+player is airborne or sliding. What survives that, in order:
+
+1. **Overall length and mass.** The player identifies the gun before they
+   identify anything on it.
+2. **The break in the top line.** An optic, or its absence.
+3. **The break in the bottom line.** A magazine, its length, its rake — this is
+   the tell that carries capacity, and it is why the SMG's 35-round stick is the
+   longest thing on it and the machinegun's 120-round drum is the biggest part
+   in the game.
+4. **Value, never hue.** Nothing in a normal frame is saturated. Anything the
+   player must read at speed is carried by light-against-dark.
+5. **Motion.** The recoil spring moves the whole assembly; that motion is read
+   before any surface is.
+
+Explicitly does NOT read at speed and must not be relied on: panel lines,
+fasteners, decals, insignia on the weapon, small text, roughness variation.
+Author them, but never as the thing that distinguishes two weapons.
+
+#### 3.2.5 Rig, topology, and technical expectations
 
 | Property | Spec | Rationale |
 |---|---|---|
 | Arms rig | Single FP arms skeletal mesh, UE5 Manny-compatible hierarchy | Lets you retarget bought animation packs without a bespoke rig |
+| Skeleton | **ONE skeleton shared by Human and Effigy** [O14] | See the note before Phase A in §7.4. Cheap today, ruinous later |
 | Triangle budget | 25k tris both arms, LOD0 only (no LODs needed — always at camera) | FP arms never LOD |
+| Weapon budget | 15–20k tris LOD0, LOD1 at ~40% for the third-person/paper-doll draw | §7.5 |
 | Texture | 2× 2048 (arms, gloves) | Gloves separate so gear-slot variation is possible later |
+| Materials | One master material, instanced. No unique unwraps — trim sheet | §7.5 rule 1 and 2 |
 | FOV | Separate FP FOV for the arms/weapon draw, default 70–80, **exposed and configurable** | Master sheet 5.4 requires FOV changes be subtle and configurable; settings already persist FOV per `CONTEXT.md` |
 | Camera-space offset | Arms parented to camera, weapon parented to arms, not to the character mesh | Standard, and keeps movement-driven camera roll from detaching the weapon |
 | Gloves | Sockets for gear variation at wrist and knuckle from day one | Gloves are a real equipment slot (GLOV) carrying crit, handling, airborne accuracy |
+| Shadows | FP arms and weapon cast **no** world shadow | A viewmodel shadow is a gun-shaped shadow from a gun nobody else can see. The blockout already sets this |
+| Visibility | Owner-see only | Multiplayer correctness; the blockout already sets this |
+
+#### 3.2.6 Separability — what must stay in pieces
+
+The blockout is replaced **piece by piece**, per §3.4, and the pieces are only
+swappable if the authored asset is split the same way the code pool is. Binding:
+
+| Piece | Must be its own mesh / socket | Why |
+|---|---|---|
+| Weapon body | Separate from arms | §3.4 replaces the weapon first; it is the largest screen-space object |
+| Barrel + muzzle device | Own mesh, own socket `Muzzle` | The muzzle flash, tracer origin and future VFX all hang off it, and the code already positions a light there per archetype |
+| Optic / sight | Own mesh, own socket `Sight` | The ADS pose is derived from the sight's height. Move the sight and the aim pose must follow automatically, not be re-authored |
+| Magazine | Own mesh | The reload animation shows the mechanism, and reload speed is a real affix |
+| Working mechanism (pump, bolt, charging handle) | Own mesh | §5 requires a visible mechanism the player can watch move |
+| Gloves | Separate from forearms | GLOV is a real equipment slot with its own affixes and its own marquee-affix tell |
+| Forearm / sleeve | Separate from gloves | So a gear-slot glove variant does not re-author the arm |
+| Personal item | Own ~200-tri mesh, socket `Personal` | §3.1's single cheapest humanising detail |
+| Marquee-affix stabiliser | Own mesh, socket on the glove | §3.3's Accuracy While Airborne tell, with an idle rotation |
+
+**Do not delete the blockout.** §7.5 rule 9 and the `CONTEXT.md` architecture
+rule both say it: every replacement keeps a fallback until it reaches parity.
+The code rig is that fallback, and it costs nothing because it ships no assets.
 
 **Motion set required for the slice.** Ordered by how often the player sees it:
 
@@ -313,6 +498,95 @@ Second rule: the dodge feedback must be *legible enough to feel lucky* and *not 
 - [ ] No hardpoint, hook, launcher, or tether geometry exists anywhere on the player model.
 - [ ] The blockout meshes still exist and can be swapped back via a Blueprint variable.
 
+### 3.6 ASSET LIST — exact paths and names
+
+Naming follows `CONTEXT.md`'s content conventions exactly: `SK_` skeletal mesh,
+`SM_` static mesh, `M_` material, `MI_` material instance, `T_` texture, `BP_`
+Blueprint, `PHYS_` physics asset, `ABP_` anim blueprint, `AS_` anim sequence.
+All game-owned content lives under `Content/ProjectBreaker`. Move and rename
+only inside Unreal Editor; fix redirectors before merging.
+
+**P0 — the arms (Phase A).**
+
+| Asset | Path |
+|---|---|
+| FP arms skeleton (shared, Human + Effigy) | `Content/ProjectBreaker/Characters/Player/SK_Breaker_FPArms_Skeleton` |
+| FP arms mesh | `Content/ProjectBreaker/Characters/Player/SK_Breaker_FPArms` |
+| FP gloves mesh | `Content/ProjectBreaker/Characters/Player/SK_Breaker_FPGloves` |
+| Physics asset | `Content/ProjectBreaker/Characters/Player/PHYS_Breaker_FPArms` |
+| Personal item | `Content/ProjectBreaker/Characters/Player/SM_Breaker_PersonalCharm` |
+| Anim blueprint | `Content/ProjectBreaker/Characters/Player/ABP_Breaker_FPArms` |
+| Viewmodel assembly | `Content/ProjectBreaker/Characters/Player/BP_BreakerViewmodel` |
+
+**P0 — materials and textures (Phase A/B).**
+
+| Asset | Path |
+|---|---|
+| Master material | `Content/ProjectBreaker/Materials/M_BreakerMaster` |
+| Militia kit trim sheet | `Content/ProjectBreaker/Textures/T_MilitiaKit_Trim_2K` |
+| Armoury trim sheet | `Content/ProjectBreaker/Textures/T_Armoury_Trim_2K` |
+| Arms instance | `Content/ProjectBreaker/Materials/MI_Breaker_FPArms` |
+| Gloves instance | `Content/ProjectBreaker/Materials/MI_Breaker_FPGloves` |
+| Armoury steel / polymer / bright-steel / hazard-amber instances | `Content/ProjectBreaker/Materials/MI_Armoury_{Steel,Polymer,Bright,Hazard}` |
+
+**Weapons.** One folder per archetype; the folder name matches the archetype's
+code name in `EBreakerWeaponArchetype` so a reader can pair them without a
+lookup. Every weapon ships the same five separable meshes.
+
+| Archetype | Folder | Meshes | Priority |
+|---|---|---|---|
+| Rifle | `Content/ProjectBreaker/Weapons/Rifle/` | `SM_Rifle_Body`, `_Barrel`, `_Sight`, `_Magazine`, `_Mechanism` | **P0** — sets the armoury vocabulary |
+| Shotgun | `Content/ProjectBreaker/Weapons/Shotgun/` | `SM_Shotgun_Body`, `_Barrel`, `_Sight`, `_TubeMagazine`, `_Pump` | **P0** |
+| Rocket | `Content/ProjectBreaker/Weapons/Rocket/` | `SM_Rocket_Body`, `_Muzzle`, `_Sight`, `_Grip`, `_RearVent` | **P0**, highest risk (open ruling, §9.2) |
+| Sniper | `Content/ProjectBreaker/Weapons/Sniper/` | `SM_Sniper_Body`, `_Barrel`, `_Scope`, `_Magazine`, `_Bolt` | P1 |
+| SMG | `Content/ProjectBreaker/Weapons/SMG/` | `SM_SMG_Body`, `_Barrel`, `_Sight`, `_Magazine`, `_Bolt` | P2 — kitbash first |
+| Burst Rifle | `Content/ProjectBreaker/Weapons/BurstRifle/` | `SM_BurstRifle_Body`, `_Barrel`, `_Optic`, `_Magazine`, `_Mechanism` | P2 |
+| Machinegun | `Content/ProjectBreaker/Weapons/Machinegun/` | `SM_Machinegun_Body`, `_Shroud`, `_Sight`, `_Drum`, `_Bipod` | P2 |
+| Sidearm | `Content/ProjectBreaker/Weapons/Sidearm/` | `SM_Sidearm_Body`, `_Barrel`, `_Sight`, `_Magazine`, `_Slide` | P2 |
+
+**CORRECTION to §5's header.** That section is written for five archetypes. The
+code now ships **eight**: Rifle, SMG, Sniper, Shotgun, Rocket, **Burst Rifle,
+Machinegun, Sidearm**. The three additions are P2 art and are described
+concretely in §5.1 below. The slice still closes on three finished weapons.
+
+**Motion set** — `Content/ProjectBreaker/Animation/Player/`, one `AS_` per
+entry in §3.2's motion list, prefixed `AS_FPArms_`: `Idle`, `Sprint`,
+`SlideEnter/Loop/Exit`, `WallRideLeft/Right`, `Dash`, `Fall`, `AirJump`, and per
+archetype `Fire`, `Reload`, `AimIn`, `AimOut`, `SwapIn`. Reload length must be
+driven by the weapon's `ReloadDuration` property, never hardcoded, because
+Reload Speed is a real affix.
+
+**Explicitly NOT on this list:** any dodge, block, parry or defensive pose.
+[O1], §3.5. Author none.
+
+### 3.7 Handoff notes
+
+- **Reference build:** run the capture harness and look at what exists before
+  modelling anything. `UnrealEditor-Cmd.exe <project> -game -BreakerAutoPlay
+  -BreakerScreenshots=16 -BreakerCycleWeapons=2 -windowed -ResX=1920 -ResY=1080`
+  walks all eight archetypes through hip and aimed poses, firing, and writes
+  PNGs to `Saved/Screenshots`. That is the framing to match.
+- **Scale check before anything else.** Model to centimetres, rig origin at the
+  trigger group, and drop the mesh in against the blockout at `ViewmodelScale`
+  1.0. If it does not sit in the same envelope, the proportions are wrong and no
+  amount of positioning will fix it.
+- **The ADS pose is derived, not authored.** Give the sight an accurate height
+  above the rig origin and the aim pose follows. Do not hand-place an aimed
+  transform; it will drift the first time a part moves.
+- **Deliver the pieces separately** per §3.2.6, even if the concept was modelled
+  as one object. A merged weapon cannot be replaced piece by piece and cannot
+  animate its own mechanism.
+- **The blockout stays.** Keep it swappable via a Blueprint variable; §7.5
+  rule 9 is not negotiable and it costs nothing, because the fallback ships no
+  assets.
+- **Open rulings that block finishing work.** Rocket self-damage/self-knockback
+  (§9.2) blocks the Rocket's launch pose and recovery. Cipher-or-person (§9.3)
+  blocks the third-person face and therefore the paper-doll head. Neither blocks
+  the arms or the weapon bodies — start there.
+- **Values are frozen.** Everything numeric in §3 is O2 PLACEHOLDER and none of
+  it has been playtested. Automation proves the ordering and the palette law;
+  screenshots proved the framing; nothing has proved the feel.
+
 ---
 
 ## 4. Anchor environment direction
@@ -375,6 +649,36 @@ Code currently ships Rifle, SMG, Sniper, Shotgun, Rocket (`CONTEXT.md`). Master 
 | **Sniper** | PRIMARY — reach. Effective range, pierce, headshot. | Extremely long, thin, with an oversized cylindrical optic that breaks the top line. Longest silhouette by 40%. | Personally maintained. Taped, bedded, a hand-marked dope card on the stock. The most *individual* weapon. | One heavy event. Hard hit-stop, long recovery, screen settles slowly. Every shot is a decision. | P1 |
 | **Shotgun** | Multi-shot behaviour. Pellet spread. | Wide, thick, blunt. Widest silhouette. Exposed pump or break action — a visible *mechanism* the player can watch move. | Industrial, blunt, unglamorous. Closer to a tool than a firearm. | Maximum single-frame impact. Biggest hit-stop, biggest screen kick, deepest audio. | **P0** |
 | **Rocket** | Movement interaction. Radial falloff. | Tube. Shoulder-borne, back-heavy, visibly asymmetric. The only weapon that breaks the player's shoulder line. | Field-fabricated. Welded, hand-painted markings, hazard amber striping. Looks like it might not be safe. | Slow, heavy, committed. Long readied pose, visible projectile, a real reason to reposition after firing. | **P0** |
+
+### 5.1 The eight archetypes, as the code blockout builds them
+
+The table above predates three archetypes. This one is the live contract: it is
+what `Source/RiorsEdge/Characters/BreakerViewmodelRig.cpp` actually builds, and
+it is what an authored mesh replaces one for one. Every proportion is read off
+the weapon's real numbers in `Source/RiorsEdge/Weapons/BreakerWeaponComponent.cpp`
+rather than invented — magazine size, cadence and swap time are the three things
+the player already feels, so those are the three the silhouette states.
+
+| Archetype | Mechanical fact it expresses | Dominant blockout feature | Length | Bulk |
+|---|---|---|---|---|
+| **Rifle** | 35 rnd, 620 rpm, 0.50 s swap | Boxy top-mounted optic, straight 30-round stick, fixed stock. The one gun that looks *issued* | ~80 cm — the reference | baseline |
+| **SMG** | 35 rnd, 900 rpm, 0.35 s swap | **No stock at all**, stubby barrel, and the longest magazine on the smallest gun | ~40 cm — shortest long gun | light, visibly cheap polymer |
+| **Sniper** | 8 rnd, 150 rpm, 0.70 s swap | **Oversized cylindrical optic breaking the top line**, plus an off-white taped dope card at the comb | ~96 cm — longest | long *without* being bulky |
+| **Shotgun** | 8 rnd, 85 rpm, 8 pellets | **Tube magazine under the barrel** and a bright-steel pump — the visible mechanism §5 asks for | ~76 cm | widest and thickest |
+| **Rocket** | 4 rnd, 55 rpm, 0.80 s swap | **A tube worn high**, breaking the shoulder line, with a forward flare, a rear back-blast cone, an offset side sight, and the only hazard-amber band in the game | ~83 cm | largest single part |
+| **Burst Rifle** | 27 rnd, 3-rnd burst, 0.55 s swap | **A tall dedicated optic on a visible riser**, longer thinner barrel, in-line stock. Rifle length, marksman's build | ~89 cm | lighter than the rifle |
+| **Machinegun** | 120 rnd, 700 rpm, 4.2 s reload | **A drum**, the biggest part on any weapon, plus a shrouded barrel and a **bipod** — "only while planted" is the archetype's actual rule | ~83 cm | >2x the rifle; heaviest in the game |
+| **Sidearm** | 14 rnd, 420 rpm, **0.18 s swap** | Almost nothing: a slide, a grip with the rounds inside, two tiny bright sights. No stock, no separate magazine | ~22 cm | 1/14th the machinegun |
+
+Each row's hands move too: the support hand sits out on the handguard for a
+rifle, back on the **pump** for a shotgun, and stacked at the grip for a sidearm
+because there is nothing out front to hold.
+
+The ordering claims in that table — sniper longest, sidearm smallest, machinegun
+heaviest, sniper long-but-not-bulky, SMG shortest long gun — are pinned by
+`RiorsEdge.Characters.ViewmodelSilhouetteOrder`. The values are not: they are O2
+placeholders and the test deliberately checks ratios, so the table can be
+retuned without going red.
 
 **Shared authoring grammar** — all five weapons share:
 - The same fastener and rail vocabulary, so they read as one armoury.

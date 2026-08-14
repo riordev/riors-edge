@@ -1,0 +1,192 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Weapons/BreakerWeaponArchetype.h"
+#include "BreakerViewmodelRig.generated.h"
+
+// ---------------------------------------------------------------------------
+// The first-person BLOCKOUT, as data.
+//
+// Why this file exists at all. Before it, the whole viewmodel was five lines of
+// SetRelativeScale3D in ABreakerCharacter's constructor and a five-case switch
+// in ApplyWeaponPresentation. Three problems, all of them visible on screen:
+//
+//   1. THE PLAYER COULD NOT TELL WHICH GUN THEY WERE HOLDING. Three cubes,
+//      re-scaled. Worse, the three newest archetypes (Burst Rifle, Machinegun,
+//      Sidearm) had no case at all and silently wore the rifle's proportions,
+//      so a 120-round machinegun and a pocket sidearm were the same object.
+//   2. THE ARMS WERE OFF SCREEN. Measured, not guessed: at the shipped
+//      transforms both arm blocks project to y=1283 and y=1384 on a 1080-tall
+//      frame. The player has been holding an invisible gun with no hands.
+//   3. THE GUN READ AS ARCHITECTURE. The proxy used the engine's default grey
+//      against the gym's grey concrete at a scale that filled a quarter of the
+//      frame; in a screenshot it is indistinguishable from a wall.
+//
+// Everything here is COMPOSED PRIMITIVES plus dynamic material instances — the
+// same asset-free technique the gym dressing uses (Game/BreakerGameMode.cpp's
+// ApplyShapeColor) — so a clean clone still plays with no content. This is NOT
+// art. It is a readable stand-in whose only job is: the player can name the gun
+// in their hands, and can see the recoil move it. Art-And-Modelling-Plan.md §5
+// is the brief for what replaces it.
+//
+// It is deliberately world-free, actor-free maths-and-data in the precedent of
+// Combat/BreakerRangedBehavior.h and Weapons/BreakerWeaponMath.h, so the layout
+// table is unit-testable without spawning anything.
+//
+// O2: every value in the default table is a PLACEHOLDER. The whole table is
+// overridable per archetype on the character instance
+// (ABreakerCharacter::ViewmodelLayoutOverrides) with no recompile, exactly like
+// UBreakerWeaponComponent::RecoilOverrides.
+//
+// O24 / the object-chroma law: the reserved saturated teal band belongs to
+// rift and suppression OBJECTS. Nothing the player wears or carries may use it.
+// The palette below is militia hardware only — gunmetal, olive polymer, one
+// hazard amber on the one weapon that is field-fabricated. Enforced by test.
+// ---------------------------------------------------------------------------
+
+// Which engine primitive a part is built from, and which rig axis it runs
+// along. The engine's BasicShapes cylinders and cones are authored along their
+// own local Z; the rig authors along X (forward), so the builder folds in the
+// intrinsic rotation and the author never has to think about it.
+UENUM(BlueprintType)
+enum class EBreakerProxyShape : uint8
+{
+    // Unused pool slot. A layout with fewer parts than the pool leaves the
+    // remainder as None and the builder hides them.
+    None,
+    Box,
+    // Cylinder whose axis lies along rig X: barrels, tubes, scope bodies. A
+    // cylinder has no direction, so only the axis matters.
+    CylinderX,
+    // Cylinder running along rig Y (lateral): the machinegun's drum.
+    CylinderY,
+    // Cone with its BASE forward — a flare, not a spike. Author a yaw of 180
+    // to point it the other way, which is what a back-blast cone wants.
+    ConeX
+};
+
+// One primitive of the proxy.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerProxyPart
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    EBreakerProxyShape Shape = EBreakerProxyShape::None;
+
+    // Centre of the part in RIG SPACE, centimetres. X forward, Y right, Z up.
+    // The rig origin sits at the firing hand / trigger group, which is why
+    // stocks author negative X and barrels author positive.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector LocationCm = FVector::ZeroVector;
+
+    // REAL-WORLD SIZE in centimetres, in rig axes: X length, Y width, Z height.
+    // Authoring in centimetres rather than in mesh-scale multiples is the whole
+    // reason this is reviewable — "a 32 cm receiver" is a claim you can argue
+    // with; "SetRelativeScale3D(0.34, 0.12, 0.11)" is not.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector SizeCm = FVector::ZeroVector;
+
+    // Author rotation applied ON TOP of the shape's intrinsic axis rotation:
+    // the rake on a magazine, the splay on a bipod leg.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FRotator Rotation = FRotator::ZeroRotator;
+
+    // Linear colour fed to the dynamic material instance. Values are dark on
+    // purpose: the gym is bright concrete under a bright sky, and a mid-grey
+    // proxy disappears into it (that is exactly the bug this pass fixes).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FLinearColor Color = FLinearColor(0.075f, 0.082f, 0.088f);
+
+    bool IsUsed() const { return Shape != EBreakerProxyShape::None; }
+};
+
+// The complete first-person presentation of one archetype.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerViewmodelLayout
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    TArray<FBreakerProxyPart> Parts;
+
+    // Where the rig origin sits relative to the camera when hip firing,
+    // centimetres. Bigger weapons sit further out and lower; the sidearm sits
+    // closer to the centre line, which is how a pistol is actually held.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector HipOffsetCm = FVector(26.0f, 13.0f, -16.0f);
+
+    // Height of this weapon's SIGHTING LINE above the rig origin. The ADS rest
+    // pose is derived from it rather than authored, so every archetype puts its
+    // own sight on the crosshair instead of each one needing a hand-tuned
+    // offset that drifts the moment a part moves.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    float SightHeightCm = 8.0f;
+
+    // How far forward the rig comes when aiming. Small: ADS is a settle onto
+    // the sights, not a lunge.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    float AdsForwardCm = 30.0f;
+
+    // Where the two hands land, in rig space. The support hand is what makes a
+    // long gun read as held rather than floating, and it MOVES per archetype —
+    // out on the handguard for a rifle, back on the pump for a shotgun, absent
+    // in spirit for the sidearm (both hands stack at the grip).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector SupportHandCm = FVector(34.0f, 0.0f, -4.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector FiringHandCm = FVector(-1.0f, 0.0f, -7.0f);
+
+    // Muzzle position in rig space: where the flash light hangs. Attached to
+    // the rig rather than to the camera so the flash rides the recoil spring
+    // with the gun instead of staying nailed to the screen.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FVector MuzzleCm = FVector(60.0f, 0.0f, 2.5f);
+
+    // Longest dimension of the assembled weapon, used by the readability test
+    // to pin the ORDERING of the silhouettes (sidearm < SMG < ... < sniper)
+    // without pinning the values, which are frozen under O2.
+    float OverallLengthCm() const;
+};
+
+namespace BreakerViewmodel
+{
+    // ---- Palette -------------------------------------------------------
+    // Militia hardware, per Art-And-Modelling-Plan.md §3.1 and Pillar 3.
+    // Desaturated steel and olive polymer; hazard amber appears on exactly one
+    // weapon. No teal anywhere — O24 and the object-chroma law.
+    // MEASURED against a screenshot, not picked from a swatch. The gym runs
+    // auto-exposure under a bright sky and its concrete is authored at linear
+    // 0.33; a first pass at linear 0.08 came back mid-grey and vanished into
+    // the floor. These are roughly a quarter of that pass and the SPREAD
+    // between them (0.010 to 0.075, about 7x) is what carries the read, because
+    // value contrast is the only budget a flat blockout has.
+    inline const FLinearColor Gunmetal      (0.022f, 0.024f, 0.026f);
+    inline const FLinearColor GunmetalDark  (0.010f, 0.011f, 0.012f);
+    inline const FLinearColor Polymer       (0.018f, 0.022f, 0.017f);
+    inline const FLinearColor PolymerCheap  (0.040f, 0.043f, 0.037f);
+    inline const FLinearColor SteelBright   (0.075f, 0.080f, 0.082f);
+    inline const FLinearColor HazardAmber   (0.300f, 0.170f, 0.030f);
+    inline const FLinearColor TapeOffWhite  (0.160f, 0.150f, 0.125f);
+    inline const FLinearColor GloveOlive    (0.014f, 0.017f, 0.013f);
+    inline const FLinearColor SleeveSlate   (0.028f, 0.032f, 0.034f);
+
+    // The largest part count any archetype uses. The character allocates this
+    // many components once in its constructor and recycles them, so switching
+    // weapons never spawns anything — the same discipline
+    // ABreakerTracerRenderer follows for rounds in flight.
+    inline constexpr int32 MaxProxyParts = 12;
+
+    // The default table. O2 PLACEHOLDER throughout.
+    RIORSEDGE_API FBreakerViewmodelLayout ArchetypeLayout(EBreakerWeaponArchetype Archetype);
+
+    // Component scale and total rotation for a part, folding in the intrinsic
+    // axis rotation of cylinders and cones. Pure; the character only applies it.
+    RIORSEDGE_API void ResolvePartTransform(const FBreakerProxyPart& Part, FVector& OutScale, FRotator& OutRotation);
+
+    // A limb drawn as one stretched box from an anchor to a hand. Returns the
+    // centre, the rotation, and the length so the caller can size the box.
+    RIORSEDGE_API void ResolveLimb(const FVector& AnchorCm, const FVector& HandCm,
+        FVector& OutCentreCm, FRotator& OutRotation, float& OutLengthCm);
+}
