@@ -135,12 +135,22 @@ Implementation notes tied to this ruling:
   bucket rule changes movement FEEL (+20/+20 becomes x1.40, not x1.44),
   which is why it is a ruling and not a fix. Related: the composed MoveSpeed
   attribute has no gameplay consumer at all.
-- **Subclass commitment** — the branch strip browses; committing needs a
-  branch field, a permanence-or-Forge rule, save versioning, and a decision
-  on whether unselected branches become unpurchasable. That last part
-  collides with O15 (branches freely mixed, no mutually exclusive tiers).
-- **Swift's third jump (O25)** — unimplemented; needs a kit design for when
-  it unlocks and whether it costs anything.
+- **Subclass commitment** — RULED by O37 (commitment unlocks the branch's
+  keystone tier; ordinary nodes stay freely mixed, so the O15 collision
+  dissolves).
+- **Swift's third jump (O25)** — mechanism BUILT and reachable (2026-08-14);
+  the unlock THRESHOLD stays open and is gated by O40(b): no CharacterLevel
+  gate until an XP loop exists.
+- **The DoT bucket question [O34]** — do Increased Damage and Increased DoT
+  share one additive bucket for DoT ticks, or keep multiplying? Currently
+  they multiply (a deliberate deviation recorded in the canon). Owner call.
+- **Replication position [O22]** — still owner-authored. A DRAFT page now
+  exists at `Docs/Design/Replication-Position.md` with a recommended
+  position; it is not law until signed off.
+- **Endgame band verification [O36]** — the 12–20x seed rails are accepted
+  arithmetic, not a feeling; first endgame-area playtest should judge them.
+- **Movement affix uplift [O29]** — the pool-wide 2.2x tier uplift made the
+  gear-only movement band large; retune is a frozen O2 value question.
 
 
 - **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
@@ -208,4 +218,42 @@ Implementation notes tied to this ruling:
 - O32: the three authored legendaries occupy Boots, Primary and Waist.
   Helmet, Body Armour, Gloves, Necklace and Secondary have none, which is what
   makes the current wait 57 hours rather than 21.
+
+## 2026-08-14 — O33..O40 (identity stack, multiplier canon, ability scaling, bands, caps, scope honesty)
+
+Provenance: ruled by the owner by direct chat directive during the 2026-08-14
+full-project audit session — the identity directive is quoted in O33, and the
+owner delegated the audit's D1–D8 recommendations verbatim ("let me know what
+you need actual insight on otherwise go with recommendations"). Entries drafted
+by the session agent under that delegation; any of them is supersedable by a
+later entry as usual. Items the owner still explicitly owns are listed in the
+pending section (replication sign-off, the DoT bucket question, band
+verification by playtest).
+
+| # | Decision |
+|---|----------|
+| O33 | **THE IDENTITY STACK: FOUR AVENUES, AND CLASS IS ONLY ONE OF THEM.** Owner directive, verbatim: "i want character identity to not be just based in the class system as well[;] players should find power and build diversity in other areas and avenues as well … we need simple ideologies that players can extensively expand on to find power … destiny 2 meets path of exile in a comfortable way that rewards innovation and barrier for entry isnt impossible." Ruling: character identity and power live in four independently expandable avenues — (1) **Class**: verbs and resource, how you act; (2) **Core-tree axes** (O30): what you amplify, class-agnostic; (3) **Gear affixes** including conditional lines: what you stack; (4) **Legendaries and Anomalous rewrites**: which rule you break. Class must never be the sole trunk: the Core tree and gear must each be able to carry a build-defining identity without class synergy. Each avenue states a one-sentence ideology that expands to depth; a baseline player is viable understanding none of them (the flat baseline curve guarantees it — that IS the comfortable barrier to entry), and innovation is rewarded through conditions and rewrites, never required for viability. |
+| O34 | **THE MULTIPLIER CANON AND THE SINGLE CEILING.** Damage-Pipeline.md gains a canon section enumerating every lane permitted to touch outgoing damage; a new lane requires a canon entry and a conformance test before it merges. There is **ONE More ceiling**, derived from the aggregator (1.30³ ≈ 2.197) — the combat chain's separate 2.20 constant is deleted and its product counts against the same budget. **Temporary ability windows ARE Mores and count within the budget** (resolves Overdrive's self-flagged 4th-More: it now competes for headroom, which is the choice O27 wants). **Weak point is ruled the aim-skill lane**, deliberately outside the O3 budget, bounded per archetype within [1.0, 2.0]; the locked line amends to: *crit and weak point are the two site multipliers — crit is build-gated, weak point is skill-gated, and nothing else may multiply at the site.* Fire rate is a named, watched, currently-uncapped lane. **Deliberately NOT ruled today:** whether Increased Damage and Increased DoT share one additive bucket for DoT ticks (they currently multiply); pending. |
+| O35 | **ABILITIES RIDE GEAR DEPTH.** All class-ability damage scales by the weapon item-level scalar (`ItemLevelDamageScalar` of the equipped weapon's item level; unequipped = ilvl 1), anchored to exactly 1.0 at ilvl 1 so no current number moves at the anchor. Cleave's weapon-coefficient path reads the SCALED weapon base. This generalizes the bleed precedent and is what makes O30's ABILITIES axis real rather than decorative — without it every ability decays ×74 against the curve by ilvl 50. |
+| O36 | **TWO BANDS, AND THE LADDER'S SUMMIT HAS A SOURCE.** The build variance band is authored at two points: **AT-CAP** (level 50, tiers a level-50 drop can produce): 8–10x stands. **ENDGAME** (ilvl 120, producible tiers): seed rails **12–20x** (O2 PLACEHOLDER; the back-loaded ladder currently measures ~15x, accepted pending playtest). `PowerBand` splits into an at-cap and an endgame fixture, each pinned. Rewrite-impact ceilings re-anchor per band (PROLIFIC's endgame ceiling seeded 1.5x, O2 PLACEHOLDER). **Item level 101–120 is sourced from endgame tier bonus**: Frontier tiers extend O6's TierBonus past +5, so pushing tiers IS pushing the ladder; the Forge is the secondary source. Area level stays capped at 100. |
+| O37 | **EQUIP CAPS PER AXIS; COMMITMENT AS EMPOWERMENT.** Caps: exactly **1 equipped legendary**, **1 non-legendary Anomalous**, **3 Aberrant** (O11 reaffirmed). A legendary still rolls at Anomalous rarity (O32) but does not consume the Anomalous cap — the axes are separate. **Subclass commitment exists and empowers rather than excludes**: committing to a branch unlocks that branch's keystone tier and identity presentation; ordinary nodes of all branches remain freely purchasable, so O15 stands untouched. One commitment per character; changing it is a Forge respec operation. |
+| O38 | **ELEMENTS ARE POST-SLICE.** The slice and first release ship five constellations; Elements is designed-not-cut (ratifies Core-Constellations' plan of record and answers Design-Overview S1). The affix pool continues to refuse elemental lines until the system lands. Rift/Entropy/Void naming stands (O19). |
+| O39 | **SLICE CLASS HONESTY.** Outside dev mode the class screen offers only classes with implemented kits — today Swift and Caster. The slice's class story is Swift + Caster end-to-end; Gunsmith, Tank and Support remain designed and gated until built, so no player can permanently lock a character into a class that grants nothing. |
+| O40 | **HYGIENE RULINGS.** (a) The current Unreal dash model (single directional dash on cooldown) is FINAL; the Godot dual-charge model is historical (closes Master §5.5). (b) **Until an XP loop exists, no system may gate on CharacterLevel** — the third-jump class of bug; the day a loop lands, gates re-open by ruling. (c) **Reachability is part of definition-of-done**: a feature merges together with its in-game path (spawn table / drop gate / UI hook / key) and a shipped-configuration test in the `JumpGrantMatrix` mold. |
+
+Implementation notes tied to these rulings:
+- O34: expected, intended balance change — on a build already holding three tree
+  Mores near the ceiling, Overdrive's window buys little; that is the ruling's
+  meaning (windows compete with tree Mores for the same budget).
+- O35: the scalar source is the EQUIPPED WEAPON's item level for every ability,
+  matching the weapon's own curve; moving to an averaged gear level later is an
+  open refinement, not part of this ruling.
+- O36: `RiorsEdge.Progression.PowerBand`'s deliberate red resolves into two
+  green tests with pinned seed rails; the suite returns to fully green being
+  meaningful.
+- O37: the equipment layer must enforce the three caps at equip time and at
+  save-load validation; save version bumps accordingly.
+- O39: `ApplySliceDefaultsIfFresh`'s auto-lock to Swift should be retired to a
+  dev convenience once the class screen's real path works, so the screen is
+  actually exercised.
 
