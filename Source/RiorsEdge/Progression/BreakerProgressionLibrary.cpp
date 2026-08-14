@@ -21,6 +21,19 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Verb_Parry, "Progression.Verb.Parry");
     UE_DEFINE_GAMEPLAY_TAG(Verb_AirJump, "Progression.Verb.AirJump");
 
+    // Velocity — the Core constellation O27 asked for: damage that keys off the
+    // movement state, which is where this game's build identity belongs and
+    // which did not exist in the slice at all.
+    UE_DEFINE_GAMEPLAY_TAG(Node_Freefall, "Progression.Node.Core.Freefall");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Slipstream, "Progression.Node.Core.Slipstream");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Traction, "Progression.Node.Core.Traction");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Afterburn, "Progression.Node.Core.Afterburn");
+    UE_DEFINE_GAMEPLAY_TAG(Node_TerminalVelocity, "Progression.Node.Core.TerminalVelocity");
+    UE_DEFINE_GAMEPLAY_TAG(Node_RedlineDoctrine, "Progression.Node.Core.RedlineDoctrine");
+    UE_DEFINE_GAMEPLAY_TAG(Node_CalledShot, "Progression.Node.Core.CalledShot");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Salvo, "Progression.Node.Core.Salvo");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Barrage, "Progression.Node.Core.Barrage");
+
     UE_DEFINE_GAMEPLAY_TAG(Node_ReadTheRoom, "Progression.Node.Swift.Kinetic.ReadTheRoom");
     UE_DEFINE_GAMEPLAY_TAG(Node_Contact, "Progression.Node.Swift.Kinetic.Contact");
     UE_DEFINE_GAMEPLAY_TAG(Node_Carry, "Progression.Node.Swift.Kinetic.Carry");
@@ -38,6 +51,12 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_PierceDiscipline, "Progression.Node.Swift.Marksman.PierceDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Sightline, "Progression.Node.Swift.Marksman.Sightline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Lead, "Progression.Node.Swift.Marksman.Lead");
+
+    UE_DEFINE_GAMEPLAY_TAG(Node_Downforce, "Progression.Node.Swift.Kinetic.Downforce");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Grind, "Progression.Node.Swift.Kinetic.Grind");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Overpressure, "Progression.Node.Swift.Kinetic.Overpressure");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Deadeye, "Progression.Node.Swift.Marksman.Deadeye");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Culling, "Progression.Node.Swift.Marksman.Culling");
 }
 
 namespace
@@ -78,13 +97,25 @@ namespace
         Node->Prerequisites.Add(Prerequisite);
     }
 
-    void AddEffect(UBreakerProgressionNode* Node, EBreakerNodeStatTarget Target, EBreakerNodeStatBucket Bucket, float ValuePerRank)
+    void AddEffect(UBreakerProgressionNode* Node, EBreakerNodeStatTarget Target, EBreakerNodeStatBucket Bucket, float ValuePerRank,
+        EBreakerBuildCondition Condition = EBreakerBuildCondition::Always)
     {
         FBreakerNodeEffect Effect;
         Effect.StatTarget = Target;
         Effect.StatBucket = Bucket;
         Effect.ValuePerRank = ValuePerRank;
+        Effect.Condition = Condition;
         Node->Effects.Add(Effect);
+    }
+
+    // A More multiplier on outgoing damage, authored as whole percent above 1.0
+    // (25.0 == x1.25). O3 restricts these to branch keystones and constellation
+    // Convergence/Keystone nodes, so every caller below is a single-rank node
+    // costing 3 or more — which is also how SBreakerMenu classifies a node as a
+    // Convergence, so the board reads them correctly with no UI change.
+    void AddDamageMore(UBreakerProgressionNode* Node, float PercentAboveOne, EBreakerBuildCondition Condition = EBreakerBuildCondition::Always)
+    {
+        AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, PercentAboveOne, Condition);
     }
 
     UBreakerProgressionTree* MakeTree(FName TreeId, const TCHAR* DisplayName, EBreakerPointCurrency Currency, EBreakerClassId RequiredClass)
@@ -121,12 +152,26 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     TunnelVision->GrantedTags.AddTag(BreakerNodeTags::Node_TunnelVision.GetTag());
     Tree->Nodes.Add(TunnelVision);
 
-    // Fixate is the slice's only More multiplier and is a Convergence node
-    // after O21. The More bucket does not exist in code yet, so it ships as a
-    // tag grant and the damage pipeline consumes it when the bucket lands.
+    // Called Shot is the crit-chance choice the Precision line was missing:
+    // without a second chance source, Critical Damage had nothing to turn on
+    // and crit could not be the third axis of the variance band (Power-Curve
+    // §4). Two ranks, so it reads as a Minor on the board.
+    UBreakerProgressionNode* CalledShot = MakeNode(TEXT("Core.Precision.CalledShot"), TEXT("Called Shot"),
+        TEXT("Deliberate fire finds the seam. Critical chance rises sharply, and every shot lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+    AddPrerequisite(CalledShot, TEXT("Core.Precision.Sightline"));
+    AddEffect(CalledShot, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f);          // O2 PLACEHOLDER
+    AddEffect(CalledShot, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f);      // O2 PLACEHOLDER
+    CalledShot->GrantedTags.AddTag(BreakerNodeTags::Node_CalledShot.GetTag());
+    Tree->Nodes.Add(CalledShot);
+
+    // Fixate is a Convergence node after O21 and now carries a REAL More
+    // multiplier: EBreakerNodeStatBucket::MorePercent exists, and the aggregator
+    // composes it under the O3 cap. Unconditional, which is what makes it the
+    // generalist pick against Terminal Velocity's larger conditional one.
     UBreakerProgressionNode* Fixate = MakeNode(TEXT("Core.Precision.Fixate"), TEXT("Fixate"),
-        TEXT("Convergence. Repeated hits on one target build a More multiplier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. Repeated hits on one target build a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
     AddPrerequisite(Fixate, TEXT("Core.Precision.TunnelVision"));
+    AddDamageMore(Fixate, 22.0f); // O2 PLACEHOLDER: x1.22
     Fixate->GrantedTags.AddTag(BreakerNodeTags::Node_Fixate.GetTag());
     Tree->Nodes.Add(Fixate);
 
@@ -152,6 +197,29 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddPrerequisite(LastRound, TEXT("Core.Volley.TriggerDiscipline"));
     LastRound->GrantedTags.AddTag(BreakerNodeTags::Node_LastRound.GetTag());
     Tree->Nodes.Add(LastRound);
+
+    // The generalist damage ladder. Deliberately the LARGEST unconditional
+    // per-rank damage in the tree and deliberately the most boring: it is the
+    // control against which every conditional node is measured, and a build
+    // that takes only this is exactly the "baseline" the variance band is
+    // defined against.
+    UBreakerProgressionNode* Salvo = MakeNode(TEXT("Core.Volley.Salvo"), TEXT("Salvo"),
+        TEXT("Volume over placement. Every rank increases all damage dealt, with no condition attached."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+    AddPrerequisite(Salvo, TEXT("Core.Volley.TriggerDiscipline"));
+    AddEffect(Salvo, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f); // O2 PLACEHOLDER
+    Salvo->GrantedTags.AddTag(BreakerNodeTags::Node_Salvo.GetTag());
+    Tree->Nodes.Add(Salvo);
+
+    // Second unconditional More. Fixate and Barrage are both generalists, so a
+    // build that wants three Mores and refuses to commit to a movement state
+    // can find only two — which is the shape O27 asks for: the uncommitted
+    // build is viable, the committed one is stronger.
+    UBreakerProgressionNode* Barrage = MakeNode(TEXT("Core.Volley.Barrage"), TEXT("Barrage"),
+        TEXT("Convergence. Sustained output becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+    AddPrerequisite(Barrage, TEXT("Core.Volley.Cyclic"));
+    AddDamageMore(Barrage, 22.0f); // O2 PLACEHOLDER: x1.22
+    Barrage->GrantedTags.AddTag(BreakerNodeTags::Node_Barrage.GetTag());
+    Tree->Nodes.Add(Barrage);
 
     // --- Affliction --------------------------------------------------------
     UBreakerProgressionNode* OpenWound = MakeNode(TEXT("Core.Affliction.OpenWound"), TEXT("Open Wound"),
@@ -217,6 +285,67 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AirJump->GrantedTags.AddTag(BreakerNodeTags::Verb_AirJump.GetTag());
     Tree->Nodes.Add(AirJump);
 
+    // --- Velocity ----------------------------------------------------------
+    // NEW under O27. "Movement is part of character building rather than a
+    // fixed utility layer" was true of the movement STATS and false of
+    // everything that mattered: no node anywhere converted a movement state
+    // into damage, so the pillar had no offensive expression at all.
+    //
+    // Four laddered conditionals and two Convergences. Each pays roughly twice
+    // what Salvo's unconditional rank pays, and each is worth nothing while you
+    // stand still — the trade that makes a movement build a build.
+    UBreakerProgressionNode* Freefall = MakeNode(TEXT("Core.Velocity.Freefall"), TEXT("Freefall"),
+        TEXT("Velocity gateway. Increased damage while airborne. Nothing while your feet are down."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1);
+    AddEffect(Freefall, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+    Freefall->GrantedTags.AddTag(BreakerNodeTags::Node_Freefall.GetTag());
+    Tree->Nodes.Add(Freefall);
+
+    UBreakerProgressionNode* Slipstream = MakeNode(TEXT("Core.Velocity.Slipstream"), TEXT("Slipstream"),
+        TEXT("Velocity gateway. Increased damage while sliding, and slides carry further."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1);
+    AddEffect(Slipstream, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
+    AddEffect(Slipstream, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f);                              // O2 PLACEHOLDER
+    Slipstream->GrantedTags.AddTag(BreakerNodeTags::Node_Slipstream.GetTag());
+    Tree->Nodes.Add(Slipstream);
+
+    // The narrowest condition in the tree pays the most per rank. Wall riding
+    // is the hardest state to hold, so the node is priced for the player who
+    // actually builds their traversal around it.
+    UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
+        TEXT("Increased damage while wall riding. The narrowest window in the constellation, and the largest per rank."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+    AddPrerequisite(Traction, TEXT("Core.Velocity.Freefall"));
+    AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
+    Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
+    Tree->Nodes.Add(Traction);
+
+    UBreakerProgressionNode* Afterburn = MakeNode(TEXT("Core.Velocity.Afterburn"), TEXT("Afterburn"),
+        TEXT("Increased damage for a few seconds after dashing. The one Velocity line you can trigger on demand."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+    AddPrerequisite(Afterburn, TEXT("Core.Velocity.Slipstream"));
+    AddEffect(Afterburn, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 8.0f, EBreakerBuildCondition::RecentlyDashed); // O2 PLACEHOLDER
+    Afterburn->GrantedTags.AddTag(BreakerNodeTags::Node_Afterburn.GetTag());
+    Tree->Nodes.Add(Afterburn);
+
+    // The largest single multiplier in the game and the hardest to keep on.
+    // Capped at the Damage-Pipeline §4 per-More ceiling of 1.30x by the
+    // aggregator, so authoring it AT the ceiling is a statement that nothing
+    // will ever be allowed past it.
+    UBreakerProgressionNode* TerminalVelocity = MakeNode(TEXT("Core.Velocity.TerminalVelocity"), TEXT("Terminal Velocity"),
+        TEXT("Convergence. A MORE multiplier to all damage dealt while airborne. Land and it is gone."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+    AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.Traction"));
+    AddDamageMore(TerminalVelocity, 30.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER: x1.30
+    TerminalVelocity->GrantedTags.AddTag(BreakerNodeTags::Node_TerminalVelocity.GetTag());
+    Tree->Nodes.Add(TerminalVelocity);
+
+    // Class-coupled by construction rather than by a RequiredClass field: the
+    // Momentum loop is inert for everyone but Swift, so Redline never fires for
+    // another class. It stays a Core node because O15 forbids mutually
+    // exclusive tiers and a Tank can see, and decline, the trade honestly.
+    UBreakerProgressionNode* RedlineDoctrine = MakeNode(TEXT("Core.Velocity.RedlineDoctrine"), TEXT("Redline Doctrine"),
+        TEXT("Convergence. A MORE multiplier to all damage dealt while at Redline Momentum. Inert for a class with no Momentum."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+    AddPrerequisite(RedlineDoctrine, TEXT("Core.Velocity.Afterburn"));
+    AddDamageMore(RedlineDoctrine, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
+    RedlineDoctrine->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
+    Tree->Nodes.Add(RedlineDoctrine);
+
     return Tree;
 }
 
@@ -273,6 +402,33 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Landing"));
     AddEffect(Node, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AirWork.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Kinetic's offensive half. The branch was eight nodes of Momentum-loop
+    // knobs, every one of which made movement better at generating Momentum and
+    // none of which made movement worth anything offensively — so a Kinetic
+    // player's damage came entirely from Core and gear.
+    Node = MakeNode(TEXT("Swift.Kinetic.Downforce"), TEXT("Downforce"),
+        TEXT("Shots fired while airborne land significantly harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 11.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Downforce.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Swift.Kinetic.Grind"), TEXT("Grind"),
+        TEXT("Shots fired off a wall ride land significantly harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 13.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Grind.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // The branch keystone O3 permits. Sliding is the state Kinetic can hold
+    // most reliably, so its More is the smallest of the four conditional ones.
+    Node = MakeNode(TEXT("Swift.Kinetic.Overpressure"), TEXT("Overpressure"),
+        TEXT("Branch keystone. A MORE multiplier to all damage dealt while sliding."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.Carry"));
+    AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER: x1.20
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overpressure.GetTag());
     Tree->Nodes.Add(Node);
 
     return Tree;
@@ -334,6 +490,26 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     AddPrerequisite(Node, TEXT("Swift.Marksman.MarkEconomy"));
     Node->GrantedAbilityIds.Add(TEXT("Lead"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Lead.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Marksman's crit-chance ladder. Long Lens gave the branch crit DAMAGE with
+    // almost no chance to apply it to, which is a stat that reads well on a card
+    // and does close to nothing.
+    Node = MakeNode(TEXT("Swift.Marksman.Deadeye"), TEXT("Deadeye"),
+        TEXT("Held aim finds the weak point. A large flat critical chance per rank."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
+    AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Deadeye.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // Marksman's branch keystone: the only unconditional More outside Core, and
+    // the pick for a build that refuses to organise itself around a movement
+    // state. It is the smallest unconditional More for exactly that reason.
+    Node = MakeNode(TEXT("Swift.Marksman.Culling"), TEXT("Culling"),
+        TEXT("Branch keystone. A MORE multiplier to all damage dealt, with no condition attached."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
+    AddDamageMore(Node, 18.0f); // O2 PLACEHOLDER: x1.18
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
     Tree->Nodes.Add(Node);
 
     return Tree;

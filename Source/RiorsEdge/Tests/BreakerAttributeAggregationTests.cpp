@@ -400,7 +400,10 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     AActor* Owner = MakeOwner();
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
     Progression->BindAttributes(Attributes);
-    TestEqual(TEXT("The baseline defaults to 1% per point"), Progression->IncreasedDamagePerSpentPoint, 1.0f, 0.0001f);
+    // Cut from 1.0% to 0.25% under O27: at 1.0% this out-earned every damage
+    // node in the game by about 3.5x, so how MANY points had been spent
+    // mattered more than where. It is a floor now, not a power source.
+    TestEqual(TEXT("The baseline defaults to 0.25% per point"), Progression->IncreasedDamagePerSpentPoint, 0.25f, 0.0001f);
     TestEqual(TEXT("Nothing spent pays nothing"), Progression->GetPointSpendDamagePercent(), 0.0f, 0.0001f);
 
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
@@ -410,15 +413,17 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     // Core.Bulwark.SetStance costs 1 and authors NO damage effect at all: the
     // whole point is that spending anywhere is felt.
     TestTrue(TEXT("A node with no damage effect purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.SetStance"), Failure));
-    TestEqual(TEXT("One committed point is one percent"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
-    TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.01f, 0.0001f);
+    TestEqual(TEXT("One committed point is one point"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
+    TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.0025f, 0.0001f);
 
     // Cost, not node count, is the unit: a 2-point notable is worth two.
     TestTrue(TEXT("A second gateway purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
     TestTrue(TEXT("The 2-point notable purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
     TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
-    // 4 points x 1% baseline + Sightline's 4% node effect, all one bucket.
-    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.08f, 0.0001f);
+    // 4 points x 0.25% baseline + Sightline's 4% node effect, all one bucket.
+    // The node is worth four times the accumulation now; before the cut they
+    // were equal, which is the imbalance O27 names.
+    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.05f, 0.0001f);
 
     // Turning the baseline off must leave exactly the node content behind, so
     // the owner can retune or disable it without touching content.

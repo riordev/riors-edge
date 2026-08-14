@@ -55,20 +55,59 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
         }
     }
 
+    // CONTENT SIZE, CHANGED DELIBERATELY UNDER O27 (was Core 15 / branches 8).
+    //
+    // The pin is not being relaxed to make new content pass — it is being
+    // re-set, because O27 rules that "every avenue (affixes, nodes, weapons)
+    // needs significantly more options than the slice currently has" and that
+    // choices must beat accumulation. Fifteen Core nodes could not carry a
+    // 2.5x additive band with the per-point accumulation baseline cut from 1.0%
+    // to 0.25%; the power that left accumulation had to land somewhere, and it
+    // landed in the nine new Core nodes (the Velocity constellation's six, plus
+    // Called Shot, Salvo and Barrage) and five new Swift branch nodes.
+    //
+    // The numbers below are still EXACT equalities on purpose. The point of the
+    // pin was never the value 15 — it is that content cannot drift without
+    // somebody saying so in a diff.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestTrue(TEXT("Core slice ships at most 15 nodes"), Core->Nodes.Num() <= 15);
-    TestEqual(TEXT("Core slice ships exactly the authored 15"), Core->Nodes.Num(), 15);
+    TestEqual(TEXT("Core slice ships exactly the authored 24"), Core->Nodes.Num(), 24);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // Swift branches, tiers 1-3 only: no tier 4/5 content leaked into the slice.
+    TestEqual(TEXT("Kinetic ships eleven nodes"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 11);
+    TestEqual(TEXT("Marksman ships ten nodes"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 10);
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
     {
-        TestEqual(TEXT("Swift branch ships eight tier 1-3 nodes"), Tree->Nodes.Num(), 8);
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {
             TestTrue(TEXT("Swift slice node is tier 1-3"), Node->Tier >= 1 && Node->Tier <= 3);
         }
     }
+
+    // O3: More multipliers may be authored only on branch keystones and
+    // constellation Convergence/Keystone nodes. In this content that is exactly
+    // "single rank, cost 3 or more" — which is also how SBreakerMenu classifies
+    // a node as a Convergence, so the board cannot disagree with the rule.
+    int32 MoreNodeCount = 0;
+    for (const UBreakerProgressionTree* Tree : Trees)
+    {
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                if (Effect.StatBucket != EBreakerNodeStatBucket::MorePercent) continue;
+                ++MoreNodeCount;
+                const FString Context = Node->NodeId.ToString();
+                TestTrue(*(Context + TEXT(" authors More only at Convergence/Keystone cost")), Node->CostPerRank >= 3);
+                TestEqual(*(Context + TEXT(" More node is single rank")), Node->MaxRank, 1);
+                TestTrue(*(Context + TEXT(" More stays at or under the 1.30x ceiling")),
+                    Effect.ValuePerRank <= (UBreakerProgressionComponent::SingleMoreCeiling - 1.0f) * 100.0f + UE_KINDA_SMALL_NUMBER);
+            }
+        }
+    }
+    // Six More options against a hard cap of three is the choice O3 describes;
+    // one or two would make the cap decorative.
+    TestTrue(TEXT("More options outnumber the O3 cap of three"), MoreNodeCount > UBreakerProgressionComponent::MaxDamageMoreSources);
 
     TestNotNull(TEXT("Swift has a fallback class definition"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift));
     TestNotNull(TEXT("Fallback node lookup finds a core node"), UBreakerProgressionLibrary::FindFallbackNode(TEXT("Core.Kinesis.AirJump")));

@@ -3,6 +3,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Components/StaticMeshComponent.h"
@@ -307,6 +308,8 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
         if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))
         {
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.7f);
+            // The standing encounter is an area-level-GymAreaLevel area.
+            Enemy->SetAreaLevel(GymAreaLevel);
         }
     }
 
@@ -318,6 +321,7 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
     if (ABreakerEnemy* Elite = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), EliteLocation, FRotator::ZeroRotator, EliteParams))
     {
         Elite->ConfigureEncounter(EliteLocation, 0.9f);
+        Elite->SetAreaLevel(GymAreaLevel);
         Elite->ConfigureElite();
     }
 
@@ -338,6 +342,7 @@ void ABreakerGameMode::SpawnCombatEncounter(const APawn* Pawn)
             ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
         {
             Ranged->ConfigureEncounter(SpawnLocation, 0.4f + Index * 1.1f);
+            Ranged->SetAreaLevel(GymAreaLevel);
         }
     }
 }
@@ -727,7 +732,7 @@ void ABreakerGameMode::StartNextWave()
         {
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
             // Later waves climb in level so drops and TTK data climb too.
-            Enemy->ConfigureWave(10 + CurrentWave * 2);
+            Enemy->ConfigureWave(GetAreaLevelForWave(CurrentWave));
             if (bEliteWave && Index == 0) Enemy->ConfigureElite();
             WaveEnemies.Add(Enemy);
         }
@@ -748,10 +753,18 @@ void ABreakerGameMode::StartNextWave()
             ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
         {
             Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
-            Ranged->ConfigureWave(10 + CurrentWave * 2);
+            Ranged->ConfigureWave(GetAreaLevelForWave(CurrentWave));
             WaveEnemies.Add(Ranged);
         }
     }
+}
+
+int32 ABreakerGameMode::GetAreaLevelForWave(int32 WaveIndex) const
+{
+    // The gym's area level climbs with the wave. This is CONTENT escalation:
+    // wave 5 is a harder area than wave 1 regardless of who is standing in it.
+    const int32 Level = GymAreaLevel + FMath::Max(WaveIndex, 0) * FMath::Max(AreaLevelPerWave, 0);
+    return UBreakerMonsterChassisLibrary::ClampAreaLevel(Level);
 }
 
 int32 ABreakerGameMode::GetWaveEnemiesAlive() const

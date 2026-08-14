@@ -12,7 +12,25 @@
 
 UBreakerProgressionComponent::UBreakerProgressionComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+    // Ticks only to notice movement-state transitions for conditional node
+    // effects. The tick itself is a byte comparison; the recalculation behind
+    // it runs on a transition, not on a frame.
+    PrimaryComponentTick.bCanEverTick = true;
+}
+
+void UBreakerProgressionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    RefreshBuildConditions();
+}
+
+void UBreakerProgressionComponent::RefreshBuildConditions()
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    const FBreakerBuildConditionState Evaluated = FBreakerBuildConditionState::EvaluateForActor(GetOwner());
+    if (Evaluated == ActiveConditions) return;
+    ActiveConditions = Evaluated;
+    RecalculateStats();
 }
 
 void UBreakerProgressionComponent::BeginPlay()
@@ -367,11 +385,19 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     return false;
 }
 
-FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution* OutContribution)
+FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks,
+    FBreakerAttributeContribution* OutContribution, const FBreakerBuildConditionState& Conditions)
 {
     constexpr int32 TargetCount = static_cast<int32>(EBreakerNodeStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
     float IncreasedByTarget[TargetCount] = {};
+    // One entry per owned More source, kept separate until the O3 cap has been
+    // applied. Sorting and truncating a list is the only honest way to enforce
+    // "a build may hold at most three": composing first and clamping the
+    // product afterwards would silently reprice the nodes the player chose.
+    TArray<float> DamageMoreMultipliers;
+    float ActiveConditionalPercent = 0.0f;
+    float PotentialConditionalPercent = 0.0f;
 
     FBreakerNodeStats Stats;
     for (const FBreakerNodeRank& Rank : Ranks)
@@ -388,11 +414,45 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             const int32 Target = static_cast<int32>(Effect.StatTarget);
             if (Target < 0 || Target >= TargetCount) continue;
             const float Value = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
+
+            const bool bConditional = Effect.Condition != EBreakerBuildCondition::Always;
+            const bool bLive = Conditions.IsActive(Effect.Condition);
+            if (bConditional && Effect.StatTarget == EBreakerNodeStatTarget::Damage
+                && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
+            {
+                PotentialConditionalPercent += Value;
+                if (bLive) ActiveConditionalPercent += Value;
+            }
+            // A conditional effect whose state is false contributes nothing at
+            // all, in any bucket.
+            if (!bLive) continue;
+
             if (Effect.StatBucket == EBreakerNodeStatBucket::Flat) FlatByTarget[Target] += Value;
-            else IncreasedByTarget[Target] += Value;
+            else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
+            else if (Effect.StatTarget == EBreakerNodeStatTarget::Damage)
+            {
+                // Rank does NOT scale a More multiplier — a rank-2 x1.25 would
+                // be x1.5625, which no node table means. Every More node in the
+                // content is single-rank; this is the guard, not a limitation.
+                DamageMoreMultipliers.Add(1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f);
+            }
         }
         Stats.GrantedTags.AppendTags(Node->GrantedTags);
     }
+
+    // O3's hard cap of three, and Damage-Pipeline §4's per-multiplier ceiling of
+    // 1.30x. The strongest three win, so a fourth purchase is dead weight the
+    // player can be told about rather than a quiet nerf to the other three.
+    Stats.DamageMoreSourceCount = DamageMoreMultipliers.Num();
+    DamageMoreMultipliers.Sort([](float A, float B) { return A > B; });
+    float DamageMoreProduct = 1.0f;
+    for (int32 Index = 0; Index < FMath::Min(DamageMoreMultipliers.Num(), MaxDamageMoreSources); ++Index)
+    {
+        DamageMoreProduct *= FMath::Min(DamageMoreMultipliers[Index], SingleMoreCeiling);
+    }
+    Stats.DamageMoreMultiplier = DamageMoreProduct;
+    Stats.ActiveConditionalDamagePercent = ActiveConditionalPercent;
+    Stats.PotentialConditionalDamagePercent = PotentialConditionalPercent;
 
     auto Flat = [&FlatByTarget](EBreakerNodeStatTarget Target) { return FlatByTarget[static_cast<int32>(Target)]; };
     auto Increased = [&IncreasedByTarget](EBreakerNodeStatTarget Target)
@@ -414,10 +474,10 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     if (OutContribution)
     {
         // Raw buckets, not the composed multipliers: tree percentages have to
-        // join gear percentages in ONE additive bucket per stat. Nodes cannot
-        // author More multipliers yet (EBreakerNodeStatBucket has no More
-        // entry); when keystones gain them under O3 they compose here through
-        // FBreakerAttributeContribution::ComposeMore.
+        // join gear percentages in ONE additive bucket per stat. The More
+        // product is the exception and always was — it is a different bucket,
+        // composed multiplicatively through ComposeMore under the O3 cap
+        // enforced above.
         OutContribution->Reset();
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
@@ -425,6 +485,10 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
+        if (!FMath::IsNearlyEqual(DamageMoreProduct, 1.0f))
+        {
+            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, DamageMoreProduct);
+        }
     }
     return Stats;
 }
@@ -452,15 +516,15 @@ void UBreakerProgressionComponent::RecalculateStats()
     TArray<FBreakerNodeRank> Ranks = State.ClassNodeRanks;
     Ranks.Append(State.CoreNodeRanks);
 
-    CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution);
+    CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution, ActiveConditions);
 
-    // The owner's report: "no matter what I do damage still feels the same".
-    // Node Damage effects only pay out on the handful of nodes that author
-    // them, so on top of those every committed point pays a small Increased
-    // Damage baseline. It goes into the SAME additive bucket as gear and node
-    // damage — it is not a separate multiplier — and it is a property of
-    // SPENDING, not of level, which keeps it clear of the cap-50 no-post-cap-
-    // power ruling.
+    // Every committed point pays a small Increased Damage baseline, into the
+    // SAME additive bucket as gear and node damage. Under O27 this is a FLOOR,
+    // not a power source: at 0.25%/point both a baseline and an optimized build
+    // spend their whole budget, so it lands on both equally and differentiates
+    // neither. What separates them is which nodes they bought. It stays a
+    // property of SPENDING, not of level, which keeps it clear of the cap-50
+    // no-post-cap-power ruling.
     const float SpendPercent = GetPointSpendDamagePercent();
     if (SpendPercent > 0.0f)
     {

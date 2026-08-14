@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Progression/BreakerBuildConditions.h"
 #include "BreakerProgressionTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -58,13 +59,21 @@ enum class EBreakerNodeStatTarget : uint8
 };
 
 // Same aggregation law as equipment: flat values sum, then one additive
-// Increased bucket per stat. More multipliers stay reserved for keystones
-// and Convergence nodes (O3) and are not expressible here yet.
+// Increased bucket per stat, then More multipliers compose as a product.
 UENUM(BlueprintType)
 enum class EBreakerNodeStatBucket : uint8
 {
     Flat,
-    IncreasedPercent
+    IncreasedPercent,
+    // O3: "More multipliers multiply as an unordered product; a build may hold
+    // 2-3 Mores total (hard cap 3). Trees may author them only on branch
+    // keystones and constellation Convergence/Keystone nodes." Appended, so
+    // authored rows keep their serialized numbers.
+    //
+    // Authored in whole percent ABOVE 1.0 — 25.0 means x1.25 — to match how
+    // every other percentage in the node tables is written. The aggregator
+    // enforces the cap; see UBreakerProgressionComponent::AggregateStats.
+    MorePercent
 };
 
 USTRUCT(BlueprintType)
@@ -77,6 +86,12 @@ struct RIORSEDGE_API FBreakerNodeEffect
     // Multiplied by the owned rank. Percent stats are authored in whole
     // percent (5.0 == 5%), matching the affix tables.
     UPROPERTY(EditAnywhere, BlueprintReadOnly) float ValuePerRank = 0.0f;
+    // A conditional effect pays out only while its movement state holds, and
+    // pays nothing otherwise. This is where a node stops being "+3% to
+    // everything" and starts being a build decision (O27, Power-Curve
+    // §"Choices over accumulation"). Default Always, so authored rows that
+    // predate the field are unchanged.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) EBreakerBuildCondition Condition = EBreakerBuildCondition::Always;
 };
 
 // Aggregated output of every owned node rank. Multipliers are 1.0-based,
@@ -99,6 +114,20 @@ struct RIORSEDGE_API FBreakerNodeStats
     // this is the whole tree layer's contribution to the shared additive
     // Increased bucket on the DamageMultiplier attribute.
     UPROPERTY(BlueprintReadOnly) float DamageMultiplier = 1.0f;
+    // The composed More product for outgoing damage, AFTER the O3 cap has
+    // been applied. 1.0 when the build holds no More node. This is a separate
+    // field from DamageMultiplier on purpose: they are different buckets and
+    // merging them would be the exact bug the aggregation rule exists to stop.
+    UPROPERTY(BlueprintReadOnly) float DamageMoreMultiplier = 1.0f;
+    // How many More sources the build actually holds, before the cap. The skill
+    // screen prints "3 / 3 MORE" from this so a fourth purchase visibly does
+    // nothing rather than silently doing nothing.
+    UPROPERTY(BlueprintReadOnly) int32 DamageMoreSourceCount = 0;
+    // Increased damage from conditional effects that are live right now, and
+    // what the same effects would be worth with every condition satisfied.
+    // Whole percent, display only — the live half is already in DamageMultiplier.
+    UPROPERTY(BlueprintReadOnly) float ActiveConditionalDamagePercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float PotentialConditionalDamagePercent = 0.0f;
     // Rule-rewrite and verb-grant nodes cannot be expressed as stats; they
     // publish a tag here and the owning system reads it.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer GrantedTags;

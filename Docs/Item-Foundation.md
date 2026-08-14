@@ -20,6 +20,34 @@ Crit remains the only damage multiplier of its kind, per the critical policy.
 This is where the multiplicative-explosion risk is managed; do not add a new
 bucket without a design pass.
 
+**The rule is unchanged by the O27 breadth pass, and that is the point.** Two
+things were added that look like new buckets and are not:
+
+- **Conditional affixes** (Damage while Airborne, while Sliding, while Wall
+  Riding, at Redline, after Dashing) are ordinary Increased percentages. While
+  their condition holds they join the SAME single additive bucket as Weapon
+  Damage; while it does not they contribute nothing at all. There is no
+  conditional multiplier and no second bucket — the bucket's *contents* change
+  with the movement state. `FBreakerBuildConditionState`
+  (`Progression/BreakerBuildConditions.h`) is the one place the state is read;
+  both the equipment and progression components consume it and neither edits
+  Movement/, Classes/ or Abilities/ to do so.
+- **Added Damage** is a Flat value on the `DamageMultiplier` attribute, whose
+  base is 1.0. Flat sums first, so it is multiplied by the Increased bucket
+  rather than added after it — the ordinary "added damage" shape, and the
+  reason a flat line and an increased line are two different decisions rather
+  than the same line twice.
+
+**More is now expressible on nodes** (`EBreakerNodeStatBucket::MorePercent`)
+and the O3 cap is enforced in code, not by convention:
+`UBreakerProgressionComponent::AggregateStats` collects every owned More
+source, sorts descending, keeps the strongest `MaxDamageMoreSources` (3) and
+clamps each to `SingleMoreCeiling` (1.30x, Damage-Pipeline §4). A fourth
+purchase is dead weight rather than a quiet nerf to the other three. LIMIT:
+the clamp is per-LAYER. Anomalous items do not author Mores yet; when they do,
+the cap has to move to one shared clamp across the whole composition or a
+build could hold three tree Mores plus an item's.
+
 ## Item instances
 
 `FBreakerItemInstance` (`BreakerItemTypes.h`) carries a GUID, a definition id
@@ -59,14 +87,44 @@ Ten tiers, T8 worst to T-1 best, stored as printed (8..1, 0, -1).
 - `TierCapForRarity` — Standard caps at T3, Uncommon at T1, the rest reach
   T-1 (ceiling only; item level still gates what actually rolls).
 
-## The slice affix pool
+## The affix pool — WIDENED [O27 2026-08-13]
 
 `UBreakerAffixLibrary::GetSliceAffixPool()` is the C++ fallback pool (same
-zero-setup convention as weapons): the universal core six (Elemental DR
-excluded until a resistance model exists), three movement affixes (Slide
-Speed, Air Control, Dash CDR — one per weapon archetype pairing), and Crit
-Chance/Damage. Do not author the full pool before this pipeline is validated
-in play.
+zero-setup convention as weapons). It was twelve lines of which exactly ONE
+was offensive, and that one rolled on four of eight slots — so helmet, body
+armour, boots and waist were structurally incapable of raising damage. That is
+the concrete reason "full level 50 gear" did not feel like anything, and O27
+rules it out.
+
+**Eighteen lines, nine of them offensive:**
+
+| Line | Bucket | Condition | Slots |
+|---|---|---|---|
+| Health, Resource Regen, Max Resource, Move Speed, Drop Chance, Physical DR | as before | — | all 8 |
+| Slide Speed / Air Control / Dash CDR | Increased | — | boots+waist / boots+neck / boots+gloves |
+| Critical Chance | Flat | — | helmet, gloves, neck, weapons |
+| Critical Damage | Flat | — | helmet, gloves, neck, weapons |
+| **Weapon Damage** | Increased | — | **all 8** |
+| **Added Damage** | Flat | — | helmet, gloves, waist, neck, weapons |
+| **Damage while Airborne** | Increased | Airborne | boots, helmet, neck, primary |
+| **Damage while Sliding** | Increased | Sliding | boots, waist, body, secondary |
+| **Damage while Wall Riding** | Increased | Wall riding | boots, waist, gloves, body |
+| **Damage at Redline** | Increased | Redline momentum | neck, body, helmet, primary |
+| **Damage after Dashing** | Increased | Recently dashed | gloves, waist, neck, secondary |
+
+Elemental DR is still excluded until a resistance model exists.
+
+**Per-slot identity is the design, not the slot list.** Every slot can raise
+damage (pinned by `RiorsEdge.Items.Affixes.Breadth`), but no two slots offer
+the same set: boots are the airborne/slide/wall piece, the waist is
+slide/dash/wall, the necklace is Redline and dash, body armour is the grounded
+traversal piece, and helmet and weapons are where precision lives. Two players
+hunting damage on boots and on a necklace are hunting different lines.
+
+Conditional lines roll roughly twice what the unconditional line does, because
+they are off whenever you are standing still. That trade is what makes
+"build around a movement state" a decision rather than a strictly better
+version of the same line.
 
 ## Roll pipeline
 
@@ -148,7 +206,8 @@ already read it (`UBreakerWeaponComponent` hitscan and projectile,
 pass nothing wrote it, so it was permanently 1.0 — the literal cause of the
 owner's report that damage never changes no matter what is equipped or spent.
 
-Three sources bid into its single additive Increased bucket:
+Four sources bid into its single additive Increased bucket, and one composes
+into its More product:
 
 - **Gear.** The `WeaponDamage` affix target. Its raw percentage is submitted by
   `UBreakerEquipmentComponent::AggregateStats`. It used to reach the weapon on a
@@ -159,16 +218,42 @@ Three sources bid into its single additive Increased bucket:
   damage site would double-count gear.
 - **Skill nodes.** The new `EBreakerNodeStatTarget::Damage`. Before it existed a
   node was structurally incapable of raising weapon damage.
+- **Conditional lines, gear and node alike.** Damage while Airborne / Sliding /
+  Wall Riding / at Redline / after Dashing. Same bucket, present only while the
+  state holds.
 - **The point-spend baseline.** `UBreakerProgressionComponent::
-  IncreasedDamagePerSpentPoint` (EditAnywhere, O2 PLACEHOLDER 1.0% per point)
-  pays a small Increased Damage per point COMMITTED to nodes, counted by cost so
-  a 3-point Convergence is worth three times a 1-point minor. It is a property
-  of spending, not of level, so it does not touch the cap-50 /
-  no-post-cap-power ruling. Set it to 0 to leave only node content.
+  IncreasedDamagePerSpentPoint` (EditAnywhere, O2 PLACEHOLDER **0.25%** per
+  point, cut from 1.0% under O27) pays a small Increased Damage per point
+  COMMITTED to nodes, counted by cost so a 3-point Convergence is worth three
+  times a 1-point minor. At 1.0% it contributed roughly +69% at a full budget
+  against roughly +19% from every damage node combined, so how MANY points had
+  been spent mattered ~3.5x more than where — backwards for a build game. At
+  0.25% it is a floor: it stops a purely defensive purchase being literally zero
+  offence, and because every build spends its whole budget it cannot
+  differentiate two builds. It is a property of spending, not of level, so it
+  does not touch the cap-50 / no-post-cap-power ruling. Set it to 0 to leave
+  only node content.
+- **More multipliers (a different bucket).** Six Convergence/keystone nodes
+  author one each; at most three count, each capped at 1.30x. See the locked
+  rule above.
 
-Slice fallback content authoring damage (all O2 PLACEHOLDER): Core Precision
-Sightline +4%, Core Volley Cyclic +3%/rank over 3 ranks, Swift Marksman Long
-Lens and Pierce Discipline +3%/rank over 2 ranks each.
+Slice fallback content authoring damage (all O2 PLACEHOLDER). Unconditional:
+Core Precision Sightline +4%, Called Shot +3%/rank x2, Core Volley Cyclic
++3%/rank x3, Salvo +6%/rank x3, Swift Marksman Long Lens and Pierce Discipline
++3%/rank x2 each. Conditional: Core Velocity Freefall +9%/rank x3 (airborne),
+Slipstream +9%/rank x3 (sliding), Traction +14%/rank x2 (wall riding),
+Afterburn +8%/rank x3 (recently dashed), Swift Kinetic Downforce +11%/rank x2
+(airborne) and Grind +13%/rank x2 (wall riding). More: Fixate x1.22, Barrage
+x1.22, Culling x1.18 (all unconditional), Terminal Velocity x1.30 (airborne),
+Overpressure x1.20 (sliding), Redline Doctrine x1.20 (at Redline).
+
+**The band test is the guard rail.** `RiorsEdge.Progression.PowerBand`
+(`Tests/BreakerPowerBandTests.cpp`) composes a baseline and an optimized
+level-50 character out of the real affix pool and the real trees, through the
+real `FBreakerAttributeAggregator`, and asserts the composed ratio lands in
+Power-Curve §4's 8-10x band. It logs the ratio layer by layer, so a future
+tuning pass can see WHICH layer moved rather than only that the band broke.
+Current: flat 1.16x, increased 2.35x, more 1.93x, crit 1.66x, composed 8.74x.
 
 Coverage: `Source/RiorsEdge/Tests/BreakerAttributeAggregationTests.cpp` —
 including `RiorsEdge.Attributes.Damage.NodePurchaseRaisesWeaponDamage`, which
@@ -258,3 +343,19 @@ inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
   `UBreakerCharacterMovementComponent`.
 - Save persistence for items (structs are save-shaped and versioned).
 - All values are placeholder until the gym feedback pass re-anchors them.
+- **Added Damage prints without a unit.** `SBreakerMenu::DescribeAffix` decides
+  the "%" suffix from the bucket, with a hard-coded exception for the two crit
+  targets. Added Damage is a Flat line authored in percentage points of base
+  weapon damage, so it renders as "Added Damage  +5.0  T1". Fixing it properly
+  means a display-format flag on `FBreakerAffixDefinition` that the UI reads,
+  which is a UI-layer change; reported rather than hacked around.
+- **The O3 More cap is enforced per LAYER, not globally.** Three tree Mores is
+  the whole budget today because nothing else authors one. When Anomalous items
+  gain Mores, the clamp has to move to a single shared pass over the composed
+  contribution or a build can hold three tree Mores plus an item's.
+- **Conditional lines are evaluated on a component tick.** The equipment and
+  progression components each re-read the movement state each frame and rebuild
+  their contribution only on a transition. That is correct and cheap, but it
+  means a conditional bonus lands on the frame AFTER the state changes. If a
+  one-frame lag on entering a slide ever reads as mushy, the fix is an event
+  from the movement component rather than a faster poll.

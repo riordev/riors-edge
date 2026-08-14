@@ -163,9 +163,175 @@ line.
 
 ## Implementation status (2026-08-13)
 
-**Nothing in this document is built yet.** It is the architecture agreed under
-O27, written before the code so that the numbers become derivable. The three
-confirmed gaps in "Why this document exists" are all still open, and the
-implementation order is: monster chassis by area level, weapon base damage by
-item level, then the affix and node breadth that makes the variance band
-reachable.
+The implementation order was: monster chassis by area level, weapon base damage
+by item level, then the affix and node breadth that makes the variance band
+reachable. **The third item is built.** The first two are not.
+
+**BUILT — §4 the build variance band, §"Choices over accumulation", §"More
+options in every avenue".**
+
+- `IncreasedDamagePerSpentPoint` cut 1.0% -> **0.25%**. Still `EditAnywhere`,
+  still safe at 0. Because every build spends its whole budget, it now lands
+  identically on a baseline and an optimized character and cannot separate
+  them — it is a floor so that a defensive purchase is not literally zero
+  offence, and nothing more.
+- The affix pool went 12 lines / 1 offensive / 4 of 8 slots to **18 lines, 9
+  offensive, damage on all 8 slots**, with per-slot identity. Full table in
+  `Docs/Item-Foundation.md`.
+- **Conditional damage exists**, keyed to the movement pillar: five affixes and
+  six node lines that pay out only while airborne, sliding, wall riding, at
+  Redline, or shortly after a dash. `FBreakerBuildConditionState`
+  (`Progression/BreakerBuildConditions.h`) reads the live state off
+  `UBreakerCharacterMovementComponent` and `UBreakerMomentumComponent`; both
+  power layers consume it and neither of those components was edited.
+- **More multipliers are real on nodes** and the O3 cap is enforced in code:
+  six Convergence/keystone options, of which the strongest three count, each
+  clamped to 1.30x. Six options against a cap of three is the choice O3
+  describes.
+- Node content: Core 15 -> **24** (a new Velocity constellation of six, plus
+  Called Shot, Salvo and Barrage), Swift Kinetic 8 -> 11, Marksman 8 -> 10.
+
+**The band, measured** (`RiorsEdge.Progression.PowerBand`, composed through the
+real aggregator; both characters level 50, both measured in the same instant —
+airborne, recently dashed, at Redline):
+
+| Layer | Baseline 50 | Optimized 50 | Ratio | Doc target |
+|---|---|---|---|---|
+| Flat (Added Damage) | x1.08 | x1.25 | 1.16x | not in the original table |
+| Additive Increased | x2.42 | x5.68 | 2.35x | 2.5x |
+| More (O3 cap 3) | x1.00 | x1.94 | 1.93x | 1.95x |
+| Effective crit | x1.32 (27% @ x2.18) | x2.19 (60% @ x2.98) | 1.66x | 1.7x |
+| **Composed** | **x3.44** | **x30.05** | **8.74x** | **8-10x** |
+
+The one deviation from §4's table is the flat layer, which the table does not
+have. Added Damage lands in the Flat lane of the `DamageMultiplier` attribute,
+so it is multiplied by the additive bucket rather than added after it; it is
+kept deliberately small (1.16x) so it colours the band rather than carrying it.
+**O3 was not broken to reach the band**, exactly as §4 predicted.
+
+**NOT BUILT.** The two structural gaps this document names first are untouched
+by this pass and remain the next work: monster health and damage are still
+constants rather than functions of area level, and weapon base damage still
+does not scale with item level. Until those land, the band is a statement about
+the multiplier stack only — an optimized character deals 8.74x a baseline
+character's damage, against an enemy whose health does not yet know what level
+the area is.
+### §2 Monster chassis — BUILT
+
+`Source/RiorsEdge/Combat/BreakerMonsterChassis.{h,cpp}` is the curve, as pure
+world-free maths in the precedent of `BreakerRangedBehavior.h` and
+`BreakerWeaponMath.h`. It takes an area level, a rank, and an authored
+parameter block, and it is *structurally* incapable of reading a player —
+there is no world, no actor and no player pointer within reach of any function
+in it. That is the guarantee, not a convention.
+
+```
+Health(AL) = BaseHealth * (1 + g)^(AL - 1) * Rank * Archetype
+Damage(AL) = BaseDamage * (1 + d)^(AL - 1) * Rank * Archetype
+```
+
+| Constant | Value | Note |
+|---|---|---|
+| `BaseHealth` | 220 | The chassis session 5 actually measured, so area level 1 is bit-identical to the shipping enemy |
+| `BaseDamage` | 14 (melee) / 16 (Lattice) | The archetype's authored damage at area level 1 |
+| `g` `HealthGrowthPerLevel` | 0.09 | ×68.2 over 50 levels |
+| `d` `DamageGrowthPerLevel` | 0.055 | ×13.8 over 50 levels — materially below `g` |
+| Elite rank | ×3.0 health, ×1.5 damage | |
+| Modifier-bearing rank | ×2.5 health, ×1.25 damage | |
+| Boss rank | ×25 health, ×2.0 damage | |
+| Lattice archetype | ×1.6 health | Encounter-Design §2.2, applied now that O27 has landed |
+
+All are `O2 PLACEHOLDER` and all are `EditAnywhere` on
+`FBreakerMonsterChassisParams`, which every enemy carries.
+
+The rank ratios are **derived from O18's targets rather than guessed**, which
+is the point of the document. Trash under ~1s and elite ~3s *is* an elite
+health ratio of 3. A boss at 20–45s against a 1s trash *is* a ratio inside
+20–45; 25 was picked at the low end. The shipping `ConfigureElite` used ×2.0
+health and still measured 3.01s only because trash was simultaneously 1.81×
+too slow — the two errors were cancelling.
+
+`ConfigureElite`'s hardcoded 440 health and `AttackDamage *= 1.5f` are gone,
+folded into that rank table so there is one source of truth for what an elite
+is. `bIsElite` is gone too: rank is the flag.
+
+**Area level is authored on the content.** `ABreakerEnemy::AreaLevel`
+(EditAnywhere, 1–100 — deliberately past the character cap of 50, because
+endgame tiers keep climbing and that is what keeps drop item level improving
+after the cap) and `ABreakerGameMode::GymAreaLevel` / `AreaLevelPerWave`, so a
+playtest walks the curve by turning a number up rather than by levelling a
+character. Wave escalation is the same arithmetic it always was
+(`10 + wave × 2`), now expressed through those two properties.
+
+`EnemyLevel` still drives loot item level and now follows area level, clamped
+to 50 because affix tiers are authored to 50 while the chassis keeps climbing.
+
+Three automation tests (`RiorsEdge.Combat.Chassis.*`) cover monotonicity and
+the geometric identity, the rank table and its ordering, and the ruling
+itself: the same area level produces the same chassis every time, and the drop
+item level follows area level.
+
+### The shape of the curve, for an unchanged player
+
+Session 5 measured melee trash at 1.81s against 220 health, i.e. ~121.5 hp/s
+effective (weak-point halo included), and elite at 3.01s against 440, i.e.
+~146 hp/s. Holding those numbers fixed — **no weapon change at all** — the
+chassis produces:
+
+| Area level | Trash health | Trash TTK | Elite health | Elite TTK | Trash hit |
+|---|---|---|---|---|---|
+| 1 | 220 | 1.81s | 660 | 4.5s | 14 |
+| 5 | 311 | 2.56s | 932 | 6.4s | 17 |
+| 10 | 478 | 3.93s | 1 434 | 9.8s | 23 |
+| 20 | 1 131 | 9.3s | 3 394 | 23.2s | 39 |
+| 30 | 2 678 | 22.0s | 8 034 | 55.0s | 66 |
+| 50 | 15 003 | 123.4s | 45 010 | 308s | 193 |
+
+That table is deliberately alarming and is **not** a balance failure: it is
+one half of a ratio. The other half is §3's `WeaponBase(ilvl)` curve, which is
+a separate task. With `w = g`, a baseline build's TTK is *flat* at 1.81s at
+every area level, and the whole table collapses to its first row — at which
+point the remaining 1.81× to O18's <1s target is a weapon-side anchor
+question, exactly as O27 says it should be.
+
+**Until the weapon curve lands, the gym is only playable at low area level.**
+`GymAreaLevel` defaults to 10 to preserve today's drop item level; set it to 1
+to recover today's exact combat feel while the second curve is built.
+
+### §3 multiplicand — built
+
+`WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1)` lives in
+`FBreakerWeaponMath::ItemLevelDamageScalar` / `WeaponBaseDamage` as a pure,
+world-free function, and every damage path in `UBreakerWeaponComponent` reads
+it: the hitscan pellet loop, the rocket projectile's payload, and the Bleed
+DoT's base per tick.
+
+- **`w` = 0.09/level**, chosen equal to the `g` this document proposes, so a
+  baseline build's TTK is level-invariant and all felt progression comes from
+  the multiplier band. It is `EditAnywhere` and O2 PLACEHOLDER, and 0 restores
+  the flat pre-curve behaviour for A/B.
+- **`g` is assumed, not read.** The monster chassis is another layer's work
+  this same session. The relationship, not the value, is what the tests pin: if
+  `w < g` baseline TTK climbs with level, if `w > g` it falls. **If the Combat
+  layer lands a different `g`, `w` should be moved to match it** — that is one
+  editable property, not a code change.
+- Item level 1 is the anchor (scalar exactly 1.0), so no previously measured
+  TTK moves and the zero-setup gym is unaffected. An unequipped weapon is item
+  level 1 for the same reason.
+- One shared exponent means the archetype table keeps its shape: a sniper
+  out-hits an SMG per shot at every level by the same ratio.
+- Item level reaches the weapon through the owner's equipment component, weapon
+  slot 1 <-> `Primary` and slot 2 <-> `Secondary`. OPEN: an item instance
+  carries no weapon archetype, so which of the five guns a Primary item *is*
+  is still unanswered; only item level crosses the boundary today.
+
+Details and the full rationale are in `Docs/Weapon-Foundation.md`; coverage is
+`RiorsEdge.Weapons.ItemLevelCurve`, `.ItemLevelTracksMonsterHealth`,
+`.ArchetypeOrderingAcrossLevels` and `.EquippedItemLevel`.
+
+### §4 and the affix/node breadth — BUILT
+
+See the §4 entry above: the band measures 8.74x, the accumulation baseline is
+cut to 0.25%/point, the affix pool is 18 lines with damage on all eight slots,
+and `RiorsEdge.Progression.PowerBand` pins the ratio so a future tuning pass
+cannot flatten builds silently.

@@ -29,6 +29,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
 
+    // --- Area level (O27 / Power-Curve.md) ---------------------------------
+    // The gym IS a piece of content, so it has an area level, and that level is
+    // the only thing deciding how hard its monsters are. Nothing here reads the
+    // player's level, gear or build — a playtester walks the curve by turning
+    // GymAreaLevel up, not by levelling a character.
+    //
+    // Both values are EditAnywhere so a playtest can sweep the curve without a
+    // recompile. Area level also drives drop item level, which is the mechanism
+    // that makes rising item level correspond to gameplay.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 10;   // O2 PLACEHOLDER
+    // Per-wave escalation, unchanged from the shipping wave mode's
+    // "10 + CurrentWave * 2": later waves climb in level so drops and TTK data
+    // climb with them. Now it climbs the CHASSIS too, which is the whole point.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="0")) int32 AreaLevelPerWave = 2;   // O2 PLACEHOLDER
+    // The area level of wave N. Pure, so a test can walk the escalation.
+    UFUNCTION(BlueprintPure, Category="Playtest|Area") int32 GetAreaLevelForWave(int32 WaveIndex) const;
+
     // --- Ammo economy (O2 placeholders) ------------------------------------
     // Third and last resupply channel alongside kill drops and wave-clear:
     // an amber supply crate in the Anchor camp. Standing next to it for

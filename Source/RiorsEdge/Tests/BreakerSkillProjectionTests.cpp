@@ -117,9 +117,11 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The projection starts from the live damage number"),
         Damage.Before, Rig.Attributes->GetDamageMultiplier(), 0.0001f);
     TestTrue(TEXT("Buying a damage node is projected to move damage"), Damage.Changed());
-    // +3% from the node effect and +1% from the per-spent-point baseline, both
-    // in the one additive Increased bucket.
-    TestEqual(TEXT("One rank of Cyclic projects +4% damage"), Damage.After - Damage.Before, 0.04f, 0.0005f);
+    // +3% from the node effect and +0.25% from the per-spent-point baseline,
+    // both in the one additive Increased bucket. The baseline was 1% until O27
+    // cut it to a floor; the node's own effect is what carries a purchase now,
+    // which is the point of the ruling.
+    TestEqual(TEXT("One rank of Cyclic projects +3.25% damage"), Damage.After - Damage.Before, 0.0325f, 0.0005f);
 
     // Now actually buy it. The arrow has to have been telling the truth.
     TestTrue(TEXT("Cyclic is purchasable"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
@@ -130,7 +132,8 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     // offers it on SHIFT+LMB, so it is projected the same way.
     const FBreakerSkillSnapshot AfterOne = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const TArray<FBreakerStatLine> ToMax = BreakerSkillProjection::ProjectPurchase(AfterOne, TEXT("Core.Volley.Cyclic"), 2);
-    TestEqual(TEXT("Two more ranks project +8% damage"), ToMax[0].After - ToMax[0].Before, 0.08f, 0.0005f);
+    // 2 x (3% node + 0.25% baseline).
+    TestEqual(TEXT("Two more ranks project +6.5% damage"), ToMax[0].After - ToMax[0].Before, 0.065f, 0.0005f);
     TestTrue(TEXT("Cyclic rank 2"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
     TestTrue(TEXT("Cyclic rank 3"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
     TestEqual(TEXT("Buying to max lands where the projection pointed"),
@@ -141,7 +144,7 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     const FBreakerSkillSnapshot AfterMax = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const TArray<FBreakerStatLine> Inert = BreakerSkillProjection::ProjectPurchase(AfterMax, TEXT("Core.Affliction.OpenWound"), 1);
     TestEqual(TEXT("An effectless node still projects its point-spend baseline"),
-        Inert[0].After - Inert[0].Before, 0.01f, 0.0005f);
+        Inert[0].After - Inert[0].Before, 0.0025f, 0.0005f);
     return true;
 }
 

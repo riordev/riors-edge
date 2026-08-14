@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Progression/BreakerBuildConditions.h"
 #include "BreakerItemTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -69,6 +70,29 @@ enum class EBreakerStatTarget : uint8
     AirControl,
     DashCooldownReduction,
     WeaponDamage,
+    // --- Appended under O27, never inserted -------------------------------
+    // Rolled affixes are save data keyed by AffixId, but authored affix
+    // definitions serialize this enum BY VALUE, so every entry above keeps its
+    // number forever. New targets go on the end.
+    //
+    // Added Damage is the FLAT half of the offensive pair the slice was missing.
+    // It bids into the Flat lane of the DamageMultiplier attribute, whose base
+    // is 1.0, so it is added BEFORE the Increased bucket multiplies — the "added
+    // damage" shape every ARPG has and the reason a flat line and an increased
+    // line are different decisions rather than the same line twice. Authored in
+    // percentage points of base weapon damage (8.0 == +0.08 to a 1.0 base).
+    AddedDamage,
+    // The conditional family (Power-Curve §"Choices over accumulation"). Each is
+    // an ordinary Increased percentage into the SAME single additive bucket as
+    // WeaponDamage — it is simply absent while its condition is false. They roll
+    // materially larger than WeaponDamage because they are not always on, which
+    // is what makes "build around a movement state" a real decision instead of
+    // a strictly-worse version of the unconditional line.
+    AirborneDamage,
+    SlidingDamage,
+    WallRideDamage,
+    RedlineDamage,
+    RecentlyDashedDamage,
     Count UMETA(Hidden)
 };
 
@@ -88,8 +112,12 @@ struct RIORSEDGE_API FBreakerAffixDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ValueAtT8 = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ValueAtT1 = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) float RollWeight = 100.0f;
+    // While this is false the line contributes nothing at all. Default Always,
+    // so every pre-existing affix keeps behaving exactly as authored.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerBuildCondition Condition = EBreakerBuildCondition::Always;
 
     bool AllowsSlot(EBreakerEquipSlot Slot) const { return AllowedSlots.Contains(Slot); }
+    bool IsConditional() const { return Condition != EBreakerBuildCondition::Always; }
 };
 
 USTRUCT(BlueprintType)
@@ -203,4 +231,16 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // sums with skill-tree damage instead of multiplying against it. Reading
     // this at a damage site would double-count gear.
     UPROPERTY(BlueprintReadOnly) float WeaponDamageMultiplier = 1.0f;
+    // DISPLAY ONLY, same rule as WeaponDamageMultiplier. Gear-granted flat
+    // Added Damage, in percentage points of base weapon damage; combat reads it
+    // through the DamageMultiplier attribute's Flat lane, never from here.
+    UPROPERTY(BlueprintReadOnly) float AddedDamagePercent = 0.0f;
+    // DISPLAY ONLY. Increased damage from conditional lines that are live RIGHT
+    // NOW, in whole percent. Zero on a rig with no movement component, which is
+    // why the aggregation tests still read clean numbers.
+    UPROPERTY(BlueprintReadOnly) float ActiveConditionalDamagePercent = 0.0f;
+    // DISPLAY ONLY. What the conditional lines would be worth with every
+    // condition satisfied at once — the tooltip figure, so a player can see what
+    // a piece is offering before they are airborne.
+    UPROPERTY(BlueprintReadOnly) float PotentialConditionalDamagePercent = 0.0f;
 };

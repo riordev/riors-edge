@@ -96,6 +96,42 @@ public:
     // never punished by an empty second gun.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Ammo") void AddReserveAmmoFraction(float Fraction);
 
+    // ---- Item level -> base damage ----------------------------------------
+    // Power-Curve.md §3. Base weapon damage is the multiplicand every affix,
+    // node and crit multiplies; before this it was an archetype constant, so an
+    // item level 1 weapon and an item level 50 weapon hit identically and the
+    // primary power axis of the genre did not exist.
+    //
+    // This layer owns the MULTIPLICAND ONLY. The additive Increased bucket, the
+    // More product and crit are the attribute set's, and nothing here touches
+    // fire rate, magazine or reserve.
+
+    // `w` in WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1), as a
+    // fraction per level. Chosen equal to the monster health growth `g` so a
+    // baseline build holds a roughly constant TTK across the game; set it above
+    // `g` and baseline TTK falls with level, below and the game outruns the
+    // player. 0 restores the flat pre-curve behaviour for A/B. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Damage", meta=(ClampMin="0", ClampMax="1"))
+    float ItemLevelDamageGrowth = 0.09f;
+
+    // What a weapon with nothing equipped in its slot represents. 1, so the
+    // scalar is exactly 1.0 and the zero-setup gym — a clean clone with no
+    // loadout — plays on the archetype numbers exactly as authored. Any other
+    // choice would silently rebalance every measured TTK. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Damage", meta=(ClampMin="1"))
+    int32 UnequippedItemLevel = 1;
+
+    // Item level of the item equipped in the loadout slot this weapon is in
+    // (slot 1 -> Primary, slot 2 -> Secondary), or UnequippedItemLevel when
+    // there is no equipment component or that slot is empty.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") int32 GetEquippedItemLevel() const;
+    // (1 + w)^(ilvl - 1) for the weapon as it stands right now.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetItemLevelDamageScalar() const;
+    // The number every damage path in this component uses as its base: the
+    // active definition's Damage, scaled to the equipped item level. For a
+    // multi-pellet weapon this is still PER PELLET, exactly as Damage was.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetScaledBaseDamage() const;
+
     // ---- Weapon feel -------------------------------------------------------
     // Recoil moves the AIM, never the bullet relative to the aim: the trace
     // already follows the controller's view rotation, so the crosshair and the
@@ -252,7 +288,9 @@ private:
     void InitializeSlotAmmunition();
     void FireOnce();
     void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha);
-    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes);
+    // LevelScalar is resolved once per trigger pull and passed down, so every
+    // pellet and the bleed it may apply share one item-level reading.
+    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar);
     void FinishReload();
     void FinishSwap();
     bool CanFire() const;

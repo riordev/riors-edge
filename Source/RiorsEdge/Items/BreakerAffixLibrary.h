@@ -27,10 +27,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Items|Affixes")
     static void AffixCountRangeForRarity(EBreakerItemRarity Rarity, int32& OutMinimum, int32& OutMaximum);
 
-    // The vertical-slice affix pool: universal core six (Elemental DR waits
-    // on a resistance model), one movement affix per weapon archetype, and
-    // both crit stats. Twelve entries prove the pipeline.
+    // The affix pool. Universal core six (Elemental DR still waits on a
+    // resistance model), three movement lines, both crit stats, an
+    // unconditional Increased and a flat Added damage line, and five
+    // conditional damage lines keyed to the movement pillar.
+    //
+    // Eighteen entries, nine of them offensive. It was twelve with exactly one
+    // offensive line that rolled on four of eight slots, which is the concrete
+    // reason "full level 50 gear" did not feel like anything (O27, Power-Curve
+    // §"More options in every avenue"). EVERY slot can now raise damage, and
+    // each does it with a different line — see the per-slot identity table in
+    // Docs/Item-Foundation.md.
     static const TArray<FBreakerAffixDefinition>& GetSliceAffixPool();
+
+    // True when the affix moves outgoing damage in any bucket or under any
+    // condition. The content test uses it to assert that no slot is
+    // structurally incapable of raising damage; the UI can use it to group.
+    static bool IsOffensiveTarget(EBreakerStatTarget Target);
 
     static const FBreakerAffixDefinition* FindAffix(const TArray<FBreakerAffixDefinition>& Pool, FName AffixId);
 };

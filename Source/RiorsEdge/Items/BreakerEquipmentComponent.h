@@ -88,7 +88,16 @@ public:
     // out-contribution is this layer's offer to the unified application path
     // in UBreakerAttributeSet, built from the same raw buckets so nothing has
     // to be reverse-engineered out of the composed multipliers.
-    static FBreakerEquipmentStats AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution = nullptr);
+    // Conditional lines pay out only for conditions active in Conditions; the
+    // default empty state means "standing still", so every call site that
+    // predates the conditional family keeps its exact previous behaviour.
+    static FBreakerEquipmentStats AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution = nullptr,
+        const FBreakerBuildConditionState& Conditions = FBreakerBuildConditionState());
+
+    // The movement/momentum conditions this component last folded in. The tick
+    // re-evaluates and only resubmits when the SET changes, so gear damage
+    // tracks state without recomputing eight items' worth of affixes a frame.
+    const FBreakerBuildConditionState& GetActiveConditions() const { return ActiveConditions; }
 
     // Binds the attribute set this component contributes to. BeginPlay calls
     // it with the set found on the owner's ability system; tests call it with
@@ -113,7 +122,11 @@ private:
     // true base; this component only ever submits a contribution, which is why
     // gear and skill nodes now stack instead of overwriting each other.
     FBreakerAttributeContribution CachedContribution;
+    FBreakerBuildConditionState ActiveConditions;
 
+    // Re-reads the owner's movement/momentum state and recalculates only if the
+    // active set actually moved. Called from the tick.
+    void RefreshBuildConditions();
     void RecalculateStats();
     void ApplyStatsToAttributes();
     bool HasAttributeAuthority() const;
