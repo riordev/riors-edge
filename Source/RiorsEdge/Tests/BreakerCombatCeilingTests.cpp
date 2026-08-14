@@ -6,6 +6,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerProjectileBase.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -323,6 +324,113 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
     const float PowerAtCeiling = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
     TestEqual(TEXT("A snapshot at the tree ceiling gains nothing from the window (one budget)"),
         PowerAtCeiling, Attributes->GetDamageMultiplier(), 0.001f);
+    return true;
+}
+
+// Fracture parity, worldless half 1: the CONTRACT. A request composed by the
+// chain at cast and handed to ABreakerProjectileBase reaches the impact
+// verbatim — window product, carried-status snapshot and all. (The fill site,
+// Fracture's activation, needs a world and GAS; the conformance scan below
+// pins that its file actually calls the chain.)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCeilingProjectileCarriesChainTest,
+    "RiorsEdge.Combat.Ceiling.ProjectileCarriesTheChain",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCeilingProjectileCarriesChainTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerCombatCeilingTest;
+    UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
+    UBreakerCombatComponent* Combat = CeilingTestMakeCombat(Attributes);
+    Combat->PushOutgoingModifier(UBreakerAbility_Overdrive::OutgoingModifierKey(), 0.0f,
+        UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0f);
+
+    // Exactly Fracture's cast-time sequence: attribute multiplier in, chain
+    // composed on top, THEN the projectile is armed.
+    FBreakerDamageRequest Damage;
+    Damage.BaseDamage = 30.0f;
+    Damage.SourceDamageMultiplier = Attributes->GetDamageMultiplier();
+    Combat->ApplyOutgoingModifiers(Damage);
+    TestEqual(TEXT("The cast-time composition carries the window product"),
+        Damage.SourceDamageMultiplier, UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0001f);
+
+    FBreakerCarriedStatus Carried;
+    Carried.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
+    Carried.Spec.BaseDamagePerTick = 5.0f;
+    Carried.Spec.Duration = 4.0f;
+    Carried.Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
+
+    ABreakerProjectileBase* Projectile = NewObject<ABreakerProjectileBase>(GetTransientPackage());
+    if (!Projectile)
+    {
+        AddError(TEXT("Could not construct a projectile"));
+        return false;
+    }
+    Projectile->AddImpactStatus(Carried);
+    Projectile->InitializeProjectile(Damage, FVector::ForwardVector, 4000.0f);
+
+    // The projectile's stored request and carried snapshot are the composed
+    // values, verbatim — the "modifiers active at the moment of casting are
+    // the ones that count" rule made checkable.
+    TestEqual(TEXT("The projectile carries the composed request verbatim"),
+        Projectile->GetProjectileDamage().SourceDamageMultiplier,
+        UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0001f);
+    if (TestEqual(TEXT("The projectile carries exactly one status"), Projectile->GetImpactStatuses().Num(), 1))
+    {
+        TestEqual(TEXT("The carried status snapshot holds the window product"),
+            Projectile->GetImpactStatuses()[0].Spec.Snapshot.SourcePower,
+            UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0001f);
+    }
+
+    // Closing the window after arming changes nothing the projectile carries.
+    Combat->RemoveOutgoingModifier(UBreakerAbility_Overdrive::OutgoingModifierKey());
+    TestEqual(TEXT("A window closing after the cast does not disarm the projectile"),
+        Projectile->GetProjectileDamage().SourceDamageMultiplier,
+        UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0001f);
+    return true;
+}
+
+// Fracture parity, worldless half 2: the CONFORMANCE (O34's canon clause —
+// every lane that submits outgoing damage must pass through the chain). Any
+// ability translation unit that submits damage — directly via ReceiveDamage
+// or by arming a projectile — must compose the outgoing chain first. Fracture
+// shipped without this call and windows silently never applied to it; this
+// scan is what makes the NEXT forgotten call a red test instead of a silent
+// hole. Deliverer-routed payloads (Rot's zone spec) contain neither submit
+// token and are rightly outside the rule — the zone composes at submission.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCeilingSubmissionConformanceTest,
+    "RiorsEdge.Combat.Ceiling.AbilitySubmissionConformance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCeilingSubmissionConformanceTest::RunTest(const FString& Parameters)
+{
+    const FString AbilitiesRoot = FPaths::Combine(FPaths::ProjectDir(), TEXT("Source"), TEXT("RiorsEdge"), TEXT("Abilities"));
+    if (!IFileManager::Get().DirectoryExists(*AbilitiesRoot))
+    {
+        AddInfo(TEXT("Source tree not present (packaged build?); conformance scan skipped."));
+        return true;
+    }
+    TArray<FString> Files;
+    IFileManager::Get().FindFilesRecursive(Files, *AbilitiesRoot, TEXT("*.cpp"), true, false, true);
+    int32 Submitters = 0;
+    for (const FString& File : Files)
+    {
+        FString Contents;
+        if (!FFileHelper::LoadFileToString(Contents, *File)) continue;
+        const bool bSubmits = Contents.Contains(TEXT("ReceiveDamage(")) || Contents.Contains(TEXT("InitializeProjectile("));
+        if (!bSubmits) continue;
+        ++Submitters;
+        if (!Contents.Contains(TEXT("ApplyOutgoingModifiers")))
+        {
+            AddError(FString::Printf(
+                TEXT("O34 conformance: '%s' submits outgoing damage without composing the outgoing modifier chain. Route the request through ApplyOutgoingModifiers before it leaves the ability (the Fracture bug, again)."),
+                *File));
+        }
+    }
+    // Cleave, Siphon, Resonance and Fracture all submit today; if this ever
+    // reads zero the scan is looking at the wrong tree, not a clean one.
+    TestTrue(TEXT("The scan found the known submitting abilities"), Submitters >= 4);
     return true;
 }
 
