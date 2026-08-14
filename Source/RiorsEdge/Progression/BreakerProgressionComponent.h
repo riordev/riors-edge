@@ -36,6 +36,14 @@ public:
     UFUNCTION(BlueprintCallable, Category="Progression") bool CanPurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason) const;
     UFUNCTION(BlueprintCallable, Category="Progression") bool EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason);
     UFUNCTION(BlueprintCallable, Category="Progression") bool RespecAtForge(EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason);
+    // O37 subclass commitment: one-way (refuses if State.CommittedBranch is
+    // already set), and BranchTreeId must name a class branch tree this
+    // character can actually spend in (Core's RequiredClass==None trees do
+    // not count — Core is not a subclass). RespecAtForge(ClassPoints, ...) is
+    // the only way back to None. Committing unlocks that branch's
+    // bCornerstone-flagged keystone tier in CanPurchaseNode; every ordinary
+    // node of every branch stays freely purchasable regardless (O15 intact).
+    UFUNCTION(BlueprintCallable, Category="Progression") bool CommitToBranch(FName BranchTreeId, FText& OutFailureReason);
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetNodeRank(FName NodeId, EBreakerPointCurrency Currency) const;
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetUnspentPoints(EBreakerPointCurrency Currency) const;
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetTreeInvestment(const UBreakerProgressionTree* Tree) const;
@@ -90,6 +98,16 @@ public:
     // same two numbers the fold does.
     static constexpr int32 MaxDamageMoreSources = 3;
     static constexpr float SingleMoreCeiling = 1.30f;
+
+    // O39's implementation note: "ApplySliceDefaultsIfFresh's auto-lock to
+    // Swift should be retired to a dev convenience once the class screen's
+    // real path works, so the screen is actually exercised." This is that
+    // gate. DEFAULT TRUE: today's flow, and every existing test that relies
+    // on a fresh pawn arriving as Swift, is unchanged until this is
+    // deliberately turned off (dev convenience or the class screen's own
+    // config, once it exists).
+    UPROPERTY(EditAnywhere, Category="Progression|Tuning")
+    bool bAutoLockSwiftIfFresh = true;
 
     // Playtest hook: hands the gym the slice point budget so trees can be
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).
@@ -146,6 +164,12 @@ private:
     // a respec would leave keystone tags behind and the ultimate would keep a
     // rewrite the player no longer owns.
     FGameplayTagContainer PublishedNodeTags;
+    // Audit item 6 (perf): running totals of points committed per currency,
+    // maintained at purchase/respec/load instead of recomputed by walking
+    // every owned rank's node definition on every RecalculateStats. See
+    // GetRefundValue's comment for the complexity this replaced.
+    int32 CachedSpentClassPoints = 0;
+    int32 CachedSpentCorePoints = 0;
 
     // Conditional node effects are live state, so the offer they belong to has
     // to be rebuilt on a transition. Called from the tick; only recalculates
@@ -157,6 +181,12 @@ private:
     bool IsAbilityUnlocked(FName AbilityId) const;
     TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency);
     const TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency) const;
+    int32& SpentPointsFor(EBreakerPointCurrency Currency);
+    // Rebuilds both running totals from State's current rank arrays. O(ranks x
+    // N^2) like the per-call path it replaces on the hot path, but this is
+    // called only when ranks are bulk-replaced (LoadProgressionState) rather
+    // than on every RecalculateStats.
+    void RecomputeSpentPointsFromState();
     void RecalculateStats();
     void ApplyStatsToAttributes();
     // Mirrors CachedStats.GrantedTags onto the owner's ability system as loose

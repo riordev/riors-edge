@@ -78,8 +78,11 @@ struct RIORSEDGE_API FBreakerItemRuleSet
     bool bAirborneAlsoGroundTraversal = false;
     // Overflow: each point of Added Damage also grants 1% Increased Damage.
     bool bAddedDamageAlsoIncreased = false;
-    // Relentless: the Physical DR cap.
-    float PhysicalDamageReductionCap = 60.0f;
+    // Relentless: the Physical DR cap. Defaults to the same named constant
+    // FBreakerEquipmentStats::PhysicalDamageReductionCap displays when no
+    // rewrite is in force (audit item 11 — the two were previously separate
+    // unflagged 60.0f literals).
+    float PhysicalDamageReductionCap = FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap;
     // Cadence: Fire Rate crosses into the damage bucket at this fraction.
     float FireRateToIncreasedDamage = 0.0f;
     // Deadfall's bill, as an ordinary negative Increased percentage rather than

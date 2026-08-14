@@ -97,7 +97,12 @@ namespace
         EBreakerClassId RequiredClass,
         int32 Tier,
         int32 MaxRank,
-        int32 CostPerRank)
+        int32 CostPerRank,
+        // Core constellation membership (audit item 5). Trailing and
+        // defaulted to None so every pre-existing call site — every Swift
+        // branch node, which has no constellation — is unchanged; only the
+        // Core tree's 30 call sites pass one.
+        FName Constellation = NAME_None)
     {
         UBreakerProgressionNode* Node = NewObject<UBreakerProgressionNode>(GetTransientPackage(), UBreakerProgressionNode::StaticClass(), NAME_None, RF_Standalone);
         Node->AddToRoot();
@@ -110,6 +115,7 @@ namespace
         Node->MaxRank = MaxRank;
         Node->CostPerRank = CostPerRank;
         Node->RequiredTreeInvestment = GateForTier(Tier);
+        Node->Constellation = Constellation;
         return Node;
     }
 
@@ -164,13 +170,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     // --- Precision ---------------------------------------------------------
     UBreakerProgressionNode* Sightline = MakeNode(TEXT("Core.Precision.Sightline"), TEXT("Sightline"),
-        TEXT("Precision gateway. Weak-point damage is easier to earn, and everything you fire lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Precision gateway. Weak-point damage is easier to earn, and everything you fire lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
     AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 7.0f); // O2 PLACEHOLDER
     AddEffect(Sightline, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Sightline);
 
     UBreakerProgressionNode* TunnelVision = MakeNode(TEXT("Core.Precision.TunnelVision"), TEXT("Tunnel Vision"),
-        TEXT("Notable. Critical damage rises while a single target holds your attention."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2);
+        TEXT("Notable. Critical damage rises while a single target holds your attention."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Precision"));
     AddPrerequisite(TunnelVision, TEXT("Core.Precision.Sightline"));
     AddEffect(TunnelVision, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 22.0f); // O2 PLACEHOLDER
     TunnelVision->GrantedTags.AddTag(BreakerNodeTags::Node_TunnelVision.GetTag());
@@ -181,7 +187,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // and crit could not be the third axis of the variance band (Power-Curve
     // §4). Two ranks, so it reads as a Minor on the board.
     UBreakerProgressionNode* CalledShot = MakeNode(TEXT("Core.Precision.CalledShot"), TEXT("Called Shot"),
-        TEXT("Deliberate fire finds the seam. Critical chance rises sharply, and every shot lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+        TEXT("Deliberate fire finds the seam. Critical chance rises sharply, and every shot lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Precision"));
     AddPrerequisite(CalledShot, TEXT("Core.Precision.Sightline"));
     AddEffect(CalledShot, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f);          // O2 PLACEHOLDER
     AddEffect(CalledShot, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f);      // O2 PLACEHOLDER
@@ -193,7 +199,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // composes it under the O3 cap. Unconditional, which is what makes it the
     // generalist pick against Terminal Velocity's larger conditional one.
     UBreakerProgressionNode* Fixate = MakeNode(TEXT("Core.Precision.Fixate"), TEXT("Fixate"),
-        TEXT("Convergence. Repeated hits on one target build a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. Repeated hits on one target build a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Precision"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.TunnelVision"));
     AddDamageMore(Fixate, 22.0f); // O2 PLACEHOLDER: x1.22
     Fixate->GrantedTags.AddTag(BreakerNodeTags::Node_Fixate.GetTag());
@@ -201,12 +207,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     // --- Volley ------------------------------------------------------------
     UBreakerProgressionNode* TriggerDiscipline = MakeNode(TEXT("Core.Volley.TriggerDiscipline"), TEXT("Trigger Discipline"),
-        TEXT("Volley gateway. Recoil settles faster between controlled bursts."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Volley gateway. Recoil settles faster between controlled bursts."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
     TriggerDiscipline->GrantedTags.AddTag(BreakerNodeTags::Node_TriggerDiscipline.GetTag());
     Tree->Nodes.Add(TriggerDiscipline);
 
     UBreakerProgressionNode* Cyclic = MakeNode(TEXT("Core.Volley.Cyclic"), TEXT("Cyclic"),
-        TEXT("Sustained fire ramps rate of fire, then decays when you stop. Every rank increases damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Sustained fire ramps rate of fire, then decays when you stop. Every rank increases damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Volley"));
     AddPrerequisite(Cyclic, TEXT("Core.Volley.TriggerDiscipline"));
     // The rate-of-fire ramp is still only a tag nothing consumes, so until the
     // weapon layer reads it this node's three ranks were a purchase that did
@@ -217,7 +223,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Tree->Nodes.Add(Cyclic);
 
     UBreakerProgressionNode* LastRound = MakeNode(TEXT("Core.Volley.LastRound"), TEXT("Last Round"),
-        TEXT("The final round of a magazine fires extra projectiles. They apply no statuses (proc coefficient 0)."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2);
+        TEXT("The final round of a magazine fires extra projectiles. They apply no statuses (proc coefficient 0)."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Volley"));
     AddPrerequisite(LastRound, TEXT("Core.Volley.TriggerDiscipline"));
     LastRound->GrantedTags.AddTag(BreakerNodeTags::Node_LastRound.GetTag());
     Tree->Nodes.Add(LastRound);
@@ -228,7 +234,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // that takes only this is exactly the "baseline" the variance band is
     // defined against.
     UBreakerProgressionNode* Salvo = MakeNode(TEXT("Core.Volley.Salvo"), TEXT("Salvo"),
-        TEXT("Volume over placement. Every rank increases all damage dealt, with no condition attached."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Volume over placement. Every rank increases all damage dealt, with no condition attached."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Volley"));
     AddPrerequisite(Salvo, TEXT("Core.Volley.TriggerDiscipline"));
     AddEffect(Salvo, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f); // O2 PLACEHOLDER
     Salvo->GrantedTags.AddTag(BreakerNodeTags::Node_Salvo.GetTag());
@@ -239,7 +245,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // can find only two — which is the shape O27 asks for: the uncommitted
     // build is viable, the committed one is stronger.
     UBreakerProgressionNode* Barrage = MakeNode(TEXT("Core.Volley.Barrage"), TEXT("Barrage"),
-        TEXT("Convergence. Sustained output becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. Sustained output becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Volley"));
     AddPrerequisite(Barrage, TEXT("Core.Volley.Cyclic"));
     AddDamageMore(Barrage, 22.0f); // O2 PLACEHOLDER: x1.22
     Barrage->GrantedTags.AddTag(BreakerNodeTags::Node_Barrage.GetTag());
@@ -247,19 +253,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     // --- Affliction --------------------------------------------------------
     UBreakerProgressionNode* OpenWound = MakeNode(TEXT("Core.Affliction.OpenWound"), TEXT("Open Wound"),
-        TEXT("Affliction gateway. Weak-point hits apply Bleed regardless of chance."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Affliction gateway. Weak-point hits apply Bleed regardless of chance."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
     OpenWound->GrantedTags.AddTag(BreakerNodeTags::Node_OpenWound.GetTag());
     Tree->Nodes.Add(OpenWound);
 
     UBreakerProgressionNode* Deepen = MakeNode(TEXT("Core.Affliction.Deepen"), TEXT("Deepen"),
-        TEXT("Damage over time hits harder and stacks deeper."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Damage over time hits harder and stacks deeper."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Affliction"));
     AddPrerequisite(Deepen, TEXT("Core.Affliction.OpenWound"));
     AddEffect(Deepen, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 18.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Deepen);
 
     // --- Bulwark -----------------------------------------------------------
     UBreakerProgressionNode* SetStance = MakeNode(TEXT("Core.Bulwark.SetStance"), TEXT("Set Stance"),
-        TEXT("Bulwark gateway. Block rolls more often and you carry more health."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Bulwark gateway. Block rolls more often and you carry more health."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
     AddEffect(SetStance, EBreakerNodeStatTarget::BlockChance, EBreakerNodeStatBucket::Flat, 6.0f);  // O2 PLACEHOLDER
     AddEffect(SetStance, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 90.0f);      // O2 PLACEHOLDER
     SetStance->GrantedTags.AddTag(BreakerNodeTags::Node_SetStance.GetTag());
@@ -269,43 +275,58 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // no-op and must not error (§10.3 criterion 5); it therefore authors no
     // stat effect at all, only a tag Parry reads.
     UBreakerProgressionNode* Read = MakeNode(TEXT("Core.Bulwark.Read"), TEXT("Read"),
-        TEXT("Parry's window widens. Inert until Parry is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Parry's window widens. Inert until Parry is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Bulwark"));
     AddPrerequisite(Read, TEXT("Core.Bulwark.SetStance"));
     Read->GrantedTags.AddTag(BreakerNodeTags::Node_Read.GetTag());
     Tree->Nodes.Add(Read);
 
     UBreakerProgressionNode* Parry = MakeNode(TEXT("Core.Bulwark.Parry"), TEXT("Parry"),
-        TEXT("VERB GRANT. Parry becomes available on its own short cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2);
+        TEXT("VERB GRANT. Parry becomes available on its own short cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Bulwark"));
     AddPrerequisite(Parry, TEXT("Core.Bulwark.SetStance"));
-    Parry->GrantedAbilityIds.Add(TEXT("Parry"));
+    // PHANTOM GRANT FIXED (audit item 3): "Parry" resolved to no entry in the
+    // ability registry (Abilities/BreakerAbilityDefinition.cpp — no
+    // UBreakerAbilityDefinition, no ability class exists yet), so purchasing
+    // this node could unlock a loadout slot that silently did nothing when
+    // pressed. O1 and O25 still name Parry the one tree-granted verb; the
+    // grant returns the day an actual Parry ability ships, rather than
+    // inventing one here to make this node's text true. Verb_Parry stays —
+    // it is a rule-rewrite tag, not an ability id, and its consumer (a future
+    // Combat/ parry check) is unaffected.
     Parry->GrantedTags.AddTag(BreakerNodeTags::Verb_Parry.GetTag());
     Tree->Nodes.Add(Parry);
 
     // --- Kinesis -----------------------------------------------------------
     UBreakerProgressionNode* LightFooting = MakeNode(TEXT("Core.Kinesis.LightFooting"), TEXT("Light Footing"),
-        TEXT("Kinesis gateway. Dodge rolls more often and you move a little quicker."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Kinesis gateway. Dodge rolls more often and you move a little quicker."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
     AddEffect(LightFooting, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 5.0f);             // O2 PLACEHOLDER
     AddEffect(LightFooting, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f);  // O2 PLACEHOLDER
     Tree->Nodes.Add(LightFooting);
 
     // Inert until Air Jump is owned — the second inert-node test.
     UBreakerProgressionNode* Loft = MakeNode(TEXT("Core.Kinesis.Loft"), TEXT("Loft"),
-        TEXT("Air Jump gains height and control. Inert until Air Jump is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Air Jump gains height and control. Inert until Air Jump is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Kinesis"));
     AddPrerequisite(Loft, TEXT("Core.Kinesis.LightFooting"));
     Loft->GrantedTags.AddTag(BreakerNodeTags::Node_Loft.GetTag());
     Tree->Nodes.Add(Loft);
 
     UBreakerProgressionNode* PhantomStep = MakeNode(TEXT("Core.Kinesis.PhantomStep"), TEXT("Phantom Step"),
-        TEXT("A successful Dodge grants brief invulnerability on a 2.0s internal cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2);
+        TEXT("A successful Dodge grants brief invulnerability on a 2.0s internal cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Kinesis"));
     AddPrerequisite(PhantomStep, TEXT("Core.Kinesis.LightFooting"));
     PhantomStep->GrantedTags.AddTag(BreakerNodeTags::Node_PhantomStep.GetTag());
     Tree->Nodes.Add(PhantomStep);
 
+    // O25 SUPERSEDES this node's original "VERB GRANT" premise: two jumps are
+    // base kit for every class (JumpMaxCount = 2 in ABreakerCharacter), so
+    // there is no longer an "Air Jump" verb left for a node purchase to grant
+    // — Parry is now the only tree-granted verb. The phantom
+    // GrantedAbilityIds.Add(TEXT("AirJump")) (no such id in the ability
+    // registry, audit item 3) is removed rather than reworded into a real
+    // grant; the node keeps its Air Control stat line, which is real content
+    // on its own.
     UBreakerProgressionNode* AirJump = MakeNode(TEXT("Core.Kinesis.AirJump"), TEXT("Air Jump"),
-        TEXT("VERB GRANT. One mid-air jump, refreshed on landing, wall contact, or a successful Dodge."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2);
+        TEXT("Sharpens air control. The verb itself is base kit for everyone now (O25); this rank no longer grants it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Kinesis"));
     AddPrerequisite(AirJump, TEXT("Core.Kinesis.LightFooting"));
     AddEffect(AirJump, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
-    AirJump->GrantedAbilityIds.Add(TEXT("AirJump"));
     AirJump->GrantedTags.AddTag(BreakerNodeTags::Verb_AirJump.GetTag());
     Tree->Nodes.Add(AirJump);
 
@@ -319,13 +340,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // what Salvo's unconditional rank pays, and each is worth nothing while you
     // stand still — the trade that makes a movement build a build.
     UBreakerProgressionNode* Freefall = MakeNode(TEXT("Core.Velocity.Freefall"), TEXT("Freefall"),
-        TEXT("Velocity gateway. Increased damage while airborne. Nothing while your feet are down."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1);
+        TEXT("Velocity gateway. Increased damage while airborne. Nothing while your feet are down."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1, TEXT("Velocity"));
     AddEffect(Freefall, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
     Freefall->GrantedTags.AddTag(BreakerNodeTags::Node_Freefall.GetTag());
     Tree->Nodes.Add(Freefall);
 
     UBreakerProgressionNode* Slipstream = MakeNode(TEXT("Core.Velocity.Slipstream"), TEXT("Slipstream"),
-        TEXT("Velocity gateway. Increased damage while sliding, and slides carry further."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1);
+        TEXT("Velocity gateway. Increased damage while sliding, and slides carry further."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1, TEXT("Velocity"));
     AddEffect(Slipstream, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
     AddEffect(Slipstream, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f);                              // O2 PLACEHOLDER
     Slipstream->GrantedTags.AddTag(BreakerNodeTags::Node_Slipstream.GetTag());
@@ -335,14 +356,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // is the hardest state to hold, so the node is priced for the player who
     // actually builds their traversal around it.
     UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
-        TEXT("Increased damage while wall riding. The narrowest window in the constellation, and the largest per rank."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+        TEXT("Increased damage while wall riding. The narrowest window in the constellation, and the largest per rank."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Velocity"));
     AddPrerequisite(Traction, TEXT("Core.Velocity.Freefall"));
     AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
     Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
     Tree->Nodes.Add(Traction);
 
     UBreakerProgressionNode* Afterburn = MakeNode(TEXT("Core.Velocity.Afterburn"), TEXT("Afterburn"),
-        TEXT("Increased damage for a few seconds after dashing. The one Velocity line you can trigger on demand."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Increased damage for a few seconds after dashing. The one Velocity line you can trigger on demand."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Velocity"));
     AddPrerequisite(Afterburn, TEXT("Core.Velocity.Slipstream"));
     AddEffect(Afterburn, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 8.0f, EBreakerBuildCondition::RecentlyDashed); // O2 PLACEHOLDER
     Afterburn->GrantedTags.AddTag(BreakerNodeTags::Node_Afterburn.GetTag());
@@ -353,7 +374,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // aggregator, so authoring it AT the ceiling is a statement that nothing
     // will ever be allowed past it.
     UBreakerProgressionNode* TerminalVelocity = MakeNode(TEXT("Core.Velocity.TerminalVelocity"), TEXT("Terminal Velocity"),
-        TEXT("Convergence. A MORE multiplier to all damage dealt while airborne. Land and it is gone."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. A MORE multiplier to all damage dealt while airborne. Land and it is gone."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Velocity"));
     AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.Traction"));
     AddDamageMore(TerminalVelocity, 30.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER: x1.30
     TerminalVelocity->GrantedTags.AddTag(BreakerNodeTags::Node_TerminalVelocity.GetTag());
@@ -364,7 +385,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // another class. It stays a Core node because O15 forbids mutually
     // exclusive tiers and a Tank can see, and decline, the trade honestly.
     UBreakerProgressionNode* RedlineDoctrine = MakeNode(TEXT("Core.Velocity.RedlineDoctrine"), TEXT("Redline Doctrine"),
-        TEXT("Convergence. A MORE multiplier to all damage dealt while at Redline Momentum. Inert for a class with no Momentum."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. A MORE multiplier to all damage dealt while at Redline Momentum. Inert for a class with no Momentum."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Velocity"));
     AddPrerequisite(RedlineDoctrine, TEXT("Core.Velocity.Afterburn"));
     AddDamageMore(RedlineDoctrine, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
     RedlineDoctrine->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
@@ -402,20 +423,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // — a strictly-better generalist than Fixate and Barrage, bought with a
     // theme it cannot enforce. The slot is reserved, not spent.
     UBreakerProgressionNode* Conductive = MakeNode(TEXT("Core.Elements.Conductive"), TEXT("Conductive"),
-        TEXT("Elements gateway. Elemental buildup decays more slowly, and everything you leave on a target burns longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1);
+        TEXT("Elements gateway. Elemental buildup decays more slowly, and everything you leave on a target burns longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
     AddEffect(Conductive, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
     Conductive->GrantedTags.AddTag(BreakerNodeTags::Node_Conductive.GetTag());
     Tree->Nodes.Add(Conductive);
 
     UBreakerProgressionNode* ChargeUp = MakeNode(TEXT("Core.Elements.ChargeUp"), TEXT("Charge Up"),
-        TEXT("Lane A. The buildup you apply grows with every rank, and damage over time grows with it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1);
+        TEXT("Lane A. The buildup you apply grows with every rank, and damage over time grows with it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Elements"));
     AddPrerequisite(ChargeUp, TEXT("Core.Elements.Conductive"));
     AddEffect(ChargeUp, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 7.0f); // O2 PLACEHOLDER
     ChargeUp->GrantedTags.AddTag(BreakerNodeTags::Node_ChargeUp.GetTag());
     Tree->Nodes.Add(ChargeUp);
 
     UBreakerProgressionNode* Threshold = MakeNode(TEXT("Core.Elements.Threshold"), TEXT("Threshold"),
-        TEXT("Notable. Crossing a status threshold resets the bar halfway instead of emptying it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2);
+        TEXT("Notable. Crossing a status threshold resets the bar halfway instead of emptying it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Elements"));
     AddPrerequisite(Threshold, TEXT("Core.Elements.Conductive"));
     AddEffect(Threshold, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
     Threshold->GrantedTags.AddTag(BreakerNodeTags::Node_Threshold.GetTag());
@@ -425,7 +446,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // rather than another DoT ladder. This is what stops Lane B reading as a
     // duplicate of Lane A while the reaction matrix does not exist.
     UBreakerProgressionNode* Catalyst = MakeNode(TEXT("Core.Elements.Catalyst"), TEXT("Catalyst"),
-        TEXT("Lane B. Reactions come off cooldown sooner, and the shots that set them up find the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+        TEXT("Lane B. Reactions come off cooldown sooner, and the shots that set them up find the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Elements"));
     AddPrerequisite(Catalyst, TEXT("Core.Elements.Conductive"));
     AddEffect(Catalyst, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
     Catalyst->GrantedTags.AddTag(BreakerNodeTags::Node_Catalyst.GetTag());
@@ -435,7 +456,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // does, the only honest expression of "your damage is resisted less" is
     // Increased Damage, and the tag is what upgrades it in place later.
     UBreakerProgressionNode* Penetrance = MakeNode(TEXT("Core.Elements.Penetrance"), TEXT("Penetrance"),
-        TEXT("Lane C. Your damage is turned aside less. Becomes true elemental penetration when resistances exist."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1);
+        TEXT("Lane C. Your damage is turned aside less. Becomes true elemental penetration when resistances exist."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Elements"));
     AddPrerequisite(Penetrance, TEXT("Core.Elements.Conductive"));
     AddEffect(Penetrance, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
     Penetrance->GrantedTags.AddTag(BreakerNodeTags::Node_Penetrance.GetTag());
@@ -444,7 +465,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // Convergence. Carries the constellation's largest single payout and,
     // deliberately, no More — see the block comment above.
     UBreakerProgressionNode* ReactionChain = MakeNode(TEXT("Core.Elements.ReactionChain"), TEXT("Reaction Chain"),
-        TEXT("Convergence. A reaction can set off one more, once. Everything you leave burning hurts considerably more."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3);
+        TEXT("Convergence. A reaction can set off one more, once. Everything you leave burning hurts considerably more."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Elements"));
     AddPrerequisite(ReactionChain, TEXT("Core.Elements.ChargeUp"));
     AddEffect(ReactionChain, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 25.0f); // O2 PLACEHOLDER
     AddEffect(ReactionChain, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f);          // O2 PLACEHOLDER
@@ -504,7 +525,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node = MakeNode(TEXT("Swift.Kinetic.SkimDiscipline"), TEXT("Skim Discipline"),
         TEXT("Grants Hard Stop. Skim may be used twice per airtime."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Redirect"));
-    Node->GrantedAbilityIds.Add(TEXT("HardStop"));
+    // PHANTOM GRANT FIXED (audit item 3): "HardStop" was never a real ability
+    // id — there is no Abilities/BreakerAbility_HardStop and no "HardStop" row
+    // in the fallback registry. Hard Stop is not a second activatable ability
+    // at all: it is a rewrite of Skim itself, already CONSUMED by
+    // Abilities/BreakerAbility_Skim.cpp via UBreakerAbility_Skim::ShouldHardStop
+    // (gated on owning this node's tag, not on an ability id in the loadout).
+    // The grant is removed rather than pointed at something that does not
+    // exist; the tag below is the real, live mechanism.
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SkimDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -592,14 +620,25 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node = MakeNode(TEXT("Swift.Marksman.Sightline"), TEXT("Sightline"),
         TEXT("Grants Sightline. Its pierce ignores Armour after the first target."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
-    Node->GrantedAbilityIds.Add(TEXT("Sightline"));
+    // PHANTOM GRANT FIXED (audit item 3): "Sightline" is not an ability id in
+    // the fallback registry (it collides in NAME ONLY with the unrelated
+    // Core.Precision.Sightline node) and there is no implemented ability it
+    // could resolve to — it is a pierce-ignores-armour RULE, and
+    // Node_Sightline is listed among the "STILL INERT" tags in
+    // Abilities/BreakerAbilityStateComponent.h awaiting a Weapons/ consumer.
+    // The grant is removed rather than invented; the tag is the real hook.
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Sightline.GetTag());
     Tree->Nodes.Add(Node);
 
     Node = MakeNode(TEXT("Swift.Marksman.Lead"), TEXT("Lead"),
         TEXT("Grants Lead. Lead may be held on two targets at once."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.MarkEconomy"));
-    Node->GrantedAbilityIds.Add(TEXT("Lead"));
+    // PHANTOM GRANT FIXED (audit item 3): the registry's real id is
+    // "Swift.Lead" (Abilities/BreakerAbilityDefinition.cpp) — the bare "Lead"
+    // this node granted never matched it, so IsAbilityUnlocked("Swift.Lead")
+    // could never see this node's rank at all and buying it could not unlock
+    // the ability it names.
+    Node->GrantedAbilityIds.Add(TEXT("Swift.Lead"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Lead.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -736,6 +775,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
         TEXT("Branch keystone. A MORE multiplier to all damage dealt at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
     AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
+    // RECORDED GAP FIXED (audit item 9): bCornerstone was never set here, so
+    // UI/BreakerMenu.cpp's ClassifyNode fell through to "single-rank costing
+    // 3+" and drew Swift's first working keystone as an ordinary Convergence
+    // square — the UI worked around it by ALSO reading the Keystone.* tag
+    // below, but the authoring flag itself, and everything that reads it
+    // directly (O37's commitment gate in CanPurchaseNode included), stayed
+    // wrong until now. The read was fixed; this is the data.
+    Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Bloodrhythm.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Swift_Bloodrhythm.GetTag());
     Tree->Nodes.Add(Node);
@@ -771,7 +818,47 @@ TArray<UBreakerProgressionTree*> UBreakerProgressionLibrary::GetTreesForClass(EB
 
 UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId ClassId)
 {
-    // Only Swift is authored in full for the slice (Class-Kits §1.7).
+    // O39 SLICE CLASS HONESTY / audit item 4: Swift and Caster are the two
+    // classes with implemented kits, so both get a row; Gunsmith, Tank and
+    // Support stay nullptr rather than a definition that grants nothing.
+    if (ClassId == EBreakerClassId::Caster)
+    {
+        static UBreakerClassDefinition* Caster = nullptr;
+        if (Caster) return Caster;
+
+        Caster = NewObject<UBreakerClassDefinition>(GetTransientPackage(), UBreakerClassDefinition::StaticClass(), NAME_None, RF_Standalone);
+        Caster->AddToRoot();
+        Caster->ClassAssetId = TEXT("Caster");
+        Caster->ClassId = EBreakerClassId::Caster;
+        Caster->DisplayName = LOCTEXT("CasterName", "Caster");
+        Caster->Description = LOCTEXT("CasterDescription",
+            "Mana: a resource that starts full, spends down per cast, and regenerates -- with Overcast allowing a temporary debt.");
+        // THE FIX ITSELF. UBreakerProgressionComponent::IsAbilityUnlocked
+        // answers only from ClassDefinition->BaseUltimateId /
+        // StartingClassAbilityIds (or a purchased node's GrantedAbilityIds),
+        // and this function returned nullptr for every class but Swift, so a
+        // Caster's ClassDefinition was null and EVERY Caster ability read as
+        // locked no matter what UBreakerAbilityComponent::TryEquipAbility
+        // asked for (see its own comment at the call site). The catalogue
+        // below lists all SEVEN ids the ability registry actually implements
+        // (Abilities/BreakerAbilityDefinition.cpp), mirrored exactly. No
+        // Caster branch tree is authored to gate the other five behind a node
+        // purchase -- that would repeat the exact "grants nothing reachable"
+        // failure this pass exists to fix -- so they are catalogued directly
+        // here instead of invented as tree content that does not exist.
+        Caster->StartingClassAbilityIds = {
+            TEXT("Caster.Cleave"), TEXT("Caster.Rot"),             // Class-Kits §2.2 starters
+            TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
+            TEXT("Caster.Fracture"), TEXT("Caster.Resonance"),
+            TEXT("Caster.Unmake")};
+        Caster->BaseUltimateId = TEXT("Caster.Unmake");
+        // Honest emptiness (O39): BranchTrees stays empty because no Caster
+        // branch tree is authored, rather than pointing at content that does
+        // not exist.
+        return Caster;
+    }
+
+    // Only Swift and Caster are authored for the slice (Class-Kits §1.7, O39).
     if (ClassId != EBreakerClassId::Swift) return nullptr;
 
     static UBreakerClassDefinition* Swift = nullptr;

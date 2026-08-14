@@ -31,6 +31,17 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FText DisplayName;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity", meta=(MultiLine="true")) FText Description;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FGameplayTagContainer NodeTags;
+    // Which Core constellation this node belongs to (Precision, Volley,
+    // Affliction, Bulwark, Kinesis, Velocity, Elements). Only meaningful for
+    // Core tree nodes; class branch nodes leave this None — a branch is not a
+    // constellation. Membership used to be inferred ONLY from the NodeId
+    // string prefix (UI/BreakerMenu.cpp's hardcoded per-constellation cluster
+    // list), which is exactly what let the Velocity constellation's six nodes
+    // fall into the board's UNMAPPED catch-all the day they were authored
+    // without a matching UI entry: a field is authoritative where a naming
+    // convention is silent. The UI is another lane's territory this pass —
+    // this is the data the consumer gets wired to at integration.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Identity") FName Constellation = NAME_None;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") EBreakerPointCurrency Currency = EBreakerPointCurrency::CorePoints;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules") EBreakerClassId RequiredClass = EBreakerClassId::None;

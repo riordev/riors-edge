@@ -434,11 +434,21 @@ struct RIORSEDGE_API FBreakerEquipmentStats
 
     // ---- Rule rewrites ----------------------------------------------------
     // Every rule currently in force from equipped items, in the order the slots
-    // were walked. Duplicates are impossible in practice (Anomalous is capped
-    // at one equipped) but the array does not assume it.
+    // were walked. Duplicates are impossible in practice — a rollable rule
+    // never doubles up because the non-legendary Anomalous axis caps at one
+    // (O37), a legendary's rule never doubles up because the legendary axis
+    // ALSO caps at one (O37, its own axis, separate from the Anomalous one
+    // per O32), and the two pools never share a value — but the array does
+    // not assume it.
     UPROPERTY(BlueprintReadOnly) TArray<EBreakerItemRule> ActiveRules = {};
+    // O2 PLACEHOLDER: the baseline Physical Damage Reduction cap with no
+    // rewrite equipped. Named once (audit item 11) so
+    // FBreakerItemRuleSet::PhysicalDamageReductionCap — the value RELENTLESS
+    // raises — cannot drift from this display default; the two were
+    // previously two unflagged 60.0f literals.
+    static constexpr float DefaultPhysicalDamageReductionCap = 60.0f;
     // The Physical DR cap actually applied, after Relentless. Published so the
     // inventory can show a raised cap instead of a number that stopped moving
     // for no visible reason.
-    UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionCap = 60.0f;
+    UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionCap = DefaultPhysicalDamageReductionCap;
 };

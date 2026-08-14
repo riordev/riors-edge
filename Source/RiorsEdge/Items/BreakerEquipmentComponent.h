@@ -66,12 +66,31 @@ public:
     // screen without touching the loadout widget.
 
     // Equipped cap for a rarity. INDEX_NONE means uncapped. O11 / master sheet
-    // 4.1: Aberrant 3, Anomalous 1; everything below them is unlimited.
+    // 4.1: Aberrant 3, Anomalous 1; everything below them is unlimited. O37
+    // reaffirms O11's numbers and separates the Anomalous axis from the
+    // legendary one — see CountEquippedOfRarity's comment and
+    // CountEquippedLegendaries below.
     static int32 EquipLimitForRarity(EBreakerItemRarity Rarity);
 
-    // How many equipped pieces are of this rarity. The header limit counters
-    // read this instead of walking GetEquipped() themselves.
+    // How many equipped pieces are of this rarity. O37: a legendary rolls
+    // Anomalous (O32) but sits on its own equip-cap axis, so it is EXCLUDED
+    // here when Rarity is Anomalous — CountEquippedLegendaries answers that
+    // question instead, and the two never double-count the same piece.
     UFUNCTION(BlueprintPure, Category="Equipment") int32 CountEquippedOfRarity(EBreakerItemRarity Rarity) const;
+    // Companion to CountEquippedOfRarity for the legendary axis O37 splits
+    // out. Capped at one by the same displacement mechanism as every other
+    // rarity cap (PreviewEquipAgainst/EquipItem never refuse; they disclose
+    // and displace the weakest piece on the axis).
+    UFUNCTION(BlueprintPure, Category="Equipment") int32 CountEquippedLegendaries() const;
+
+    // O37: exactly 1 equipped legendary, 1 non-legendary Anomalous, 3
+    // Aberrant. Equip-time displacement (PreviewEquipAgainst/EquipItem) never
+    // lets a live component exceed these, so this validator's job is a save
+    // load, a hand-edited fixture, or a content-authoring check finding MORE
+    // than the cap — the one thing that should never happen live. Pure and
+    // static so it needs no component, actor, or world.
+    UFUNCTION(BlueprintPure, Category="Equipment|Validation")
+    static bool ValidateEquipCaps(const TArray<FBreakerItemInstance>& Items, FText& OutFailureReason);
 
     // How many backpack items DiscardBackpackBelowRarity would destroy. Shares
     // its predicate with the discard itself, so the number the confirmation

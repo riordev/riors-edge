@@ -418,7 +418,10 @@ bool FBreakerLegendarySignatureTest::RunTest(const FString& Parameters)
         const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollLegendary(Definition.LegendaryId, 50, 4242);
         TestTrue(*(Context + TEXT(" rolls a valid item")), Rolled.IsValid());
         TestTrue(*(Context + TEXT(" is legendary")), Rolled.IsLegendary());
-        TestEqual(*(Context + TEXT(" is Anomalous, so the equip cap of one applies")),
+        // O37: a legendary rolls Anomalous (O32) but sits on its OWN equip-cap
+        // axis, separate from the non-legendary Anomalous cap of one —
+        // RiorsEdge.Items.Equipment.PerAxisCaps covers the separation itself.
+        TestEqual(*(Context + TEXT(" is Anomalous, per O32")),
             static_cast<int32>(Rolled.Rarity), static_cast<int32>(EBreakerItemRarity::Anomalous));
         TestEqual(*(Context + TEXT(" carries its own rule, not a rolled one")),
             static_cast<int32>(Rolled.Rule), static_cast<int32>(Definition.Rule));
