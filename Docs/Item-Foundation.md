@@ -1,6 +1,7 @@
 # Item Foundation
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 The first pass at the itemization prerequisites the master sheet calls out as
 "cheap now, miserable to retrofit": item instances, item level, the roll
@@ -881,7 +882,7 @@ Anomalous rule rewrites") without anything implementing it.
 | Uncommon | 2-3 | T2 | — |
 | Exceptional | 3-5 | T-1 | — |
 | **Aberrant** | 4-6 | T-1 | **FOCUSED** — one affix rolls a tier better |
-| **Anomalous** | 5-6 | T-1 | **A ROLLED RULE REWRITE**, exactly one. Equip cap 1 |
+| **Anomalous** | 5-6 | T-1 | **A ROLLED RULE REWRITE**, exactly one. Equip cap 1 non-legendary — legendaries carry their own separate 1-equip cap [O37] |
 
 The tier caps are the O29 re-derivation (T4 / T2, not the pre-O29 T3 / T1); see
 the tier scale section for why Uncommon moved off T1.
@@ -895,7 +896,9 @@ Every legendary rolls AT Anomalous rarity; **most Anomalous drops are not
 legendaries.** The two are stored separately (`Rule` and `LegendaryId`) because
 a rule is a mechanic and a legendary is an identity — two legendaries could one
 day share a rewrite, and the display name, the signature and the drop table all
-key off the identity.
+key off the identity. **Equip caps split the same way [O37]:** exactly one
+equipped legendary and, separately, one non-legendary Anomalous piece (plus
+three Aberrant, O11) — a legendary does not draw against the Anomalous cap.
 
 **ABERRANT IS FOCUSED.** Its first affix rolls against a ceiling one tier above
 what item level alone allows, and never *worse* than the ordinary ceiling — a
@@ -907,8 +910,10 @@ the focused slot is the seat those will occupy when they land. This pass does no
 guess at what they are.
 
 **ANOMALOUS CARRIES A RULE.** One rewrite, drawn deterministically from a pool of
-four, on top of its affixes. Its equip cap of 1 is unchanged, so a character
-holds at most one rewrite at a time — which is what makes finding a *different*
+four, on top of its affixes. Its equip cap of 1 is unchanged **and applies to
+non-legendary Anomalous pieces only** — legendaries carry their own separate
+1-equip cap and never draw against this one [O37] — so a character holds at
+most one ROLLED rewrite at a time — which is what makes finding a *different*
 Anomalous a decision rather than an accumulation.
 
 ### The constraint that shaped every rewrite: none of them is a More
@@ -983,10 +988,20 @@ at higher volume.** So every effect below was checked against a live consumer
 *before* it was designed, and every one has a test that drives the number rather
 than the card.
 
-A legendary is always **Anomalous**, which means the existing equip cap of one
-Anomalous piece is also the cap on legendaries. That is the design, not a side
-effect: "build-defining" means the build is defined by the one you chose, and
-three that stack would be a set bonus.
+**LEGENDARY AND ANOMALOUS ARE DIFFERENT AXES, NOT ONE SHARED CAP [O32, O37].**
+Anomalous is a RARITY — the fifth tier, gating affix count and the tier
+ceiling, and carrying one rule rewrite ROLLED from the generic pool of four.
+Legendary is a separate field (`FBreakerItemInstance::LegendaryId`) naming one
+of these three specific authored items, with a fixed slot, guaranteed affixes
+and a HAND-AUTHORED rule that is never rolled. Every legendary still rolls AT
+Anomalous rarity (O32), but equip caps are per axis (O37): exactly **one
+equipped legendary**, separately from **one non-legendary Anomalous** piece
+(and three Aberrant, O11) — a legendary does **not** consume the Anomalous
+cap, so a player could in principle hold one legendary and one different
+non-legendary Anomalous piece equipped at the same time. What actually keeps
+these three legendaries from stacking is the dedicated one-legendary cap, not
+a shared Anomalous cap: "build-defining" means the build is defined by the one
+you chose, and three that stack would be a set bonus.
 
 ### DEADFALL — boots — bends the CONDITION system
 
