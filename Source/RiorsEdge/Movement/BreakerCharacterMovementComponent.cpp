@@ -1,8 +1,11 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 
+#include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 
@@ -62,6 +65,38 @@ void UBreakerCharacterMovementComponent::BeginPlay()
     {
         CharacterOwner->JumpMaxHoldTime = JumpHoldWindow;
     }
+
+    // O25. Binds the progression delegate and resolves the starting budget;
+    // the tick poll re-runs it if the progression component was not up yet.
+    RefreshJumpGrant();
+}
+
+UBreakerAttributeSet* UBreakerCharacterMovementComponent::GetAttributes() const
+{
+    if (!CachedAttributes.IsValid())
+    {
+        if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
+        {
+            if (UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
+            {
+                CachedAttributes = const_cast<UBreakerAttributeSet*>(ASC->GetSet<UBreakerAttributeSet>());
+            }
+        }
+    }
+    return CachedAttributes.Get();
+}
+
+void UBreakerCharacterMovementComponent::PublishMoveSpeedBase()
+{
+    if (bPublishedMoveSpeedBase) return;
+    // Deliberately NOT done in BeginPlay: the attribute set is registered with
+    // the ability system in ABreakerCharacter::BeginPlay, which can run after
+    // this component's, so a one-shot there would silently find nothing. Polled
+    // from the tick until it lands, then never again.
+    UBreakerAttributeSet* Attributes = GetAttributes();
+    if (!Attributes) return;
+    Attributes->SetAggregatedAttributeBase(EBreakerAggregatedAttribute::MoveSpeed, WalkSpeed);
+    bPublishedMoveSpeedBase = true;
 }
 
 float UBreakerCharacterMovementComponent::ComputeGravityMultiplier(float VerticalVelocity, float ApexBand, float ApexMultiplier, float FallMultiplier)
@@ -136,12 +171,105 @@ bool UBreakerCharacterMovementComponent::DoJump(bool bReplayingMoves, float Delt
         return true;
     }
 
+    // ACharacter::CheckJumpInput increments JumpCurrentCount AFTER DoJump
+    // returns, so the jump about to be taken is index JumpCurrentCount + 1.
+    // Two spent already means this one is the third — Swift's, by construction,
+    // because nobody else is ever granted a third.
+    const bool bIsBonusJump = CharacterOwner && CharacterOwner->JumpCurrentCount >= FMath::Max(BaseJumpCount, 1);
+
     const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
     if (bJumped)
     {
         bJumpCutArmed = true;
+        if (bIsBonusJump)
+        {
+            ApplyBonusJumpRedirect();
+        }
     }
     return bJumped;
+}
+
+void UBreakerCharacterMovementComponent::ApplyBonusJumpRedirect()
+{
+    // The third jump must not read as a repeat of the second. It buys a course
+    // correction, not altitude and not speed: horizontal velocity rotates
+    // partway onto the current input direction with its magnitude preserved
+    // exactly. With no input it is a plain jump that keeps every bit of the
+    // momentum it arrived with, which is the "preserved momentum" half.
+    if (SwiftThirdJumpRedirectAlpha <= 0.0f)
+    {
+        return;
+    }
+    const FVector Horizontal(Velocity.X, Velocity.Y, 0.0f);
+    const FVector Blended = BlendHorizontalVelocity(Horizontal, Acceleration.GetSafeNormal2D(), SwiftThirdJumpRedirectAlpha);
+    Velocity.X = Blended.X;
+    Velocity.Y = Blended.Y;
+    // Vertical velocity is Super's business. Touching it here would turn a
+    // course correction into a height buff, which O26 puts firmly out of scope.
+}
+
+FVector UBreakerCharacterMovementComponent::BlendHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float Alpha)
+{
+    const FVector Heading = Direction.GetSafeNormal2D();
+    const FVector Current = FVector(HorizontalVelocity.X, HorizontalVelocity.Y, 0.0f);
+    const float Speed = Current.Size();
+    if (Heading.IsNearlyZero() || Speed <= UE_KINDA_SMALL_NUMBER)
+    {
+        return Current;
+    }
+    const float Blend = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    const FVector Steered = FMath::Lerp(Current.GetSafeNormal(), Heading, Blend).GetSafeNormal2D();
+    // A perfect 180 with alpha 0.5 lerps to the zero vector and normalizes to
+    // nothing; keeping the original heading is the honest degenerate answer,
+    // and it is still speed-preserving.
+    if (Steered.IsNearlyZero())
+    {
+        return Current;
+    }
+    // Magnitude is re-applied from the INPUT, never from the blend, so this can
+    // never manufacture speed (Master 5.4).
+    return Steered * Speed;
+}
+
+int32 UBreakerCharacterMovementComponent::ResolveJumpCount(EBreakerClassId PermanentClass, int32 CharacterLevel, int32 BaseCount, bool bThirdJumpEnabled, int32 UnlockLevel)
+{
+    const int32 Base = FMath::Max(1, BaseCount);
+    if (!bThirdJumpEnabled || PermanentClass != EBreakerClassId::Swift)
+    {
+        return Base;
+    }
+    return CharacterLevel >= UnlockLevel ? Base + 1 : Base;
+}
+
+void UBreakerCharacterMovementComponent::HandleProgressionChanged()
+{
+    RefreshJumpGrant();
+}
+
+void UBreakerCharacterMovementComponent::RefreshJumpGrant()
+{
+    UBreakerProgressionComponent* Progression = GetProgression();
+    // Binding here rather than only in BeginPlay: component BeginPlay order is
+    // not guaranteed, so the progression component may not exist yet when this
+    // one starts. The tick poll calls back in, and the bind lands then.
+    if (Progression && !bBoundProgression)
+    {
+        Progression->OnProgressionChanged.AddDynamic(this, &UBreakerCharacterMovementComponent::HandleProgressionChanged);
+        bBoundProgression = true;
+    }
+    ObservedClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    ObservedLevel = Progression ? Progression->GetProgressionState().CharacterLevel : 0;
+    GrantedJumpCount = ResolveJumpCount(ObservedClass, ObservedLevel, BaseJumpCount, bSwiftThirdJumpEnabled, SwiftThirdJumpUnlockLevel);
+
+    if (!CharacterOwner)
+    {
+        return;
+    }
+    CharacterOwner->JumpMaxCount = GrantedJumpCount;
+    // A swap AWAY from Swift mid-air must not leave a jump already banked
+    // against a budget the character no longer has. Clamping the spent count
+    // is the whole reason this is a refresh rather than a one-time grant.
+    CharacterOwner->JumpCurrentCount = FMath::Min(CharacterOwner->JumpCurrentCount, GrantedJumpCount);
 }
 
 void UBreakerCharacterMovementComponent::ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations)
@@ -190,33 +318,74 @@ UBreakerProgressionComponent* UBreakerCharacterMovementComponent::GetProgression
     return CachedProgression.Get();
 }
 
-float UBreakerCharacterMovementComponent::GearMoveSpeedMultiplier() const
+float UBreakerCharacterMovementComponent::ComposeAdditiveMultiplier(float LayerA, float LayerB)
 {
-    const UBreakerEquipmentComponent* Equipment = GetEquipment();
-    const UBreakerProgressionComponent* Progression = GetProgression();
-    return (Equipment ? Equipment->GetStats().MoveSpeedMultiplier : 1.0f)
-        * (Progression ? Progression->GetMoveSpeedMultiplier() : 1.0f);
+    // Each layer hands over a 1.0-based multiplier that is ITSELF already one
+    // additive bucket, so merging the two buckets is adding the fractional
+    // parts: (1 + a) and (1 + b) become (1 + a + b). Floored at zero so a
+    // pathological pair of debuffs reverses nobody's direction of travel.
+    return FMath::Max(0.0f, LayerA + LayerB - 1.0f);
 }
 
-float UBreakerCharacterMovementComponent::GearSlideSpeedMultiplier() const
+float UBreakerCharacterMovementComponent::GetComposedMoveSpeedMultiplier() const
 {
+    if (const UBreakerAttributeSet* Attributes = GetAttributes())
+    {
+        // The attribute holds a SPEED in cm/s (its base is this component's
+        // WalkSpeed, published in PublishMoveSpeedBase). What the rest of the
+        // movement layer wants is the ratio, because sprint, the redirect floor
+        // and the boosted ceiling all scale off their own authored speeds.
+        const float Base = Attributes->GetAttributeBase(EBreakerAggregatedAttribute::MoveSpeed);
+        if (Base > UE_KINDA_SMALL_NUMBER)
+        {
+            return FMath::Max(0.0f, Attributes->GetMoveSpeed() / Base);
+        }
+    }
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
     const UBreakerProgressionComponent* Progression = GetProgression();
-    return (Equipment ? Equipment->GetStats().SlideSpeedMultiplier : 1.0f)
-        * (Progression ? Progression->GetSlideSpeedMultiplier() : 1.0f);
+    return ComposeAdditiveMultiplier(
+        Equipment ? Equipment->GetStats().MoveSpeedMultiplier : 1.0f,
+        Progression ? Progression->GetMoveSpeedMultiplier() : 1.0f);
 }
 
-float UBreakerCharacterMovementComponent::GearAirControlMultiplier() const
+float UBreakerCharacterMovementComponent::GetComposedSlideSpeedMultiplier() const
 {
+    if (const UBreakerAttributeSet* Attributes = GetAttributes())
+    {
+        return FMath::Max(0.0f, Attributes->GetSlideSpeedMultiplier());
+    }
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
     const UBreakerProgressionComponent* Progression = GetProgression();
-    return (Equipment ? Equipment->GetStats().AirControlMultiplier : 1.0f)
-        * (Progression ? Progression->GetAirControlMultiplier() : 1.0f);
+    return ComposeAdditiveMultiplier(
+        Equipment ? Equipment->GetStats().SlideSpeedMultiplier : 1.0f,
+        Progression ? Progression->GetSlideSpeedMultiplier() : 1.0f);
 }
 
-float UBreakerCharacterMovementComponent::GearDashCooldownMultiplier() const
+float UBreakerCharacterMovementComponent::GetComposedAirControlMultiplier() const
 {
+    if (const UBreakerAttributeSet* Attributes = GetAttributes())
+    {
+        return FMath::Max(0.0f, Attributes->GetAirControlMultiplier());
+    }
     const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    const UBreakerProgressionComponent* Progression = GetProgression();
+    return ComposeAdditiveMultiplier(
+        Equipment ? Equipment->GetStats().AirControlMultiplier : 1.0f,
+        Progression ? Progression->GetAirControlMultiplier() : 1.0f);
+}
+
+float UBreakerCharacterMovementComponent::GetComposedDashCooldownMultiplier() const
+{
+    if (const UBreakerAttributeSet* Attributes = GetAttributes())
+    {
+        // The attribute is the REDUCTION and shares the additive bucket in that
+        // shape; the dash wants the scale, which is its reciprocal. The
+        // attribute set floors the reduction, so this cannot divide by zero.
+        return 1.0f / FMath::Max(0.05f, Attributes->GetDashCooldownReduction());
+    }
+    const UBreakerEquipmentComponent* Equipment = GetEquipment();
+    // No tree layer to merge: no node stat target authors dash cooldown yet, so
+    // gear's own single bucket IS the composed bucket.
     return Equipment ? Equipment->GetStats().DashCooldownMultiplier : 1.0f;
 }
 
@@ -224,9 +393,9 @@ float UBreakerCharacterMovementComponent::GetMaxSpeed() const
 {
     if (bSliding)
     {
-        return FMath::Max(SprintSpeed * GearSlideSpeedMultiplier(), Velocity.Size2D());
+        return FMath::Max(SprintSpeed * GetComposedSlideSpeedMultiplier(), Velocity.Size2D());
     }
-    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GearMoveSpeedMultiplier() * GetSpeedMultiplier();
+    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed) * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier();
     return FMath::Max(GroundedCap, BoostedSpeedCeiling);
 }
 
@@ -259,7 +428,7 @@ bool UBreakerCharacterMovementComponent::TryRedirect(const FVector& Direction)
     // The redirect floor is the walk speed as it stands right now, gear and
     // tree multipliers included, so the same call reads the same threshold the
     // rest of the movement layer uses.
-    const float MinimumSpeed = WalkSpeed * GearMoveSpeedMultiplier() * GetSpeedMultiplier();
+    const float MinimumSpeed = WalkSpeed * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier();
     const FVector Horizontal(Velocity.X, Velocity.Y, 0.0f);
     if (!CanRedirect(Horizontal.Size(), MinimumSpeed))
     {
@@ -382,7 +551,7 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)
 {
     const UWorld* World = GetWorld();
-    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown * GearDashCooldownMultiplier())
+    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown * GetComposedDashCooldownMultiplier())
     {
         return false;
     }
@@ -476,6 +645,25 @@ void UBreakerCharacterMovementComponent::PrepareSlideJump()
 
 void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+    // The attribute set is registered with the ability system after this
+    // component's BeginPlay, so the base it cannot know until then is published
+    // here. Costs one branch per frame after the first success.
+    PublishMoveSpeedBase();
+
+    // O25 poll backstop, in the precedent of UBreakerManaComponent::AdvanceLoop.
+    // DevForceClass DOES broadcast OnProgressionChanged today — that was
+    // checked, not assumed — but an illegal third jump that outlives its class
+    // is exactly the failure that must not depend on every future writer of the
+    // progression state remembering to broadcast. Two integer comparisons.
+    if (const UBreakerProgressionComponent* Progression = GetProgression())
+    {
+        const FBreakerProgressionState& LiveState = Progression->GetProgressionState();
+        if (LiveState.PermanentClass != ObservedClass || LiveState.CharacterLevel != ObservedLevel)
+        {
+            RefreshJumpGrant();
+        }
+    }
+
     FHitResult RunnableWall;
     const float SecondsSinceLastWallRide = GetWorld()
         ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastWallRideEndTime)
@@ -566,7 +754,7 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
     const FVector FloorNormal = CurrentFloor.HitResult.ImpactNormal.GetSafeNormal();
     if (SlideEntryBoostRemaining > 0.0f && SlideEntryBoostDuration > UE_SMALL_NUMBER)
     {
-        const float BoostRoom = FMath::Max(0.0f, (SprintSpeed + SlideEntryBoost) * GearSlideSpeedMultiplier() - Velocity.Size2D());
+        const float BoostRoom = FMath::Max(0.0f, (SprintSpeed + SlideEntryBoost) * GetComposedSlideSpeedMultiplier() - Velocity.Size2D());
         const float AppliedBoost = FMath::Min3(SlideEntryBoostRemaining, SlideEntryBoost / SlideEntryBoostDuration * DeltaTime, BoostRoom);
         Velocity += Velocity.GetSafeNormal2D() * AppliedBoost;
         SlideEntryBoostRemaining -= AppliedBoost;
@@ -597,7 +785,7 @@ void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
         return;
     }
 
-    const float SteerRate = AirSteerRate * GearAirControlMultiplier() * (0.35f + 0.65f * FMath::Max(Alignment, 0.0f));
+    const float SteerRate = AirSteerRate * GetComposedAirControlMultiplier() * (0.35f + 0.65f * FMath::Max(Alignment, 0.0f));
     const float Alpha = FMath::Clamp(SteerRate * DeltaTime, 0.0f, 1.0f);
     const FVector SteeredDirection = FMath::Lerp(HorizontalDirection, WishDirection, Alpha).GetSafeNormal2D();
     Velocity.X = SteeredDirection.X * HorizontalSpeed;

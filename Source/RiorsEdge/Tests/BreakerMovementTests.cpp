@@ -303,6 +303,140 @@ bool FBreakerWallRideEntryTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMovementAdditiveCompositionTest,
+    "RiorsEdge.Movement.AdditiveComposition",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMovementAdditiveCompositionTest::RunTest(const FString& Parameters)
+{
+    using FMovement = UBreakerCharacterMovementComponent;
+
+    // The locked rule (Docs/Item-Foundation.md, "Unified attribute
+    // application"): ALL Increased percentages form ONE additive bucket per
+    // stat. Movement was the last place two layers were MULTIPLIED. The single
+    // number this test exists for: +20% gear and +20% tree is x1.40, not x1.44.
+    TestTrue(TEXT("Twenty gear and twenty tree read x1.40, never x1.44"),
+        FMath::IsNearlyEqual(FMovement::ComposeAdditiveMultiplier(1.20f, 1.20f), 1.40f, 0.0001f));
+    TestTrue(TEXT("It is strictly weaker than the multiplicative composition it replaces"),
+        FMovement::ComposeAdditiveMultiplier(1.20f, 1.20f) < 1.20f * 1.20f);
+    TestEqual(TEXT("Neither layer contributing is neutral"), FMovement::ComposeAdditiveMultiplier(1.0f, 1.0f), 1.0f);
+    TestTrue(TEXT("One layer alone is unchanged"),
+        FMath::IsNearlyEqual(FMovement::ComposeAdditiveMultiplier(1.35f, 1.0f), 1.35f, 0.0001f));
+    TestTrue(TEXT("Order does not matter"),
+        FMath::IsNearlyEqual(FMovement::ComposeAdditiveMultiplier(1.35f, 1.08f), FMovement::ComposeAdditiveMultiplier(1.08f, 1.35f), 0.0001f));
+    // A slow and a speed-up cancel exactly, which multiplication does not do.
+    TestTrue(TEXT("Equal and opposite percentages cancel"),
+        FMath::IsNearlyEqual(FMovement::ComposeAdditiveMultiplier(1.30f, 0.70f), 1.0f, 0.0001f));
+    // Nothing may reverse the character's direction of travel.
+    TestEqual(TEXT("A pathological pair of debuffs floors at zero"), FMovement::ComposeAdditiveMultiplier(0.2f, 0.1f), 0.0f);
+
+    // Representative investment levels, the same table published in
+    // Docs/Movement-Design.md so the doc and the code cannot drift.
+    struct FBreakerJumpCompositionRow { float Gear; float Tree; float Additive; };
+    const FBreakerJumpCompositionRow Rows[] = {
+        {1.00f, 1.00f, 1.00f},
+        {1.08f, 1.00f, 1.08f},
+        {1.08f, 1.12f, 1.20f},
+        {1.20f, 1.20f, 1.40f},
+        {1.30f, 1.24f, 1.54f},
+    };
+    for (const FBreakerJumpCompositionRow& Row : Rows)
+    {
+        TestTrue(TEXT("The published table matches the implementation"),
+            FMath::IsNearlyEqual(FMovement::ComposeAdditiveMultiplier(Row.Gear, Row.Tree), Row.Additive, 0.0001f));
+    }
+
+    // A movement component with no owner has no attribute set and no layers, so
+    // every composed stat must be exactly neutral rather than zero.
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    TestEqual(TEXT("Move speed composes to one with nothing equipped or allocated"), Movement->GetComposedMoveSpeedMultiplier(), 1.0f);
+    TestEqual(TEXT("Slide speed composes to one"), Movement->GetComposedSlideSpeedMultiplier(), 1.0f);
+    TestEqual(TEXT("Air control composes to one"), Movement->GetComposedAirControlMultiplier(), 1.0f);
+    TestEqual(TEXT("Dash cooldown composes to one"), Movement->GetComposedDashCooldownMultiplier(), 1.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMovementJumpGrantTest,
+    "RiorsEdge.Movement.JumpGrant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMovementJumpGrantTest::RunTest(const FString& Parameters)
+{
+    using FMovement = UBreakerCharacterMovementComponent;
+
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    // O25: two jumps are base kit for EVERYONE. The count is now resolved at
+    // runtime, so this assertion is what stops the base kit drifting.
+    TestEqual(TEXT("Two jumps are base kit"), Movement->BaseJumpCount, 2);
+    TestTrue(TEXT("The third jump is enabled by default"), Movement->bSwiftThirdJumpEnabled);
+    TestTrue(TEXT("The third jump is a LATER unlock, not part of the starting kit"), Movement->SwiftThirdJumpUnlockLevel > 1);
+    TestTrue(TEXT("The unlock level is reachable inside the level 50 cap"), Movement->SwiftThirdJumpUnlockLevel <= 50);
+    TestEqual(TEXT("A component with no progression grants exactly the base kit"), Movement->GetGrantedJumpCount(), 2);
+
+    // --- The class x level matrix ------------------------------------------
+    const int32 Unlock = 20;
+    const EBreakerClassId EveryClass[] = {
+        EBreakerClassId::None, EBreakerClassId::Caster, EBreakerClassId::Swift,
+        EBreakerClassId::Gunsmith, EBreakerClassId::Tank, EBreakerClassId::Support };
+    for (const EBreakerClassId ClassId : EveryClass)
+    {
+        for (const int32 Level : {1, 19, 20, 21, 50})
+        {
+            const int32 Granted = FMovement::ResolveJumpCount(ClassId, Level, 2, true, Unlock);
+            const bool bShouldHaveThree = (ClassId == EBreakerClassId::Swift) && (Level >= Unlock);
+            TestEqual(TEXT("Jump count matches the O25 class/level matrix"), Granted, bShouldHaveThree ? 3 : 2);
+            // The invariant that outranks the rest: NOBODY drops below the base
+            // kit, and nobody but Swift ever exceeds it.
+            TestTrue(TEXT("Two jumps are never taken away"), Granted >= 2);
+            TestTrue(TEXT("Only Swift can hold three"), Granted <= 2 || ClassId == EBreakerClassId::Swift);
+        }
+    }
+    // Exactly at the threshold unlocks; one below does not.
+    TestEqual(TEXT("One level short of the threshold is still two"), FMovement::ResolveJumpCount(EBreakerClassId::Swift, 19, 2, true, 20), 2);
+    TestEqual(TEXT("The threshold itself unlocks the third"), FMovement::ResolveJumpCount(EBreakerClassId::Swift, 20, 2, true, 20), 3);
+    // Swapping AWAY from Swift is the case a one-time grant would get wrong.
+    TestEqual(TEXT("A swap away from Swift returns the character to two jumps"),
+        FMovement::ResolveJumpCount(EBreakerClassId::Tank, 50, 2, true, 20), 2);
+    // The master switch restores exactly the pre-O25 behaviour.
+    TestEqual(TEXT("Disabling the third jump gives Swift the plain base kit"),
+        FMovement::ResolveJumpCount(EBreakerClassId::Swift, 50, 2, false, 20), 2);
+    // A degenerate base count must never produce a zero-jump character.
+    TestEqual(TEXT("A zero base count is floored at one jump"), FMovement::ResolveJumpCount(EBreakerClassId::Tank, 1, 0, true, 20), 1);
+
+    // --- The third jump's feel: a redirect, never a boost -------------------
+    const FVector Sprinting(1400.0f, 0.0f, 0.0f);
+    const FVector Full = FMovement::BlendHorizontalVelocity(Sprinting, FVector::RightVector, 1.0f);
+    TestTrue(TEXT("A full blend lands on the input direction"), Full.GetSafeNormal().Equals(FVector::RightVector, 0.001f));
+    TestTrue(TEXT("A full blend preserves speed exactly"), FMath::IsNearlyEqual(Full.Size(), 1400.0f, 0.01f));
+    const FVector Partial = FMovement::BlendHorizontalVelocity(Sprinting, FVector::RightVector, 0.55f);
+    TestTrue(TEXT("A partial blend preserves speed exactly"), FMath::IsNearlyEqual(Partial.Size(), 1400.0f, 0.01f));
+    TestTrue(TEXT("A partial blend actually turns"), Partial.GetSafeNormal().Y > 0.0f);
+    TestTrue(TEXT("A partial blend does not fully commit"), Partial.GetSafeNormal().X > 0.0f);
+    TestTrue(TEXT("A zero alpha is a no-op"),
+        FMovement::BlendHorizontalVelocity(Sprinting, FVector::RightVector, 0.0f).Equals(Sprinting, 0.001f));
+    TestTrue(TEXT("No input leaves the momentum untouched"),
+        FMovement::BlendHorizontalVelocity(Sprinting, FVector::ZeroVector, 1.0f).Equals(Sprinting, 0.001f));
+    TestTrue(TEXT("A standing player gains nothing"),
+        FMovement::BlendHorizontalVelocity(FVector::ZeroVector, FVector::RightVector, 1.0f).IsNearlyZero());
+    // The degenerate 180 at exactly half: the lerp collapses to zero, and the
+    // honest answer is the original heading rather than a dead stop.
+    const FVector Reversal = FMovement::BlendHorizontalVelocity(Sprinting, -FVector::ForwardVector, 0.5f);
+    TestTrue(TEXT("A half-blended reversal never dead-stops"), FMath::IsNearlyEqual(Reversal.Size(), 1400.0f, 0.01f));
+    // The whole guardrail, swept: a blend can never manufacture speed.
+    for (float Alpha = 0.0f; Alpha <= 1.0f; Alpha += 0.05f)
+    {
+        for (const FVector& Direction : {FVector::RightVector, -FVector::ForwardVector, FVector(1.0f, 1.0f, 0.0f), FVector(0.0f, 0.0f, 1.0f)})
+        {
+            const FVector Result = FMovement::BlendHorizontalVelocity(Sprinting, Direction, Alpha);
+            TestTrue(TEXT("A third-jump blend never manufactures speed"), Result.Size() <= 1400.0f + 0.01f);
+            TestTrue(TEXT("A third-jump blend stays horizontal"), FMath::IsNearlyZero(Result.Z));
+        }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerPlaytestAssemblyTest,
     "RiorsEdge.Playtest.Assembly",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

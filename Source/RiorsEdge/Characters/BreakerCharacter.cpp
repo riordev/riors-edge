@@ -47,6 +47,10 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(-10.0, 0.0, 64.0));
     FirstPersonCamera->bUsePawnControlRotation = true;
+    // O25 base kit. This is the authored default; at runtime
+    // UBreakerCharacterMovementComponent::RefreshJumpGrant owns the budget,
+    // because the third jump is class- and level-gated and has to survive a
+    // mid-session class change. Two remains correct for every class.
     JumpMaxCount = 2;
     AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
     AbilitySystem->SetIsReplicated(true);

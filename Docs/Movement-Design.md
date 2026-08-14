@@ -172,11 +172,171 @@ of starting a second timer keeps the burst in sync with the camera.
 Whether any of this *feels* good is unverified: automation can prove the envelope
 and the plumbing, not the read.
 
+## Gear x tree movement composition is now ADDITIVE — this is a FELT CHANGE
+
+**Movement gets slightly slower at high investment. Judge it in a playtest.**
+
+The locked aggregation rule (`Source/RiorsEdge/Attributes/BreakerAttributeAggregation.h`,
+and the "Unified attribute application" section of `Docs/Item-Foundation.md`) is:
+flat sums first, **all** Increased percentages form **one additive bucket per
+stat**, More multipliers reserved for trees and Anomalous. Damage was conformed
+when `GearWeaponDamageMultiplier` was deleted. Movement was the last violation:
+`UBreakerCharacterMovementComponent` read the gear multiplier and the tree
+multiplier separately and *multiplied* them, so +20% boots and +20% tree read
+**x1.44** where the rule says **x1.40**.
+
+Nothing was retuned. The composition changed, which means a heavily invested
+character is now measurably slower than they were yesterday, and a character
+with investment in only one layer is **bit-identical**.
+
+### Before / after at representative investment
+
+Sprint 1100 cm/s, walk 700 cm/s, dash cooldown 4.0 s, air steer rate 4.2.
+
+| Gear | Tree | Composed | Old (x) | New (x) | Sprint old | Sprint new | Δ |
+|---:|---:|---|---:|---:|---:|---:|---:|
+| +0% | +0% | x1.00 | 1.000 | 1.000 | 1100 | 1100 | — |
+| +8% | +0% | x1.08 | 1.080 | 1.080 | 1188 | 1188 | — |
+| +0% | +12% | x1.12 | 1.120 | 1.120 | 1232 | 1232 | — |
+| +8% | +12% | x1.20 | 1.210 | 1.200 | 1330 | 1320 | **−0.8%** |
+| +20% | +20% | x1.40 | 1.440 | 1.400 | 1584 | 1540 | **−2.8%** |
+| +30% | +24% | x1.54 | 1.612 | 1.540 | 1773 | 1694 | **−4.5%** |
+
+Same arithmetic, same four stats:
+
+| Stat | At +20% gear / +20% tree | Old | New | Δ |
+|---|---|---:|---:|---:|
+| Walk ceiling | 700 x mult | 1008 cm/s | 980 cm/s | −2.8% |
+| Sprint ceiling | 1100 x mult | 1584 cm/s | 1540 cm/s | −2.8% |
+| Slide ceiling | 1100 x mult | 1584 cm/s | 1540 cm/s | −2.8% |
+| Air steer rate | 4.2 x mult | 6.05 | 5.88 | −2.8% |
+| Dash cooldown | 4.0 s ÷ reduction | 3.39 s | 3.39 s | **unchanged** |
+
+Dash cooldown is unchanged *today* only because no `EBreakerNodeStatTarget`
+authors dash cooldown, so gear is the only bidder and one bucket equals one
+layer. It is conformed anyway: the moment a node adds a dash line it is additive
+from day one instead of repeating this bug.
+
+**Only one layer invested? Nothing changed.** The whole delta lives at the
+intersection, which is exactly where the rule was being broken.
+
+### How it is implemented
+
+Not by fixing the multiplication in place — by deleting the composition from the
+movement layer entirely, in the precedent the damage pass set:
+
+- `EBreakerAggregatedAttribute` gained `SlideSpeedMultiplier`,
+  `AirControlMultiplier` and `DashCooldownReduction` (all base 1.0, all
+  replicated on `UBreakerAttributeSet`). `MoveSpeed` already existed.
+- Gear (`UBreakerEquipmentComponent::AggregateStats`) and the tree
+  (`UBreakerProgressionComponent::AggregateStats`) each bid raw percentages into
+  those attributes, so the additive bucket is structural rather than a
+  convention the movement layer has to remember.
+- `UBreakerCharacterMovementComponent` reads the composed attributes:
+  `GetComposedMoveSpeedMultiplier` / `SlideSpeed` / `AirControl` /
+  `DashCooldownMultiplier`. The private `GearMoveSpeedMultiplier()` and friends
+  are gone.
+- `DashCooldownReduction` is a **divisor** (x1.20 == a 20% shorter cooldown).
+  That shape is what lets it live in an additive bucket at all; an attribute
+  holding the cooldown in seconds could not be shared by two layers additively.
+
+**To revert to the old feel exactly** there is no switch — it is a rule, not a
+tunable. Reverting means putting the multiplication back in
+`GetComposed*Multiplier`, which re-breaks the locked rule. If the new numbers
+feel bad, retune the *content* (affix ranges, node percentages) instead.
+
+Covered by `RiorsEdge.Movement.AdditiveComposition` (the arithmetic, including
+the exact table above) and `RiorsEdge.Movement.ComposedAttributes` (both layers
+through the real attribute set with real gear and a real node).
+
+Not playtested. Automation proves the maths; whether a 2.8% loss at heavy
+investment is felt at all is exactly what it cannot see.
+
+## The composed MoveSpeed attribute now has a consumer
+
+`UBreakerAttributeSet::MoveSpeed` was written by the aggregator and read by
+**nobody** — the movement component computed its own speed. That is the
+"attribute that lies to the player" failure mode, the same one `DamageMultiplier`
+had before the damage pass. It is now the single source of truth for move-speed
+composition, consumed by `GetComposedMoveSpeedMultiplier`.
+
+One wrinkle worth stating rather than hiding: `MoveSpeed` is a **speed in cm/s**
+while the other three are multipliers. `WalkSpeed` is authored `EditAnywhere` on
+the movement component, so an attribute-set constant for it (it was 650, against
+a real walk speed of 700) goes stale the moment the owner retunes it — a
+composed attribute that disagrees with the speed the character actually walks at
+is the same class of lie. The movement component therefore **publishes** its
+`WalkSpeed` as the attribute's base
+(`UBreakerAttributeSet::SetAggregatedAttributeBase`) once the ability system has
+registered the set, and reads back `composed / base` as the multiplier. After
+that the attribute genuinely is the character's current walk speed.
+
+**SlideSpeed / AirControl / DashCooldown reached the attribute set at all for
+the first time here** — they are routed in, not documented away.
+
+The publish is polled from `TickComponent` rather than done in `BeginPlay`,
+because the attribute set is registered with the ability system in
+`ABreakerCharacter::BeginPlay`, which can run *after* the movement component's;
+a one-shot there would silently find nothing. It costs one branch per frame
+after the first success.
+
+## Swift's third jump (O25)
+
+O25: "TWO JUMPS are base kit for everyone and Swift innately unlocks a third
+later — innate to the class, not a tree purchase." Before this the count was the
+constant `JumpMaxCount = 2` on `ABreakerCharacter` and the third jump did not
+exist in any form.
+
+**What is delivered is the MECHANISM.** The threshold is a placeholder awaiting
+an owner ruling — CONTEXT.md lists "when it unlocks and whether it is free" as
+open — and it is flagged `O2 PLACEHOLDER` at the code.
+
+| Tunable | Default | Kind |
+|---|---:|---|
+| `BaseJumpCount` | **2** | O25 base kit, every class, every level. Written onto `ACharacter::JumpMaxCount` at runtime, so a Blueprint override is deliberately overwritten: O25 is a rule, not a per-Blueprint preference. |
+| `bSwiftThirdJumpEnabled` | **true** | Master switch. False restores exactly the pre-O25 behaviour. |
+| `SwiftThirdJumpUnlockLevel` | **20** | **O2 PLACEHOLDER, awaiting a ruling.** Free — no resource cost, no cooldown, no point spend. 20 was chosen only so the grant reads as a *later* unlock rather than part of the starting kit; it carries no design authority. |
+| `SwiftThirdJumpRedirectAlpha` | **0.55** | **O2 PLACEHOLDER.** How far the third jump turns horizontal velocity onto input. 0 makes it identical to the second jump. |
+
+**Rules, all tested by `RiorsEdge.Movement.JumpGrant`:**
+
+- Two jumps for every class at every level. Nobody ever drops below two.
+- Three only for Swift, only at or past the unlock level. The threshold is
+  inclusive: level 19 is two, level 20 is three.
+- The grant reads the **permanent** class from `UBreakerProgressionComponent`,
+  recomputes on `OnProgressionChanged`, **and** polls the live state from
+  `TickComponent` as a backstop, in the precedent of
+  `UBreakerManaComponent::AdvanceLoop`. `DevForceClass` *does* broadcast today —
+  that was checked, not assumed — but an illegal third jump that outlives its
+  class must not depend on every future writer of the progression state
+  remembering to broadcast.
+- A swap **away** from Swift returns the character to two immediately, and
+  clamps `JumpCurrentCount` so a jump already banked against the larger budget
+  cannot survive the swap.
+
+**Why it feels like Swift's and not like a repeat.** The third jump buys a
+*course correction*, not altitude and not speed: `BlendHorizontalVelocity`
+rotates horizontal velocity partway onto the current input direction with its
+magnitude **preserved exactly**, and vertical velocity is untouched. With no
+input it is a plain jump that keeps all of its momentum. Redirection is Swift's
+verb already (Skim is the same idea) and Master 5.4 forbids self-acceleration,
+so a speed-preserving turn is the restrained version. O26 says movement gets no
+further dedicated passes, so this executes O25 and adds nothing else.
+
+**Known gap for a playtest:** nothing raises `CharacterLevel` yet — there is no
+XP loop — so at the shipped threshold of 20 the third jump is **unreachable in
+the gym**. Set `SwiftThirdJumpUnlockLevel` to 1 on `BP_BreakerCharacter`'s
+movement component to feel it. Never playtested; automation proves the matrix
+and the speed-preservation guardrail, not the feel.
+
 ## Base kit
 
 Every character has walk, sprint, jump, crouch, dash, slide, wall ride, wall jump, block, and dodge from level one. No class or constellation unlocks these actions.
 
-Air jump is the exception and remains a tree unlock.
+**Two jumps are base kit for every class (O25).** The earlier line here — "air
+jump is the exception and remains a tree unlock" — was superseded by O25 and is
+deleted. Swift innately unlocks a *third* jump later; see "Swift's third jump"
+below. Parry is the only tree-granted verb left.
 
 Trees and affixes scale these actions. Affixes own raw percentages and stamina economy; trees own rule changes and quality such as i-frame duration and parry. See `Docs/Layer-Ownership.md`.
 

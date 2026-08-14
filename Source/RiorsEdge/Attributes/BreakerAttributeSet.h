@@ -57,8 +57,23 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_DamageOverTimeMultiplier, Category="Offense") FGameplayAttributeData DamageOverTimeMultiplier;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DamageOverTimeMultiplier)
 
+    // The character's composed walk speed in cm/s. The movement component owns
+    // the authored base (it is EditAnywhere there, not here) and publishes it
+    // through SetAggregatedAttributeBase, so this attribute is the real number
+    // rather than a parallel one that happens to be close.
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MoveSpeed, Category="Movement") FGameplayAttributeData MoveSpeed;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, MoveSpeed)
+    // Multiplier-shaped, base 1.0, exactly like DamageMultiplier. These three
+    // exist so gear and tree movement percentages share ONE additive bucket
+    // instead of being multiplied together in the movement component — the last
+    // instance of the bug class the damage pass already fixed.
+    // DashCooldownReduction is a DIVISOR: x1.20 means a 20% shorter cooldown.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_SlideSpeedMultiplier, Category="Movement") FGameplayAttributeData SlideSpeedMultiplier;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, SlideSpeedMultiplier)
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AirControlMultiplier, Category="Movement") FGameplayAttributeData AirControlMultiplier;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AirControlMultiplier)
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_DashCooldownReduction, Category="Movement") FGameplayAttributeData DashCooldownReduction;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DashCooldownReduction)
 
     // --- Unified attribute application path -------------------------------
     // This attribute set is the ONE owner of the true base value for every
@@ -103,6 +118,18 @@ public:
     // always done, made testable.
     void ApplyClassResource(float NewValue);
 
+    // Publishes an authored base that this class cannot know on its own.
+    // MoveSpeed is the case that forced it: WalkSpeed is EditAnywhere on
+    // UBreakerCharacterMovementComponent, so an attribute-set constant would go
+    // stale the moment the owner retunes it — and a composed MoveSpeed that
+    // disagrees with the speed the character actually walks at is precisely the
+    // "attribute that lies to the player" failure mode.
+    //
+    // Captures first (idempotent), so a caller running before any contributor
+    // cannot leave the other bases uncaptured, then overrides the one base and
+    // re-derives everything.
+    void SetAggregatedAttributeBase(EBreakerAggregatedAttribute Attribute, float Value);
+
     float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
     float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
     const FBreakerAttributeAggregator& GetAttributeAggregator() const { return Aggregator; }
@@ -121,6 +148,9 @@ protected:
     UFUNCTION() void OnRep_DamageMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DamageOverTimeMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_SlideSpeedMultiplier(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_AirControlMultiplier(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_DashCooldownReduction(const FGameplayAttributeData& OldValue) const;
 
 private:
     FBreakerAttributeAggregator Aggregator;

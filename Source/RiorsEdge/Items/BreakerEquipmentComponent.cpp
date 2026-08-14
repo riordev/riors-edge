@@ -386,6 +386,14 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)]);
+        // Slide speed, air control and dash cooldown reduction were the last
+        // stats that reached gameplay WITHOUT passing through the aggregator:
+        // the movement component read the composed multipliers below and the
+        // tree's own multipliers and multiplied the two. Same bug class as
+        // WeaponDamage. The Stats.* fields above survive as display figures.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::SlideSpeedMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::SlideSpeed)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirControl)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DashCooldownReduction)]);
         // Weapon Damage used to reach the weapon on its own private path
         // (GearWeaponDamageMultiplier, multiplied against the DamageMultiplier
         // attribute), which meant gear damage and tree damage would have
