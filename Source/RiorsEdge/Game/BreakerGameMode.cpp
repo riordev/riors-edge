@@ -11,6 +11,8 @@
 #include "Combat/BreakerSkirmisherEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
 #include "Interaction/BreakerNPC.h"
+#include "Playtest/BreakerKillTelemetryComponent.h"
+#include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInterface.h"
@@ -55,6 +57,19 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
     TickSupplyCrate(DeltaSeconds);
 }
 
+void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+    // A console command registered against a game-mode instance outlives the
+    // world unless it is unregistered: the next PIE session's `Breaker.Boss`
+    // would call through a dangling this.
+    if (BossConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(BossConsoleCommand);
+        BossConsoleCommand = nullptr;
+    }
+    Super::EndPlay(Reason);
+}
+
 void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
@@ -76,6 +91,93 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     LogGymSummary();
     BuildCaptureTour();
     ScheduleScreenshots();
+
+    // THE BOSS KEY. F5, because the playtest keys F1-F4 and the F talk key all
+    // live on ABreakerCharacter (Characters/), which this lane does not own.
+    // Binding onto the PLAYER CONTROLLER's input component reaches the same
+    // keyboard without touching that file: the pawn's component sits above the
+    // controller's on the input stack, so a key the pawn does not claim falls
+    // through to here, and F5 is claimed by nothing.
+    if (NewPlayer->InputComponent)
+    {
+        NewPlayer->InputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ABreakerGameMode::SpawnBossTest);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] no controller input component; the F5 boss key is unavailable. Use Breaker.Boss."));
+    }
+    if (!BossConsoleCommand)
+    {
+        BossConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.Boss"),
+            TEXT("Spawns THE FIELD MARSHAL at the elite arena (Encounter-Design 3)."),
+            FConsoleCommandDelegate::CreateUObject(this, &ABreakerGameMode::SpawnBossTest));
+    }
+}
+
+bool ABreakerGameMode::IsBossAlive() const
+{
+    return IsValid(ActiveBoss) && !ActiveBoss->IsDeadEnemy();
+}
+
+void ABreakerGameMode::SpawnBossTest()
+{
+    UWorld* World = GetWorld();
+    if (!World || !bFieldFrameSet) return;
+    if (IsBossAlive())
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerGym] the Field Marshal is already alive; refusing a second."));
+        return;
+    }
+
+    // The elite arena, which is the fourth combat pocket. Level-Design §5 puts
+    // it at ArenaDistance with radius CombatPocketRadius (2000), and §5.1
+    // notices that doubling that radius is EXACTLY Encounter-Design §3.3's
+    // 4000 x 4000 boss room. So the arena is the right size by two independent
+    // derivations — but only just: the boss's gallery offsets are ±1900 and the
+    // pocket's broken wall arc sits at 1800-2200 cm from centre, so a gallery
+    // can land inside a ruin segment. Checked and reported rather than assumed.
+    const FVector ArenaCentre = Frame.At(ArenaDistance, 0.0f, 140.0f);
+    if (CombatPocketRadius < BossArenaClearanceCm)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[BreakerGym] arena radius %.0f cm is under the boss's %.0f cm gallery reach; orders will point into geometry."),
+            CombatPocketRadius, BossArenaClearanceCm);
+    }
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    // Facing back down the field, so a player arriving from the camp meets its
+    // FRONT — which is the armoured side, and the whole fight is the decision
+    // to stop being there.
+    ABreakerBossEnemy* Boss = World->SpawnActor<ABreakerBossEnemy>(
+        ABreakerBossEnemy::StaticClass(), ArenaCentre, (-Frame.Forward).Rotation(), Params);
+    if (!Boss) return;
+
+    Boss->ConfigureEncounter(ArenaCentre, 0.0f);
+    Boss->SetAreaLevel(GymAreaLevel);
+    // Rank Boss is authored in the class and must NOT be overwritten here;
+    // SetAreaLevel rebuilds the chassis against whatever rank the archetype
+    // set, which is exactly the one-source-of-truth rule O27 installed.
+    UBreakerKillTelemetryComponent::AttachTo(Boss);
+    Boss->OnBossDefeated.AddDynamic(this, &ABreakerGameMode::HandleBossDefeated);
+    ActiveBoss = Boss;
+
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerGym] FIELD MARSHAL spawned at the elite arena (%.0f cm forward), area level %d, %.0f health. Walk to it."),
+        ArenaDistance, GymAreaLevel, Boss->GetMonsterMaxHealth());
+}
+
+void ABreakerGameMode::HandleBossDefeated()
+{
+    // O18 puts the boss band at 20-45s and Encounter-Design §3.2 records a
+    // DIVERGENCE that is still open: the order cadence imposes a script floor
+    // independent of health, so even a player who bursts a phase down waits on
+    // the phases. Whether the composition lands inside the band is a
+    // MEASUREMENT, and it is the boss TTK bucket that carries it — filed by the
+    // kill-telemetry component from the boss's own rank, not from here.
+    RefillPlayerAmmo();
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] FIELD MARSHAL down. Boss TTK sample recorded; F2 copies the report."));
 }
 
 float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn) const
@@ -853,6 +955,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.7f);
             // The standing encounter is an area-level-GymAreaLevel area.
             Enemy->SetAreaLevel(GymAreaLevel);
+            UBreakerKillTelemetryComponent::AttachTo(Enemy);
         }
     }
 
@@ -870,6 +973,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
         Elite->SetAreaLevel(GymAreaLevel);
         Elite->ConfigureElite();
         GrantModifiers(Elite, ModifierSeedBase);
+        UBreakerKillTelemetryComponent::AttachTo(Elite);
     }
 
     // Two LATTICE ranged enemies (Encounter-Design §2.2) flank the pack wide.
@@ -894,6 +998,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
         {
             Ranged->ConfigureEncounter(SpawnLocation, 0.4f + Index * 1.1f);
             Ranged->SetAreaLevel(GymAreaLevel);
+            UBreakerKillTelemetryComponent::AttachTo(Ranged);
         }
     }
 
@@ -911,6 +1016,7 @@ void ABreakerGameMode::SpawnCombatEncounter()
     {
         Warden->ConfigureEncounter(WardenLocation, 1.4f);
         Warden->SetAreaLevel(GymAreaLevel);
+        UBreakerKillTelemetryComponent::AttachTo(Warden);
     }
 
     // TWO Skirmishers, and their placement is the whole point. They go AT the
@@ -1460,6 +1566,7 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
         ABreakerSkirmisherEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
     if (!Skirmisher) return nullptr;
     Skirmisher->ConfigureEncounter(SpawnLocation, PatrolPhase);
+    UBreakerKillTelemetryComponent::AttachTo(Skirmisher);
     if (!bHasCover)
     {
         // Loud, because a Skirmisher with nothing to hide behind is a plain

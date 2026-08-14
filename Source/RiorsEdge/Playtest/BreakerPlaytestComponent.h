@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Playtest/BreakerKillBuckets.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "BreakerPlaytestComponent.generated.h"
 
@@ -26,6 +27,19 @@ struct RIORSEDGE_API FBreakerPlaytestStats
     // measures a different thing. Mixing them would corrupt the one number the
     // O18 re-anchor is waiting on.
     UPROPERTY(BlueprintReadOnly) TArray<float> RangedTimeToKillSamples;
+    // The two buckets that were missing, and the reason is the same bug class
+    // twice over. Before this, a ModifierBearing enemy (x2.5 health plus the
+    // per-modifier step) and the boss (x25) both fell into MELEE TRASH — not,
+    // as the handover assumed, into elite: `IsElite()` is `rank == Elite`, and
+    // neither of those ranks is Elite. One boss kill therefore moved the one
+    // number O18's re-anchor reads by more than a hundred trash kills could.
+    UPROPERTY(BlueprintReadOnly) TArray<float> ModifierTimeToKillSamples;
+    UPROPERTY(BlueprintReadOnly) TArray<float> BossTimeToKillSamples;
+
+    // Read-only routing so nothing outside this struct has to know which array
+    // is which. Non-const twin below for the writer.
+    const TArray<float>& SamplesForBucket(EBreakerKillBucket Bucket) const;
+    TArray<float>& SamplesForBucket(EBreakerKillBucket Bucket);
 
     float Accuracy() const { return ShotsFired > 0 ? 100.0f * Hits / ShotsFired : 0.0f; }
     float WeakPointRate() const { return Hits > 0 ? 100.0f * WeakPointHits / Hits : 0.0f; }
@@ -52,7 +66,29 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest") FString BuildReport() const;
     UFUNCTION(BlueprintCallable, Category="Playtest") void CopyReportToClipboard() const;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetStats();
+    // The call ABreakerEnemy::HandleDeath still makes. It can only describe
+    // three of the five buckets, so it consults a HINT first (see
+    // NotePendingKillBucket) and falls back to the legacy classification.
     UFUNCTION(BlueprintCallable, Category="Playtest") void AddTimeToKillSample(float Seconds, bool bElite, bool bRanged = false);
+    // The unambiguous path: the caller already knows what it killed.
+    UFUNCTION(BlueprintCallable, Category="Playtest") void AddClassifiedTimeToKillSample(float Seconds, EBreakerKillBucket Bucket);
+
+    // WHY A HINT AND NOT AN ARGUMENT. The sample is fed from inside
+    // ABreakerEnemy::HandleDeath, in Combat/, which this lane does not own and
+    // which two other agents are editing in parallel — so the three-argument
+    // call cannot be widened to carry the rank. Instead
+    // UBreakerKillTelemetryComponent, which rides on every enemy the gym
+    // spawns, classifies its OWN owner and posts the answer here.
+    //
+    // The ordering is a CODE PATH, not a delegate registration order (which
+    // this codebase is explicit is an accident and not a contract):
+    // UBreakerCombatComponent::ApplyDamage broadcasts OnDamageReceived — where
+    // the hint is posted — and only then broadcasts OnDeath, which is what
+    // eventually reaches HandleDeath and the sample. The hint is stamped with
+    // the world time it was posted and is only honoured within the same frame,
+    // so a Wakeful revive (which takes the damage broadcast and then SUPPRESSES
+    // the death) cannot leave a hint lying around for the next kill.
+    UFUNCTION(BlueprintCallable, Category="Playtest") void NotePendingKillBucket(EBreakerKillBucket Bucket);
     UFUNCTION(BlueprintCallable, Category="Playtest") void ToggleDiagnostics() { bDiagnosticsVisible = !bDiagnosticsVisible; }
     UFUNCTION(BlueprintPure, Category="Playtest") bool AreDiagnosticsVisible() const { return bDiagnosticsVisible; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetSecondsSinceReportCopy() const;
@@ -64,4 +100,6 @@ private:
     UPROPERTY() FBreakerPlaytestStats Stats;
     bool bDiagnosticsVisible = true;
     mutable double LastReportCopyTime = -1000.0;
+    EBreakerKillBucket PendingKillBucket = EBreakerKillBucket::Count;
+    double PendingKillBucketTime = -1000.0;
 };

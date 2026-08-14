@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Containers/Ticker.h"
+#include "HAL/IConsoleManager.h"
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
@@ -14,6 +15,7 @@ class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 public:
     ABreakerGameMode();
     virtual void Tick(float DeltaSeconds) override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetPlaytestTargets();
 
@@ -185,6 +187,26 @@ public:
     // 1800 cm wall face.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="100")) float GroundProbeRadius = 1500.0f;
 
+    // --- THE FIELD MARSHAL (Encounter-Design §3) ---------------------------
+    // Spawns the boss at the elite arena and teleports nothing: the player
+    // walks there, which is the §5.2 "approach" beat and is the only part of
+    // the pacing curve a gym can actually give you.
+    //
+    // Reachable three ways, because the obvious one is not available to this
+    // lane: the playtest keys live on ABreakerCharacter (Characters/, which
+    // this lane does not own), so the binding is installed onto the PLAYER
+    // CONTROLLER's input component from HandleStartingNewPlayer instead, and a
+    // console command backs it up.
+    UFUNCTION(BlueprintCallable, Category="Playtest|Boss") void SpawnBossTest();
+    UFUNCTION(BlueprintPure, Category="Playtest|Boss") bool IsBossAlive() const;
+    UFUNCTION() void HandleBossDefeated();
+
+    // The boss needs ±1900 cm of clear ground for its gallery offsets and
+    // ±1700 for its alcoves — it spawns adds and orders them into those points,
+    // and a gallery inside a wall is an order with nowhere to land. Checked
+    // against the arena at spawn time rather than asserted in a comment.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Boss", meta=(ClampMin="0")) float BossArenaClearanceCm = 1900.0f;   // O2 PLACEHOLDER
+
     // Wave mode: the TTK measurement instrument. Escalating non-respawning
     // waves in the elite arena; every third wave carries an elite.
     UFUNCTION(BlueprintCallable, Category="Playtest|Waves") void StartNextWave();
@@ -302,6 +324,11 @@ private:
     TArray<FVector> CoverAnchors;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
+    UPROPERTY() TObjectPtr<class ABreakerBossEnemy> ActiveBoss;
+    // Console fallback for the boss key, registered once. Held so it is
+    // unregistered on EndPlay — a stale IConsoleCommand outliving its game mode
+    // is a dangling this pointer the next PIE session walks straight into.
+    IConsoleCommand* BossConsoleCommand = nullptr;
     FVector SafeZoneCenter = FVector::ZeroVector;
     bool bSafeZoneSet = false;
     FVector SupplyCrateLocation = FVector::ZeroVector;
