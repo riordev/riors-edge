@@ -1,9 +1,11 @@
 #pragma once
 
 #include "Containers/Ticker.h"
+#include "HAL/IConsoleManager.h"
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Game/BreakerWaveBudget.h"
 #include "BreakerGameMode.generated.h"
 
 UCLASS(Blueprintable)
@@ -14,6 +16,7 @@ class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 public:
     ABreakerGameMode();
     virtual void Tick(float DeltaSeconds) override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetPlaytestTargets();
 
@@ -185,9 +188,38 @@ public:
     // 1800 cm wall face.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="100")) float GroundProbeRadius = 1500.0f;
 
+    // --- THE FIELD MARSHAL (Encounter-Design §3) ---------------------------
+    // Spawns the boss at the elite arena and teleports nothing: the player
+    // walks there, which is the §5.2 "approach" beat and is the only part of
+    // the pacing curve a gym can actually give you.
+    //
+    // Reachable three ways, because the obvious one is not available to this
+    // lane: the playtest keys live on ABreakerCharacter (Characters/, which
+    // this lane does not own), so the binding is installed onto the PLAYER
+    // CONTROLLER's input component from HandleStartingNewPlayer instead, and a
+    // console command backs it up.
+    UFUNCTION(BlueprintCallable, Category="Playtest|Boss") void SpawnBossTest();
+    UFUNCTION(BlueprintPure, Category="Playtest|Boss") bool IsBossAlive() const;
+    UFUNCTION() void HandleBossDefeated();
+
+    // The boss needs ±1900 cm of clear ground for its gallery offsets and
+    // ±1700 for its alcoves — it spawns adds and orders them into those points,
+    // and a gallery inside a wall is an order with nowhere to land. Checked
+    // against the arena at spawn time rather than asserted in a comment.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Boss", meta=(ClampMin="0")) float BossArenaClearanceCm = 1900.0f;   // O2 PLACEHOLDER
+
     // Wave mode: the TTK measurement instrument. Escalating non-respawning
     // waves in the elite arena; every third wave carries an elite.
     UFUNCTION(BlueprintCallable, Category="Playtest|Waves") void StartNextWave();
+    // Encounter-Design §4.2's budget, costs, cadence and §5.3's caps, in one
+    // authored block. The composition is SOLVED from these rather than ramped,
+    // so the whole shape of wave mode is retunable in-editor and provable by
+    // automation. O2: every value inside is a PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves") FBreakerWaveBudgetParams WaveBudget;
+    // What wave N would spawn, without spawning it. Exposed so a tuning pass
+    // can read the ramp out of the editor rather than by playing to wave 12.
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves")
+    FBreakerWaveComposition GetWaveComposition(int32 WaveIndex) const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetCurrentWave() const { return CurrentWave; }
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
@@ -240,6 +272,20 @@ public:
     // The area level of wave N. Pure, so a test can walk the escalation.
     UFUNCTION(BlueprintPure, Category="Playtest|Area") int32 GetAreaLevelForWave(int32 WaveIndex) const;
 
+    // --- The modifier layer reaching a player (O27) -------------------------
+    // Ten modifiers, a component and a legality system shipped and NOTHING
+    // called ConfigureWithModifiers, so O27's "difficulty lives in bosses,
+    // elites and monsters with MODIFIERS, not in trash health" was true of the
+    // code and false of the game. This is the switch that makes it true of both.
+    //
+    // Off turns the gym back into the pre-modifier instrument, which matters
+    // because the TTK baseline every earlier session recorded was measured
+    // without them.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") bool bGrantModifiers = true;
+    // Deterministic in the seed, so two runs of the same wave meet the same
+    // Champions and a screenshot of wave 4 is comparable with the last one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Modifiers") int32 ModifierSeedBase = 20260814;   // O2 PLACEHOLDER
+
     // --- Ammo economy (O2 placeholders) ------------------------------------
     // Third and last resupply channel alongside kill drops and wave-clear:
     // an amber supply crate in the Anchor camp. Standing next to it for
@@ -282,8 +328,17 @@ private:
     void BuildCaptureTour();
 
     bool bPlaytestTargetsSpawned = false;
+    // Every piece of hard cover the field built, in world space. Populated
+    // during SpawnExpandedField, so it survives an F1 reset (which rebuilds the
+    // enemies but not the geometry).
+    TArray<FVector> CoverAnchors;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
+    UPROPERTY() TObjectPtr<class ABreakerBossEnemy> ActiveBoss;
+    // Console fallback for the boss key, registered once. Held so it is
+    // unregistered on EndPlay — a stale IConsoleCommand outliving its game mode
+    // is a dangling this pointer the next PIE session walks straight into.
+    IConsoleCommand* BossConsoleCommand = nullptr;
     FVector SafeZoneCenter = FVector::ZeroVector;
     bool bSafeZoneSet = false;
     FVector SupplyCrateLocation = FVector::ZeroVector;
@@ -301,6 +356,48 @@ private:
     void SpawnPlaytestTargets();
     void SpawnMovementCourse();
     void SpawnCombatEncounter();
+
+    // --- The cover registry ------------------------------------------------
+    // ABreakerSkirmisherEnemy has a PLACEMENT REQUIREMENT, not a preference:
+    // it is the only enemy in the project that breaks line of sight, and its
+    // own class note says so plainly — "in an empty field it correctly finds no
+    // cover and degrades to an open-ground shooter, which is honest but is NOT
+    // the fight." Its cover search is a ring of SearchRadiusCm (1400) around
+    // ITSELF, filtered to candidates whose line from the threat is blocked, so
+    // whether the archetype exists at all is decided by where it is spawned.
+    //
+    // The field already builds hard cover — pocket cover blocks on a
+    // CoverPitchMax ring, pocket pillars, the sniper lane's hard-cover piece.
+    // Nothing recorded WHERE, so the spawners could not aim at it. This records
+    // every piece as it is built, which also makes the derived cover pitch
+    // (Level-Design G23, max 1700 cm) checkable at runtime instead of by
+    // reading the spawner.
+    void RegisterCoverAnchor(const FVector& WorldLocation);
+    // Nearest recorded cover to Around, within MaxDistance. False means "there
+    // is no cover here", which is a real answer and is why the Skirmisher
+    // spawners fall back to a plain position rather than skipping the spawn.
+    bool FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const;
+    // Spawns a Skirmisher AT a cover anchor near Around, standing off from the
+    // threat side so its first act is to duck rather than to walk into view.
+    class ABreakerSkirmisherEnemy* SpawnSkirmisherNearCover(const FVector& Around,
+        const FVector& ThreatLocation, float PatrolPhase);
+
+    // Rolls a legal modifier set onto an enemy and then RESTORES the rank it
+    // was authored with.
+    //
+    // ABreakerEnemy::ConfigureWithModifiers promotes the rank to
+    // ModifierBearing unconditionally, which is correct for trash and wrong for
+    // an elite: ModifierBearing is x2.5/x1.25 against Elite's x3.0/x1.5, so
+    // calling it on the arena elite would quietly DEMOTE it. Restoring the rank
+    // afterwards rebuilds the chassis, which invalidates the Warded ward
+    // (sized off max health), so the set is re-published last — the same
+    // re-derive-after-the-chassis order ConfigureWithModifiers itself uses, and
+    // for the same reason.
+    void GrantModifiers(class ABreakerEnemy* Enemy, int32 Seed) const;
+    // §4.3's "loot only on rest and boss waves". Reaches a protected property
+    // by reflection because adding a setter would mean editing Combat/ — see
+    // the note at the implementation.
+    void SetEnemyDropsLoot(class ABreakerEnemy* Enemy, bool bDrops) const;
     void SpawnSafeZone();
     void SpawnAnchorCamp();
     // Overgrown-Earth dressing (O24): vegetation, ruins, and scattered tech.

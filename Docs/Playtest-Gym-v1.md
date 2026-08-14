@@ -157,3 +157,101 @@ Test each item for several minutes and record **too weak / good / too strong**, 
 10. Any motion discomfort, camera obstruction, collision snag, or input failure.
 
 Do not tune from a single run. First verify the controls and target behavior, restart once, then perform the real feedback pass.
+
+---
+
+## The enemy content now reaches a player (integration pass)
+
+Before this pass, ten modifiers, three archetypes and a boss existed in
+`Combat/` and spawned nowhere. `Game/` now calls into all of them.
+
+### What the standing encounter spawns
+
+Everything at the encounter pocket (8500 cm forward, radius 2000):
+
+| Archetype | Count | Where, and why there |
+|---|---:|---|
+| Skitter (melee) | 3 | Near half of the pocket, unchanged. |
+| Elite anchor | 1 | Back of the pack, **now carrying rolled modifiers** — O27's difficulty axis, reachable from a controller for the first time. |
+| LATTICE | 2 | On the pocket rim at ±2000, fire lanes crossing the ground route. |
+| **SEVERED WARDEN** | 1 | **Front** of the pocket. §2.4's axis is "Wardens punish approaching from the front", so the player meets it and has to decide to go around. §5.3 caps these at 1 per player. |
+| **SEVERED SKIRMISHER** | 1 | **At a cover anchor**, 260 cm behind the block on the side away from the player's approach. Not a preference — see below. |
+
+One Skirmisher and not two, because two alongside the two Lattices is four
+converging projectile sources against §5.3's cap of three. The cap check in
+`LogGymSummary` is what caught it.
+
+### The cover registry, and why the Skirmisher needs it
+
+`ABreakerSkirmisherEnemy` searches a 1400 cm ring around **itself** and keeps
+only candidates whose line from the threat is blocked. Where it spawns
+therefore decides whether the archetype exists at all: in the open it is a
+plain shooter with a longer telegraph than a Lattice, which is strictly worse
+than a Lattice.
+
+The field already built hard cover and recorded none of it.
+`RegisterCoverAnchor` now records every piece as it is spawned — each pocket's
+four cover blocks (on a `CoverPitchMax` ring, Level-Design G23), each pocket
+pillar, and the sniper lane's hard-cover piece. **21 anchors** in the shipped
+field. `SpawnSkirmisherNearCover` places against the nearest one and **logs a
+warning** when there is none in range rather than spawning a silent
+open-ground shooter.
+
+### THE FIELD MARSHAL
+
+| Reach it by | Notes |
+|---|---|
+| **F5** | Bound onto the *PlayerController's* input component from `HandleStartingNewPlayer`, because the playtest keys F1–F4 live on `ABreakerCharacter` in `Characters/`, which this lane does not own. |
+| `Breaker.Boss` | Console fallback, unregistered on EndPlay. |
+| Wave 12 | §4.2's boss wave. |
+| `-BreakerBossOnStart` | Spawns it during the gym build so the capture harness can photograph it. |
+
+It spawns at the **elite arena** (17000 cm forward), facing back down the
+field so a player arriving from camp meets its armoured front. `OnBossDefeated`
+refills ammo and logs; its TTK sample lands in the new boss bucket.
+
+**Clearance, measured:** its galleries reach ±1900 cm and its alcoves ±1700
+against the arena pocket's 2000 cm radius. It fits — and only just. The
+pocket's broken wall arc sits at 1800–2200 cm from centre, so a gallery can
+land inside a ruin segment. `SpawnBossTest` warns if the radius is ever tuned
+under the clearance.
+
+### Wave mode is solved, not ramped
+
+`Game/BreakerWaveBudget.h` is Encounter-Design §4.2/§4.3/§5.3 as pure
+world-free maths. `Budget(n) = 6 + 4n` capped at 90; Skitter 1 / Lattice 3 /
+Skirmisher 3 / Warden 6 / +4 per elite modifier; rest waves every 6 at half
+budget with no elites; **wave 12 is the Field Marshal alone**; loot only on
+rest and boss waves; the 70% single-archetype variety rule; and every §5.3 cap
+enforced. `WaveBudget` on the game mode is EditAnywhere, so the whole shape
+retunes without a recompile, and `GetWaveComposition(N)` reads any wave out
+without playing to it.
+
+**Two findings, both pinned by test:**
+
+1. **§4.2's budget curve and §5.3's density caps contradict each other from
+   about wave 8.** Under 12 live enemies, 3 ranged sources, 1 Warden and 1
+   elite, a solo wave cannot spend past the mid thirties while the curve climbs
+   to 90. The caps win — they are the ones with reasons written beside them —
+   and the composition reports the shortfall for the owner rather than
+   resolving the contradiction silently.
+2. **12 is a multiple of both the rest and boss intervals.** Checking rest
+   first deletes the boss wave entirely. The order is load-bearing and tested.
+
+### TTK buckets
+
+The report splits **melee trash / ranged trash / elite / modifier-bearing /
+boss**. Before this, a Champion and the boss both landed in **melee trash** —
+not, as the handover assumed, in elite: `IsElite()` is `rank == Elite`, and a
+Champion's rank is `ModifierBearing` while the boss's is `Boss`. One boss kill
+at 25x health moved the sub-1s trash average that O18's re-anchor reads.
+
+Precedence is by **rank**, because rank is what multiplies the chassis. An
+elite that also carries modifiers is an elite sample.
+
+### The `[BreakerGym]` summary line
+
+Now counts by class as well as telemetry bucket — a Warden and a Skitter were
+both "melee" — and asserts §5.3's caps **per encounter** rather than per world,
+since a Warden at 8500 and the boss at 17000 are two fights and not one
+illegal one.

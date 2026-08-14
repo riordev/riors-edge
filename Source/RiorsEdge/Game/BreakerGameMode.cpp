@@ -5,7 +5,14 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerModifierComponent.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
 #include "Interaction/BreakerNPC.h"
+#include "Playtest/BreakerKillTelemetryComponent.h"
+#include "Playtest/BreakerPlaytestComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInterface.h"
@@ -50,6 +57,19 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
     TickSupplyCrate(DeltaSeconds);
 }
 
+void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+    // A console command registered against a game-mode instance outlives the
+    // world unless it is unregistered: the next PIE session's `Breaker.Boss`
+    // would call through a dangling this.
+    if (BossConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(BossConsoleCommand);
+        BossConsoleCommand = nullptr;
+    }
+    Super::EndPlay(Reason);
+}
+
 void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
@@ -71,6 +91,104 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     LogGymSummary();
     BuildCaptureTour();
     ScheduleScreenshots();
+
+    // THE BOSS KEY. F5, because the playtest keys F1-F4 and the F talk key all
+    // live on ABreakerCharacter (Characters/), which this lane does not own.
+    // Binding onto the PLAYER CONTROLLER's input component reaches the same
+    // keyboard without touching that file: the pawn's component sits above the
+    // controller's on the input stack, so a key the pawn does not claim falls
+    // through to here, and F5 is claimed by nothing.
+    if (NewPlayer->InputComponent)
+    {
+        NewPlayer->InputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ABreakerGameMode::SpawnBossTest);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] no controller input component; the F5 boss key is unavailable. Use Breaker.Boss."));
+    }
+    // -BreakerBossOnStart spawns the Field Marshal during the gym build, so the
+    // capture harness can PHOTOGRAPH it. Without this the boss is only
+    // reachable by a key press, and a headless run cannot press a key — which
+    // would leave the one archetype most worth looking at as the one archetype
+    // nobody has looked at. Dev-only by construction: a command-line switch
+    // cannot be reached from a shipped build.
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerBossOnStart")))
+    {
+        SpawnBossTest();
+        LogGymSummary();
+    }
+    if (!BossConsoleCommand)
+    {
+        BossConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.Boss"),
+            TEXT("Spawns THE FIELD MARSHAL at the elite arena (Encounter-Design 3)."),
+            FConsoleCommandDelegate::CreateUObject(this, &ABreakerGameMode::SpawnBossTest));
+    }
+}
+
+bool ABreakerGameMode::IsBossAlive() const
+{
+    return IsValid(ActiveBoss) && !ActiveBoss->IsDeadEnemy();
+}
+
+void ABreakerGameMode::SpawnBossTest()
+{
+    UWorld* World = GetWorld();
+    if (!World || !bFieldFrameSet) return;
+    if (IsBossAlive())
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerGym] the Field Marshal is already alive; refusing a second."));
+        return;
+    }
+
+    // The elite arena, which is the fourth combat pocket. Level-Design §5 puts
+    // it at ArenaDistance with radius CombatPocketRadius (2000), and §5.1
+    // notices that doubling that radius is EXACTLY Encounter-Design §3.3's
+    // 4000 x 4000 boss room. So the arena is the right size by two independent
+    // derivations — but only just: the boss's gallery offsets are ±1900 and the
+    // pocket's broken wall arc sits at 1800-2200 cm from centre, so a gallery
+    // can land inside a ruin segment. Checked and reported rather than assumed.
+    const FVector ArenaCentre = Frame.At(ArenaDistance, 0.0f, 140.0f);
+    if (CombatPocketRadius < BossArenaClearanceCm)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[BreakerGym] arena radius %.0f cm is under the boss's %.0f cm gallery reach; orders will point into geometry."),
+            CombatPocketRadius, BossArenaClearanceCm);
+    }
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    // Facing back down the field, so a player arriving from the camp meets its
+    // FRONT — which is the armoured side, and the whole fight is the decision
+    // to stop being there.
+    ABreakerBossEnemy* Boss = World->SpawnActor<ABreakerBossEnemy>(
+        ABreakerBossEnemy::StaticClass(), ArenaCentre, (-Frame.Forward).Rotation(), Params);
+    if (!Boss) return;
+
+    Boss->ConfigureEncounter(ArenaCentre, 0.0f);
+    Boss->SetAreaLevel(GymAreaLevel);
+    // Rank Boss is authored in the class and must NOT be overwritten here;
+    // SetAreaLevel rebuilds the chassis against whatever rank the archetype
+    // set, which is exactly the one-source-of-truth rule O27 installed.
+    UBreakerKillTelemetryComponent::AttachTo(Boss);
+    Boss->OnBossDefeated.AddDynamic(this, &ABreakerGameMode::HandleBossDefeated);
+    ActiveBoss = Boss;
+
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerGym] FIELD MARSHAL spawned at the elite arena (%.0f cm forward), area level %d, %.0f health. Walk to it."),
+        ArenaDistance, GymAreaLevel, Boss->GetMonsterMaxHealth());
+}
+
+void ABreakerGameMode::HandleBossDefeated()
+{
+    // O18 puts the boss band at 20-45s and Encounter-Design §3.2 records a
+    // DIVERGENCE that is still open: the order cadence imposes a script floor
+    // independent of health, so even a player who bursts a phase down waits on
+    // the phases. Whether the composition lands inside the band is a
+    // MEASUREMENT, and it is the boss TTK bucket that carries it — filed by the
+    // kill-telemetry component from the boss's own rank, not from here.
+    RefillPlayerAmmo();
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] FIELD MARSHAL down. Boss TTK sample recorded; F2 copies the report."));
 }
 
 float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn) const
@@ -183,6 +301,12 @@ void ABreakerGameMode::BuildCaptureTour()
         { Frame.At(EncounterPocketDistance - 3200.0f, FieldHalfExtent * 0.62f, 320.0f), FRotator(-3.0f, Frame.Forward.Rotation().Yaw, 0.0f) },
         // 6. Along the sniper lane from the firing line.
         { Frame.At(RangeFiringLineDistance - 1200.0f, -FieldHalfExtent * 0.62f, 260.0f), FRotator(-2.0f, Frame.Forward.Rotation().Yaw, 0.0f) },
+        // 7. Oblique over the ELITE ARENA. Added because the boss lives there
+        //    and nothing pointed at it: the Field Marshal's galleries reach
+        //    ±1900 cm against a 2000 cm pocket radius, and whether its orders
+        //    point at open ground or into the pocket's ruin arc is a question
+        //    only a picture answers.
+        { Frame.At(ArenaDistance - CombatPocketRadius * 1.6f, -CombatPocketRadius * 1.3f, 2200.0f), FRotator(-24.0f, Frame.Forward.Rotation().Yaw + 34.0f, 0.0f) },
     };
 
     for (const FVantage& Vantage : Vantages)
@@ -255,17 +379,83 @@ void ABreakerGameMode::LogGymSummary() const
 {
     const UWorld* World = GetWorld();
     if (!World) return;
+    // Counted by CLASS as well as by telemetry bucket. The summary line used to
+    // say "melee N | ranged N", which was true and useless the moment four
+    // archetypes existed: a Warden and a Skitter are both "melee" and a
+    // Skirmisher and a Lattice are both "ranged", so the one line that proves
+    // the gym spawned what it meant to could not tell them apart. A headless
+    // smoke run reads this line to confirm the integration, so it has to name
+    // every archetype it is asserting.
     int32 Melee = 0;
     int32 Ranged = 0;
+    int32 Wardens = 0;
+    int32 Skirmishers = 0;
+    int32 Lattices = 0;
+    int32 Bosses = 0;
+    int32 ModifierBearing = 0;
+    int32 Elites = 0;
+    int32 ModifierTotal = 0;
+    TArray<FVector> AnchorLocations;
+    TArray<FVector> RangedLocations;
     for (TActorIterator<ABreakerEnemy> It(const_cast<UWorld*>(World)); It; ++It)
     {
         if (It->IsRangedForTelemetry()) ++Ranged; else ++Melee;
+        // Boss first: it SUBCLASSES the Warden (§3.1 "a Warden that commands
+        // the other three archetypes"), so an unordered cast chain would count
+        // the Field Marshal as a Warden and silently break the §5.3 cap check.
+        if (It->IsA<ABreakerBossEnemy>()) { ++Bosses; AnchorLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerWardenEnemy>()) { ++Wardens; AnchorLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerSkirmisherEnemy>()) { ++Skirmishers; RangedLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerRangedEnemy>()) { ++Lattices; RangedLocations.Add(It->GetActorLocation()); }
+        if (It->IsElite()) ++Elites;
+        if (const UBreakerEnemyModifierComponent* Modifiers = It->GetModifierComponent();
+            Modifiers && Modifiers->GetModifierCount() > 0)
+        {
+            ++ModifierBearing;
+            ModifierTotal += Modifiers->GetModifierCount();
+        }
     }
     int32 Targets = 0;
     for (TActorIterator<ABreakerTargetDummy> It(const_cast<UWorld*>(World)); It; ++It) ++Targets;
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | target dummies %d"),
-        GymAreaLevel, Melee, Ranged, Targets);
+        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | skitter/other %d | lattice %d | warden %d | skirmisher %d | boss %d | elite %d | modifier-bearing %d (%d modifiers) | target dummies %d"),
+        GymAreaLevel, Melee, Ranged,
+        Melee + Ranged - Lattices - Wardens - Skirmishers - Bosses,
+        Lattices, Wardens, Skirmishers, Bosses, Elites, ModifierBearing, ModifierTotal, Targets);
+    // The §5.3 caps, asserted rather than assumed. They are the difference
+    // between "dense" and "unplayable", and this check has already earned its
+    // keep once: it caught two Skirmishers standing alongside two Lattices in
+    // the encounter, which is four converging projectile sources against a cap
+    // of three.
+    //
+    // Counted PER ENCOUNTER, not per world. The caps are about what is in one
+    // fight — the field holds a standing encounter at 8500 cm and an arena at
+    // 17000, and a Warden in one plus the Field Marshal in the other is two
+    // separate fights, not an illegal one. Proximity is the only definition of
+    // "one fight" available here, and one combat pocket's diameter is the
+    // honest radius for it.
+    const float EncounterRadius = CombatPocketRadius * 2.0f;
+    auto WarnOnCrowding = [&](const TArray<FVector>& Locations, int32 Cap, const TCHAR* What, const TCHAR* Reason)
+    {
+        for (const FVector& Centre : Locations)
+        {
+            int32 Nearby = 0;
+            for (const FVector& Other : Locations)
+            {
+                if (FVector::DistSquared2D(Centre, Other) <= FMath::Square(EncounterRadius)) ++Nearby;
+            }
+            if (Nearby > Cap)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d %s within one encounter; Encounter-Design 5.3 caps them at %d — %s"),
+                    Nearby, What, Cap, Reason);
+                return;
+            }
+        }
+    };
+    WarnOnCrowding(AnchorLocations, 1, TEXT("Warden-class anchors"),
+        TEXT("overlapping frontal-armour anchors create unsolvable geometry."));
+    WarnOnCrowding(RangedLocations, 3, TEXT("ranged sources"),
+        TEXT("four converging projectile sources removes all safe ground."));
 
     // The stock First Person template geometry is the other half of the "map
     // scope" complaint and it can only be removed in the editor. Measuring it
@@ -807,11 +997,15 @@ void ABreakerGameMode::SpawnCombatEncounter()
             Enemy->ConfigureEncounter(SpawnLocation, Index * 1.7f);
             // The standing encounter is an area-level-GymAreaLevel area.
             Enemy->SetAreaLevel(GymAreaLevel);
+            UBreakerKillTelemetryComponent::AttachTo(Enemy);
         }
     }
 
     // One elite anchors the back of the pack: tougher, harder-hitting, and
-    // guaranteed Exceptional-or-better drops.
+    // guaranteed Exceptional-or-better drops. It is also the first enemy in the
+    // gym to CARRY MODIFIERS — O27 puts difficulty in modifiers rather than
+    // trash health, and until this call existed that ruling was implemented in
+    // Combat/ and unreachable from a controller.
     const FVector EliteLocation = Frame.At(EncounterPocketDistance + CombatPocketRadius * 0.5f, 0.0f, 120.0f);
     FActorSpawnParameters EliteParams;
     EliteParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -820,6 +1014,8 @@ void ABreakerGameMode::SpawnCombatEncounter()
         Elite->ConfigureEncounter(EliteLocation, 0.9f);
         Elite->SetAreaLevel(GymAreaLevel);
         Elite->ConfigureElite();
+        GrantModifiers(Elite, ModifierSeedBase);
+        UBreakerKillTelemetryComponent::AttachTo(Elite);
     }
 
     // Two LATTICE ranged enemies (Encounter-Design §2.2) flank the pack wide.
@@ -844,6 +1040,78 @@ void ABreakerGameMode::SpawnCombatEncounter()
         {
             Ranged->ConfigureEncounter(SpawnLocation, 0.4f + Index * 1.1f);
             Ranged->SetAreaLevel(GymAreaLevel);
+            UBreakerKillTelemetryComponent::AttachTo(Ranged);
+        }
+    }
+
+    // ONE Warden, front and centre (Encounter-Design §5.3: live Wardens per
+    // player = 1, "frontal-armour anchors overlapping create unsolvable
+    // geometry"). It stands in FRONT of the pack rather than behind it, which
+    // is the point of the archetype: §2.4's third axis is "Wardens punish
+    // approaching from the front", so the player meets it first and has to
+    // decide to go around something instead of through it.
+    const FVector WardenLocation = Frame.At(EncounterPocketDistance - CombatPocketRadius * 0.85f, 0.0f, 120.0f);
+    FActorSpawnParameters WardenParams;
+    WardenParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    if (ABreakerWardenEnemy* Warden = World->SpawnActor<ABreakerWardenEnemy>(
+        ABreakerWardenEnemy::StaticClass(), WardenLocation, FRotator::ZeroRotator, WardenParams))
+    {
+        Warden->ConfigureEncounter(WardenLocation, 1.4f);
+        Warden->SetAreaLevel(GymAreaLevel);
+        UBreakerKillTelemetryComponent::AttachTo(Warden);
+    }
+
+    // ONE Skirmisher, and its placement is the whole point. It goes AT the
+    // pocket's cover ring, not at an arbitrary bearing: the pocket's four cover
+    // blocks sit on a CoverPitchMax ring around the pocket centre, and a
+    // Skirmisher that starts beside one of them is behind cover on frame one.
+    // Spawned in the open it is a plain shooter with a longer telegraph than a
+    // Lattice, which is strictly worse than a Lattice and teaches nothing.
+    //
+    // ONE, not two, and the cap check in LogGymSummary is what caught it: two
+    // Skirmishers alongside the two flanking Lattices is FOUR converging
+    // projectile sources, and §5.3 holds that at three at any party size
+    // because "four converging projectile sources removes all safe ground —
+    // this is the single most dangerous scaling knob". Wave mode introduces
+    // more of them, inside the same budget solver that enforces the same cap.
+    const FVector PocketCentre = Frame.At(EncounterPocketDistance, 0.0f, 0.0f);
+    const FVector PlayerApproach = Frame.At(EncounterPocketDistance - CombatPocketRadius * 2.0f, 0.0f, 0.0f);
+    for (int32 Index = 0; Index < 1; ++Index)
+    {
+        // Two different bearings off the pocket centre so they resolve to two
+        // different cover blocks rather than crowding one.
+        const FVector Bearing = Frame.Forward.RotateAngleAxis(Index == 0 ? 55.0f : -55.0f, FVector::UpVector);
+        if (ABreakerSkirmisherEnemy* Skirmisher = SpawnSkirmisherNearCover(
+            PocketCentre + Bearing * (CoverPitchMax * 0.5f), PlayerApproach, 0.6f + Index * 1.3f))
+        {
+            Skirmisher->SetAreaLevel(GymAreaLevel);
+        }
+    }
+}
+
+void ABreakerGameMode::GrantModifiers(ABreakerEnemy* Enemy, int32 Seed) const
+{
+    if (!bGrantModifiers || !Enemy) return;
+
+    // The rank the CONTENT authored. ConfigureWithModifiers overwrites it with
+    // ModifierBearing, which is a demotion for anything ranked above that, so
+    // it is captured and put back. Rank is the single source of truth for what
+    // an elite is worth (O27); a modifier roll must not become a second one.
+    const EBreakerMonsterRank AuthoredRank = Enemy->GetMonsterRank();
+    if (Enemy->ConfigureWithModifiers(Seed) <= 0) return;
+
+    if (Enemy->GetMonsterRank() != AuthoredRank)
+    {
+        Enemy->SetMonsterRank(AuthoredRank);
+        // SetMonsterRank rebuilt the chassis, so max health moved, so the
+        // Warded ward is now sized against a number that no longer exists.
+        // Re-publishing the same set re-runs ApplyPersistentModifiers against
+        // the new health. Copied into a local first because SetModifiers
+        // assigns over the very array it would otherwise be reading.
+        if (UBreakerEnemyModifierComponent* Modifiers = Enemy->GetModifierComponent())
+        {
+            const TArray<EBreakerEnemyModifier> Granted = Modifiers->GetModifiers();
+            Modifiers->SetModifiers(Granted);
         }
     }
 }
@@ -1107,18 +1375,28 @@ void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& St
     {
         const float Angle = BaseYaw + 45.0f + Block * 90.0f;
         const FVector Offset = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector) * (CoverPitchMax * 0.5f);
-        SpawnShape(World, ShapeCube, Frame.At(Fwd, Rgt, 55.0f) + Offset,
+        const FVector CoverLocation = Frame.At(Fwd, Rgt, 55.0f) + Offset;
+        SpawnShape(World, ShapeCube, CoverLocation,
             FVector(Stream.FRandRange(1.8f, 2.6f), Stream.FRandRange(0.9f, 1.5f), 1.1f),
             FRotator(0.0f, Angle + Stream.FRandRange(-30.0f, 30.0f), 0.0f),
             PaletteStone, true, TEXT("Runtime_PocketCover"));
+        // These four blocks are the staggered cover chain a Skirmisher is meant
+        // to work: on a CoverPitchMax ring, so a player crossing the pocket
+        // always has the next piece inside one telegraph-plus-flight window,
+        // and so does the enemy.
+        RegisterCoverAnchor(CoverLocation);
     }
 
     // One full-height pillar per pocket: the only thing here that breaks a
     // LATTICE sight line outright (Encounter-Design 3.3 gives the boss arena
     // two for the same reason). Off centre, so it never covers the whole rim.
-    SpawnShape(World, ShapeCylinder,
-        Frame.At(Fwd, Rgt, 250.0f) + Frame.Forward.RotateAngleAxis(BaseYaw + 200.0f, FVector::UpVector) * (CombatPocketRadius * 0.45f),
+    const FVector PillarLocation =
+        Frame.At(Fwd, Rgt, 250.0f) + Frame.Forward.RotateAngleAxis(BaseYaw + 200.0f, FVector::UpVector) * (CombatPocketRadius * 0.45f);
+    SpawnShape(World, ShapeCylinder, PillarLocation,
         FVector(1.4f, 1.4f, 5.0f), FRotator::ZeroRotator, PaletteConcrete, true, TEXT("Runtime_PocketPillar"));
+    // Full height, so it is the only thing in the pocket that blocks a sight
+    // line outright rather than at a crouch. The best cover in the pocket.
+    RegisterCoverAnchor(PillarLocation);
 
     for (int32 Bush = 0; Bush < 6; ++Bush)
     {
@@ -1274,8 +1552,79 @@ void ABreakerGameMode::SpawnExpandedField()
     // clear ground behind a single piece of hard cover, which is the minimum
     // geometry a LATTICE needs to use its whole 900-1900 band instead of
     // backing into a kerb.
-    SpawnShape(World, ShapeCube, Frame.At(LaneStart + RangedSightlineDepth, LaneRight + 500.0f, 150.0f),
+    const FVector LaneCoverLocation = Frame.At(LaneStart + RangedSightlineDepth, LaneRight + 500.0f, 150.0f);
+    SpawnShape(World, ShapeCube, LaneCoverLocation,
         FVector(2.6f, 0.5f, 3.0f), FRotator(0.0f, 8.0f, -4.0f), PaletteConcrete, true, TEXT("Runtime_LaneCover"));
+    RegisterCoverAnchor(LaneCoverLocation);
+
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] cover anchors recorded: %d (pitch limit %.0f cm, Level-Design G23)"),
+        CoverAnchors.Num(), CoverPitchMax);
+}
+
+void ABreakerGameMode::RegisterCoverAnchor(const FVector& WorldLocation)
+{
+    CoverAnchors.Add(WorldLocation);
+}
+
+bool ABreakerGameMode::FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const
+{
+    float BestDistanceSquared = MaxDistance * MaxDistance;
+    bool bFound = false;
+    for (const FVector& Anchor : CoverAnchors)
+    {
+        // 2D: cover is chosen on the ground plane, and a pillar's registered
+        // point is at its mid-height, which would otherwise cost it 250 cm of
+        // spurious distance against a block registered at 55.
+        const float DistanceSquared = FVector::DistSquared2D(Anchor, Around);
+        if (DistanceSquared > BestDistanceSquared) continue;
+        BestDistanceSquared = DistanceSquared;
+        OutAnchor = Anchor;
+        bFound = true;
+    }
+    return bFound;
+}
+
+ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVector& Around,
+    const FVector& ThreatLocation, float PatrolPhase)
+{
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+
+    // Stand it just BEHIND the cover relative to the threat. Its opening state
+    // is Relocating, so the first thing it does is look for a point whose line
+    // from the threat is blocked; starting on the blocked side means it finds
+    // one on frame one instead of walking across open ground to get there.
+    FVector Anchor = Around;
+    const bool bHasCover = FindCoverAnchorNear(Around, CoverPitchMax, Anchor);
+    FVector SpawnLocation = Anchor;
+    if (bHasCover)
+    {
+        const FVector AwayFromThreat = (Anchor - ThreatLocation).GetSafeNormal2D();
+        // 260 cm: clear of the cover block's own footprint (the pocket blocks
+        // are up to 260 cm on their long axis) and well inside the 1400 cm
+        // search radius, so every candidate ring it generates still contains
+        // this piece.
+        SpawnLocation = Anchor + AwayFromThreat * 260.0f;
+    }
+    SpawnLocation.Z = Frame.Ground.Z + 120.0f;
+
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    ABreakerSkirmisherEnemy* Skirmisher = World->SpawnActor<ABreakerSkirmisherEnemy>(
+        ABreakerSkirmisherEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+    if (!Skirmisher) return nullptr;
+    Skirmisher->ConfigureEncounter(SpawnLocation, PatrolPhase);
+    UBreakerKillTelemetryComponent::AttachTo(Skirmisher);
+    if (!bHasCover)
+    {
+        // Loud, because a Skirmisher with nothing to hide behind is a plain
+        // shooter and the whole archetype has quietly stopped existing. That is
+        // exactly the failure its own class note warns about.
+        UE_LOG(LogTemp, Warning,
+            TEXT("[BreakerGym] Skirmisher spawned with NO cover anchor within %.0f cm of (%.0f, %.0f) — it will degrade to an open-ground shooter."),
+            CoverPitchMax, Around.X, Around.Y);
+    }
+    return Skirmisher;
 }
 
 
@@ -1304,59 +1653,176 @@ void ABreakerGameMode::StartNextWave()
     // Encounter-Design 5.2's 1500-4000 cm spawn band at the near packs and
     // still far enough that nothing materialises in the player's face.
     const FVector ArenaCenter = Origin + Forward * DashRefreshDistance;
-    // Dense packs by design: AoE, on-death chains, and multikill procs need
-    // crowds to feel like anything. Clusters of ~4 around the arena ring.
-    const int32 EnemyCount = FMath::Min(4 + CurrentWave * 3, 24);
-    const bool bEliteWave = CurrentWave % 3 == 0;
 
-    // LATTICE ranged enemies join from wave 2 and climb to the hard cap of 3
-    // live at once (Encounter-Design §5.3: "four converging projectile sources
-    // removes all safe ground; this is the single most dangerous scaling
-    // knob"). They come OUT OF the melee budget rather than on top of it, so
-    // pack density and the TTK sample size are unchanged — what changes is the
-    // kind of pressure, not the amount.
-    const int32 RangedCount = FMath::Clamp(CurrentWave / 2, 0, 3);
-    const int32 MeleeCount = FMath::Max(EnemyCount - RangedCount, 1);
+    // THE WAVE IS SOLVED, NOT RAMPED. What was here was `4 + wave * 3` capped
+    // at 24, an elite every third wave and `wave/2` Lattices: no budget, no
+    // archetype costs, no rest waves, no boss wave, no variety rule, and 24
+    // live enemies against Encounter-Design §5.3's ceiling of TWELVE.
+    // UBreakerWaveBudgetLibrary is §4.2's arithmetic as pure world-free maths,
+    // so what a wave IS can be asserted by automation, and all this function
+    // does is place the answer in the world.
+    const FBreakerWaveComposition Composition =
+        UBreakerWaveBudgetLibrary::SolveWave(CurrentWave, 1, WaveBudget);
+    FString IllegalReason;
+    if (!UBreakerWaveBudgetLibrary::IsCompositionLegal(Composition, 1, WaveBudget, IllegalReason))
+    {
+        // Loud, never silent, and never trimmed: a spawner that quietly drops
+        // an enemy makes the instrument report a wave that did not happen.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] wave %d composition is ILLEGAL: %s"), CurrentWave, *IllegalReason);
+    }
+    const int32 AreaLevel = GetAreaLevelForWave(CurrentWave);
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] %s | area level %d"),
+        *UBreakerWaveBudgetLibrary::DescribeComposition(Composition), AreaLevel);
 
-    for (int32 Index = 0; Index < MeleeCount; ++Index)
+    // --- The boss wave (§4.2, wave 12) -------------------------------------
+    // The Field Marshal and nothing else. It deploys its own adds and respawns
+    // its own gallery Lattices, and §5.3's density ceiling is enforced at that
+    // SOURCE — a wave budget spent alongside it would blow the cap from two
+    // directions at once and neither would know about the other.
+    if (Composition.bBoss)
+    {
+        SpawnBossTest();
+        if (IsValid(ActiveBoss))
+        {
+            ActiveBoss->ConfigureWave(AreaLevel);
+            WaveEnemies.Add(ActiveBoss);
+        }
+        return;
+    }
+
+    // --- Melee, including the elite promotions ------------------------------
+    // An elite is a PROMOTED body, not an extra one, which is what keeps the
+    // density ceiling honest: the solver counts elites inside Skitters.
+    for (int32 Index = 0; Index < Composition.Skitters; ++Index)
     {
         const int32 Pack = Index / 4;
-        const float PackAngle = 360.0f * Pack / FMath::Max(1, (MeleeCount + 3) / 4);
+        const float PackAngle = 360.0f * Pack / FMath::Max(1, (Composition.Skitters + 3) / 4);
         // Packs sit on the pocket rim rather than at a flat 1100 cm, so the
         // ring the player circles is the same radius everywhere in the field.
         const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * (CombatPocketRadius * 0.55f);
         const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        if (ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params))
+        ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+        if (!Enemy) continue;
+        Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
+        Enemy->ConfigureWave(AreaLevel);
+        if (Index < Composition.Elites)
         {
-            Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
-            // Later waves climb in level so drops and TTK data climb too.
-            Enemy->ConfigureWave(GetAreaLevelForWave(CurrentWave));
-            if (bEliteWave && Index == 0) Enemy->ConfigureElite();
-            WaveEnemies.Add(Enemy);
+            Enemy->ConfigureElite();
+            // Seeded on the WAVE and the index, so wave 8 meets the same
+            // Champion every run and a TTK sample taken across two sessions
+            // compares. The solver decided HOW MANY modifiers it could afford;
+            // the roll decides which, subject to §1.3's composition rules.
+            GrantModifiers(Enemy, ModifierSeedBase + CurrentWave * 7919 + Index);
         }
+        SetEnemyDropsLoot(Enemy, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Enemy);
+        WaveEnemies.Add(Enemy);
     }
 
-    // Ranged support sits a ring further out and spread evenly around the
-    // arena, so the melee packs push the player ACROSS the ranged fire lanes
-    // instead of away from them. Never promoted to elite: the elite is already
-    // the melee anchor, and two things to read at once is one too many.
-    for (int32 Index = 0; Index < RangedCount; ++Index)
+    // --- LATTICE ------------------------------------------------------------
+    // A ring further out and spread evenly around the arena, so the melee packs
+    // push the player ACROSS the ranged fire lanes instead of away from them.
+    for (int32 Index = 0; Index < Composition.Lattices; ++Index)
     {
-        const float Angle = 360.0f * Index / FMath::Max(1, RangedCount) + 45.0f;
+        const float Angle = 360.0f * Index / FMath::Max(1, Composition.Lattices) + 45.0f;
         const FVector SpawnLocation = ArenaCenter
             + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * CombatPocketRadius;
         FActorSpawnParameters RangedParams;
         RangedParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        if (ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
-            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams))
+        ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
+            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams);
+        if (!Ranged) continue;
+        Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
+        Ranged->ConfigureWave(AreaLevel);
+        SetEnemyDropsLoot(Ranged, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Ranged);
+        WaveEnemies.Add(Ranged);
+    }
+
+    // --- SKIRMISHER ---------------------------------------------------------
+    // Placed against COVER, never on a bearing. Wave mode spawns wherever the
+    // playtest happens to be standing, so the anchor it finds is whatever the
+    // field built nearby — a pocket's cover ring inside a pocket, the sniper
+    // lane's hard-cover piece on the lane. In the open it degrades to a Lattice
+    // with a longer telegraph, which is strictly worse than a Lattice.
+    for (int32 Index = 0; Index < Composition.Skirmishers; ++Index)
+    {
+        const float Angle = 360.0f * Index / FMath::Max(1, Composition.Skirmishers) + 200.0f;
+        const FVector Around = ArenaCenter
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * (CombatPocketRadius * 0.8f);
+        if (ABreakerSkirmisherEnemy* Skirmisher = SpawnSkirmisherNearCover(Around, Origin, Index * 1.1f))
         {
-            Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
-            Ranged->ConfigureWave(GetAreaLevelForWave(CurrentWave));
-            WaveEnemies.Add(Ranged);
+            Skirmisher->ConfigureWave(AreaLevel);
+            SetEnemyDropsLoot(Skirmisher, Composition.bDropsLoot);
+            WaveEnemies.Add(Skirmisher);
         }
     }
+
+    // --- WARDEN -------------------------------------------------------------
+    // BETWEEN the player and the pack. §2.4's axis is "Wardens punish
+    // approaching from the front", and a Warden behind the pack is a Warden the
+    // player never has to solve.
+    for (int32 Index = 0; Index < Composition.Wardens; ++Index)
+    {
+        const FVector SpawnLocation = ArenaCenter - Forward * (CombatPocketRadius * 0.6f)
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 300.0f;
+        FActorSpawnParameters WardenParams;
+        WardenParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        ABreakerWardenEnemy* Warden = GetWorld()->SpawnActor<ABreakerWardenEnemy>(
+            ABreakerWardenEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, WardenParams);
+        if (!Warden) continue;
+        Warden->ConfigureEncounter(SpawnLocation, 1.7f + Index);
+        Warden->ConfigureWave(AreaLevel);
+        SetEnemyDropsLoot(Warden, Composition.bDropsLoot);
+        UBreakerKillTelemetryComponent::AttachTo(Warden);
+        WaveEnemies.Add(Warden);
+    }
+
+    if (Composition.Kind == EBreakerWaveKind::Rest)
+    {
+        // §4.3: the rest wave exists so wave mode measures COMBAT rather than
+        // endurance. Half budget, no elites, loot on, and a breather — the
+        // breather is the player's to take, because F4 is what starts the next
+        // wave, so what this does is restock and say so.
+        RefillPlayerAmmo();
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerGym] wave %d is a REST wave: half budget, no elites, loot enabled, ammo restocked. Take %.0fs before F4."),
+            CurrentWave, WaveBudget.RestBreatherSeconds);
+    }
+}
+
+void ABreakerGameMode::SetEnemyDropsLoot(ABreakerEnemy* Enemy, bool bDrops) const
+{
+    if (!Enemy) return;
+
+    // §4.3: "Loot only on rest and boss waves. Otherwise the gym becomes a farm
+    // and pollutes drop-rate data" — and drop-rate data is one of the two
+    // numbers wave mode exists to produce.
+    //
+    // WHY REFLECTION AND NOT A SETTER. `bDropsLoot` is protected on
+    // ABreakerEnemy and there is no mutator; adding one is a one-line change to
+    // Combat/, which this lane does not own and which two other agents are
+    // editing in parallel. The property is marked BlueprintReadWrite, so it is
+    // deliberately writable from outside the class — this reaches it the way a
+    // Blueprint would. A missing property WARNS rather than failing silently,
+    // because the failure mode is a farm that nobody notices.
+    static const FName DropsLootName(TEXT("bDropsLoot"));
+    if (FBoolProperty* Property = FindFProperty<FBoolProperty>(ABreakerEnemy::StaticClass(), DropsLootName))
+    {
+        Property->SetPropertyValue_InContainer(Enemy, bDrops);
+        return;
+    }
+    UE_LOG(LogTemp, Warning,
+        TEXT("[BreakerGym] ABreakerEnemy::bDropsLoot not found by reflection; Encounter-Design 4.3's loot rule is not being applied."));
+}
+
+FBreakerWaveComposition ABreakerGameMode::GetWaveComposition(int32 WaveIndex) const
+{
+    // Solo, because solo is the primary balance target and the gym has one
+    // player. Party sizes go through the same solver with a different count.
+    return UBreakerWaveBudgetLibrary::SolveWave(WaveIndex, 1, WaveBudget);
 }
 
 int32 ABreakerGameMode::GetAreaLevelForWave(int32 WaveIndex) const
