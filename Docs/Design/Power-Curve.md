@@ -163,9 +163,56 @@ line.
 
 ## Implementation status (2026-08-13)
 
-**Nothing in this document is built yet.** It is the architecture agreed under
-O27, written before the code so that the numbers become derivable. The three
-confirmed gaps in "Why this document exists" are all still open, and the
-implementation order is: monster chassis by area level, weapon base damage by
-item level, then the affix and node breadth that makes the variance band
-reachable.
+The implementation order was: monster chassis by area level, weapon base damage
+by item level, then the affix and node breadth that makes the variance band
+reachable. **The third item is built.** The first two are not.
+
+**BUILT — §4 the build variance band, §"Choices over accumulation", §"More
+options in every avenue".**
+
+- `IncreasedDamagePerSpentPoint` cut 1.0% -> **0.25%**. Still `EditAnywhere`,
+  still safe at 0. Because every build spends its whole budget, it now lands
+  identically on a baseline and an optimized character and cannot separate
+  them — it is a floor so that a defensive purchase is not literally zero
+  offence, and nothing more.
+- The affix pool went 12 lines / 1 offensive / 4 of 8 slots to **18 lines, 9
+  offensive, damage on all 8 slots**, with per-slot identity. Full table in
+  `Docs/Item-Foundation.md`.
+- **Conditional damage exists**, keyed to the movement pillar: five affixes and
+  six node lines that pay out only while airborne, sliding, wall riding, at
+  Redline, or shortly after a dash. `FBreakerBuildConditionState`
+  (`Progression/BreakerBuildConditions.h`) reads the live state off
+  `UBreakerCharacterMovementComponent` and `UBreakerMomentumComponent`; both
+  power layers consume it and neither of those components was edited.
+- **More multipliers are real on nodes** and the O3 cap is enforced in code:
+  six Convergence/keystone options, of which the strongest three count, each
+  clamped to 1.30x. Six options against a cap of three is the choice O3
+  describes.
+- Node content: Core 15 -> **24** (a new Velocity constellation of six, plus
+  Called Shot, Salvo and Barrage), Swift Kinetic 8 -> 11, Marksman 8 -> 10.
+
+**The band, measured** (`RiorsEdge.Progression.PowerBand`, composed through the
+real aggregator; both characters level 50, both measured in the same instant —
+airborne, recently dashed, at Redline):
+
+| Layer | Baseline 50 | Optimized 50 | Ratio | Doc target |
+|---|---|---|---|---|
+| Flat (Added Damage) | x1.08 | x1.25 | 1.16x | not in the original table |
+| Additive Increased | x2.42 | x5.68 | 2.35x | 2.5x |
+| More (O3 cap 3) | x1.00 | x1.94 | 1.93x | 1.95x |
+| Effective crit | x1.32 (27% @ x2.18) | x2.19 (60% @ x2.98) | 1.66x | 1.7x |
+| **Composed** | **x3.44** | **x30.05** | **8.74x** | **8-10x** |
+
+The one deviation from §4's table is the flat layer, which the table does not
+have. Added Damage lands in the Flat lane of the `DamageMultiplier` attribute,
+so it is multiplied by the additive bucket rather than added after it; it is
+kept deliberately small (1.16x) so it colours the band rather than carrying it.
+**O3 was not broken to reach the band**, exactly as §4 predicted.
+
+**NOT BUILT.** The two structural gaps this document names first are untouched
+by this pass and remain the next work: monster health and damage are still
+constants rather than functions of area level, and weapon base damage still
+does not scale with item level. Until those land, the band is a statement about
+the multiplier stack only — an optimized character deals 8.74x a baseline
+character's damage, against an enemy whose health does not yet know what level
+the area is.

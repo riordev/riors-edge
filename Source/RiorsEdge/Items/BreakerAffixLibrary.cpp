@@ -51,7 +51,8 @@ namespace
         std::initializer_list<EBreakerEquipSlot> Slots,
         float ValueAtT8,
         float ValueAtT1,
-        float RollWeight = 100.0f)
+        float RollWeight = 100.0f,
+        EBreakerBuildCondition Condition = EBreakerBuildCondition::Always)
     {
         FBreakerAffixDefinition Affix;
         Affix.AffixId = AffixId;
@@ -63,6 +64,7 @@ namespace
         Affix.ValueAtT8 = ValueAtT8;
         Affix.ValueAtT1 = ValueAtT1;
         Affix.RollWeight = RollWeight;
+        Affix.Condition = Condition;
         return Affix;
     }
 
@@ -85,10 +87,58 @@ namespace
         Pool.Add(MakeAffix(TEXT("Move.SlideSpeed"), TEXT("Slide Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlideSpeed, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 5.0f, 20.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Move.AirControl"), TEXT("Air Control"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirControl, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace}, 5.0f, 22.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Move.DashCooldown"), TEXT("Dash Cooldown Reduction"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DashCooldownReduction, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Gloves}, 4.0f, 18.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Crit.Chance"), TEXT("Critical Chance"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 10.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Crit.Damage"), TEXT("Critical Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 8.0f, 35.0f, 60.0f));
-        // O2 PLACEHOLDER: master-sheet Weapon Damage % line, 4% (T8) -> 22% (T1).
-        Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 4.0f, 22.0f, 80.0f));
+
+        // --- Critical, both directions ------------------------------------
+        // Crit is a genuine third axis in the variance band (Power-Curve §4),
+        // which it can only be if BOTH halves have range and enough slots to
+        // reach it. Chance is the scarcer half deliberately: it is what turns
+        // Critical Damage on, so a build that wants the crit layer has to spend
+        // on both rather than stacking whichever line it happens to find.
+        const std::initializer_list<EBreakerEquipSlot> CritChanceSlots =
+        {
+            EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace,
+            EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary
+        };
+        const std::initializer_list<EBreakerEquipSlot> CritDamageSlots =
+        {
+            EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace,
+            EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary
+        };
+        Pool.Add(MakeAffix(TEXT("Crit.Chance"), TEXT("Critical Chance"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat, CritChanceSlots, 1.0f, 4.0f, 60.0f));   // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Crit.Damage"), TEXT("Critical Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat, CritDamageSlots, 5.0f, 18.0f, 60.0f));    // O2 PLACEHOLDER
+
+        // --- Unconditional damage, on every slot ---------------------------
+        // Was gloves/neck/weapons only, which made helmet, body, boots and
+        // waist STRUCTURALLY incapable of raising damage (Power-Curve §"More
+        // options in every avenue"). It rolls everywhere now, and its per-line
+        // value came down as the pool widened: eight small lines that add up,
+        // not four large ones you either find or do not.
+        // O2 PLACEHOLDER: 3% (T8) -> 16% (T1); T-1 spikes to 28.8%.
+        Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 16.0f, 80.0f));
+        // The flat half. Lands before the Increased bucket, so it is worth most
+        // to a build that already has a large bucket to multiply it by — the
+        // opposite scaling shape to the line above, which is the point.
+        // O2 PLACEHOLDER: 1 -> 5 percentage points of base weapon damage.
+        Pool.Add(MakeAffix(TEXT("Offense.AddedDamage"), TEXT("Added Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::AddedDamage, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 1.0f, 5.0f, 70.0f));
+
+        // --- Conditional damage: the movement pillar as a build axis --------
+        // Each rolls roughly twice the unconditional line because it is off
+        // whenever you are standing still. Slot allocation is per-slot IDENTITY,
+        // not a uniform spread: boots are where airborne and slide power lives,
+        // the waist is slide/dash/wall, the necklace is Redline and dash, body
+        // armour is the grounded-traversal piece. Two players hunting damage on
+        // boots and on a necklace are hunting different lines.
+        Pool.Add(MakeAffix(TEXT("Offense.AirborneDamage"), TEXT("Damage while Airborne"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirborneDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::Airborne));   // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Offense.SlidingDamage"), TEXT("Damage while Sliding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlidingDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Secondary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::Sliding));  // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Offense.WallRideDamage"), TEXT("Damage while Wall Riding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WallRideDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::BodyArmour}, 6.0f, 26.0f, 40.0f, EBreakerBuildCondition::WallRiding));  // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Offense.RedlineDamage"), TEXT("Damage at Redline"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RedlineDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary}, 4.5f, 20.0f, 45.0f, EBreakerBuildCondition::Redline));  // O2 PLACEHOLDER
+        Pool.Add(MakeAffix(TEXT("Offense.DashDamage"), TEXT("Damage after Dashing"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RecentlyDashedDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::RecentlyDashed)); // O2 PLACEHOLDER
         return Pool;
     }
 }
@@ -97,6 +147,25 @@ const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetSliceAffixPool()
 {
     static const TArray<FBreakerAffixDefinition> Pool = BuildSliceAffixPool();
     return Pool;
+}
+
+bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
+{
+    switch (Target)
+    {
+    case EBreakerStatTarget::WeaponDamage:
+    case EBreakerStatTarget::AddedDamage:
+    case EBreakerStatTarget::CriticalChance:
+    case EBreakerStatTarget::CriticalDamage:
+    case EBreakerStatTarget::AirborneDamage:
+    case EBreakerStatTarget::SlidingDamage:
+    case EBreakerStatTarget::WallRideDamage:
+    case EBreakerStatTarget::RedlineDamage:
+    case EBreakerStatTarget::RecentlyDashedDamage:
+        return true;
+    default:
+        return false;
+    }
 }
 
 const FBreakerAffixDefinition* UBreakerAffixLibrary::FindAffix(const TArray<FBreakerAffixDefinition>& Pool, FName AffixId)

@@ -71,15 +71,29 @@ bool FBreakerLootRollTest::RunTest(const FString& Parameters)
         }
     }
 
-    // Weapon Damage is a weapon/hands/neck affix: it must never appear on
-    // Boots, and must be reachable on an allowed slot.
+    // Weapon Damage is a UNIVERSAL affix as of O27. It used to be restricted to
+    // gloves/neck/weapons, which is precisely what made helmet, body armour,
+    // boots and waist structurally incapable of raising damage (Power-Curve
+    // §"More options in every avenue"). The assertion is inverted deliberately:
+    // the old expectation encoded the bug.
     const FBreakerAffixDefinition* WeaponDamage = UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), TEXT("Offense.WeaponDamage"));
     TestNotNull(TEXT("Weapon Damage affix exists in the slice pool"), WeaponDamage);
     if (WeaponDamage)
     {
-        TestFalse(TEXT("Weapon Damage is illegal on Boots"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Boots));
-        TestTrue(TEXT("Weapon Damage is legal on Primary"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Primary));
-        TestTrue(TEXT("Weapon Damage is legal on Gloves"), WeaponDamage->AllowsSlot(EBreakerEquipSlot::Gloves));
+        for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
+        {
+            TestTrue(TEXT("Weapon Damage rolls on every slot"), WeaponDamage->AllowsSlot(static_cast<EBreakerEquipSlot>(SlotIndex)));
+        }
+        // Per-slot identity still holds for the CONDITIONAL lines: Damage while
+        // Airborne is a boots/helmet/neck/weapon line and must never be a body
+        // armour or gloves roll, or every slot would offer the same thing.
+        const FBreakerAffixDefinition* Airborne = UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), TEXT("Offense.AirborneDamage"));
+        TestNotNull(TEXT("The airborne conditional exists"), Airborne);
+        if (Airborne)
+        {
+            TestTrue(TEXT("Airborne damage is a boots line"), Airborne->AllowsSlot(EBreakerEquipSlot::Boots));
+            TestFalse(TEXT("Airborne damage is not a body armour line"), Airborne->AllowsSlot(EBreakerEquipSlot::BodyArmour));
+        }
 
         bool bRolledOnPrimary = false;
         for (int32 Seed = 0; Seed < 200; ++Seed)

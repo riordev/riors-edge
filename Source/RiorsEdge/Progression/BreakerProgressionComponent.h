@@ -21,6 +21,7 @@ class RIORSEDGE_API UBreakerProgressionComponent : public UActorComponent
 public:
     UBreakerProgressionComponent();
     virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     UFUNCTION(BlueprintCallable, Category="Progression") bool ChoosePermanentClass(const UBreakerClassDefinition* ClassDefinition);
     // Selection framework path while class Data Assets do not exist yet:
@@ -68,13 +69,27 @@ public:
     // The point-spend baseline in whole percent, before node effects.
     UFUNCTION(BlueprintPure, Category="Progression") float GetPointSpendDamagePercent() const;
 
-    // O2 PLACEHOLDER: 1.0% increased damage per committed point. Deliberately
-    // small — the feel target is that a purchase is noticeable and a full slice
-    // budget is a real step, not that one node doubles your output. EditAnywhere
-    // so the owner can retune it on BP_BreakerCharacter without a recompile;
-    // set it to 0 to switch the baseline off entirely and leave only the nodes.
+    // O2 PLACEHOLDER, retuned under O27: 0.25% increased damage per committed
+    // point, down from 1.0%.
+    //
+    // At 1.0% this contributed roughly +69% at a full point budget against
+    // roughly +19% from every damage node combined, so HOW MANY points you had
+    // spent mattered about 3.5x more than WHERE you spent them. O27 rules that
+    // choices must beat accumulation, so the power moved into the nodes and this
+    // dropped to a floor: it exists only so that a point committed to a purely
+    // defensive or utility node is not literally zero offence. It cannot
+    // differentiate two builds, because both of them spend every point.
+    //
+    // Still EditAnywhere on BP_BreakerCharacter, and still safe to set to 0,
+    // which leaves node choices as the entire tree contribution.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression|Tuning", meta=(ClampMin="0.0", UIMax="5.0"))
-    float IncreasedDamagePerSpentPoint = 1.0f;
+    float IncreasedDamagePerSpentPoint = 0.25f;
+
+    // O3's hard cap and Damage-Pipeline §4's per-multiplier ceiling, enforced
+    // in AggregateStats. Public so the skill screen and the band test read the
+    // same two numbers the fold does.
+    static constexpr int32 MaxDamageMoreSources = 3;
+    static constexpr float SingleMoreCeiling = 1.30f;
 
     // Playtest hook: hands the gym the slice point budget so trees can be
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).
@@ -96,7 +111,14 @@ public:
     // application path in UBreakerAttributeSet, built from the same raw
     // buckets so Increased percentages reach the shared additive bucket
     // unmerged.
-    static FBreakerNodeStats AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution* OutContribution = nullptr);
+    // Conditional effects pay out only for conditions active in Conditions. The
+    // default empty state means "standing still", so the skill screen's
+    // projection and every pre-existing call site keep their exact behaviour.
+    static FBreakerNodeStats AggregateStats(const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks,
+        FBreakerAttributeContribution* OutContribution = nullptr, const FBreakerBuildConditionState& Conditions = FBreakerBuildConditionState());
+
+    // The movement/momentum conditions this component last folded in.
+    const FBreakerBuildConditionState& GetActiveConditions() const { return ActiveConditions; }
 
     // Binds the attribute set this component contributes to. BeginPlay calls
     // it with the set found on the owner's ability system; tests call it with
@@ -118,7 +140,12 @@ private:
     // true base; this component only ever submits a contribution, which is why
     // skill nodes and gear now stack instead of overwriting each other.
     FBreakerAttributeContribution CachedContribution;
+    FBreakerBuildConditionState ActiveConditions;
 
+    // Conditional node effects are live state, so the offer they belong to has
+    // to be rebuilt on a transition. Called from the tick; only recalculates
+    // when the active set actually moved.
+    void RefreshBuildConditions();
     int32 GetRefundValue(EBreakerPointCurrency Currency) const;
     const UBreakerProgressionNode* FindOwnedNodeDefinition(FName NodeId, EBreakerPointCurrency Currency) const;
     void CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const;

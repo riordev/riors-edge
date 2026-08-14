@@ -46,6 +46,10 @@ bool UBreakerEquipmentComponent::HasAttributeAuthority() const
 void UBreakerEquipmentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    // Conditional damage affixes are live state, so the offer they belong to
+    // has to be rebuilt when the state changes. Cheap: the comparison is one
+    // byte and the rebuild only runs on an actual transition.
+    RefreshBuildConditions();
     // Gear-granted resource regeneration; the class loop adds its own on top.
     if (Attributes && GetOwner() && GetOwner()->HasAuthority() && CachedStats.ResourceRegenPerSecond > 0.0f)
     {
@@ -297,7 +301,8 @@ bool UBreakerEquipmentComponent::GetEquippedItem(EBreakerEquipSlot Slot, FBreake
     return false;
 }
 
-FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution)
+FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution,
+    const FBreakerBuildConditionState& Conditions)
 {
     const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
 
@@ -305,17 +310,43 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     constexpr int32 TargetCount = static_cast<int32>(EBreakerStatTarget::Count);
     float FlatByTarget[TargetCount] = {};
     float IncreasedByTarget[TargetCount] = {};
+    // What the conditional lines are worth right now and what they would be
+    // worth with everything satisfied. Display figures only; the live half is
+    // already inside IncreasedByTarget.
+    float ActiveConditionalPercent = 0.0f;
+    float PotentialConditionalPercent = 0.0f;
     for (const FBreakerItemInstance& Item : Items)
     {
         for (const FBreakerRolledAffix& Rolled : Item.Affixes)
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Rolled.AffixId);
             if (!Definition) continue;
+            if (Definition->IsConditional())
+            {
+                PotentialConditionalPercent += Rolled.Value;
+                // A conditional line whose condition is false contributes
+                // NOTHING — not a reduced amount, not a separate multiplier.
+                // That is what keeps the locked one-bucket rule intact while
+                // the bucket's contents change with the movement state.
+                if (!Conditions.IsActive(Definition->Condition)) continue;
+                ActiveConditionalPercent += Rolled.Value;
+            }
             const int32 Target = static_cast<int32>(Definition->StatTarget);
             if (Definition->StatBucket == EBreakerStatBucket::Flat) FlatByTarget[Target] += Rolled.Value;
             else if (Definition->StatBucket == EBreakerStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Rolled.Value;
         }
     }
+
+    // Every conditional damage line and the unconditional one share the single
+    // additive Increased bucket for outgoing damage. Summed here once so both
+    // the display figure below and the contribution submit the same number.
+    const float TotalIncreasedDamagePercent =
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirborneDamage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::SlidingDamage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WallRideDamage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RedlineDamage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RecentlyDashedDamage)];
 
     auto Increased = [&IncreasedByTarget](EBreakerStatTarget Target)
     {
@@ -334,7 +365,13 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerStatTarget::AirControl);
     Stats.DashCooldownMultiplier = 1.0f / Increased(EBreakerStatTarget::DashCooldownReduction);
-    Stats.WeaponDamageMultiplier = Increased(EBreakerStatTarget::WeaponDamage);
+    // The gear-only display multiplier now includes whatever conditional lines
+    // are live, because that is what the player's damage actually is at this
+    // instant. The two figures below break it down for the tooltip.
+    Stats.WeaponDamageMultiplier = 1.0f + TotalIncreasedDamagePercent / 100.0f;
+    Stats.AddedDamagePercent = FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)];
+    Stats.ActiveConditionalDamagePercent = ActiveConditionalPercent;
+    Stats.PotentialConditionalDamagePercent = PotentialConditionalPercent;
 
     if (OutContribution)
     {
@@ -356,14 +393,32 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // bucket like every other Increased percentage. Stats
         // .WeaponDamageMultiplier survives as the gear-only display figure the
         // inventory totals panel prints; nothing in combat reads it any more.
-        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]);
+        //
+        // Every conditional line rides the SAME bid — they are not a second
+        // multiplier and never were. Only the live ones are in the sum.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, TotalIncreasedDamagePercent);
+        // Added Damage lands in the FLAT lane of the same attribute, whose base
+        // is 1.0. Flat sums first, so it is multiplied by the Increased bucket
+        // rather than added after it — which is precisely why a flat line and an
+        // increased line are two different decisions instead of one.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::DamageMultiplier,
+            FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)] / 100.0f);
     }
     return Stats;
 }
 
+void UBreakerEquipmentComponent::RefreshBuildConditions()
+{
+    if (!HasAttributeAuthority()) return;
+    const FBreakerBuildConditionState Evaluated = FBreakerBuildConditionState::EvaluateForActor(GetOwner());
+    if (Evaluated == ActiveConditions) return;
+    ActiveConditions = Evaluated;
+    RecalculateStats();
+}
+
 void UBreakerEquipmentComponent::RecalculateStats()
 {
-    CachedStats = AggregateStats(Equipped, &CachedContribution);
+    CachedStats = AggregateStats(Equipped, &CachedContribution, ActiveConditions);
     ApplyStatsToAttributes();
 }
 
@@ -378,6 +433,6 @@ void UBreakerEquipmentComponent::ApplyStatsToAttributes()
 
 void UBreakerEquipmentComponent::OnRep_Equipped()
 {
-    CachedStats = AggregateStats(Equipped, &CachedContribution);
+    CachedStats = AggregateStats(Equipped, &CachedContribution, ActiveConditions);
     OnEquipmentChanged.Broadcast();
 }
