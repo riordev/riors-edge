@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Combat/BreakerEnemy.h"
@@ -43,8 +44,15 @@ namespace BreakerCurveCompositionTest
     // point of authoring it as the item-level-1 number.
     constexpr float CurveCompositionArchetypeBase = 13.0f;
 
-    // `w`, matching UBreakerWeaponComponent::ItemLevelDamageGrowth's default.
-    constexpr float CurveCompositionWeaponGrowth = 0.09f;   // O2 PLACEHOLDER
+    // `w`, read off UBreakerWeaponComponent's class default object — the
+    // SHIPPING value of ItemLevelDamageGrowth, not a copy of it. This used to
+    // be a hardcoded 0.09f, which meant a retune of the component's default
+    // would leave this suite green while measuring a curve the game no longer
+    // ships; now the two cannot disagree by construction.
+    float CurveCompositionWeaponGrowth()
+    {
+        return GetDefault<UBreakerWeaponComponent>()->ItemLevelDamageGrowth;
+    }
 
     // The TTK of an unmodified character against on-level trash, expressed as
     // a multiple of the same figure at area level 1. 1.0 means the two curves
@@ -61,7 +69,7 @@ namespace BreakerCurveCompositionTest
         // the content harder.
         const int32 ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
         const float Damage = FBreakerWeaponMath::WeaponBaseDamage(
-            CurveCompositionArchetypeBase, ItemLevel, CurveCompositionWeaponGrowth);
+            CurveCompositionArchetypeBase, ItemLevel, CurveCompositionWeaponGrowth());
 
         // Cadence, accuracy and the multiplier band are all constant across
         // area level, so they cancel out of the RATIO and are omitted rather
@@ -69,7 +77,7 @@ namespace BreakerCurveCompositionTest
         const float BaseHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
             1, EBreakerMonsterRank::Trash, Params);
         const float BaseDamage = FBreakerWeaponMath::WeaponBaseDamage(
-            CurveCompositionArchetypeBase, 1, CurveCompositionWeaponGrowth);
+            CurveCompositionArchetypeBase, 1, CurveCompositionWeaponGrowth());
 
         return (Health / Damage) / (BaseHealth / BaseDamage);
     }
@@ -91,7 +99,7 @@ bool FBreakerCurveCompositionTest::RunTest(const FString& Parameters)
     // FIRST, so that if someone retunes one the failure names the cause rather
     // than reporting a mysterious TTK drift forty lines later.
     TestEqual(TEXT("Weapon growth w tracks monster health growth g (Power-Curve 3)"),
-        CurveCompositionWeaponGrowth, Params.HealthGrowthPerLevel, 0.0001f);
+        CurveCompositionWeaponGrowth(), Params.HealthGrowthPerLevel, 0.0001f);
 
     // Walk the levelling game. The band is generous because the intent is
     // "roughly constant", and because a future ruling may deliberately give
@@ -113,7 +121,7 @@ bool FBreakerCurveCompositionTest::RunTest(const FString& Parameters)
             AreaLevel,
             UBreakerMonsterChassisLibrary::GetMonsterHealth(AreaLevel, EBreakerMonsterRank::Trash, Params),
             FBreakerWeaponMath::WeaponBaseDamage(CurveCompositionArchetypeBase,
-                UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel), CurveCompositionWeaponGrowth),
+                UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel), CurveCompositionWeaponGrowth()),
             CurveCompositionRelativeTimeToKill(AreaLevel, Params)));
     }
 
@@ -171,11 +179,11 @@ bool FBreakerEndgameCompositionTest::RunTest(const FString& Parameters)
         const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(
             AreaLevel, EBreakerMonsterRank::Trash, Params);
         const float Damage = FBreakerWeaponMath::WeaponBaseDamage(
-            CurveCompositionArchetypeBase, ItemLevel, CurveCompositionWeaponGrowth);
+            CurveCompositionArchetypeBase, ItemLevel, CurveCompositionWeaponGrowth());
         const float BaseHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
             1, EBreakerMonsterRank::Trash, Params);
         const float BaseDamage = FBreakerWeaponMath::WeaponBaseDamage(
-            CurveCompositionArchetypeBase, 1, CurveCompositionWeaponGrowth);
+            CurveCompositionArchetypeBase, 1, CurveCompositionWeaponGrowth());
         const float Relative = (Health / Damage) / (BaseHealth / BaseDamage);
 
         TestTrue(*FString::Printf(TEXT("Area level %d: baseline TTK is %.3fx the level-1 figure"), AreaLevel, Relative),
@@ -254,6 +262,11 @@ bool FBreakerEnemyDropLevelReachesTheCurveTest::RunTest(const FString& Parameter
     // at the character cap.
     Enemy->SetAreaLevel(100);
     TestTrue(TEXT("A deep-endgame enemy drops ABOVE the character cap of 50"), Enemy->GetEnemyLevel() > 50);
+    // And pinned to the LITERAL number, not to whatever the library returns: if
+    // GetDropItemLevel ever regressed to a lower clamp, the comparison against
+    // "Expected" above would follow it down and stay green. An area-level-100
+    // enemy drops item level 100, full stop.
+    TestEqual(TEXT("An area-level-100 enemy drops item level 100, literally"), Enemy->GetEnemyLevel(), 100);
     return true;
 }
 
