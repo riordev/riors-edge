@@ -1,6 +1,6 @@
 # Level Design — the spatial grammar
 
-Last reconciled against: `Docs/Design/Decisions.md` O1, O2, O24, O25, O26 (2026-08-14).
+**Last reconciled against: O32** (`Docs/Design/Decisions.md` O1, O2, O24, O25, O26 read for content; O27–O32 read for conflicts, none found — this document authors space, not power).
 
 Owner: level and space. Status: the grammar is derived here; the runtime field
 in `Source/RiorsEdge/Game/BreakerGameMode.cpp` is built against it. Every
@@ -345,29 +345,61 @@ Cannot be done headlessly; `.umap` must not be hand-edited. All names below are
 the actual actor labels, printed by `LogGymSummary` as `[BreakerGymTemplate]`
 lines on every launch, with their measured bounds.
 
-### 8.1 Delete — the seal
+**How to check this section against the map**, because the obvious method does
+not work. `Lvl_FirstPerson` is **World Partition with external actors**: the
+`.umap` itself is ~14 KB and contains no `SM_*` actor names at all. Every actor
+is its own one-actor `.uasset` under
+`Content/__ExternalActors__/FirstPerson/Lvl_FirstPerson/<hash>/<hash>/`, and
+deleting an actor deletes its file. Grepping the `.umap` returns a confident
+false negative. Grep the external-actor files instead — and note that historical
+blobs in git are **LFS pointers**, so `git show <commit>:<path>` shows a pointer
+and not the asset; only working-tree files are real binaries.
 
-| Actors | Bounds | Why |
-|---|---|---|
-| `SM_Cube2`, `SM_Cube3`, `SM_Cube4`, `SM_Cube5` | the four walls, z 0–200 | They seal the courtyard. There is no doorway anywhere in the map. |
-| `SM_Cube17`, `SM_Cube18`, `SM_Cube19`, `SM_Cube20` | the same four, z 200–400 | The upper course. Together with the above they put the crest at 400 cm against a 355 cm double jump. |
+### 8.1 Delete — the seal · **DONE (2026-08-14, commit `c0bf4b3`)**
 
-Deleting these eight actors is the single highest-value edit in the project's
-level layer. **When they go, set `bSpawnBreachRamp` to false** — or keep the
-embankment as authored ruin, which is the O24-consistent choice, and delete only
-the wall it climbs.
+| Actors | Bounds | Why | State |
+|---|---|---|---|
+| `SM_Cube2`, `SM_Cube3`, `SM_Cube4`, `SM_Cube5` | the four walls, z 0–200 | They seal the courtyard. There was no doorway anywhere in the map. | **DELETED** |
+| `SM_Cube17`, `SM_Cube18`, `SM_Cube19`, `SM_Cube20` | the same four, z 200–400 | The upper course. Together with the above they put the crest at 400 cm against a 355 cm double jump. | **DELETED** |
 
-**Replace with:** one compound wall carrying **one mouth** on the +X face at
-`SprintCorridorWidth` (1100 cm) or wider, height ≥ 400 so it still reads as an
-Anchor perimeter. A camp should have a wall; it should not have a lid.
+All eight are gone. **The courtyard is no longer sealed**, and the single
+highest-value edit in the level layer has been made. Everything below this
+subsection is still outstanding.
 
-### 8.2 Delete — the crowding
+**Three consequences, none of them yet handled:**
 
-| Actors | Count | Why |
-|---|---:|---|
-| `SM_Cylinder2` … `SM_Cylinder9` | 8 | 250 cm × 400 cm pillars embedded in the wall midpoints, protruding 150 cm into the room. They narrow every approach to the wall to well under G2. |
-| `SM_Cube`, `SM_Cube6` … `SM_Cube12`, `SM_QuarterCylinder`, `SM_QuarterCylinder2/3/4` | 12 | 300 × 300 × 200 corner fillets. They exist to make a 40 m template room feel navigable; in a 250 m field they are noise. |
-| `SM_Ramp` … `SM_Ramp8` | 8 | 400 × 300 × 200 wall ramps. These are the yellow shapes that fill the entire before-shot. Nothing in the gym uses them. |
+1. **`bSpawnBreachRamp` still defaults `true`**, and there is **no runtime
+   detection of the seal** — `SpawnBreach()` early-outs on the flag alone and
+   nothing traces for the parapet or counts wall actors. So the game still
+   builds the full embankment every session: ascent 900→2100 rising to
+   `BreachCrestHeight` 520, crest landing, descent 2100→4100, stone edging and
+   two rubble cubes — **climbing a wall that no longer exists.** The decision is
+   the one this section already framed: set the flag false, or keep the
+   embankment deliberately as O24 ruin. It has not been made, and leaving it
+   defaulted is making it by accident.
+2. **The `GroundProbeRadius` rationale is stale.** The header justifies 1500 cm
+   as "inside its 1800 cm wall face"; that wall face is gone. Nothing breaks —
+   the ring still lands on `Floor` (−2000…2000) and still clears the 350 cm
+   plinth — but the comment now argues from a thing that is not there.
+3. **A stale external-actor reference may remain.** The `.umap` still carries a
+   `WorldExternalActorsReferences` entry for a path with no file on disk. Likely
+   a leftover of the deletion and probably harmless; it is an in-editor check,
+   not something readable from the binary. **Recorded for the owner, not
+   diagnosed.**
+
+**Replace the seal with:** one compound wall carrying **one mouth** on the +X
+face at `SprintCorridorWidth` (1100 cm) or wider, height ≥ 400 so it still reads
+as an Anchor perimeter. A camp should have a wall; it should not have a lid.
+Right now it has neither, which is a strictly better state than the lid but is
+not the authored one.
+
+### 8.2 Delete — the crowding · **PARTIALLY DONE**
+
+| Actors | Count | Why | State |
+|---|---:|---|---|
+| `SM_Cylinder2` … `SM_Cylinder9` | 8 | 250 cm × 400 cm pillars embedded in the wall midpoints, protruding 150 cm into the room. They narrow every approach to the wall to well under G2. | **ALL 8 STILL PRESENT.** Note their reason for existing went with the wall they were embedded in — they now protrude into open air. |
+| `SM_Cube`, `SM_Cube6` … `SM_Cube12`, `SM_QuarterCylinder`, `SM_QuarterCylinder2/3/4` | 12 | 300 × 300 × 200 corner fillets. They exist to make a 40 m template room feel navigable; in a 250 m field they are noise. | **4 of 12 deleted** — `SM_Cube6`–`SM_Cube9` went with the seal in the same commit. `SM_Cube`, `SM_Cube10`–`12` and all four `SM_QuarterCylinder`s remain. |
+| `SM_Ramp` … `SM_Ramp8` | 8 | 400 × 300 × 200 wall ramps. These are the yellow shapes that fill the entire before-shot. Nothing in the gym uses them. | **ALL 8 STILL PRESENT.** Now the highest-value remaining delete: they were ramps up a wall that is gone, and they are still the yellow mass filling the spawn view. |
 
 ### 8.3 Keep, or make a deliberate decision about
 
@@ -379,7 +411,10 @@ Anchor perimeter. A camp should have a wall; it should not have a lid.
 
 ### 8.4 Other editor-only items
 
-- **There is no kill volume and no `KillZ`.** `Docs/Playtest-Gym-v1.md` records
+- **There is still no kill volume and no `KillZ`** — checked, not assumed: no
+  `KillZ` appears in the map's WorldSettings. The only kill plane in the project
+  is the gameplay one, `FallKillZ = spawn Z − 4000` in `ABreakerCharacter`.
+  `Docs/Playtest-Gym-v1.md` records
   that a 40 m fall triggers a playtest reset *because* the template level has
   none. Set World Settings → Kill Z to spawn Z − 4000 so the engine-level and
   gameplay-level answers agree.
@@ -398,11 +433,13 @@ can be wrong out loud.
 
 - [ ] The G9 gap (700 cm) clears with **one** jump, every time, from a sprint.
 - [ ] The G12 gap (1400 cm) **fails** on one jump and clears on two.
-- [ ] The G14 gap (2100 cm) fails on two. It should stay uncrossable until
-      Swift's third jump is reachable — with `SwiftThirdJumpUnlockLevel` at its
-      O2 placeholder of 20 and nothing raising `CharacterLevel`, it is
-      uncrossable in the gym today **by design**. It is the one piece of
-      geometry that will visibly change the day that ruling lands.
+- [ ] The G14 gap (2100 cm) fails on two, and **now clears on three as Swift**.
+      This changed on 2026-08-14: `SwiftThirdJumpUnlockLevel` was 20 against a
+      `CharacterLevel` nothing in the project writes, so the third jump — and
+      therefore this lane — was unreachable **by construction** rather than by
+      design. The gate now defaults to 1. This is the one piece of geometry in
+      the field that reads differently for one class, and it is now the fastest
+      way to confirm by hand that the grant is live.
 - [ ] A full wall ride fits on a G17 wall, and a wall jump crosses a G18
       corridor to the opposite wall with air to spare.
 - [ ] A slide entered at sprint ends at or near the G21 stripe.
@@ -413,19 +450,29 @@ can be wrong out loud.
       is only ever a dodge, G1 is wrong or `DashCooldown` is (§7.1).
 
 Nothing above has been playtested. Automation proves that the field spawns and
-that 151 tests still pass; whether 22.7 seconds of long axis feels like a world
-or like a walk is exactly what it cannot see.
+that the suite still passes; whether 22.7 seconds of long axis feels like a
+world or like a walk is exactly what it cannot see.
 
 ---
 
 ## 10. Capture harness
 
 `-BreakerCaptureTour` alongside `-BreakerScreenshots=N` points the capture at
-authored vantage cameras derived from the same station constants — plan view,
-the route from behind the camp, the breach crest, an oblique over the encounter
-pocket, down the wall-ride corridor, and along the sniper lane — instead of at
+authored vantage cameras derived from the same station constants instead of at
 the player's eyes. A spawn view is one composition; a layout is not visible from
-inside it, and this pass changes the layout.
+inside it.
+
+**Eight vantages** as shipped: plan view, the route from behind the camp, the
+breach crest, an oblique over the encounter pocket, down the wall-ride corridor,
+along the sniper lane, the **elite arena** (added when the boss started spawning
+there and nothing was looking at it), and a **grazing-angle ground vantage**.
+
+The grazing vantage earns its own paragraph. §6.5's coplanar-ground defect is
+**invisible from every one of the other seven** — it only aliases into visible
+seams when the camera looks along the surface at 150–200 m. It shipped because
+no camera in the harness could see it. The general lesson: a vantage set is a
+hypothesis about what can go wrong, and a defect class that no vantage covers is
+a defect class the harness will keep passing.
 
 **Known harness quirk, recorded rather than hidden:** the screenshot request is
 serviced at the end of the frame, after the view-target change in the same
