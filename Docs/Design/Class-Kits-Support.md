@@ -743,10 +743,12 @@ forbid.
 ## 6.2 Verb ownership — Master 5.2 CONFIRMED
 
 **No Support node grants walk, sprint, jump, crouch, dash, slide, wall ride, wall jump,
-air jump, or Parry.** Air jump (Kinesis) and Parry (Bulwark) remain the only tree-granted
-verbs and both are Core Tree grants, not class grants. Per **O1**, block and dodge are not
-verbs at all — they are passive chance layers — so there is nothing for this tree to grant
-and no node here reads them as inputs.
+air jump, or Parry.** **Amended by O25:** air jump is base kit for everyone, not a tree
+grant at all — two jumps ship with every character, and Swift's third jump, if built, is
+class-innate to Swift specifically, not a Core Tree grant. **Parry (Bulwark) remains the
+only tree-granted verb**, and it is a Core Tree grant, not a class grant. Per **O1**, block
+and dodge are not verbs at all — they are passive chance layers — so there is nothing for
+this tree to grant and no node here reads them as inputs.
 
 Cadence and Suppress occupy *ability slots*; neither is a base-kit addition. A Support who
 equips neither has base-kit mobility and base-kit defense exactly.

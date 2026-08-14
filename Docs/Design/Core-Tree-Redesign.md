@@ -770,10 +770,13 @@ taxonomy currently has no home for the seven live Bulwark and Kinesis nodes.
 Each has options and costs. None is decided here.
 
 **1. Where do defence and mobility go?** O30's taxonomy is entirely offensive.
-Seven live nodes (Bulwark 3, Kinesis 4) and two of the game's three tree-granted
-verbs — Parry and Air Jump — have no axis. Options: (a) a DEFENCE axis in Core,
+Seven live nodes (Bulwark 3, Kinesis 4) and Parry — **[O25 correction: the
+game's only tree-granted verb, not "two of three."** Air jump is base kit for
+everyone under O25, not a tree grant; Swift's third jump, if built, is
+class-innate. The pre-O25 count of three tree-granted verbs no longer applies —
+Parry is the sole one.] — have no axis. Options: (a) a DEFENCE axis in Core,
 breaking the GUNS/ABILITIES/MINIONS symmetry but keeping the content; (b) push
-defence entirely to gear and class trees, which deletes 7 nodes and both verbs
+defence entirely to gear and class trees, which deletes 7 nodes and Parry
 and collides with "trees improve movement verbs, gear does not grant them";
 (c) treat defence as a fourth category outside the taxonomy. **Cost: (a) near
 zero, (b) high and lossy, (c) a naming decision.** This is the biggest unanswered

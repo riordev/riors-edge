@@ -62,7 +62,7 @@ branch content below.**
 | Solo is the primary balance target | Master 11.1 | Every resource loop generates solo. Every Support branch has a self path. |
 | Crit is the only multiplier of its kind | Master 6.3 | No node grants "chance to deal double damage", "chance to double-hit for full", or any parallel roll-and-multiply. |
 | Affixes scale verbs, trees rewrite rules, classes own the fantasy | Layer-Ownership | **No node in this document is a flat percentage.** Every node is a rule rewrite or a resource-loop modifier. |
-| Air jump (Kinesis) and Parry (Bulwark) are the only tree-granted verbs | Master 5.2 / 7.6 | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
+| **Parry (Bulwark) is the only tree-granted verb.** Air jump is base kit for everyone (two jumps); Swift's third jump, if built, is class-innate, not tree-granted. | **O25** (was Master 5.2 / 7.6) | No class tree grants a movement or defensive verb. Class trees grant *abilities* (equippable, slot-limited) and rule rewrites. |
 | No grapple / tether | Master 5.1 | Kinetic and Demolitionist reposition with impulses and dashes only. |
 | Flat sums -> one additive Increased bucket -> More reserved for trees/Anomalous | Item-Foundation | Class nodes may author More multipliers, but each class gets a **hard budget of three** (see 0.1). |
 | More multipliers are an unordered product | **O3** | UNBLOCKED: the More-multiplier budget below is ratified — one More per branch keystone, build-wide cap 3, Aberrant signatures may not author a More. Remaining stat-aggregation-bucket work (Master 3.15 / 6.6) no longer gates it. |

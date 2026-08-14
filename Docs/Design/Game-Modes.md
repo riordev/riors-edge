@@ -453,7 +453,7 @@ Every Frontier ends with a map boss. Requirements:
 
 - **3-4 bosses per tileset**, rolled per instance. The player should not know which one they are running until Ingress.
 - **2-4 minutes at appropriate gear.** Longer than this and it becomes the run's bottleneck; players will optimise by re-rolling for the fast boss, which is a failure state.
-- **Fought with base kit only.** No arena mechanic may require air jump, parry, a timed dodge, or a grapple. (§0.) A boss may *reward* mobility — a phase where a wall-ride line reaches a weak point 25% faster — but never require it.
+- **Fought with base kit only.** No arena mechanic may require Parry, Swift's third jump, a timed dodge, or a grapple. **[O25-SWEEP]** — the universal two-jump air-jump kit is base kit under O25, not a verb some players lack, so requiring it is no longer forbidden by this line; what remains genuinely optional is Parry (tree-gated) and Swift's third jump (class-gated). (§0.) A boss may *reward* mobility — a phase where a wall-ride line reaches a weak point 25% faster — but never require anything gated.
 - **Boss caps on DoT stacking and armour reduction** per 7.10 risk 5, without making status builds feel disabled. Recommended shape: DoT stacks from a single source cap at their normal maximum but boss armour reduction caps at 60% of applied value rather than being immune.
 - **The boss owns a dedicated T-1 table.** This is one of the three legal T-1 sources (3.1). A map boss should have a small, per-boss list of 3-5 T-1 affixes it can drop directly, so the community learns "you farm Boss X for the T-1 Slide Momentum Retention." This is the single most effective way to make an infinite mode feel targeted.
 - No boss may be immune to a damage type. Immunity invalidates builds; caps constrain them.
@@ -608,7 +608,7 @@ The Frontier reward package, per completed run:
 
 **Encounter design constraints (inherited, restated because raids are where they get violated):**
 - No encounter requires a timed dodge input. Dodge is passive. (§0.)
-- No encounter requires air jump or parry — those are tree verbs and the group cannot assume anyone has them.
+- No encounter requires Parry or Swift's third jump — those remain tree/class-gated verbs and the group cannot assume anyone has them. **[O25-SWEEP]** Air jump itself (the base two-jump kit) is universal under O25 and may be assumed of every player.
 - No encounter requires a specific class. A raid that needs a Tank is a raid that cannot be matchmade or scheduled.
 - Boss DoT and armour-reduction caps apply, per 7.10 risk 5.
 - **[O31] No encounter reduces any legal build's contribution to zero.** The
