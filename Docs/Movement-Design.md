@@ -1,5 +1,7 @@
 # Movement design
 
+Last reconciled against: O32
+
 ## Product intent
 
 Movement gives players expressive positioning, recovery, and route choice without becoming the entire challenge or invalidating weapons, enemies, and arenas. A player using ordinary run, sprint, jump, and cover should remain viable. Advanced movement rewards awareness without being mandatory for baseline combat effectiveness.
@@ -8,12 +10,20 @@ Movement gives players expressive positioning, recovery, and route choice withou
 
 - Walk: 700 cm/s.
 - Sprint: 1100 cm/s.
-- Jump: 700 cm/s with 1.60 gravity scale, an asymmetric fall curve, a jump cut on release, and a terminal velocity — see "Weight pass" below. Jumping from a slide always performs a normal jump—never a mantle—while preserving the exact horizontal slide velocity and returning to the sprinting air state.
+- Jump: 700 cm/s impulse with **1.38** gravity scale on the rise (eased twice
+  from the weight pass's 1.60) and a **1.55x** fall multiplier (eased once from
+  1.80), an apex band, a jump cut on release, and a 2400 cm/s terminal
+  velocity — see "Weight pass" below. Jumping from a slide always performs a normal jump—never a mantle—while preserving the exact horizontal slide velocity and returning to the sprinting air state.
 - Air control: moderate CMC control plus a Source-inspired steering assist that rotates existing horizontal momentum toward input without adding speed or permitting free reversals.
 - Dash: available on ground or in air whenever the player is not sliding, with a four-second cooldown. It redirects momentum with a 1500 cm/s floor plus a 200 cm/s bonus and preserves earned speed while movement input continues. Releasing movement or colliding clears the boosted ceiling; a 4200 cm/s safety cap remains.
 - Slide: available from 550 cm/s, eases its small deterministic entry push across 0.35 seconds, gives that boost at most once per 1.2 seconds, and never uses the entry boost to exceed sprint speed plus 120 cm/s. This prevents crouch-spam speed generation while allowing downhill momentum. It carries momentum and ends after one second or when released/slowed; holding slide while airborne queues one slide for landing; downhill surfaces add restrained acceleration.
 - Wall ride: implemented baseline with 0.85-second maximum, minimum **450 cm/s** (was 700 — see "Wall ride was dead" below), reduced gravity, no passive speed gain, loss-of-contact exit, and a controlled wall jump. The wall jump keeps its own 700 cm/s exit floor and hands back one air jump.
 - Mantle: pressing jump at a clear 35-150 cm ledge smoothly lifts the capsule over it in 0.20 seconds; tall walls and obstructed landing space reject the attempt.
+- Aiming: the grounded speed cap is multiplied by the weapon's
+  `GetAimMoveSpeedMultiplier()`, ramped with ADS progress and clamped to [0,1]
+  on both sides. **Grounded only** — the slide cap and the boosted ceiling have
+  no opinion, deliberately. See `Docs/Weapon-Foundation.md` for the per-archetype
+  values.
 - Grapple: excluded.
 
 All numbers are initial editor-test values, not promises. Tune them in the context of aiming, incoming attacks, encounter distances, and readable enemy behavior.
@@ -27,9 +37,13 @@ hook are untouched. Every value below is `EditAnywhere` on
 the engine's own Character Movement categories for the two inherited ones), so
 the whole pass can be A/B'd and reverted in the editor without a rebuild.
 
+The **New** column is the pass as it landed. Two values have been eased since,
+one per owner report — the current shipped values are called out in the rows and
+derived in the two report sections below.
+
 | Value | Old | New | Why |
 |---|---:|---:|---|
-| `GravityScale` | 1.35 | **1.60** | Single strongest lever. Shortens the rise and lowers the apex at the same time. |
+| `GravityScale` | 1.35 | **1.60** → now **1.38** | Single strongest lever. Shortens the rise and lowers the apex at the same time. Eased twice: 1.60 → 1.45 → 1.38, one per "too heavy" report. |
 | `FallGravityMultiplier` | — (1.0) | **1.55** | A symmetric arc is the classic floaty read; a real-feeling jump falls faster than it rises. Was 1.80; eased once — see "Gravity, fourth report" below. |
 | `ApexGravityMultiplier` | — (1.0) | **1.50** | Time spent near zero vertical velocity is felt directly as hang. Blended into 1.0 upward and into the fall multiplier downward, so the curve is continuous. |
 | `ApexBandSpeed` | — | **220 cm/s** | Half-width of the apex band. |
@@ -37,7 +51,7 @@ the whole pass can be A/B'd and reverted in the editor without a rebuild.
 | `JumpCutMultiplier` | — (1.0) | **0.55** | Variable jump height: releasing jump mid-rise scales the remaining rise. Authority over the arc reads as control rather than drift. |
 | `JumpCutMinimumRiseSpeed` | — | **50 cm/s** | Below this a cut is not worth the discontinuity. |
 | `JumpHoldWindow` | — (0) | **0.60 s** | Written onto `ACharacter::JumpMaxHoldTime` at BeginPlay purely so the movement layer can see a key release; the engine's own hold-to-rise is suppressed in `DoJump`. Must exceed the ~0.45 s rise. |
-| `LandingHeavyFallSpeed` | — | **950 cm/s** | Landing threshold. A full-height jump lands at ~937 cm/s, so routine jumping is never taxed. |
+| `LandingHeavyFallSpeed` | — | **950 cm/s** | Landing threshold. At the pass's values a full-height jump landed at ~937 cm/s, so routine jumping was never taxed; after both eases it arrives at **871 cm/s**, with more margin. |
 | `LandingMaxFallSpeed` / `LandingMinimumSpeedScale` | — | **2400 / 0.78** | Real falls cost horizontal speed on arrival, ramped, so an arrival has consequence instead of being weightless. |
 | `BrakingDecelerationWalking` | 1800 | **2400** | Floaty is often really "slow to stop" rather than anything airborne. |
 | `GroundFriction` | 7.5 | **8.5** | Same reason: a released stick plants instead of skating. |
@@ -45,15 +59,17 @@ the whole pass can be A/B'd and reverted in the editor without a rebuild.
 | `AirControl` / `AirSteerRate` | 0.55 / 4.2 | *unchanged* | Already restrained per the Godot audit. Reducing air authority reads as *more* drift, not less — and `AirSteerRate` is the gear/tree air-control consumption point. |
 | `MaxAcceleration` | 4200 | *unchanged* | Already twice the engine default; more reads as twitchy, not heavy. |
 
-Resulting arc, flat ground, no gear or tree multipliers:
+Resulting arc, flat ground, no gear or tree multipliers. The **shipped** column
+is after both eases (`GravityScale` 1.38, `FallGravityMultiplier` 1.55) and is
+the arc the game currently has:
 
-| | Old | New |
-|---|---:|---:|
-| Rise time | 0.53 s | 0.45 s |
-| Apex height | 185 cm | 156 cm |
-| Fall time | 0.53 s | 0.34 s |
-| Total airtime | 1.06 s | 0.79 s |
-| Landing speed | 700 cm/s | ~937 cm/s |
+| | Old (1.35) | At the pass (1.60 / 1.80) | Shipped (1.38 / 1.55) |
+|---|---:|---:|---:|
+| Rise time | 0.53 s | 0.45 s | 0.518 s |
+| Apex height | 185 cm | 156 cm | 181 cm |
+| Fall time | 0.53 s | 0.34 s | 0.416 s |
+| Total airtime | 1.06 s | 0.79 s | 0.933 s |
+| Landing speed | 700 cm/s | ~937 cm/s | 871 cm/s |
 
 Exemptions, all deliberate:
 
@@ -418,7 +434,19 @@ jump is the exception and remains a tree unlock" — was superseded by O25 and i
 deleted. Swift innately unlocks a *third* jump later; see "Swift's third jump"
 below. Parry is the only tree-granted verb left.
 
-Trees and affixes scale these actions. Affixes own raw percentages and stamina economy; trees own rule changes and quality such as i-frame duration and parry. See `Docs/Layer-Ownership.md`.
+Trees and affixes scale these actions. Affixes own raw percentages; trees own
+rule changes and quality such as i-frame duration and parry. (The earlier
+"and stamina economy" is deleted: **O1 removed stamina entirely** and it must
+not come back.) See `Docs/Layer-Ownership.md`.
+
+The live movement affixes are Movement Speed (all eight slots), Slide Speed
+(boots, waist, and both weapon slots), Air Control (boots, necklace) and Dash
+Cooldown Reduction (boots, gloves, and both weapon slots). Every one of them
+inherited O29's pool-wide ~2.2x uplift to the T1 ceiling anchor, so **the
+composed movement band is now reachable from gear alone at high item level** —
+a balance question for this layer, called out rather than pre-emptively
+retuned. No node stat target authors dash cooldown yet, so gear is its only
+bidder.
 
 ## Guardrails
 
@@ -429,6 +457,33 @@ Trees and affixes scale these actions. Affixes own raw percentages and stamina e
 - Advanced movement cannot be required to land routine weapon shots or avoid every baseline enemy attack.
 - Camera roll, FOV changes, and shake must be subtle and configurable.
 - Enemy and level design should offer movement opportunities without punishing players who use conventional routes.
+
+## FOR THE OWNER — open in this layer (2026-08-14)
+
+1. **Swift's third jump threshold.** `SwiftThirdJumpUnlockLevel` defaults to 1
+   because nothing writes `CharacterLevel` — verified again in this audit, the
+   field has a declaration and no assignment anywhere in the project. The
+   mechanism is done; the ruling is "when does it unlock and does it cost
+   anything", and it cannot be answered usefully until an XP loop exists.
+   Note that `RefreshJumpGrant`'s one-shot warning compares the gate against the
+   character's CURRENT level, not against the highest level the game can
+   produce — so once an XP loop exists it will warn for every under-levelled
+   Swift rather than only for an unreachable gate.
+2. **The O29 movement affix uplift.** Move Speed, Slide Speed, Air Control and
+   Dash Cooldown all rose with the pool-wide ceiling uplift. Either the
+   composed movement band is fine at high item level or the movement affix
+   ranges come back down; nobody has measured it.
+3. **Two asymmetries in the speed stack**, both harmless today and both the kind
+   of thing that surprises later:
+   - `PushSpeedMultiplier`'s temporary stack is applied to the grounded cap and
+     to the redirect floor, but **not to the slide cap** — a keyed speed buff
+     does nothing while sliding.
+   - `TryRedirect`'s minimum-speed floor omits the ADS multiplier that the
+     grounded cap includes, so while fully sighted with a rooted archetype the
+     cap can sit below the speed a redirect requires.
+4. **`JumpMaxCount = 2` is authored twice** — as `BaseJumpCount` here (the
+   stated single authority, written onto the character at runtime) and as a
+   constructor default on `ABreakerCharacter`. Same value today.
 
 ## Testing questions
 
