@@ -1,5 +1,7 @@
 # Playtest Gym v1
 
+**Last reconciled against: O32**
+
 The existing First Person map now becomes a zero-setup combat and movement test whenever `BreakerGameMode` is active.
 
 ## THE FIELD WAS RE-LAID-OUT — read `Docs/Design/Level-Design.md` first
@@ -13,12 +15,14 @@ quoted further down this page:
 - **The field is built on the real floor.** It used to be built 212 cm above
   it, because the ground plane was taken as "spawn minus a capsule" and the
   PlayerStart sits on the template's 210 cm plinth.
-- **The template courtyard is a sealed 4000 x 4000 cm room with a 400 cm wall
-  and no doorway** (measured; `LogGymSummary` prints it every launch). Sprint
-  crosses it in 3.6 s against a 4.0 s dash cooldown, so the dash could not be a
-  traversal verb anywhere the player could reach. A runtime **breach ramp** and
-  a **rubble stair** now lead out of it; deleting the wall is editor work and
-  the delete list is in Level-Design §8.
+- **THE COURTYARD IS NO LONGER SEALED.** It used to be a 4000 × 4000 cm room
+  with a 400 cm wall and no doorway anywhere in the map, which is why a runtime
+  **breach ramp** and a **rubble stair** were built to climb out of it. On
+  2026-08-14 the owner deleted all eight parapet cubes in the editor, so the
+  wall is gone. **`bSpawnBreachRamp` still defaults `true` and nothing in the
+  code detects the seal**, so the embankment is still built every session
+  against nothing. Keeping it is a legitimate O24 choice — an authored ruin —
+  but it is currently the default rather than a decision. See Level-Design §8.1.
 - **Everything moved out past the breach and onto stations**, each at least one
   dash-refresh distance (1100 x 4.0 = 4400 cm) from the last: camp, breach,
   target range, encounter pocket, jump-gap run, two more pockets, sniper lane,
@@ -26,13 +30,38 @@ quoted further down this page:
   sprint.
 
 New in the field: a **jump-gap run** with three lanes at 700 / 1400 / 2100 cm,
-pipped 1 / 2 / 3, sized so each gap needs exactly that many jumps (the 3-jump
-lane is deliberately uncrossable until Swift's third jump is reachable), and a
-**flat slide lane** with a stripe where a sprint-entered slide should end.
+pipped 1 / 2 / 3, sized so each gap needs exactly that many jumps. **The 3-jump
+lane is now crossable as Swift** — it was described here as "uncrossable until
+Swift's third jump is reachable", and as of 2026-08-14 it is, because the unlock
+gate was keyed to a `CharacterLevel` nothing writes and now defaults to 1. There
+is also a **flat slide lane** with a stripe where a sprint-entered slide should
+end.
 
-Capture: add `-BreakerCaptureTour` to a `-BreakerScreenshots=N` run to shoot the
-field from authored vantage points (plan, route, breach crest, pocket, wall-ride
-corridor, sniper lane) instead of from the player's eyes.
+## Capture switches
+
+The gym can photograph itself. Verified against the parse sites, because two of
+these are commonly mis-stated.
+
+| Switch | Form | What it does |
+|---|---|---|
+| `-BreakerAutoPlay` | flag | Skips the title menu into the gym. **Required for `-BreakerCaptureMenu`**, which is parsed inside its branch. |
+| `-BreakerScreenshots=N` | int, clamped 1–60 | Takes N frames and exits. First at 6.0 s, then every 2.0 s. |
+| `-BreakerCaptureMenu=<SCREEN>` | string | Opens the front end on a named screen first. Accepts `INVENTORY`, `SKILLTREES` (or `SKILLS`), `LOADOUT`, `SETTINGS`, `CLASS` (or `CLASSSELECT`), `PAUSE`. Anything else **silently** falls back to the main screen. |
+| `-BreakerCaptureBoard=<BOARD>` | **string, not a flag** | Picks a skill board: `CORE`, `COMPARE`, or `BRANCH<n>`. |
+| `-BreakerCaptureTour` | flag | Points at eight authored field vantages instead of the player's eyes. |
+| `-BreakerCaptureHUD` | flag | Fabricates the HUD **events** a headless run cannot reach — damage numbers at worst-case O29 magnitudes, an absorbed-state hit marker, and the wave banner cycling its three shapes. Layout goes through the identical drawing paths. |
+| `-BreakerCycleWeapons=<seconds>` | float, > 0 | Walks the viewmodel through every archetype. |
+| `-BreakerBossOnStart` | flag | Spawns the Field Marshal during the gym build so a headless run can photograph it. |
+
+Frames land in `Saved/Screenshots/breaker_NN.png`; the process exits ~2.5 s
+after the last one. Capture runs on a **core ticker, not a world timer**,
+because opening a menu pauses the world — the first version photographed
+nothing while logging success.
+
+`-BreakerCaptureHUD` exists for a specific reason worth keeping in front of
+people: the wave banner and every damage number **shipped broken**, and they
+were exactly the two readouts a capture run could not reach. Nothing presses F4
+and nothing pulls a trigger. That is not a coincidence.
 
 ## What appears at runtime
 
@@ -41,6 +70,13 @@ corridor, sniper lane) instead of from the player's eyes.
 - Two LATTICE ranged enemies (`ABreakerRangedEnemy`), spawned wide on either
   flank of the melee pack so their fire lanes cross the ground route the
   chasers push you down. See "The ranged archetype" below.
+- **One elite carrying rolled modifiers, one SEVERED WARDEN at the front of the
+  pocket, and one SEVERED SKIRMISHER placed against a real cover anchor.** These
+  are new; the full account is in "The enemy content now reaches a player" at
+  the end of this page, which is the section to read for what a fight in the
+  pocket actually contains.
+- **21 registered cover anchors** across the field. Not decoration — the
+  Skirmisher archetype does not exist without them.
 - Runtime movement facilities: mantle steps, dash markers, gap platforms, parallel wall-ride lanes, a flat slide lane, and a downhill slide lane.
 - A code-driven crosshair and debug HUD showing movement state, horizontal speed, health, shields, ammunition, and reload state.
 - Red body-hit feedback, gold weak-point feedback, and applied damage numbers.
@@ -64,12 +100,27 @@ The targets use engine basic-shape meshes, so this setup does not depend on new 
 
 The game opens on a title menu rather than immediately dropping the player into the gym. Title and pause menus expose the two-slot loadout and saved sensitivity, FOV, and invert-look settings.
 
-The combat HUD is grouped along the bottom-left: movement and vitals, active weapon/ammunition, then placeholder slots for two class abilities and one ultimate. The ability slots communicate the intended shipping layout but have no gameplay bindings yet.
+The combat HUD is the FIELDPLATE layout, not the original bottom-left strip:
+vitals bottom-**left**, a single 440×184 combat cluster bottom-**right** carrying
+the class-resource track, weapon/ammo and three ability squares, a wave banner
+top-centre, and a minimap top-right. **The ability squares are live**, not
+placeholders — they show ready / window / cooldown-wedge / unaffordable states
+for the abilities actually bound to E/T/G. Full spec in
+`Docs/Design/UI-HUD-Spec.md`.
 - Reset player, ammunition, targets, and session stats: F1
 - Copy a structured session report to the clipboard: F2
 - Toggle diagnostics: F3
+- **Start the next wave: F4**
+- **Spawn the Field Marshal: F5** (or the console command `Breaker.Boss`)
+- **Abilities: E / T / G** — two class abilities and the ultimate
+- **Inventory: I** (EQUIPMENT | SKILL TREES tabs). **Talk to the nearest NPC / pick up loot: F**
 - FOV: left/right bracket
 - Mouse sensitivity: fixed equal X/Y baseline for this pass
+
+F5 is bound onto the **PlayerController's** input component rather than the
+character's, because F1–F4 live on `ABreakerCharacter` in `Characters/` and the
+lane that added the boss did not own that file. If the controller has no input
+component it logs a warning and `Breaker.Boss` is the fallback.
 
 FOV persists locally between launches. Diagnostics show frame rate, session accuracy, weak-point rate, damage, reload count, target types/distances, and a brief impact marker. The copied report is formatted for pasting into the Notion Signals database.
 
@@ -248,6 +299,27 @@ at 25x health moved the sub-1s trash average that O18's re-anchor reads.
 
 Precedence is by **rank**, because rank is what multiplies the chassis. An
 elite that also carries modifiers is an elite sample.
+
+### Most kills no longer drop anything, and that is the fix
+
+Expect the gym to feel much less generous than it did, on purpose. Until
+2026-08-14 every death rolled loot unconditionally, so **kill count was item
+count**, and the rarity table was flat — a trash mob at area level 1 had exactly
+the same Aberrant odds as a boss at 50. Now there is a **drop-chance step by
+rank** (trash 0.10, elite 0.75, modifier-bearing 0.90, boss 1.0) and a **rarity
+gate** before the weighted roll: a rarity can only appear when the drop's item
+level is at or above its unlock *and* the monster's rank is at or above its
+minimum.
+
+What that means at the controller: ~134 items/hour instead of ~692, and
+Aberrants are **structurally impossible** below area level 25 and off trash at
+any level. If you are measuring loot feel, `GymAreaLevel` is the dial — the
+whole rarity ladder is gated on it. Numbers and the full table are in
+`Docs/Item-Foundation.md`; all of them are `EditAnywhere` and O2 PLACEHOLDER.
+
+In wave mode, loot is separately restricted to **rest waves and the boss wave**
+by the budget solver, so a standard wave drops nothing at all regardless of the
+chance step.
 
 ### The `[BreakerGym]` summary line
 
