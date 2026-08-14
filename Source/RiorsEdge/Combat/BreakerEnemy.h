@@ -6,6 +6,7 @@
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerEnemyModifiers.h"
+#include "Items/BreakerDropTable.h"
 #include "BreakerEnemy.generated.h"
 
 class UAbilitySystemComponent;
@@ -213,6 +214,14 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Family") EBreakerSeveranceStage SeveranceStage = EBreakerSeveranceStage::NotApplicable;
     // The curve itself, all O2 placeholders, tunable per enemy in-editor.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area") FBreakerMonsterChassisParams Chassis;
+
+    // The DROP pipeline's authored block, same precedent as Chassis above: one
+    // struct, EditAnywhere, every value O2 PLACEHOLDER, so drop rates retune
+    // from the details panel with no recompile. It is what GrantLoot runs
+    // instead of calling RollRarity unconditionally on every death — see
+    // Items/BreakerDropTable.h for the full derivation and the owner report it
+    // answers.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Loot") FBreakerDropTableParams DropTable;
     // Per-archetype ratios ON TOP of rank, so two trash monsters in the same
     // area can differ. Encounter-Design §2.2's 1.6x Lattice is the first user.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area", meta=(ClampMin="0")) float ArchetypeHealthMultiplier = 1.0f;   // O2 PLACEHOLDER

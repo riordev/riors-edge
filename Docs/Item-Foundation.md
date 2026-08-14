@@ -232,12 +232,175 @@ they are off whenever you are standing still. That trade is what makes
 "build around a movement state" a decision rather than a strictly better
 version of the same line.
 
+## THE DROP PIPELINE (2026-08-14)
+
+Owner playtest, verbatim: *"not every single enemy needs to drop an item — we
+need to make the calculations for drop rates and how they should work. I was
+getting way way too many Aberrants at this item level when it shouldn't even be
+fundamentally possible, and every single enemy dropped an item."*
+
+### What was actually wrong, confirmed in code before anything was written
+
+Both halves of that report were **one structural gap**.
+`ABreakerEnemy::GrantLoot` called `UBreakerLootLibrary::RollRarity`
+unconditionally on every death and spawned whatever came back. So:
+
+1. **There was no "does this enemy drop at all" step.** Kill count *was* item
+   count. At the documented kill rate below that is ~690 items an hour.
+2. **The rarity table was doing the entire job on its own, and it is flat.** A
+   2.5% Aberrant weight applied at area level 1 to a trash mob exactly as it did
+   to a boss at area level 50 — roughly **17 Aberrants an hour, at any level**,
+   against O11's cap of *three equipped*. The owner's "it shouldn't even be
+   fundamentally possible" was literally true: nothing made it impossible,
+   because nothing in the loot path read the level or the rank at all.
+
+### The pipeline is now three steps where it was one
+
+`Items/BreakerDropTable.{h,cpp}` — world-free pure functions in the precedent of
+`Combat/BreakerMonsterChassis.h` and `Weapons/BreakerWeaponMath.h`, so it is
+unit-testable and structurally incapable of reading a player.
+
+1. **DROP CHANCE**, per monster rank. Most trash kills drop nothing.
+2. **RARITY GATE**. A rarity whose gate is unmet has its weight zeroed *before*
+   the roll — not rerolled after.
+3. **RARITY ROLL**, the weighted table over whatever survived step 2.
+
+`UBreakerDropTableLibrary::RollDrop` is the one entry point content calls. It
+derives two independent sub-seeds from the kill seed so the drop decision and
+the rarity do not correlate; sharing a stream would make "dropped at all" and
+"dropped well" the same coin, which shows up as the rare tiers clustering in the
+same seeds. Determinism is preserved end to end and pinned.
+
+`RollRarity` keeps its signature and delegates with every gate open, so there is
+**one** weight table in the project rather than two that drift. Content must not
+call it — it is for dev grants, fixtures and crafting previews, which have no
+rank and no item level to supply.
+
+### THE RARITY GATE RULE, in one sentence
+
+> **A rarity can only roll when BOTH the drop's item level is at or above that
+> rarity's unlock level AND the killed monster's rank is at or above that
+> rarity's minimum rank; a gated-out rarity's weight is zero and its share
+> redistributes across the rarities that are open.**
+
+Two levers because the complaint had two halves. Item level answers "at this
+item level". Rank answers "every single enemy dropped an item" — the top tiers
+now come from the encounter content O27 says the difficulty lives in.
+
+Redistribution rather than a reroll is deliberate: a reroll preserves the SHAPE
+of the table and just relabels illegal results, whereas zeroing the weight means
+a low-level trash kill genuinely has a *different* rarity distribution.
+
+### The authored block — `FBreakerDropTableParams`
+
+One struct, `EditAnywhere`, every value `O2 PLACEHOLDER`, sitting on
+`ABreakerEnemy` beside the existing `Chassis` params so drop rates retune from
+the details panel with no recompile.
+
+| Rank | Drop chance | Why |
+|---|---|---|
+| Trash | **0.10** | O27: trash exists to be trivialized. Occasional, not routine. |
+| Elite | **0.75** | Reliable. |
+| ModifierBearing | **0.90** | O27 puts the difficulty here, so the loot follows. |
+| Boss | **1.00** | Guaranteed. |
+
+| Rarity | Weight | Min item level | Min rank |
+|---|---|---|---|
+| Standard | 62 | — | — |
+| Uncommon | 25 | — | — |
+| Exceptional | 10 | 8 | Trash |
+| **Aberrant** | **1.2** (was 2.5) | **25** | **Elite** |
+| **Anomalous** | **0.25** (was 0.5) | **40** | **Elite** |
+
+Exceptional is deliberately reachable from trash: something has to be worth
+picking up off an ordinary kill, or a 10% drop rate is 10% of nothing and the
+player stops looking at the floor.
+
+**The Aberrant weight had to fall as well as be gated.** O11 caps Aberrant at
+three equipped, *globally*. A rarity capped at 3 must be rare enough that 3 is a
+goal; at the old flat rate the cap filled in the first twenty minutes and was
+thereafter only ever displaced. The gates do most of the work, but elites alone
+would have refilled the cap hourly at 2.5.
+
+**Drop Chance now bids on quantity as well as quality.** It multiplies the
+per-rank chance (`DropChanceQuantityScale`, 1.0 — so +100% Drop Chance doubles
+it, clamped so a guaranteed drop stays one drop) *and* keeps its existing
+drain-weight-out-of-Standard effect on the rarity table. A stat printed as "Drop
+Chance" that only changed which rarity came out of a drop you were getting
+anyway is the same quiet lie as the `DamageMultiplier` nothing wrote. Set the
+scale to 0 to make it a pure quality stat again.
+
+**Off switches, both one field:** set every rank chance to 1.0 to recover the old
+"every enemy drops" behaviour exactly; set every gate to item level 1 / rank
+Trash to recover the old flat table.
+
+### THE LOOT-PER-HOUR ARITHMETIC
+
+This is the number the owner actually wants to tune against, and nothing in the
+project could answer it before. `UBreakerDropTableLibrary::ProjectLootRate`
+computes it analytically; `RiorsEdge.Items.Drops.LootPerHour` simulates 200
+hours through the real `RollDrop` and asserts the two agree, so this table
+cannot drift away from what the pipeline actually does.
+
+**The reference hour** (`FBreakerKillRateSample`, all `O2 PLACEHOLDER` — an
+*input*, not a measurement; nothing in the codebase measures kills per hour yet
+and the wave-mode report is the instrument that eventually should):
+600 trash + 60 elite + 30 modifier-bearing + 2 boss = **692 kills**.
+
+At no Drop Chance, by the area level of the content:
+
+| Area / item level | Items/h | Exceptional+/h | Aberrant/h | Hours per Aberrant | Anomalous/h | Hours per Anomalous |
+|---|---|---|---|---|---|---|
+| 5 | 134 | **0** | 0 | never | 0 | never |
+| 10 | 134 | 13.8 | 0 | never | 0 | never |
+| 25 | 134 | 14.6 | 0.90 | 1.1 | 0 | never |
+| 50 | 134 | 14.8 | 0.90 | **1.1** | 0.19 | 5.3 |
+
+Simulated figures at item level 50, from the test log: 133.9 items/h, 14.4
+Exceptional+, 0.87 Aberrant, 0.17 Anomalous.
+
+**Read against what it replaced:** 692 items/h became **134** (a 5.2x cut), and
+~17 Aberrants/h at *any* level became **zero below area level 25** and 0.90/h
+above it. Three Aberrants — O11's whole allowance — is about **3.3 hours** of
+on-level elite killing, and because a drop lands in one of eight random slots,
+three in *useful* slots is materially longer than that. That is the shape O11's
+cap wants.
+
+**A number to look at hard, flagged rather than hidden:** a legendary is 25% of
+an Anomalous drop in one of the three slots that has one, so **~57 hours per
+legendary** at area level 50. Against O4's 300-400 hours to a finished build
+that is defensible; for a vertical slice it is probably too long, and
+`LegendaryChanceWithinAnomalous` (0.25) is the single knob that moves it.
+
+### Coverage
+
+`RiorsEdge.Items.Drops.ChanceByRank` (the ordering is the design, and the roll
+measurably honours it), `.TrashCannotRollAberrant` (the gate checked
+**exhaustively** over the whole item level range plus 40k real rolls at ilvl 50
+with max Drop Chance — "fundamentally impossible" is the bar the owner set, and
+a gate that leaks one in ten thousand is not a gate), `.Determinism` (a seed
+reproduces the drop decision, the rarity and the item; and the chance step does
+not bias the rarity step), `.LootPerHour` (the sweep above).
+
+### Built against MaxItemLevel 50
+
+O29 was unmerged in this worktree: item level clamps to **50**, the tier ladder
+is T8..T-1 and `TierCapForRarity` is Standard T3 / Uncommon T1 / rest T-1. When
+O29's 120-level, T12..T-1 ladder lands, **the rarity gates want revisiting
+upward, not sideways** — a longer ladder makes each rarity step worth more, so
+the item-level unlocks (8 / 25 / 40) should scale with the new range and the two
+top weights should if anything fall again.
+
 ## Roll pipeline
 
 `UBreakerLootLibrary` implements steps 1-5 of the master-sheet pipeline,
-fully deterministic from a seed:
+fully deterministic from a seed. **Step 0 is now the drop pipeline above** —
+these five steps only run on a kill that has already passed the chance step and
+been given a gated rarity:
 
 1. `RollRarity` — weighted table; Drop Chance % drains weight out of Standard.
+   Superseded as the *content* entry point by
+   `UBreakerDropTableLibrary::RollDrop`; see the drop pipeline section.
 2. Affix count from the rarity range.
 3. Affix selection — slot-legal, weighted, no duplicates, max 4 prefixes and
    4 suffixes.
@@ -445,9 +608,13 @@ the day it lands rather than repeating this bug.
 
 ## Gym drops
 
-`ABreakerEnemy` grants a rolled item to the first player's backpack on death
-(`bDropsLoot`), seeded by spawn location and kill count. No pickup actor or
-inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
+`ABreakerEnemy::GrantLoot` runs the drop pipeline on death (`bDropsLoot`),
+seeded by spawn location and kill count: `RollDrop` first (most trash kills now
+return early and drop nothing), then the ordinary `RollItem`, then a ground
+pickup. The elite Exceptional floor survives the rewrite but is now *composed*
+with the gates rather than competing with them — it can only lift a drop to a
+rarity that drop's item level actually unlocks, so an elite in a level-3 area no
+longer produces an Exceptional out of nowhere.
 
 ## Also in this pass
 

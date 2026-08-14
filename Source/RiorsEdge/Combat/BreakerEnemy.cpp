@@ -14,6 +14,7 @@
 #include "EngineUtils.h"
 #include "Game/BreakerGameMode.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerDropTable.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Items/BreakerLootPickup.h"
 #include "Playtest/BreakerPlaytestComponent.h"
@@ -706,8 +707,31 @@ void ABreakerEnemy::GrantLoot()
 
     ++KillCount;
     const int32 Seed = HashCombine(GetTypeHash(GetActorLocation()), KillCount);
-    EBreakerItemRarity Rarity = UBreakerLootLibrary::RollRarity(Seed, Equipment->GetStats().DropChancePercent);
-    if (IsElite() && Rarity < EBreakerItemRarity::Exceptional) Rarity = EBreakerItemRarity::Exceptional;
+
+    // THE DROP PIPELINE (Items/BreakerDropTable.h). This used to be a bare
+    // RollRarity call, which meant every death produced an item and the flat
+    // rarity table was the whole system — the owner's playtest report from both
+    // ends. Now: a per-rank DROP CHANCE step runs first (most trash kills drop
+    // nothing at all), then the rarity is rolled against gates on drop item
+    // level and monster rank, so a low-level trash kill is structurally
+    // incapable of producing an Aberrant.
+    EBreakerItemRarity Rarity = EBreakerItemRarity::Standard;
+    if (!UBreakerDropTableLibrary::RollDrop(Seed, EnemyLevel, MonsterRank,
+        Equipment->GetStats().DropChancePercent, DropTable, Rarity))
+    {
+        return;
+    }
+
+    // The elite floor survives the rewrite. It is a FLOOR on an elite that has
+    // already decided to drop, not a second drop chance, so it composes with
+    // the gates rather than competing with them: an elite in a level-3 area
+    // still cannot exceed what its item level unlocks.
+    if (IsElite() && Rarity < EBreakerItemRarity::Exceptional
+        && UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity::Exceptional, EnemyLevel, MonsterRank, DropTable))
+    {
+        Rarity = EBreakerItemRarity::Exceptional;
+    }
+
     const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
 
