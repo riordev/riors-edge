@@ -58,6 +58,8 @@ Alternate Earth, ~2125. Materials are recognisable: steel, concrete, polymer, ba
 
 The reference axis is **field-repaired military hardware**, not sci-fi couture.
 
+**Composes with O24 — overgrown Earth.** Nature has reclaimed the ground: vegetation grows over and through the ruin, right alongside the field-repaired hardware this pillar already calls for. This is the environmental read for Anchors, rift approaches, and erased Earths alike — Pillar 2's industrial materials (steel, concrete, polymer) still dominate the object language, but the world itself is going green at the edges, with slight sci-fi styling and functional, weathered, out-of-place tech scattered through the growth. The two read together rather than in tension: Pillar 2 says what things are made of; O24 says what has happened to the ground they sit on.
+
 ### Pillar 3 — The rift is a colour, and only the rift gets it
 Reserve one narrow chroma band for rift-origin phenomena: rift portals, Vestige emissive, severance progression, Anomalous rarity. Everything else in the world sits in desaturated earth/steel/concrete. This makes rift material read as *foreign* without any writing.
 
@@ -774,7 +776,7 @@ Ranked by importance, because this drives what gets authored first:
 
 1. **Which slots are filled and which are empty.** Empty slots show the base bodysuit — visibly unarmoured, so the gap is obvious.
 2. **Rarity of each equipped item**, per §3.3's rarity treatment ladder. Anomalous must be unmistakable at a glance.
-3. **Equip-limit state** — Aberrant max 3, Anomalous max 1 (master sheet 4.1). The doll should carry a visible tell when the player is at their Aberrant limit, so the constraint feels like a decision rather than an error message.
+3. **Equip-limit state** — three separate axes, per O37 (was cited to the now-retired "master sheet 4.1"): Aberrant max 3, non-legendary Anomalous max 1, legendary max 1 — a legendary does not consume the Anomalous cap, so a player could hold one of each simultaneously. The doll should carry a visible tell when the player is at any of these limits, so the constraint feels like a decision rather than an error message.
 4. **Marquee affixes** — the Accuracy While Airborne stabiliser (§3.3) must be visible on the doll.
 
 ### 6.5 Acceptance criteria — paper-doll
