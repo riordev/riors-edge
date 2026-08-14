@@ -84,6 +84,32 @@ enum class EBreakerAggregatedAttribute : uint8
     // affix authors an Increased percentage OF THE REDUCTION; this is what the
     // ability cost path multiplies by.
     ResourceCostMultiplier,
+    // Class resource regenerated per second. Base 0; gear's Resource
+    // Regeneration affix bids Flat.
+    //
+    // It is on this path rather than being added by whoever happens to tick,
+    // and that is a correction rather than a nicety. Gear regeneration was
+    // ticked by the equipment component while the class loop ticked its own
+    // PassiveRegenPerSecond, so the two composed by simple addition with no
+    // shared bucket -- which was tolerable while regeneration was a trickle
+    // beneath an accumulating bank, and stopped being tolerable the moment the
+    // owner ruled that Mana starts FULL and DRAINS, making regeneration the
+    // Caster's primary recovery path.
+    //
+    // Two separate additions cannot express an Increased percentage: a future
+    // "Increased Resource Regeneration" line, or a Bulwark-style node, would
+    // have to pick ONE of the two sources to multiply. One bucket is the same
+    // rule damage and movement already follow, and the reason it is the rule
+    // is that gear-times-tree composition has now been found and fixed three
+    // times in this project.
+    //
+    // The class loops (Classes/) do not bid yet -- that file belongs to
+    // another lane -- so today the composed value equals gear's flat alone and
+    // live behaviour is bit-identical. The bucket exists so that when
+    // UBreakerManaComponent moves its 6/s in and deletes its own tick, the two
+    // are additive from day one instead of after the fourth instance of the
+    // bug.
+    ClassResourceRegen,
     Count
 };
 

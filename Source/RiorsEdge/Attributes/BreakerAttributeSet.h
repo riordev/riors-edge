@@ -88,6 +88,14 @@ public:
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ResourceCostMultiplier, Category="Resource") FGameplayAttributeData ResourceCostMultiplier;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ResourceCostMultiplier)
 
+    // Class resource regenerated per second. Base 0, so a character with no
+    // gear and no class loop regenerates nothing, exactly as before. THE one
+    // additive bucket every regeneration source bids into -- see the comment
+    // on EBreakerAggregatedAttribute::ClassResourceRegen for why addition by
+    // whoever ticks is not good enough.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ClassResourceRegen, Category="Resource") FGameplayAttributeData ClassResourceRegen;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, ClassResourceRegen)
+
     // --- Unified attribute application path -------------------------------
     // This attribute set is the ONE owner of the true base value for every
     // attribute in EBreakerAggregatedAttribute. Equipment and progression (and
@@ -175,6 +183,7 @@ protected:
     UFUNCTION() void OnRep_DashCooldownReduction(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_FireRateMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_ResourceCostMultiplier(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_ClassResourceRegen(const FGameplayAttributeData& OldValue) const;
 
 private:
     FBreakerAttributeAggregator Aggregator;

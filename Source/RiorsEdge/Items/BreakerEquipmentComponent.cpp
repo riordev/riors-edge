@@ -74,10 +74,9 @@ void UBreakerEquipmentComponent::HandleKillDealt(const FBreakerHitContext& Hit)
         // so the observable behaviour is identical to AddClassResource's
         // Min-against-Max, in a live game and in automation alike.
         //
-        // REPORTED, not worked around: the one-line fix is for
-        // UBreakerCombatComponent::AddClassResource (and SpendClassResource) to
-        // use ApplyClassResource too, which would make the whole class-resource
-        // path exercisable. That file belongs to another lane this pass.
+        // The matching fix in UBreakerCombatComponent::AddClassResource and
+        // SpendClassResource has since landed, so the whole class-resource path
+        // is now exercisable with no world.
         Attributes->ApplyClassResource(Attributes->GetClassResource() + CachedStats.ResourceOnKill);
     }
 }
@@ -105,10 +104,30 @@ void UBreakerEquipmentComponent::TickComponent(float DeltaTime, ELevelTick TickT
     // has to be rebuilt when the state changes. Cheap: the comparison is one
     // byte and the rebuild only runs on an actual transition.
     RefreshBuildConditions();
-    // Gear-granted resource regeneration; the class loop adds its own on top.
-    if (Attributes && GetOwner() && GetOwner()->HasAuthority() && CachedStats.ResourceRegenPerSecond > 0.0f)
+    // Resource regeneration, applied from the COMPOSED ClassResourceRegen
+    // attribute rather than from this component's own cached stat. Two changes,
+    // both of them corrections rather than features:
+    //
+    //  - It reads the shared bucket, so the day the class loops bid their
+    //    PassiveRegenPerSecond here instead of ticking it themselves, gear and
+    //    class regeneration are additive with no further work and an Increased
+    //    Regeneration line can multiply both. Today nothing else bids, so the
+    //    composed value equals gear's flat and behaviour is bit-identical.
+    //  - It writes through UBreakerAttributeSet::ApplyClassResource, not the
+    //    GAS-generated SetClassResource. The generated setter ensure()s when
+    //    there is no owning ability system, so a rig without one could not
+    //    observe the tick at all and the Resource Regeneration affix was the
+    //    last resource path unexercisable in automation. ApplyClassResource
+    //    routes through the same PreAttributeChange clamp -- [Floor, Max] --
+    //    so the live result is identical, including Overcast's negative floor
+    //    which the old Min-against-Max here did not even know about.
+    if (Attributes && GetOwner() && GetOwner()->HasAuthority())
     {
-        Attributes->SetClassResource(FMath::Min(Attributes->GetMaxClassResource(), Attributes->GetClassResource() + CachedStats.ResourceRegenPerSecond * DeltaTime));
+        const float RegenPerSecond = Attributes->GetClassResourceRegen();
+        if (RegenPerSecond > 0.0f)
+        {
+            Attributes->ApplyClassResource(Attributes->GetClassResource() + RegenPerSecond * DeltaTime);
+        }
     }
 }
 
@@ -765,6 +784,21 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // the same additive bucket rather than beside it.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier,
             IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DamageOverTime)]);
+
+        // Resource Regeneration, bid FLAT into the one regeneration bucket.
+        // Bid from Stats rather than from FlatByTarget because Overrun's rule
+        // rewrite (triple while traversing, zero otherwise) has already been
+        // applied to Stats by this point, and a per-ITEM rule must resolve
+        // before the shared bucket sees the number -- exactly as the tier
+        // uplift does.
+        //
+        // Before this the equipment component ticked the resource itself while
+        // the class loop ticked its own PassiveRegenPerSecond, so gear regen and
+        // class regen composed by bare addition in two different files. See
+        // EBreakerAggregatedAttribute::ClassResourceRegen for why that had to
+        // stop now that Mana starts full and drains.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::ClassResourceRegen,
+            Stats.ResourceRegenPerSecond);
 
         // Life on Kill and Resource on Kill submit NOTHING here on purpose.
         // They are amounts paid at an event, not values an attribute can hold,
