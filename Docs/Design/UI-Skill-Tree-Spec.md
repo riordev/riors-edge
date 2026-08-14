@@ -12,7 +12,9 @@ Owner-authored design canvas, transcribed from `Skill Tree v2.dc.html` on
   points gold rail, each showing unspent large and `/ N spent` beneath — and
   respec at the far right in the discard style.
 - **Board** 1500×936 fills the rest, with a 60px branch header strip above the
-  path field.
+  path field. The board is a **viewport**: it draws at its full authored size
+  and is zoomed and panned inside that frame, never scrolled. See the
+  2026-08-14 zoom/pan section.
 - **Detail rail** is a fixed 420px column so node cards never reflow when it
   populates.
 - **Footer** 1920×56 carries the input legend (`LMB BUY 1 RANK · HOVER FULL
@@ -49,7 +51,9 @@ never land on node copy. Minor and Notable nodes label beneath the marker in a
 trunk never runs through their text. Nodes are the markers themselves — 48px
 square for multi-rank Minors with the rank inside, 44px diamond for Notables,
 64px square for Convergences, 60px diamond for Keystones — and their name,
-number, and state sit as plain text beneath, not inside a card.
+number, and state sit as plain text beneath, not inside a card. Those four
+figures are a **floor**: a marker grows from the measured width of the text it
+carries, so a `10/10` rank never clips (2026-08-14).
 
 **Core** is spatial: five clusters positioned around Kinesis as the hub, linked
 by convergence lines, each cluster showing its node grid at a glance with a
@@ -235,6 +239,122 @@ Still not verified or not fixed:
   against the next column. It scrolls horizontally and nothing actually
   overlaps, so it was left as-is.
 - Motion (panel transition, purchase-confirm snap) is still unimplemented.
+
+## Implementation status (2026-08-14, the zoom/pan + clipped-number pass)
+
+Owner playtest, verbatim: *"some numbers in the tree aren't showing. Scrolling
+in the tree is off by a little bit — you should be able to zoom in and out and
+drag the menu itself."*
+
+### The rank numbers were not clipped by the marker. They were never given it.
+
+The board was photographed and the pixels measured before anything was
+changed, and the marker was innocent: a 48px Minor has **40px of content area
+holding 20px of text**. The defect is one layer in:
+
+- A marker is `BorderWrap(SButton[ text ])`, and `SButton` aligns its content
+  `HAlign_Center`. In Slate, centring arranges the child at exactly its own
+  **desired** width — never at the width available.
+- An `STextBlock`'s desired width is its **measured** width, and Slate then
+  clips the drawn run to that same box (the default `ETextOverflowPolicy`).
+- Measuring a string and rasterising it round independently. A run that lands
+  a fraction wider than its measurement loses the right edge of its last
+  glyph. Two identical `0/2` markers at different fractional X positions
+  therefore disagreed — one clipped, one did not, which is exactly what the
+  captures showed.
+
+That is also what the Core chips were doing at 30px, where the previous pass
+read it as "the box is too small" and moved the box to 36. The box was never
+the constraint; 36 changed the fractional offsets and the symptom went away.
+
+The fix is two halves, and both are arithmetic on numbers known before layout
+runs (`FSlateFontMeasure` on a string and a font — the sanctioned pattern,
+never `SWrapBox`/`UseAllottedSize`):
+
+1. `MakeMarkerLabel` arranges the text in a measured box with 4px of slack and
+   centres the run by **justification**, so the overflow clip has nothing to
+   cut.
+2. `MarkerSizeForLabel` sizes the marker from the same measurement plus the
+   ring and the button's own 2px style padding, so the box it needs always
+   fits. The spec's 48 / 44 / 64 / 60 are now a **floor**, not a fixed size —
+   a `10/10` marker grows rather than clipping, and two markers of the same
+   kind can differ by 4px because a 2px purchasable ring eats more than a 1px
+   locked one.
+
+Every marker kind goes through that one rule: Minor squares, Notable and
+Keystone diamonds, Convergence squares, and the Core cluster chips, whose size
+is now derived from the widest rank string on the map instead of a constant.
+
+**The tier gutter is measured the same way.** The owner's `AT 2` / `AT 4` was
+the 76px gutter against `OPENS AT n`; the previous pass widened it to 104 by
+hand. It is now derived from the longest sentence the board will actually
+print, so a tier gating at 120 costs a board whose gates are single digits
+nothing.
+
+### The board is a viewport, not two scroll boxes
+
+The class and Core boards each sat in a horizontal `SScrollBox` nested inside a
+vertical one. Two scroll boxes on one surface fight over the same wheel
+gesture, which is the likeliest reading of "scrolling is off by a little bit".
+Both are gone, replaced by `SBreakerBoardViewport` — one way for a board to
+move, on both boards.
+
+What a player does:
+
+| Gesture | Result |
+| --- | --- |
+| Mouse wheel | Zooms **about the cursor**, 1.15x a notch, clamped 0.5x–2.0x |
+| Left-drag on empty board | Pans. A press only reaches the viewport when no marker took it, so a left-click on a marker still buys |
+| Middle-drag | Pans, anywhere |
+| `−` / `+` / `RESET VIEW` | A `VIEW` row above the board, because a gesture nobody knows about is not a feature and a trackpad without a wheel still has to zoom |
+
+How it avoids the two patterns this project has been bitten by:
+
+- The board is laid out **once**, at its full authored pixel size, by
+  `OnArrangeChildren` handing the child exactly `BoardSize` regardless of the
+  room available. Nothing measures its own arrangement, so there is no layout
+  feedback loop.
+- Zoom and pan are a **render transform** on that already-arranged child, set
+  imperatively from the input handlers. No widget is rebuilt, no attribute is
+  polled per frame, and no text is re-laid-out at a new size.
+- Pan is clamped so an edge can never be dragged past the window, so the board
+  cannot be flung somewhere it cannot be found.
+- Zoom and pan are held on `SBreakerMenu` and survive the rebuild a purchase
+  causes; they reset deliberately when the board itself changes (branch chip,
+  CLASS/CORE tab), because a pan that made sense on one branch means nothing
+  on another.
+- The detail rail is a sibling column of fixed width, and the viewport reports
+  a desired size of **zero**, so it cannot push or resize the rail.
+  `BuildZonedFrame` gained a `bFillHeight` flag for exactly that reason: a
+  plate that shrink-wrapped a zero-height viewport collapsed to the height of
+  the branch strip. The loadout still shrink-wraps.
+
+**Boards open at 1:1.** Fit-to-width was implemented, photographed and
+reverted: COMPARE ALL is ~2600px of board in a ~1300px column, so fitting it
+means 0.5x, and 0.5x of the 11px caption floor is 5px of unreadable type
+against FIELDPLATE 02. Zooming out for bearings stays available as a
+deliberate act.
+
+### Verified by looking, and what was not
+
+Captured at 1920x1080 and READ: `BRANCH0` (Swift — Frenzy), `BRANCH2`
+(Swift — Marksman), `COMPARE`, and `CORE`. On every one, the rank glyph runs
+were also measured out of the PNG rather than eyeballed: three complete runs
+per `0/2` marker with equal margins either side, and complete single digits in
+every Core chip. **No number is clipped on any board.** The tier gutter reads
+`TIER n` / `OPENS AT n` in full. 206 automation tests pass.
+
+**Zoom and pan are NOT visually verified, and cannot be.** The capture harness
+cannot move a mouse, so no wheel event, no drag, and no cursor-anchored zoom
+has ever been executed against this code — only the resting state at 1:1 has
+been seen. The same limit still covers everything hover-driven: the detail
+rail, the before/after projection, and the marker hover states remain
+unphotographed. Nothing here is playtested.
+
+Unchanged from the pass below: the Core map's `UNMAPPED` cluster still holds
+six nodes authored outside the five `Core.<Constellation>.` prefixes (content
+naming in `Progression/`, not a UI fix), and motion — panel transition and the
+purchase-confirm snap — is still unimplemented.
 
 ## Layout fixes, 2026-08-13 (the "numbers clip / clunky" pass)
 
