@@ -146,7 +146,34 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - MOVEMENT WEIGHT PASS (owner: "movement should be less floaty"): the jump arc is now asymmetric and the character has landing consequence. `GravityScale` 1.35 -> 1.60, a continuous gravity curve (`ApexGravityMultiplier` 1.50 at the apex, `FallGravityMultiplier` 1.80 once falling) applied inside `NewFallVelocity`, a 2400 cm/s terminal velocity, variable jump height (release cuts the rise to 55%, driven by `JumpHoldWindow` written onto `ACharacter::JumpMaxHoldTime` at BeginPlay with the engine's hold-to-rise suppressed in `DoJump`), a landing horizontal-speed ramp in `ProcessLanded` with an `OnLandingImpact` presentation delegate, and quicker ground stops (braking 1800 -> 2400, friction 7.5 -> 8.5). No verb changed. Wall ride is exempt from the fall curve; dash clears the cut; a queued slide is exempt from the landing cost. Jump impulse, air control and air steer rate are deliberately unchanged. All values are `EditAnywhere` under the **Weight** category with old values in comments; the before/after table, the revert list and the tuning order live in `Docs/Movement-Design.md`. NOT PLAYTESTED — automation and arithmetic only.
 - Save/resume exists: `UBreakerSaveGame` (slot `BreakerSave0`) stores progression state, equipped items, backpack, and weapon slot archetypes; autoloaded in character BeginPlay, autosaved in EndPlay and on class lock.
 - Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
-- The gym encounter includes one elite (`ConfigureElite`): 1.5x scale, tripled health, doubled damage, drops never below Exceptional.
+- MONSTERS ARE CONTENT-SCALED (O27, `Docs/Design/Power-Curve.md` §2). Before
+  this, `EnemyLevel` drove nothing but loot item level and health was the
+  literal constant `SetMaxHealth(220.0f)` at every level, so the player's 3-5x
+  power growth landed on an enemy identical at level 1 and level 50.
+  `Source/RiorsEdge/Combat/BreakerMonsterChassis.{h,cpp}` is the curve:
+  `Health(AL) = BaseHealth * (1+g)^(AL-1) * Rank * Archetype`, same shape for
+  damage, with `g` 0.09 (x68 over 50 levels) and `d` 0.055 (x14 — incoming
+  damage MUST scale materially slower than health or every build becomes a
+  defensive build). It is pure world-free maths in the precedent of
+  `BreakerRangedBehavior.h`, so it is unit-testable and readable by tools with
+  no actor, and it is STRUCTURALLY incapable of reading the player — which is
+  the failure mode O27 exists to forbid. Rank MULTIPLIES the chassis: elite
+  x3.0/x1.5, modifier-bearing x2.5/x1.25, boss x25/x2.0, all derived from
+  O18's TTK targets rather than guessed. `ConfigureElite`'s hardcoded 440
+  health and `*= 1.5f` damage are folded into that table (one source of truth
+  for what an elite is) and `bIsElite` is gone — rank IS the flag. The Lattice
+  ranged archetype now takes Encounter-Design 2.2's 1.6x through the same
+  composition. Area level is authored on the CONTENT: `AreaLevel` on the enemy
+  (1-100, deliberately past the character cap of 50) and `GymAreaLevel` /
+  `AreaLevelPerWave` on the game mode, both EditAnywhere, so a playtest walks
+  the curve by turning a number up. `EnemyLevel` still drives loot item level
+  and now follows area level (clamped 50). Every constant is O2 PLACEHOLDER.
+  CAUTION: this is one half of a ratio. For an UNCHANGED player, trash TTK is
+  1.81s at area level 1, 3.93s at 10 and 9.3s at 20; the other half is the
+  weapon base-damage-by-item-level curve (Power-Curve §3, NOT built here). Set
+  `GymAreaLevel = 1` to recover today's exact feel until that lands.
+- The gym encounter includes one elite (`ConfigureElite`): 1.25x scale, the
+  elite rank chassis, slower implacable advance, drops never below Exceptional.
 - Inventory backpack sorts best-rarity-first with per-slot filter chips and auto-height cards.
 - Weapons have a mechanical feel layer (`Weapons/BreakerWeaponFeel.h`, pure maths so it is unit-testable): per-archetype recoil with a learnable pattern and a settle that lands on exactly zero, player compensation credited against the recovery budget, ADS tightening four axes, first-shot accuracy with bloom, and a substepped viewmodel spring. The round goes where the crosshair was when fired; the kick moves the aim for the NEXT one, and that invariant is tested. Weak points carry a world-space forgiveness halo (`WeakPointToleranceCm`, 14 cm) after a geometry bug left the bottom of the head unhittable from the front. Falloff is softened per archetype with the ORDERING pinned by test rather than the values. ADS pays aim-in time and a movement spread penalty, so hip fire is the mobile close option rather than strictly worse; it has no ADS movement-speed penalty yet because `Movement/` has no aim awareness.
 - `ABreakerRangedEnemy` (LATTICE) holds a 9-19 m band, strafes while firing, has no contact attack, and throws a real replicated projectile at 1100 cm/s against a 950 cm/s sprint with a 0.85 s telegraph and 0.35 lead — enough that holding a lane is punished and any direction change beats it. It SUBCLASSES `ABreakerEnemy`, so loot, waves, health bars and TTK sampling work unchanged; it declares itself through `IsRangedForTelemetry()` so its kills get their own TTK bucket instead of polluting the melee average.
@@ -158,7 +185,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 104-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 107-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -190,7 +217,7 @@ Source/RiorsEdge/
   Playtest/       Instrumentation + report (TTK vs O18 targets)
   Progression/    Trees/nodes, fallback content, purchase/respec, node effects
   Save/           UBreakerSaveGame (slot BreakerSave0)
-  Tests/          95 automation tests (RiorsEdge.* filter)
+  Tests/          107 automation tests (RiorsEdge.* filter)
   UI/             SBreakerMenu (all screens) + ABreakerPlaytestHUD (canvas)
 ```
 
@@ -257,18 +284,16 @@ grants) gate on the DEV checkbox on the BREAKER CLASS screen.
 
 Next actions, in priority order:
 
-1. **AWAITING OWNER RULING — TTK re-anchor.** Session 5 is the strongest
-   sample yet and it splits: **elite 3.01s is ON TARGET**; melee trash
-   **1.81s vs <1s** is ~1.8x slow (34 kills, engagement-gapped, ranged
-   separated out). The correction is one ratio: trash health ~220 -> ~120,
-   or an equivalent damage raise. Health is the better lever — it leaves
-   weapon damage free as the gear/tree tuning surface. Two riders when the
-   ruling lands: set `WeakPointToleranceCm = 0` for the measuring run (the
-   new forgiveness halo adds 8-14% damage per hit at a 50-60% weak-point
-   rate), and apply Encounter-Design 2.2's 1.6x to the ranged archetype,
-   which deliberately ships at the base 220 chassis. The ranged/melee bucket
-   mixing noted last session is FIXED — the report now splits melee, ranged
-   and elite.
+1. **RULED (O27) and half-built — the power curve.** The TTK re-anchor is no
+   longer a single retune: monster health is a curve in AREA level and the
+   target is stated for a baseline build in on-level content. The monster
+   chassis half is BUILT (see above); Encounter-Design 2.2's 1.6x is applied
+   to the Lattice. **The other half is `WeaponBase(ilvl)` (Power-Curve §3) and
+   until it lands the two curves do not compose** — an unchanged player at
+   `GymAreaLevel = 10` sees 3.93s trash, not 1.81s. Still true for a measuring
+   run: set `WeakPointToleranceCm = 0` (the forgiveness halo adds 8-14% damage
+   per hit at a 50-60% weak-point rate). The ranged/melee bucket mixing noted
+   in session 5 is FIXED — the report splits melee, ranged and elite.
 2. **Assets are now the binding constraint on feel, not code.** In order of
    how much they block: AUDIO (nothing exists — recoil, bloom and viewmodel
    kick are all built and land on silence); the three OFL faces (Saira
