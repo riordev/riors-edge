@@ -1,6 +1,38 @@
 # Class Kit — GUNSMITH (Scrap) — full treatment
 
-Status: design draft, authored to the depth of Class-Kits §1 (Swift) and §2 (Caster).
+**Last reconciled against: O32** (2026-08-14).
+
+> ## NOTHING IN THIS DOCUMENT IS BUILT. Not one line of it reaches a player.
+>
+> Verified against the code on 2026-08-14, because a full-depth treatment reads
+> like a specification and this one is not yet one:
+>
+> - **The Gunsmith is selectable and grants nothing.**
+>   `UBreakerProgressionLibrary::GetFallbackClassDefinition` returns `nullptr`
+>   for every class but Swift, so a locked Gunsmith has no class definition, no
+>   starting abilities, no ultimate and no branch trees.
+> - **No Gunsmith tree exists.** `GetAllFallbackTrees` returns exactly four:
+>   the Core slice and Swift's Frenzy, Kinetic and Marksman.
+> - **No Gunsmith ability exists.** The ability fallback registry carries Swift
+>   and Caster only.
+> - **The Scrap loop does not exist.** `Source/RiorsEdge/Classes/` contains two
+>   components — Momentum (Swift) and Mana (Caster). There is no Scrap
+>   component and `ClassResource` is inert for a Gunsmith.
+> - **Deployables and minions do not exist in any form** — no component, no
+>   actor, no density cap, no lifetime, no targeting. **O30 records this
+>   explicitly**: *"minions/deployables do not exist in any form. The Gunsmith
+>   kit designs them; nothing is built."*
+>
+> **That last point makes this document unusually important and unusually
+> exposed.** **O30** puts MINIONS — drones, turrets, deployables — on the Core
+> tree's build-axis taxonomy alongside GUNS and ABILITIES, and **this document
+> is the only place in the entire corpus that designs them.** So the minion axis
+> O30 asks the Core tree to be organised around has its design here and its
+> implementation nowhere, and `Core-Tree-Redesign.md` costs it as the single
+> most expensive part of the redesign. Nothing here should be trusted as
+> validated; everything here should be read as the standing proposal.
+
+Status: design draft, **UNBUILT** (see above), authored to the depth of Class-Kits §1 (Swift) and §2 (Caster).
 This document **extends** Class-Kits §3's one-page Gunsmith treatment. It does not
 contradict it: §3's resource table, anti-farm rules, density cap, branch identities, six
 abilities, ultimate, keystone names, and acceptance criteria are all carried forward
@@ -21,6 +53,27 @@ one per branch). O11 (Aberrant signatures may not author a More). O13 (self-dama
 reduction, never immunity). O18 (seed targets). O19 (elements are Rift / Entropy / Void).
 Layer-Ownership (**no node in this document is a flat percentage** — every node is a rule
 rewrite or a resource-loop modifier; percentages belong to the affix layer).
+
+**Three later rulings this document has not been written against.**
+
+- **O28.** `Master-Sheet-Import.txt` is **superseded** and has lost its standing
+  — historical source material, never authority. Every "Master N.N" citation
+  below records provenance, not law. The chain is `Decisions.md` ->
+  `Design-Overview.md` (map) -> this document.
+- **O30.** The minion axis is this document's, and it is unimplemented (see the
+  banner). One structural consequence beyond that: **`EBreakerBuildCondition`
+  is movement-only**, so no node anywhere — Core or class — can key off combat
+  or status state. Several Field Tech and Tinkerer nodes below assume a
+  deployable-state condition exists. It does not, in any form.
+- **O31.** Every build must be able to make an impact; no encounter may have a
+  build that cannot participate. **The Gunsmith is the class most exposed to
+  this**, because it is the game's one *pre-commitment* class: its power is
+  placed before contact. An encounter that moves the fight, denies placement
+  time, or destroys deployables faster than they pay for themselves does not
+  weaken a Field Tech build — it deletes it. **Armory exists partly as the
+  answer** (§0: "you were never committed; your power was on your gun the
+  whole time"), and under O31 that stops being a flavour distinction and
+  becomes the class's participation floor. Recorded, not designed against.
 
 **Engineering home.** `Docs/Design/Ability-Implementation-Spec.md` — D1 (tag-driven
 keystone ultimate variants), D2 (ability archetype hierarchy), D3 (cost/cooldown as
