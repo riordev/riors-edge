@@ -1,5 +1,30 @@
 # Core Constellations — six universal trees authored, FIVE shipping
 
+Last reconciled against: O31
+
+> **O30 — THIS DOCUMENT IS OPEN TO REDESIGN, AND IT ALREADY DISAGREES WITH THE
+> CODE.** O30 puts the Core tree up for reorganisation around build axes rather
+> than fantasies. The scouting pass, its costs, and the recommended structure
+> are in **`Docs/Design/Core-Tree-Redesign.md`** — read it before authoring
+> anything here.
+>
+> Two facts that document establishes and this one does not yet reflect:
+>
+> 1. **The live roster is seven clusters and 24 nodes, not six of eleven.** A
+>    **VELOCITY** constellation of six movement-conditional nodes was added
+>    under O27 and is not described anywhere in this document. It is the only
+>    cluster already organised the way O30 wants the tree organised, and it is
+>    currently drawn in the skill board's `UNMAPPED` catch-all because
+>    `Core.Velocity.` is not one of the six prefixes the UI knows.
+> 2. **No constellation is authored at the 11-node/26-point size this document
+>    specifies.** Affliction has two live nodes; Bulwark has three. The §2.2
+>    budget arithmetic — and the "at most two keystones, ever" conclusion that
+>    rests on it — is a statement about a tree that does not exist yet. It is
+>    still the right target; it is not a description of the current build.
+>
+> Nothing below is retracted. The redesign document costs the options; it does
+> not rule between them.
+
 Status: design pass 1, propagated against `Docs/Design/Decisions.md` (O1–O23, law). Values are placeholder and must be re-anchored after the Playtest Gym TTK pass, consistent with Affixes §3 ("ALL VALUES ARE PLACEHOLDER"). **Per O2, no value in this document may be re-authored until wave-mode instrumentation reports.** Nodes whose cost basis was invalidated by O1 are tagged **NEEDS-RECOST [O1/O2]** and carry their frozen original values until then; **per O20 the subset whose *trigger* O1 deleted is split into a separate REDESIGN [O20] bucket** (§11) — those cannot be closed by any number. **O18's TTK/TTD seed targets are the validation reference for that eventual tuning pass (§10.3, criterion 16).**
 
 Scope: the six universal Core Tree constellations spent with Core Points — Precision, Volley, Affliction, Elements, Bulwark, Kinesis. Class trees and affixes are out of scope and are governed by `Docs/Layer-Ownership.md`.
