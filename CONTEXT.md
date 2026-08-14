@@ -12,7 +12,7 @@ The current character concept proposes five classes—Caster, Swift, Gunsmith, T
 
 Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge; the level cap is 50 with a hard stop and no post-cap power progression, so all endgame character power comes from gear; dash, slide, wall ride, block, and dodge are all base kit, with trees improving them rather than unlocking them; TWO JUMPS are base kit for everyone and Swift innately unlocks a third later (O25, superseding the earlier air-jump-is-tree-granted line), leaving parry as the only tree-granted verb. Movement is a big part of the game but is NOT the centre of the design and gets no further dedicated passes for now (O26).
 
-## Current milestone and next actions (updated 2026-08-13)
+## Current milestone and next actions (updated 2026-08-14)
 
 Current milestone: **Vertical-slice systems — Swift playable end-to-end**.
 Movement gym, combat sandbox, loot loop, and the progression framework are
@@ -27,15 +27,33 @@ F2 copy report (includes engagement-gapped TTK vs O18 targets), F3
 diagnostics, 1/2 weapon slots. Dev tools (class swap, test gear, point
 grants) gate on the DEV checkbox on the BREAKER CLASS screen.
 
-**In flight right now** (four parallel agent lanes, unmerged worktree
-branches — do not start these): the movement lane (Swift's third jump per O25,
-the gear x tree additive conformance, the orphaned MoveSpeed attribute); the
-progression-content lane (Swift's Frenzy branch, the Elements constellation);
-the combat-systems lane (damage zones, a shared player projectile base, status
-consumption, healing through the damage contract, and the Caster abilities that
-need them); and the weapons lane (per-pellet shot impacts and the shotgun
-tracer, more archetypes, the weapons half of the ADS trade). Items 3, 4 and 6
-below are partly claimed by that wave.
+**THE PROJECT CAN NOW LOOK AT ITSELF, and that is the most important
+change of the last session.** `-BreakerAutoPlay -BreakerScreenshots=N` captures
+frames and quits; `-BreakerCaptureMenu=<SCREEN>` opens the front end on a named
+screen first (`SKILLTREES`, `INVENTORY`, `LOADOUT`, `SETTINGS`, `CLASS`,
+`PAUSE`), `-BreakerCaptureBoard` picks a skill board, `-BreakerCaptureTour`
+points at field vantages, and `-BreakerCycleWeapons=<seconds>` walks the
+viewmodel through all eight archetypes. Shots land in `Saved/Screenshots`.
+Capture runs on a CORE ticker, not a world timer, because opening a menu pauses
+the world and the first version photographed nothing while logging success.
+
+**USE IT. Every agent doing visual work is expected to read its own
+screenshots.** Automation proves arithmetic and cannot see a layout. In one
+session, looking found: the first-person arms rendering entirely OFFSCREEN
+(y=1283 on a 1080 viewport); the template level being a SEALED 40 m courtyard
+with the whole runtime field stranded outside it and built 212 cm too high; the
+HUD reading `MOMENTUMSETTLED`; a keystone marker drawing as a black hole; the
+loadout clipping its own weapon names; and the class screen dimming all five
+class names to unreadable. Every one of those had shipped with a green suite.
+
+**In flight right now** (unmerged worktree branches — do not start these): the
+`Game/` + `Playtest/` integration lane (spawning the modifiers, Warden,
+Skirmisher and boss that exist but reach no field; the wave budget solver; TTK
+buckets for boss and modifier kills); the `Save/` + `Interaction/` lane (the
+quest-flag data-loss bug, gated dialogue, a quest object as a layer over
+flags, save versioning); and the `Combat/` + `Abilities/` lane (the
+class-resource testability bug, player-chosen ability loadout, and Caster's
+remaining branch content).
 
 Next actions, in priority order:
 
@@ -95,44 +113,63 @@ Next actions, in priority order:
      (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
      page, which gates Damage-Pipeline sign-off and also decides whether
      recoil should be client-predicted; the held items in Decisions.md.
-4. **Content gaps that are content, not code:**
-   - Swift's FRENZY branch and the ELEMENTS constellation are now AUTHORED
-     (10 and 6 nodes). Frenzy carries the Redline condition, which gives the
-     three Swift branches three distinct conditions — airborne/wall/slide,
-     unconditional, Redline — so the branch strip is a choice rather than a
-     preference. Every Class-Kits §1.3 node is a Momentum-LOOP rewrite and the
-     loop is not a node stat target, so each ships the doc rule as a tag plus
-     an authored stat line; §1.3.1 tabulates which half is which.
+4. **Content that now EXISTS but does not yet reach a player:**
+   - **Ten enemy modifiers, three new archetypes and a boss are built and
+     spawn nowhere.** `Combat/BreakerEnemyModifiers.h` and
+     `BreakerModifierComponent`, `ABreakerWardenEnemy`,
+     `ABreakerSkirmisherEnemy` and `ABreakerBossEnemy` (THE FIELD MARSHAL) are
+     all implemented and tested; the agent that built them correctly refused
+     to reach into `Game/`. Until they are spawned, O27's "difficulty lives in
+     modifiers, not trash health" is unimplemented in practice. The Skirmisher
+     has a placement REQUIREMENT, not a preference: it must spawn near cover,
+     because in the open it degrades to a plain shooter and is the only enemy
+     that breaks line of sight.
+   - **Three legendaries, four Anomalous rule rewrites and the Forge's three
+     crafting verbs have no UI.** They are Blueprint/console/automation
+     reachable only, and the crafting wallet is not in `UBreakerSaveGame`.
+   - Caster has six abilities implemented and three keys, so only one of five
+     class abilities is reachable at a time; the loadout is a hardcoded
+     fallback table rather than a player choice.
+   - Swift's FRENZY branch and the ELEMENTS constellation are AUTHORED. The
+     three Swift branches now carry three distinct conditions - airborne/wall/
+     slide, unconditional, Redline - so the branch strip is a choice rather
+     than a preference.
    - **`EBreakerBuildCondition` is movement-only, and that has now blocked
-     content twice.** It cost Elements its More multiplier (the only
-     authorable form would have been an unconditional generalist strictly
-     better than Fixate and Barrage) and it is why no node can key off combat
-     or status state. Widening it is cheap and unblocks a whole axis.
-   - **Elements is pre-resistance and therefore overlaps Affliction.** There
-     is no resistance stat, no buildup track and no reaction matrix, so its
-     nodes pay in DoT and damage with the elemental rule carried as a tag.
-     E10 Resonance is deliberately unauthored: with no elements in the
-     pipeline its restriction half cannot exist, so it could only ship as
-     pure upside.
-   - Caster's Rot / Siphon / Fracture / Resonance need Combat/ systems that
-     do not exist (zones, partial healing, a projectile base, status
-     consumption). Overdrive keystone branch stubs and the inert node tags
-     (ledger in `BreakerAbilityStateComponent.h`). NOTE: node tags now publish
-     to the ASC as diffed loose tags, so Bloodrhythm is the first branch
-     keystone whose ultimate rewrite actually resolves; Overpressure and
-     Culling still carry no keystone tag, leaving Terminal Velocity and
-     Standing Wave unreachable.
-5. **Real gym map authored in-editor.** The stock First Person template
-   geometry still crowds the runtime-spawned field, and the owner has now
-   twice reported that the SPACE reads wrong ("walk speed feels weird but i
-   think its a map scope issue"). Editor work.
-6. **Known smaller gaps, each recorded at the code:** the shotgun draws no
-   tracer because `FBreakerShotResult` carries one impact for a whole spread
-   (per-pellet impacts are a weapon-contract change); ADS has no movement
-   SPEED penalty because `Movement/` has no aim awareness, which is the
-   other half of the hip/ADS trade; `DevForceClass` keeps a stale
-   `ClassDefinition` after a dev swap; Slate panel-transition and
-   purchase-confirm motion are unimplemented.
+     content twice.** It cost Elements its More multiplier and it is why no
+     node can key off combat or status state. Widening it is cheap and
+     unblocks a whole axis.
+   - The Caster branch TREES are still unauthored, and the Gunsmith / Tank /
+     Support kits exist only as design docs, so three of the five selectable
+     classes grant nothing.
+5. **Editor work only the owner can do**, now that the space has been
+   measured and the reason it read wrong is known. `Lvl_FirstPerson` is a
+   SEALED 4000x4000 cm courtyard with no doorway; sprint crosses it in 3.64 s
+   against a 4.0 s dash cooldown, so the dash was structurally incapable of
+   being a traversal verb, and the entire runtime field was being built 212 cm
+   above the real floor. The runtime side is fixed (the ground plane is probed
+   now, and a breach ramp exits the box). The editor side is not:
+   - **Delete the seal**: `SM_Cube2/3/4/5` and `SM_Cube17/18/19/20`. Highest
+     value edit available in the level layer. Replace with one compound wall
+     carrying a single mouth of at least 1100 cm, then set
+     `bSpawnBreachRamp` false or keep the embankment as O24 ruin.
+   - **Delete the crowding**: `SM_Cylinder2-9`, the twelve corner fillets, and
+     `SM_Ramp`..`SM_Ramp8` - the yellow shapes filling the spawn view.
+   - **Set a Kill Z** in World Settings to spawn minus 4000, so the engine and
+     the 40 m gameplay reset agree. None exists today.
+   - Decide the central plinth: keep it as a 210 cm spawn dais (the frame
+     handles it) or delete it and drop the PlayerStart to about z 100.
+   - The floor material is a courtyard-scale checker that reads as graph paper
+     over 250 m.
+   Full derivation, the "what makes movement feel BAD" table, and the delete
+   list are in `Docs/Design/Level-Design.md`.
+6. **Known smaller gaps, each recorded at the code:** `DevForceClass` keeps a
+   stale `ClassDefinition` after a dev swap; Slate panel-transition and
+   purchase-confirm motion are unimplemented; the Core map's UNMAPPED cluster
+   holds six nodes authored outside the five `Core.<Constellation>.` prefixes;
+   Bloodrhythm's `bCornerstone` is unset in content (the READ was fixed, not
+   the data); hover states across the whole front end are unphotographed
+   because the harness cannot move a mouse, so node detail cards, the
+   before/after projection and the discard modal remain unseen.
 
 ## Canonical project
 
