@@ -155,6 +155,24 @@ struct RIORSEDGE_API FBreakerDropTableParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Gates", meta=(ClampMin="1"))
     int32 AnomalousMinimumItemLevel = 40;   // O2 PLACEHOLDER
 
+    // NOTE ON O29, recorded rather than acted on. These three unlocks were
+    // derived against the old 1-50 item level range, and O29 took item level to
+    // 120. The obvious move is to scale them proportionally (8/25/40 becomes
+    // roughly 19/60/96) and it is very probably WRONG.
+    //
+    // Item level tracks AREA level, and the campaign is area levels 1-50; the
+    // endgame is 50-100. Scaling proportionally would put Aberrant at ilvl 60
+    // and Anomalous at 96, so a player would finish the entire campaign having
+    // never seen either rarity - the ladder would be introduced only after the
+    // content that teaches it. These gates pace the player's INTRODUCTION to
+    // rarity, and that introduction still happens across 1-50 regardless of how
+    // far the tier ladder now runs.
+    //
+    // What O29 does argue for is the top two WEIGHTS falling again, because a
+    // longer tier ladder makes each rarity worth more than it was. That is a
+    // tuning question with a measurable answer (the hours-per-Aberrant figure
+    // in the projection) and it wants a playtest, not a guess.
+
     // Exceptional is deliberately reachable from trash: something has to be
     // worth picking up off an ordinary kill, or the 10% trash drop is 10% of
     // nothing and the player stops looking at the floor.
