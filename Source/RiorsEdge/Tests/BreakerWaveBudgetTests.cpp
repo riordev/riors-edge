@@ -180,8 +180,15 @@ bool FBreakerWaveBudgetCollisionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Early waves spend everything"), ELib::SolveWave(1, 1, Params).UnspentBudget, 0);
     TestTrue(TEXT("Late waves cannot spend their budget under the 5.3 caps"),
         ELib::SolveWave(20, 1, Params).UnspentBudget > 0);
+    // Compared between two STANDARD waves. Wave 30 is a rest wave and takes
+    // half budget, so it has LESS to leave unspent than wave 20 — which is the
+    // rest wave working, not the shortfall shrinking, and is worth stating
+    // because the first version of this assertion compared against it and
+    // failed for exactly that reason.
     TestTrue(TEXT("The shortfall grows with the wave"),
-        ELib::SolveWave(30, 1, Params).UnspentBudget >= ELib::SolveWave(20, 1, Params).UnspentBudget);
+        ELib::SolveWave(26, 1, Params).UnspentBudget >= ELib::SolveWave(20, 1, Params).UnspentBudget);
+    TestEqual(TEXT("Wave 20 and 26 are both standard waves"),
+        ELib::GetWaveKind(26, Params), EBreakerWaveKind::Standard);
 
     // The caps are never broken to spend it, which is the half that matters.
     const FBreakerWaveComposition Late = ELib::SolveWave(40, 1, Params);
