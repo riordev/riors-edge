@@ -228,9 +228,14 @@ bool FBreakerItemRuleProlificTest::RunTest(const FString& Parameters)
     const float PlainPercent    = BreakerRuleIncreasedDamage(Plain, FBreakerBuildConditionState());
     const float ProlificPercent = BreakerRuleIncreasedDamage(Prolific, FBreakerBuildConditionState());
 
-    // T1 -> T0 is the authored spike, exactly 1.4x. This is what makes the two
-    // best tiers in the game reachable without the Forge.
-    TestEqual(TEXT("A T1 line resolves at T0's authored 1.4x spike"), ProlificPercent, PlainPercent * 1.4f, 0.01f);
+    // T1 -> T0 is the authored spike. This is what makes the two best tiers in
+    // the game reachable without the Forge. O29 re-sited the spike from 1.4x to
+    // 2.2x, so PROLIFIC got materially stronger without anybody editing it —
+    // its whole value IS the size of a tier step, and the steps grew. That
+    // consequence is measured in RiorsEdge.Progression.RuleBandImpact and is a
+    // reported finding, not a silent retune here.
+    TestEqual(TEXT("A T1 line resolves at T0's authored spike"),
+        ProlificPercent, PlainPercent * UBreakerAffixLibrary::TierSpikeT0Multiplier, 0.01f);
 
     // The uplift is per ITEM. A second, ordinary piece must not inherit it —
     // leaking a rewrite onto the rest of the loadout is the failure mode the
@@ -239,7 +244,8 @@ bool FBreakerItemRuleProlificTest::RunTest(const FString& Parameters)
         BreakerRuleMakeItem(EBreakerEquipSlot::Helmet, 1, Lines, EBreakerItemRule::Prolific),
         BreakerRuleMakeItem(EBreakerEquipSlot::Gloves, 1, Lines)};
     TestEqual(TEXT("Prolific does not leak onto other equipped pieces"),
-        BreakerRuleIncreasedDamage(Mixed, FBreakerBuildConditionState()), PlainPercent * 2.4f, 0.02f);
+        BreakerRuleIncreasedDamage(Mixed, FBreakerBuildConditionState()),
+        PlainPercent * (1.0f + UBreakerAffixLibrary::TierSpikeT0Multiplier), 0.02f);
 
     // Already at the bottom of the curve: nowhere to go, and no runaway.
     TArray<FBreakerItemInstance> AtFloor = {BreakerRuleMakeItem(EBreakerEquipSlot::Helmet, -1, Lines, EBreakerItemRule::Prolific)};
@@ -351,7 +357,12 @@ bool FBreakerItemRarityMeaningTest::RunTest(const FString& Parameters)
         {
             const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Focus"),
                 EBreakerEquipSlot::Necklace, Rarity, 30, Seed * 17);
-            int32 Best = 8;
+            // Seeded from the ladder floor, not the literal 8. With the O29
+            // ladder an ilvl-30 roll starts at T12, so a hardcoded 8 clamped
+            // every sample to 8 and made the Aberrant focus measurably invisible
+            // — the test would have reported the feature as broken when only its
+            // own initialiser was.
+            int32 Best = UBreakerAffixLibrary::WorstTier;
             for (const FBreakerRolledAffix& Rolled : Item.Affixes) Best = FMath::Min(Best, Rolled.Tier);
             Sum += Best;
             ++Count;
