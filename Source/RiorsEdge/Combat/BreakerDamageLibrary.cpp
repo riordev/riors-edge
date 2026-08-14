@@ -30,7 +30,11 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     FBreakerDamageResult Result;
     Result.RawDamage = FMath::Max(0.0f, Request.BaseDamage) * FMath::Max(0.0f, Request.SourceDamageMultiplier);
     Result.bWeakPoint = Request.bWeakPointHit;
-    if (Result.bWeakPoint) Result.RawDamage *= FMath::Max(1.0f, Request.WeakPointMultiplier);
+    // O34 bound guard: the aim-skill lane is deliberately outside the O3 More
+    // budget, so its multiplier is hard-bounded here instead. Clamping (rather
+    // than warning) is correct at a per-hit site — the archetype-value test is
+    // where an out-of-bounds author gets caught loudly.
+    if (Result.bWeakPoint) Result.RawDamage *= FMath::Clamp(Request.WeakPointMultiplier, WeakPointMultiplierFloor, WeakPointMultiplierCeiling);
 
     if (Request.bCanCritical)
     {

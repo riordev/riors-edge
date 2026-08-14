@@ -28,8 +28,9 @@ public:
     // MS7's upgrade applies TWO cycle positions per cast. Data, not a branch.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="1", ClampMax="4")) int32 CyclePositionsPerCast = 1;
     // Every value below is O2 PLACEHOLDER: Class-Kits gives Fracture a cost and
-    // a behaviour and no numbers at all.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ImpactDamage = 30.0f;
+    // a behaviour and no numbers at all. ImpactDamage is the item-level-1
+    // number and rides the equipped weapon's item-level scalar (O35).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ImpactDamage = 30.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float ProjectileSpeed = 4000.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture", meta=(ClampMin="0")) float MuzzleForwardCm = 80.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Fracture") TSubclassOf<ABreakerProjectileBase> ProjectileClass;

@@ -22,6 +22,15 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 
+    // The authored critical baseline, declared ONCE. The constructor's base
+    // table initialises from these, and every damage site that cannot reach a
+    // live attribute set (a rig without GAS, a test) falls back to the SAME
+    // two names — there used to be ~8 restatements of 0.05f/1.5f across the
+    // weapon and ability damage paths, which is exactly the drift-by-copy bug
+    // class the aggregation layer exists to kill. O2 PLACEHOLDER
+    static constexpr float DefaultCriticalChance = 0.05f;
+    static constexpr float DefaultCriticalMultiplier = 1.5f;
+
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Health, Category="Vitals") FGameplayAttributeData Health;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, Health)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealth, Category="Vitals") FGameplayAttributeData MaxHealth;

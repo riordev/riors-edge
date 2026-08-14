@@ -11,6 +11,17 @@ class RIORSEDGE_API UBreakerDamageLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    // O34: weak point is ruled THE aim-skill lane — crit and weak point are the
+    // two site multipliers (crit is build-gated, weak point is skill-gated, and
+    // nothing else may multiply at the site). It sits deliberately OUTSIDE the
+    // O3 More budget, and the price of living outside a budget is a hard bound:
+    // every archetype's weak-point multiplier must land inside
+    // [WeakPointMultiplierFloor, WeakPointMultiplierCeiling], and the resolve
+    // site clamps to the same pair so an out-of-bounds author cannot ship.
+    // The endpoints are the ruling's seed values. O2 PLACEHOLDER
+    static constexpr float WeakPointMultiplierFloor = 1.0f;
+    static constexpr float WeakPointMultiplierCeiling = 2.0f;
+
     UFUNCTION(BlueprintPure, Category="Combat|Damage")
     static FBreakerDamageResult ResolveDamage(const FBreakerDamageRequest& Request, const FBreakerDefenseState& Defense);
 

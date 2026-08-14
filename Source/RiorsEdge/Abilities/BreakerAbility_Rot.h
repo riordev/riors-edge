@@ -47,9 +47,10 @@ public:
     // Class-Kits §2.2 C3: a FLAT 40. Flat and never percentage is the ruling —
     // it is what protects the boss armour cap (Master 7.10.5).
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float FlatArmorReduction = 40.0f;
-    // O2 PLACEHOLDER: the Poison payload. No doc supplies these.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDamagePerTick = 5.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDuration = 4.0f;
+    // O2 PLACEHOLDER: the Poison payload. No doc supplies these. Per-tick
+    // damage is the item-level-1 number and rides the weapon scalar (O35).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDamagePerTick = 5.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float PoisonDuration = 4.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0.05")) float PoisonTickInterval = 1.0f;
     // How far out the puddle can be placed. O2 PLACEHOLDER.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float MaximumRangeCm = 2500.0f;

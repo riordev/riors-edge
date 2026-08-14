@@ -152,6 +152,16 @@ void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, f
     Modifier.Key = Key;
     Modifier.FlatBonus = FlatBonus;
     Modifier.MoreMultiplier = FMath::Max(0.0f, MoreMultiplier);
+    // O34: a single More source is capped at the SAME per-source ceiling the
+    // aggregator's budget is derived from (O3's 1.30, cited — never restated).
+    // The tree's selection already clamps its own sources this way; a window
+    // that pushed 1.6x would otherwise be a stronger More than any node may be.
+    if (Modifier.MoreMultiplier > FBreakerAttributeAggregator::SingleMoreCeiling)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Outgoing modifier '%s' More %.3f exceeds the single-More ceiling %.2f (O3/O34); clamping."),
+            *Key.ToString(), Modifier.MoreMultiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
+        Modifier.MoreMultiplier = FBreakerAttributeAggregator::SingleMoreCeiling;
+    }
     Modifier.ExpiryTime = ExpirySeconds > 0.0f && GetWorld()
         ? static_cast<float>(GetWorld()->GetTimeSeconds()) + ExpirySeconds
         : -1.0f;
@@ -184,6 +194,17 @@ void UBreakerCombatComponent::PruneExpiredOutgoingModifiers()
     });
 }
 
+float UBreakerCombatComponent::GetAttributeSideMoreProduct() const
+{
+    // The aggregator recomputes from the live equipment and progression
+    // contributions, so this is always the post-clamp product the composed
+    // DamageMultiplier attribute actually contains. No attribute set bound
+    // (an enemy, a bare test rig) means no attribute-side Mores: 1.0.
+    return Attributes
+        ? Attributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier)
+        : 1.0f;
+}
+
 float UBreakerCombatComponent::GetComposedMoreMultiplier() const
 {
     float Product = 1.0f;
@@ -193,18 +214,35 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
         if (Now >= 0.0f && Modifier.ExpiryTime >= 0.0f && Modifier.ExpiryTime <= Now) continue;
         Product *= Modifier.MoreMultiplier;
     }
-    // Damage-Pipeline §4: the composed More product may never exceed 2.20x.
-    // Exceeding it is a design bug, not a runtime condition — surface it loudly
-    // and clamp so a live session degrades instead of running away.
-    if (Product > ComposedMoreCeiling)
+
+    // O34: ONE More ceiling. The chain spends whatever headroom the attribute
+    // side (tree keystones, Anomalous rewrites) left under the aggregator's
+    // budget — total effective More is (attribute-side product x chain product)
+    // and may never exceed FBreakerAttributeAggregator::ComposedMoreCeiling().
+    // On a build already holding three Mores near the ceiling a window buys
+    // little; that competition is the ruling's intent, not a defect.
+    const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+    const float AttributeSide = FMath::Max(GetAttributeSideMoreProduct(), UE_SMALL_NUMBER);
+    const float ChainBudget = Ceiling / AttributeSide;
+    if (Product > ChainBudget + UE_KINDA_SMALL_NUMBER)
     {
-        // Loud but suite-safe: the automation test intentionally crosses the
-        // ceiling, and an ensure would fail the run it exists to protect.
-        UE_LOG(LogTemp, Warning, TEXT("Composed More product %.3f exceeds the %.2f ceiling (Damage-Pipeline S4); clamping."),
-            Product, ComposedMoreCeiling);
-        Product = ComposedMoreCeiling;
+        // Loud but suite-safe: automation intentionally crosses the ceiling,
+        // and an ensure would fail the run it exists to protect.
+        UE_LOG(LogTemp, Warning, TEXT("Composed More total %.3f (attribute side %.3f x chain %.3f) exceeds the %.3f ceiling (O34); clamping the chain to %.3f."),
+            AttributeSide * Product, AttributeSide, Product, Ceiling, ChainBudget);
+        Product = ChainBudget;
     }
     return Product;
+}
+
+float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat)
+{
+    // Application-time snapshot only. The chain's product is budgeted by
+    // GetComposedMoreMultiplier, so a window folded in here and the attribute
+    // side it rides on still compose to at most the one O34 ceiling.
+    const float AttributePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    const float WindowProduct = OwnerCombat ? OwnerCombat->GetComposedMoreMultiplier() : 1.0f;
+    return AttributePower * WindowProduct;
 }
 
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)

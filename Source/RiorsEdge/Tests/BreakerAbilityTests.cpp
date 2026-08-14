@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
@@ -427,8 +428,10 @@ bool FBreakerAbilityImpactRulesTest::RunTest(const FString& Parameters)
     // Overdrive is a power state: doubled generation and a real More.
     TestEqual(TEXT("Overdrive doubles Momentum generation"), UBreakerAbility_Overdrive::LoopGenerationMultiplier, 2.0f);
     TestTrue(TEXT("Overdrive raises outgoing damage"), UBreakerAbility_Overdrive::OutgoingMoreMultiplier > 1.0f);
-    // Damage-Pipeline §4 caps any single More at 1.30x.
-    TestTrue(TEXT("Overdrive's More respects the per-modifier ceiling"), UBreakerAbility_Overdrive::OutgoingMoreMultiplier <= 1.30f);
+    // O34: a window is a More and no single More may exceed the shared
+    // per-source ceiling the aggregator's budget derives from.
+    TestTrue(TEXT("Overdrive's More respects the per-modifier ceiling"),
+        UBreakerAbility_Overdrive::OutgoingMoreMultiplier <= FBreakerAttributeAggregator::SingleMoreCeiling);
     TestFalse(TEXT("Overdrive's modifier key is real"), UBreakerAbility_Overdrive::OutgoingModifierKey().IsNone());
     TestNotEqual(TEXT("The modifier key is distinct from the window key"), UBreakerAbility_Overdrive::OutgoingModifierKey(), UBreakerAbility_Overdrive::WindowKey());
     return true;

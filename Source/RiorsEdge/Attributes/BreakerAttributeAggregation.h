@@ -197,15 +197,27 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // the whole build. A contributor cannot buy its way past O3 by arriving
     // second.
     //
-    // 1.30^3 == 2.197, i.e. Damage-Pipeline §4's 2.20 composed ceiling and
-    // UBreakerCombatComponent::ComposedMoreCeiling, reached from the two numbers
-    // that define it rather than restated as a third constant that can drift.
+    // O34: THIS IS THE ONE MORE CEILING. 1.30^3 == 2.197, reached from the two
+    // numbers that define it rather than restated as a constant that can drift.
+    // The combat component's outgoing-modifier chain (temporary ability windows
+    // — Overdrive is the first) used to hold its own hardcoded 2.20 ceiling on
+    // top of this one, so the two budgets MULTIPLIED; O34 deleted that constant
+    // and the chain now queries ComposedMoreProduct() below and spends whatever
+    // headroom the attribute side left. Temporary windows ARE Mores and count
+    // within this budget.
     // Damage only: no other aggregated attribute has an authored More budget,
     // and silently clamping (say) move speed would be a balance decision hiding
     // in a safety net.
     static constexpr int32 MaxComposedMoreSources = 3;
     static constexpr float SingleMoreCeiling = 1.30f;
     static float ComposedMoreCeiling();
+    // The post-clamp More product across every contributor, WITHOUT the base,
+    // flat and Increased terms. O34 needs it queryable at the combat site: the
+    // outgoing chain's windows count against the SAME budget, so the chain must
+    // know how much of it the attribute side already holds. Recomputed from the
+    // live contributions on every call, so it is correct for equipment and
+    // progression submissions alike with nothing to cache or invalidate.
+    float ComposedMoreProduct(EBreakerAggregatedAttribute Attribute) const;
     // True when Attribute is under the O3 budget. Named so the rule is
     // greppable rather than living inside an `if` in Compose.
     static bool IsMoreCappedAttribute(EBreakerAggregatedAttribute Attribute)

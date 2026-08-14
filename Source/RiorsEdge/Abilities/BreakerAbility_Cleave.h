@@ -5,6 +5,7 @@
 #include "BreakerAbility_Cleave.generated.h"
 
 class UBreakerAttributeSet;
+class UBreakerCombatComponent;
 
 // C1 Cleave (Class-Kits §2.2, Ability-Implementation-Spec §5.1): 20 Mana, no
 // cooldown. "Short forward melee arc, 3 m, physical damage scaled by weapon
@@ -35,6 +36,15 @@ public:
     UFUNCTION(BlueprintPure, Category="Cleave")
     static float SwingDamage(float WeaponDamage, float Coefficient, float UnarmedFallback);
 
+    // The swing base as the activation actually computes it (O35): the
+    // weapon-coefficient path reads the SCALED weapon base
+    // (UBreakerWeaponComponent::GetScaledBaseDamage — item level 1 is exactly
+    // the authored archetype number), and the unarmed fallback rides the same
+    // item-level scalar. Public and actor-parameterised so a test can pin the
+    // composition on a rigged actor without a world or an activation.
+    UFUNCTION(BlueprintPure, Category="Cleave")
+    float ComputeSwingBaseDamage(const AActor* OwnerActor) const;
+
     // Pure rule: Edgework removes the animation lock entirely (Class-Kits §2.2).
     UFUNCTION(BlueprintPure, Category="Cleave")
     static float AnimationLockFor(bool bHasEdgework, float AuthoredLockSeconds);
@@ -47,20 +57,27 @@ public:
     // 180, so the base must be narrower than that; 120 is a shape, not balance.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0", ClampMax="360")) float ArcDegrees = 120.0f;
     // O2 PLACEHOLDER: "scaled by weapon damage" with no coefficient authored.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.5f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float WeaponDamageCoefficient = 1.5f;   // O2 PLACEHOLDER
     // O2 PLACEHOLDER: a Caster with no weapon component still has a melee verb.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float UnarmedDamage = 20.0f;
+    // The authored number is the ITEM LEVEL 1 value; it rides the equipped
+    // weapon's item-level scalar (O35).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float UnarmedDamage = 20.0f;   // O2 PLACEHOLDER
     // O2 PLACEHOLDER: the lock is the melee risk. Class-Kits names it (Edgework
     // removes it) but never times it.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float AnimationLockSeconds = 0.45f;
     // Class-Kits §2.2 C1: Bleed at a 100% base chance. The magnitude and
     // duration are O2 PLACEHOLDER — no doc supplies them for this application.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDamagePerTick = 6.0f;
+    // Per-tick damage is an item-level-1 number and rides the weapon scalar at
+    // application (O35), the weapon-bleed precedent generalised.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDamagePerTick = 6.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0")) float BleedDuration = 4.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cleave", meta=(ClampMin="0.05")) float BleedTickInterval = 1.0f;
 
 private:
-    void ApplyCleaveBleed(AActor* Target, const UBreakerAttributeSet* SourceAttributes, int32 Salt) const;
+    // LevelScalar and OwnerCombat are read once by the activation and passed
+    // down so every target of one swing shares one item-level reading and one
+    // window snapshot (O35 / DoT snapshot completeness).
+    void ApplyCleaveBleed(AActor* Target, const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat, float LevelScalar, int32 Salt) const;
 
     FTimerHandle LockTimer;
 };

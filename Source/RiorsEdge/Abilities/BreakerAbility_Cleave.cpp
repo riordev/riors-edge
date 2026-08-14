@@ -52,6 +52,28 @@ float UBreakerAbility_Cleave::AnimationLockFor(bool bHasEdgework, float Authored
     return bHasEdgework ? 0.0f : FMath::Max(0.0f, AuthoredLockSeconds);
 }
 
+float UBreakerAbility_Cleave::ComputeSwingBaseDamage(const AActor* OwnerActor) const
+{
+    // O35: the weapon-coefficient path reads the SCALED weapon base — the
+    // number every weapon round already uses — instead of the raw archetype
+    // constant, which stood still while weapon rounds grew (1 + w)^(ilvl - 1)
+    // and turned "1.5x weapon damage" into a rounding error by ilvl 50. At
+    // item level 1 GetScaledBaseDamage IS the authored Definition->Damage, so
+    // nothing moves at the anchor.
+    float WeaponDamage = 0.0f;
+    if (const UBreakerWeaponComponent* Weapon = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
+    {
+        if (Weapon->GetActiveDefinition())
+        {
+            WeaponDamage = Weapon->GetScaledBaseDamage();
+        }
+    }
+    // The unarmed fallback is flat ability damage and rides the same scalar
+    // (1.0 with no weapon component, so a bare Caster is bit-identical).
+    const float ScaledUnarmed = UnarmedDamage * AbilityDamageScalarFor(OwnerActor);
+    return SwingDamage(WeaponDamage, WeaponDamageCoefficient, ScaledUnarmed);
+}
+
 void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -87,15 +109,11 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
 
-    float WeaponDamage = 0.0f;
-    if (const UBreakerWeaponComponent* Weapon = Character->FindComponentByClass<UBreakerWeaponComponent>())
-    {
-        if (const UBreakerWeaponDefinition* Definition = Weapon->GetActiveDefinition())
-        {
-            WeaponDamage = Definition->Damage;
-        }
-    }
-    const float BaseDamage = SwingDamage(WeaponDamage, WeaponDamageCoefficient, UnarmedDamage);
+    // One item-level reading for the whole swing — every target and any bleed
+    // those hits apply share it, so a swing can never straddle an equipment
+    // change (the weapon path's own rule).
+    const float BaseDamage = ComputeSwingBaseDamage(Character);
+    const float LevelScalar = AbilityDamageScalarFor(Character);
 
     UBreakerCombatComponent* OwnerCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
     const TArray<AActor*> Targets = UBreakerMeleeSweep::SweepTargets(World, Character, Params);
@@ -117,8 +135,8 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         // bullet downstream.
         Damage.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
         Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
-        Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-        Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+        Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+        Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
         Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(TargetIndex) + static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
         Damage.SourceLocation = Params.Origin;
@@ -131,7 +149,7 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         TargetCombat->ReceiveDamage(Damage);
 
         // Class-Kits §2.2 C1: Bleed at a 100% base chance — no roll at all.
-        ApplyCleaveBleed(Target, SourceAttributes, TargetIndex);
+        ApplyCleaveBleed(Target, SourceAttributes, OwnerCombat, LevelScalar, TargetIndex);
         ++TargetIndex;
     }
 
@@ -162,7 +180,7 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     }), Lock, false);
 }
 
-void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttributeSet* SourceAttributes, int32 Salt) const
+void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat, float LevelScalar, int32 Salt) const
 {
     UBreakerStatusComponent* Status = Target ? Target->FindComponentByClass<UBreakerStatusComponent>() : nullptr;
     if (!Status || BleedDamagePerTick <= 0.0f || BleedDuration <= 0.0f)
@@ -172,12 +190,18 @@ void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttr
 
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
-    Spec.BaseDamagePerTick = BleedDamagePerTick;
+    // O35: the per-tick base rides the equipped weapon's item-level scalar,
+    // exactly as the weapon's own bleed does. Item level 1 is x1.0.
+    Spec.BaseDamagePerTick = BleedDamagePerTick * FMath::Max(0.0f, LevelScalar);
     Spec.Duration = BleedDuration;
     Spec.TickInterval = FMath::Max(0.05f, BleedTickInterval);
-    Spec.Snapshot.SourcePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
-    Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-    Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    // DoTs snapshot at APPLICATION, and the snapshot now includes the outgoing
+    // chain's budgeted window product: a bleed applied inside an Overdrive-like
+    // window keeps that strength for its whole life, one applied outside never
+    // gains it retroactively.
+    Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat);
+    Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
 
     const ABreakerCharacter* Character = GetBreakerCharacter();

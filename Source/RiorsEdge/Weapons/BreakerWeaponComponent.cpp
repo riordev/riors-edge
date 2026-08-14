@@ -1264,8 +1264,8 @@ bool UBreakerWeaponComponent::FireOnce()
             Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
             Damage.ArmorPenetration = Definition->ArmorPenetration;
             Damage.bWeakPointHit = bPelletWeakPoint;
-            Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-            Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+            Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+            Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
             // ONE number. Gear's Weapon Damage affix and every skill node that
             // raises damage are already summed into the DamageMultiplier
             // attribute's single additive Increased bucket; multiplying gear in
@@ -1351,9 +1351,15 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     Spec.BaseDamagePerTick = Definition->BleedDamagePerTick * FMath::Max(0.0f, LevelScalar);
     Spec.Duration = Definition->BleedDuration;
     Spec.TickInterval = FMath::Max(0.05f, Definition->BleedTickInterval);
-    Spec.Snapshot.SourcePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
-    Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-    Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    // DoTs snapshot at APPLICATION (locked rule), and the snapshot now folds in
+    // the outgoing chain's budgeted window product: a bleed applied inside an
+    // Overdrive window ticks at window strength for its whole life, one applied
+    // outside never gains it, and a window opened after application changes
+    // nothing. Application-time only — never per tick.
+    Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(
+        SourceAttributes, GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr);
+    Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
     // The critical result is rolled once at application; every tick of this
     // application then crits or does not for its whole lifetime.
@@ -1377,8 +1383,8 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.WeakPointMultiplier = 1.0f;
     Damage.ArmorPenetration = Definition->ArmorPenetration;
-    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : 0.05f;
-    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : 1.5f;
+    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     // Same single composed number as the hitscan path.
     Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);

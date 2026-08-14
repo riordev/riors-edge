@@ -56,6 +56,9 @@ public:
 
     // Outgoing-damage modifier chain (SI-7 partial). Pushed by ability windows
     // and class nodes; applied to a request just before it is submitted.
+    // Each modifier's More is clamped at the single-More ceiling on push
+    // (FBreakerAttributeAggregator::SingleMoreCeiling — O3's per-source cap,
+    // shared with the tree's selection, never restated here).
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
     void PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds);
 
@@ -63,12 +66,34 @@ public:
     void RemoveOutgoingModifier(FName Key);
 
     // Adds the composed flat bonus to BaseDamage and folds the More product
-    // into SourceDamageMultiplier. The product is clamped at the Damage-Pipeline
-    // §4 ceiling (2.20x).
+    // into SourceDamageMultiplier. O34: the chain's product counts against the
+    // SAME aggregator-derived budget as the attribute-side Mores — total
+    // effective More (attribute-side product x chain product) never exceeds
+    // FBreakerAttributeAggregator::ComposedMoreCeiling(). There is no second
+    // ceiling constant here any more; the 2.20 local was deleted by ruling.
     UFUNCTION(BlueprintCallable, Category="Combat|Outgoing")
     void ApplyOutgoingModifiers(UPARAM(ref) FBreakerDamageRequest& Request);
 
+    // The chain's effective More product AFTER the O34 budget: clamped so that
+    // (attribute-side More product) x (this) stays at or under the one ceiling.
+    // With no bound attributes (enemies, bare test rigs) the attribute side is
+    // 1.0 and the whole budget is available to the chain.
     UFUNCTION(BlueprintPure, Category="Combat|Outgoing") float GetComposedMoreMultiplier() const;
+
+    // The attribute side of the O34 budget: the post-clamp More product the
+    // aggregator composed into DamageMultiplier (equipment and progression
+    // submissions alike), 1.0 when no attribute set is bound.
+    UFUNCTION(BlueprintPure, Category="Combat|Outgoing") float GetAttributeSideMoreProduct() const;
+
+    // Snapshot-time source power for a DoT APPLICATION: the composed
+    // DamageMultiplier attribute times the outgoing chain's budgeted More
+    // product. DoTs snapshot offensive stats at application (locked rule), and
+    // before this the chain's product was NOT in the snapshot — a bleed applied
+    // inside an Overdrive window ticked as if the window did not exist. Called
+    // at application time only, never per tick; ticks already resolved read
+    // their spec's captured value and stay untouched. Null-safe on both
+    // arguments so every application site can call it unconditionally.
+    static float ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat);
 
     // Incoming-damage modifier chain (Ability-Implementation-Spec §4.4). Keyed
     // push/remove, composed multiplicatively into FBreakerDefenseState::
@@ -128,8 +153,11 @@ public:
     // this one.
     UPROPERTY(BlueprintAssignable, Category="Combat|Healing") FBreakerHealDealt OnHealingDealt;
 
-    // Damage-Pipeline §4: at most three More multipliers, each capped at 1.30x.
-    static constexpr float ComposedMoreCeiling = 2.20f;
+    // O34: there is deliberately NO More ceiling constant on this class. The
+    // one budget is FBreakerAttributeAggregator::ComposedMoreCeiling() and the
+    // chain queries it; a second constant here is exactly the drift the ruling
+    // deleted (the old local 2.20 silently multiplied with the aggregator's
+    // 2.197 into a ~4.83x total nothing ever authored).
 
     // --- Facing-dependent armour -----------------------------------------
     // Encounter-Design §7 names this "the one genuinely new combat-pipeline
@@ -182,9 +210,9 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerHitDealt OnDamageTaken;
     // Passive defensive layers: classes and gear raise these; no inputs.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockChance = 0.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float BlockMitigation = 0.5f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0", ClampMax="1")) float DodgeChance = 0.0f;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Defense", meta=(ClampMin="0")) float DodgeResourceRefund = 5.0f;   // O2 PLACEHOLDER
 
 private:
     void PruneExpiredOutgoingModifiers();
