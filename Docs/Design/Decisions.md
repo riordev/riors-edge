@@ -72,13 +72,30 @@ Implementation notes tied to these rulings:
 - O26: gravity eased 1.60 -> 1.45 the same day, per the owner's "feels too
   heavy" playtest; the rest of the weight pass is unchanged.
 
+## 2026-08-13 — O27 (the power curve)
+
+| # | Decision |
+|---|----------|
+| O27 | **Monsters are CONTENT-scaled to area level, never player-scaled.** Area level drives monster health and damage, and drives the item level of what they drop, so rising item level corresponds to gameplay instead of being cosmetic. The model is PoE's: a legible spreadsheet underneath, geometric monster scaling, and player power that outruns it when the player builds well. **Trash exists to be trivialized** — an optimized character roughly 40 hours past level 50 should delete trash on contact, and difficulty lives entirely in elites, bosses, and monsters carrying modifiers. Hitting 50 must be satisfying with decent power; optimized 50 must feel great. **Choices beat accumulation** — per-point accumulation is cut back and the power moves into node choices — and every avenue (affixes, nodes, weapons) needs significantly more options than the slice currently has. |
+
+Implementation notes tied to this ruling:
+- O27 supersedes the reading of O18 as a global invariant. TTK targets are a
+  statement about an ON-LEVEL character with a BASELINE build in ON-LEVEL
+  content; they are the ratio of two authored curves at one point, not a
+  constant to be held true at every point of progression.
+- The full architecture, the curve identity, and the tuning dials are in
+  `Docs/Design/Power-Curve.md`.
+- Three structural gaps this ruling exposes, all confirmed in code:
+  `EnemyLevel` existed but drove only loot item level, never monster stats;
+  monster health was the literal constant 220 at every level; and `Weapons/`
+  contained no reference to `ItemLevel` at all, so weapon base damage was an
+  archetype constant and item level touched only affix tier values.
+
 ## Owner choices currently pending (presented, not ruled)
 
-- **TTK re-anchor [O18/O2]** — session 5 measured melee trash 1.81s vs a
-  <1s target and elite 3.01s vs ~3s (ON target). The correction is one
-  ratio: trash health ~220 -> ~120 or an equivalent damage raise. Health is
-  the recommended lever; it leaves weapon damage as the gear/tree tuning
-  surface. Set `WeakPointToleranceCm = 0` for the measuring run.
+- **TTK re-anchor** — RULED by O27. It is no longer a single retune: trash
+  health becomes a curve in area level, and the target is stated for a
+  baseline build in on-level content. Do not pick a new constant.
 - **Movement's multiplicative gear x tree composition** — the last instance
   of the bug class fixed everywhere else. Conforming to the one-additive-
   bucket rule changes movement FEEL (+20/+20 becomes x1.40, not x1.44),
