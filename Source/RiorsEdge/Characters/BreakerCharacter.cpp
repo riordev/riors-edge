@@ -31,6 +31,7 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
+#include "Save/BreakerQuestJournal.h"
 #include "Interaction/BreakerNPC.h"
 #include "Items/BreakerLootPickup.h"
 #include "Game/BreakerGameMode.h"
@@ -69,6 +70,7 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));
     Mana = CreateDefaultSubobject<UBreakerManaComponent>(TEXT("Mana"));
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
+    Quests = CreateDefaultSubobject<UBreakerQuestJournal>(TEXT("QuestJournal"));
 
     // --- The first-person blockout --------------------------------------
     // Composed engine primitives plus dynamic material instances, exactly the
@@ -193,6 +195,14 @@ void ABreakerCharacter::BeginPlay()
     {
         Equipment->OnEquipmentChanged.AddDynamic(Weapon, &UBreakerWeaponComponent::SyncArchetypesToEquipment);
     }
+    // Write-through persistence for quest state. The journal decides WHEN its
+    // state must reach disk (only on a real change); the character owns the
+    // slot and so is the only thing that can honour the request. Bound before
+    // the load so a migration performed during LoadGameState is itself durable.
+    if (Quests && HasAuthority())
+    {
+        Quests->OnPersistRequested.AddWeakLambda(this, [this]() { SaveGameState(); });
+    }
     if (HasAuthority()) LoadGameState();
     if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
     // Build the blockout for whatever the save restored. Before this the proxy
@@ -241,7 +251,12 @@ void ABreakerCharacter::SaveGameState()
     Save->BackpackItems = Equipment->GetBackpack();
     Save->SlotOneArchetype = Weapon->GetSlotArchetype(1);
     Save->SlotTwoArchetype = Weapon->GetSlotArchetype(2);
-    Save->QuestFlags = QuestFlags;
+    if (Quests)
+    {
+        Save->QuestFlags = Quests->GetState().Flags;
+        Save->QuestCounters = Quests->GetState().Counters;
+    }
+    Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
     UGameplayStatics::SaveGameToSlot(Save, UBreakerSaveGame::DefaultSlotName(), 0);
 }
 
@@ -250,11 +265,24 @@ void ABreakerCharacter::LoadGameState()
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
     UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(UBreakerSaveGame::DefaultSlotName(), 0));
     if (!Save) return;
+    // Migrate BEFORE reading anything out of the payload. A file written by an
+    // older build is not wrong, it is old; reading it with today's assumptions
+    // is what silently misinterprets it.
+    FString MigrationNote;
+    if (!UBreakerSaveGame::MigrateToCurrent(*Save, MigrationNote))
+    {
+        // Refuse-to-load, per Save-Architecture 5.2: a file from a NEWER build
+        // is not opened, not repaired, and not overwritten. Leaving the
+        // character at defaults is recoverable; overwriting is not.
+        UE_LOG(LogTemp, Error, TEXT("BreakerSave: refusing to load — %s"), *MigrationNote);
+        return;
+    }
+    if (!MigrationNote.IsEmpty()) UE_LOG(LogTemp, Log, TEXT("BreakerSave: %s"), *MigrationNote);
     Progression->LoadProgressionState(Save->Progression);
     Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
     Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
     Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
-    QuestFlags = Save->QuestFlags;
+    if (Quests) Quests->RestoreFrom(Save->QuestFlags, Save->QuestCounters);
 }
 
 void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -1104,7 +1132,26 @@ void ABreakerCharacter::InteractWithNearbyNPC()
 
 void ABreakerCharacter::AddQuestFlag(FName Flag)
 {
-    if (Flag != NAME_None) QuestFlags.AddUnique(Flag);
+    // The journal persists on change. This used to be an AddUnique into a bare
+    // array with no save anywhere on the path, so a story beat survived only a
+    // clean shutdown.
+    if (Quests) Quests->SetFlag(Flag);
+}
+
+bool ABreakerCharacter::HasQuestFlag(FName Flag) const
+{
+    return Quests && Quests->HasFlag(Flag);
+}
+
+const TArray<FName>& ABreakerCharacter::GetQuestFlags() const
+{
+    static const TArray<FName> Empty;
+    return Quests ? Quests->GetFlags() : Empty;
+}
+
+void ABreakerCharacter::SetQuestFlags(const TArray<FName>& NewFlags)
+{
+    if (Quests) Quests->RestoreFrom(NewFlags, TMap<FName, int32>());
 }
 
 void ABreakerCharacter::TogglePauseMenu()

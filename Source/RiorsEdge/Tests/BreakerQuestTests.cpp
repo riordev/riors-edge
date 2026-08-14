@@ -1,0 +1,146 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+#include "Kismet/GameplayStatics.h"
+#include "Save/BreakerQuestJournal.h"
+#include "Save/BreakerSaveGame.h"
+
+// THE REGRESSION TEST FOR THE DATA-LOSS BUG.
+//
+// Shipped behaviour: ABreakerCharacter::AddQuestFlag was `QuestFlags.AddUnique`
+// into a bare array, and SaveGameState() was called only from EndPlay and a few
+// menu commit points. A flag earned in conversation reached disk only if the
+// session later ended cleanly, so a crash after a story beat lost the beat.
+//
+// What this pins is the contract that fixes it: setting a NEW flag requests a
+// save in the same call, and setting one that is already present requests
+// nothing. If the write-through is removed, the first block fails.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerQuestFlagPersistenceTest,
+    "RiorsEdge.Save.QuestFlagPersistence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerQuestFlagPersistenceTest::RunTest(const FString& Parameters)
+{
+    UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
+    int32 PersistRequests = 0;
+    Journal->OnPersistRequested.AddLambda([&PersistRequests]() { ++PersistRequests; });
+
+    TestTrue(TEXT("A new flag is accepted"), Journal->SetFlag(TEXT("Quest.Test.Beat")));
+    TestEqual(TEXT("Setting a new flag persists exactly once"), PersistRequests, 1);
+    TestTrue(TEXT("The flag reads back"), Journal->HasFlag(TEXT("Quest.Test.Beat")));
+
+    TestFalse(TEXT("A repeated flag is not a change"), Journal->SetFlag(TEXT("Quest.Test.Beat")));
+    TestEqual(TEXT("A repeated flag costs no disk write"), PersistRequests, 1);
+
+    TestFalse(TEXT("NAME_None is never a flag"), Journal->SetFlag(NAME_None));
+    TestEqual(TEXT("NAME_None costs no disk write"), PersistRequests, 1);
+    TestFalse(TEXT("NAME_None never reads back as set"), Journal->HasFlag(NAME_None));
+    TestEqual(TEXT("Only the one real flag is stored"), Journal->GetFlags().Num(), 1);
+
+    // Counters: progress persists too, and crossing the threshold sets the
+    // objective's flag in the same call so no caller can advance progress and
+    // forget to close the objective.
+    const int32 BeforeProgress = PersistRequests;
+    TestFalse(TEXT("Below threshold does not complete"), Journal->AddProgress(TEXT("Quest.Test.Kills"), 1, 3, TEXT("Quest.Test.Killed")));
+    TestEqual(TEXT("Partial progress is persisted"), PersistRequests, BeforeProgress + 1);
+    TestEqual(TEXT("Counter advanced"), Journal->GetCounter(TEXT("Quest.Test.Kills")), 1);
+    Journal->AddProgress(TEXT("Quest.Test.Kills"), 1, 3, TEXT("Quest.Test.Killed"));
+    TestFalse(TEXT("Still short of the threshold"), Journal->HasFlag(TEXT("Quest.Test.Killed")));
+    TestTrue(TEXT("Reaching the threshold completes"), Journal->AddProgress(TEXT("Quest.Test.Kills"), 1, 3, TEXT("Quest.Test.Killed")));
+    TestTrue(TEXT("Objective flag is set"), Journal->HasFlag(TEXT("Quest.Test.Killed")));
+
+    // Monotonic: there is no remove, and a counter never walks backwards.
+    FBreakerQuestFlagSet Set = Journal->GetState();
+    TestFalse(TEXT("A counter never decreases"), Set.RaiseCounter(TEXT("Quest.Test.Kills"), 1));
+    TestEqual(TEXT("Counter held its value"), Set.GetCounter(TEXT("Quest.Test.Kills")), 3);
+    return true;
+}
+
+// The other half of the same bug: whatever the journal holds must survive a
+// real serialization round trip through UBreakerSaveGame.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerQuestFlagRoundTripTest,
+    "RiorsEdge.Save.QuestFlagRoundTrip",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerQuestFlagRoundTripTest::RunTest(const FString& Parameters)
+{
+    UBreakerSaveGame* Written = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Written) { AddError(TEXT("Could not create a save object")); return false; }
+
+    Written->QuestFlags = { TEXT("Quest.FirstContract.Offered"), TEXT("Quest.FirstContract.Accepted") };
+    Written->QuestCounters.Add(TEXT("Quest.FirstContract.Kills"), 5);
+    Written->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+
+    // Memory rather than a slot so the suite never touches the player's real
+    // BreakerSave0, while still exercising the actual UPROPERTY serializer.
+    TArray<uint8> Bytes;
+    TestTrue(TEXT("Save serializes"), UGameplayStatics::SaveGameToMemory(Written, Bytes));
+    UBreakerSaveGame* Read = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    if (!Read) { AddError(TEXT("Save did not deserialize")); return false; }
+
+    TestEqual(TEXT("Flag count survives"), Read->QuestFlags.Num(), 2);
+    TestTrue(TEXT("Offered survives"), Read->QuestFlags.Contains(FName(TEXT("Quest.FirstContract.Offered"))));
+    TestTrue(TEXT("Accepted survives"), Read->QuestFlags.Contains(FName(TEXT("Quest.FirstContract.Accepted"))));
+    TestEqual(TEXT("Counter survives"), Read->QuestCounters.FindRef(TEXT("Quest.FirstContract.Kills")), 5);
+
+    // And back into a journal, which is how the character restores it.
+    UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
+    Journal->RestoreFrom(Read->QuestFlags, Read->QuestCounters);
+    TestTrue(TEXT("Restored journal reads the flag"), Journal->HasFlag(TEXT("Quest.FirstContract.Accepted")));
+    TestEqual(TEXT("Restored journal reads the counter"), Journal->GetCounter(TEXT("Quest.FirstContract.Kills")), 5);
+    return true;
+}
+
+// A player's existing BreakerSave0 must still load. Version 1 is what shipped;
+// this proves the v1 -> v2 step is a migration rather than a silent misread.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSaveMigrationTest,
+    "RiorsEdge.Save.Migration",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSaveMigrationTest::RunTest(const FString& Parameters)
+{
+    // A faithful v1 payload: version 1, the v1 flag spellings, and no counters
+    // (a v1 file has no such property, so it deserializes empty).
+    UBreakerSaveGame* Old = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Old) { AddError(TEXT("Could not create a save object")); return false; }
+    Old->SaveVersion = 1;
+    Old->QuestFlags = { TEXT("Quest.MetForgeKeeper"), TEXT("Quest.AcceptedFirstContract"), TEXT("Mod.SomeBranchFlag") };
+
+    FString Note;
+    TestTrue(TEXT("A v1 save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, Note));
+    TestEqual(TEXT("It is now current"), Old->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
+    TestFalse(TEXT("The migration reports itself"), Note.IsEmpty());
+
+    TestFalse(TEXT("The v1 contract flag is gone"), Old->QuestFlags.Contains(FName(TEXT("Quest.AcceptedFirstContract"))));
+    TestTrue(TEXT("It was renamed, not dropped"), Old->QuestFlags.Contains(FName(TEXT("Quest.FirstContract.Accepted"))));
+    TestTrue(TEXT("The offered prerequisite is backfilled"), Old->QuestFlags.Contains(FName(TEXT("Quest.FirstContract.Offered"))));
+    TestTrue(TEXT("Unrelated flags are untouched"), Old->QuestFlags.Contains(FName(TEXT("Quest.MetForgeKeeper"))));
+    TestTrue(TEXT("Unknown flags are quarantined, never dropped"), Old->QuestFlags.Contains(FName(TEXT("Mod.SomeBranchFlag"))));
+
+    // Idempotent: migrating an already-current save changes nothing.
+    const int32 CountAfterFirst = Old->QuestFlags.Num();
+    FString SecondNote;
+    TestTrue(TEXT("A current save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, SecondNote));
+    TestTrue(TEXT("A current save reports no migration"), SecondNote.IsEmpty());
+    TestEqual(TEXT("A current save is unchanged"), Old->QuestFlags.Num(), CountAfterFirst);
+
+    // A save that never accepted the contract gets no backfill.
+    UBreakerSaveGame* Untouched = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    Untouched->SaveVersion = 1;
+    Untouched->QuestFlags = { TEXT("Quest.CheckedVendor") };
+    TestTrue(TEXT("A v1 save with no contract loads"), UBreakerSaveGame::MigrateToCurrent(*Untouched, Note));
+    TestEqual(TEXT("Nothing was invented"), Untouched->QuestFlags.Num(), 1);
+
+    // Refuse-to-load: a file from a newer build is not opened, not repaired and
+    // above all not overwritten (Save-Architecture 5.2).
+    UBreakerSaveGame* Future = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    Future->SaveVersion = UBreakerSaveGame::CurrentSaveVersion + 1;
+    TestFalse(TEXT("A newer save is refused"), UBreakerSaveGame::MigrateToCurrent(*Future, Note));
+    TestFalse(TEXT("The refusal is explained"), Note.IsEmpty());
+    return true;
+}
+
+#endif

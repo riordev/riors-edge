@@ -21,6 +21,7 @@ class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
 class UBreakerManaComponent;
 class UBreakerAbilityComponent;
+class UBreakerQuestJournal;
 class ABreakerNPC;
 class ABreakerLootPickup;
 class SBreakerMenu;
@@ -60,9 +61,13 @@ public:
     // items up is by far the more frequent action.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerLootPickup* FindNearbyPickup() const;
     UFUNCTION(BlueprintCallable, Category="Interaction") void AddQuestFlag(FName Flag);
-    UFUNCTION(BlueprintPure, Category="Interaction") bool HasQuestFlag(FName Flag) const { return QuestFlags.Contains(Flag); }
-    UFUNCTION(BlueprintPure, Category="Interaction") const TArray<FName>& GetQuestFlags() const { return QuestFlags; }
-    void SetQuestFlags(const TArray<FName>& NewFlags) { QuestFlags = NewFlags; }
+    UFUNCTION(BlueprintPure, Category="Interaction") bool HasQuestFlag(FName Flag) const;
+    UFUNCTION(BlueprintPure, Category="Interaction") const TArray<FName>& GetQuestFlags() const;
+    void SetQuestFlags(const TArray<FName>& NewFlags);
+    // The journal owns quest state; the character owns the save slot. Dialogue
+    // conditions, quest state derivation and the kill tracker all read through
+    // this rather than through a bare array on the pawn.
+    UFUNCTION(BlueprintPure, Category="Interaction") UBreakerQuestJournal* GetQuestJournal() const { return Quests; }
     UFUNCTION(BlueprintPure, Category="Playtest") UBreakerPlaytestComponent* GetPlaytest() const { return Playtest; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetLookSensitivity() const { return LookSensitivity; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetCurrentFOV() const;
@@ -261,7 +266,7 @@ private:
 
     FTransform PlaytestSpawnTransform;
     float FallKillZ = -100000.0f;
-    TArray<FName> QuestFlags;
+    UPROPERTY() TObjectPtr<UBreakerQuestJournal> Quests;
     float LookSensitivity = 1.0f;
     bool bInvertLookY = false;
     bool bShowingInitialMenu = false;
