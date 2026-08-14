@@ -572,6 +572,17 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // first because its unset bit was a recorded content gap).
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overpressure.GetTag());
+    // REACHABILITY (O40c). Overdrive's `Keystone.Swift.TerminalVelocity`
+    // variant row existed and NO node granted the tag, so the Kinetic ultimate
+    // rewrite was unreachable by construction — the same failure class as the
+    // third jump, and recorded as an open fork in Class-Kits §6.1.1 consequence
+    // 1: "either the shipped keystones adopt those tags or the rewrites are
+    // re-sited onto them". Adopting is the half that changes NO authored value:
+    // Overpressure keeps its 1.20x-while-sliding More exactly as authored and
+    // additionally resolves Overdrive to its Kinetic row. Re-siting would mean
+    // authoring a new condition and magnitude, which O2 forbids. The ledger
+    // fork itself is still the owner's to close.
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Swift_TerminalVelocity.GetTag());
     Tree->Nodes.Add(Node);
 
     return Tree;
@@ -665,6 +676,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     AddDamageMore(Node, 18.0f); // O2 PLACEHOLDER: x1.18
     Node->bCornerstone = true; // O37: keystone tier requires branch commitment
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
+    // REACHABILITY (O40c) — the Marksman half of the same fork recorded in
+    // Class-Kits §6.1.1. Standing Wave is "the stationary Swift ultimate", and
+    // Culling is the branch keystone authored for the build that refuses to
+    // organise around a movement state, so the adoption is not merely
+    // mechanical: the two say the same thing about the branch. Culling's
+    // unconditional 1.18x More is untouched.
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Swift_StandingWave.GetTag());
     Tree->Nodes.Add(Node);
 
     return Tree;

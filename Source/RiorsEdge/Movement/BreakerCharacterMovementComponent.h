@@ -55,6 +55,24 @@ public:
     UFUNCTION(BlueprintCallable, Category="Movement") void PushSpeedMultiplier(FName Key, float Multiplier, float Duration);
     UFUNCTION(BlueprintCallable, Category="Movement") void PopSpeedMultiplier(FName Key);
     UFUNCTION(BlueprintPure, Category="Movement") float GetSpeedMultiplier() const;
+
+    // Keystone-rewrite availability suspensions (Swift's Terminal Velocity,
+    // Class-Kits.md:192). Modeled on the PushSpeedMultiplier trio above: same
+    // TMap<FName, entry>, same ExpiryTime convention (Duration <= 0 means -1.0,
+    // "no expiry, popped explicitly"), same mutable-map + const-prune shape.
+    // They are BOOLEANS, not scales, on purpose: both are availability
+    // rewrites ("unlimited dash charges" honestly means the cooldown GATE is
+    // suspended, not a new charge model, per O40(a)'s final single-dash-on-
+    // cooldown model; "removes the wall-ride timer" means the duration expiry
+    // stops firing). A scale would require authoring a magnitude, and ruling
+    // O2 forbids any agent authoring a balance value — so there is no dial
+    // here, only an on/off keyed to the caller's own duration.
+    UFUNCTION(BlueprintCallable, Category="Movement") void PushDashCooldownSuspension(FName Key, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Movement") void PopDashCooldownSuspension(FName Key);
+    UFUNCTION(BlueprintPure, Category="Movement") bool IsDashCooldownSuspended() const;
+    UFUNCTION(BlueprintCallable, Category="Movement") void PushWallRideTimerSuspension(FName Key, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Movement") void PopWallRideTimerSuspension(FName Key);
+    UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRideTimerSuspended() const;
     UFUNCTION(BlueprintCallable, Category="Movement") bool BeginSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") void PrepareSlideJump();
     UFUNCTION(BlueprintCallable, Category="Movement") void EndSlide();
@@ -280,6 +298,17 @@ public:
     static FVector RedirectHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float MinimumSpeed);
     // Multiplicative composition of the active temporary multipliers.
     static float ComposeSpeedMultipliers(const TArray<float>& Multipliers);
+    // The expiry rule shared by both keystone suspension chains, factored out
+    // as a pure predicate for exactly the reason CanBeginWallRide and the
+    // weight curve below are pure: PushSpeedMultiplier's own expiry has no
+    // world-free test anywhere in this suite (NewObject() has no World, so a
+    // Duration > 0 push there never actually reaches its ExpiryTime branch),
+    // so copying that pattern verbatim would leave suspension expiry equally
+    // untestable without a live world. This predicate is the one piece of the
+    // prune loop that does NOT need a UWorld, so it can be asserted directly.
+    // A negative ExpiryTime never expires; otherwise active strictly before
+    // Now, matching PruneSpeedMultipliers' own remove condition exactly.
+    static bool IsSuspensionActive(double ExpiryTime, double Now);
 
     // The locked aggregation rule, expressed over two 1.0-based layer
     // multipliers that are each already a single additive bucket: the shared
@@ -346,6 +375,19 @@ private:
     // entries, which is what "lazy expiry" means here.
     mutable TMap<FName, FSpeedMultiplierEntry> SpeedMultipliers;
     void PruneSpeedMultipliers() const;
+
+    // Keystone suspension entries carry no payload beyond the expiry itself —
+    // they are pure booleans (see the O2 comment at the public API above).
+    struct FSuspensionEntry
+    {
+        // Negative = no expiry; popped explicitly. Same convention as
+        // FSpeedMultiplierEntry::ExpiryTime.
+        double ExpiryTime = -1.0;
+    };
+    mutable TMap<FName, FSuspensionEntry> DashCooldownSuspensions;
+    mutable TMap<FName, FSuspensionEntry> WallRideTimerSuspensions;
+    void PruneDashCooldownSuspensions() const;
+    void PruneWallRideTimerSuspensions() const;
 
     // The composed attribute set is the source of truth for the four movement
     // stats above. Equipment and progression are still resolved, but only as

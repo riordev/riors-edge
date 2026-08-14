@@ -48,6 +48,17 @@ public:
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentum() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentumFraction() const;
 
+    // Direct credit, mirroring UBreakerManaComponent::GrantMana(Amount,
+    // bIgnoreGlobalCap=true): it bypasses the metered per-second generation
+    // budget (PendingGrants/GlobalGenerationCap) entirely rather than queuing,
+    // because a keystone refund is not generation and trickling it in through
+    // the budget would read as a bug. Clamped to MaxClassResource by the same
+    // ApplyMomentumDelta clamp every other credit path uses; non-positive
+    // amounts are ignored; inert (no grant, no clamp write) for a non-Swift
+    // owner via the same IsActiveForOwner() gate as the rest of this loop.
+    // Observable the same way the Mana side is observable: through GetMomentum().
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Momentum") void GrantMomentum(float Amount);
+
     // Loop overrides (Class-Kits §1.2 ULTIMATE). A named, temporary rewrite of
     // the loop itself rather than of a magnitude: decay can be suspended and
     // generation multiplied, both against the per-second cap, which is what

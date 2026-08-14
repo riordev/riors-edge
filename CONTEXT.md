@@ -1,6 +1,6 @@
 # Rior's Edge — agent context
 
-**Last reconciled against: O32**
+**Last reconciled against: O40**
 
 This is the durable handoff document for anyone working on the project. Read it before making changes, then update it whenever architecture, milestone status, paths, or workflow constraints materially change.
 
@@ -80,7 +80,7 @@ level 120, the drop pipeline, the skill-board viewport and the HUD feedback
 pass. `main` is the truth. If you are picking up work, start from the list
 below rather than from a branch.
 
-**THE SUITE IS FULLY GREEN AGAIN — 244 tests, 0 failures — and green is
+**THE SUITE IS FULLY GREEN — 252 tests, 0 failures — and green is
 meaningful.** O36 ruled the band question the former deliberate reds were
 holding open: the band is authored at TWO points now — at-cap 8–10x
 (measures 8.08x) and endgame seed rails 12–20x at ilvl 120 (measures
@@ -222,11 +222,29 @@ Next actions, in priority order:
      kitless lock at the component (O39).
    - **Minions and deployables do not exist in any form** (O30). The Gunsmith
      kit designs them; nothing is built.
-   - **Keystone REACHABILITY beyond Swift:** five of six keystone tags are
-     granted by no node and four behavioral halves are stubs — the variant
-     rows resolve and do nothing, silently. Now that commitment gates the
-     tier, authoring the missing keystone content is the next Swift/Caster
-     depth item.
+   - **Keystone reachability: SWIFT IS CLOSED, CASTER IS THE REMAINDER.**
+     Five of six keystone tags were granted by no node and every one of the
+     six behavioural branches was an empty stub — the variant rows resolved
+     and did nothing, silently, including Bloodrhythm's, which was the one
+     tag a player could actually hold. All three SWIFT rewrites now reach a
+     player and do what they say: Overpressure and Culling adopted the
+     Terminal Velocity and Standing Wave tags (adoption, not re-siting — it
+     is the option that changes no authored value, per O2), Terminal Velocity
+     suspends the dash cooldown and wall-ride timer, Standing Wave freezes
+     Momentum and resolves falloff to point-blank, and Bloodrhythm refunds
+     Momentum per hit outside the generation budget and ends the ultimate
+     after 1.5s without one. **The class of bug is now instrumented, not
+     described:** `RiorsEdge.Abilities.KeystoneReachability` fails if any
+     variant row's tag is granted by no node, and `KeystoneGrantsAreRead`
+     fails if any node grants a keystone tag nothing consumes. Caster's three
+     rows are exempt only while no Caster branch tree exists, and **the
+     exemption closes itself the day one is authored** — so authoring Caster
+     branch trees now turns the suite red until its keystones are sited.
+     Two things the owner still holds: Class-Kits §6.1.1's table describes a
+     different design (K12 1.25x airborne, M12 1.25x beyond 40 m) than the
+     code ships — adoption fixed reachability, not that divergence; and
+     Standing Wave's "projectile speed treatment" half is not built, because
+     the projectile path carries no falloff or speed concept to reach.
 6. **Editor work only the owner can do.** THE SEAL IS GONE — all eight parapet
    cubes (`SM_Cube2/3/4/5`, `SM_Cube17/18/19/20`) were deleted on 2026-08-14,
    along with four of the twelve corner fillets. The courtyard is open. What
@@ -785,10 +803,10 @@ The user's future affix system is intentionally different from the Godot attachm
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
-- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; **213 of 215 pass and 2 fail deliberately** (see Verification status). NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; **all 252 pass; there are no deliberate failures any more** (O36 resolved the two, see Verification status). NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
 - Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
 - `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
-- The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after a clean run. **"Clean" means 213 of 215, with `PowerBand` and `RuleBandImpact` the only failures** — do not treat their names appearing in the log as a regression, and do not silence them. (Do not pin a commit hash here; it goes stale within a session. `git log` is the source of truth.)
+- The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after a clean run. **"Clean" means ZERO failures.** The two former deliberate reds were resolved by O36 into pinned fixtures, so any `Result={Fail}` is now a regression without exception. (Do not pin a commit hash here; it goes stale within a session. `git log` is the source of truth.)
 - Zero-setup convention: all content (weapons, affixes, trees, abilities, class defs) has C++ fallback registries so a clean clone plays with no assets; Data Assets replace them later one-for-one.
 - IMPORTANT UI lesson: never use SWrapBox with UseAllottedSize inside a scroll box (layout oscillation), and never poll input/rebuild widgets from per-frame Text_Lambda attributes — both caused owner-visible bugs.
 

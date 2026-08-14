@@ -82,7 +82,20 @@ void UBreakerMomentumComponent::PushLoopOverride(FName Key, bool bSuspendDecay, 
     if (Key.IsNone()) return;
     FLoopOverrideEntry Entry;
     Entry.bSuspendDecay = bSuspendDecay;
-    Entry.GenerationMultiplier = GenerationMultiplier > 0.0f ? GenerationMultiplier : 1.0f;
+    // ZERO IS A LEGAL MULTIPLIER AND USED TO BE SILENTLY DISCARDED. The guard
+    // read `> 0.0f`, so a caller asking for "generation stops entirely" was
+    // handed 1.0 — full normal generation — with no warning: the exact opposite
+    // of what it requested. Standing Wave (Class-Kits M12) is the first caller
+    // to ask for it, and its "no gain, no loss" freeze would have shipped as
+    // "no loss, normal gain" and read as the keystone simply not working. Only
+    // a NEGATIVE multiplier is meaningless, and that one is now loud.
+    if (GenerationMultiplier < 0.0f)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("PushLoopOverride('%s'): negative generation multiplier %.3f is meaningless; falling back to 1.0."),
+            *Key.ToString(), GenerationMultiplier);
+    }
+    Entry.GenerationMultiplier = GenerationMultiplier >= 0.0f ? GenerationMultiplier : 1.0f;
     const UWorld* World = GetWorld();
     Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
     // Re-pushing the same key replaces rather than stacks: a re-cast refreshes.
@@ -212,6 +225,20 @@ void UBreakerMomentumComponent::ApplyMomentumDelta(float Delta)
     // component that somehow found itself on an Overcasting bank still cannot
     // generate into a debt it does not own.
     Attributes->ApplyClassResource(FMath::Clamp(Attributes->GetClassResource() + Delta, 0.0f, Max));
+}
+
+void UBreakerMomentumComponent::GrantMomentum(float Amount)
+{
+    // Same guard shape as UBreakerManaComponent::GrantMana: non-positive
+    // amounts are a no-op, server authority only, and inert for any owner
+    // this loop is not currently running for (a non-Swift owner must not gain
+    // Momentum). Unlike Mana this has no generation-suspension concept to
+    // check — Momentum's decay/generation suspension lives in LoopOverrides
+    // and this grant, like Mana's bIgnoreGlobalCap path, is deliberately
+    // outside that loop's metering.
+    if (Amount <= 0.0f || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner()) return;
+    ApplyMomentumDelta(Amount);
+    RefreshState();
 }
 
 void UBreakerMomentumComponent::RefreshState()

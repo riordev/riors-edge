@@ -138,6 +138,13 @@ private:
     int32 LastActivatedSlotIndex = INDEX_NONE;
     FString CalloutText;
     double CalloutTime = -1000.0;
+    // The keystone variant last announced for each slot. A keystone rewrite is
+    // bought long after the teaching callout has retired itself, so without
+    // this the rewrite would announce itself NEVER — the player's build would
+    // change their ultimate in silence. Comparing against the last announced
+    // name buys exactly one more callout on the cast after the rewrite first
+    // resolves, and none thereafter.
+    FString SlotLastVariantName[AbilitySlotCount];
     // Latched separately from the callout: the crosshair burst fires on every
     // Skim, not only the first three.
     double SkimBurstTime = -1000.0;

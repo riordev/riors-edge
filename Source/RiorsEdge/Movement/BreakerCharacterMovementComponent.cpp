@@ -553,6 +553,91 @@ float UBreakerCharacterMovementComponent::ComposeSpeedMultipliers(const TArray<f
     return Composed;
 }
 
+bool UBreakerCharacterMovementComponent::IsSuspensionActive(double ExpiryTime, double Now)
+{
+    return ExpiryTime < 0.0 || ExpiryTime > Now;
+}
+
+void UBreakerCharacterMovementComponent::PushDashCooldownSuspension(FName Key, float Duration)
+{
+    if (Key.IsNone())
+    {
+        return;
+    }
+    FSuspensionEntry Entry;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    DashCooldownSuspensions.Add(Key, Entry);
+}
+
+void UBreakerCharacterMovementComponent::PopDashCooldownSuspension(FName Key)
+{
+    DashCooldownSuspensions.Remove(Key);
+}
+
+void UBreakerCharacterMovementComponent::PruneDashCooldownSuspensions() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || DashCooldownSuspensions.Num() == 0)
+    {
+        return;
+    }
+    const double Now = World->GetTimeSeconds();
+    for (auto It = DashCooldownSuspensions.CreateIterator(); It; ++It)
+    {
+        if (!IsSuspensionActive(It.Value().ExpiryTime, Now))
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+bool UBreakerCharacterMovementComponent::IsDashCooldownSuspended() const
+{
+    PruneDashCooldownSuspensions();
+    return DashCooldownSuspensions.Num() > 0;
+}
+
+void UBreakerCharacterMovementComponent::PushWallRideTimerSuspension(FName Key, float Duration)
+{
+    if (Key.IsNone())
+    {
+        return;
+    }
+    FSuspensionEntry Entry;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    WallRideTimerSuspensions.Add(Key, Entry);
+}
+
+void UBreakerCharacterMovementComponent::PopWallRideTimerSuspension(FName Key)
+{
+    WallRideTimerSuspensions.Remove(Key);
+}
+
+void UBreakerCharacterMovementComponent::PruneWallRideTimerSuspensions() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || WallRideTimerSuspensions.Num() == 0)
+    {
+        return;
+    }
+    const double Now = World->GetTimeSeconds();
+    for (auto It = WallRideTimerSuspensions.CreateIterator(); It; ++It)
+    {
+        if (!IsSuspensionActive(It.Value().ExpiryTime, Now))
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+bool UBreakerCharacterMovementComponent::IsWallRideTimerSuspended() const
+{
+    PruneWallRideTimerSuspensions();
+    return WallRideTimerSuspensions.Num() > 0;
+}
+
 bool UBreakerCharacterMovementComponent::CanBeginWallRide(
     bool bAlreadyWallRiding,
     bool bFalling,
@@ -610,7 +695,19 @@ void UBreakerCharacterMovementComponent::SetSlideRequested(bool bEnabled)
 bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirection)
 {
     const UWorld* World = GetWorld();
-    if (!World || bSliding || World->GetTimeSeconds() - LastDashTime < DashCooldown * GetComposedDashCooldownMultiplier())
+    // bSliding is an unconditional gate: Terminal Velocity is an AVAILABILITY
+    // rewrite of the cooldown term only (Class-Kits.md:192), so a suspended
+    // cooldown must never let a dash through a slide it could not pass
+    // otherwise. GetComposedDashCooldownMultiplier() keeps composing normally
+    // either way — the equipment scale it returns is a separate lane of the
+    // same stat and is untouched by the suspension.
+    if (!World || bSliding)
+    {
+        return false;
+    }
+    const bool bCooldownReady = IsDashCooldownSuspended()
+        || (World->GetTimeSeconds() - LastDashTime >= DashCooldown * GetComposedDashCooldownMultiplier());
+    if (!bCooldownReady)
     {
         return false;
     }
@@ -738,7 +835,11 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
     if (bWallRiding)
     {
         WallRideElapsed += DeltaTime;
-        if (IsMovingOnGround() || WallRideElapsed >= WallRideMaxDuration || !FindRunnableWall(RunnableWall))
+        // Terminal Velocity removes only the DURATION timer (Class-Kits.md:192).
+        // Everything else that can end a ride — leaving the ground, losing the
+        // wall — is untouched, so the elapsed clock keeps running (for
+        // whatever reads it later) but its expiry check alone is suspended.
+        if (IsMovingOnGround() || (!IsWallRideTimerSuspended() && WallRideElapsed >= WallRideMaxDuration) || !FindRunnableWall(RunnableWall))
         {
             EndWallRide();
         }

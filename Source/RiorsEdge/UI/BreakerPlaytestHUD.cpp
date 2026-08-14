@@ -1346,11 +1346,49 @@ void ABreakerPlaytestHUD::HandleAbilityActivated(EBreakerAbilitySlot Slot)
         SkimBurstTime = Now;
     }
 
-    // The teaching callout retires itself. After three casts the player knows
-    // what the key does, and a permanent banner would be noise.
-    if (!Definition || SlotActivationCount[Index] > BreakerHUD::AbilityCalloutMaxShows) return;
+    if (!Definition) return;
 
-    const FString Name = (Definition->DisplayName.IsEmpty() ? FText::FromName(Definition->AbilityId) : Definition->DisplayName).ToString();
+    // Which variant this cast actually resolved to. A keystone rewrite is
+    // otherwise completely invisible: the row's authored VariantName was read
+    // by nothing in the project, so a player who committed a branch and bought
+    // its keystone saw an identical ultimate and had to infer the rewrite from
+    // its effects. Resolved from the owner's live tag set, the same input
+    // UBreakerGameplayAbility uses, so the HUD can never disagree with the
+    // ability about which row ran.
+    FString VariantName;
+    if (const ABreakerCharacter* Caster = Abilities ? Cast<ABreakerCharacter>(Abilities->GetOwner()) : nullptr)
+    {
+        if (const UAbilitySystemComponent* ASC = Caster->GetAbilitySystemComponent())
+        {
+            FGameplayTagContainer OwnerTags;
+            ASC->GetOwnedGameplayTags(OwnerTags);
+            const FBreakerAbilityVariant Variant = Definition->ResolveVariant(OwnerTags);
+            if (Variant.KeystoneTag.IsValid() && !Variant.VariantName.IsEmpty())
+            {
+                VariantName = Variant.VariantName.ToString();
+            }
+        }
+    }
+
+    // The teaching callout retires itself. After three casts the player knows
+    // what the key does, and a permanent banner would be noise. The ONE
+    // exception is a rewrite the player has not been told about yet: a keystone
+    // is bought long after the third cast, so gating it on the show count alone
+    // would mean the ultimate silently becomes a different ability. A newly
+    // resolved variant name re-opens the callout exactly once.
+    const bool bVariantIsNew = !VariantName.IsEmpty() && VariantName != SlotLastVariantName[Index];
+    if (!bVariantIsNew)
+    {
+        SlotLastVariantName[Index] = VariantName;
+        if (SlotActivationCount[Index] > BreakerHUD::AbilityCalloutMaxShows) return;
+    }
+    SlotLastVariantName[Index] = VariantName;
+
+    // The variant name already reads as "Overdrive — Terminal Velocity", so it
+    // replaces the plain display name rather than appending to it.
+    const FString Name = !VariantName.IsEmpty()
+        ? VariantName
+        : (Definition->DisplayName.IsEmpty() ? FText::FromName(Definition->AbilityId) : Definition->DisplayName).ToString();
     const FString Blurb = BreakerHUD::FirstSentence(Definition->Description.ToString()).TrimStartAndEnd();
     CalloutText = Blurb.IsEmpty() ? Name.ToUpper() : FString::Printf(TEXT("%s — %s"), *Name.ToUpper(), *Blurb);
     CalloutTime = Now;

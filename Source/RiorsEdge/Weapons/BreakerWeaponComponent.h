@@ -278,6 +278,25 @@ public:
     // Clears kick, bloom, and viewmodel state without touching the aim.
     UFUNCTION(BlueprintCallable, Category="Weapon|Feel") void ResetWeaponFeel();
 
+    // ---- Point-blank range treatment (keystone rewrite support) -----------
+    // Standing Wave's Overdrive variant (Class-Kits line 193): "converts the
+    // frozen [Momentum] value into weapon range... shots behave as if fired
+    // at point-blank regardless of distance." This is the RANGE half only —
+    // it forces the falloff multiplier to 1.0 regardless of Hit.Distance
+    // while at least one entry is active. It changes nothing else about the
+    // shot path: spread, pellets, the trace, recoil, and the aim/trace
+    // contract are untouched. There is no projectile-speed concept on this
+    // component for the other half of that sentence to reach (rockets carry
+    // no falloff at all today, see FireProjectile) — that half is left
+    // uncovered rather than invented.
+    //
+    // Keyed, duration-expiring, lazily pruned: the same shape as
+    // UBreakerCharacterMovementComponent::PushSpeedMultiplier. Duration <= 0
+    // means no expiry, popped explicitly instead.
+    UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PushRangeTreatmentOverride(FName Key, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PopRangeTreatmentOverride(FName Key);
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") bool IsRangeTreatmentOverridden() const;
+
     // Master switch, so the owner can A/B the whole layer in the editor.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bRecoilEnabled = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bViewmodelKickEnabled = true;
@@ -368,6 +387,18 @@ private:
     FRotator LastAppliedControlRotation = FRotator::ZeroRotator;
     bool bHasAppliedControlRotation = false;
     FBreakerViewmodelState Viewmodel;
+
+    // Same entry shape as UBreakerCharacterMovementComponent::FSpeedMultiplierEntry,
+    // minus the magnitude this override has no use for: presence is the signal.
+    struct FRangeTreatmentOverrideEntry
+    {
+        // Negative = no expiry; popped explicitly.
+        double ExpiryTime = -1.0;
+    };
+    // Mutable: IsRangeTreatmentOverridden() is const and is the natural place
+    // to drop expired entries, matching the movement/momentum lazy-expiry pattern.
+    mutable TMap<FName, FRangeTreatmentOverrideEntry> RangeTreatmentOverrides;
+    void PruneRangeTreatmentOverrides() const;
 
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;

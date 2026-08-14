@@ -678,6 +678,41 @@ void UBreakerWeaponComponent::ResetWeaponFeel()
     UpdateFeelTickEnabled();
 }
 
+void UBreakerWeaponComponent::PushRangeTreatmentOverride(FName Key, float Duration)
+{
+    if (Key.IsNone()) return;
+    FRangeTreatmentOverrideEntry Entry;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    // Re-pushing the same key replaces rather than stacks, matching PushSpeedMultiplier.
+    RangeTreatmentOverrides.Add(Key, Entry);
+}
+
+void UBreakerWeaponComponent::PopRangeTreatmentOverride(FName Key)
+{
+    RangeTreatmentOverrides.Remove(Key);
+}
+
+void UBreakerWeaponComponent::PruneRangeTreatmentOverrides() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || RangeTreatmentOverrides.Num() == 0) return;
+    const double Now = World->GetTimeSeconds();
+    for (auto It = RangeTreatmentOverrides.CreateIterator(); It; ++It)
+    {
+        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+bool UBreakerWeaponComponent::IsRangeTreatmentOverridden() const
+{
+    PruneRangeTreatmentOverrides();
+    return RangeTreatmentOverrides.Num() > 0;
+}
+
 void UBreakerWeaponComponent::UpdateFeelTickEnabled()
 {
     const bool bBusy = RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f
@@ -1259,7 +1294,14 @@ bool UBreakerWeaponComponent::FireOnce()
             FBreakerDamageRequest Damage;
             // The multiplicand: archetype base carried up the item-level curve,
             // then falloff. Per pellet, exactly as before.
-            Damage.BaseDamage = ScaledBaseDamage * FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, Hit.Distance);
+            // While a range-treatment override is active (Standing Wave's
+            // Overdrive rewrite), the falloff computation itself is
+            // short-circuited to 1.0 — every other term here (spread, the
+            // trace, weak-point resolution) is untouched.
+            const float FalloffMultiplier = IsRangeTreatmentOverridden()
+                ? 1.0f
+                : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, Hit.Distance);
+            Damage.BaseDamage = ScaledBaseDamage * FalloffMultiplier;
             Damage.DamageFamily = EBreakerDamageFamily::Physical;
             Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
             Damage.ArmorPenetration = Definition->ArmorPenetration;

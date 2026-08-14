@@ -265,9 +265,11 @@ only inside `FBreakerNodeStats` where no ability could see them.
 aggregate onto the ability system component as loose tags, diffed against the
 last publication so a respec removes exactly what it added. Bloodrhythm carries
 `Keystone.Swift.Bloodrhythm`, which is already a row in Overdrive's variant
-table. Kinetic's Terminal Velocity and Marksman's Standing Wave rows exist and
-are still unclaimed — Overpressure and Culling carry no keystone tag, so those
-two rewrites remain unreachable. Not playtested; automation only.
+table. **Kinetic's Terminal Velocity and Marksman's Standing Wave are now
+claimed too** (2026-08-14): Overpressure and Culling carry their branch's
+keystone tag, so all three Swift rewrites resolve and all three have real
+behaviour behind them — see §6.1.1 for what shipped and what the owner still
+rules. Not playtested; automation only.
 
 ## 1.4 Swift branch — KINETIC
 
@@ -739,11 +741,37 @@ so nobody cites the ledger as a description of the game.
 Two consequences the owner should see, neither of them fixable from this
 document:
 
-1. **Overdrive's Kinetic and Marksman rewrites are unreachable.** Overdrive's
-   variant table carries `Keystone.Swift.TerminalVelocity` and
-   `Keystone.Swift.StandingWave` rows, and neither Overpressure nor Culling
-   grants either tag. Only Bloodrhythm's rewrite resolves. Either the shipped
-   keystones adopt those tags or the rewrites are re-sited onto them.
+1. ~~**Overdrive's Kinetic and Marksman rewrites are unreachable.**~~ **CLOSED
+   2026-08-14, by adoption.** Overdrive's variant table carried
+   `Keystone.Swift.TerminalVelocity` and `Keystone.Swift.StandingWave` rows and
+   neither Overpressure nor Culling granted either tag, so only Bloodrhythm's
+   rewrite resolved. Of the two options recorded here — the shipped keystones
+   adopt the tags, or the rewrites are re-sited — **adoption shipped**, because
+   it is the half that changes NO authored value: Overpressure keeps its
+   1.20x-while-sliding More and Culling its unconditional 1.18x, exactly as the
+   table below records, and each additionally resolves Overdrive to its branch
+   row. Re-siting would have meant authoring a new condition and magnitude,
+   which O2 forbids an agent from doing.
+
+   All three rewrite BEHAVIOURS are now built as well; before this they were
+   empty C++ branches, so even Bloodrhythm — the one reachable keystone —
+   rewrote nothing. Terminal Velocity suspends the dash cooldown and the
+   wall-ride timer (an availability rewrite under O40(a)'s final single-dash
+   model, not a charge pool); Standing Wave freezes Momentum and resolves
+   weapon falloff to point-blank; Bloodrhythm refunds Momentum per landed hit
+   outside the generation budget and ends the ultimate after 1.5s without one.
+
+   **The gap is now instrumented rather than described.**
+   `RiorsEdge.Abilities.KeystoneReachability` walks the shipped registries and
+   fails if any variant row's tag is granted by no node, and its twin
+   `KeystoneGrantsAreRead` fails if any node grants a keystone tag nothing
+   consumes. Caster's three rows are exempt only while no Caster branch tree
+   exists, and the exemption closes itself the day one is authored.
+
+   **Still owner's to rule:** this section's own table still describes a
+   different design (K12 1.25x airborne, M12 1.25x beyond 40 m) than the code
+   ships. Adoption resolved the reachability defect; it did not resolve the
+   design divergence, and only an owner ruling can.
 2. **"Terminal Velocity" now names two different things.** K12 here, and a Core
    **Velocity** Convergence node (`Core.Velocity.TerminalVelocity`, a More of
    x1.30 while airborne) added under O27 — see `Core-Constellations.md`. That
