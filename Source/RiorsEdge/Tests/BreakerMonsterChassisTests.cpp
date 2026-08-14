@@ -187,10 +187,15 @@ bool FBreakerChassisContentScaledTest::RunTest(const FString& Parameters)
         ELib::GetMonsterHealth(18, EBreakerMonsterRank::Trash, Params), 0.0f);
 
     // Drop item level follows area level — that is the mechanism by which
-    // rising item level corresponds to gameplay (O27) — but stops at the
-    // character cap of 50 because affix tiers are authored to 50.
+    // rising item level corresponds to gameplay (O27) — and under O29 it no
+    // longer stops at the character cap, because the affix ladder runs to 120.
+    // This is now the IDENTITY across the whole area-level range, and that is
+    // precisely what makes the monster and weapon curves cancel: ilvl = AL with
+    // w = g is the condition for a constant baseline TTK. While this clamped at
+    // 50 the monster curve ran fifty levels further than the player's.
     TestEqual(TEXT("Drop item level follows area level"), ELib::GetDropItemLevel(23), 23);
-    TestEqual(TEXT("Drop item level clamps at the character cap"), ELib::GetDropItemLevel(80), 50);
+    TestEqual(TEXT("Drop item level no longer clamps at the character cap"), ELib::GetDropItemLevel(80), 80);
+    TestEqual(TEXT("Drop item level follows area level to the ceiling"), ELib::GetDropItemLevel(100), 100);
     TestEqual(TEXT("Drop item level has a floor of 1"), ELib::GetDropItemLevel(0), 1);
     for (int32 Level = 1; Level < ELib::BreakerMaxAreaLevel; ++Level)
     {

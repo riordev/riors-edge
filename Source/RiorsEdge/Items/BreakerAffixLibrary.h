@@ -33,6 +33,13 @@ public:
     static constexpr int32 BestNormalTier = 1;              // best tier item level alone can reach
     static constexpr int32 TopTier = -1;                    // the crafted/Anomalous ceiling
 
+    // The character level cap, expressed as an item level, and the tier a
+    // player is standing on when they reach it. Owner ruling: the levelling
+    // game must cross HALF the ladder, not a third of it -- see
+    // BestTierForItemLevel for the two-slope derivation.
+    static constexpr int32 CharacterCapItemLevel = 50;      // O2 PLACEHOLDER
+    static constexpr int32 TierAtCharacterCap = 6;          // O2 PLACEHOLDER
+
     /**
      * The back-loaded tier value curve, O29.
      *

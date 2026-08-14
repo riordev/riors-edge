@@ -1,5 +1,7 @@
 #include "Combat/BreakerMonsterChassis.h"
 
+#include "Items/BreakerAffixLibrary.h"
+
 int32 UBreakerMonsterChassisLibrary::ClampAreaLevel(int32 AreaLevel)
 {
     return FMath::Clamp(AreaLevel, BreakerMinAreaLevel, BreakerMaxAreaLevel);
@@ -61,10 +63,25 @@ float UBreakerMonsterChassisLibrary::GetMonsterDamage(int32 AreaLevel, EBreakerM
 
 int32 UBreakerMonsterChassisLibrary::GetDropItemLevel(int32 AreaLevel)
 {
-    // Affix tier tables are authored to the character cap of 50; the chassis
-    // curve is not. Clamping here keeps a level-80 area's drops legal instead
-    // of rolling off the end of the tier curve.
-    return FMath::Clamp(ClampAreaLevel(AreaLevel), 1, 50);
+    // THIS WAS THE LAST LINK IN THE ENDGAME GAP, and it is now the identity.
+    //
+    // It used to clamp to 50 because the affix tier tables were authored only
+    // that far, so a level-80 area's drops would have rolled off the end of the
+    // curve. O29 removed that reason: the ladder runs to item level 120, past
+    // both the character cap and the area-level ceiling.
+    //
+    // With the clamp gone this returns the area level unchanged across the
+    // whole range, and THAT is what makes the two curves cancel. Monster health
+    // grows at (1+g)^(AL-1) and weapon base damage at (1+w)^(ilvl-1) with
+    // w = g, so ilvl = AL is exactly the condition under which a baseline
+    // build holds a constant TTK from area level 1 to 100. While this clamped
+    // at 50, the monster curve ran for fifty more levels than the player's and
+    // the measured swing was 74x with nothing to answer it.
+    //
+    // ClampAreaLevel already bounds to 1..100, so the extra clamp is a
+    // belt-and-braces guard against a caller that bypasses it, not a design
+    // limit.
+    return FMath::Clamp(ClampAreaLevel(AreaLevel), 1, UBreakerAffixLibrary::MaxItemLevel);
 }
 
 float UBreakerMonsterChassisLibrary::GetTimeToKillSeconds(float Health, float DamagePerSecond)

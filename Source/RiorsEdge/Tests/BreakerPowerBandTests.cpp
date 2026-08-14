@@ -43,6 +43,20 @@ namespace BreakerPowerBandTest
     // are ~50 from levels plus ~15 from world content. A level-50 character who
     // has finished the campaign holds and spends roughly this many.
     constexpr int32 PowerBandFullPointBudget = 95;
+    // WHERE THE BAND IS MEASURED, after O29. The band compares a baseline and
+    // an optimized build in the SAME content; O29 moved the top of gear
+    // progression from the character cap to item level 120, so this is where
+    // two finished builds actually compete. Measuring at ilvl 50 now compares
+    // two characters who are both mid-ladder and neither of whom is optimized.
+    constexpr int32 PowerBandItemLevel = 120;
+    // A tier apart, not the whole ladder apart. The baseline found good gear;
+    // the optimized character found the best. On the back-loaded curve T1 is
+    // +36.5% over T2, so a two-tier spread here is already a large gear
+    // difference -- much larger than the old T5-vs-T1 spread on a linear
+    // ladder, which is the other half of why the band read 23.7x.
+    constexpr int32 PowerBandBaselineTier = 3;
+    constexpr int32 PowerBandOptimizedTier = 1;
+
 
     // Power-Curve §4's target, restated as an assertion.
     constexpr float PowerBandMinimum = 8.0f;
@@ -65,7 +79,13 @@ namespace BreakerPowerBandTest
         Item.DefinitionId = TEXT("PowerBand");
         Item.Slot = Piece.Slot;
         Item.Rarity = EBreakerItemRarity::Anomalous;
-        Item.ItemLevel = 50;
+        // ENDGAME item level, not the character cap. O29 moved where the band
+        // lives: at ilvl 50 a character stands on T6, so the T3/T1 spread this
+        // fixture compares is not obtainable there at any rarity -- the old
+        // fixture described a character the pipeline could not produce, which
+        // is why it read 23.7x. The band is a statement about two builds
+        // competing at the SAME content, and that content is now the endgame.
+        Item.ItemLevel = PowerBandItemLevel;
         for (const FName AffixId : Piece.AffixIds)
         {
             const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, AffixId);
@@ -169,14 +189,14 @@ namespace BreakerPowerBandTest
     TArray<FBreakerItemInstance> BaselineLoadout()
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     5, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::BodyArmour, 5, {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Core.PhysicalDR")}},
-            {EBreakerEquipSlot::Gloves,     5, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
-            {EBreakerEquipSlot::Boots,      5, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Core.MoveSpeed")}},
-            {EBreakerEquipSlot::Necklace,   5, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Waist,      5, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    5, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.MaxResource")}},
-            {EBreakerEquipSlot::Secondary,  5, {TEXT("Offense.WeaponDamage"), TEXT("Core.ResourceRegen"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Helmet,     PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::BodyArmour, PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Core.PhysicalDR")}},
+            {EBreakerEquipSlot::Gloves,     PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
+            {EBreakerEquipSlot::Boots,      PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Core.MoveSpeed")}},
+            {EBreakerEquipSlot::Necklace,   PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Waist,      PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.MaxResource")}},
+            {EBreakerEquipSlot::Secondary,  PowerBandBaselineTier, {TEXT("Offense.WeaponDamage"), TEXT("Core.ResourceRegen"), TEXT("Core.Health")}},
         });
     }
 
@@ -215,14 +235,14 @@ namespace BreakerPowerBandTest
     TArray<FBreakerItemInstance> OptimizedLoadout()
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::BodyArmour, 1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.RedlineDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Gloves,     1, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
-            {EBreakerEquipSlot::Boots,      1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
-            {EBreakerEquipSlot::Necklace,   1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Waist,      1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.DashDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    1, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.RedlineDamage")}},
-            {EBreakerEquipSlot::Secondary,  1, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
+            {EBreakerEquipSlot::Helmet,     PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::BodyArmour, PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.RedlineDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Gloves,     PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
+            {EBreakerEquipSlot::Boots,      PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
+            {EBreakerEquipSlot::Necklace,   PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Waist,      PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.DashDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.RedlineDamage")}},
+            {EBreakerEquipSlot::Secondary,  PowerBandOptimizedTier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage"), TEXT("Offense.DashDamage")}},
         });
     }
 
@@ -329,6 +349,31 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
         TEXT("BestTierForItemLevel(50) is now T%d, so neither tier is rollable at that item level. ")
         TEXT("See the comment above before retuning anything."),
         Ratio, PowerBandMinimum, PowerBandMaximum, UBreakerAffixLibrary::BestTierForItemLevel(50)));
+
+    // ---------------------------------------------------------------------
+    // FAILING DELIBERATELY, AWAITING AN OWNER RULING. Same precedent as
+    // PowerCurve.EndgameClamp: a red test that states an open decision is more
+    // honest than a green one that hides it by moving the goalposts.
+    //
+    // O29 widened the affix ladder and raised every ceiling anchor ~2.2x. The
+    // band was authored at 8-10x against the OLD ladder and now measures around
+    // 15x with the fixture moved to where builds actually compete (ilvl 120,
+    // T3 baseline vs T1 optimized -- a gear spread of 1.85x, close to the 1.97x
+    // the old T5-vs-T1 fixture had).
+    //
+    // The extra did NOT come from the gear spread. It came from absolute affix
+    // values roughly doubling, which moves flat crit chance and the additive
+    // bucket into a different part of their own curves for the optimized build
+    // specifically. That is a real consequence of O29, not a fixture artefact.
+    //
+    // Two ways out, and it is a design decision, not an implementation one:
+    //   (a) The band target moves. 8-10x was authored before the endgame
+    //       existed; a longer ladder arguably SHOULD separate builds further.
+    //   (b) The content retunes -- crit and the additive bucket come down so
+    //       the composed band lands back at 8-10x on the new ladder.
+    // Do not "fix" this by widening the asserted range. That is choosing (a)
+    // without saying so.
+    // ---------------------------------------------------------------------
 
     // The assertion O27 is actually about.
     TestTrue(*FString::Printf(TEXT("Composed band %.2fx is at least %.1fx"), Ratio, PowerBandMinimum), Ratio >= PowerBandMinimum);

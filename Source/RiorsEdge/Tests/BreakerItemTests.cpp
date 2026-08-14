@@ -126,15 +126,23 @@ bool FBreakerItemLevelGatingTest::RunTest(const FString& Parameters)
 {
     using ALib = UBreakerAffixLibrary;
 
+    // TWO SLOPES (owner ruling): the levelling game crosses HALF the ladder,
+    // the endgame crosses the other half more slowly because each of its tiers
+    // is worth more. A single slope put the character cap at T8 -- a third of
+    // the ladder -- and the owner reported that as awkward progression.
     TestEqual(TEXT("Level 1 rolls only T12"), ALib::BestTierForItemLevel(1), 12);
-    TestEqual(TEXT("Level 10 is still T12 (ten levels per tier)"), ALib::BestTierForItemLevel(10), 12);
-    TestEqual(TEXT("Level 11 opens T11"), ALib::BestTierForItemLevel(11), 11);
-    // The character cap is now MID-ladder, which is the whole of O29 in one
-    // assertion: reaching 50 is no longer the end of gear progression.
-    TestEqual(TEXT("Level 50, the character cap, reaches only T8"), ALib::BestTierForItemLevel(50), 8);
-    TestEqual(TEXT("Level 100, the area-level ceiling, reaches T3"), ALib::BestTierForItemLevel(100), 3);
-    TestEqual(TEXT("Level 111 opens T1"), ALib::BestTierForItemLevel(111), 1);
+    // THE ANCHOR THE RULING IS ABOUT: half the ladder by the character cap.
+    TestEqual(TEXT("Level 50, the character cap, stands on T6"),
+        ALib::BestTierForItemLevel(50), ALib::TierAtCharacterCap);
     TestEqual(TEXT("Level 120 is T1"), ALib::BestTierForItemLevel(120), 1);
+    // The levelling slope is steeper than the endgame slope, which is the
+    // whole point of having two of them.
+    const int32 LevellingSteps = ALib::WorstTier - ALib::BestTierForItemLevel(ALib::CharacterCapItemLevel);
+    const int32 EndgameSteps = ALib::BestTierForItemLevel(ALib::CharacterCapItemLevel) - ALib::BestNormalTier;
+    const float LevellingPace = static_cast<float>(ALib::CharacterCapItemLevel) / FMath::Max(1, LevellingSteps);
+    const float EndgamePace = static_cast<float>(ALib::MaxItemLevel - ALib::CharacterCapItemLevel) / FMath::Max(1, EndgameSteps);
+    AddInfo(FString::Printf(TEXT("Levelling %.1f ilvl/tier, endgame %.1f ilvl/tier"), LevellingPace, EndgamePace));
+    TestTrue(TEXT("Tiers arrive faster while levelling than in the endgame"), LevellingPace < EndgamePace);
 
     // The full range, walked. Monotonic (a higher item level never rolls a
     // worse ceiling), never off the ends of the ladder, and never reaching the

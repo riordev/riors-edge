@@ -27,13 +27,39 @@ float UBreakerAffixLibrary::ValueForTier(const FBreakerAffixDefinition& Affix, i
 
 int32 UBreakerAffixLibrary::BestTierForItemLevel(int32 ItemLevel)
 {
-    // Levels 1-120 map onto T12..T1: one tier unlocked every 10 levels.
-    // 120 / 12 tiers is exact, so T1's band is ilvl 111-120 and every other
-    // tier owns a full ten levels — the old ladder gave T1 the single level 50
-    // and nothing else, which made the top tier a threshold rather than a band.
+    // TWO SLOPES, not one. Owner ruling after playtesting O29: "the item level
+    // tier capping at 8 might make for awkward feeling progression, let's bring
+    // that to 6."
+    //
+    // A single slope of one tier per 10 levels put the CHARACTER CAP at T8 --
+    // eight of twelve tiers, meaning a player who finished the levelling game
+    // had seen only a third of the ladder and every tier they had met was in
+    // its shallow, back-loaded lower half. The ladder was authored for the
+    // endgame and the levelling game paid for it.
+    //
+    // So the levelling band is steeper than the endgame band:
+    //
+    //   ilvl   1 -> 50    T12 -> T6    ~8.2 levels per tier  (the campaign)
+    //   ilvl  50 -> 120   T6  -> T1    ~14 levels per tier   (the chase)
+    //
+    // Reaching T6 by the character cap means a levelling player crosses half
+    // the ladder and finishes standing on the shoulder of the curve, where the
+    // steps start to be worth something. The endgame is longer per tier BECAUSE
+    // each of those tiers is worth more, not as a tax.
+    //
+    // O2 PLACEHOLDER: both the anchor (T6 at the character cap) and the two
+    // slopes are shape rather than balance.
     const int32 Clamped = FMath::Clamp(ItemLevel, 1, MaxItemLevel);
-    const int32 LevelsPerTier = MaxItemLevel / WorstTier;   // 10
-    return FMath::Clamp(WorstTier - (Clamped - 1) / LevelsPerTier, BestNormalTier, WorstTier);
+    if (Clamped <= CharacterCapItemLevel)
+    {
+        // T12 at ilvl 1 down to T6 at ilvl 50. Six steps across 49 levels.
+        const int32 Steps = ((Clamped - 1) * (WorstTier - TierAtCharacterCap)) / (CharacterCapItemLevel - 1);
+        return FMath::Clamp(WorstTier - Steps, TierAtCharacterCap, WorstTier);
+    }
+    // T6 at ilvl 50 down to T1 at ilvl 120. Five steps across 70 levels.
+    const int32 Steps = ((Clamped - CharacterCapItemLevel) * (TierAtCharacterCap - BestNormalTier))
+        / (MaxItemLevel - CharacterCapItemLevel);
+    return FMath::Clamp(TierAtCharacterCap - Steps, BestNormalTier, TierAtCharacterCap);
 }
 
 int32 UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity Rarity)
