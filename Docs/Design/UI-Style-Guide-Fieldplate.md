@@ -239,6 +239,21 @@ screenshot harness (`-BreakerCaptureMenu=<SCREEN>`) and READ: `SKILLTREES`
   BREAKER CLASS screen it dimmed all five class names, including the one the
   character actually is, to an unreadable grey. Paint the disabled state and
   refuse the click in the handler instead.
+- **A centred child is arranged at its DESIRED width, and text clips there.**
+  (Added 2026-08-14.) The second recurring defect, and the cause of every
+  "number is clipped" report so far. `HAlign_Center` — which `SButton` applies
+  to its content — arranges the child at exactly its own desired width, never
+  at the width available; an `STextBlock`'s desired width is its measured
+  width; and Slate's default overflow policy then clips the drawn run to that
+  same box. Measuring and rasterising round independently, so a run landing a
+  fraction wider than its measurement loses its last glyph, and two identical
+  labels at different fractional positions disagree about whether they clip.
+  **Enlarging the container does not fix it** — that only reshuffles the
+  rounding, which is what the skill tree's 30px→36px chip bump did. The fix is
+  to measure the string, arrange it in a box with a few pixels of slack, and
+  centre the run by justification rather than by alignment; then size the
+  container from the same measurement. Both halves are pure functions of
+  inputs known before layout, so neither can oscillate.
 - **A marker with nothing inside it is a hole, not a marker.** Empty shapes on
   a `panel/00` fill behind a `border/rest` ring are invisible: rest is one
   value step off the plate face. Locked markers use `border/emphasis`, and
