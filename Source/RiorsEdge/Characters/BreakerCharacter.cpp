@@ -6,6 +6,9 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "CollisionShape.h"
 #include "UObject/ConstructorHelpers.h"
 #include "EnhancedInputComponent.h"
@@ -67,55 +70,75 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Mana = CreateDefaultSubobject<UBreakerManaComponent>(TEXT("Mana"));
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
 
+    // --- The first-person blockout --------------------------------------
+    // Composed engine primitives plus dynamic material instances, exactly the
+    // technique the gym dressing uses, so a clean clone still plays with no
+    // content. The layout table and the reasoning behind every proportion live
+    // in Characters/BreakerViewmodelRig.{h,cpp}; this constructor only
+    // ALLOCATES the pool. Shapes, sizes and colours are assigned at runtime by
+    // RebuildViewmodelParts, because they change with the equipped archetype.
     PrototypeWeaponVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponVisual"));
     PrototypeWeaponVisual->SetupAttachment(FirstPersonCamera);
-    PrototypeWeaponVisual->SetRelativeLocation(FVector(48.0f, 18.0f, -18.0f));
-    PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.42f, 0.08f, 0.08f));
+    PrototypeWeaponVisual->SetRelativeLocation(FVector(26.0f, 13.0f, -16.0f));
     PrototypeWeaponVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    // Deliberately MESHLESS. This is the transform the recoil spring drives;
+    // giving it geometry is what made the old proxy a single grey slab.
     PrototypeWeaponVisual->SetOnlyOwnerSee(true);
+
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-    if (CubeMesh.Succeeded()) PrototypeWeaponVisual->SetStaticMesh(CubeMesh.Object);
 
-    PrototypeWeaponBarrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponBarrel"));
-    PrototypeWeaponBarrel->SetupAttachment(PrototypeWeaponVisual);
-    PrototypeWeaponBarrel->SetRelativeLocation(FVector(75.0f, 0.0f, 0.0f));
-    PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.75f, 0.32f, 0.32f));
-    PrototypeWeaponBarrel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    PrototypeWeaponBarrel->SetOnlyOwnerSee(true);
-    if (CubeMesh.Succeeded()) PrototypeWeaponBarrel->SetStaticMesh(CubeMesh.Object);
+    auto MakeProxyPart = [this](const TCHAR* Name) -> UStaticMeshComponent*
+    {
+        UStaticMeshComponent* Part = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+        Part->SetupAttachment(PrototypeWeaponVisual);
+        Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Part->SetOnlyOwnerSee(true);
+        // A viewmodel that casts world shadows draws a gun-shaped shadow on the
+        // floor from a gun nobody else can see.
+        Part->SetCastShadow(false);
+        Part->SetVisibility(false);
+        return Part;
+    };
 
-    PrototypeWeaponSight = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrototypeWeaponSight"));
-    PrototypeWeaponSight->SetupAttachment(PrototypeWeaponVisual);
-    PrototypeWeaponSight->SetRelativeLocation(FVector(15.0f, 0.0f, 65.0f));
-    PrototypeWeaponSight->SetRelativeScale3D(FVector(0.12f, 0.3f, 0.32f));
-    PrototypeWeaponSight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    PrototypeWeaponSight->SetOnlyOwnerSee(true);
-    if (CubeMesh.Succeeded()) PrototypeWeaponSight->SetStaticMesh(CubeMesh.Object);
+    // Slots 0 and 1 keep their historic names so BP_BreakerCharacter's
+    // inherited-component records still resolve; they are ordinary pool slots.
+    PrototypeWeaponBarrel = MakeProxyPart(TEXT("PrototypeWeaponBarrel"));
+    PrototypeWeaponSight = MakeProxyPart(TEXT("PrototypeWeaponSight"));
+    ViewmodelParts.Add(PrototypeWeaponBarrel);
+    ViewmodelParts.Add(PrototypeWeaponSight);
+    for (int32 Index = ViewmodelParts.Num(); Index < BreakerViewmodel::MaxProxyParts; ++Index)
+    {
+        ViewmodelParts.Add(MakeProxyPart(*FString::Printf(TEXT("ViewmodelPart_%02d"), Index)));
+    }
 
     PrototypeMuzzleFlash = CreateDefaultSubobject<UPointLightComponent>(TEXT("PrototypeMuzzleFlash"));
-    PrototypeMuzzleFlash->SetupAttachment(FirstPersonCamera);
-    PrototypeMuzzleFlash->SetRelativeLocation(FVector(90.0f, 0.0f, -10.0f));
+    // Hung off the RIG rather than the camera: a flash nailed to the screen
+    // does not move when the gun kicks, which is half the reason the recoil was
+    // hard to read.
+    PrototypeMuzzleFlash->SetupAttachment(PrototypeWeaponVisual);
+    PrototypeMuzzleFlash->SetRelativeLocation(FVector(60.0f, 0.0f, 2.5f));
     PrototypeMuzzleFlash->SetLightColor(FLinearColor(1.0f, 0.35f, 0.05f));
     PrototypeMuzzleFlash->SetIntensity(0.0f);
     PrototypeMuzzleFlash->SetAttenuationRadius(220.0f);
 
-    // Lightweight first-person assembly for the movement gym. Blueprint can
-    // replace these blocks with authored arms without changing gameplay rules.
-    LeftArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArmVisual"));
-    LeftArmVisual->SetupAttachment(FirstPersonCamera);
-    LeftArmVisual->SetRelativeLocation(FVector(25.0f, -17.0f, -22.0f));
-    LeftArmVisual->SetRelativeScale3D(FVector(0.28f, 0.045f, 0.045f));
-    LeftArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    LeftArmVisual->SetOnlyOwnerSee(true);
-    if (CubeMesh.Succeeded()) LeftArmVisual->SetStaticMesh(CubeMesh.Object);
-
-    RightArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArmVisual"));
-    RightArmVisual->SetupAttachment(FirstPersonCamera);
-    RightArmVisual->SetRelativeLocation(FVector(31.0f, 13.0f, -24.0f));
-    RightArmVisual->SetRelativeScale3D(FVector(0.32f, 0.045f, 0.045f));
-    RightArmVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    RightArmVisual->SetOnlyOwnerSee(true);
-    if (CubeMesh.Succeeded()) RightArmVisual->SetStaticMesh(CubeMesh.Object);
+    // Arms. Parented to the rig, not the camera, because the hands hold the
+    // gun; that is also what makes the recoil read as the whole assembly
+    // moving rather than a stick sliding past two static blocks.
+    UStaticMesh* const CubeAsset = CubeMesh.Succeeded() ? CubeMesh.Object : nullptr;
+    auto MakeLimbPart = [this, CubeAsset](const TCHAR* Name) -> UStaticMeshComponent*
+    {
+        UStaticMeshComponent* Limb = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+        Limb->SetupAttachment(PrototypeWeaponVisual);
+        Limb->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Limb->SetOnlyOwnerSee(true);
+        Limb->SetCastShadow(false);
+        if (CubeAsset) Limb->SetStaticMesh(CubeAsset);
+        return Limb;
+    };
+    LeftArmVisual = MakeLimbPart(TEXT("LeftArmVisual"));
+    RightArmVisual = MakeLimbPart(TEXT("RightArmVisual"));
+    LeftGloveVisual = MakeLimbPart(TEXT("LeftGloveVisual"));
+    RightGloveVisual = MakeLimbPart(TEXT("RightGloveVisual"));
 }
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
@@ -123,6 +146,10 @@ UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { 
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    // Backstop for every path that changes the equipped gun without going
+    // through the 1/2 keys — the loadout screen, an item equip, a dev swap.
+    // Early-outs on the first line when nothing changed.
+    ApplyWeaponPresentation();
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
     // Fall-out-of-map recovery: the template level has no kill volume, so
@@ -168,6 +195,11 @@ void ABreakerCharacter::BeginPlay()
     }
     if (HasAuthority()) LoadGameState();
     if (Weapon && Equipment && HasAuthority()) Weapon->SyncArchetypesToEquipment();
+    // Build the blockout for whatever the save restored. Before this the proxy
+    // was only ever rebuilt on a 1/2 keypress, so a fresh session showed the
+    // constructor's rifle no matter what was actually equipped.
+    ApplyWeaponPresentation();
+    StartViewmodelCaptureCycle();
     float SavedFOV = 90.0f;
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
@@ -512,18 +544,41 @@ void ABreakerCharacter::StopAim()
 
 FVector ABreakerCharacter::GetWeaponRestLocation() const
 {
-    return Weapon && Weapon->IsAiming() ? FVector(48.0f, 0.0f, -12.0f) : FVector(48.0f, 18.0f, -18.0f);
+    // ADS is DERIVED, not authored: the rig comes forward and drops by exactly
+    // this weapon's sight height, which puts its own sight on the crosshair.
+    // Authoring the aimed pose per archetype was the alternative and it rots —
+    // move one part and the sight silently stops lining up.
+    if (Weapon && Weapon->IsAiming())
+    {
+        return FVector(ActiveLayout.AdsForwardCm, 0.0f, -ActiveLayout.SightHeightCm * ViewmodelScale);
+    }
+    return ActiveLayout.HipOffsetCm;
 }
 
 void ABreakerCharacter::UpdateViewmodelKick()
 {
     // The weapon component owns the spring; the character only reads it onto
-    // the placeholder mesh. Presentation, never a damage input.
+    // the blockout rig. Presentation, never a damage input. The whole assembly
+    // — every proxy part, both arms, the muzzle light — is parented to this one
+    // transform, so the kick moves the gun AND the hands holding it.
     if (!PrototypeWeaponVisual) return;
+    const FVector Rest = GetWeaponRestLocation();
     const FVector Offset = Weapon ? Weapon->GetViewmodelLocationOffset() : FVector::ZeroVector;
     const FRotator Rotation = Weapon ? Weapon->GetViewmodelRotationOffset() : FRotator::ZeroRotator;
-    PrototypeWeaponVisual->SetRelativeLocation(GetWeaponRestLocation() + Offset);
+    PrototypeWeaponVisual->SetRelativeLocation(Rest + Offset);
     PrototypeWeaponVisual->SetRelativeRotation(Rotation);
+
+    // The shoulders do NOT move with the rig — they are the player's body — so
+    // moving the rig into or out of the sights changes where the arms have to
+    // reach. Re-posed on the REST pose only, never on the kick: a recoiling gun
+    // takes the hands with it, so compensating for the spring would decouple
+    // them and the recoil would stop reading.
+    if (bViewmodelBuilt && !Rest.Equals(PosedArmRestLocation, 0.01f))
+    {
+        PosedArmRestLocation = Rest;
+        PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
+        PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
+    }
 }
 void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
 
@@ -539,36 +594,190 @@ void ABreakerCharacter::EquipSecondaryWeapon()
     ApplyWeaponPresentation();
 }
 
+namespace
+{
+    // One dynamic instance per pooled component, created on first use and
+    // re-tinted forever after. The stock basic-shape material exposes a single
+    // "Color" vector parameter, which is the whole reason this blockout needs
+    // no assets — the same trick BreakerGameMode's gym dressing uses.
+    UMaterialInstanceDynamic* GetOrCreateBlockoutMaterial(UMeshComponent* Component)
+    {
+        if (!Component) return nullptr;
+        if (UMaterialInstanceDynamic* Existing = Cast<UMaterialInstanceDynamic>(Component->GetMaterial(0)))
+        {
+            return Existing;
+        }
+        UMaterialInterface* Base = LoadObject<UMaterialInterface>(
+            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        if (!Base) return nullptr;
+        UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Base, Component);
+        if (Dynamic) Component->SetMaterial(0, Dynamic);
+        return Dynamic;
+    }
+}
+
+void ABreakerCharacter::StartViewmodelCaptureCycle()
+{
+    // -BreakerCycleWeapons=<seconds> walks the equipped archetype through the
+    // whole enum on a timer. It exists for exactly one reason: the screenshot
+    // harness photographs an idle standing player, so without it a capture run
+    // can only ever verify ONE gun, and "each archetype is distinguishable" is
+    // a claim nobody could check. Dev-only by construction — a command-line
+    // switch, unreachable from a shipped build, and it never touches a rule.
+    float Interval = 0.0f;
+    if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerCycleWeapons="), Interval) || Interval <= 0.0f) return;
+    if (!Weapon) return;
+
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] cycling weapon archetypes every %.1fs."), Interval);
+    GetWorldTimerManager().SetTimer(ViewmodelCycleTimer, [this]()
+    {
+        if (!Weapon) return;
+        const int32 Count = static_cast<int32>(EBreakerWeaponArchetype::Count);
+        const EBreakerWeaponArchetype Next = static_cast<EBreakerWeaponArchetype>(ViewmodelCycleIndex % Count);
+        // Second lap is aimed. The ADS rest pose is DERIVED from each layout's
+        // sight height, so "every archetype puts its own sight on the
+        // crosshair" is a claim only a capture can check.
+        const bool bAimed = (ViewmodelCycleIndex / Count) % 2 == 1;
+        ++ViewmodelCycleIndex;
+        Weapon->SetSlotArchetype(1, Next);
+        Weapon->EquipSlot(1);
+        Weapon->SetAiming(bAimed);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] archetype -> %s (%s)"),
+            *BreakerWeaponArchetypeNames::Display(Next), bAimed ? TEXT("ADS") : TEXT("hip"));
+    }, Interval, true, FMath::Max(0.5f, Interval * 0.5f));
+
+    // ...and pulse the trigger, because a capture of an idle player proves
+    // nothing about the two things this blockout exists for: that the recoil
+    // spring visibly moves the gun, and that the muzzle flash lands at the
+    // muzzle. Semi-automatic archetypes need the release, hence a pulse rather
+    // than a held trigger.
+    GetWorldTimerManager().SetTimer(ViewmodelFireTimer, [this]()
+    {
+        if (!Weapon) return;
+        Weapon->StartFire();
+        FTimerHandle Release;
+        GetWorldTimerManager().SetTimer(Release, [this]() { if (Weapon) Weapon->StopFire(); }, 0.12f, false);
+    }, 0.3f, true, 1.0f);
+}
+
+FBreakerViewmodelLayout ABreakerCharacter::ResolveViewmodelLayout(EBreakerWeaponArchetype Archetype) const
+{
+    if (const FBreakerViewmodelLayout* Override = ViewmodelLayoutOverrides.Find(Archetype))
+    {
+        return *Override;
+    }
+    return BreakerViewmodel::ArchetypeLayout(Archetype);
+}
+
 void ABreakerCharacter::ApplyWeaponPresentation()
 {
-    if (!Weapon || !PrototypeWeaponVisual || !PrototypeWeaponBarrel || !PrototypeWeaponSight) return;
-    switch (Weapon->GetArchetype())
+    if (!Weapon || !PrototypeWeaponVisual) return;
+    const EBreakerWeaponArchetype Archetype = Weapon->GetArchetype();
+    // Cheap idempotence, because Tick calls this every frame as a backstop: the
+    // archetype can change from the loadout screen, from an item equip, or from
+    // a dev swap, and NONE of those route through EquipPrimary/EquipSecondary.
+    // That is why the proxy used to keep the previous gun's proportions after a
+    // loadout change until the player pressed 1 or 2.
+    if (bViewmodelBuilt && Archetype == PresentedArchetype) return;
+    PresentedArchetype = Archetype;
+    ActiveLayout = ResolveViewmodelLayout(Archetype);
+    bViewmodelBuilt = true;
+    RebuildViewmodelParts();
+    UpdateViewmodelKick();
+}
+
+void ABreakerCharacter::RebuildViewmodelParts()
+{
+    // Loaded here rather than held as constructor references because a part's
+    // SHAPE changes with the archetype and the constructor cannot know it.
+    UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+
+    PrototypeWeaponVisual->SetRelativeScale3D(FVector(ViewmodelScale));
+
+    const int32 PartCount = ActiveLayout.Parts.Num();
+    for (int32 Index = 0; Index < ViewmodelParts.Num(); ++Index)
     {
-        case EBreakerWeaponArchetype::Shotgun:
-            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.34f, 0.12f, 0.11f));
-            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.55f, 0.48f, 0.48f));
-            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.08f, 0.22f, 0.22f));
-            break;
-        case EBreakerWeaponArchetype::Sniper:
-            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.52f, 0.065f, 0.065f));
-            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(1.05f, 0.22f, 0.22f));
-            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.22f, 0.45f, 0.45f));
-            break;
-        case EBreakerWeaponArchetype::SMG:
-            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.28f, 0.09f, 0.09f));
-            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.45f, 0.28f, 0.28f));
-            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.09f, 0.24f, 0.24f));
-            break;
-        case EBreakerWeaponArchetype::Rocket:
-            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.4f, 0.16f, 0.16f));
-            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.9f, 0.6f, 0.6f));
-            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.14f, 0.34f, 0.34f));
-            break;
-        default:
-            PrototypeWeaponVisual->SetRelativeScale3D(FVector(0.42f, 0.08f, 0.08f));
-            PrototypeWeaponBarrel->SetRelativeScale3D(FVector(0.75f, 0.32f, 0.32f));
-            PrototypeWeaponSight->SetRelativeScale3D(FVector(0.12f, 0.3f, 0.32f));
-            break;
+        UStaticMeshComponent* Component = ViewmodelParts[Index];
+        if (!Component) continue;
+        if (Index >= PartCount || !ActiveLayout.Parts[Index].IsUsed())
+        {
+            // Unused pool slots are hidden, never destroyed. Swapping from a
+            // nine-part machinegun to a five-part sidearm must not allocate.
+            Component->SetVisibility(false);
+            continue;
+        }
+
+        const FBreakerProxyPart& Part = ActiveLayout.Parts[Index];
+        UStaticMesh* ShapeMesh = Cube;
+        switch (Part.Shape)
+        {
+        case EBreakerProxyShape::CylinderX:
+        case EBreakerProxyShape::CylinderY: ShapeMesh = Cylinder; break;
+        case EBreakerProxyShape::ConeX:     ShapeMesh = Cone; break;
+        default: break;
+        }
+        if (Component->GetStaticMesh() != ShapeMesh) Component->SetStaticMesh(ShapeMesh);
+
+        FVector Scale;
+        FRotator Rotation;
+        BreakerViewmodel::ResolvePartTransform(Part, Scale, Rotation);
+        Component->SetRelativeLocation(Part.LocationCm);
+        Component->SetRelativeRotation(Rotation);
+        Component->SetRelativeScale3D(Scale);
+        Component->SetVisibility(true);
+        if (UMaterialInstanceDynamic* Dynamic = GetOrCreateBlockoutMaterial(Component))
+        {
+            Dynamic->SetVectorParameterValue(TEXT("Color"), Part.Color);
+        }
+    }
+
+    // The flash sits at the actual muzzle of the actual gun, so a sidearm
+    // flashes 18 cm out and a sniper 73 cm out.
+    if (PrototypeMuzzleFlash)
+    {
+        PrototypeMuzzleFlash->SetRelativeLocation(ActiveLayout.MuzzleCm);
+    }
+
+    PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
+    PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
+}
+
+void ABreakerCharacter::PoseArm(UStaticMeshComponent* Forearm, UStaticMeshComponent* Glove,
+    const FVector& AnchorCm, const FVector& HandRigCm)
+{
+    if (!Forearm || !Glove || !PrototypeWeaponVisual) return;
+
+    // The anchor is authored in CAMERA space (it is a property of the player's
+    // body) and the hand in RIG space (it is a property of the gun), so the
+    // anchor has to be pulled into rig space before the limb can be measured.
+    // The near plane clips the shoulder end, which is what makes the limbs read
+    // as entering frame from the player rather than as floating sticks.
+    const float Scale = FMath::Max(ViewmodelScale, KINDA_SMALL_NUMBER);
+    const FVector AnchorInRig = (AnchorCm - GetWeaponRestLocation()) / Scale;
+
+    FVector Centre;
+    FRotator Rotation;
+    float Length = 0.0f;
+    BreakerViewmodel::ResolveLimb(AnchorInRig, HandRigCm, Centre, Rotation, Length);
+
+    Forearm->SetRelativeLocation(Centre);
+    Forearm->SetRelativeRotation(Rotation);
+    Forearm->SetRelativeScale3D(FVector(Length, ForearmWidthCm, ForearmWidthCm) / 100.0f);
+    Forearm->SetVisibility(true);
+    if (UMaterialInstanceDynamic* Dynamic = GetOrCreateBlockoutMaterial(Forearm))
+    {
+        Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerViewmodel::SleeveSlate);
+    }
+
+    Glove->SetRelativeLocation(HandRigCm);
+    Glove->SetRelativeRotation(Rotation);
+    Glove->SetRelativeScale3D(FVector(GloveSizeCm, GloveSizeCm, GloveSizeCm * 0.8f) / 100.0f);
+    Glove->SetVisibility(true);
+    if (UMaterialInstanceDynamic* Dynamic = GetOrCreateBlockoutMaterial(Glove))
+    {
+        Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerViewmodel::GloveOlive);
     }
 }
 
