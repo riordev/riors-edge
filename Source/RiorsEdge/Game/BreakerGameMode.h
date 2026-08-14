@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Containers/Ticker.h"
+
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "BreakerGameMode.generated.h"
@@ -55,7 +57,14 @@ public:
     // cannot reach it. Shots land in Saved/Screenshots.
     void ScheduleScreenshots();
     void CaptureScreenshot();
-    FTimerHandle ScreenshotTimer;
+    // A CORE ticker, not a world timer. Opening the front end calls
+    // SetPause(true), which stops world timers dead -- so the first attempt at
+    // menu capture opened the screen and then photographed nothing, forever.
+    // FTSTicker runs on real time and does not care that the game is paused,
+    // which is exactly the property a capture harness needs, because the menus
+    // are the thing most worth capturing and they are ALWAYS paused.
+    FTSTicker::FDelegateHandle ScreenshotTickHandle;
+    double NextScreenshotTime = 0.0;
     int32 ScreenshotsRemaining = 0;
     int32 ScreenshotIndex = 0;
     // First shot waits this long so the gym has spawned, the HUD has ticked and

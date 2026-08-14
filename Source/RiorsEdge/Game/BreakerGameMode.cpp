@@ -69,13 +69,20 @@ void ABreakerGameMode::ScheduleScreenshots()
     if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshots="), Count) || Count <= 0) return;
     ScreenshotsRemaining = FMath::Clamp(Count, 1, 60);
     ScreenshotIndex = 0;
+    NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotFirstDelaySeconds);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first at %.1fs, every %.1fs after."),
         ScreenshotsRemaining, ScreenshotFirstDelaySeconds, ScreenshotIntervalSeconds);
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().SetTimer(ScreenshotTimer, this, &ABreakerGameMode::CaptureScreenshot,
-            FMath::Max(0.1f, ScreenshotIntervalSeconds), true, FMath::Max(0.1f, ScreenshotFirstDelaySeconds));
-    }
+
+    ScreenshotTickHandle = FTSTicker::GetCoreTicker().AddTicker(
+        FTickerDelegate::CreateWeakLambda(this, [this](float) -> bool
+        {
+            if (FPlatformTime::Seconds() >= NextScreenshotTime)
+            {
+                NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotIntervalSeconds);
+                CaptureScreenshot();
+            }
+            return ScreenshotsRemaining > 0;
+        }), 0.0f);
 }
 
 void ABreakerGameMode::CaptureScreenshot()
@@ -91,19 +98,19 @@ void ABreakerGameMode::CaptureScreenshot()
     FScreenshotRequest::RequestScreenshot(Path, /*bShowUI*/ true, /*bAddFilenameSuffix*/ false);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] shot %d -> %s"), ScreenshotIndex, *Path);
     ++ScreenshotIndex;
+
     if (--ScreenshotsRemaining > 0) return;
 
-    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(ScreenshotTimer);
-    // Quit on a short delay so the last shot finishes writing to disk.
-    FTimerHandle QuitTimer;
-    if (UWorld* World = GetWorld())
+    // Quit on a real-time delay so the last shot finishes writing. Real time
+    // again, for the same pause reason.
+    const double QuitAt = FPlatformTime::Seconds() + 2.5;
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([QuitAt](float) -> bool
     {
-        World->GetTimerManager().SetTimer(QuitTimer, []()
-        {
-            UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] done."));
-            FPlatformMisc::RequestExit(false);
-        }, 2.0f, false);
-    }
+        if (FPlatformTime::Seconds() < QuitAt) return true;
+        UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] done."));
+        FPlatformMisc::RequestExit(false);
+        return false;
+    }), 0.0f);
 }
 
 // One line stating what the gym actually built. This exists for the
