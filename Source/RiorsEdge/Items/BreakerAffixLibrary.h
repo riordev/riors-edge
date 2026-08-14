@@ -98,6 +98,15 @@ public:
     static constexpr float TierSpikeT0Multiplier = 2.2f;     // O2 PLACEHOLDER, ~2.5 top-steps
     static constexpr float TierSpikeTopMultiplier = 3.6f;    // O2 PLACEHOLDER, ~4.1 top-steps
 
+    // Probability that a drop's tier walk takes one more step toward the
+    // ceiling. Solved from the old ladder rather than picked: the walk used to
+    // continue with probability 0.5 over 7 steps, so a full climb was
+    // 0.5^7 = 1/128. Over 11 steps, 0.64^11 = 1/136 -- the rarity of a top
+    // roll is preserved while the ladder tripled in length. Left at 0.5 it
+    // would have become 1/2048, which is not rarity, it is a tier nobody sees.
+    // Consumed by UBreakerLootLibrary::RollItem.
+    static constexpr float TierUpgradeChance = 0.64f;        // O2 PLACEHOLDER
+
     // Item level gates the best rollable tier: 1-120 onto T12..T1, one tier
     // per 10 levels. Level 1 rolls only T12; T1 opens at ilvl 111.
     // T0/T-1 never come from item level alone — they are crafted or carried by

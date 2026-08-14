@@ -62,7 +62,10 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
     Item.DefinitionId = DefinitionId;
     Item.Slot = Slot;
     Item.Rarity = Rarity;
-    Item.ItemLevel = FMath::Clamp(ItemLevel, 1, 50);
+    // O29: item level runs to 120, past the character cap of 50 and past the
+    // area-level ceiling of 100. This is THE endgame power source -- deeper
+    // item level means deeper affix tiers and a bigger WeaponBase(ilvl).
+    Item.ItemLevel = FMath::Clamp(ItemLevel, 1, UBreakerAffixLibrary::MaxItemLevel);
 
     // A weapon drop decides WHICH GUN IT IS before it decides its affixes,
     // because the archetype bends the affix odds (owner: "certain guns have
@@ -137,11 +140,30 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         const int32 SlotBestTier = (bFocused && Index == 0)
             ? FMath::Max(BestTier - 1, UBreakerAffixLibrary::TierCapForRarity(Rarity))
             : BestTier;
-        const int32 WorstTier = 8;
+        // RE-DERIVED FOR THE 12-TIER LADDER (O29). The walk is unchanged in
+        // shape -- start at the worst tier, take a step toward the ceiling
+        // until a roll fails -- but the number of steps went from 7 to 11, and
+        // the per-step probability cannot stay at one half through that.
+        //
+        // The arithmetic: reaching the top of the ladder from the bottom used
+        // to be 0.5^7 = 1/128. At 0.5 over eleven steps it would be 0.5^11 =
+        // 1/2048, which is not "rare", it is a tier nobody sees. Solving
+        // q^11 = 1/128 gives q = 0.643, so:
+        //
+        //     0.64^11 = 1/136, against the old 0.50^7 = 1/128
+        //
+        // The rarity of a full climb is preserved almost exactly while the
+        // ladder tripled in length. What DID change, correctly, is the middle:
+        // each individual step is now likelier, so an ordinary drop lands a
+        // tier or two above the floor more often than it used to. That is the
+        // point of a back-loaded value curve -- the low tiers are cheap
+        // because they are worth little, and the top is expensive because it
+        // is worth a lot.
+        const int32 WorstTier = UBreakerAffixLibrary::WorstTier;
         int32 Tier = WorstTier;
         for (int32 Candidate = WorstTier - 1; Candidate >= SlotBestTier; --Candidate)
         {
-            if (Random.FRand() < 0.5f) break;
+            if (Random.FRand() >= UBreakerAffixLibrary::TierUpgradeChance) break;
             Tier = Candidate;
         }
         // ...and the focused slot never rolls WORSE than the ordinary ceiling,
@@ -158,7 +180,7 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         // Step 5: value within the tier band — between this tier's value and
         // partway toward the next tier up.
         const float TierValue = UBreakerAffixLibrary::ValueForTier(*Chosen, Tier);
-        const float NextValue = UBreakerAffixLibrary::ValueForTier(*Chosen, FMath::Max(Tier - 1, -1));
+        const float NextValue = UBreakerAffixLibrary::ValueForTier(*Chosen, FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier));
         Rolled.Value = FMath::Lerp(TierValue, NextValue, Random.FRand() * 0.5f);
         Item.Affixes.Add(Rolled);
 

@@ -7,6 +7,7 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerLootLibrary.h"
+#include "Weapons/BreakerWeaponMath.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAffixTierCurveTest,
@@ -15,16 +16,104 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerAffixTierCurveTest::RunTest(const FString& Parameters)
 {
-    FBreakerAffixDefinition Affix;
-    Affix.ValueAtT8 = 25.0f;
-    Affix.ValueAtT1 = 180.0f;
+    using ALib = UBreakerAffixLibrary;
 
-    TestEqual(TEXT("T8 returns the floor value"), UBreakerAffixLibrary::ValueForTier(Affix, 8), 25.0f);
-    TestEqual(TEXT("T1 returns the ceiling value"), UBreakerAffixLibrary::ValueForTier(Affix, 1), 180.0f);
-    TestEqual(TEXT("T0 spikes to 1.4x T1"), UBreakerAffixLibrary::ValueForTier(Affix, 0), 252.0f);
-    TestEqual(TEXT("T-1 spikes to 1.8x T1"), UBreakerAffixLibrary::ValueForTier(Affix, -1), 324.0f);
-    const float T4 = UBreakerAffixLibrary::ValueForTier(Affix, 4);
-    TestTrue(TEXT("Middle tiers interpolate linearly"), T4 > 25.0f && T4 < 180.0f);
+    // Core.Health's authored anchors, so the numbers in the table on
+    // ValueForTier and the numbers here are the same numbers.
+    FBreakerAffixDefinition Affix;
+    Affix.ValueAtT12 = 25.0f;
+    Affix.ValueAtT1 = 400.0f;
+
+    TestEqual(TEXT("T12 returns the floor value exactly"), ALib::ValueForTier(Affix, 12), 25.0f);
+    TestEqual(TEXT("T1 returns the ceiling value exactly"), ALib::ValueForTier(Affix, 1), 400.0f);
+    TestEqual(TEXT("T0 spikes to 2.2x T1"), ALib::ValueForTier(Affix, 0), 880.0f, 0.01f);
+    TestEqual(TEXT("T-1 spikes to 3.6x T1"), ALib::ValueForTier(Affix, -1), 1440.0f, 0.01f);
+
+    // MONOTONIC. Nothing else in the file is meaningful if a better tier can
+    // ever be worth less, and a curve with an exponent is exactly the shape
+    // where a sign slip produces that silently.
+    for (int32 Tier = 12; Tier > ALib::TopTier; --Tier)
+    {
+        const float Worse = ALib::ValueForTier(Affix, Tier);
+        const int32 Better = (Tier == 1) ? 0 : Tier - 1;
+        TestTrue(*FString::Printf(TEXT("T%d is worth strictly more than T%d"), Better, Tier),
+            ALib::ValueForTier(Affix, Better) > Worse);
+    }
+
+    // BACK-LOADED, in both senses (O29: "a materially bigger jump between the
+    // high tiers"). Asserting the PROPERTY rather than the eleven values,
+    // because the exponent is an O2 placeholder and the shape is the ruling.
+    float PreviousStep = 0.0f;
+    float PreviousRatio = 0.0f;
+    for (int32 Tier = 11; Tier >= 1; --Tier)
+    {
+        const float Value = ALib::ValueForTier(Affix, Tier);
+        const float Below = ALib::ValueForTier(Affix, Tier + 1);
+        const float Step = Value - Below;
+        const float Ratio = Value / Below;
+        TestTrue(*FString::Printf(TEXT("T%d's absolute step exceeds the one below it"), Tier), Step > PreviousStep);
+        TestTrue(*FString::Printf(TEXT("T%d's relative step exceeds the one below it"), Tier), Ratio > PreviousRatio);
+        PreviousStep = Step;
+        PreviousRatio = Ratio;
+    }
+
+    // The two headline figures from the derivation, so a retune of the exponent
+    // has to come past a number a human wrote down.
+    const float BottomStep = ALib::ValueForTier(Affix, 11) / ALib::ValueForTier(Affix, 12);
+    const float TopStep = ALib::ValueForTier(Affix, 1) / ALib::ValueForTier(Affix, 2);
+    TestEqual(TEXT("Bottom step is +14.8%"), BottomStep, 1.148f, 0.005f);
+    TestEqual(TEXT("Top step is +36.5%"), TopStep, 1.365f, 0.005f);
+    AddInfo(FString::Printf(TEXT("Tier ladder: bottom step x%.3f, top step x%.3f (%.2fx), T1/T12 = %.1fx"),
+        BottomStep, TopStep, (TopStep - 1.0f) / (BottomStep - 1.0f), Affix.ValueAtT1 / Affix.ValueAtT12));
+
+    // T-1 IS THE TOP, and the spike is still a spike. Re-sited from 1.4x/1.8x
+    // precisely because against a +36.5% top step those would have been about
+    // one ordinary step and the spike would have stopped being one (O29).
+    TestTrue(TEXT("T-1 is the highest value on the ladder"),
+        ALib::ValueForTier(Affix, ALib::TopTier) > ALib::ValueForTier(Affix, 0));
+    TestTrue(TEXT("The T0 spike is worth more than two ordinary top steps"),
+        ALib::ValueForTier(Affix, 0) > ALib::ValueForTier(Affix, 1) * TopStep * TopStep);
+
+    // Tiers outside the ladder clamp rather than extrapolate: the equipment
+    // uplift path asks for Tier - Uplift and must not be able to walk off the
+    // end into a value with no entry on the curve.
+    TestEqual(TEXT("Below T-1 clamps to T-1"), ALib::ValueForTier(Affix, -5), ALib::ValueForTier(Affix, -1));
+    TestEqual(TEXT("Above T12 clamps to T12"), ALib::ValueForTier(Affix, 99), ALib::ValueForTier(Affix, 12));
+
+    // The degenerate-band fallback. An affix authored with a zero floor cannot
+    // take the geometric branch; it must still be monotonic rather than zero or
+    // NaN, because a NaN here reaches the damage pipeline.
+    FBreakerAffixDefinition ZeroFloor;
+    ZeroFloor.ValueAtT12 = 0.0f;
+    ZeroFloor.ValueAtT1 = 10.0f;
+    TestEqual(TEXT("A zero-floor affix is still exactly 0 at T12"), ALib::ValueForTier(ZeroFloor, 12), 0.0f);
+    TestEqual(TEXT("A zero-floor affix still reaches its ceiling at T1"), ALib::ValueForTier(ZeroFloor, 1), 10.0f);
+    TestTrue(TEXT("A zero-floor affix is still monotonic"),
+        ALib::ValueForTier(ZeroFloor, 5) > ALib::ValueForTier(ZeroFloor, 8));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE LADDER'S BOUNDARIES (O29)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTierLadderTest,
+    "RiorsEdge.Items.TierLadder",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTierLadderTest::RunTest(const FString& Parameters)
+{
+    using ALib = UBreakerAffixLibrary;
+
+    // THE SEAM. BreakerWeaponMath is deliberately dependency-free, so its item
+    // level ceiling is a second copy of this number rather than an include.
+    // A weapon clamping below the item system would cap base damage while the
+    // affixes on the same item kept climbing — the same class of split as the
+    // 74x endgame gap O29 exists to close.
+    TestEqual(TEXT("The weapon damage curve supports the full O29 item level range"),
+        FBreakerWeaponMath::MaxSupportedItemLevel, ALib::MaxItemLevel);
+    TestEqual(TEXT("Item level runs to 120 (O29)"), ALib::MaxItemLevel, 120);
+    TestEqual(TEXT("The ladder is 12 tiers deep (O29)"), ALib::WorstTier, 12);
     return true;
 }
 
@@ -35,11 +124,147 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerItemLevelGatingTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("Level 1 rolls only T8"), UBreakerAffixLibrary::BestTierForItemLevel(1), 8);
-    TestEqual(TEXT("Level 50 opens T1"), UBreakerAffixLibrary::BestTierForItemLevel(50), 1);
-    TestTrue(TEXT("Level 25 sits between"), UBreakerAffixLibrary::BestTierForItemLevel(25) < 8 && UBreakerAffixLibrary::BestTierForItemLevel(25) > 1);
-    TestEqual(TEXT("Standard rarity caps at T3"), UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity::Standard), 3);
-    TestEqual(TEXT("Exceptional rarity ceiling is T-1"), UBreakerAffixLibrary::TierCapForRarity(EBreakerItemRarity::Exceptional), -1);
+    using ALib = UBreakerAffixLibrary;
+
+    TestEqual(TEXT("Level 1 rolls only T12"), ALib::BestTierForItemLevel(1), 12);
+    TestEqual(TEXT("Level 10 is still T12 (ten levels per tier)"), ALib::BestTierForItemLevel(10), 12);
+    TestEqual(TEXT("Level 11 opens T11"), ALib::BestTierForItemLevel(11), 11);
+    // The character cap is now MID-ladder, which is the whole of O29 in one
+    // assertion: reaching 50 is no longer the end of gear progression.
+    TestEqual(TEXT("Level 50, the character cap, reaches only T8"), ALib::BestTierForItemLevel(50), 8);
+    TestEqual(TEXT("Level 100, the area-level ceiling, reaches T3"), ALib::BestTierForItemLevel(100), 3);
+    TestEqual(TEXT("Level 111 opens T1"), ALib::BestTierForItemLevel(111), 1);
+    TestEqual(TEXT("Level 120 is T1"), ALib::BestTierForItemLevel(120), 1);
+
+    // The full range, walked. Monotonic (a higher item level never rolls a
+    // worse ceiling), never off the ends of the ladder, and never reaching the
+    // spike tiers from item level alone — T0/T-1 are crafted or carried by a
+    // rule, which is what keeps the Forge a destination.
+    int32 Previous = ALib::WorstTier;
+    for (int32 Level = 1; Level <= ALib::MaxItemLevel; ++Level)
+    {
+        const int32 Best = ALib::BestTierForItemLevel(Level);
+        TestTrue(*FString::Printf(TEXT("ilvl %d: tier ceiling never worsens"), Level), Best <= Previous);
+        TestTrue(*FString::Printf(TEXT("ilvl %d: tier ceiling is inside T12..T1"), Level),
+            Best >= ALib::BestNormalTier && Best <= ALib::WorstTier);
+        Previous = Best;
+    }
+    // Out of range in both directions clamps rather than extrapolating.
+    TestEqual(TEXT("Below 1 clamps to the worst tier"), ALib::BestTierForItemLevel(-40), 12);
+    TestEqual(TEXT("Past 120 clamps to the best normal tier"), ALib::BestTierForItemLevel(9999), 1);
+    // Every one of the twelve tiers is actually reachable from some item level.
+    // A mapping that skipped one would author a tier nobody can ever roll.
+    for (int32 Tier = 1; Tier <= ALib::WorstTier; ++Tier)
+    {
+        bool bReachable = false;
+        for (int32 Level = 1; Level <= ALib::MaxItemLevel && !bReachable; ++Level)
+        {
+            bReachable = ALib::BestTierForItemLevel(Level) == Tier;
+        }
+        TestTrue(*FString::Printf(TEXT("T%d is reachable from some item level"), Tier), bReachable);
+    }
+
+    // RARITY CAPS, re-derived against 11 steps rather than 7. The invariant
+    // that survives the widening is the two-tier gap between Standard and
+    // Uncommon; the numbers themselves both move up one.
+    TestEqual(TEXT("Standard rarity caps at T4"), ALib::TierCapForRarity(EBreakerItemRarity::Standard), 4);
+    TestEqual(TEXT("Uncommon rarity caps at T2"), ALib::TierCapForRarity(EBreakerItemRarity::Uncommon), 2);
+    TestEqual(TEXT("The Standard->Uncommon gap is still two tiers"),
+        ALib::TierCapForRarity(EBreakerItemRarity::Standard) - ALib::TierCapForRarity(EBreakerItemRarity::Uncommon), 2);
+    TestEqual(TEXT("Exceptional rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Exceptional), -1);
+    TestEqual(TEXT("Aberrant rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Aberrant), -1);
+    TestEqual(TEXT("Anomalous rarity ceiling is T-1"), ALib::TierCapForRarity(EBreakerItemRarity::Anomalous), -1);
+
+    // The caps must remain ORDERED, and no cap may sit outside the ladder — a
+    // cap worse than the worst tier would make a rarity unrollable.
+    TestTrue(TEXT("Rarity ceilings improve monotonically"),
+        ALib::TierCapForRarity(EBreakerItemRarity::Standard) > ALib::TierCapForRarity(EBreakerItemRarity::Uncommon)
+        && ALib::TierCapForRarity(EBreakerItemRarity::Uncommon) > ALib::TierCapForRarity(EBreakerItemRarity::Exceptional));
+    TestTrue(TEXT("No rarity cap sits outside the ladder"),
+        ALib::TierCapForRarity(EBreakerItemRarity::Standard) <= ALib::WorstTier
+        && ALib::TierCapForRarity(EBreakerItemRarity::Anomalous) >= ALib::TopTier);
+
+    // A Standard drop at the item-level ceiling is capped by its RARITY, not by
+    // its item level — which is the only thing that makes a rarity cap mean
+    // anything now that item level reaches T1 on its own.
+    const int32 StandardAt120 = FMath::Max(ALib::BestTierForItemLevel(120), ALib::TierCapForRarity(EBreakerItemRarity::Standard));
+    TestEqual(TEXT("An ilvl-120 Standard is held at T4 by rarity"), StandardAt120, 4);
+    const int32 ExceptionalAt120 = FMath::Max(ALib::BestTierForItemLevel(120), ALib::TierCapForRarity(EBreakerItemRarity::Exceptional));
+    TestEqual(TEXT("An ilvl-120 Exceptional reaches T1 from item level"), ExceptionalAt120, 1);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// EXISTING SAVES STILL LOAD (O29's implementation note)
+// ---------------------------------------------------------------------------
+// A rolled affix stores Tier and Value per item, so widening the ladder cannot
+// invalidate one. The ruling adds that items rolled before O29 keep the values
+// they rolled and "will read as weak. That is correct and should not be
+// migrated." This test VERIFIES that rather than assuming it — the failure mode
+// it guards is a well-meaning future pass re-deriving Value from Tier on load,
+// which would silently rewrite every item anybody owns.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerLegacyItemTest,
+    "RiorsEdge.Items.LegacyItemsSurviveTheWiderLadder",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerLegacyItemTest::RunTest(const FString& Parameters)
+{
+    using ALib = UBreakerAffixLibrary;
+    const TArray<FBreakerAffixDefinition>& Pool = ALib::GetSliceAffixPool();
+
+    // An item as the PRE-O29 pipeline would have written it: item level 50 (the
+    // old ceiling), tier 1 (the old best), and the value the old linear curve
+    // produced for Core.Health at T1 — 180, which is now what the new curve
+    // pays at about T4.
+    FBreakerItemInstance Legacy;
+    Legacy.ItemId = FGuid::NewGuid();
+    Legacy.DefinitionId = TEXT("LegacySave");
+    Legacy.Slot = EBreakerEquipSlot::Helmet;
+    Legacy.Rarity = EBreakerItemRarity::Exceptional;
+    Legacy.ItemLevel = 50;
+    FBreakerRolledAffix Rolled;
+    Rolled.AffixId = TEXT("Core.Health");
+    Rolled.Tier = 1;
+    Rolled.Value = 180.0f;
+    Rolled.Category = EBreakerAffixCategory::Suffix;
+    Legacy.Affixes.Add(Rolled);
+
+    TestTrue(TEXT("A pre-O29 item is still a valid item"), Legacy.IsValid());
+
+    // The aggregation path reads the STORED value, never re-derives it.
+    const FBreakerBuildConditionState Standing;
+    FBreakerAttributeContribution Offer;
+    const FBreakerEquipmentStats Stats = UBreakerEquipmentComponent::AggregateStats({Legacy}, &Offer, Standing);
+    TestEqual(TEXT("A pre-O29 item contributes exactly the value it rolled"),
+        Offer.GetFlat(EBreakerAggregatedAttribute::MaxHealth), 180.0f, 0.001f);
+    TestEqual(TEXT("...and the display stat agrees"), Stats.BonusHealth, 180.0f, 0.001f);
+
+    // It reads as WEAK against what the same tier is worth now, and that is the
+    // ruled outcome rather than a bug: it is a T1 roll from a shallower ladder.
+    const FBreakerAffixDefinition* Definition = ALib::FindAffix(Pool, TEXT("Core.Health"));
+    TestNotNull(TEXT("Core.Health is still in the pool"), Definition);
+    if (Definition)
+    {
+        TestTrue(TEXT("A pre-O29 T1 roll is worth less than a post-O29 T1 roll"),
+            Rolled.Value < ALib::ValueForTier(*Definition, 1));
+        AddInfo(FString::Printf(TEXT("Legacy T1 Core.Health = %.1f; post-O29 T1 = %.1f (%.2fx), roughly today's T%d"),
+            Rolled.Value, ALib::ValueForTier(*Definition, 1),
+            ALib::ValueForTier(*Definition, 1) / Rolled.Value, 4));
+    }
+
+    // Every legal pre-O29 tier — 8 down to -1 — is still inside the new
+    // ladder's domain and still produces a finite, ordered value, so nothing
+    // stored in an old save can index off the end of the curve.
+    if (Definition)
+    {
+        for (int32 Tier = 8; Tier >= -1; --Tier)
+        {
+            const float Value = ALib::ValueForTier(*Definition, Tier);
+            TestTrue(*FString::Printf(TEXT("Legacy tier %d still evaluates finite and positive"), Tier),
+                FMath::IsFinite(Value) && Value > 0.0f);
+        }
+    }
     return true;
 }
 

@@ -66,7 +66,11 @@ namespace
     // looting".
     float BreakerForgeLevelScalar(int32 ItemLevel)
     {
-        return 1.0f + (FMath::Clamp(ItemLevel, 1, 50) - 1) * 0.06f;  // O2 PLACEHOLDER, x3.94 at 50
+        // Follows the O29 item-level ceiling rather than the old character cap:
+        // an ilvl 120 item carries roughly three times the affix value of an
+        // ilvl 50 one, so crafting it at level-50 prices would make the Forge
+        // strictly cheaper the deeper the endgame goes.
+        return 1.0f + (FMath::Clamp(ItemLevel, 1, UBreakerAffixLibrary::MaxItemLevel) - 1) * 0.06f;  // O2 PLACEHOLDER, x3.94 at 50, x8.14 at 120
     }
 
     // O2 PLACEHOLDER. Tempering INTO this tier costs this, in the currency the
@@ -76,15 +80,22 @@ namespace
     {
         FBreakerForgeCost Cost;
         const float LevelScalar = BreakerForgeLevelScalar(ItemLevel);
-        if (TargetTier >= 4)
+        // The currency bands are re-sited onto the 12-tier ladder (O29). They
+        // used to split an 8-tier ladder at T4 -- the top 3 normal tiers cost
+        // Flux, the rest Slag. The same split of 11 steps puts the boundary at
+        // T4 again by coincidence of arithmetic (3 of 11 rounds to 3), so
+        // T12..T5 are the Slag band and T4..T1 the Flux band; only the linear
+        // coefficients move, so that the cheapest step in each band still costs
+        // what it did.
+        if (TargetTier >= 5)
         {
             Cost.Currency = EBreakerForgeCurrency::Slag;
-            Cost.Amount = FMath::RoundToInt((9 - TargetTier) * 6.0f * LevelScalar);
+            Cost.Amount = FMath::RoundToInt((13 - TargetTier) * 6.0f * LevelScalar);
         }
         else if (TargetTier >= 1)
         {
             Cost.Currency = EBreakerForgeCurrency::Flux;
-            Cost.Amount = FMath::RoundToInt((5 - TargetTier) * 8.0f * LevelScalar);
+            Cost.Amount = FMath::RoundToInt((6 - TargetTier) * 8.0f * LevelScalar);
         }
         else
         {
