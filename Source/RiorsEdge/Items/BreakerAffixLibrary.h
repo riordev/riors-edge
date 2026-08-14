@@ -32,7 +32,11 @@ public:
     // unconditional Increased and a flat Added damage line, and five
     // conditional damage lines keyed to the movement pillar.
     //
-    // Eighteen entries, nine of them offensive. It was twelve with exactly one
+    // Plus the non-damage breadth pass: flat Armour, Health and Resource on
+    // Kill, and Increased Damage over Time — the survivability, resource and
+    // DoT axes, each of which had a live consumer sitting unused.
+    //
+    // Twenty-two entries, ten of them offensive. It was twelve with exactly one
     // offensive line that rolled on four of eight slots, which is the concrete
     // reason "full level 50 gear" did not feel like anything (O27, Power-Curve
     // §"More options in every avenue"). EVERY slot can now raise damage, and

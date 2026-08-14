@@ -3,10 +3,13 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Attributes/BreakerAttributeAggregation.h"
+#include "Items/BreakerForgeLibrary.h"
+#include "Items/BreakerItemRules.h"
 #include "Items/BreakerItemTypes.h"
 #include "BreakerEquipmentComponent.generated.h"
 
 class UBreakerAttributeSet;
+struct FBreakerHitContext;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerEquipmentChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerItemAcquired, const FBreakerItemInstance&, Item);
@@ -42,6 +45,12 @@ public:
     // item level and equips it, so TTK passes start from a full loadout.
     // Whatever was equipped goes back to the backpack the usual way.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void DevGrantTestGear(int32 ItemLevel);
+    // Playtest helper: rolls every legendary at the given item level into the
+    // backpack. Anomalous is ~0.5% of drops and only three slots have one, so
+    // without this the three build-defining items are unreachable in a session
+    // — which is the same "exists but cannot be found" failure as an affix with
+    // no consumer, one step removed.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void DevGrantLegendaries(int32 ItemLevel);
     UFUNCTION(BlueprintPure, Category="Equipment") bool GetEquippedItem(EBreakerEquipSlot Slot, FBreakerItemInstance& OutItem) const;
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetBackpack() const { return Backpack; }
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetEquipped() const { return Equipped; }
@@ -91,8 +100,41 @@ public:
     // Conditional lines pay out only for conditions active in Conditions; the
     // default empty state means "standing still", so every call site that
     // predates the conditional family keeps its exact previous behaviour.
+    // Rule rewrites carried by the equipped set are resolved and applied HERE,
+    // inside the same function, rather than by a second pass somewhere else.
+    // That is the whole reason an Anomalous rewrite reaches gameplay at all:
+    // this function's output is what the attribute set folds and what
+    // UBreakerCombatComponent reads, so a rewrite expressed here cannot be a
+    // line of text on a card.
     static FBreakerEquipmentStats AggregateStats(const TArray<FBreakerItemInstance>& Items, FBreakerAttributeContribution* OutContribution = nullptr,
         const FBreakerBuildConditionState& Conditions = FBreakerBuildConditionState());
+
+    // The rules the equipped set currently imposes. Exposed so the inventory
+    // can print them and so a test can assert on the resolved set rather than
+    // inferring it from a composed number.
+    UFUNCTION(BlueprintPure, Category="Equipment|Rules")
+    TArray<EBreakerItemRule> GetActiveRules() const { return CachedStats.ActiveRules; }
+
+    // ---- The Forge --------------------------------------------------------
+    // Item agency, gated on standing at one exactly like the respec is. The
+    // arithmetic lives in UBreakerForgeLibrary as pure functions; this is the
+    // authority-checked, wallet-owning wrapper.
+    UFUNCTION(BlueprintPure, Category="Equipment|Forge") const FBreakerForgeWallet& GetForgeWallet() const { return ForgeWallet; }
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount);
+    // Destroys a backpack item and pays its salvage value into the wallet. This
+    // is the ONLY currency source, which is what gives the discard pile a
+    // purpose it did not have: DiscardFromBackpack still exists and still pays
+    // nothing, so "melt" and "bin" are different verbs.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") bool SalvageFromBackpack(const FGuid& ItemId);
+    // Bulk salvage, sharing its predicate with DiscardBackpackBelowRarity so
+    // the two cannot disagree about which items are junk.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") int32 SalvageBackpackBelowRarity(EBreakerItemRarity MinimumKept);
+    // The three verbs, applied to an item held anywhere (backpack or equipped)
+    // and identified by id, because an item the player is wearing is exactly
+    // the item they most want to improve.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") EBreakerForgeResult TemperItem(const FGuid& ItemId, int32 AffixIndex, bool bIsAtForge);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") EBreakerForgeResult ReforgeItem(const FGuid& ItemId, bool bIsAtForge);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") EBreakerForgeResult AttuneItem(const FGuid& ItemId, bool bIsAtForge);
 
     // The movement/momentum conditions this component last folded in. The tick
     // re-evaluates and only resubmits when the SET changes, so gear damage
@@ -104,6 +146,13 @@ public:
     // a standalone set. Capturing the bases is the attribute set's job.
     void BindAttributes(UBreakerAttributeSet* InAttributes);
 
+    // Subscribes to the owner's combat events. Called from BeginPlay, and
+    // exposed for the same reason BindAttributes is: an affix that only pays
+    // out when a real actor in a real world lands a real kill is exactly the
+    // kind of line that ships broken, so the whole chain — bind, broadcast,
+    // heal — has to be exercisable in automation. Idempotent.
+    void BindCombatEvents();
+
     // This layer's current offer, exactly as submitted.
     const FBreakerAttributeContribution& GetAttributeContribution() const { return CachedContribution; }
 
@@ -112,10 +161,16 @@ public:
 
 protected:
     UFUNCTION() void OnRep_Equipped();
+    // Bound to the owner's UBreakerCombatComponent::OnKillDealt. This is how
+    // Health on Kill and Resource on Kill reach gameplay: an amount paid at an
+    // event has no attribute to live in, so it needs a listener. Bound once in
+    // BeginPlay and never rebound, so a recalculation cannot double-subscribe.
+    UFUNCTION() void HandleKillDealt(const FBreakerHitContext& Hit);
 
 private:
     UPROPERTY(ReplicatedUsing=OnRep_Equipped) TArray<FBreakerItemInstance> Equipped;
     UPROPERTY(Replicated) TArray<FBreakerItemInstance> Backpack;
+    UPROPERTY(Replicated) FBreakerForgeWallet ForgeWallet;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     FBreakerEquipmentStats CachedStats;
     // No base-value cache lives here any more. The attribute set owns the one
@@ -130,4 +185,11 @@ private:
     void RecalculateStats();
     void ApplyStatsToAttributes();
     bool HasAttributeAuthority() const;
+    // Finds a held item by id in either container. Returns null when the id is
+    // unknown; the caller re-equips if the item it mutated was worn.
+    FBreakerItemInstance* FindHeldItem(const FGuid& ItemId, bool& bOutEquipped);
+    // Rebuilds attributes and broadcasts after a Forge operation mutated an
+    // item in place. Equipped gear has to re-fold; a backpack item only has to
+    // repaint, but the same call covers both and cannot forget the first.
+    void OnHeldItemMutated(bool bWasEquipped);
 };

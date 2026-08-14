@@ -4,6 +4,7 @@
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemRules.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -327,6 +328,96 @@ bool FBreakerPowerBandTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Accumulation is a floor, not the band: removing it widens the band, never narrows it"),
         RatioWithoutAccumulation >= Ratio);
 
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// WHAT A RULE REWRITE IS WORTH, measured against the band it has to live in.
+// ---------------------------------------------------------------------------
+// The band above is unchanged by the rarity pass, and that is by construction:
+// FBreakerItemInstance::Rule defaults to None and the two loadouts are authored
+// affix by affix, so the power-band characters carry no rewrite even though
+// every piece is built at Anomalous to lift the tier cap. Which means the band
+// test on its own would say NOTHING about whether the rewrites are balanced.
+//
+// This is that measurement. A rewrite is available to a baseline and an
+// optimized character alike, so the number that matters is not the 8-10x band
+// but the STEP: what one Anomalous piece is worth on top of a build that has
+// already done everything else right. Logged in full, because the value of the
+// rewrites is the deliverable and a future tuning pass needs to see which one
+// moved.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRuleBandImpactTest,
+    "RiorsEdge.Progression.PowerBand.RuleImpact",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    const FBreakerBuildConditionState State = MeasurementState();
+    const FComposedBuild Baseline = Compose(BaselineLoadout(), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(), OptimizedRanks(), State);
+    const float PlainBand = Optimized.Total / Baseline.Total;
+
+    // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
+    // one Anomalous rewrite is the top of the rarity ladder, so it has to be a
+    // real step. It must NOT be so large that finding the right Anomalous is
+    // worth more than the whole optimized loadout, which is what "choices beat
+    // accumulation" (O27) would look like inverted.
+    constexpr float MaximumRuleStep = 1.35f;
+
+    for (const FBreakerItemRuleDefinition& Definition : UBreakerItemRuleLibrary::GetRuleDefinitions())
+    {
+        if (!Definition.bRollable) continue;   // legendaries have their own tests
+
+        // The rewrite lands on ONE piece, because the equip cap is one
+        // Anomalous. Helmet: it carries damage, crit and a conditional line, so
+        // every rollable rewrite has something on it to bite on.
+        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout();
+        WithRule[0].Rule = Definition.Rule;
+        const FComposedBuild Ruled = Compose(WithRule, OptimizedRanks(), State);
+
+        const float Step = Ruled.Total / Optimized.Total;
+        const float RuledBand = Ruled.Total / Baseline.Total;
+
+        // The SAME step measured while STANDING STILL, and it is not a footnote:
+        // the band above is measured airborne, recently dashed and at Redline,
+        // which is the one state in which UNBOUND is worth exactly nothing. A
+        // rewrite whose whole job is to free conditional lines has to be
+        // measured somewhere its conditions are false, or the report says it is
+        // worthless when it is the largest rewrite in the table.
+        const FBreakerBuildConditionState Grounded;
+        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(), OptimizedRanks(), Grounded);
+        const FComposedBuild GroundedRuled = Compose(WithRule, OptimizedRanks(), Grounded);
+        const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
+
+        AddInfo(FString::Printf(TEXT("RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx)"),
+            *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand));
+        TestTrue(*FString::Printf(TEXT("%s never lowers a grounded build either"),
+            *Definition.DisplayName.ToString()), GroundedStep >= 1.0f - UE_KINDA_SMALL_NUMBER);
+
+        TestTrue(*FString::Printf(TEXT("%s never LOWERS an optimized build's damage"),
+            *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
+        TestTrue(*FString::Printf(TEXT("%s is worth at most x%.2f on top of an optimized build (measured x%.3f)"),
+            *Definition.DisplayName.ToString(), MaximumRuleStep, Step), Step <= MaximumRuleStep);
+        // ...and it must not be the whole build. A rewrite that outweighs the
+        // 8.7x band would make every other decision a rounding error.
+        TestTrue(*FString::Printf(TEXT("%s is smaller than the band it lives in"),
+            *Definition.DisplayName.ToString()), Step < PlainBand);
+    }
+
+    // The pass's own claim, asserted: an item with no rewrite composes exactly
+    // as it did before rules existed. If this ever fails, a rewrite has leaked
+    // out of its item and become a property of rarity.
+    TArray<FBreakerItemInstance> Untouched = OptimizedLoadout();
+    for (const FBreakerItemInstance& Item : Untouched)
+    {
+        TestEqual(TEXT("A power-band piece carries no rewrite despite being Anomalous"),
+            static_cast<int32>(Item.Rule), static_cast<int32>(EBreakerItemRule::None));
+    }
+    TestEqual(TEXT("The measured band is untouched by the rarity pass"),
+        Compose(Untouched, OptimizedRanks(), State).Total / Baseline.Total, PlainBand, 0.0001f);
     return true;
 }
 

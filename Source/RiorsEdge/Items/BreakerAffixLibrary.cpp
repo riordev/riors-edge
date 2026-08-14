@@ -155,6 +155,64 @@ namespace
             {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary}, 4.5f, 20.0f, 45.0f, EBreakerBuildCondition::Redline));  // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.DashDamage"), TEXT("Damage after Dashing"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RecentlyDashedDamage, EBreakerStatBucket::IncreasedPercent,
             {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary}, 5.0f, 22.0f, 45.0f, EBreakerBuildCondition::RecentlyDashed)); // O2 PLACEHOLDER
+
+        // --- The non-damage breadth pass [O27] -----------------------------
+        // The first breadth pass took offence from one line to nine and left
+        // the other axes where it found them: survivability was Physical DR
+        // alone, the resource family was two lines that both did the same
+        // thing slowly, and damage-over-time had node support and no gear
+        // support at all. O27 asks for "significantly more options in ALL
+        // avenues", so these four widen the avenues that were not offence.
+        //
+        // Each one was chosen because a LIVE consumer already existed and was
+        // going unused. None of them is a new pipeline.
+
+        // Flat armour. Consumer: the Armor aggregated attribute ->
+        // UBreakerCombatComponent::GetEffectiveArmor() -> the mitigation
+        // formula. Armour rolls on the FIVE armour pieces and nowhere else:
+        // the necklace and the two weapons are the offence/utility slots in
+        // the per-slot identity table, and armour on a gun reads as filler.
+        // O2 PLACEHOLDER: 6 (T8) -> 34 (T1). Deliberately meaningful against
+        // the target dummy's 100 without approaching the boss armour cap.
+        Pool.Add(MakeAffix(TEXT("Core.Armour"), TEXT("Armour"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Armour, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 6.0f, 34.0f, 90.0f));
+
+        // Sustain, paid at an event rather than over time. Consumer:
+        // UBreakerEquipmentComponent binds UBreakerCombatComponent::OnKillDealt
+        // and routes it through ApplyHealing — the one healing path — so it
+        // obeys the overheal clamp and is visible to every listener instead of
+        // writing Health behind their backs.
+        //
+        // On-kill rather than on-hit on purpose: on-hit sustain scales with
+        // fire rate and turns the SMG into the only defensive weapon in the
+        // game, while on-kill scales with how well the build is already doing
+        // and pays nothing at all against a boss. That is the correct shape for
+        // a game whose difficulty lives in elites and bosses (O27).
+        // O2 PLACEHOLDER: 8 (T8) -> 42 (T1) health per kill.
+        Pool.Add(MakeAffix(TEXT("Core.LifeOnKill"), TEXT("Health on Kill"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::LifeOnKill, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace,
+             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 8.0f, 42.0f, 70.0f));
+
+        // The resource half of the same hook. Consumer: AddClassResource, which
+        // both live class loops (Swift's Momentum, Caster's Mana) read as their
+        // bank. It is the line that lets a Caster pay for the next cast by
+        // landing the last kill, which the flat regen trickle cannot express.
+        // O2 PLACEHOLDER: 2 (T8) -> 11 (T1).
+        Pool.Add(MakeAffix(TEXT("Core.ResourceOnKill"), TEXT("Resource on Kill"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceOnKill, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Waist,
+             EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 2.0f, 11.0f, 70.0f));
+
+        // Damage over time. Consumer: the DamageOverTimeMultiplier attribute,
+        // snapshotted at application by every DoT in the game (the SMG's Bleed,
+        // Cleave, Rot, Fracture). Six skill nodes bid on it and no affix did,
+        // so an Affliction build could be assembled in the tree and not in the
+        // stash — the same one-sided gap the damage pass found on the other
+        // side. Its own bucket, not the weapon-damage bucket: DoTs snapshot
+        // separately and always have.
+        // O2 PLACEHOLDER: 5% (T8) -> 26% (T1). Larger than Weapon Damage
+        // because it moves only the DoT portion of a build's output.
+        Pool.Add(MakeAffix(TEXT("Offense.DoTDamage"), TEXT("Damage over Time"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DamageOverTime, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 26.0f, 55.0f));
         return Pool;
     }
 }
@@ -181,6 +239,9 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     // Fire rate raises sustained damage output, so the breadth test counts it
     // as offence even though it lands on a different attribute.
     case EBreakerStatTarget::FireRate:
+    // Damage over time is damage. It lands on its own attribute and its own
+    // snapshot, but a build whose output is a DoT is not a defensive build.
+    case EBreakerStatTarget::DamageOverTime:
         return true;
     default:
         return false;
@@ -223,6 +284,9 @@ namespace BreakerArchetypeLeans
         { TEXT("Weapon.FireRate"),          3.0f },
         { TEXT("Crit.Chance"),              1.8f },
         { TEXT("Offense.AddedDamage"),      1.5f },  // flat pays a fast gun most
+        // The SMG is the gun that applies Bleed on hit, so it is the one gun
+        // whose own mechanics make a damage-over-time roll worth having.
+        { TEXT("Offense.DoTDamage"),        2.0f },
     };
 
     static const FLean MachinegunLeans[] = {
@@ -239,6 +303,9 @@ namespace BreakerArchetypeLeans
         { TEXT("Core.MoveSpeed"),           2.2f },
         { TEXT("Move.DashCooldown"),        1.8f },
         { TEXT("Offense.SlidingDamage"),    1.8f },
+        // The tempo gun refunds tempo: the fastest swap in the game paired
+        // with the resource to do something with it.
+        { TEXT("Core.ResourceOnKill"),      1.8f },
     };
 
     static const FLean SniperLeans[] = {
@@ -251,6 +318,8 @@ namespace BreakerArchetypeLeans
         { TEXT("Offense.AddedDamage"),      2.6f },  // flat pays per pellet
         { TEXT("Core.Health"),              1.8f },  // it is the close-range gun
         { TEXT("Offense.SlidingDamage"),    1.8f },
+        // Sustain belongs on the gun that has to be in the fight to work.
+        { TEXT("Core.LifeOnKill"),          2.0f },
     };
 
     static const FLean RocketLeans[] = {

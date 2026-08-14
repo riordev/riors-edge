@@ -43,10 +43,28 @@ and the O3 cap is enforced in code, not by convention:
 `UBreakerProgressionComponent::AggregateStats` collects every owned More
 source, sorts descending, keeps the strongest `MaxDamageMoreSources` (3) and
 clamps each to `SingleMoreCeiling` (1.30x, Damage-Pipeline §4). A fourth
-purchase is dead weight rather than a quiet nerf to the other three. LIMIT:
-the clamp is per-LAYER. Anomalous items do not author Mores yet; when they do,
-the cap has to move to one shared clamp across the whole composition or a
-build could hold three tree Mores plus an item's.
+purchase is dead weight rather than a quiet nerf to the other three.
+
+**RESOLVED — the cap is now GLOBAL as well as per-layer.** This section used
+to carry a limit: "the clamp is per-LAYER … when Anomalous items author Mores,
+the cap has to move to one shared clamp across the whole composition or a build
+could hold three tree Mores plus an item's."
+`FBreakerAttributeAggregator::Compose` now clamps the composed More product for
+`DamageMultiplier` at `ComposedMoreCeiling()` — `SingleMoreCeiling^
+MaxComposedMoreSources`, i.e. 1.30³ = **2.197**, which is Damage-Pipeline §4's
+2.20 and `UBreakerCombatComponent::ComposedMoreCeiling` reached from the two
+numbers that define it rather than restated as a third constant that can drift.
+The per-layer selection stays where it is, because only that layer knows its
+individual sources; what moved is the ceiling on what any combination of layers
+can compose to. **A contributor cannot buy its way past O3 by arriving second.**
+Damage only: no other aggregated attribute has an authored More budget, and
+silently clamping (say) move speed would be a balance decision hiding in a
+safety net. Pinned by `RiorsEdge.Items.Rules.NeverAuthorsAMore`, which also
+asserts the ceiling does *not* touch a build already inside the budget.
+
+Note that no rule rewrite actually authors a More — see the rarity section
+below for why that was a design constraint rather than an oversight. The global
+clamp is the guard rail for the next thing that tries.
 
 ## Item instances
 
@@ -87,6 +105,14 @@ Ten tiers, T8 worst to T-1 best, stored as printed (8..1, 0, -1).
 - `TierCapForRarity` — Standard caps at T3, Uncommon at T1, the rest reach
   T-1 (ceiling only; item level still gates what actually rolls).
 
+**T0 and T-1 are now reachable.** They were not, by any means, until the Forge
+landed: `BestTierForItemLevel` stops at T1 at level 50, the comment there says
+they are "crafting/boss territory", there was no crafting and there is no boss.
+Two tenths of the tier scale — the two the whole curve *spikes* toward — existed
+only as a comment. There are now exactly two routes, and both are gated:
+**tempering at the Forge** (Sigil-only, see the Forge section) and the
+**PROLIFIC** Anomalous rewrite (see rarity, below).
+
 ## The affix pool — WIDENED [O27 2026-08-13]
 
 `UBreakerAffixLibrary::GetSliceAffixPool()` is the C++ fallback pool (same
@@ -111,6 +137,14 @@ rules it out.
 | **Damage while Wall Riding** | Increased | Wall riding | boots, waist, gloves, body |
 | **Damage at Redline** | Increased | Redline momentum | neck, body, helmet, primary |
 | **Damage after Dashing** | Increased | Recently dashed | gloves, waist, neck, secondary |
+| Fire Rate | Increased | — | primary, secondary |
+| **Armour** | Flat | — | helmet, body, gloves, boots, waist |
+| **Health on Kill** | Flat | — | body, gloves, waist, neck, both weapons |
+| **Resource on Kill** | Flat | — | helmet, gloves, neck, waist, both weapons |
+| **Damage over Time** | Increased | — | helmet, body, gloves, neck, primary |
+
+The last four landed in the 2026-08-14 non-damage breadth pass, taking the pool
+to **22 lines**; see that section for why each one has a live consumer.
 
 Elemental DR is still excluded until a resistance model exists.
 
@@ -282,7 +316,11 @@ something a player can observe.
 | Affix | SlideSpeed | SlideSpeedMultiplier attribute → movement | yes |
 | Affix | AirControl | AirControlMultiplier attribute → steer rate | yes |
 | Affix | DashCooldownReduction | DashCooldownReduction attribute → dash | yes |
-| Affix | WeaponDamage | DamageMultiplier attribute (this pass) | yes |
+| Affix | WeaponDamage | DamageMultiplier attribute | yes |
+| Affix | Armour | Armor attribute → `GetEffectiveArmor()` → mitigation | yes (2026-08-14) |
+| Affix | LifeOnKill | `OnKillDealt` → `UBreakerCombatComponent::ApplyHealing` | yes (2026-08-14) |
+| Affix | ResourceOnKill | `OnKillDealt` → ClassResource | yes (2026-08-14) |
+| Affix | DamageOverTime | DamageOverTimeMultiplier attribute → DoT snapshots | yes (2026-08-14) |
 | Node | CriticalChance | CriticalChance attribute | yes |
 | Node | CriticalDamage | CriticalMultiplier attribute | yes |
 | Node | MoveSpeed | MoveSpeed attribute → `GetComposedMoveSpeedMultiplier()` | yes |
@@ -356,7 +394,10 @@ inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
 
 ## Not built / open
 
-- Crafting (add/reroll/upgrade/exalt), signatures, pickup actors, loot UI.
+- ~~Crafting~~ and ~~signatures~~ are BUILT (2026-08-14) — see the Forge and
+  legendary sections. What is still missing from crafting is the "add an affix"
+  verb (deliberately: an item's affix COUNT is rarity's job and adding one would
+  make rarity craftable) and any UI at all. Pickup actors and loot UI exist.
 - Movement affix multipliers are computed but not yet consumed by
   `UBreakerCharacterMovementComponent`.
 - Save persistence for items (structs are save-shaped and versioned).
@@ -367,10 +408,11 @@ inventory UI yet — `OnItemAcquired` is the Blueprint/UI hook.
   weapon damage, so it renders as "Added Damage  +5.0  T1". Fixing it properly
   means a display-format flag on `FBreakerAffixDefinition` that the UI reads,
   which is a UI-layer change; reported rather than hacked around.
-- **The O3 More cap is enforced per LAYER, not globally.** Three tree Mores is
-  the whole budget today because nothing else authors one. When Anomalous items
-  gain Mores, the clamp has to move to a single shared pass over the composed
-  contribution or a build can hold three tree Mores plus an item's.
+- ~~The O3 More cap is enforced per LAYER, not globally.~~ **RESOLVED
+  2026-08-14**: `FBreakerAttributeAggregator::Compose` now clamps the composed
+  More product for `DamageMultiplier` at 1.30³ across every contributor, so a
+  layer arriving second cannot buy its way past O3. See the aggregation section
+  at the top of this document.
 - **Conditional lines are evaluated on a component tick.** The equipment and
   progression components each re-read the movement state each frame and rebuild
   their contribution only on a transition. That is correct and cheap, but it
@@ -477,3 +519,358 @@ against each other: the lean must be **visible** in real rolls, and it must
 **not** be a filter. Measured across 120 drops per archetype — SMG 70 fire-rate
 lines against Sniper 36, Sidearm 74 slide-speed lines against Rifle 42 — with
 the off-lean roll asserted to still happen.
+
+## Rarity MEANS something now (2026-08-14)
+
+Ruling **O27**: *"choices should beat accumulation but there should be
+significantly more options in all avenues."*
+
+The problem, stated plainly. **Rarity gated affix COUNT and a tier ceiling and
+nothing else.** An Anomalous item was a Standard item with more lines. Finding
+one was an arithmetic event, not a build event — and this document had, from the
+first pass, reserved Anomalous as the home of rule rewrites (the locked
+aggregation rule says More multipliers are "reserved for tree nodes and
+Anomalous rule rewrites") without anything implementing it.
+
+### The rarity ladder, end to end
+
+| Rarity | Affixes | Tier cap | Qualitative rule |
+|---|---|---|---|
+| Standard | 1-2 | T3 | — |
+| Uncommon | 2-3 | T1 | — |
+| Exceptional | 3-5 | T-1 | — |
+| **Aberrant** | 4-6 | T-1 | **FOCUSED** — one affix rolls a tier better |
+| **Anomalous** | 5-6 | T-1 | **A RULE REWRITE**, exactly one. Equip cap 1 |
+
+**ABERRANT IS FOCUSED.** Its first affix rolls against a ceiling one tier above
+what item level alone allows, and never *worse* than the ordinary ceiling — a
+floor as well as a raised roof, because a headline property that is invisible on
+most drops is a comment rather than a feature (the first version of the archetype
+leans shipped exactly that way). It is deliberately ONE slot: **O11 reserves
+Aberrant's "1-2 unique modifier affixes" for the owner to name and design**, and
+the focused slot is the seat those will occupy when they land. This pass does not
+guess at what they are.
+
+**ANOMALOUS CARRIES A RULE.** One rewrite, drawn deterministically from a pool of
+four, on top of its affixes. Its equip cap of 1 is unchanged, so a character
+holds at most one rewrite at a time — which is what makes finding a *different*
+Anomalous a decision rather than an accumulation.
+
+### The constraint that shaped every rewrite: none of them is a More
+
+O3 caps a build at **three** composed More multipliers, and the trees already
+author six options against that cap. So an Anomalous rewrite that is simply a
+fourth More is either dead weight (the new global clamp eats it) or a quiet nerf
+to the three the player chose. **Every rewrite therefore changes a RULE the
+aggregation obeys**, in the precedent of a tree keystone — which removes an
+animation lock or makes casts free rather than adding a number.
+
+`RiorsEdge.Items.Rules.NeverAuthorsAMore` walks every rule in the table, applies
+it to a maximal loadout, and asserts the equipment contribution's More multiplier
+is exactly 1.0 on **every** aggregated attribute.
+
+### The four rollable rewrites
+
+All four live in `Items/BreakerItemRules.{h,cpp}` and are applied inside
+`UBreakerEquipmentComponent::AggregateStats` — the one function whose output is
+both folded by `UBreakerAttributeSet` and read by `UBreakerCombatComponent`. A
+rewrite expressed anywhere else could only reach a card.
+
+| Rule | What it rewrites | Live consumer |
+|---|---|---|
+| **UNBOUND** | The condition PREDICATE. Every conditional affix pays regardless of its condition. | `FBreakerBuildConditionState` → the additive Increased bucket |
+| **OVERFLOW** | The BUCKET boundary. Each point of Added Damage also grants 1% Increased Damage. | `DamageMultiplier`, Flat lane *and* Increased lane |
+| **PROLIFIC** | TIER RESOLUTION. Every affix on this item resolves one tier better. | The rolled value, scaled by the authored T1→T0 ratio |
+| **RELENTLESS** | A CAP. Physical Damage Reduction caps at 80% instead of 60%. | `PhysicalDamageReductionPercent` → `ReceiveDamage`'s incoming multiplier |
+
+Design notes worth keeping:
+
+- **UNBOUND is worth exactly the conditions, never more.** Pinned: its value
+  while standing still equals the plain item's value with every condition live. A
+  rewrite that also inflated the numbers would be a multiplier in a rule's
+  clothing.
+- **OVERFLOW does not MOVE the point, it doubles where it counts.** Added Damage
+  stays in the Flat lane; the Increased lane gains the same figure. That is
+  pinned too, because a rewrite that silently relocated the line would be a nerf
+  to a build that had already invested in it.
+- **PROLIFIC scales by the tier RATIO** rather than re-deriving at the better
+  tier, so a lucky in-band roll is carried upward instead of flattened to the new
+  tier's floor. T1 → T0 is the authored 1.4x spike. It is resolved **per item**,
+  not per wearer — folding it into the wearer-wide rule set would leak the uplift
+  onto every other equipped piece, and there is a test for that.
+- **PROLIFIC is the non-Forge route to T0/T-1**, and its printed temper ceiling
+  tightens by its own uplift so the two routes compose to one T-1 rather than to
+  a T-2 the value curve has no entry for.
+
+### `FBreakerItemInstance::Rule` is a FIELD, never derived from rarity
+
+Load-bearing. Deriving the rewrite from `Rarity` would hand one to every
+Anomalous item that already exists in a save, in a test fixture, and in the two
+power-band loadouts — which build every piece at Anomalous purely to lift the
+tier cap. An item earns a rewrite when it is *rolled* one.
+`RiorsEdge.Progression.PowerBand.RuleImpact` asserts exactly this, so a future
+refactor that "simplifies" the field away fails loudly.
+
+## Three build-defining legendaries (2026-08-14)
+
+`Docs/Vertical-Slice.md` has scoped "three build-defining legendary items" since
+the first slice document. Zero existed.
+
+The bar they were authored against is this project's own history: it has shipped
+a skill node structurally incapable of raising damage, an affix pool where four
+of eight slots could not raise damage, and a `DamageMultiplier` attribute read by
+every damage path and written by nobody. **A legendary that lies is that failure
+at higher volume.** So every effect below was checked against a live consumer
+*before* it was designed, and every one has a test that drives the number rather
+than the card.
+
+A legendary is always **Anomalous**, which means the existing equip cap of one
+Anomalous piece is also the cap on legendaries. That is the design, not a side
+effect: "build-defining" means the build is defined by the one you chose, and
+three that stack would be a set bonus.
+
+### DEADFALL — boots — bends the CONDITION system
+
+> *Damage while Airborne also applies while Sliding and while Wall Riding. 40%
+> less Air Control.*
+
+Airborne is the richest conditional family in the game (the Airborne affix, plus
+Freefall, Downforce and Terminal Velocity in the trees) and the hardest to hold:
+you are airborne in bursts and it pays nothing the rest of the time. Deadfall
+makes the two grounded traversal states count as airborne **for those lines
+only**, turning a burst build into a rotation.
+
+It is deliberately **not** UNBOUND. Freeing every conditional line would make the
+legendary strictly better than the Anomalous rewrite that does exactly that, and
+a legendary that outclasses the generic rewrite makes the generic rewrite dead
+content. Tested: Deadfall pays **nothing** while standing still, and does not
+free an unrelated conditional line.
+
+The bill is an ordinary **negative Increased percentage** into the same additive
+bucket every other layer bids on — never a sub-1.0 More. A downside is not an
+exemption from the locked rule, and `RiorsEdge.Items.Legendary.Deadfall` asserts
+both halves: exactly −40 points additive, and a More of exactly 1.0. Consumer:
+`AirControlMultiplier` → the movement component's air steer rate.
+
+Signature: Damage while Airborne, Slide Speed, Movement Speed.
+
+### CADENCE — primary — bends the BUCKET rule and the SLOT rule
+
+> *Fire Rate also grants Increased Damage at half its value. Cannot be worn with
+> a Secondary.*
+
+Fire Rate is a peer of Weapon Damage that lands on a *different* attribute
+(`FireRateMultiplier` → `GetEffectiveRoundsPerMinute`), so the two never
+compound. Cadence makes half of it compound — the first reason in the game to
+stack cadence past the point the gun already feels fast. Fire Rate still reaches
+the fire-timing attribute in full; the rewrite adds, it does not divert.
+
+The bill is the Secondary slot, which is worth roughly a whole item's affixes
+plus a swap-tempo option. It **ejects rather than refuses, in both directions**:
+equipping Cadence sends the Secondary to the backpack, and equipping a Secondary
+sends Cadence back. Nothing in `UBreakerEquipmentComponent` refuses an equip —
+the rarity cap does not — and a rule inventing a second, harsher failure mode
+would be worse than a disclosed swap. `FBreakerEquipPreview` gained
+`bRuleDisplaces` / `RuleDisplaced` so the consequence is stated before the click,
+exactly like the rarity cap's `LimitDisplaced`.
+
+Signature: Fire Rate, Weapon Damage, Added Damage.
+
+### OVERRUN — waist — bends the RESOURCE REGEN rule
+
+> *Triple Resource Regeneration while airborne, sliding or wall riding. None
+> otherwise.*
+
+Gear resource regeneration is a flat per-second trickle ticked on the server,
+which pays a player standing in the safe ring exactly as well as one in a fight.
+Overrun deletes the trickle and pays triple for fast traversal — the only item in
+the game that makes the class-resource loop a movement question. Both live class
+loops (Swift's Momentum, Caster's Mana) read `ClassResource` as their bank.
+
+Deliberately **not** a damage item. Two of the three would otherwise be offence,
+and survivability and resource are the thin axes.
+
+Signature: Resource Regeneration, Maximum Resource, Damage while Sliding.
+
+### Finding them
+
+`RollItem` redirects an Anomalous drop in a legendary's slot into that legendary
+with probability `LegendaryChanceWithinAnomalous` (**0.25**, O2 PLACEHOLDER).
+Anomalous is ~0.5% of drops before Drop Chance and only three of eight slots have
+a legendary, so the effective rate is deliberately rare — and
+`RiorsEdge.Items.Legendary.Signature` asserts one *can* come out of the ordinary
+pipeline, because a legendary reachable only through a dev grant is the "exists
+but cannot be found" failure one step removed.
+`UBreakerEquipmentComponent::DevGrantLegendaries` puts all three in the backpack
+(not equipped — the cap of one would silently eject two and the grant would look
+broken).
+
+A legendary is a real rolled item: its affix values come off the same tier curve
+and two of them differ. The signature is what is *guaranteed*; a guaranteed line
+the ordinary roll already produced is left exactly as it rolled, because
+overwriting it would quietly re-roll a good value down to the floor of its tier.
+
+## The Forge — minimal item agency (2026-08-14)
+
+`Items/BreakerForgeLibrary.{h,cpp}`. This document has said since the first pass
+that T0 and T-1 come "from crafting"; there was no crafting, so the two best
+tiers in the game were unreachable by any means. The Forge exists in the world
+already — it is the respec location and Kess, the Forge Keeper, stands at it.
+
+**What this deliberately is NOT**: an economy. No vendor, no material drop table,
+no orb inventory, no bench progression, and no item-derived materials — O12 rules
+the currencies *scalar and tiered*, 3-4 of them, and that is exactly what this
+implements. The slice does not want a crafting game; it wants the top of its own
+tier curve to be reachable and a reason not to vendor every drop.
+
+**The loop**: salvage a backpack item → scalar currency → temper, reforge or
+attune. Three verbs, all deterministic, all pure functions over an item and a
+wallet, all gated on `bIsAtForge` — the same flag and the same rule
+`UBreakerProgressionComponent::RespecAtForge` already uses, so "the Forge is a
+place you go" is one rule rather than two.
+
+| Currency | Source | Buys |
+|---|---|---|
+| **Slag** | Every rarity, scaled by item level | Reforges; tempers into T8..T4 |
+| **Flux** | Uncommon and above, rarity-pure | Attunes; tempers into T3..T1 |
+| **Sigil** | **Aberrant and above only**, rarity-pure | **T0 and T-1, and nothing else** |
+
+Item level scales the **Slag** yield only. Flux and Sigil stay rarity-pure so
+farming a low level cannot substitute for finding the rarity, which is the
+shortest route from "minimal crafting" to "crafting replaces looting".
+
+| Verb | Moves | Keeps | Cost |
+|---|---|---|---|
+| **Temper** | One affix, one tier better | Everything else | Steps with the target tier |
+| **Reforge** | Every affix VALUE within its band | Ids and tiers | Slag, scaled by affix count |
+| **Attune** | WHICH affixes | Count and tiers | Flux, the expensive verb |
+
+Rules worth keeping in view:
+
+- **Rarity still caps crafting.** A Standard item stops at T3 no matter how much
+  Sigil the player holds. Otherwise crafting would erase rarity's meaning in the
+  same session this pass gave it one.
+- **A refused craft costs nothing.** `FBreakerForgeWallet::Spend` is
+  all-or-nothing; the Forge gate and the ceiling check both run before any spend.
+  A partial spend is how one refused craft becomes a lost-currency bug report.
+- **Temper re-derives the value at the new tier** rather than scaling the old
+  one. Scaling would carry a bad in-band roll upward forever; re-deriving means a
+  temper is always exactly what that tier is worth, which is also the only
+  version a player can reason about.
+- **Reforge draws from the identical distribution the drop pipeline's step 5
+  uses**, so a reforged value and a dropped value are the same kind of number.
+- **Attune keeps a legendary's signature and its rule.** Its identity is those
+  lines plus that rewrite; a craft that could roll them away would turn the
+  build-defining item into a lottery ticket.
+- **Salvage and discard are different verbs.** `DiscardFromBackpack` still exists
+  and still pays nothing; salvage destroys the same items and pays. That is what
+  finally gives the discard pile a purpose.
+
+Coverage: `RiorsEdge.Items.Forge.Wallet`, `.Salvage`, `.TemperReachesTheSpike`
+(walks an affix all the way to T-1 and asserts it is worth the authored 1.8x),
+`.ReforgeAndAttune`, `.Loop` (salvage → temper an **equipped** item → the
+composed MaxHealth attribute moves, which is the assertion that the Forge is a
+gameplay system and not a data editor).
+
+**KNOWN GAP, stated rather than hidden: there is no Forge UI.** `UI/` is another
+lane's directory this pass, so every verb is reachable from Blueprint, from a
+console exec, and from automation, and not yet from the inventory screen. The
+mechanic is real; the button is not. The wallet is a replicated field on
+`UBreakerEquipmentComponent`; **it is not yet in `UBreakerSaveGame`**, so
+currency does not survive a session.
+
+## Affix breadth on the non-damage axes (2026-08-14)
+
+The first breadth pass took offence from one line to nine and left the other axes
+where it found them: survivability was Physical DR alone, the resource family was
+two lines that both did the same thing slowly, and damage-over-time had six skill
+nodes bidding on it and **no gear support at all** — the same one-sided gap the
+damage pass found on the other side. Four lines, taking the pool from 18 to
+**22**:
+
+| Line | Bucket | Slots | Live consumer |
+|---|---|---|---|
+| **Armour** | Flat | Helmet, body, gloves, boots, waist | `Armor` aggregated attribute → `GetEffectiveArmor()` → the mitigation formula |
+| **Health on Kill** | Flat | Body, gloves, waist, neck, both weapons | `OnKillDealt` → `ApplyHealing` |
+| **Resource on Kill** | Flat | Helmet, gloves, neck, waist, both weapons | `OnKillDealt` → the ClassResource bank |
+| **Damage over Time** | Increased | Helmet, body, gloves, neck, primary | `DamageOverTimeMultiplier` → every DoT's application snapshot |
+
+- **`Armor` joins `EBreakerAggregatedAttribute`.** The player's Armor attribute
+  was authored 0 and written by *nobody*, so the most ordinary defensive stat in
+  the genre had a whole mitigation pipeline behind it and no way in. It goes
+  through the aggregator rather than a private path so that the first Bulwark
+  node to author armour is additive from the day it lands — the same reasoning
+  that produced `SlideSpeedMultiplier` and friends. Enemies and target dummies
+  are untouched: they carry neither an equipment nor a progression component, so
+  nothing captures their bases and the recompute never runs on them.
+- **The on-kill pair is paid at an EVENT**, so it has no attribute to live in and
+  needs a listener. `UBreakerEquipmentComponent::BindCombatEvents` subscribes to
+  `UBreakerCombatComponent::OnKillDealt` once (guarded by `IsAlreadyBound`, so a
+  rebind cannot pay the affix twice per kill) and is public for the same reason
+  `BindAttributes` is: an affix that only pays when a real actor in a real world
+  lands a real kill is exactly the line that ships broken.
+  `RiorsEdge.Items.Affixes.OnKillReachesGameplay` binds, broadcasts the real
+  delegate, and asserts health and resource actually move — then unequips and
+  asserts the payment stops exactly.
+- **On-kill rather than on-hit, deliberately.** On-hit sustain scales with fire
+  rate and would make the SMG the only defensive weapon in the game; on-kill
+  scales with how well the build is already doing and pays *nothing* against a
+  boss, which is the right shape for a game whose difficulty lives in elites and
+  bosses (O27).
+- **DoT damage does not leak into the weapon-damage bucket.** DoTs snapshot
+  separately and always have; a line that quietly buffed both would be strictly
+  better than Weapon Damage. Pinned.
+
+New archetype leans, all O2 PLACEHOLDER: SMG → Damage over Time ×2.0 (it is the
+gun that applies Bleed on hit), Shotgun → Health on Kill ×2.0 (sustain belongs on
+the gun that has to be in the fight), Sidearm → Resource on Kill ×1.8.
+
+### FOUND AND REPORTED, not worked around
+
+`UBreakerCombatComponent::AddClassResource` and `SpendClassResource` write
+through the **generated** attribute setter, which `ensure()`s when there is no
+owning ability system — so the entire class-resource path is unexercisable in a
+world-less rig. `UBreakerAttributeSet::ApplyClassResource` exists for exactly
+this and routes through the same `PreAttributeChange` clamp. Resource on Kill
+therefore uses `ApplyClassResource` directly, with identical observable
+behaviour, and the note is at the code. **The one-line fix belongs in `Combat/`**
+(have those two functions use `ApplyClassResource`), which is another lane's
+directory this pass.
+
+## Band impact of this pass
+
+**The 8-10x build variance band is UNCHANGED at 8.74x**, and that is by
+construction rather than by luck: `FBreakerItemInstance::Rule` defaults to `None`
+and the two power-band loadouts are authored affix by affix, so neither character
+carries a rewrite even though every piece is built at Anomalous to lift the tier
+cap. The four new affixes are not in either loadout either.
+
+Which means the band test alone would say **nothing** about whether the rewrites
+are balanced, so `RiorsEdge.Progression.PowerBand.RuleImpact` measures the thing
+that actually matters — the STEP one Anomalous rewrite is worth on top of a build
+that has already done everything else right, measured both in the optimized
+build's rotation (airborne / recently dashed / at Redline) and standing still:
+
+| Rewrite | Step in rotation | Step standing still | Band with it |
+|---|---|---|---|
+| UNBOUND | x1.000 | **x1.645** | 8.74x |
+| OVERFLOW | x1.044 | x1.083 | 9.12x |
+| PROLIFIC | x1.079 | x1.074 | 9.43x |
+| RELENTLESS | x1.000 | x1.000 | 8.74x |
+
+Read that table carefully. **UNBOUND is worth nothing in the rotation and 1.65x
+standing still**, which is exactly right: its whole job is to free conditional
+lines, so it is worthless to a player already holding every condition and
+transformative to one who is not. Measuring it only in the rotation would have
+reported the largest rewrite in the table as inert. **RELENTLESS is 1.000 in
+both** because it is purely defensive and the band measures damage — its effect
+is asserted separately, all the way through the mitigation formula.
+
+The test asserts three properties per rewrite, all `O2 PLACEHOLDER` bounds: it
+never *lowers* an optimized build, it is worth at most **x1.35** on top of one,
+and it is **smaller than the band it lives in** — a rewrite that outweighed the
+8.7x band would make every other decision a rounding error, which is O27
+inverted.
+
+The band is therefore 8.74x for a character with no rewrite and at most 9.43x for
+one carrying the best rewrite for its build. Both are inside the 8-10x band.

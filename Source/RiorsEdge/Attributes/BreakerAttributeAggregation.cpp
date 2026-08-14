@@ -129,5 +129,19 @@ float FBreakerAttributeAggregator::Compose(EBreakerAggregatedAttribute Attribute
         More *= Contribution.GetMore(Attribute);
     }
 
+    // O3's hard cap, applied ACROSS contributors rather than inside each of
+    // them. Without this an Anomalous item's More would ride on top of the
+    // three the tree already selected, which is the exact hole Item-Foundation
+    // recorded when node Mores landed.
+    if (IsMoreCappedAttribute(Attribute))
+    {
+        More = FMath::Min(More, ComposedMoreCeiling());
+    }
+
     return (Bases[Index] + Flat) * (1.0f + IncreasedPercent / 100.0f) * More;
+}
+
+float FBreakerAttributeAggregator::ComposedMoreCeiling()
+{
+    return FMath::Pow(SingleMoreCeiling, static_cast<float>(MaxComposedMoreSources));
 }
