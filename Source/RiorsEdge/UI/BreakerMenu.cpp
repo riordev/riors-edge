@@ -10,6 +10,7 @@
 #include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Fonts/FontMeasure.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -184,7 +185,68 @@ namespace
     // the viewport), and it is sampled once per Rebuild — an event — never
     // from a paint attribute or a tick.
     // ---------------------------------------------------------------------
-    struct FSkillScreenMetrics
+    // -----------------------------------------------------------------------
+    // Chip packing.
+    //
+    // A chip row that does not fit is the defect this exists to kill: the
+    // loadout's nine slot-filter chips ran off the right edge of a 1920 screen
+    // and printed straight through the input legend beside them, because they
+    // sat in an SHorizontalBox FillWidth slot whose children overflow rather
+    // than wrap.
+    //
+    // MeasureChipWidth measures TEXT against a FONT. That is emphatically NOT
+    // the banned pattern: SWrapBox with UseAllottedSize measures a widget
+    // against its own arrangement, which feeds the arrangement back into
+    // itself and oscillates. Nothing here reads an allotted size, so the row
+    // count is arithmetic on numbers known before layout starts — the same
+    // rule the Core cluster grids already follow.
+    // -----------------------------------------------------------------------
+    float MeasureChipWidth(const FString& Label, float HorizontalPad, float BorderThickness)
+    {
+        // Fallback for headless runs, where Slate has no renderer and nothing
+        // is on screen anyway. Deliberately generous so a headless layout errs
+        // toward more rows rather than an overflowing one.
+        float TextWidth = Label.Len() * (BreakerUI::TypeCaption * 0.68f);
+        if (FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer())
+        {
+            const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+            const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption);
+            TextWidth = static_cast<float>(Measure->Measure(Label, Font).X);
+        }
+        // SButton draws its own style padding UNDER the ContentPadding we ask
+        // for, so a chip is always wider than text + our own margins. MEASURED
+        // from a 1920 capture rather than derived: the first pass at this
+        // arithmetic under-counted by ~32px per chip and the eight-chip row
+        // still ran through the plate edge. Erring high only costs an extra
+        // row, and the bar that holds these is auto-height.
+        constexpr float ButtonChromeAllowance = 32.0f;
+        return TextWidth + 2.0f * HorizontalPad + 2.0f * BorderThickness + ButtonChromeAllowance;
+    }
+
+    // Lays chips out across as many rows as MaxWidth needs. One chip wider
+    // than the whole row still gets its own row rather than being dropped.
+    TSharedRef<SWidget> PackChipRows(const TArray<TSharedRef<SWidget>>& Chips, const TArray<float>& Widths,
+        float MaxWidth, float Gap)
+    {
+        TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+        TSharedPtr<SHorizontalBox> Row;
+        float Used = 0.0f;
+        for (int32 Index = 0; Index < Chips.Num(); ++Index)
+        {
+            const float Width = Widths.IsValidIndex(Index) ? Widths[Index] + Gap : Gap;
+            if (!Row.IsValid() || (Used + Width > MaxWidth && Used > 0.0f))
+            {
+                Row = SNew(SHorizontalBox);
+                Rows->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)[Row.ToSharedRef()];
+                Used = 0.0f;
+            }
+            Row->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Gap, 0.0f)[Chips[Index]];
+            Used += Width;
+        }
+        return Rows;
+    }
+
+    struct FWideScreenMetrics
     {
         float PanelWidth = 1760.0f;
         float PanelHeight = 1000.0f;
@@ -195,9 +257,13 @@ namespace
         float BoardViewWidth = 1300.0f;
     };
 
-    FSkillScreenMetrics MeasureSkillScreen()
+    // Shared by BOTH wide screens. The loadout used to hard-code 1760 and
+    // simply run off the edge of anything narrower; the skill matrix learned
+    // that lesson first, and there is no reason for two answers to one
+    // question.
+    FWideScreenMetrics MeasureWideScreen()
     {
-        FSkillScreenMetrics Metrics;
+        FWideScreenMetrics Metrics;
 
         FVector2D Viewport(1920.0f, 1080.0f);
         if (GEngine && GEngine->GameViewport)
@@ -282,6 +348,23 @@ void SBreakerMenu::HandleEscape()
     {
         Character->ResumeFromMenu();
     }
+}
+
+void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
+{
+    // Dev capture only, and a command-line switch by construction, so a
+    // shipped build cannot reach it. It exists because "capture SKILLTREES"
+    // photographed exactly one of that screen's three boards, and the two it
+    // skipped are the two nobody has ever looked at.
+    FString Board;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCaptureBoard="), Board))
+    {
+        Board = Board.ToUpper();
+        if (Board == TEXT("CORE")) { SkillBoardTab = 1; }
+        else if (Board == TEXT("COMPARE")) { SkillBoardTab = 0; SkillBranchIndex = -1; }
+        else if (Board.StartsWith(TEXT("BRANCH"))) { SkillBoardTab = 0; SkillBranchIndex = FCString::Atoi(*Board.RightChop(6)); }
+    }
+    Rebuild(Screen);
 }
 
 void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
@@ -701,9 +784,22 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
         [
             MenuText(FText::FromString(FString::Printf(TEXT("SLOT %d — click an archetype to assign"), SlotNumber)), 11, Cyan, true)
         ];
-        TSharedRef<SHorizontalBox> RowBox = SNew(SHorizontalBox);
+        // FOUR per row, not eight. The O27 breadth pass took this row from five
+        // archetypes to eight while every tile still split one 880px panel, so
+        // "BURST RIFLE" and "MACHINEGUN" were drawn into ~90px and came out as
+        // "BURS" and "MACI" — the screen was clipping its own weapon names.
+        constexpr int32 ArchetypesPerRow = 4;
+        TSharedRef<SVerticalBox> RowStack = SNew(SVerticalBox);
+        TSharedPtr<SHorizontalBox> RowBox;
+        int32 ArchetypeIndex = 0;
         for (const FArchetypeEntry& Entry : Archetypes)
         {
+            if (ArchetypeIndex % ArchetypesPerRow == 0)
+            {
+                RowBox = SNew(SHorizontalBox);
+                RowStack->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[RowBox.ToSharedRef()];
+            }
+            ++ArchetypeIndex;
             const bool bAssigned = Entry.Archetype == Assigned;
             const EBreakerWeaponArchetype CapturedArchetype = Entry.Archetype;
             const int32 CapturedSlot = SlotNumber;
@@ -732,7 +828,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
                 ]
             ];
         }
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 16.0f)[RowBox];
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)[RowStack];
     }
 
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("ARMORY REFERENCE")), 12, SoftText, true)];
@@ -746,7 +842,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
     }
     Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)[MenuText(FText::FromString(TEXT("Two equipped weapons maximum  |  ESC Back")), 9, SoftText)];
-    return BuildFrame(FText::FromString(TEXT("LOADOUT")), FText::FromString(TEXT("WEAPON SLOTS / ARMORY")), Body, 880.0f);
+    // 1040, not 880: four H2 tiles per row need ~240 each before MACHINEGUN
+    // loses its last letter, and a weapon that cannot say its own name is not
+    // pickable in any useful sense.
+    return BuildFrame(FText::FromString(TEXT("LOADOUT")), FText::FromString(TEXT("WEAPON SLOTS / ARMORY")), Body, 1040.0f);
 }
 
 namespace
@@ -961,6 +1060,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     // The outline handles belong to the widget tree being replaced right now.
     EquipSlotOutlines.Reset();
 
+    // Read the viewport once, the same way the skill matrix does. This screen
+    // used to be authored at a hard 1760 with two hard 560/400 columns, so it
+    // could only be correct on exactly one window size. The zone arithmetic
+    // below derives from the measured panel instead, and the fixed columns
+    // give ground before the backpack does — the backpack is where the cards
+    // are, so it is the last thing that should be squeezed.
+    const FWideScreenMetrics Metrics = MeasureWideScreen();
+    const float ZoneGutters = 2.0f * BreakerUI::Space24;
+    // Spec widths at 1760; scaled down together once the panel cannot hold
+    // them plus a usable backpack, floored where the copy stops fitting.
+    float CharacterColumnWidth = 560.0f;
+    float EquipmentColumnWidth = 400.0f;
+    {
+        const float MinimumBackpack = 640.0f;   // two 300px cards plus gutters
+        const float FixedRoom = Metrics.PanelWidth - ZoneGutters - MinimumBackpack;
+        const float SpecFixed = CharacterColumnWidth + EquipmentColumnWidth;
+        if (FixedRoom < SpecFixed)
+        {
+            const float Scale = FMath::Max(0.55f, FixedRoom / SpecFixed);
+            CharacterColumnWidth = FMath::Max(320.0f, CharacterColumnWidth * Scale);
+            EquipmentColumnWidth = FMath::Max(280.0f, EquipmentColumnWidth * Scale);
+        }
+    }
+    const float BackpackZoneWidth = FMath::Max(320.0f,
+        Metrics.PanelWidth - CharacterColumnWidth - EquipmentColumnWidth - ZoneGutters);
+
     // One-click cards: an equipped slot unequips on click, a backpack item
     // equips on click.
     auto MakeSlotCard = [this, Equipment](EBreakerEquipSlot Slot) -> TSharedRef<SWidget>
@@ -1143,6 +1268,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         return static_cast<uint8>(A.Rarity) > static_cast<uint8>(B.Rarity);
     });
     const int32 TotalBackpackCount = BackpackItems.Num();
+    // Cards per row is arithmetic on the measured zone, not a frozen 2: a
+    // wider window should show more loot, and a narrower one must not push the
+    // second card out through the panel edge.
+    const float BackpackCardWidth = 300.0f;
+    const int32 BackpackCardsPerRow = FMath::Clamp(
+        FMath::FloorToInt((BackpackZoneWidth + BreakerUI::Space8) / (BackpackCardWidth + BreakerUI::Space8)), 1, 4);
     if (BackpackSlotFilter >= 0)
     {
         BackpackItems.RemoveAll([this](const FBreakerItemInstance& Item)
@@ -1189,11 +1320,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             return FReply::Handled();
         });
 
-        // Fixed rows of two, never a wrap box: SWrapBox measured by allotted
-        // width inside a scroll box oscillates between two layouts every
-        // frame. Two because the backpack zone is what is left of the panel
-        // after the 560 character column and the 400 equipment column.
-        if (BackpackCardIndex % 2 == 0)
+        // Fixed rows of a KNOWN count, never a wrap box: SWrapBox measured by
+        // allotted width inside a scroll box oscillates between two layouts
+        // every frame. The count comes from the measured backpack zone above,
+        // which is arithmetic done before layout rather than during it.
+        if (BackpackCardIndex % BackpackCardsPerRow == 0)
         {
             BackpackRow = SNew(SHorizontalBox);
             BackpackGrid->AddSlot().AutoHeight()[BackpackRow.ToSharedRef()];
@@ -1201,7 +1332,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ++BackpackCardIndex;
         BackpackRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 8.0f)
         [
-            SNew(SBox).WidthOverride(300.0f)
+            SNew(SBox).WidthOverride(BackpackCardWidth)
             [
                 SNew(SOverlay)
                 + SOverlay::Slot()
@@ -1296,12 +1427,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     }
 
     // Slot filter row: ALL plus one chip per equipment slot.
-    TSharedRef<SHorizontalBox> FilterRow = SNew(SHorizontalBox);
-    auto AddFilterChip = [this, &FilterRow](const FString& Label, int32 FilterValue)
+    //
+    // The chips are BUILT here and PACKED into rows below, once the bar knows
+    // how much width it has. Before this they lived in an SHorizontalBox
+    // FillWidth slot beside the input legend, which is two bugs in one place:
+    // an overflowing horizontal box does not wrap, it just keeps drawing, so
+    // the row ran off the right edge of a 1920 screen AND printed through the
+    // legend that shared the slot ("GLOVES / X DISCARD LMB NECKLACE").
+    TArray<TSharedRef<SWidget>> FilterChips;
+    TArray<float> FilterChipWidths;
+    auto AddFilterChip = [this, &FilterChips, &FilterChipWidths](const FString& Label, int32 FilterValue)
     {
         const bool bSelectedChip = BackpackSlotFilter == FilterValue;
-        FilterRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space4, 0.0f)
-        [
+        const float ChipBorder = bSelectedChip ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+        FilterChipWidths.Add(MeasureChipWidth(Label, BreakerUI::Space8, ChipBorder));
+        FilterChips.Add(
             BorderWrap(
                 SNew(SButton)
                 .ButtonColorAndOpacity(bSelectedChip ? PanelHover : Panel)
@@ -1316,8 +1456,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     MenuText(FText::FromString(Label), BreakerUI::TypeCaption, bSelectedChip ? Primary : Muted, true)
                 ],
                 bSelectedChip ? Cyan : BorderEmphasis,
-                bSelectedChip ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
-        ];
+                ChipBorder));
     };
     AddFilterChip(TEXT("ALL"), -1);
     for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
@@ -1401,28 +1540,40 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     }
 
     // ---- Backpack zone -----------------------------------------------------
-    // Filter bar 64 tall carrying the slot chips and the input hint, then the
-    // card grid. The spec puts the input hints here, which is why the screen
-    // has no footer.
+    // Filter bar carrying the count, the input hint and the slot chips, then
+    // the card grid. The spec puts the input hints here, which is why the
+    // screen has no footer.
+    //
+    // TWO ROWS, not one. The count and the legend own the first row outright,
+    // so the legend can never be drawn over again; the chips get the whole
+    // width of the second and wrap into as many rows as they need. The bar is
+    // auto-height with the spec's 64 as a FLOOR — a fixed 64 is what forced
+    // nine chips onto one line in the first place.
+    const float FilterChipRoom = FMath::Max(240.0f,
+        BackpackZoneWidth - 2.0f * BreakerUI::Space16 - BreakerUI::RailThickness - 2.0f * BreakerUI::BorderThin);
     TSharedRef<SVerticalBox> BackpackColumn = SNew(SVerticalBox);
     BackpackColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
-        SNew(SBox).HeightOverride(64.0f)
+        SNew(SBox).MinDesiredHeight(64.0f)
         [
             MakePlate(
                 SNew(SVerticalBox)
-                + SVerticalBox::Slot().AutoHeight()
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
                 [
                     SNew(SHorizontalBox)
                     + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
                     [
                         MenuText(FText::FromString(FString::Printf(TEXT("BACKPACK %d/%d"), BackpackItems.Num(), TotalBackpackCount)), BreakerUI::TypeCaption, Primary, true)
                     ]
-                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[FilterRow]
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
                     + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                     [
                         MenuText(FText::FromString(TEXT("RMB / X DISCARD · LMB EQUIP")), BreakerUI::TypeCaption, Muted, true)
                     ]
+                ]
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    PackChipRows(FilterChips, FilterChipWidths, FilterChipRoom, BreakerUI::Space4)
                 ],
                 Panel, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space8))
         ]
@@ -1528,11 +1679,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     TSharedRef<SHorizontalBox> Body = SNew(SHorizontalBox);
     Body->AddSlot().AutoWidth()
     [
-        SNew(SBox).WidthOverride(560.0f)[CharacterColumn]
+        SNew(SBox).WidthOverride(CharacterColumnWidth)[CharacterColumn]
     ];
     Body->AddSlot().AutoWidth().Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
     [
-        SNew(SBox).WidthOverride(400.0f)[EquipmentColumn]
+        SNew(SBox).WidthOverride(EquipmentColumnWidth)[EquipmentColumn]
     ];
     Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
     [
@@ -1547,7 +1698,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         HeaderRight,
         Body,
         SNullWidget::NullWidget,
-        1760.0f);
+        Metrics.PanelWidth,
+        Metrics.PanelHeight);
 
     if (DiscardModalIndex < 0) return Screen;
 
@@ -1716,10 +1868,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
             BorderWrap(
             SNew(SButton)
             .ButtonColorAndOpacity(bSelectable ? PanelRaised : BreakerUI::BgRaised)
-            .IsEnabled(bSelectable)
+            // Deliberately NOT IsEnabled(false). Slate's disabled state fades
+            // the whole content, which on this screen dimmed all five class
+            // names — INCLUDING the one the character actually is — to an
+            // unreadable grey the moment a class was locked. FIELDPLATE 01 is
+            // explicit that disabled "keeps geometry, drops text to #3E4C5E,
+            // strips the accent entirely — never lowers opacity". So the
+            // unavailable state is painted, and the click is refused here.
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
-            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bCapturedDevSwap]()
+            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bCapturedDevSwap, bSelectable]()
             {
+                if (!bSelectable) return FReply::Handled();
                 if (Character.IsValid() && Character->GetProgression())
                 {
                     UBreakerProgressionComponent* Progression = Character->GetProgression();
@@ -1734,11 +1893,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
                 + SVerticalBox::Slot().AutoHeight()
                 [
                     SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, bSelectable ? Primary : Disabled, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Entry.Resource), BreakerUI::TypeCaption, bIsCurrent ? Cyan : Muted, true)]
+                    // The class you ARE is never disabled copy. It is the one
+                    // row on this screen that states a fact about the
+                    // character, so it reads at full contrast whether or not
+                    // it can be clicked.
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, (bIsCurrent || bSelectable) ? Primary : Disabled, true)]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[MenuText(FText::FromString(Entry.Resource), BreakerUI::TypeCaption, bIsCurrent ? Cyan : (bSelectable ? Muted : Disabled), true)]
                 ]
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), BreakerUI::TypeCaption, Muted, true)]
-                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), BreakerUI::TypeCaption, SoftText)]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), BreakerUI::TypeCaption, (bIsCurrent || bSelectable) ? Muted : Disabled, true)]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), BreakerUI::TypeCaption, (bIsCurrent || bSelectable) ? SoftText : Disabled)]
             ],
             // Locked-in class carries the accent ring; everything else keeps
             // the same geometry on the neutral rest border.
@@ -1990,10 +2153,18 @@ namespace
     // marker label has one line for it, and a wrapped four-line lock reason is
     // what used to run into the node beneath. The full sentence still reaches
     // the player on the detail rail and in the status line.
-    bool SkillNodeIsPurchasable(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node, int32 TreeSpent, FString& OutLockReason, FString* OutShortReason = nullptr)
+    //
+    // OutTierGated says the ONLY thing standing in the way is the tier's entry
+    // requirement. The board states that requirement once, in the tier gutter,
+    // so a node held only by it must not repeat it — the repetition was the
+    // `GATE 0/2` printed under every locked marker, which is uniform noise
+    // rather than information, and which collided with the gutter's own `GATE`
+    // label meaning something else entirely.
+    bool SkillNodeIsPurchasable(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, const UBreakerProgressionNode* Node, int32 TreeSpent, FString& OutLockReason, FString* OutShortReason = nullptr, bool* OutTierGated = nullptr)
     {
         OutLockReason.Reset();
         if (OutShortReason) OutShortReason->Reset();
+        if (OutTierGated) *OutTierGated = false;
         auto Fail = [&OutLockReason, OutShortReason](const FString& Full, const FString& Short)
         {
             OutLockReason = Full;
@@ -2011,9 +2182,10 @@ namespace
         }
         if (Node->RequiredTreeInvestment > TreeSpent)
         {
+            if (OutTierGated) *OutTierGated = true;
             return Fail(
-                FString::Printf(TEXT("REQUIRES %d INVESTED (%d)"), Node->RequiredTreeInvestment, TreeSpent),
-                FString::Printf(TEXT("GATE %d/%d"), TreeSpent, Node->RequiredTreeInvestment));
+                FString::Printf(TEXT("TIER OPENS AT %d INVESTED (%d SO FAR)"), Node->RequiredTreeInvestment, TreeSpent),
+                FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, Node->RequiredTreeInvestment));
         }
         for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
         {
@@ -2063,10 +2235,32 @@ namespace
     // -----------------------------------------------------------------------
     enum class ESkillMarkerKind : uint8 { Minor, Notable, Convergence, Keystone };
 
+    // A node that hands its owner a `Keystone.*` tag IS a keystone, whatever
+    // the authoring flag says.
+    //
+    // This is why Bloodrhythm rendered wrong. It is Swift/Frenzy's branch
+    // keystone — it grants Keystone.Swift.Bloodrhythm, which is a real row in
+    // Overdrive's variant table — but the fallback content never set
+    // bCornerstone, so ClassifyNode fell through to "single-rank costing 3+"
+    // and drew the game's first working keystone as an ordinary Convergence
+    // square. The content lives in Progression/, which this screen does not
+    // own; reading the tag the content already publishes is both the fix
+    // available here and the more truthful test, since the tag is what
+    // actually makes a keystone a keystone at runtime.
+    bool NodeCarriesKeystoneTag(const UBreakerProgressionNode* Node)
+    {
+        if (!Node) return false;
+        for (const FGameplayTag& Tag : Node->GrantedTags)
+        {
+            if (Tag.ToString().StartsWith(TEXT("Keystone."))) return true;
+        }
+        return false;
+    }
+
     ESkillMarkerKind ClassifyNode(const UBreakerProgressionNode* Node)
     {
         if (!Node) return ESkillMarkerKind::Minor;
-        if (Node->bCornerstone) return ESkillMarkerKind::Keystone;
+        if (Node->bCornerstone || NodeCarriesKeystoneTag(Node)) return ESkillMarkerKind::Keystone;
         if (Node->MaxRank > 1) return ESkillMarkerKind::Minor;
         if (Node->CostPerRank >= 3) return ESkillMarkerKind::Convergence;
         return ESkillMarkerKind::Notable;
@@ -2093,6 +2287,67 @@ namespace
     bool MarkerLabelsRight(ESkillMarkerKind Kind)
     {
         return Kind == ESkillMarkerKind::Convergence || Kind == ESkillMarkerKind::Keystone;
+    }
+
+    // How heavy the marker's own ring is. A keystone always carries rail
+    // weight, so it reads as the most important shape on the board even
+    // locked; everything else uses the ordinary selected/rest border weights.
+    float MarkerRingThickness(ESkillMarkerKind Kind, bool bOwnedOrPurchasable)
+    {
+        if (Kind == ESkillMarkerKind::Keystone) return BreakerUI::RailThickness;
+        if (Kind == ESkillMarkerKind::Convergence) return BreakerUI::BorderSelected;
+        return bOwnedOrPurchasable ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+    }
+
+    // The mark INSIDE the marker.
+    //
+    // Everything except a multi-rank Minor used to put an SSpacer here, so a
+    // Notable, a Convergence and a Keystone were all an empty box — and an
+    // empty box on a panel/00 fill behind a 1px rest-colour ring is not a
+    // marker, it is a hole. That is precisely how the keystone read on screen:
+    // a solid black square, the LEAST distinct thing on a board where it
+    // should be the most. Each kind now carries a filled core in its state
+    // colour, and the keystone carries a ringed one, so the four kinds are
+    // told apart by silhouette AND by centre, not by size alone.
+    // MarkerPixels is the marker's own edge length, so the core scales with
+    // whatever the caller draws — the path board at 44/64/60 and the Core
+    // constellation map at its compact chip size read as the same language.
+    TSharedRef<SWidget> MakeMarkerCore(ESkillMarkerKind Kind, const FLinearColor& StateColor, const FLinearColor& Face,
+        float MarkerPixels)
+    {
+        switch (Kind)
+        {
+            case ESkillMarkerKind::Notable:
+            {
+                const float Core = FMath::Max(6.0f, MarkerPixels * 0.27f);
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidBlock(StateColor)];
+            }
+            case ESkillMarkerKind::Convergence:
+            {
+                const float Core = FMath::Max(8.0f, MarkerPixels * 0.31f);
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)[SolidBlock(StateColor)];
+            }
+            case ESkillMarkerKind::Keystone:
+            {
+                // Ring, gap, core — concentric, which nothing else on the
+                // board is.
+                const float Core = FMath::Max(14.0f, MarkerPixels * 0.50f);
+                return SNew(SBox).WidthOverride(Core).HeightOverride(Core)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(Face)
+                        .Padding(FMargin(BreakerUI::Space4))
+                        [
+                            SolidBlock(StateColor)
+                        ],
+                        StateColor, BreakerUI::BorderSelected)
+                ];
+            }
+            default:
+                return SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+        }
     }
 
     FString MarkerKindLabel(ESkillMarkerKind Kind)
@@ -2426,7 +2681,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // Read the viewport once. Everything below is laid out against these
     // numbers rather than against 1920x1080, which is why the screen no longer
     // walks off the edge of a smaller window.
-    const FSkillScreenMetrics Metrics = MeasureSkillScreen();
+    const FWideScreenMetrics Metrics = MeasureWideScreen();
 
     // The character's real aggregation, captured once. Every before/after
     // number on this screen is composed from this snapshot, so the screen can
@@ -2481,10 +2736,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         MakeSkillDetailPlaceholder()
     ];
 
+    // What the board is actually DRAWING. The class board draws one branch at
+    // a time unless COMPARE ALL is chosen, so this is not the same list as
+    // ClassTrees — and the footer count below used ClassTrees, which is how it
+    // came to read "8 PURCHASABLE" over a branch showing three gold nodes. A
+    // number that disagrees with what the player can see is worse than no
+    // number, so the count and the board now read the same list.
+    TArray<const UBreakerProgressionTree*> VisibleTrees;
+    if (bCoreBoard)
+    {
+        VisibleTrees = CoreTrees;
+    }
+    else if (ClassTrees.IsValidIndex(SkillBranchIndex))
+    {
+        VisibleTrees.Add(ClassTrees[SkillBranchIndex]);
+    }
+    else
+    {
+        VisibleTrees = ClassTrees;
+    }
+    // True when the footer's count covers more than the one branch on screen,
+    // which is the only case where it needs to say so.
+    const bool bCountSpansBoard = bCoreBoard || VisibleTrees.Num() != 1;
+
     // Live purchasable count for the footer, over the visible board only.
     int32 PurchasableCount = 0;
     {
-        const TArray<const UBreakerProgressionTree*>& VisibleTrees = bCoreBoard ? CoreTrees : ClassTrees;
         for (const UBreakerProgressionTree* Tree : VisibleTrees)
         {
             int32 Spent = 0;
@@ -2580,11 +2857,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // all side by side to compare). One branch at a time is what buys the
         // board the width it needs to be readable — the whole reason it felt
         // cramped was three columns of full-detail nodes fighting for 1200px.
-        TArray<const UBreakerProgressionTree*> Drawn;
-        if (SkillBranchIndex >= 0 && SkillBranchIndex < ClassTrees.Num()) Drawn.Add(ClassTrees[SkillBranchIndex]);
-        else Drawn = ClassTrees;
+        // VisibleTrees is that selection, resolved once above so the footer
+        // count cannot disagree with the board.
+        const TArray<const UBreakerProgressionTree*>& Drawn = VisibleTrees;
 
-        const float GutterWidth = 76.0f;    // the dedicated tier-gate gutter
+        // The tier gutter. Widened from 76 because it now carries a sentence
+        // ("OPENS AT 12") rather than the two-word "GATE n" that used to
+        // collide, in meaning, with the node markers' own gate readout.
+        const float GutterWidth = 104.0f;
         const float TopPad = 28.0f;
 
         TArray<int32> Tiers;
@@ -2669,11 +2949,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         {
             const float TierTop = TopPad + TierIndex * TierHeight;
             int32 Gate = 0;
-            for (const UBreakerProgressionTree* Tree : Drawn)
+            bool bGateMet = true;
+            for (int32 BranchIndex = 0; BranchIndex < Drawn.Num(); ++BranchIndex)
             {
-                for (const UBreakerProgressionNode* Node : Tree->Nodes)
+                for (const UBreakerProgressionNode* Node : Drawn[BranchIndex]->Nodes)
                 {
-                    if (Node && Node->Tier == Tiers[TierIndex]) Gate = FMath::Max(Gate, Node->RequiredTreeInvestment);
+                    if (!Node || Node->Tier != Tiers[TierIndex]) continue;
+                    Gate = FMath::Max(Gate, Node->RequiredTreeInvestment);
+                    if (BranchSpent[BranchIndex] < Node->RequiredTreeInvestment) bGateMet = false;
                 }
             }
 
@@ -2683,21 +2966,36 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 [
                     DashedLine(FieldWidth - GutterWidth, BorderEmphasis)
                 ];
-            Canvas->AddSlot()
-                .Position(FVector2D(0.0f, TierTop + BreakerUI::Space8))
-                .Size(FVector2D(GutterWidth - BreakerUI::Space8, 40.0f))
+            {
+                // The tier's ENTRY REQUIREMENT, stated once for the whole row.
+                //
+                // This used to read "GATE 2" while every locked marker beneath
+                // it read "GATE 0/2" — the same word for the tier's cost and
+                // for one node's progress toward it, stacked vertically. The
+                // gutter now says what OPENS the tier; the markers say only
+                // what is true of themselves.
+                TSharedRef<SVerticalBox> GutterLabel = SNew(SVerticalBox);
+                GutterLabel->AddSlot().AutoHeight()
                 [
-                    // Two short lines: tier, then gate cost.
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot().AutoHeight()
-                    [
-                        MenuText(FText::FromString(FString::Printf(TEXT("TIER %d"), Tiers[TierIndex])), BreakerUI::TypeCaption, Muted, true)
-                    ]
-                    + SVerticalBox::Slot().AutoHeight()
-                    [
-                        MenuText(FText::FromString(FString::Printf(TEXT("GATE %d"), Gate)), BreakerUI::TypeCaption, Gate > 0 ? Amber : Muted, true)
-                    ]
+                    MenuText(FText::FromString(FString::Printf(TEXT("TIER %d"), Tiers[TierIndex])), BreakerUI::TypeCaption, Muted, true)
                 ];
+                if (Gate > 0)
+                {
+                    GutterLabel->AddSlot().AutoHeight()
+                    [
+                        MenuText(FText::FromString(bGateMet
+                                ? FString(TEXT("OPEN"))
+                                : FString::Printf(TEXT("OPENS AT %d"), Gate)),
+                            BreakerUI::TypeCaption, bGateMet ? Cyan : Amber, true)
+                    ];
+                }
+                Canvas->AddSlot()
+                    .Position(FVector2D(0.0f, TierTop + BreakerUI::Space8))
+                    .Size(FVector2D(GutterWidth - BreakerUI::Space8, 40.0f))
+                    [
+                        GutterLabel
+                    ];
+            }
         }
 
         float ColumnX = GutterWidth;
@@ -2739,7 +3037,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
                     FString LockReason;
                     FString ShortReason;
-                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason, &ShortReason);
+                    bool bTierGated = false;
+                    const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason, &ShortReason, &bTierGated);
                     const bool bOwned = Rank > 0;
                     const bool bMaxed = Rank >= Node->MaxRank;
 
@@ -2747,17 +3046,24 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop + BreakerUI::Space8),
                         FVector2D(NodeX, NodeY - Size * 0.5f), bOwned ? Cyan : PanelHover);
 
-                    const FLinearColor Fill = (bOwned || bPurchasable) ? PanelRaised : Panel;
+                    const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
                     // Gold is the only border colour that means "spend now".
-                    const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderRest);
-                    const float RingThickness = (bOwned || bPurchasable) ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+                    // Locked takes border/emphasis rather than border/rest:
+                    // rest sits one value step off the plate face, which on a
+                    // 44px shape against the board ground is invisible, and an
+                    // invisible ring around a dark fill is what made the whole
+                    // locked tier read as a row of holes.
+                    const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
+                    const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
+                    const FLinearColor CoreColor = bOwned ? Cyan : (bPurchasable ? Amber : Muted);
 
                     // Multi-rank Minors carry their rank inside the marker;
-                    // every other kind is a bare shape with text beneath.
+                    // every other kind carries a filled core in its state
+                    // colour, so no marker is ever an empty box.
                     TSharedRef<SWidget> Inner = (Kind == ESkillMarkerKind::Minor)
                         ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::Printf(TEXT("%d/%d"), Rank, Node->MaxRank)),
                             BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
-                        : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)));
+                        : MakeMarkerCore(Kind, CoreColor, Fill, Size);
 
                     const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
                     TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
@@ -2776,11 +3082,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // The SHORT reason on the board; the full sentence is on
                     // the rail. A wrapped four-line lock reason in a fixed
                     // label box is what used to overrun into the tier beneath.
+                    //
+                    // A node held ONLY by its tier's entry requirement prints
+                    // nothing here. The gutter states that requirement once
+                    // per tier; repeating it under every marker in the tier
+                    // was noise that looked like information, and the muted
+                    // marker already says "not yet". Node-specific reasons
+                    // (a prerequisite by name, points you cannot afford) still
+                    // print, because those ARE about this node.
                     const FString StateLine = bMaxed
                         ? FString(TEXT("MAXED"))
                         : (bPurchasable
                             ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : ShortReason));
+                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : (bTierGated ? FString() : ShortReason)));
                     const FLinearColor StateColor = bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted));
 
                     TSharedRef<SVerticalBox> Label = SNew(SVerticalBox);
@@ -2971,7 +3285,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // old flat 156 assumed one row and a wide cluster's chips ran straight
         // out through the plate's right edge.
         const int32 ChipsPerRow = 6;
-        const float ChipSize = 30.0f;
+        // 36, not 30: a multi-rank chip prints its rank digit inside the
+        // marker and at 30 the glyph was cut off by the button's own content
+        // box, so a rank read as a bracket. The plate height derives from this
+        // number, so growing it is a one-line change.
+        const float ChipSize = 36.0f;
         int32 WidestClusterRows = 1;
         for (const FConstellationCluster& Cluster : Clusters)
         {
@@ -3025,17 +3343,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 const bool bOwned = Rank > 0;
                 const ESkillMarkerKind Kind = ClassifyNode(Node);
 
-                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelRaised : Panel;
-                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderRest);
-                const float RingThickness = (bOwned || bPurchasable) ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
+                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
+                const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
+                const FLinearColor CoreColor = bOwned ? Cyan : (bPurchasable ? Amber : Muted);
                 const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
 
                 // The cluster grid is a glance, not the path board: every kind
-                // draws at one compact size here, keeping its silhouette.
+                // draws at one compact size here, keeping its silhouette AND
+                // its centre mark. Without the mark a single-rank chip is an
+                // empty black box, which is the same defect the path board's
+                // keystone had — the map should not repeat it thirty times.
                 TSharedRef<SWidget> Chip = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness,
                     Node->MaxRank > 1
                         ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::FromInt(Rank)), BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
-                        : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))));
+                        : MakeMarkerCore(Kind, CoreColor, Fill, ChipSize));
                 if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
 
                 ChipRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
@@ -3246,29 +3568,45 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     AddBoardTab(bCompactHeader ? TEXT("CLASS") : FString::Printf(TEXT("CLASS · %s"), *ClassDisplayName(PermanentClass)), 0);
     AddBoardTab(TEXT("CORE"), 1);
 
+    // Both numbers, each one NAMED.
+    //
+    // The counter used to stack a large unspent count over a small "/ N SPENT",
+    // which at real values read as "108 / 32" — a fraction, and a nonsensical
+    // one, since unspent is not out of spent. The big number now carries the
+    // word UNSPENT on its own baseline and the spent count is a separate
+    // labelled line, so no reading of the two as one ratio survives.
     auto MakePointChip = [bCompactHeader](const FString& Label, int32 Unspent, int32 Spent, const FLinearColor& Rail) -> TSharedRef<SWidget>
     {
+        TSharedRef<SWidget> Headline =
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
+            [
+                MenuText(FText::FromString(FString::FromInt(Unspent)), BreakerUI::TypeH2, Rail, true)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(TEXT("UNSPENT")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+
         if (bCompactHeader)
         {
-            // One line instead of three. The counter still says both numbers;
-            // it just stops claiming 115px of a header row that has none left.
+            // Two lines instead of three. Every word still present; the plate
+            // just stops claiming a header row that has none left.
             return MakePlate(
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[Headline]
+                + SVerticalBox::Slot().AutoHeight()
                 [
-                    MenuText(FText::FromString(FString::FromInt(Unspent)), BreakerUI::TypeH2, Rail, true)
-                ]
-                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
-                [
-                    MenuText(FText::FromString(FString::Printf(TEXT("%s / %d"), *Label.Left(5).TrimEnd(), Spent)), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+                    MenuText(FText::FromString(FString::Printf(TEXT("%s · %d SPENT"), *Label.Replace(TEXT(" POINTS"), TEXT("")), Spent)),
+                        BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
                 ],
                 BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space8, BreakerUI::Space4));
         }
         return MakePlate(
             SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)]
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::FromInt(Unspent)), BreakerUI::TypeH2, Rail, true)]
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("/ %d SPENT"), Spent)), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)],
+            + SVerticalBox::Slot().AutoHeight()[Headline]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(FString::Printf(TEXT("%d SPENT"), Spent)), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)],
             BreakerUI::Panel10, Rail, FMargin(BreakerUI::Space16, BreakerUI::Space4));
     };
 
@@ -3391,8 +3729,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
                 [
                     // Said out loud, because the screen must not imply a
-                    // commitment the save has no field for.
-                    MenuText(FText::FromString(TEXT("BROWSING — NO SUBCLASS IS COMMITTED")), BreakerUI::TypeCaption, Muted, true)
+                    // commitment the save has no field for. Clipped for the
+                    // same reason the footer is: a class with more branches
+                    // than Swift's three must push this note off rather than
+                    // print it through the chips.
+                    SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
+                    .HAlign(HAlign_Right)
+                    [
+                        MenuText(FText::FromString(TEXT("BROWSING — NO SUBCLASS IS COMMITTED")), BreakerUI::TypeCaption, Muted, true)
+                    ]
                 ],
                 BreakerUI::BgRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space8))
         ];
@@ -3435,15 +3780,29 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     [
         MakePlate(
             SNew(SHorizontalBox)
-            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space24, 0.0f)
             [
+                // Clipped, not merely filled. An SHorizontalBox does not
+                // shrink an oversized child to its slot — it draws it at full
+                // width straight through whatever shares the row, which is
+                // exactly how the count and the legend came to overprint each
+                // other. The legend is also cut back to the bindings a player
+                // cannot guess; the rest was documentation, not a legend.
                 // O2: node numbers are not balanced yet.
-                MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · BRANCH CHIPS SWAP THE TREE · CLASS / CORE SWITCHES BOARD · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
-                    BreakerUI::TypeCaption, Muted, true)
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
+                [
+                    MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
+                        BreakerUI::TypeCaption, Muted, true)
+                ]
             ]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%d PURCHASABLE"), PurchasableCount)), BreakerUI::TypeH2, Amber, true)
+                // Scoped to the board and LABELLED with its scope. The count
+                // is only useful if the player can look up and find that many
+                // gold nodes.
+                MenuText(FText::FromString(FString::Printf(TEXT("%d PURCHASABLE %s"),
+                        PurchasableCount, bCountSpansBoard ? TEXT("ON THIS BOARD") : TEXT("ON THIS BRANCH"))),
+                    BreakerUI::TypeH2, PurchasableCount > 0 ? Amber : Muted, true)
             ],
             BreakerUI::BgRaised, Amber, FMargin(BreakerUI::Space24, BreakerUI::Space8))
     ];

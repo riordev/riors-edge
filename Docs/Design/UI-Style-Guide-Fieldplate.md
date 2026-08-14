@@ -208,3 +208,42 @@ Not implemented, and deliberately so:
   which the 64px screen margin makes impossible, so the panel is 1760 wide.
 - None of the re-zoned layout has been looked at by a human. It compiles and
   the automation suite passes; that is not the same as it being right.
+  *(SUPERSEDED 2026-08-14 — see below.)*
+
+## Implementation status (2026-08-14, the first LOOKING pass)
+
+Every front-end screen has now been captured at 1920x1080 through the
+screenshot harness (`-BreakerCaptureMenu=<SCREEN>`) and READ: `SKILLTREES`
+(all three of its boards), `INVENTORY`, `LOADOUT`, `SETTINGS`, `CLASS`,
+`PAUSE`. Per-screen findings live in `UI-Inventory-Spec.md` and
+`UI-Skill-Tree-Spec.md`. System-level findings:
+
+- **`SHorizontalBox` overflow is this codebase's recurring UI defect, and it
+  has a shape.** A `FillWidth` slot does NOT shrink an oversized child; it
+  draws it at its full desired width, straight through whatever shares the row.
+  It caused all three collisions found by looking: the inventory chips through
+  the input legend, the skill footer legend through the purchasable count, and
+  the loadout's eight weapon tiles clipping their own names. The three fixes
+  are the three legitimate answers: give the crowded thing its own row; pack
+  into rows from a measured width; or clip the slot with
+  `EWidgetClipping::ClipToBounds`. None of them measure a widget against its
+  own arrangement, which is what makes them safe where `SWrapBox` +
+  `UseAllottedSize` is not.
+- **Text measurement is not layout measurement.** `FSlateFontMeasure` on a
+  string and a font is a pure function of inputs known before layout runs, so
+  using it to decide a row count cannot oscillate. This is now the sanctioned
+  way to fit chips.
+- **`IsEnabled(false)` violates FIELDPLATE 01.** Slate's disabled state fades
+  the whole content, and section 01 says disabled "keeps geometry, drops text
+  to `#3E4C5E`, strips the accent entirely — never lowers opacity". On the
+  BREAKER CLASS screen it dimmed all five class names, including the one the
+  character actually is, to an unreadable grey. Paint the disabled state and
+  refuse the click in the handler instead.
+- **A marker with nothing inside it is a hole, not a marker.** Empty shapes on
+  a `panel/00` fill behind a `border/rest` ring are invisible: rest is one
+  value step off the plate face. Locked markers use `border/emphasis`, and
+  every marker carries a centre mark.
+- Fonts, motion, and section 05 texture are unchanged — still not implemented,
+  still deliberately so.
+- `SETTINGS` and `PAUSE` were captured and need no changes: both read cleanly
+  at 1080p with no collision, clipping or contrast problem.

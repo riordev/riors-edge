@@ -160,10 +160,81 @@ Not landed / known compromises:
   names them FRENZY, KINETIC and MARKSMAN (not "Survivor");
   `UBreakerProgressionLibrary` authors Kinetic and Marksman only, so the strip
   shows two chips. Frenzy is unauthored content, not a UI gap.
-- **Nothing here is visually verified.** The build compiles and the automation
-  suite passes; no one has looked at the screen. That is the standing gap on
-  every item above — including whether the clipping the owner reported is fully
-  gone.
+- **Nothing here was visually verified** as of this pass. SUPERSEDED by the
+  2026-08-14 looking pass at the end of this file, which photographed all three
+  boards and lists what looking found.
+
+## Implementation status (2026-08-14, the first LOOKING pass)
+
+**This screen has now been photographed at 1920x1080 and iterated against the
+pictures.** All three of its boards were captured: the Class path board, the
+Core constellation map, and COMPARE ALL. The Core map and COMPARE ALL had never
+been seen by anyone before this pass — the capture harness only reached the
+default board, so `-BreakerCaptureBoard=CORE|COMPARE|BRANCH<n>` was added
+(parsed in `SBreakerMenu::ShowScreenForCapture`, dev-only, command-line gated).
+
+What the pictures showed, and what changed:
+
+- **The keystone rendered as a solid black hole.** Bloodrhythm is Swift/Frenzy's
+  branch keystone and drew as an unmarked black square — the least distinct
+  marker on the board. Two causes, both fixed. (1) `ClassifyNode` keyed only on
+  `bCornerstone`, which the fallback content never sets, so Bloodrhythm fell
+  through to "single-rank costing 3+" and was classified as a Convergence. It
+  now ALSO reads the node's granted tags: a node that hands its owner a
+  `Keystone.*` tag IS a keystone, which is the same thing that makes it a
+  keystone at runtime (`Keystone.Swift.Bloodrhythm` is a real row in Overdrive's
+  variant table). (2) Every kind except a multi-rank Minor put an `SSpacer`
+  inside the marker, so Notables, Convergences and Keystones were all empty
+  boxes; `MakeMarkerCore` now gives each a filled centre in its state colour,
+  and the keystone a concentric ring-gap-core no other marker has. Keystones
+  also always carry rail-weight (3px) rings, and locked markers moved from
+  `border/rest` to `border/emphasis` — rest is one value step off the plate
+  face and was simply invisible at 44px.
+- **"GATE" meant two things on one screen.** The tier gutter read `GATE 2` (the
+  tier's entry requirement) while every locked marker read `GATE 0/2` (that
+  node's progress toward it), stacked vertically. The gutter now reads
+  `TIER n` / `OPENS AT g` in gold, or `OPEN` in cyan once met, and prints no
+  second line at all when the gate is 0. The gutter widened 76 -> 104 to hold
+  the sentence.
+- **Locked nodes no longer repeat the tier gate.** A node held ONLY by its
+  tier's entry requirement prints no state line — the gutter states that
+  requirement once for the whole row, and the muted marker already says "not
+  yet". Node-SPECIFIC reasons (a prerequisite by name, points you cannot
+  afford) still print, because those are about that node.
+  `SkillNodeIsPurchasable` gained an `OutTierGated` flag to tell the two apart.
+- **The footer count disagreed with the board.** It read `8 PURCHASABLE` over a
+  branch showing three gold nodes, because it counted every class tree while
+  the board draws one branch. The visible-tree list is now resolved once and
+  used by both the board and the count, and the count states its scope:
+  `3 PURCHASABLE ON THIS BRANCH` / `9 PURCHASABLE ON THIS BOARD`.
+- **The point counters inverted their own hierarchy.** `CLASS POINTS · 108 ·
+  / 32 SPENT` read as "108 of 32". The big number now carries the word
+  `UNSPENT` on its own baseline and `32 SPENT` is a separate labelled line.
+- **The footer legend and the count overprinted each other** once the count got
+  longer. An `SHorizontalBox` does not shrink an oversized child to its slot —
+  it draws it at full width straight through its neighbour, which is the same
+  bug class as the loadout's chip row. The legend is now clipped to its slot
+  and cut back to bindings a player cannot guess.
+- **Core cluster chips clipped their own rank digits** at 30px (a `0` read as a
+  bracket) and, being single-rank, were empty black boxes. Chips are 36px and
+  carry the same centre marks as the path board; `MakeMarkerCore` scales off
+  the marker's edge length so both boards speak one language.
+
+Still not verified or not fixed:
+
+- **Hover has never been photographed.** The detail rail, the before/after
+  projection and the equip-limit outline are all hover-driven and the harness
+  cannot move a mouse. Everything above is the resting state only.
+- **The Core map's UNMAPPED cluster holds six nodes.** That is the catch-all
+  working as designed, but it means six authored Core nodes sit outside the
+  five known `Core.<Constellation>.` prefixes and are therefore on the wrong
+  part of the map. That is content naming in `Progression/`, not a UI fix.
+- The constellation canvas is 1060 wide inside a ~1300 board viewport, so the
+  right third of the Core board is empty. Cosmetic; left alone.
+- In COMPARE ALL the node pitch hits its 168px floor and labels sit tight
+  against the next column. It scrolls horizontally and nothing actually
+  overlaps, so it was left as-is.
+- Motion (panel transition, purchase-confirm snap) is still unimplemented.
 
 ## Layout fixes, 2026-08-13 (the "numbers clip / clunky" pass)
 
