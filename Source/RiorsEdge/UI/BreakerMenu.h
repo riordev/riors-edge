@@ -68,7 +68,8 @@ private:
     // skill matrix derives both from the viewport so the screen cannot run off
     // the edge of a window smaller than the authored 1920x1080 canvas.
     TSharedRef<SWidget> BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
-        const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight = 1000.0f) const;
+        const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight = 1000.0f,
+        bool bFillHeight = false) const;
     // Event-driven limit tell: paints (or clears) the harm-red outline on the
     // equipment-column row a hovered backpack card would eject. Called from
     // OnHovered/OnUnhovered only — never from a tick or a paint attribute.
@@ -127,6 +128,18 @@ private:
     // selection" note in BuildSkillTreesScreen for what a real commitment
     // would need.
     int32 SkillBranchIndex = 0;
+    // The skill board's view transform, held here so a purchase — which
+    // rebuilds the whole screen — does not throw the player back to the
+    // top-left of the board they were reading. Written from the board
+    // viewport's OnViewChanged (an input event, never a tick), and reset
+    // deliberately when the board itself changes, because a pan that made
+    // sense on one branch means nothing on another.
+    // Zero means "not chosen yet" — the board opens on the zoom that fits it,
+    // which is not 1:1 for COMPARE ALL.
+    float SkillBoardZoom = 0.0f;
+    FVector2D SkillBoardPan = FVector2D::ZeroVector;
+    void HandleBoardViewChanged(float NewZoom, FVector2D NewPan);
+    void ResetBoardView();
     // The fixed 420px hover-detail rail. Node hover handlers swap its content
     // through SetContent; it is never driven by a per-frame attribute, and it
     // never changes width, so the board cannot reflow when it populates.

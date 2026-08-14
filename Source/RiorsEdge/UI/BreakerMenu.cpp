@@ -283,6 +283,304 @@ namespace
         return Metrics;
     }
 
+    // -----------------------------------------------------------------------
+    // The board viewport: zoom and pan for the skill matrix.
+    //
+    // The board used to be an SCanvas of fixed pixel positions inside a
+    // horizontal SScrollBox inside a vertical one. Two scroll boxes on one
+    // surface is what "scrolling is off by a little bit" felt like: a wheel
+    // event landed in whichever of the two claimed it first, and the pair
+    // fight over the same gesture. Both are gone. This widget is the ONE way
+    // the board moves.
+    //
+    // How it works, and why it cannot become the per-frame-rebuild trap this
+    // project has been bitten by twice:
+    //
+    //  * The board is laid out ONCE, at its full authored pixel size, by
+    //    OnArrangeChildren handing the child exactly BoardSize regardless of
+    //    how much room this widget has. Nothing measures its own arrangement,
+    //    so there is no layout feedback loop.
+    //  * Zoom and pan are a RENDER transform on that already-arranged child,
+    //    set imperatively from the input handlers. Painting a transform is
+    //    free; no widget is rebuilt, no attribute is polled, and no text is
+    //    re-laid-out at a new size, so zooming cannot reflow the board.
+    //  * Slate carries the render transform through the hit-test grid, so the
+    //    marker buttons stay hoverable and clickable at every zoom level, and
+    //    hover is what populates the detail rail.
+    //  * The rail is a sibling column of fixed width and this widget reports a
+    //    desired size of zero, so nothing here can push the rail or resize it.
+    // -----------------------------------------------------------------------
+    DECLARE_DELEGATE_TwoParams(FOnBoardViewChanged, float /*Zoom*/, FVector2D /*Pan*/);
+
+    class SBreakerBoardViewport : public SCompoundWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerBoardViewport)
+            : _BoardSize(FVector2D(1000.0f, 800.0f))
+            , _InitialZoom(1.0f)
+            , _InitialPan(FVector2D::ZeroVector)
+            {}
+            SLATE_ARGUMENT(FVector2D, BoardSize)
+            SLATE_ARGUMENT(float, InitialZoom)
+            SLATE_ARGUMENT(FVector2D, InitialPan)
+            SLATE_EVENT(FOnBoardViewChanged, OnViewChanged)
+            SLATE_DEFAULT_SLOT(FArguments, Content)
+        SLATE_END_ARGS()
+
+        // Zoom limits. Below MinZoom the 11px caption floor stops being
+        // readable at all, so there is no point offering it; above MaxZoom a
+        // 48px marker is bigger than a HUD ability square and the board stops
+        // being a map.
+        static constexpr float MinZoom = 0.5f;
+        static constexpr float MaxZoom = 2.0f;
+        // One wheel notch. 1.15 is roughly seven notches across the whole
+        // range, which is enough travel to feel continuous and few enough that
+        // a player can get back to 1.00 by counting.
+        static constexpr float ZoomStep = 1.15f;
+
+        void Construct(const FArguments& InArgs)
+        {
+            BoardSize = InArgs._BoardSize;
+            DefaultZoom = FMath::Clamp(InArgs._InitialZoom, MinZoom, MaxZoom);
+            Zoom = DefaultZoom;
+            Pan = InArgs._InitialPan;
+            OnViewChanged = InArgs._OnViewChanged;
+
+            // The viewport is a window onto a larger board, so it must clip.
+            SetClipping(EWidgetClipping::ClipToBounds);
+            ChildSlot
+            [
+                InArgs._Content.Widget
+            ];
+            ApplyTransform();
+        }
+
+        float GetZoom() const { return Zoom; }
+
+        // The two button controls. They zoom about the middle of the viewport,
+        // which is the only sensible anchor when the gesture did not come from
+        // a cursor position.
+        void StepZoom(float Notches)
+        {
+            const FVector2D View = GetViewSize();
+            ZoomAbout(View * 0.5f, Notches);
+        }
+
+        // Back to the view the board OPENED on, which for a board wider than
+        // its window is the zoom that fits it — not a bare 1.00, which would
+        // "reset" a COMPARE ALL board to a state where a third of it is off
+        // the right edge.
+        void ResetView()
+        {
+            Zoom = DefaultZoom;
+            Pan = FVector2D::ZeroVector;
+            ClampPan();
+            ApplyTransform();
+            Notify();
+        }
+
+        virtual FVector2D ComputeDesiredSize(float) const override
+        {
+            // Take whatever the parent column gives. A desired size here would
+            // let the board argue with the fixed detail rail beside it.
+            return FVector2D::ZeroVector;
+        }
+
+        virtual void OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const override
+        {
+            const TSharedRef<SWidget>& Child = ChildSlot.GetWidget();
+            if (ArrangedChildren.Accepts(Child->GetVisibility()))
+            {
+                // Full authored size, always. Clamping the board to the
+                // viewport is what a scroll box does, and it is what made the
+                // board's own geometry depend on the window.
+                ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(Child, BoardSize, FSlateLayoutTransform()));
+            }
+        }
+
+        virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+        {
+            // About the CURSOR, never about the origin. Zooming about the
+            // origin is what makes a board feel like it is fighting you: the
+            // thing you were looking at slides away from under the pointer.
+            ZoomAbout(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()), MouseEvent.GetWheelDelta());
+            return FReply::Handled();
+        }
+
+        virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+        {
+            const FKey Button = MouseEvent.GetEffectingButton();
+            if (Button != EKeys::LeftMouseButton && Button != EKeys::MiddleMouseButton)
+            {
+                return FReply::Unhandled();
+            }
+            // A press only reaches this widget when no marker took it first —
+            // SButton handles its own press and captures the mouse — so
+            // left-drag pans the empty board without ever stealing a purchase.
+            bDragging = true;
+            DragOrigin = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+            PanOrigin = Pan;
+            return FReply::Handled().CaptureMouse(SharedThis(this));
+        }
+
+        virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+        {
+            if (!bDragging || !HasMouseCapture()) return FReply::Unhandled();
+            Pan = PanOrigin + (MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) - DragOrigin);
+            ClampPan();
+            ApplyTransform();
+            return FReply::Handled();
+        }
+
+        virtual FReply OnMouseButtonUp(const FGeometry&, const FPointerEvent&) override
+        {
+            if (!bDragging) return FReply::Unhandled();
+            bDragging = false;
+            Notify();
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+
+        virtual void OnMouseCaptureLost(const FCaptureLostEvent&) override
+        {
+            bDragging = false;
+        }
+
+        virtual FCursorReply OnCursorQuery(const FGeometry&, const FPointerEvent&) const override
+        {
+            return bDragging ? FCursorReply::Cursor(EMouseCursor::GrabHandClosed) : FCursorReply::Unhandled();
+        }
+
+    private:
+        FVector2D GetViewSize() const
+        {
+            const FVector2D View = GetTickSpaceGeometry().GetLocalSize();
+            return FVector2D(FMath::Max(1.0f, static_cast<float>(View.X)), FMath::Max(1.0f, static_cast<float>(View.Y)));
+        }
+
+        void ZoomAbout(const FVector2D& LocalPoint, float Notches)
+        {
+            const float Previous = Zoom;
+            Zoom = FMath::Clamp(Zoom * FMath::Pow(ZoomStep, Notches), MinZoom, MaxZoom);
+            if (FMath::IsNearlyEqual(Previous, Zoom)) return;
+            // Keep the board point under LocalPoint exactly where it is:
+            //   board = (Local - Pan) / Previous, and Pan' = Local - Zoom*board.
+            Pan = LocalPoint - (LocalPoint - Pan) * (Zoom / Previous);
+            ClampPan();
+            ApplyTransform();
+            Notify();
+        }
+
+        void ClampPan()
+        {
+            const FVector2D View = GetViewSize();
+            const FVector2D Scaled = BoardSize * Zoom;
+            auto ClampAxis = [](float Offset, float Content, float Visible)
+            {
+                // Smaller than the window: pinned inside it. Larger: the edges
+                // may not be dragged past the window, so the board can never
+                // be flung somewhere the player cannot find it again.
+                return Content <= Visible
+                    ? FMath::Clamp(Offset, 0.0f, Visible - Content)
+                    : FMath::Clamp(Offset, Visible - Content, 0.0f);
+            };
+            Pan.X = ClampAxis(static_cast<float>(Pan.X), static_cast<float>(Scaled.X), static_cast<float>(View.X));
+            Pan.Y = ClampAxis(static_cast<float>(Pan.Y), static_cast<float>(Scaled.Y), static_cast<float>(View.Y));
+        }
+
+        void ApplyTransform()
+        {
+            const TSharedRef<SWidget>& Child = ChildSlot.GetWidget();
+            Child->SetRenderTransformPivot(FVector2D::ZeroVector);
+            Child->SetRenderTransform(TOptional<FSlateRenderTransform>(
+                FSlateRenderTransform(FScale2D(Zoom, Zoom), Pan)));
+        }
+
+        void Notify()
+        {
+            OnViewChanged.ExecuteIfBound(Zoom, Pan);
+        }
+
+        FVector2D BoardSize = FVector2D(1000.0f, 800.0f);
+        FVector2D Pan = FVector2D::ZeroVector;
+        FVector2D PanOrigin = FVector2D::ZeroVector;
+        FVector2D DragOrigin = FVector2D::ZeroVector;
+        float Zoom = 1.0f;
+        float DefaultZoom = 1.0f;
+        bool bDragging = false;
+        FOnBoardViewChanged OnViewChanged;
+    };
+
+    // The zoom a board OPENS on: 1:1 unless it is wider than the window it has
+    // been given, in which case it opens showing all of itself. COMPARE ALL is
+    // the case that needs it — three branches side by side are wider than the
+    // board column at any window size, and a comparison view whose third
+    // column starts off-screen is not a comparison. Derived from the viewport
+    // width read once at the top of the screen build, never from an
+    // arrangement, so it cannot feed back into layout.
+    float FitZoomForBoard(float BoardWidth, float ViewWidth)
+    {
+        if (BoardWidth <= 1.0f) return 1.0f;
+        return FMath::Clamp(ViewWidth / BoardWidth, SBreakerBoardViewport::MinZoom, 1.0f);
+    }
+
+    // The board's view controls. The wheel and the drag are the real verbs;
+    // these exist because a gesture nobody knows about is not a feature, and
+    // because a trackpad without a wheel still has to be able to zoom.
+    TSharedRef<SWidget> MakeBoardViewControls(const TSharedPtr<SBreakerBoardViewport>& Viewport)
+    {
+        TWeakPtr<SBreakerBoardViewport> Weak = Viewport;
+        auto MakeStep = [Weak](const FString& Label, float Notches) -> TSharedRef<SWidget>
+        {
+            return BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space4))
+                .OnClicked(FOnClicked::CreateLambda([Weak, Notches]()
+                {
+                    if (const TSharedPtr<SBreakerBoardViewport> View = Weak.Pin())
+                    {
+                        if (Notches == 0.0f) View->ResetView();
+                        else View->StepZoom(Notches);
+                    }
+                    return FReply::Handled();
+                }))
+                [
+                    MenuText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, true)
+                ],
+                BorderEmphasis);
+        };
+
+        return MakePlate(
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(TEXT("VIEW")), BreakerUI::TypeCaption, Muted, true)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                MakeStep(TEXT("-"), -1.0f)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                MakeStep(TEXT("+"), 1.0f)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                MakeStep(TEXT("RESET VIEW"), 0.0f)
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+            [
+                // Clipped, because an SHorizontalBox draws an oversized child
+                // straight through its neighbour rather than shrinking it.
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds).HAlign(HAlign_Right)
+                [
+                    MenuText(FText::FromString(TEXT("WHEEL ZOOMS AT THE CURSOR  ·  DRAG THE BOARD TO PAN")),
+                        BreakerUI::TypeCaption, Muted, true)
+                ]
+            ],
+            BreakerUI::BgRaised, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space4));
+    }
+
     // Diamond markers are square markers turned 45 degrees. The rotation is a
     // render transform, so the layout box stays axis-aligned and the board
     // geometry stays trivially predictable.
@@ -370,6 +668,18 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         else if (Board.StartsWith(TEXT("BRANCH"))) { SkillBoardTab = 0; SkillBranchIndex = FCString::Atoi(*Board.RightChop(6)); }
     }
     Rebuild(Screen);
+}
+
+void SBreakerMenu::HandleBoardViewChanged(float NewZoom, FVector2D NewPan)
+{
+    SkillBoardZoom = NewZoom;
+    SkillBoardPan = NewPan;
+}
+
+void SBreakerMenu::ResetBoardView()
+{
+    SkillBoardZoom = 0.0f;
+    SkillBoardPan = FVector2D::ZeroVector;
 }
 
 void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
@@ -475,7 +785,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FText& Meta, const TSharedRef<SWidget>& HeaderRight,
-    const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight) const
+    const TSharedRef<SWidget>& Body, const TSharedRef<SWidget>& Footer, float PanelWidth, float PanelHeight,
+    bool bFillHeight) const
 {
     // Header band, 88 tall at bg/raised on the cyan identity rail: h1 title
     // with the meta caption beneath it, the screen's own controls pinned to
@@ -507,6 +818,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
     Root->AddSlot().FillHeight(1.0f).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)[Body];
     Root->AddSlot().AutoHeight()[Footer];
 
+    // bFillHeight claims the whole PanelHeight instead of shrinking to the
+    // body's desired height. The skill matrix needs it: its board is a
+    // VIEWPORT onto a larger surface, so it deliberately has no desired height
+    // of its own, and a plate that shrink-wrapped it would collapse to the
+    // height of the branch strip. The loadout still shrink-wraps, which is why
+    // this is a parameter and not a change of rule.
+    TSharedRef<SBox> Plate = SNew(SBox).WidthOverride(PanelWidth);
+    if (bFillHeight) Plate->SetHeightOverride(PanelHeight);
+    else Plate->SetMaxDesiredHeight(PanelHeight);
+    Plate->SetContent(Root);
+
     return SNew(SOverlay)
         + SOverlay::Slot()
         [
@@ -516,10 +838,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
-            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(PanelHeight)
-            [
-                Root
-            ]
+            Plate
         ];
 }
 
@@ -2271,7 +2590,10 @@ namespace
         return ESkillMarkerKind::Notable;
     }
 
-    float MarkerSize(ESkillMarkerKind Kind)
+    // The spec's authored marker geometry (UI-Skill-Tree-Spec "Class <-> Core").
+    // It is a FLOOR, not a fixed size: MarkerSizeForLabel below grows it when
+    // the rank text inside genuinely needs more room.
+    float MarkerBaseSize(ESkillMarkerKind Kind)
     {
         switch (Kind)
         {
@@ -2302,6 +2624,87 @@ namespace
         if (Kind == ESkillMarkerKind::Keystone) return BreakerUI::RailThickness;
         if (Kind == ESkillMarkerKind::Convergence) return BreakerUI::BorderSelected;
         return bOwnedOrPurchasable ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
+    }
+
+    // -----------------------------------------------------------------------
+    // The rank text INSIDE a marker, and why it was losing its last glyph.
+    //
+    // THE CAUSE, found by photographing the board and measuring the pixels
+    // rather than by nudging a pad. A marker is BorderWrap(SButton[ text ]),
+    // and SButton aligns its content HAlign_Center — which in Slate means the
+    // child is arranged at exactly its own DESIRED width, never at the width
+    // available. An STextBlock's desired width is its MEASURED width, and
+    // Slate then clips the drawn run to that same box (the default
+    // ETextOverflowPolicy). Measurement and rasterisation round independently,
+    // so a run that lands a fraction wider than its measurement loses the
+    // right edge of its final glyph — which is exactly what `0/2` did, and
+    // what a `0` did at 30px on the Core chips, where the previous pass read
+    // it as "the box is too small" and bumped the box. The box was never the
+    // problem: a 48px marker has 40px of content area for 20px of text. The
+    // text simply was never GIVEN it.
+    //
+    // The fix is two-part and holds for `10/10` as well as `0/2`:
+    //   1. the text is arranged in a box measured to fit it with slack, so the
+    //      overflow clip has nothing to cut;
+    //   2. the marker is sized from that same measurement, so the box it needs
+    //      always fits inside the marker's chrome.
+    // -----------------------------------------------------------------------
+
+    // SButton draws the FCoreStyle button's own 2px NormalPadding underneath
+    // whatever ContentPadding we ask for, on every side.
+    inline constexpr float MarkerButtonPad = 2.0f;
+    // Slack around the measured run. Two pixels a side puts the arranged box
+    // outside any rounding difference between measuring a string and drawing
+    // it; it is not a fudge for an unknown size, it is the known quantisation.
+    inline constexpr float MarkerTextSlack = 4.0f;
+
+    // Measures TEXT against a FONT, which is a pure function of inputs known
+    // before layout runs — the sanctioned pattern in this file (see
+    // MeasureChipWidth). Nothing here reads an allotted size, so there is no
+    // layout feedback loop.
+    float MarkerTextWidth(const FString& Label)
+    {
+        if (Label.IsEmpty()) return 0.0f;
+        if (FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer())
+        {
+            const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+            const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption);
+            return static_cast<float>(Measure->Measure(Label, Font).X);
+        }
+        // Headless: nothing is on screen, and erring wide only makes a marker
+        // a few pixels larger than it needs to be.
+        return Label.Len() * (BreakerUI::TypeCaption * 0.72f);
+    }
+
+    // The marker edge length that holds this label, never smaller than the
+    // authored floor it is given, and kept on the 4px grid. The path board
+    // passes the spec's per-kind geometry; the Core map passes its own chip
+    // floor, so one rule serves both boards.
+    float MarkerSizeForLabel(float Base, float RingThickness, const FString& CentreLabel)
+    {
+        if (CentreLabel.IsEmpty()) return Base;
+        const float Needed = MarkerTextWidth(CentreLabel) + MarkerTextSlack
+            + 2.0f * (RingThickness + MarkerButtonPad);
+        const float Snapped = FMath::CeilToFloat(Needed / BreakerUI::Space4) * BreakerUI::Space4;
+        return FMath::Max(Base, Snapped);
+    }
+
+    // The centre label itself, in a box wide enough that the overflow clip can
+    // never reach a glyph. HAlign_Fill inside hands the text the whole box;
+    // the justification is what centres the run.
+    TSharedRef<SWidget> MakeMarkerLabel(const FString& Label, const FLinearColor& Color)
+    {
+        return SNew(SBox)
+            .WidthOverride(FMath::CeilToFloat(MarkerTextWidth(Label) + MarkerTextSlack))
+            .HAlign(HAlign_Fill)
+            .VAlign(VAlign_Center)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(Label))
+                .ColorAndOpacity(Color)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                .Justification(ETextJustify::Center)
+            ];
     }
 
     // The mark INSIDE the marker.
@@ -2866,10 +3269,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // count cannot disagree with the board.
         const TArray<const UBreakerProgressionTree*>& Drawn = VisibleTrees;
 
-        // The tier gutter. Widened from 76 because it now carries a sentence
-        // ("OPENS AT 12") rather than the two-word "GATE n" that used to
-        // collide, in meaning, with the node markers' own gate readout.
-        const float GutterWidth = 104.0f;
         const float TopPad = 28.0f;
 
         TArray<int32> Tiers;
@@ -2914,6 +3313,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             BranchWidest.Add(Widest);
             WidestTierRow = FMath::Max(WidestTierRow, Widest);
         }
+
+        // The tier gutter is MEASURED against the longest sentence it will
+        // actually print, not set to a number and hoped over. The owner's
+        // screenshot read `AT 2` where the label says `OPENS AT 2`: the gutter
+        // was 76px against copy that needed more, so the first two words fell
+        // outside the slot. Shortening the words again would only move the
+        // same cliff, so the width is derived from the widest gate on this
+        // board — `OPENS AT 120` costs the gutter nothing on a board whose
+        // gates are single digits.
+        int32 WidestGate = 0;
+        for (const UBreakerProgressionTree* Tree : Drawn)
+        {
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                if (Node) WidestGate = FMath::Max(WidestGate, Node->RequiredTreeInvestment);
+            }
+        }
+        const float GutterWidth = FMath::Max(104.0f,
+            FMath::CeilToFloat(MarkerTextWidth(FString::Printf(TEXT("OPENS AT %d"), WidestGate))
+                + 3.0f * BreakerUI::Space8));
 
         // Node pitch is derived from the KNOWN board viewport (the viewport
         // read at the top of this function), never from an allotted size, so
@@ -3035,7 +3454,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 {
                     const UBreakerProgressionNode* Node = TierNodes[NodeIndex];
                     const ESkillMarkerKind Kind = ClassifyNode(Node);
-                    const float Size = MarkerSize(Kind);
                     const float NodeX = TrunkX + (NodeIndex - (TierNodes.Num() - 1) * 0.5f) * NodeSpacing;
                     const float NodeY = TierTop + 76.0f;
 
@@ -3046,6 +3464,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Node, Spent, LockReason, &ShortReason, &bTierGated);
                     const bool bOwned = Rank > 0;
                     const bool bMaxed = Rank >= Node->MaxRank;
+
+                    // The ring is measured before the marker, because the
+                    // marker's edge length depends on it: a 2px ring eats 4px
+                    // of the box the rank text has to live in, and a 1px ring
+                    // eats 2. Two markers of the same kind on the same board
+                    // can therefore be different sizes, which is correct — the
+                    // spec's numbers are the floor, not the answer.
+                    const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
+                    // Multi-rank Minors carry their rank inside the marker;
+                    // every other kind carries a filled core in its state
+                    // colour, so no marker is ever an empty box.
+                    const FString CentreLabel = (Kind == ESkillMarkerKind::Minor)
+                        ? FString::Printf(TEXT("%d/%d"), Rank, Node->MaxRank)
+                        : FString();
+                    const float Size = MarkerSizeForLabel(MarkerBaseSize(Kind), RingThickness, CentreLabel);
 
                     // 2px diagonal dropping from the trunk to the marker.
                     AddCanvasSegment(Canvas, FVector2D(TrunkX, TierTop + BreakerUI::Space8),
@@ -3059,16 +3492,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // invisible ring around a dark fill is what made the whole
                     // locked tier read as a row of holes.
                     const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
-                    const float RingThickness = MarkerRingThickness(Kind, bOwned || bPurchasable);
                     const FLinearColor CoreColor = bOwned ? Cyan : (bPurchasable ? Amber : Muted);
 
-                    // Multi-rank Minors carry their rank inside the marker;
-                    // every other kind carries a filled core in its state
-                    // colour, so no marker is ever an empty box.
-                    TSharedRef<SWidget> Inner = (Kind == ESkillMarkerKind::Minor)
-                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::Printf(TEXT("%d/%d"), Rank, Node->MaxRank)),
-                            BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
-                        : MakeMarkerCore(Kind, CoreColor, Fill, Size);
+                    TSharedRef<SWidget> Inner = CentreLabel.IsEmpty()
+                        ? MakeMarkerCore(Kind, CoreColor, Fill, Size)
+                        : MakeMarkerLabel(CentreLabel, bOwned ? Cyan : Muted);
 
                     const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, Spent, Snapshot);
                     TSharedRef<SWidget> Marker = WireMarker(Tree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness, Inner);
@@ -3182,33 +3610,42 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             ];
         }
 
-        // The board SCROLLS in both axes now. It used to sit in a vertical
-        // scroll box at a fixed pixel width, so a board wider than the panel
-        // was simply cut off at the right edge with no way to reach it — the
-        // known compromise in UI-Skill-Tree-Spec, and half of what "clunky"
-        // meant. Nesting a horizontal scroll box inside the vertical one is
-        // safe: neither measures its own arrangement, so this is nothing like
-        // the SWrapBox/UseAllottedSize oscillation.
-        return SNew(SScrollBox)
-            + SScrollBox::Slot()
+        // The board is ZOOMED AND PANNED, not scrolled. The two nested scroll
+        // boxes that used to live here are gone: they fought each other for
+        // the wheel, which is the most likely reading of "scrolling in the
+        // tree is off by a little bit", and neither of them could make a board
+        // wider than the panel legible — it could only be dragged past.
+        //
+        // The branch header strip rides INSIDE the transform with the columns
+        // it labels, so a panned column still knows which branch it belongs
+        // to, and it zooms with them rather than sliding out of register.
+        const float StripHeight = 60.0f + BreakerUI::Space8;
+        TSharedPtr<SBreakerBoardViewport> Viewport;
+        SAssignNew(Viewport, SBreakerBoardViewport)
+            .BoardSize(FVector2D(BoardWidth, BoardHeight + StripHeight))
+            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : FitZoomForBoard(BoardWidth, Metrics.BoardViewWidth))
+            .InitialPan(SkillBoardPan)
+            .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
             [
-                SNew(SScrollBox)
-                .Orientation(Orient_Horizontal)
-                + SScrollBox::Slot()
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
                 [
-                    SNew(SBox).WidthOverride(BoardWidth)
-                    [
-                        SNew(SVerticalBox)
-                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-                        [
-                            SNew(SBox).HeightOverride(60.0f)[BranchStrip]
-                        ]
-                        + SVerticalBox::Slot().AutoHeight()
-                        [
-                            SNew(SBox).HeightOverride(BoardHeight)[Canvas]
-                        ]
-                    ]
+                    SNew(SBox).HeightOverride(60.0f)[BranchStrip]
                 ]
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SNew(SBox).HeightOverride(BoardHeight)[Canvas]
+                ]
+            ];
+
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                MakeBoardViewControls(Viewport)
+            ]
+            + SVerticalBox::Slot().FillHeight(1.0f)
+            [
+                Viewport.ToSharedRef()
             ];
     };
 
@@ -3290,11 +3727,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // old flat 156 assumed one row and a wide cluster's chips ran straight
         // out through the plate's right edge.
         const int32 ChipsPerRow = 6;
-        // 36, not 30: a multi-rank chip prints its rank digit inside the
-        // marker and at 30 the glyph was cut off by the button's own content
-        // box, so a rank read as a bracket. The plate height derives from this
-        // number, so growing it is a one-line change.
-        const float ChipSize = 36.0f;
+        // The chip is MEASURED, not guessed. It was 30 and clipped a `0` into
+        // a bracket; the previous pass moved it to 36 and the clip went away
+        // by luck rather than by arithmetic — the real defect was the text
+        // being arranged at its own measured width and then overflow-clipped
+        // (see MarkerSizeForLabel). One chip size serves the whole map, taken
+        // from the widest rank string any chip on it will print, so a
+        // constellation with a rank-10 node cannot reintroduce the bug.
+        float ChipSize = 36.0f;
+        for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
+        {
+            if (!Node || Node->MaxRank <= 1) continue;
+            ChipSize = FMath::Max(ChipSize, MarkerSizeForLabel(36.0f,
+                BreakerUI::BorderSelected, FString::FromInt(Node->MaxRank)));
+        }
         int32 WidestClusterRows = 1;
         for (const FConstellationCluster& Cluster : Clusters)
         {
@@ -3361,7 +3807,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // keystone had — the map should not repeat it thirty times.
                 TSharedRef<SWidget> Chip = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring, RingThickness,
                     Node->MaxRank > 1
-                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(FString::FromInt(Rank)), BreakerUI::TypeCaption, bOwned ? Cyan : Muted, true))
+                        ? MakeMarkerLabel(FString::FromInt(Rank), bOwned ? Cyan : Muted)
                         : MakeMarkerCore(Kind, CoreColor, Fill, ChipSize));
                 if (MarkerIsDiamond(Kind)) Chip = RotateFortyFive(Chip);
 
@@ -3424,6 +3870,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 ];
         }
 
+        // Same viewport as the class board — one way for a board to move, on
+        // both boards. The constellation map is 1060x800 and the panel is not,
+        // on most windows.
+        TSharedPtr<SBreakerBoardViewport> Viewport;
+        SAssignNew(Viewport, SBreakerBoardViewport)
+            .BoardSize(FVector2D(BoardWidth, BoardHeight))
+            .InitialZoom(SkillBoardZoom > 0.0f ? SkillBoardZoom : FitZoomForBoard(BoardWidth, Metrics.BoardViewWidth))
+            .InitialPan(SkillBoardPan)
+            .OnViewChanged(FOnBoardViewChanged::CreateSP(this, &SBreakerMenu::HandleBoardViewChanged))
+            [
+                SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
+            ];
+
         return SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
             [
@@ -3442,20 +3901,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                         BreakerUI::BgRaised, Amber, FMargin(BreakerUI::Space16, BreakerUI::Space8))
                 ]
             ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                MakeBoardViewControls(Viewport)
+            ]
             + SVerticalBox::Slot().FillHeight(1.0f)
             [
-                // Same two-axis scroll as the class board: the constellation
-                // map is 1060 wide and the panel is not, on most windows.
-                SNew(SScrollBox)
-                + SScrollBox::Slot()
-                [
-                    SNew(SScrollBox)
-                    .Orientation(Orient_Horizontal)
-                    + SScrollBox::Slot()
-                    [
-                        SNew(SBox).WidthOverride(BoardWidth).HeightOverride(BoardHeight)[Canvas]
-                    ]
-                ]
+                Viewport.ToSharedRef()
             ];
     };
 
@@ -3504,6 +3956,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     {
                         SkillBranchIndex = Index;
                         SkillTreeStatus = FText::GetEmpty();
+                        ResetBoardView();
                         Rebuild(EBreakerMenuScreen::SkillTrees);
                         return FReply::Handled();
                     }))
@@ -3560,6 +4013,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 {
                     SkillBoardTab = TabIndex;
                     SkillTreeStatus = FText::GetEmpty();
+                    ResetBoardView();
                     Rebuild(EBreakerMenuScreen::SkillTrees);
                     return FReply::Handled();
                 }))
@@ -3796,7 +4250,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 // O2: node numbers are not balanced yet.
                 SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
                 [
-                    MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · [O2] VALUES ARE PLACEHOLDER · ESC BACK")),
+                    MenuText(FText::FromString(TEXT("LMB BUY 1 RANK · SHIFT+LMB BUY TO MAX · HOVER FOR BEFORE / AFTER · WHEEL ZOOM · DRAG PAN · ESC BACK")),
                         BreakerUI::TypeCaption, Muted, true)
                 ]
             ]
@@ -3819,7 +4273,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         Body,
         Footer,
         Metrics.PanelWidth,
-        Metrics.PanelHeight);
+        Metrics.PanelHeight,
+        /*bFillHeight=*/true);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
