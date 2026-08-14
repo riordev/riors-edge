@@ -106,6 +106,17 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     {
         UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] no controller input component; the F5 boss key is unavailable. Use Breaker.Boss."));
     }
+    // -BreakerBossOnStart spawns the Field Marshal during the gym build, so the
+    // capture harness can PHOTOGRAPH it. Without this the boss is only
+    // reachable by a key press, and a headless run cannot press a key — which
+    // would leave the one archetype most worth looking at as the one archetype
+    // nobody has looked at. Dev-only by construction: a command-line switch
+    // cannot be reached from a shipped build.
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerBossOnStart")))
+    {
+        SpawnBossTest();
+        LogGymSummary();
+    }
     if (!BossConsoleCommand)
     {
         BossConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
@@ -290,6 +301,12 @@ void ABreakerGameMode::BuildCaptureTour()
         { Frame.At(EncounterPocketDistance - 3200.0f, FieldHalfExtent * 0.62f, 320.0f), FRotator(-3.0f, Frame.Forward.Rotation().Yaw, 0.0f) },
         // 6. Along the sniper lane from the firing line.
         { Frame.At(RangeFiringLineDistance - 1200.0f, -FieldHalfExtent * 0.62f, 260.0f), FRotator(-2.0f, Frame.Forward.Rotation().Yaw, 0.0f) },
+        // 7. Oblique over the ELITE ARENA. Added because the boss lives there
+        //    and nothing pointed at it: the Field Marshal's galleries reach
+        //    ±1900 cm against a 2000 cm pocket radius, and whether its orders
+        //    point at open ground or into the pocket's ruin arc is a question
+        //    only a picture answers.
+        { Frame.At(ArenaDistance - CombatPocketRadius * 1.6f, -CombatPocketRadius * 1.3f, 2200.0f), FRotator(-24.0f, Frame.Forward.Rotation().Yaw + 34.0f, 0.0f) },
     };
 
     for (const FVantage& Vantage : Vantages)
@@ -378,16 +395,18 @@ void ABreakerGameMode::LogGymSummary() const
     int32 ModifierBearing = 0;
     int32 Elites = 0;
     int32 ModifierTotal = 0;
+    TArray<FVector> AnchorLocations;
+    TArray<FVector> RangedLocations;
     for (TActorIterator<ABreakerEnemy> It(const_cast<UWorld*>(World)); It; ++It)
     {
         if (It->IsRangedForTelemetry()) ++Ranged; else ++Melee;
         // Boss first: it SUBCLASSES the Warden (§3.1 "a Warden that commands
         // the other three archetypes"), so an unordered cast chain would count
         // the Field Marshal as a Warden and silently break the §5.3 cap check.
-        if (It->IsA<ABreakerBossEnemy>()) ++Bosses;
-        else if (It->IsA<ABreakerWardenEnemy>()) ++Wardens;
-        else if (It->IsA<ABreakerSkirmisherEnemy>()) ++Skirmishers;
-        else if (It->IsA<ABreakerRangedEnemy>()) ++Lattices;
+        if (It->IsA<ABreakerBossEnemy>()) { ++Bosses; AnchorLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerWardenEnemy>()) { ++Wardens; AnchorLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerSkirmisherEnemy>()) { ++Skirmishers; RangedLocations.Add(It->GetActorLocation()); }
+        else if (It->IsA<ABreakerRangedEnemy>()) { ++Lattices; RangedLocations.Add(It->GetActorLocation()); }
         if (It->IsElite()) ++Elites;
         if (const UBreakerEnemyModifierComponent* Modifiers = It->GetModifierComponent();
             Modifiers && Modifiers->GetModifierCount() > 0)
@@ -404,16 +423,39 @@ void ABreakerGameMode::LogGymSummary() const
         Melee + Ranged - Lattices - Wardens - Skirmishers - Bosses,
         Lattices, Wardens, Skirmishers, Bosses, Elites, ModifierBearing, ModifierTotal, Targets);
     // The §5.3 caps, asserted rather than assumed. They are the difference
-    // between "dense" and "unplayable", and every one of them was violated at
-    // some point by a spawner that did not know the others existed.
-    if (Wardens + Bosses > 1)
+    // between "dense" and "unplayable", and this check has already earned its
+    // keep once: it caught two Skirmishers standing alongside two Lattices in
+    // the encounter, which is four converging projectile sources against a cap
+    // of three.
+    //
+    // Counted PER ENCOUNTER, not per world. The caps are about what is in one
+    // fight — the field holds a standing encounter at 8500 cm and an arena at
+    // 17000, and a Warden in one plus the Field Marshal in the other is two
+    // separate fights, not an illegal one. Proximity is the only definition of
+    // "one fight" available here, and one combat pocket's diameter is the
+    // honest radius for it.
+    const float EncounterRadius = CombatPocketRadius * 2.0f;
+    auto WarnOnCrowding = [&](const TArray<FVector>& Locations, int32 Cap, const TCHAR* What, const TCHAR* Reason)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d Warden-class anchors alive; Encounter-Design 5.3 caps them at 1 per player."), Wardens + Bosses);
-    }
-    if (Lattices + Skirmishers > 3)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d ranged sources alive; Encounter-Design 5.3 caps Lattices at 3 regardless of party size."), Lattices + Skirmishers);
-    }
+        for (const FVector& Centre : Locations)
+        {
+            int32 Nearby = 0;
+            for (const FVector& Other : Locations)
+            {
+                if (FVector::DistSquared2D(Centre, Other) <= FMath::Square(EncounterRadius)) ++Nearby;
+            }
+            if (Nearby > Cap)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] %d %s within one encounter; Encounter-Design 5.3 caps them at %d — %s"),
+                    Nearby, What, Cap, Reason);
+                return;
+            }
+        }
+    };
+    WarnOnCrowding(AnchorLocations, 1, TEXT("Warden-class anchors"),
+        TEXT("overlapping frontal-armour anchors create unsolvable geometry."));
+    WarnOnCrowding(RangedLocations, 3, TEXT("ranged sources"),
+        TEXT("four converging projectile sources removes all safe ground."));
 
     // The stock First Person template geometry is the other half of the "map
     // scope" complaint and it can only be removed in the editor. Measuring it
@@ -1019,16 +1061,22 @@ void ABreakerGameMode::SpawnCombatEncounter()
         UBreakerKillTelemetryComponent::AttachTo(Warden);
     }
 
-    // TWO Skirmishers, and their placement is the whole point. They go AT the
+    // ONE Skirmisher, and its placement is the whole point. It goes AT the
     // pocket's cover ring, not at an arbitrary bearing: the pocket's four cover
     // blocks sit on a CoverPitchMax ring around the pocket centre, and a
     // Skirmisher that starts beside one of them is behind cover on frame one.
-    // Spawned in the open they are a plain shooter with a longer telegraph than
-    // a Lattice, which is strictly worse than a Lattice and teaches the player
-    // nothing.
+    // Spawned in the open it is a plain shooter with a longer telegraph than a
+    // Lattice, which is strictly worse than a Lattice and teaches nothing.
+    //
+    // ONE, not two, and the cap check in LogGymSummary is what caught it: two
+    // Skirmishers alongside the two flanking Lattices is FOUR converging
+    // projectile sources, and §5.3 holds that at three at any party size
+    // because "four converging projectile sources removes all safe ground —
+    // this is the single most dangerous scaling knob". Wave mode introduces
+    // more of them, inside the same budget solver that enforces the same cap.
     const FVector PocketCentre = Frame.At(EncounterPocketDistance, 0.0f, 0.0f);
     const FVector PlayerApproach = Frame.At(EncounterPocketDistance - CombatPocketRadius * 2.0f, 0.0f, 0.0f);
-    for (int32 Index = 0; Index < 2; ++Index)
+    for (int32 Index = 0; Index < 1; ++Index)
     {
         // Two different bearings off the pocket centre so they resolve to two
         // different cover blocks rather than crowding one.
