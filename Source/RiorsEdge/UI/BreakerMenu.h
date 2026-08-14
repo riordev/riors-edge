@@ -128,6 +128,9 @@ private:
     // purchase/respec message echoed under the node grid.
     int32 SelectedTreeIndex = 0;
     FText SkillTreeStatus;
+    // O37 commit control: first click arms, second confirms. Cleared on any
+    // other strip interaction so a stray click can never commit permanently.
+    FName PendingCommitBranch;
     // Skill matrix board tab: 0 = Class (the path board), 1 = Core (the
     // constellation map). One tab pair, not a mode toggle — the header and
     // the detail rail persist across the swap.

@@ -16,18 +16,25 @@ Locked progression decisions: class selection is permanent per character; charac
 
 ## Current milestone and next actions (updated 2026-08-14)
 
-Current milestone: **Vertical-slice systems — Swift playable end-to-end**.
+Current milestone: **Vertical-slice systems — Swift AND Caster playable
+end-to-end, framed by the O33 identity stack** (four avenues: class verbs,
+Core axes, gear, legendary rewrites — class is never the sole trunk).
 Movement gym, combat sandbox, loot loop, and the progression framework are
 all live; presentation is deliberately blockout.
 
 The whole loop works in Play In Editor today: spawn at the safe ring →
 talk to camp NPCs (F) → fight the encounter/waves (F4) → loot ground drops
-(F) → equip (I, tabs for EQUIPMENT | SKILL TREES) → spend points → use
-Swift abilities (E Skim / T Lead / G Overdrive) or Caster abilities
-(E Cleave / T Closequarter / G Unmake). Playtest keys: F1 reset,
-F2 copy report (includes engagement-gapped TTK vs O18 targets), F3
-diagnostics, 1/2 weapon slots. Dev tools (class swap, test gear, point
-grants) gate on the DEV checkbox on the BREAKER CLASS screen.
+(F) → equip (I, tabs for EQUIPMENT | SKILL TREES | ABILITIES | FORGE) →
+spend points, COMMIT a branch (two-step control on the strip; unlocks the
+keystone tier per O37), pick abilities per slot on the ABILITIES tab, and
+salvage/Temper/Reforge/Attune on the FORGE tab → use Swift abilities
+(E Skim / T Lead / G Overdrive) or Caster abilities (defaults E Cleave /
+T Rot / G Unmake; all seven pickable). Playtest keys: F1 reset, F2 copy
+report (engagement-gapped TTK vs O18 targets, now including the
+modifier-bearing bucket, deaths and engaged TTD), F3 diagnostics, 1/2
+weapon slots. Dev tools (class swap, test gear, legendary grant, point
+grants) gate on the DEV checkbox on the BREAKER CLASS screen; outside dev
+mode the class screen offers only implemented kits (O39).
 
 **THE PROJECT CAN LOOK AT ITSELF.** Eight switches, all verified against their
 parse sites:
@@ -73,31 +80,58 @@ level 120, the drop pipeline, the skill-board viewport and the HUD feedback
 pass. `main` is the truth. If you are picking up work, start from the list
 below rather than from a branch.
 
-**TWO TESTS FAIL ON `main` BY DESIGN. DO NOT "FIX" THEM.**
-The suite is **215 tests: 213 pass, 2 fail deliberately** —
-`RiorsEdge.Progression.PowerBand` and `RiorsEdge.Progression.RuleBandImpact`.
-Both fail for one reason: O29 widened the affix ladder and raised every ceiling
-anchor, and the composed build-variance band now measures **~15x against an
-authored 8-10x**. The extra did not come from the gear spread, which is close to
-what it always was; it came from absolute affix values roughly doubling and
-moving crit and the additive bucket into a different part of their own curves.
-The fixture has already been moved to where builds actually compete (ilvl 120,
-T3 baseline vs T1 optimized). **Widening the asserted range is choosing one of
-the two available rulings without saying so.** See item 1 below. A red test that
-states an open decision is more honest than a green one that hides it.
+**THE SUITE IS FULLY GREEN AGAIN — 244 tests, 0 failures — and green is
+meaningful.** O36 ruled the band question the former deliberate reds were
+holding open: the band is authored at TWO points now — at-cap 8–10x
+(measures 8.08x) and endgame seed rails 12–20x at ilvl 120 (measures
+15.40x) — and `PowerBand.AtCap` / `PowerBand.Endgame` / `RuleBandImpact`
+(PROLIFIC re-anchored to a 1.5x endgame ceiling) pin all three. A red test
+is a regression again, everywhere.
+
+**The 2026-08-14 O33–O40 wave** (five parallel worktree lanes, merged
+`a877be9`..`2c6b106` plus integration): the owner ruled the identity stack
+(O33), the multiplier canon with ONE More ceiling and windows counting
+inside it (O34), abilities riding the equipped weapon's item-level scalar
+(O35), the two bands and the ilvl 101–120 source (O36), per-axis equip
+caps and commitment-as-empowerment (O37), Elements post-slice (O38), slice
+class honesty (O39), and the hygiene rulings (O40: dash model final, no
+CharacterLevel gates until an XP loop exists, reachability is part of
+definition-of-done). Code followed: the second More budget is deleted and
+the chain counts against the aggregator's 2.197 (a source-scan test proves
+no restated constant); every class ability scales with gear (anchored
+bit-identical at ilvl 1); Fracture rides the modifier chain and DoT
+snapshots capture window multipliers at application; weak point is clamped
+to its ruled [1.0, 2.0]; modifier-bearing enemies exist at kill time (gym
+carriers + wave solver row) so the O27 bucket finally receives samples;
+the F2 report measures deaths and engaged TTD; the Forge wallet persists
+(save v3); the condition mask is uint32 with loud dead-lane warnings; the
+five phantom node ability grants are fixed with a registry validation
+test; the Caster fallback class definition exists so ability selection
+actually works; all three Swift branch keystones are cornerstones behind
+the O37 commitment gate; nodes carry a Constellation field and VELOCITY
+renders as a real plate (UNMAPPED is a loud fallback only); and
+`ChoosePermanentClassById` refuses kitless classes at the component. Docs:
+the corpus is reconciled through O40 — Design-Overview §7 renumbered to
+Q-numbers (the O18–O25 citation collision is dead), the identity-stack and
+multiplier-canon sections exist, the O25/O29/O32 sweeps landed, every
+design doc carries a Scope marker, and `Docs/Design/Replication-Position.md`
+is a DRAFT awaiting the owner (O22 keeps it owner-authored).
 
 Next actions, in priority order:
 
-1. **RULE THE POWER BAND. It is the only thing holding the suite red, and it is
-   a one-line answer either way.** O27 authored an 8-10x spread between a
-   baseline and an optimized build; O29 made the real number ~15x. Two options,
-   and they are both defensible:
-   **(a)** the band target moves — 8-10x was authored before the endgame
-   existed, and a longer ladder arguably *should* separate builds further; or
-   **(b)** the content retunes — crit and the additive bucket come down until
-   the composed band lands back at 8-10x on the new ladder. (a) is a one-line
-   edit to two constants. (b) is a content pass. Nothing else is blocked by
-   this, but every future balance conversation inherits whichever answer.
+1. **THE MEASURING PLAYTEST. Everything is now instrumented for it; nothing
+   about it can be automated further.** Set `WeakPointToleranceCm = 0`, walk
+   `GymAreaLevel` 1 / 10 / 25 / 50 / 75 / 100, and read the F2 splits —
+   melee / ranged / elite / modifier-bearing (now populated) / boss, plus
+   deaths and engaged TTD vs the 4–5s target. Drops now track area level to
+   the full ladder (O29 end-to-end). The predictions to falsify: baseline
+   TTK roughly flat at every stop, and TTD inside its band. While in there,
+   FEEL the new reach: pick Caster abilities on the ABILITIES tab, COMMIT a
+   branch and buy its keystone, grant a legendary from the dev panel and
+   equip it against the per-axis caps, salvage into the wallet and Temper —
+   every one of these paths is hours old and none has ever been touched by
+   a human. O36's endgame rails (12–20x) are seed arithmetic; this playtest
+   and the ones after it are what confirm or move them.
 2. **Assets are the binding constraint on feel, and have been for three
    sessions.** In order of how much they block: **AUDIO** (nothing exists at
    all — recoil, bloom, viewmodel kick, the boss's three phases and every
@@ -111,20 +145,30 @@ Next actions, in priority order:
    authoring `.uasset`s is editor work.
 3. **Owner decisions, none blocking code.** Ranked by how much they cost to
    leave open:
-   - **O30's Core-tree redesign is scouted and uncosted in practice.** The axis
-     taxonomy is ruled; several axes (ailment, crit, stacking) cannot be
-     authored honestly until `EBreakerBuildCondition` is widened past
-     movement-only. That widening is cheap and is the single highest-leverage
-     unblock in the progression layer.
+   - **O30's Core-tree redesign is scouted; the mask is ready, the vocabulary
+     is not.** The condition bitmask is uint32 now (the silent-overflow trap
+     is gone), but `EBreakerBuildCondition` itself is still movement-only —
+     the actual widening (ailment/combat/status conditions) waits on the S4
+     hook-and-condition vocabulary in Design-Overview, which remains the
+     largest unwritten technical document in the project and the single
+     highest-leverage unblock in the progression layer. Write S4, widen the
+     enum, then pilot ONE axis end-to-end before authoring at scale.
    - **O32's legendary pool is ruled and not built.** The ruling is that the
      pool grows rather than the drop rate; the pool is still the same three
      items (Boots / Primary / Waist), and Helmet, Body Armour, Gloves, Necklace
      and Secondary have none. Until more are authored the measured wait stays
      ~57 hours rather than the ~21 the ruling reasons about.
-   - **Subclass commitment.** The branch strip browses; committing needs a
-     branch field on the progression state or tree, a one-way setter with a
-     permanence-or-Forge rule, save versioning, and a ruling on whether
-     unselected branches become unpurchasable — which collides with O15.
+   - **Subclass commitment is BUILT (O37)** — `CommittedBranch` on the state,
+     one-way `CommitToBranch`, Forge respec clears, keystone tier gated,
+     ordinary nodes untouched (O15 intact), two-step COMMIT control on the
+     branch strip. What remains owner-side is FEELING whether the keystone
+     gate reads as empowerment in play.
+   - **Two O34 questions the owner still holds:** whether Increased Damage
+     and Increased DoT share one additive bucket for DoT ticks (they
+     currently multiply — a recorded canon deviation), and sign-off on
+     `Docs/Design/Replication-Position.md` (DRAFT; O22 keeps it
+     owner-authored; it gates Damage-Pipeline sign-off and decides where the
+     More ceiling and recoil prediction live).
    - **Swift's third jump THRESHOLD** (O25). The mechanism is built and the gate
      now defaults to **1**, because it shipped at 20 against a `CharacterLevel`
      that **nothing in the project writes** — no XP loop, no assignment
@@ -163,27 +207,26 @@ Next actions, in priority order:
    falsify is that a baseline build holds roughly constant TTK across all four.
    Loot pacing wants the same run: ~134 items/hour and zero Aberrants below area
    level 25 is a projection nobody has felt.
-5. **Content that EXISTS but does not reach a player.** This list is much
-   shorter than it was — the enemy integration closed most of it.
-   - **Three legendaries, four Anomalous rule rewrites and the Forge's three
-     crafting verbs have no UI.** Blueprint/console/automation reachable only,
-     and the crafting wallet is not in `UBreakerSaveGame`. This is now the
-     biggest built-but-unreachable item in the project.
-   - **Caster's ability SELECTION is built and refuses.**
-     `UBreakerProgressionComponent::IsAbilityUnlocked` answers from a class
-     definition that `GetFallbackClassDefinition` returns `nullptr` for on every
-     class but Swift, so `TryEquipAbility` always refuses for a Caster. The
-     selection API, its catalogue and its typed refusal reasons are complete and
-     tested; the missing link is one Caster row in the fallback class
-     definition. Recorded at the call site.
-   - **`EBreakerBuildCondition` is movement-only**, and that has now blocked
-     content three times: it cost Elements its More multiplier, it is why no
-     node can key off combat or status state, and O30's taxonomy needs it.
-   - The Caster branch TREES are still unauthored, and the Gunsmith / Tank /
-     Support kits exist only as design docs, so **three of the five selectable
-     classes grant nothing** — and class selection is permanent.
+5. **Content that EXISTS but does not reach a player.** This list shrank
+   again — the O33–O40 wave closed the Forge, ability selection, the
+   legendary grant path and the commitment model.
+   - **The legendary POOL is still three items** (Boots / Primary / Waist;
+     O32 rules the pool grows, not the drop rate), so the organic wait stays
+     ~57 hours; the dev grant button is the sanctioned playtest path.
+   - **`EBreakerBuildCondition` is still movement-only** (the mask is
+     hardened; the vocabulary widening waits on S4 — see item 3).
+   - The Caster branch TREES are still unauthored (the class plays through
+     abilities + Core only), and the Gunsmith / Tank / Support kits exist
+     only as design docs — but they are no longer traps: the class screen
+     gates them outside dev mode and `ChoosePermanentClassById` refuses a
+     kitless lock at the component (O39).
    - **Minions and deployables do not exist in any form** (O30). The Gunsmith
      kit designs them; nothing is built.
+   - **Keystone REACHABILITY beyond Swift:** five of six keystone tags are
+     granted by no node and four behavioral halves are stubs — the variant
+     rows resolve and do nothing, silently. Now that commitment gates the
+     tier, authoring the missing keystone content is the next Swift/Caster
+     depth item.
 6. **Editor work only the owner can do.** THE SEAL IS GONE — all eight parapet
    cubes (`SM_Cube2/3/4/5`, `SM_Cube17/18/19/20`) were deleted on 2026-08-14,
    along with four of the twelve corner fillets. The courtyard is open. What
@@ -213,17 +256,21 @@ Next actions, in priority order:
    under `Content/__ExternalActors__/`.
 7. **Known smaller gaps, each recorded at the code:** `DevForceClass` keeps a
    stale `ClassDefinition` after a dev swap; Slate panel-transition and
-   purchase-confirm motion are unimplemented; the Core map's UNMAPPED cluster
-   holds six nodes authored outside the five `Core.<Constellation>.` prefixes;
-   Bloodrhythm's `bCornerstone` is unset in content (the READ was fixed, not the
-   data); `SetEnemyDropsLoot` reaches a protected `bDropsLoot` **by reflection**
-   because adding a setter means editing `Combat/`, and only warns if the
-   property disappears; the wave budget curve and the density caps contradict
-   each other from about wave 8, so every wave past it reports unspent budget by
-   design; and **everything hover-driven across the whole front end is
-   structurally unphotographable**, because the harness cannot move a mouse —
-   node detail cards, the before/after projection and the discard modal have
-   never been seen.
+   purchase-confirm motion are unimplemented (the O37 COMMIT control's
+   two-step arm/confirm is the pattern to generalize); `SetEnemyDropsLoot`
+   reaches a protected `bDropsLoot` **by reflection** because adding a setter
+   means editing `Combat/`, and only warns if the property disappears; the
+   wave budget curve and the density caps contradict each other from about
+   wave 8, so every wave past it reports unspent budget by design; the O34
+   clamp warning fires per composed shot when a 3-More build opens Overdrive
+   (expected-state noise — consider rate-limiting after owner sign-off); and
+   **everything hover-driven across the whole front end is structurally
+   unphotographable**, because the harness cannot move a mouse — node detail
+   cards, the before/after projection and the discard modal have never been
+   seen. (Resolved this wave: the UNMAPPED cluster — nodes carry a
+   Constellation field and VELOCITY has a real plate; Bloodrhythm's
+   `bCornerstone` — set, along with Overpressure and Culling, all three
+   behind the O37 gate.)
 
 ## Canonical project
 
@@ -633,11 +680,16 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8.
 
-**The suite is 215 tests: 213 pass, 2 fail BY DESIGN** —
-`RiorsEdge.Progression.PowerBand` and `RiorsEdge.Progression.RuleBandImpact`,
-both awaiting the owner ruling in next-action 1. **A green run is not the
-expected result and would mean someone widened the assertion.** Run headless
-with `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}` and check the two names against that list.
+**The suite is 244 tests, all passing, and GREEN IS MEANINGFUL AGAIN.** The
+former deliberate reds were ruled by O36 and split into pinned fixtures
+(`PowerBand.AtCap` 8.0–10.0, `PowerBand.Endgame` 12.0–20.0 seed rails,
+`RuleBandImpact` at the re-anchored 1.5x PROLIFIC ceiling), so any
+`Result={Fail}` is a regression. Run headless with
+`UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the LOG FILE
+(`Saved/Logs/riors_edge.log` — the results do not reach stdout) for
+`Result={Fail}`. One workflow scar from this session: piping build output
+through `tail` swallows the exit code — a build "completing" is not a build
+succeeding; check for `Result: Succeeded` or the exit code directly.
 
 Two lessons from this suite are worth carrying. `PowerBand` **had never
 actually run**: UE's automation tree cannot hold a leaf test at a node that is

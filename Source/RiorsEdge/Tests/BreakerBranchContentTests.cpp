@@ -115,6 +115,12 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     const float BaseCritMultiplier = Attributes->GetCriticalMultiplier();
     const float BaseDamage = Attributes->GetDamageMultiplier();
 
+    // O37: Bloodrhythm is the branch cornerstone and refuses purchase without
+    // commitment, so a full-branch walk commits first — which is exactly what
+    // a real Frenzy character does.
+    FText CommitFailure;
+    TestTrue(*FString::Printf(TEXT("Committing to Frenzy succeeds (%s)"), *CommitFailure.ToString()),
+        Progression->CommitToBranch(Frenzy->TreeId, CommitFailure));
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
         BranchContentBuyToMax(*this, Progression, Frenzy, Node->NodeId);

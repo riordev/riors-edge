@@ -567,6 +567,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
         TEXT("Branch keystone. A MORE multiplier to all damage dealt while sliding."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Carry"));
     AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER: x1.20
+    // O37: every branch keystone is a cornerstone, so commitment gates all
+    // three of Swift's branches identically (Bloodrhythm alone was flagged
+    // first because its unset bit was a recorded content gap).
+    Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overpressure.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -659,6 +663,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
         TEXT("Branch keystone. A MORE multiplier to all damage dealt, with no condition attached."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
     AddDamageMore(Node, 18.0f); // O2 PLACEHOLDER: x1.18
+    Node->bCornerstone = true; // O37: keystone tier requires branch commitment
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
     Tree->Nodes.Add(Node);
 

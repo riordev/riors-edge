@@ -3745,7 +3745,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         struct FConstellationCluster
         {
             FString Name;
-            FString Prefix;
+            FName Constellation;
             FVector2D Centre = FVector2D::ZeroVector;
             bool bHub = false;
             bool bSealed = false;
@@ -3753,45 +3753,49 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         };
 
         TArray<FConstellationCluster> Clusters;
-        auto AddCluster = [&Clusters](const TCHAR* Name, const TCHAR* Prefix, float X, float Y, bool bHub, bool bSealed)
+        auto AddCluster = [&Clusters](const TCHAR* Name, FName Constellation, float X, float Y, bool bHub, bool bSealed)
         {
             FConstellationCluster Cluster;
             Cluster.Name = FString(Name).ToUpper();
-            Cluster.Prefix = Prefix;
+            Cluster.Constellation = Constellation;
             Cluster.Centre = FVector2D(X, Y);
             Cluster.bHub = bHub;
             Cluster.bSealed = bSealed;
             Clusters.Add(MoveTemp(Cluster));
         };
         // Kinesis is the hub; the other clusters sit around it. Elements is
-        // sealed below centre.
-        AddCluster(TEXT("Kinesis"), TEXT("Core.Kinesis."), 520.0f, 350.0f, true, false);
-        AddCluster(TEXT("Precision"), TEXT("Core.Precision."), 190.0f, 130.0f, false, false);
-        AddCluster(TEXT("Volley"), TEXT("Core.Volley."), 850.0f, 130.0f, false, false);
-        AddCluster(TEXT("Affliction"), TEXT("Core.Affliction."), 190.0f, 570.0f, false, false);
-        AddCluster(TEXT("Bulwark"), TEXT("Core.Bulwark."), 850.0f, 570.0f, false, false);
-        AddCluster(TEXT("Elements"), TEXT("Core.Elements."), 520.0f, 660.0f, false, true);
+        // sealed below centre; Velocity (the O27 addition the prefix map used
+        // to sweep into UNMAPPED) takes the centre-north slot.
+        AddCluster(TEXT("Kinesis"), TEXT("Kinesis"), 520.0f, 350.0f, true, false);
+        AddCluster(TEXT("Precision"), TEXT("Precision"), 190.0f, 130.0f, false, false);
+        AddCluster(TEXT("Volley"), TEXT("Volley"), 850.0f, 130.0f, false, false);
+        AddCluster(TEXT("Velocity"), TEXT("Velocity"), 520.0f, 130.0f, false, false);
+        AddCluster(TEXT("Affliction"), TEXT("Affliction"), 190.0f, 570.0f, false, false);
+        AddCluster(TEXT("Bulwark"), TEXT("Bulwark"), 850.0f, 570.0f, false, false);
+        AddCluster(TEXT("Elements"), TEXT("Elements"), 520.0f, 660.0f, false, true);
 
-        // Constellation membership rides the NodeId prefix
-        // (Core.<Constellation>.<Node>) — the content library has no
-        // constellation field yet. When one lands, read it here instead.
+        // Constellation membership is the node's own Constellation field now
+        // (populated for every Core node, asserted non-None by
+        // RiorsEdge.Progression.CoreConstellationField) — the prefix
+        // inference this replaced is what drew VELOCITY under an UNMAPPED
+        // heading.
         TSet<FName> Claimed;
         for (FConstellationCluster& Cluster : Clusters)
         {
             for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
             {
-                if (!Node || !Node->NodeId.ToString().StartsWith(Cluster.Prefix)) continue;
+                if (!Node || Node->Constellation != Cluster.Constellation) continue;
                 Cluster.Nodes.Add(Node);
                 Claimed.Add(Node->NodeId);
             }
             Cluster.Nodes.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B) { return A.Tier < B.Tier; });
         }
         {
-            // A node authored outside the known prefixes must never silently
-            // vanish off the map.
+            // A node whose constellation names no cluster above must never
+            // silently vanish off the map — it lands here, loudly.
             FConstellationCluster Other;
             Other.Name = TEXT("UNMAPPED");
-            Other.Centre = FVector2D(520.0f, 130.0f);
+            Other.Centre = FVector2D(190.0f, 350.0f);
             for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
             {
                 if (Node && !Claimed.Contains(Node->NodeId)) Other.Nodes.Add(Node);
@@ -4000,27 +4004,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // "There should be a button to select your subclass and swap between to
     // the others which shows the different trees and what they do."
     //
-    // SUBCLASS COMMITMENT DOES NOT EXIST IN THE DATA MODEL, and this screen
-    // does not invent one. FBreakerProgressionState records a permanent class,
-    // points and node ranks — there is no chosen-branch field — and
-    // UBreakerClassDefinition::BranchTrees is a flat list with no selected
-    // member. Nothing in Decisions.md rules on whether a branch is ever
-    // chosen, so committing one here would be authoring a progression rule
-    // from the UI layer.
-    //
-    // What IS built is the browsing half the owner asked for: one branch is
-    // focused at a time at full board width, every other branch is one click
-    // away with its identity and its investment on the chip, and COMPARE ALL
-    // puts them side by side. The strip says plainly that it is a view.
-    //
-    // A real commitment would need, at minimum: a branch id on
-    // UBreakerProgressionTree or a selected index on FBreakerProgressionState;
-    // a one-way setter next to ChoosePermanentClassById with the same
-    // permanence rule (or an explicit Forge-respec rule); save-version
-    // handling in UBreakerSaveGame; and a ruling on whether unselected
-    // branches become unpurchasable — which is a balance decision, not a UI
-    // one, and would collide with O15 (branch nodes freely mixed, no mutually
-    // exclusive tiers).
+    // O37 ruled commitment into the data model (FBreakerProgressionState::
+    // CommittedBranch, one-way CommitToBranch, Forge respec clears), and it
+    // EMPOWERS rather than excludes: committing unlocks the branch's
+    // cornerstone keystone tier; every ordinary node of every branch stays
+    // freely purchasable (O15 intact). The strip is still the browsing view
+    // the owner asked for — the COMMIT control below is two-step (arm, then
+    // confirm) because the choice is permanent outside the Forge.
     TSharedRef<SHorizontalBox> BranchChips = SNew(SHorizontalBox);
     if (!bCoreBoard && ClassTrees.Num() > 0)
     {
@@ -4036,6 +4026,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     {
                         SkillBranchIndex = Index;
                         SkillTreeStatus = FText::GetEmpty();
+                        PendingCommitBranch = NAME_None; // switching views disarms O37 commit
                         ResetBoardView();
                         Rebuild(EBreakerMenuScreen::SkillTrees);
                         return FReply::Handled();
@@ -4066,6 +4057,72 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 Index, SkillBranchIndex == Index);
         }
         AddBranchChip(TEXT("COMPARE ALL"), FString::Printf(TEXT("%d BRANCHES"), ClassTrees.Num()), -1, SkillBranchIndex == -1);
+
+        // ---- O37 commit control (two-step: arm, then confirm) --------------
+        if (Progression && ClassTrees.IsValidIndex(SkillBranchIndex))
+        {
+            const UBreakerProgressionTree* SelectedBranch = ClassTrees[SkillBranchIndex];
+            const FName Committed = Progression->GetProgressionState().CommittedBranch;
+            if (Committed != NAME_None)
+            {
+                const bool bThisBranch = SelectedBranch && Committed == SelectedBranch->TreeId;
+                BranchChips->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    BorderWrap(
+                        SNew(SBox).Padding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                        [
+                            MenuText(FText::FromString(bThisBranch
+                                ? TEXT("COMMITTED — KEYSTONE TIER OPEN")
+                                : FString::Printf(TEXT("COMMITTED ELSEWHERE: %s"), *Committed.ToString())),
+                                BreakerUI::TypeCaption, bThisBranch ? Cyan : Muted, true)
+                        ],
+                        bThisBranch ? Cyan : BorderEmphasis, BreakerUI::BorderThin)
+                ];
+            }
+            else if (SelectedBranch)
+            {
+                const bool bArmed = PendingCommitBranch == SelectedBranch->TreeId;
+                BranchChips->AddSlot().AutoWidth().Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    BorderWrap(
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(bArmed ? PanelHover : Panel)
+                        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                        .OnClicked(FOnClicked::CreateLambda([this, SelectedBranch]()
+                        {
+                            if (PendingCommitBranch != SelectedBranch->TreeId)
+                            {
+                                PendingCommitBranch = SelectedBranch->TreeId;
+                                SkillTreeStatus = FText::FromString(TEXT("Committing is permanent outside the Forge. Click CONFIRM to commit."));
+                            }
+                            else
+                            {
+                                FText Failure;
+                                UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
+                                if (Prog && Prog->CommitToBranch(SelectedBranch->TreeId, Failure))
+                                {
+                                    SkillTreeStatus = FText::FromString(TEXT("Committed. The branch keystone tier is now open."));
+                                }
+                                else
+                                {
+                                    SkillTreeStatus = Failure;
+                                }
+                                PendingCommitBranch = NAME_None;
+                            }
+                            Rebuild(EBreakerMenuScreen::SkillTrees);
+                            return FReply::Handled();
+                        }))
+                        [
+                            MenuText(FText::FromString(bArmed
+                                ? TEXT("CONFIRM COMMIT — PERMANENT")
+                                : TEXT("COMMIT TO THIS BRANCH")),
+                                BreakerUI::TypeCaption, bArmed ? Primary : SoftText, true)
+                        ],
+                        bArmed ? Cyan : BorderEmphasis,
+                        bArmed ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+                ];
+            }
+        }
     }
 
     // ---- Header zone -------------------------------------------------------

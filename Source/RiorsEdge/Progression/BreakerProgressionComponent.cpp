@@ -1,5 +1,13 @@
 #include "Progression/BreakerProgressionComponent.h"
 
+#include "Attributes/BreakerAttributeAggregation.h"
+
+// The per-source More ceiling exists in two headers for include-cycle reasons;
+// this is the guard that keeps them one value (O3/O34: a restated constant
+// that can drift is the bug class the aggregator header warns about).
+static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttributeAggregator::SingleMoreCeiling,
+    "Progression's SingleMoreCeiling must equal the aggregator's (O34: one More budget)");
+
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -81,6 +89,15 @@ void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
 bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId ClassId)
 {
     if (ClassId == EBreakerClassId::None || State.PermanentClass != EBreakerClassId::None) return false;
+    // O39: a permanent lock into a class with no implemented kit is a trap
+    // (null definition, no trees, no abilities, no resource) — refuse it here,
+    // not only in the UI, so console/Blueprint/save paths get the same rule.
+    // DevForceClass remains the dev-mode way to inhabit an unbuilt class.
+    if (!ClassDefinition && !UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ChoosePermanentClassById refused %d: no implemented kit (O39)"), static_cast<int32>(ClassId));
+        return false;
+    }
     State.PermanentClass = ClassId;
     if (!ClassDefinition)
     {
