@@ -1,5 +1,8 @@
 # Class Kits — Resource Loops, Abilities, and Branch Trees
 
+**Last reconciled against: O32** (2026-08-14). Authority chain per O28:
+`Decisions.md` -> `Design-Overview.md` (map, not law) -> this document.
+
 Status: design draft. Numbers are placeholder and must be re-anchored after the Playtest Gym TTK pass, exactly as the affix tables are.
 
 **TTK anchors now exist [O18]:** the re-anchoring pass no longer runs against an unknown target. Seed targets are trash a little under 1s (scaling exponentially with enemy difficulty), rare/elite ~3s, boss 20-45s unless a special enemy, and TTD 4-5s with no resources/sustain (substantially higher once sustain is invested). Every "re-anchor after the TTK pass" note in this document means "measure divergence from those seeds"; no value in this document is re-authored ahead of wave mode's report (O2 freeze).
@@ -15,6 +18,35 @@ Detail level follows the master sheet's prototyping order (7.5): **Swift and Cas
 ## 0. Rules this document obeys
 
 Restated so a reader does not have to hold four documents open.
+
+**On the "Master N.N" citations throughout this document [O28].**
+`Master-Sheet-Import.txt` is **superseded** — historical source material, not
+law. Every `Master` reference below and in the rest of this file should be read
+as *"this is where the idea came from"*, never as *"this is the authority"*.
+Where a Master citation disagrees with `Decisions.md`, the ledger wins. The
+citations are left in place rather than stripped because they make the
+derivation auditable, which is the same reason the ledger never deletes a
+superseded ruling.
+
+**Three later rulings bear on this document and are not yet worked into the
+branch content below.**
+
+- **O29** (item level 120, tier ladder widened to T12..T-1, values tuned up
+  with a back-loaded high end) is the answer to where endgame power comes from.
+  It does not touch a class node — class trees complete at 30 and never grow —
+  but it does mean §6.6's "levels 31-50 add nothing to this document's systems"
+  is now *the point* rather than an admission.
+- **O30** opens the Core tree to redesign around build axes (guns / abilities /
+  minions). Two consequences here: the **Gunsmith** kit in §3 is the only place
+  in the corpus that designs minions and deployables, and **none of it is
+  built**; and `EBreakerBuildCondition` is movement-only, so the ailment, crit
+  and stacking axes cannot be authored honestly on any node, class or Core.
+- **O31** (raids are puzzles rewarded for team play; **every build must be able
+  to make an impact**) is a constraint on class kits, not just on encounters.
+  The class that fails it first is **Support** — §5's own acceptance criterion
+  5 already tolerates "the worst solo damage dealer". Under O31 that is fine in
+  a raid only if every encounter has a lane Support can contribute through.
+  Recorded, not solved; see `Encounter-Design.md` and `Game-Modes.md`.
 
 | Constraint | Source | Consequence here |
 |---|---|---|
@@ -332,6 +364,24 @@ scalar can be a divide-by-zero. Efficiency is floored
 (`MinimumResourceCostMultiplier`) — gear may reduce a cost, never eliminate it,
 because Mana *is* the cooldown.
 
+### 2.1.1 NEEDS RE-SITING — the nodes the inversion invalidated
+
+**Verified against `Source/RiorsEdge/Classes/BreakerManaComponent.h` on
+2026-08-14.** Every claim in the table above reads true in code:
+`PassiveRegenPerSecond = 6.0f`, `GlobalGenerationCap = 6.0f` (comment records
+the 20.0 it replaced), `WeaponHitGain = 1.5f` and `WeakPointGain = 4.0f`
+unchanged, `OvercastFloor = -20.0f`, `OvercastGenerationMultiplier = 2.0f`,
+`OvercastIncomingDamageTaken = 0.15f`. Regeneration is applied in
+`AdvanceLoop` *above* the safe-zone gate and *outside* the `GlobalGenerationCap`
+budget, so the two paths genuinely are independent and conditional income really
+is capped at par with the baseline.
+
+The nine nodes below are the authored content that ruling invalidated. **Their
+values are NOT re-authored here.** Rates moved this week and re-costing them is
+an owner decision (O2 freeze); every one of them is tagged `NEEDS-RE-SITING
+[Mana inversion]` at its own row in §2.3-§2.5 so a reader working from the
+branch table cannot miss it.
+
 **Invalidated by the inversion, and NOT yet re-sited** (flagged rather than
 silently rewritten — these are owner calls):
 
@@ -429,15 +479,59 @@ Branch keystones rewrite it:
 - **Void Whisperer keystone (Long Dark):** Unmake's duration becomes 12s but abilities cost 50% instead of 0%. Zones placed during it do not expire until the window ends. The attrition ultimate.
 - **Multispell keystone (Cascade):** during Unmake, every status application also applies the next status in Fracture's cycle at proc coefficient 0. The reaction ultimate. Proc coefficient 0 is load-bearing: without it this is the recursion bomb named in Master 7.10.1.
 
+### 2.2.1 Caster abilities — implementation status
+
+Read from `Source/RiorsEdge/Abilities/` on 2026-08-14. **All six class abilities
+and the ultimate are BUILT.** This section exists because the reverse used to be
+true and the doc claimed nothing either way.
+
+| # | Ability | Built? | Class file |
+|---|---|---|---|
+| C1 | Cleave | **BUILT** | `BreakerAbility_Cleave.{h,cpp}` (melee sweep via `BreakerMeleeSweep`) |
+| C2 | Closequarter | **BUILT** | `BreakerAbility_Closequarter.{h,cpp}` |
+| C3 | Rot | **BUILT** | `BreakerAbility_Rot.{h,cpp}` (zones via `Combat/BreakerZoneActor`) |
+| C4 | Siphon | **BUILT** | `BreakerAbility_Siphon.{h,cpp}` |
+| C5 | Fracture | **BUILT** | `BreakerAbility_Fracture.{h,cpp}` (cycle via `Combat/BreakerStatusCycleComponent`) |
+| C6 | Resonance | **BUILT** | `BreakerAbility_Resonance.{h,cpp}` (via `Combat/BreakerStatusConsumption`) |
+| — | UNMAKE | **BUILT** | `BreakerAbility_Unmake.{h,cpp}` |
+
+**Two keystone rewrites are UNBUILT and are the only Caster gaps left in the
+ability layer.** All three keystone tags exist (`Keystone.Caster.Edgework`,
+`.LongDark`, `.Cascade`) and all three resolve as rows in Unmake's variant
+table, so the gap is visible rather than silent:
+
+- **Edgework's Closequarter half** — "no range limit within line of sight" —
+  is not implemented. Its Cleave half (removing the animation lock) is.
+- **Cascade** is not implemented at all beyond the variant row. It needs status
+  *application* to be interceptable, which the status layer does not expose.
+
+**CASTER CANNOT YET CHOOSE ITS ABILITIES, and the reason is not in the ability
+layer.** `UBreakerAbilityComponent` now exposes a real selection API —
+`GetSelectableAbilityIds` / `GetEquippedAbilityId` / `PreviewSelection` /
+`TryEquipAbility`, with `ValidateSelection` as a world-free pure rule — replacing
+the hardcoded fallback table this document was written against. It validates
+class, slot and duplicate-equip, then delegates the single write to
+`UBreakerProgressionComponent::EquipAbility`. But `EquipAbility` asks
+`IsAbilityUnlocked`, which reads `ClassDefinition->StartingClassAbilityIds` /
+`BaseUltimateId`, and `UBreakerProgressionLibrary::GetFallbackClassDefinition`
+returns `nullptr` for every class but Swift. **A Caster therefore has a null
+class definition, nothing reads as unlocked, and every equip attempt is refused
+— the fallback default table (Cleave / Rot / Unmake) is still what a Caster
+actually plays.** Verified in code, and the blocker is annotated at
+`Abilities/BreakerAbilityComponent.cpp`. The fix is a Caster row in that
+fallback definition naming Cleave and Rot as starters and `Caster.Unmake` as
+the ultimate; the §2.3-2.5 Tier-3 grant nodes then supply the other four. That
+is `Progression/` work and belongs to whoever owns that lane.
+
 ## 2.3 Caster branch — SPELLBLADE
 
 Identity: close-range spell/melee hybrid and target-crossing mobility. The branch that converts the Mana bank into position.
 
 | Node | Tier | Ranks | Cost/rank | Effect |
 |---|---|---|---|---|
-| SB1 — Contact Charge | 1 | 2 | 1 | Melee hits generate Mana at the weak-point rate (+4.0) instead of the weapon-hit rate. R2: +6.0. |
+| SB1 — Contact Charge | 1 | 2 | 1 | Melee hits generate Mana at the weak-point rate (+4.0) instead of the weapon-hit rate. R2: +6.0. **NEEDS-RE-SITING [Mana inversion]** — buys a share of conditional income, now capped at 6.0/s and no longer the bulk of the loop. |
 | SB2 — Follow Through | 1 | 2 | 1 | Cleave's Bleed application also generates its status-application Mana even if Bleed is already present (R2: and refunds 5 Mana on kill). Bypasses the 0.4s per-type internal cooldown for melee only. |
-| SB3 — Close | 1 | 2 | 1 | Weapon hits within 8 m generate double Mana (R2: within 12 m). The range-gated generation node that defines the branch's play distance. |
+| SB3 — Close | 1 | 2 | 1 | Weapon hits within 8 m generate double Mana (R2: within 12 m). The range-gated generation node that defines the branch's play distance. **NEEDS-RE-SITING [Mana inversion]** — doubling a rate that is now capped at par with a regeneration the node cannot touch. The branch's play-distance identity survives; its magnitude does not. |
 | SB4 — Debt | 2 | 2 | 1 | Overcast's negative floor extends from -20 to -35 (R2: -50). More rope. |
 | SB5 — Momentum Transfer | 2 | 2 | 1 | Closequarter's arrival grants 0.4s in which the next melee hit suppresses the target's passive block and evade *rolls* (R2: 0.8s). **RESOLVED [O1]:** re-expressed against the passive chance layer — this cancels a roll, it does not beat a stance. Rewrites the target's defensive roll, not the player's damage. |
 | SB6 — Bloodprice | 2 | 2 | 1 | While Mana is negative, melee hits restore health equal to a portion of damage dealt (R2: doubled). Turns the Overcast penalty into a sustain window. |
@@ -458,9 +552,9 @@ Identity: damage over time, sustain, and controlled zones. The attrition branch 
 
 | Node | Tier | Ranks | Cost/rank | Effect |
 |---|---|---|---|---|
-| VW1 — Seep | 1 | 2 | 1 | Status applications generate +5.0 Mana instead of +3.0 (R2: +7.0). |
-| VW2 — Standing Water | 1 | 2 | 1 | Zones generate 2 Mana/s while at least one enemy is inside (R2: 4/s), independent of enemy count. Count-independence is the anti-farm rule. |
-| VW3 — Patience | 1 | 2 | 1 | Passive Mana regeneration doubles while the caster has not fired a weapon for 2s (R2: 1.2s). The stand-back generation node. |
+| VW1 — Seep | 1 | 2 | 1 | Status applications generate +5.0 Mana instead of +3.0 (R2: +7.0). **NEEDS-RE-SITING [Mana inversion]** — conditional income, now the smaller half. |
+| VW2 — Standing Water | 1 | 2 | 1 | Zones generate 2 Mana/s while at least one enemy is inside (R2: 4/s), independent of enemy count. Count-independence is the anti-farm rule. **NEEDS-RE-SITING [Mana inversion]** — 2-4/s was competitive against a +2.0/s baseline and is a third to two-thirds of a 6.0/s one. The worst-hit node in the class. |
+| VW3 — Patience | 1 | 2 | 1 | Passive Mana regeneration doubles while the caster has not fired a weapon for 2s (R2: 1.2s). The stand-back generation node. **NEEDS-RE-SITING [Mana inversion] — the most urgent of the nine.** It doubles the PRIMARY income now: 6.0/s becomes 12.0/s for holding fire, which is more than the entire conditional cap. Authored as a trickle bonus, reads as the strongest node in the class. |
 | VW4 — Lingering | 2 | 2 | 1 | Zone duration is refreshed, not stacked, when a second zone overlaps it (R2: refreshed and its radius grows by 1 m, once). Explicit anti-stack rule. |
 | VW5 — Attrition | 2 | 2 | 1 | Enemies killed while affected by a Caster DoT refund 15 Mana (R2: 25). |
 | VW6 — Drain | 2 | 2 | 1 | Siphon's channel no longer breaks on damage below 15% of max health (R2: 30%). |
@@ -479,17 +573,17 @@ Identity: sequencing different statuses to create reactions — **Multispell rot
 
 | Node | Tier | Ranks | Cost/rank | Effect |
 |---|---|---|---|---|
-| MS1 — Variance | 1 | 2 | 1 | Applying a status type the target does not already have generates double Mana (R2: triple). The core sequencing incentive stated as a resource rule. |
+| MS1 — Variance | 1 | 2 | 1 | Applying a status type the target does not already have generates double Mana (R2: triple). The core sequencing incentive stated as a resource rule. **NEEDS-RE-SITING [Mana inversion]** — the incentive is intact; the payout is a multiple of the capped half. |
 | MS2 — Cycle | 1 | 2 | 1 | Fracture's cycle advances on hit rather than on cast, so a missed cast does not waste a position (R2: the next position is previewed on the HUD 1 cast ahead). |
-| MS3 — Reservoir | 1 | 2 | 1 | Maximum Mana +15 (R2: +25). **The one intentional stat node in this document** — Multispell needs headroom to hold multi-cast sequences and the alternative is a cost reduction that would double-dip with the affix layer. Flagged as a knowing exception in Open Questions. |
+| MS3 — Reservoir | 1 | 2 | 1 | Maximum Mana +15 (R2: +25). **The one intentional stat node in this document** — Multispell needs headroom to hold multi-cast sequences and the alternative is a cost reduction that would double-dip with the affix layer. Flagged as a knowing exception in Open Questions. **NEEDS-RE-SITING [Mana inversion] — upward, not downward.** Maximum Mana is now the size of the magazine you spawn with, not a ceiling rarely touched. Also the one node whose exception the inversion makes MORE defensible, so re-siting it may mean nothing but recording that. |
 | MS4 — Chain | 2 | 2 | 1 | A target carrying 2 distinct status types spreads the *newest* one to the nearest enemy within 8 m on application (R2: 12 m). Proc coefficient 0 on the spread; the spread cannot itself spread. Mirrors Affliction's Contagion normalization rule. |
 | MS5 — Payment | 2 | 2 | 1 | Resonance refunds 5 Mana per distinct status consumed (R2: 10). |
-| MS6 — Sequence | 2 | 2 | 1 | Applying 3 distinct status types to one target within 4s generates 20 Mana (R2: 30), once per target per 10s. |
+| MS6 — Sequence | 2 | 2 | 1 | Applying 3 distinct status types to one target within 4s generates 20 Mana (R2: 30), once per target per 10s. **NEEDS-RE-SITING [Mana inversion]** — a 20-30 lump metered through a 6.0/s cap now takes 3.3-5.0 seconds to actually arrive, where the old 20/s cap paid it in one to one-and-a-half. The node did not change; the drip did. |
 | MS7 — Fracture | 3 | 1 | 2 | **Grants C5 Fracture.** Fracture applies two cycle positions at once instead of one. |
 | MS8 — Resonance | 3 | 1 | 2 | **Grants C6 Resonance.** Resonance no longer consumes the statuses it detonates; instead it halves their remaining duration. |
 | MS9 — Interference | 4 | 1 | 2 | Resonance's damage scaling changes from linear in distinct-status-count to a fixed value per status *plus* a flat bonus at 3+. Deliberately re-shaped away from a count multiplier — the anti-explosion rewrite. |
 | MS10 — Prepared | 4 | 1 | 2 | Overcast's doubled generation also applies to Multispell's status-application bonuses, and the negative floor drops to -35. |
-| MS11 — Conductor's Rule | 4 | 1 | 2 | Only one reaction may trigger per target per 0.5s, and reactions that would have triggered instead grant 10 Mana. Turns the "same application must not trigger multiple reactions" architecture requirement into a *player-facing benefit* rather than an invisible clamp. |
+| MS11 — Conductor's Rule | 4 | 1 | 2 | Only one reaction may trigger per target per 0.5s, and reactions that would have triggered instead grant 10 Mana. Turns the "same application must not trigger multiple reactions" architecture requirement into a *player-facing benefit* rather than an invisible clamp. **NEEDS-RE-SITING [Mana inversion]** — the compensation half is conditional income against the 6.0/s cap, so the consolation prize for a suppressed reaction is now a much smaller one. The clamp itself is unaffected and is the half that matters architecturally. |
 | MS12 — CASCADE (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (3 of 3):** damage against targets carrying 3 or more distinct status types is multiplied by 1.25. Caster's three More multipliers are now spent. |
 
 ## 2.6 Caster — worked builds against 30 points
@@ -622,6 +716,41 @@ Decay: none. Global cap 18/s. Spending: abilities cost Charge, 4-10s cooldowns.
 **RESOLVED [O3]:** these multiply as an **unordered product**; each is authored on a branch keystone (the only legal class-layer site); the **build-wide cap is 3**; and **Aberrant signatures may not author a More**, so the Aberrant layer does not spend against this budget.
 
 A character can hold **one** keystone (0.2). Therefore the class layer contributes at most **one** More multiplier, maximum 1.30x, always conditional. Combined with Anomalous items — the only other More source — the theoretical ceiling from non-crit multipliers is two conditional multipliers, inside O3's build-wide cap of 3. This is the intended bound and should be re-verified whenever a keystone or Anomalous is added.
+
+### 6.1.1 What actually shipped — the ledger above is the DESIGN, not the build
+
+Read from `Source/RiorsEdge/Progression/BreakerProgressionLibrary.cpp` on
+2026-08-14. Three Swift branch keystones exist in code and **none of the three
+matches the row above.** The design intent is kept; the divergence is recorded
+so nobody cites the ledger as a description of the game.
+
+| Branch | Ledger says | Code ships | Node id |
+|---|---|---|---|
+| Frenzy | 1.20x at Redline | 1.20x at Redline — **matches** | `Swift.Frenzy.Bloodrhythm` |
+| Kinetic | K12 Terminal Velocity, 1.25x airborne | **Overpressure, 1.20x while SLIDING** | `Swift.Kinetic.Overpressure` |
+| Marksman | M12 Standing Wave, 1.25x beyond 40 m | **Culling, 1.18x UNCONDITIONAL** | `Swift.Marksman.Culling` |
+
+Two consequences the owner should see, neither of them fixable from this
+document:
+
+1. **Overdrive's Kinetic and Marksman rewrites are unreachable.** Overdrive's
+   variant table carries `Keystone.Swift.TerminalVelocity` and
+   `Keystone.Swift.StandingWave` rows, and neither Overpressure nor Culling
+   grants either tag. Only Bloodrhythm's rewrite resolves. Either the shipped
+   keystones adopt those tags or the rewrites are re-sited onto them.
+2. **"Terminal Velocity" now names two different things.** K12 here, and a Core
+   **Velocity** Convergence node (`Core.Velocity.TerminalVelocity`, a More of
+   x1.30 while airborne) added under O27 — see `Core-Constellations.md`. That
+   Core node is the closer match to what K12 describes, and it lives in the
+   universal tree rather than a Swift branch. **Unresolved: which layer owns
+   "airborne More".** Both existing is inside O3's cap only because a character
+   cannot easily hold both, and that is luck, not design.
+
+**Culling is also the first unconditional More in the class layer**, which the
+ledger's own closing sentence ("always conditional") forbids. It was authored as
+the deliberate pick for a build that refuses to organise around a movement
+state. That is a defensible design, but it is a change to this section's rule
+and needs an owner ruling rather than a doc edit.
 
 ## 6.2 Crit policy compliance
 

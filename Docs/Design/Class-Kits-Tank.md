@@ -1,6 +1,36 @@
 # Class Kit — TANK / Grit (full treatment)
 
-Status: design draft, authored to the depth of Class-Kits §1 (Swift) and §2 (Caster).
+**Last reconciled against: O32** (2026-08-14).
+
+> ## NOTHING IN THIS DOCUMENT IS BUILT.
+>
+> Verified against the code on 2026-08-14, because a full-depth treatment reads
+> like a specification and this one is not yet one:
+>
+> - **The Tank is selectable and grants nothing.**
+>   `UBreakerProgressionLibrary::GetFallbackClassDefinition` returns `nullptr`
+>   for every class but Swift, so a locked Tank has no class definition, no
+>   starting abilities, no ultimate and no branch trees.
+> - **No Tank tree and no Tank ability exist.** `GetAllFallbackTrees` returns
+>   the Core slice plus Swift's three; the ability registry carries Swift and
+>   Caster only.
+> - **The Grit loop does not exist.** `Source/RiorsEdge/Classes/` holds two
+>   components, Momentum and Mana. `ClassResource` is inert for a Tank.
+> - **The pipeline hooks this class is built on DO exist**, which is worth
+>   saying because it makes the Tank the cheapest of the three unbuilt classes:
+>   post-mitigation damage is already resolvable through the damage contract,
+>   the passive Block proc is real (`UBreakerCombatComponent` exposes
+>   `BlockChance` / `BlockMitigation`), `ApplyHealing` exists, and attacker-side
+>   `OnHitDealt` / `OnKillDealt` are live. The Grit component would be reading
+>   things that already report.
+>
+> **One structural gap this document cannot design around:**
+> `EBreakerBuildCondition` is **movement-only**, so no node in this document can
+> key off "while shielded", "while an enemy is within 5 m", or any other combat
+> state. **O30** names the same widening as a prerequisite for its ailment, crit
+> and stacking axes. Nothing here should be trusted as validated.
+
+Status: design draft, **UNBUILT** (see above), authored to the depth of Class-Kits §1 (Swift) and §2 (Caster).
 This document **extends** `Docs/Design/Class-Kits.md` §4 (Tank's one-page treatment). Where
 §4 states a rule, this document honours it verbatim and elaborates it; nothing here contradicts
 it. Where §4 is silent, this document authors.
@@ -28,6 +58,27 @@ strong self-damage reduction, full self-knockback control, **never** immunity; r
 tolerated, never required), O15 (branch nodes freely mixed with investment gates), O18 (TTK/TTD
 seeds), O19 (elements are Rift / Entropy / Void), O20 (the REDESIGN bucket is a list of what
 **not** to build on).
+
+**Rulings this document was authored BEFORE, added 2026-08-14.**
+
+- **O28.** `Master-Sheet-Import.txt` is **superseded** — historical source
+  material, not law. Master citations here record provenance only. Chain:
+  `Decisions.md` -> `Design-Overview.md` (map) -> this document.
+- **O30.** No defensive axis exists in O30's taxonomy at all — it names GUNS,
+  ABILITIES and MINIONS. `Core-Tree-Redesign.md` flags the same hole for
+  Bulwark and Kinesis (seven Core nodes with nowhere to go). **The Tank is the
+  class that hole is largest for**, and where its defensive identity lives if
+  the Core tree re-themes onto three offensive axes is genuinely unanswered.
+  Recorded for the owner; not decided here.
+- **O31.** Every build must be able to make an impact and **feel player power**;
+  no encounter may have a build that cannot participate. The Tank passes the
+  participation half of that easily — a Tank is never excluded by a damage
+  check — and is the class most at risk on the **felt power** half. §5's
+  Bastion branch is an explicit party role, and a build whose contribution is
+  "the group survived" is exactly the shape O31's *"feel player power"* clause
+  is aimed at. §4's solo-conversion rule (Bastion's shields convert to damage)
+  is already the right instinct and now has a ruling behind it. **Not audited
+  against the encounter roster; that is `Encounter-Design.md`'s pass.**
 
 ---
 

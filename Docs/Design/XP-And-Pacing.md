@@ -5,6 +5,17 @@ act breakpoints, XP sources, catch-up mechanics, the ~15 world-content Core
 Points, the vertical slice's compressed level-10 curve, and the enemy-level /
 item-level relationship.
 
+**Last reconciled against: O32** (2026-08-14).
+
+> **O29 INVALIDATES §8's ITEM-LEVEL ARITHMETIC. Read §8.1 before using any tier
+> number in this document.** O29 runs item level to **120**, past the character
+> cap and past the area-level ceiling, and widens the affix ladder from
+> T8..T-1 to **T12..T-1**. §8's formula clamps item level at **50** and its
+> worked example maps ilvl 30 to T5 and level 50 to "opening T1". Both are now
+> wrong, and the ladder is built — this is not a pending change. **The
+> zone-anchored model itself (O6) survives intact; only the ceiling and the
+> ilvl→tier mapping moved.** Full correction in §8.1.
+
 **Authority.** `Docs/Design/Decisions.md` is law and supersedes anything here.
 This pass propagates O4 (§10.1), O6 (§8), O7 (§7), O8 (Frontier naming), and
 O9 (§5.1 Rank vocabulary), O18 (§3 TTK/TTD seed targets), and O23 (§5.1
@@ -679,6 +690,96 @@ which needs a `ZoneLevel` input defaulting to the enemy's level when unset) and
 Game-Modes §3.7 consumes `ZoneLevel`; it does not define it. This is a small
 change now and an expensive one later, consistent with 4.8's warning.
 
+### 8.1 CORRECTION [O29] — the ceiling is 120 and the tier mapping is two-slope
+
+**Added 2026-08-14, read directly from
+`Source/RiorsEdge/Items/BreakerAffixLibrary.{h,cpp}` and
+`Source/RiorsEdge/Weapons/BreakerWeaponMath.h`. O29 is BUILT, not pending.**
+
+**What O29 changed and this section did not.**
+
+| Quantity | §8 as written | Shipped under O29 |
+|---|---|---|
+| Item level ceiling | `clamp(..., 1, 50)` | **120** (`MaxItemLevel`, `MaxSupportedItemLevel`, pinned equal by `RiorsEdge.Items.TierLadder`) |
+| Affix tier ladder | T8..T-1 implied; "level 50 opening T1" | **T12..T-1** |
+| ilvl → tier mapping | "one tier per ~7 levels" | **two slopes**: ~8.2 levels/tier from ilvl 1 (T12) to ilvl 50 (T6), then ~14 levels/tier from ilvl 50 (T6) to ilvl 120 (T1) |
+| Tier at the character cap | T1 | **T6** — half the ladder, not a third |
+| Drop item level at high area level | clamped to 50 | **unclamped**; `GetDropItemLevel` returns area level unchanged |
+
+**The zone-anchored model is untouched.** `ZoneLevel` on the rift/zone Data
+Asset, the Rank TierBonus table, the ±1 variance, the enemy-level fallback —
+all of O6 stands exactly as ratified. **Only the clamp and the tier mapping
+moved.** The formula reads:
+
+```
+ItemLevel = clamp( ZoneLevel + TierBonus + VarianceRoll, 1, 120 )
+```
+
+**The §8 worked example, recomputed.** Same zone level 30, same TierBonus
+table, same variance — run through the shipped two-slope mapping instead of
+the retired one-tier-per-7-levels rule. This is arithmetic from code, not a
+re-authored value:
+
+| Source | ilvl range | Best natural tier — §8 said | Best natural tier — **shipped** |
+|---|---|---|---|
+| Standard enemy | 29-31 | T5 | **T9** |
+| Veteran | 30-32 | T5 | **T9** |
+| Champion (pack leader) | 31-33 | T4 | **T9** |
+| Champion (mini-boss) | 32-34 | T4 | **T9-T8** |
+| Boss (rift boss) | 33-35 | T4 | **T9-T8** |
+| World chest | 29-31 | T5 | **T9** |
+
+Derivation, so the numbers are checkable rather than trusted:
+`Steps = floor((ilvl - 1) * (12 - 6) / 49)`, `Tier = 12 - Steps`. The single
+tier boundary anywhere in the 29-36 range sits at **ilvl 34**. So across the
+entire TierBonus table — Standard through act boss, a spread of five item
+levels plus variance — a zone-30 drop is T9 or T8, and usually T9.
+
+**The conclusion §8 drew from that table is WEAKER than it was, and that is the
+finding.** §8 argued "the boss's advantage over trash is one tier band plus a
+far better rarity roll — that is the correct ratio." Under the twelve-tier
+ladder the ±5 TierBonus spread mostly **does not cross a tier boundary at all**
+at zone level 30, because the campaign slope is ~8.2 item levels per tier and
+the whole bonus range is 5. **The tier bonus has become close to inert in the
+campaign band.** Whether that is acceptable — §8's own argument was that the
+bonus should be "bounded and small," and it is now smaller than bounded — is an
+owner call. **No value is re-authored here (O2).**
+
+**The endgame note in §8 is now backwards and must be read as superseded.** It
+reads: *"In Rior's Frontier, `ZoneLevel` is pinned at 50 for all content and the
+entire progression axis moves to rarity, affix tier via crafting, and the T-1 /
+Anomalous chase. Item level stops being a progression axis at cap, by design."*
+
+**O29 rules the exact opposite.** Item level running to 120 — past the character
+cap of 50 and past the area-level ceiling — **is** the endgame power source, and
+is what makes the locked "all endgame character power comes from gear" rule
+function rather than merely be stated. It is O29's answer to the 74x gap
+recorded at the end of `Power-Curve.md`. Item level does not stop being a
+progression axis at cap; **cap is where it starts being the only one.**
+
+**Two consequences worth stating plainly:**
+
+1. **§4's "Level 50 — hard stop" section survives, and is strengthened.** No XP
+   past 50, no paragon, no mastery bar — O29 explicitly **rejects** a
+   paragon-style post-cap tree as colliding with that rule and as pure
+   accumulation against O27. What §4 could not say, and now can, is *what*
+   replaces the bar: seventy more item levels and six more affix tiers.
+2. **§4's build-completion readout recommendation needs one more field.** It
+   proposes Aberrant count, Anomalous count, and T0+ affix count. Under a
+   T12..T-1 ladder, **T0+ is no longer the meaningful threshold** — the player
+   spends the whole campaign between T12 and T6 and never sees a T0. The
+   readout wants an average or best equipped tier, or an item-level average.
+   **Not authored here**; it is a UI decision and belongs to `UI-UX-Spec.md`.
+
+**What is NOT resolved, and needs the owner:** §8 authors `ZoneLevel` capped at
+50 for endgame content. O27 introduced **area level**, authored 1-100 on the
+content, and O29 runs item level to 120. **There are now three ceilings —
+zone level 50, area level 100, item level 120 — and no document says how they
+relate.** `GetDropItemLevel` currently returns area level unchanged, which makes
+area level and item level the same number and leaves `ZoneLevel` with no
+defined relationship to either. That is a real gap and it is the largest one
+this section leaves open.
+
 ### Enemy level scaling curve — EXTENDS
 
 6.7 leaves "enemy level scaling curve" open. It is out of this document's
@@ -978,3 +1079,28 @@ Recorded here only because this document's numbers assume them:
    currency at a fixed rate? A conversion would be a clean sink and would keep
    the kill-value tables meaningful at cap, but it edges toward a post-cap
    progression track and needs an explicit ruling against 7.1.
+
+8. **[O29] Which ceiling governs where — zone level 50, area level 100, or item
+   level 120?** Raised by §8.1. `ZoneLevel` is authored per zone and capped at
+   50 by §8; O27 authored **area level** on the content at 1-100; O29 runs
+   **item level** to 120. `GetDropItemLevel` currently returns area level
+   unchanged, so area level and item level are the same number and `ZoneLevel`
+   has no defined relationship to either. **This is the largest unresolved item
+   in this document** and it blocks any endgame reward-band authoring, here or
+   in `Game-Modes.md`.
+
+9. **[O29] Has the tier bonus become inert in the campaign band?** §8's Rank
+   TierBonus table spans +0 to +5 item levels. The shipped campaign slope is
+   ~8.2 item levels per tier, so at zone level 30 the entire spread crosses
+   **one** tier boundary (at ilvl 34) and usually none — a boss and a trash mob
+   drop the same affix tier. §8's own argument was that the bonus should be
+   "bounded and small"; it is now smaller than bounded. Either the bonus grows,
+   or §8 accepts that rarity and drop count carry the whole boss reward and says
+   so. **Not re-authored (O2).**
+
+10. **[O29] What does the level-50 build-completion readout show now?** §4
+    proposes Aberrant count, Anomalous count, and **T0+ affix count**. On a
+    T12..T-1 ladder a levelling player finishes at **T6** and never sees a T0,
+    so the third field reads zero for the entire campaign and for a good part of
+    the endgame. It needs to become a best or average equipped tier, or an
+    item-level average. A `UI-UX-Spec.md` decision, not a curve one.

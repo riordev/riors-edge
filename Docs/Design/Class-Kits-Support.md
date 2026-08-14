@@ -1,6 +1,36 @@
 # Class Kit — SUPPORT / Charge (full treatment)
 
-Status: design draft, authored to the depth of `Docs/Design/Class-Kits.md` §1 (Swift)
+**Last reconciled against: O32** (2026-08-14).
+
+> ## NOTHING IN THIS DOCUMENT IS BUILT.
+>
+> Verified against the code on 2026-08-14, because a full-depth treatment reads
+> like a specification and this one is not yet one:
+>
+> - **The Support is selectable and grants nothing.**
+>   `UBreakerProgressionLibrary::GetFallbackClassDefinition` returns `nullptr`
+>   for every class but Swift, so a locked Support has no class definition, no
+>   starting abilities, no ultimate and no branch trees.
+> - **No Support tree and no Support ability exist.** `GetAllFallbackTrees`
+>   returns the Core slice plus Swift's three; the ability registry carries
+>   Swift and Caster only.
+> - **The Charge loop does not exist.** `Source/RiorsEdge/Classes/` holds two
+>   components, Momentum and Mana. `ClassResource` is inert for a Support.
+> - **The party layer this class is designed against does not exist either**,
+>   and this is the gap that matters most here. There is no ally, no party
+>   membership, no ally query, no buff propagation, and no `UBreakerMarkComponent`.
+>   `ApplyHealing` exists, so the *self* path of every source could be built
+>   today; **none of the ally-facing halves could be.** For this class
+>   specifically, that means the solo baseline is buildable and the party role
+>   is not — the reverse of the order the design implies.
+> - **`EBreakerBuildCondition` is movement-only**, so no node here can key off
+>   "while a buff is active", "against a marked target", or any other combat or
+>   status state. **O30** names the same widening as a prerequisite for its own
+>   axes. Effectively every Warden and Conductor node depends on it.
+>
+> Nothing here should be trusted as validated.
+
+Status: design draft, **UNBUILT** (see above), authored to the depth of `Docs/Design/Class-Kits.md` §1 (Swift)
 and §2 (Caster). This document **replaces** Class-Kits §5's one-page treatment as the
 canonical Support design; §5 remains the source of the non-negotiable clauses, all of
 which are carried forward verbatim and extended, never weakened.
@@ -22,6 +52,39 @@ freeze), **O3** (Mores are an unordered product; one per branch keystone; build-
 3; Aberrant signatures may not author a More), **O4**, **O15**, **O18**, **O19** (the
 elements are **Rift / Entropy / Void**; Void Whisperer is the Void specialist; saturated
 teal is a property of objects, not of damage), **O21**, **O24**.
+
+**Rulings this document was authored BEFORE, added 2026-08-14.**
+
+- **O28.** `Master-Sheet-Import.txt` is **superseded** — historical source
+  material, not law. Master citations record provenance only. Chain:
+  `Decisions.md` -> `Design-Overview.md` (map) -> this document.
+- **O30.** The taxonomy names GUNS, ABILITIES and MINIONS and has **no support
+  or defensive axis at all**. Support is the class least served by it: healing,
+  buff propagation, marks and suppression map onto none of the three. Where
+  Support's identity lives if the Core tree re-themes onto those axes is
+  unanswered, and it is a bigger hole here than for the Tank, whose damage-
+  facing nodes at least land on GUNS. Recorded for the owner.
+- **O31 is the most consequential ruling this class has received, and it cuts
+  both ways.** O31: raids are **puzzles rewarded for team play**, and **every
+  build must be able to make an impact and feel player power**; no encounter
+  may have a build that cannot participate.
+  - **The half that helps.** "Rewarded for team play" is the first ruling that
+    gives a Support-shaped contribution first-class standing. Master 7.10.6's
+    solo problem — the one this class is built around — is not withdrawn, but
+    it is no longer the only lens.
+  - **The half that bites.** Class-Kits §5's acceptance criterion 5 reads
+    *"a Support's solo damage output is within 25% of the five-class median.
+    Support may be the worst solo damage dealer; it may not be unplayable."*
+    Under O31 that criterion is **necessary but no longer sufficient.** "Not
+    unplayable" is a floor on *participation*; O31 also demands *felt player
+    power*, and a build that participates by making other people better does
+    not automatically feel powerful. The Warden branch — natively solo, the
+    recommended starting branch, and the one whose keystone More is
+    unconditional offence — is where this document already answers that, and
+    under O31 that answer stops being a hedge and becomes load-bearing.
+  - **Not resolved:** whether §5's criterion 5 should gain an explicit felt-power
+    clause, and what would test it. That is an owner call and a playtest
+    question, not a doc edit.
 
 **Shared grammar inherited unchanged** from Class-Kits §0 / §0.1 / §0.2 / §0.3: 5-tier
 branch shape, 12 nodes, 26 points per branch, 30 Class Points, one keystone per
