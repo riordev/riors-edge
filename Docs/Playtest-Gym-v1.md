@@ -2,6 +2,38 @@
 
 The existing First Person map now becomes a zero-setup combat and movement test whenever `BreakerGameMode` is active.
 
+## THE FIELD WAS RE-LAID-OUT — read `Docs/Design/Level-Design.md` first
+
+The gym's spatial layout is no longer a set of hand-picked offsets. It is built
+from a table of dimensions **derived from the movement constants**, all
+`EditAnywhere` on `ABreakerGameMode` under **Playtest | Field**, each carrying
+its derivation in a comment. Three things changed that invalidate the distances
+quoted further down this page:
+
+- **The field is built on the real floor.** It used to be built 212 cm above
+  it, because the ground plane was taken as "spawn minus a capsule" and the
+  PlayerStart sits on the template's 210 cm plinth.
+- **The template courtyard is a sealed 4000 x 4000 cm room with a 400 cm wall
+  and no doorway** (measured; `LogGymSummary` prints it every launch). Sprint
+  crosses it in 3.6 s against a 4.0 s dash cooldown, so the dash could not be a
+  traversal verb anywhere the player could reach. A runtime **breach ramp** and
+  a **rubble stair** now lead out of it; deleting the wall is editor work and
+  the delete list is in Level-Design §8.
+- **Everything moved out past the breach and onto stations**, each at least one
+  dash-refresh distance (1100 x 4.0 = 4400 cm) from the last: camp, breach,
+  target range, encounter pocket, jump-gap run, two more pockets, sniper lane,
+  wall-ride corridor, elite arena. Field long axis is 25000 cm — 22.7 s at
+  sprint.
+
+New in the field: a **jump-gap run** with three lanes at 700 / 1400 / 2100 cm,
+pipped 1 / 2 / 3, sized so each gap needs exactly that many jumps (the 3-jump
+lane is deliberately uncrossable until Swift's third jump is reachable), and a
+**flat slide lane** with a stripe where a sprint-entered slide should end.
+
+Capture: add `-BreakerCaptureTour` to a `-BreakerScreenshots=N` run to shoot the
+field from authored vantage points (plan, route, breach crest, pocket, wall-ride
+corridor, sniper lane) instead of from the player's eyes.
+
 ## What appears at runtime
 
 - Four recycling diagnostic targets: health, shield, armour, and lateral movement.
