@@ -208,8 +208,14 @@ enum class EBreakerItemRule : uint8
     Count UMETA(Hidden)
 };
 
-// Tiers run T8 (worst) to T1 linearly, then spike: T0 = 1.4x T1, T-1 = 1.8x
-// T1. Stored as the printed number, so Tier ranges 8..-1.
+// Tiers run T12 (worst) to T1 on a BACK-LOADED geometric curve, then spike:
+// T0 = 2.2x T1, T-1 = 3.6x T1. Stored as the printed number, so Tier ranges
+// 12..-1. The ladder widened from T8..T-1 under O29 (endgame power is gear
+// depth; item level runs to 120). The full derivation, the value table and the
+// re-siting of the spikes are on UBreakerAffixLibrary::ValueForTier.
+//
+// The two anchors below are the only per-affix balance numbers: the curve
+// interpolates between them and authors nothing of its own.
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerAffixDefinition
 {
@@ -221,7 +227,10 @@ struct RIORSEDGE_API FBreakerAffixDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerStatTarget StatTarget = EBreakerStatTarget::Health;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerStatBucket StatBucket = EBreakerStatBucket::Flat;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<EBreakerEquipSlot> AllowedSlots;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ValueAtT8 = 0.0f;
+    // Renamed from ValueAtT8 with the ladder (O29). Definitions are immutable
+    // CONTENT, never save data — a rolled affix stores its Tier and Value — so
+    // renaming the anchor cannot invalidate an existing item.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float ValueAtT12 = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float ValueAtT1 = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) float RollWeight = 100.0f;
     // While this is false the line contributes nothing at all. Default Always,
@@ -238,7 +247,10 @@ struct RIORSEDGE_API FBreakerRolledAffix
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName AffixId = NAME_None;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="-1", ClampMax="8")) int32 Tier = 8;
+    // ClampMax follows the widened ladder (O29). Items rolled before it carry
+    // tiers 8..-1 and stay legal — 8 is simply no longer the worst tier, so an
+    // old item reads as a mid-ladder roll, which is exactly what it is.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="-1", ClampMax="12")) int32 Tier = 12;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float Value = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerAffixCategory Category = EBreakerAffixCategory::Prefix;
 };
