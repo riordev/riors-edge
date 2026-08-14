@@ -195,7 +195,16 @@ void UBreakerMomentumComponent::ApplyMomentumDelta(float Delta)
 {
     if (!Attributes || FMath::IsNearlyZero(Delta)) return;
     const float Max = Attributes->GetMaxClassResource();
-    Attributes->SetClassResource(FMath::Clamp(Attributes->GetClassResource() + Delta, 0.0f, Max));
+    // ApplyClassResource, not the generated SetClassResource — the same reason
+    // the Mana loop and UBreakerCombatComponent's resource helpers use it: the
+    // generated setter ensure()s with no owning AbilitySystemComponent, so the
+    // whole generation loop was unexercisable in automation and Momentum was
+    // proven only by the pure StateForFraction/decay maths either side of this
+    // write. The explicit [0, Max] clamp stays: Swift's floor is 0, so this is
+    // bit-identical to what it replaced, and stating it here means a Momentum
+    // component that somehow found itself on an Overcasting bank still cannot
+    // generate into a debt it does not own.
+    Attributes->ApplyClassResource(FMath::Clamp(Attributes->GetClassResource() + Delta, 0.0f, Max));
 }
 
 void UBreakerMomentumComponent::RefreshState()

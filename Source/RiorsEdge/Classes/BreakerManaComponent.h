@@ -11,9 +11,23 @@ class UBreakerProgressionComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerOvercastChanged, bool, bOvercast);
 
-// Caster's Mana loop: an accumulating bank, the deliberate opposite of Swift's
-// Momentum state machine (Class-Kits 2.1). Weapons generate, spells spend, and
-// nothing decays — a banked bar is never taken back by standing still.
+// Caster's Mana loop.
+//
+// OWNER RULING 2026-08-14 INVERTED THIS: "Caster's mana bar should be full and
+// go down when using spells, and affixes like resource efficiency and resource
+// regeneration should exist." It supersedes Class-Kits §2.1's accumulating-bank
+// model, in which the bar started EMPTY and the class fantasy was "the Caster
+// shoots to pay for spells". The bar now starts FULL, spends DOWN, and
+// REGENERATES back up; passive regeneration is the primary recovery path and
+// the conditional sources (weapon hits, weak points, kills, status
+// applications, reloads) are ACCELERATORS on top of it, not the income.
+//
+// What did not change, and must not: the anti-Multishot 1/n pellet rule
+// (mandatory, Class-Kits §2.1), DoT ticks generating exactly nothing, and the
+// Overcast debt machinery. Only the WEIGHTING moved — see GlobalGenerationCap.
+//
+// Still the deliberate opposite of Swift's Momentum state machine: nothing
+// decays here, and a Caster standing still recovers rather than draining.
 // Server-authority only; inert unless the owner's permanent class is Caster.
 //
 // Overcast (Class-Kits 2.1, Ability-Implementation-Spec 1.8) is grounded here
@@ -90,6 +104,14 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Mana") void PopGenerationSuspension(FName Key);
     UFUNCTION(BlueprintPure, Category="Mana") bool IsGenerationSuspended() const { return GenerationSuspensions.Num() > 0; }
 
+    // Fills the bank to MaxClassResource. The owner ruling's first clause: a
+    // fresh Caster can cast immediately. Called when the owner BECOMES a Caster
+    // (class lock, save load, dev swap) and on every vitals restore — the
+    // playtest reset and respawn path — so "start full" holds after F1 as well
+    // as at spawn. No-op for any other class: nothing may fill a Swift's bar,
+    // which is earned by moving.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Mana") void FillToMaximum();
+
     // Pure loop rules, exposed for tests and for the eventual DA_ManaPolicy
     // asset that will own these numbers.
     //
@@ -108,22 +130,55 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Mana") FBreakerOvercastChanged OnOvercastChanged;
 
-    // O2 placeholders, straight from Class-Kits 2.1. No passive regeneration
-    // and no decay: this slice ships the conditional bank only, and the +2.0/s
-    // idle trickle is deliberately deferred with the rest of the O2 re-anchor.
+    // THE primary recovery path under the 2026-08-14 owner ruling, and the one
+    // number to turn when a Caster feels resource-starved or resource-free.
+    //
+    // O2 PLACEHOLDER 6.0/s. Derived, not guessed: Class-Kits §2.1 authored
+    // +2.0/s as a FLOOR under an accumulating loop (a full 100 bar in 50s,
+    // "usable but never sufficient"), and §2.7's first acceptance criterion
+    // reads one 25-cost cast every ~13s from regeneration alone. As the primary
+    // path that is far too slow — it is a floor being asked to be a ceiling.
+    // 6.0/s refills the bar in ~17s and sustains one mid-cost (30 Mana) cast
+    // every 5s with no target present, which is a cadence a player can actually
+    // fight at while still making a three-cast burst something they have to
+    // stop and recover from. §2.7 criterion 1 needs restating against this.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float PassiveRegenPerSecond = 6.0f; // O2 PLACEHOLDER
+    // Unchanged from Class-Kits §2.1 on purpose. The per-source magnitudes are
+    // what SB1/SB3/VW1/MS1 and §2.7's shotgun-vs-rifle criterion are authored
+    // against, and the anti-Multishot 1/n ratio lives between them — moving
+    // them would silently rewrite a dozen branch nodes. The re-weighting the
+    // ruling asks for is done at the CAP below instead: one number, and every
+    // relative rate the acceptance criteria measure is preserved.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeaponHitGain = 1.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float WeakPointGain = 4.0f;
-    // Lower than Swift's 25 because Caster generation is target-dependent and a
-    // dense pack would otherwise fill the bar instantly.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float GlobalGenerationCap = 20.0f;
+    // O2 PLACEHOLDER 6.0/s, was 20.0/s. This is the re-weight: it is the
+    // ceiling on how much CONDITIONAL income can arrive per second, and at par
+    // with PassiveRegenPerSecond it says exactly what the ruling asks — a
+    // Caster who fights well recovers at most twice as fast as one who stands
+    // still, so the weapon is an accelerator rather than the income. At the old
+    // 20/s a rifle out-earned the new regeneration threefold and the bar would
+    // have inverted straight back into a bank that happened to start full.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Generation", meta=(ClampMin="0")) float GlobalGenerationCap = 6.0f; // O2 PLACEHOLDER
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Overcast", meta=(ClampMax="0")) float OvercastFloor = -20.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Overcast", meta=(ClampMin="1")) float OvercastGenerationMultiplier = 2.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mana|Overcast", meta=(ClampMin="0")) float OvercastIncomingDamageTaken = 0.15f;
 
+    // Public for the same reason the Momentum component's is: BeginPlay is the
+    // only thing that binds it, the suite has no world, and the contract it
+    // implements (a class change re-syncing the floor) silently broke once
+    // already. Idempotent; calling it spuriously costs a component lookup.
+    UFUNCTION() void HandleProgressionChanged();
+
 private:
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
-    UFUNCTION() void HandleProgressionChanged();
+    UFUNCTION() void HandleVitalsRestored();
+    // Binds the owner's shot and vitals-restore events. Called from BeginPlay
+    // and from BindAttributes, because a component wired up outside a world
+    // never gets a BeginPlay and would otherwise miss the reset path entirely.
+    // Guarded against double-binding: AddDynamic on an already-bound delegate
+    // is a duplicate-listener bug, not a no-op.
+    void BindOwnerEvents();
 
     bool IsInSafeZone() const;
     void ApplyManaDelta(float Delta);

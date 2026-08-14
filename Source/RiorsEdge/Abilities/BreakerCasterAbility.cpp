@@ -22,7 +22,27 @@ FName UBreakerCasterAbility::UnmakeWindowKey()
 
 float UBreakerCasterAbility::CostUnderWindow(float AuthoredCost, float WindowScalar)
 {
-    return FMath::Max(0.0f, AuthoredCost * FMath::Max(0.0f, WindowScalar));
+    return ComposeResourceCost(AuthoredCost, 1.0f, WindowScalar);
+}
+
+float UBreakerCasterAbility::ComposeResourceCost(float AuthoredCost, float CostMultiplier, float WindowScalar)
+{
+    return FMath::Max(0.0f, AuthoredCost * FMath::Max(0.0f, CostMultiplier) * FMath::Max(0.0f, WindowScalar));
+}
+
+float UBreakerCasterAbility::GetResourceCostMultiplier() const
+{
+    const UBreakerAttributeSet* Attributes = GetBreakerAttributes();
+    if (!Attributes) return 1.0f;
+
+    // Read live per cast, never cached: the player re-gears mid-fight and a
+    // cached efficiency would keep charging the old price.
+    //
+    // Floored here as well as on the aggregator's side. Two independent clamps
+    // on one invariant is not redundancy worth deleting: Casters have NO
+    // cooldowns because Mana is the cooldown, so a cost reaching zero does not
+    // make a strong build, it deletes the only pacing mechanism the class has.
+    return FMath::Max(MinimumResourceCostMultiplier, Attributes->GetResourceCostMultiplier());
 }
 
 bool UBreakerCasterAbility::CanCastAt(float CurrentMana, float Cost, float Floor)
@@ -65,13 +85,16 @@ UBreakerManaComponent* UBreakerCasterAbility::GetManaComponent() const
 float UBreakerCasterAbility::GetResourceCost() const
 {
     const float Authored = Super::GetResourceCost();
+    // Read live, never cached (owner ruling 2026-08-14): the player re-gears
+    // mid-fight and a stale efficiency would quote a price the bank is not
+    // being charged. 1.0 until the affix layer supplies otherwise.
+    const float CostMultiplier = GetResourceCostMultiplier();
     const ABreakerCharacter* Character = GetBreakerCharacter();
     const UBreakerAbilityStateComponent* State = Character ? Character->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
-    if (!State || !State->IsWindowActive(UnmakeWindowKey()))
-    {
-        return Authored;
-    }
     // A window with no payload authored would silently make everything free;
     // default to full price so a mis-authored Unmake fails safe.
-    return CostUnderWindow(Authored, State->GetWindowPayload(UnmakeWindowKey(), 1.0f));
+    const float WindowScalar = (State && State->IsWindowActive(UnmakeWindowKey()))
+        ? State->GetWindowPayload(UnmakeWindowKey(), 1.0f)
+        : 1.0f;
+    return ComposeResourceCost(Authored, CostMultiplier, WindowScalar);
 }

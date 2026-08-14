@@ -85,7 +85,11 @@ bool FBreakerManaInertTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An inert component affords nothing"), Mana->CanAffordSpend(1.0f));
     TestEqual(TEXT("Defaults match the Class-Kits weapon-hit gain"), Mana->WeaponHitGain, 1.5f);
     TestEqual(TEXT("Defaults match the Class-Kits weak-point gain"), Mana->WeakPointGain, 4.0f);
-    TestEqual(TEXT("Defaults match the Class-Kits global cap"), Mana->GlobalGenerationCap, 20.0f);
+    // The two numbers the 2026-08-14 inversion moved. Pinned so a silent revert
+    // to the accumulating-bank weighting shows up as a failing test rather than
+    // as a Caster who quietly stops needing to regenerate.
+    TestEqual(TEXT("Passive regeneration is the primary recovery path"), Mana->PassiveRegenPerSecond, 6.0f);
+    TestEqual(TEXT("The conditional-income cap is at par with regeneration"), Mana->GlobalGenerationCap, 6.0f);
     TestEqual(TEXT("Defaults match the Class-Kits Overcast floor"), Mana->GetOvercastFloor(), -20.0f);
     TestEqual(TEXT("Defaults match the Class-Kits Overcast damage penalty"), Mana->OvercastIncomingDamageTaken, 0.15f);
 
@@ -158,7 +162,12 @@ namespace BreakerOvercastTestHelpers
         UBreakerAttributeSet* Attributes = nullptr;
     };
 
-    FCasterRig MakeRig(EBreakerClassId ClassId)
+    // StartingMana is set EXPLICITLY after the rig is built, because binding a
+    // Caster fills the bar to maximum (owner ruling 2026-08-14, "the mana bar
+    // should be full and go down when using spells"). Every test below asserts
+    // one rule; the fill itself has its own test rather than being an implicit
+    // precondition of all the others.
+    FCasterRig MakeRig(EBreakerClassId ClassId, float StartingMana = 0.0f)
     {
         FCasterRig Rig;
         Rig.Owner = NewObject<AActor>();
@@ -167,6 +176,7 @@ namespace BreakerOvercastTestHelpers
         Rig.Attributes = NewObject<UBreakerAttributeSet>();
         Rig.Progression->DevForceClass(ClassId);
         Rig.Mana->BindAttributes(Rig.Attributes);
+        Rig.Attributes->ApplyClassResource(StartingMana);
         return Rig;
     }
 
@@ -200,8 +210,8 @@ bool FBreakerOvercastReachableTest::RunTest(const FString& Parameters)
 
     // Bank 30, then spend 45: the cast is affordable because it lands inside
     // the debt allowance, and the bank genuinely goes negative.
-    Caster.Mana->GrantMana(30.0f, /*bIgnoreGlobalCap*/ true);
-    TestEqual(TEXT("Generation banks normally above zero"), Caster.Mana->GetMana(), 30.0f);
+    Caster.Attributes->ApplyClassResource(30.0f);
+    TestEqual(TEXT("The bank holds what it was given"), Caster.Mana->GetMana(), 30.0f);
     TestFalse(TEXT("A full bank is not Overcast"), Caster.Mana->IsOvercast());
 
     TestTrue(TEXT("A cast that exceeds the bank is affordable inside the floor"), Caster.Mana->CanAffordSpend(45.0f));
@@ -217,8 +227,7 @@ bool FBreakerOvercastReachableTest::RunTest(const FString& Parameters)
 
     // A cast that would breach the floor is REFUSED, not truncated to the
     // floor: a partial spend would hand the player a silent discount.
-    FCasterRig Deep = MakeRig(EBreakerClassId::Caster);
-    Deep.Mana->GrantMana(10.0f, true);
+    FCasterRig Deep = MakeRig(EBreakerClassId::Caster, 10.0f);
     TestFalse(TEXT("A cast past the floor is refused"), Deep.Mana->CanAffordSpend(31.0f));
     TestFalse(TEXT("The over-floor spend does not happen"), Deep.Mana->TrySpendMana(31.0f));
     TestEqual(TEXT("A refused over-floor cast costs nothing"), Deep.Mana->GetMana(), 10.0f);
@@ -247,12 +256,16 @@ bool FBreakerOvercastRecoveryTest::RunTest(const FString& Parameters)
 
     // Doubled generation while in debt (Class-Kits §2.1). Now that the debt is
     // reachable, confirm the doubling actually runs rather than merely existing.
-    FCasterRig Caster = MakeRig(EBreakerClassId::Caster);
-    Caster.Mana->GrantMana(30.0f, true);
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster, 30.0f);
+    // Passive regeneration OFF for this test only. It is the primary recovery
+    // path since the 2026-08-14 inversion and would swamp the thing under test,
+    // which is that CONDITIONAL credit is doubled while the bank is negative.
+    // Regeneration's own doubling has its own test below.
+    Caster.Mana->PassiveRegenPerSecond = 0.0f;
     Caster.Mana->TrySpendMana(45.0f);
     TestEqual(TEXT("The bank starts the recovery in debt"), Caster.Mana->GetMana(), -15.0f);
 
-    // Metered generation: 10 of credit, paid out through the 20/s budget. The
+    // Metered generation: 10 of credit, paid out through the per-second budget. The
     // exact landing point depends on which slice crosses zero (the doubling is
     // evaluated against the bank as it stands when each credit is paid), so
     // assert the property rather than a step-size-sensitive number: 10 of
@@ -284,8 +297,7 @@ bool FBreakerOvercastFloorClosesTest::RunTest(const FString& Parameters)
 
     // A class change must never strand a negative floor — or a bank sitting
     // below the floor that replaces it, which would be permanent debt.
-    FCasterRig Rig = MakeRig(EBreakerClassId::Caster);
-    Rig.Mana->GrantMana(30.0f, true);
+    FCasterRig Rig = MakeRig(EBreakerClassId::Caster, 30.0f);
     Rig.Mana->TrySpendMana(45.0f);
     TestTrue(TEXT("The Caster is in debt before the change"), Rig.Mana->IsOvercast());
 
@@ -301,8 +313,7 @@ bool FBreakerOvercastFloorClosesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("No incoming-damage penalty survives the change"), Rig.Mana->GetOvercastIncomingDamageTaken(), 0.0f);
 
     // A respec broadcasts, so the bound handler covers that path.
-    FCasterRig Respec = MakeRig(EBreakerClassId::Caster);
-    Respec.Mana->GrantMana(30.0f, true);
+    FCasterRig Respec = MakeRig(EBreakerClassId::Caster, 30.0f);
     Respec.Mana->TrySpendMana(45.0f);
     FText Failure;
     Respec.Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure);
@@ -338,13 +349,123 @@ bool FBreakerMomentumUnaffectedByFloorTest::RunTest(const FString& Parameters)
 
     // A Caster's floor is per-character state on that character's attribute
     // set, so it cannot leak onto a Swift.
-    FCasterRig Caster = MakeRig(EBreakerClassId::Caster);
-    Caster.Mana->GrantMana(20.0f, true);
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster, 20.0f);
     Caster.Mana->TrySpendMana(35.0f);
     TestTrue(TEXT("The Caster is in debt"), Caster.Mana->IsOvercast());
     TestEqual(TEXT("The Swift's floor is untouched by another character"), Swift.Attributes->GetClassResourceFloor(), 0.0f);
     TestEqual(TEXT("The Swift's bank is untouched"), Swift.Attributes->GetClassResource(), 0.0f);
     TestEqual(TEXT("The Momentum component is still inert without a Swift-owned bar"), Momentum->GetMomentum(), 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerManaStartsFullTest,
+    "RiorsEdge.Classes.ManaStartsFull",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerManaStartsFullTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // OWNER RULING 2026-08-14: "Caster's mana bar should be full and go down
+    // when using spells." This is the inversion of Class-Kits §2.1's
+    // accumulating bank, in which a fresh Caster started at zero and had to
+    // shoot something before they could cast anything at all.
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerCombatComponent* Combat = NewObject<UBreakerCombatComponent>(Owner);
+    UBreakerManaComponent* Mana = NewObject<UBreakerManaComponent>(Owner);
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    Combat->BindAttributes(Attributes);
+    Mana->BindAttributes(Attributes);
+
+    // Not yet a Caster: nothing has been filled, because filling is a Caster
+    // rule and not an attribute-set default. A Swift's bar is earned.
+    TestEqual(TEXT("A classless character has an empty bar"), Attributes->GetClassResource(), 0.0f);
+
+    Progression->DevForceClass(EBreakerClassId::Caster);
+    Mana->HandleProgressionChanged();
+    TestEqual(TEXT("Becoming a Caster fills the bar"), Mana->GetMana(), Attributes->GetMaxClassResource());
+    TestEqual(TEXT("A fresh Caster is at full fraction"), Mana->GetManaFraction(), 1.0f);
+    TestTrue(TEXT("A fresh Caster can cast immediately"), Mana->CanAffordSpend(80.0f));
+
+    // The fill is a TRANSITION, not a refresh. RefreshClassOwnership also runs
+    // from the tick poll and from a respec; refilling on either would hand a
+    // player a free bar mid-fight for standing still.
+    Mana->TrySpendMana(60.0f);
+    const float AfterCast = Mana->GetMana();
+    Mana->HandleProgressionChanged();
+    TestEqual(TEXT("A progression refresh does not refill the bar"), Mana->GetMana(), AfterCast);
+    TestTrue(TEXT("The bar went DOWN when a spell was cast"), AfterCast < Attributes->GetMaxClassResource());
+
+    // The reset and respawn path. RestoreVitals raises OnVitalsRestored and the
+    // Mana component decides for itself; Combat/ never learns what a Caster is.
+    Combat->RestoreVitals();
+    TestEqual(TEXT("A vitals restore refills a Caster"), Mana->GetMana(), Attributes->GetMaxClassResource());
+
+    // ...and does NOT fill a Swift, whose bar is the reward for moving.
+    AActor* SwiftOwner = NewObject<AActor>();
+    UBreakerProgressionComponent* SwiftProgression = NewObject<UBreakerProgressionComponent>(SwiftOwner);
+    UBreakerCombatComponent* SwiftCombat = NewObject<UBreakerCombatComponent>(SwiftOwner);
+    UBreakerManaComponent* SwiftMana = NewObject<UBreakerManaComponent>(SwiftOwner);
+    UBreakerAttributeSet* SwiftAttributes = NewObject<UBreakerAttributeSet>();
+    SwiftProgression->DevForceClass(EBreakerClassId::Swift);
+    SwiftCombat->BindAttributes(SwiftAttributes);
+    SwiftMana->BindAttributes(SwiftAttributes);
+    SwiftCombat->RestoreVitals();
+    TestEqual(TEXT("A reset never fills a Swift's Momentum"), SwiftAttributes->GetClassResource(), 0.0f);
+    TestEqual(TEXT("A reset does restore a Swift's health"), SwiftAttributes->GetHealth(), SwiftAttributes->GetMaxHealth());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerManaRegenerationTest,
+    "RiorsEdge.Classes.ManaRegeneration",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerManaRegenerationTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerOvercastTestHelpers;
+
+    // Regeneration is the PRIMARY recovery path under the inversion, so it is
+    // worth proving it actually runs rather than existing as a property.
+    FCasterRig Caster = MakeRig(EBreakerClassId::Caster, 40.0f);
+    Caster.Mana->PassiveRegenPerSecond = 6.0f;
+
+    RunFor(Caster.Mana, 2.0f);
+    TestEqual(TEXT("Regeneration pays its authored rate"), Caster.Mana->GetMana(), 52.0f, 0.001f);
+
+    // It stops at the ceiling rather than accumulating an invisible surplus.
+    RunFor(Caster.Mana, 20.0f);
+    TestEqual(TEXT("Regeneration stops at the maximum"), Caster.Mana->GetMana(), Caster.Attributes->GetMaxClassResource());
+
+    // Doubled while in debt, exactly like conditional generation: climbing out
+    // of Overcast is what the doubling is for.
+    FCasterRig Debt = MakeRig(EBreakerClassId::Caster, 10.0f);
+    Debt.Mana->PassiveRegenPerSecond = 6.0f;
+    Debt.Mana->TrySpendMana(30.0f);
+    TestEqual(TEXT("The bank is at the floor"), Debt.Mana->GetMana(), -20.0f);
+    RunFor(Debt.Mana, 1.0f, 0.05f);
+    // 1s at 6/s doubled is 12 of repayment, so the debt is -8 rather than -14.
+    TestEqual(TEXT("Regeneration is doubled while in debt"), Debt.Mana->GetMana(), -8.0f, 0.001f);
+
+    // Unmake suspends generation (Class-Kits §2.2), and regeneration is now
+    // most of it — if it ran through the free window, the ultimate would refund
+    // most of its own 80-Mana price while it was being spent.
+    FCasterRig Unmaking = MakeRig(EBreakerClassId::Caster, 20.0f);
+    Unmaking.Mana->PushGenerationSuspension(TEXT("Unmake"));
+    RunFor(Unmaking.Mana, 3.0f);
+    TestEqual(TEXT("Unmake suspends regeneration too"), Unmaking.Mana->GetMana(), 20.0f);
+    Unmaking.Mana->PopGenerationSuspension(TEXT("Unmake"));
+    RunFor(Unmaking.Mana, 1.0f);
+    TestTrue(TEXT("Regeneration resumes when the window closes"), Unmaking.Mana->GetMana() > 20.0f);
+
+    // Zeroing the rate is the "off" position and must be exactly inert, so the
+    // owner can turn the whole path off in one place while tuning.
+    FCasterRig Off = MakeRig(EBreakerClassId::Caster, 30.0f);
+    Off.Mana->PassiveRegenPerSecond = 0.0f;
+    RunFor(Off.Mana, 5.0f);
+    TestEqual(TEXT("A zeroed rate regenerates nothing"), Off.Mana->GetMana(), 30.0f);
     return true;
 }
 

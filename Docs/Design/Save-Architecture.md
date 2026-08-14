@@ -1,6 +1,8 @@
 # Save / State Architecture
 
-Status: design target. Nothing below the Migration section is implemented.
+Status: design target, with one slice as-built. Nothing below is implemented
+EXCEPT what §11 records: quest state, write-through persistence on flag change,
+and save versioning/migration.
 Owner layer: C++ (save formats are a durable-rules concern per `Docs/Architecture.md`).
 
 This document defines what is saved, where it lives, how it survives a crash,
@@ -566,3 +568,88 @@ local-only step and the first server step simultaneously.
 10. Cloud save for the pre-server period — Steam Cloud, or none? Steam Cloud plus
     rotating local backups has a known conflict-resolution failure mode that
     `WriteCounter` mitigates but does not solve.
+
+---
+
+## 11. AS BUILT — quest state, write-through persistence, and versioning
+
+**IMPLEMENTED.** This section records what is in the code, not what is planned.
+Everything above it remains a design target unless named here. Automation:
+`RiorsEdge.Save.QuestFlagPersistence`, `.QuestFlagRoundTrip`, `.Migration`,
+`.QuestLoop`, `.QuestContent`, `RiorsEdge.Interaction.GatedDialogue`.
+
+### 11.1 The data-loss bug, confirmed and fixed
+
+§1 defect 4 was worse than "`EndPlay` is not a crash-safe cadence". Quest flags
+reached disk on **no** path of their own: `ABreakerCharacter::AddQuestFlag` was
+`QuestFlags.AddUnique(Flag)` into a bare, non-`UPROPERTY`, non-replicated array,
+and `SaveGameState()` was called only from `EndPlay`, class lock, and three menu
+commit points. The dialogue choice lambda in `BreakerMenu.cpp` set a flag and
+saved nothing. A story beat therefore survived only a clean shutdown.
+
+Fixed by **write-through persistence**: `UBreakerQuestJournal::SetFlag` requests
+a save whenever the set actually changes, and never otherwise. The request is a
+delegate (`OnPersistRequested`) rather than a direct save, so the journal stays
+world-free and unit-testable and the slot policy stays with the character.
+Repeated sets and `NAME_None` cost no disk write, which is what bounds the
+frequency — §4.3's "deliberately not on a timer during a rift" still holds,
+because a flag only moves on a beat.
+
+### 11.2 Quest state lives in `Save/`, and it is a layer over flags
+
+| Type | File | Role |
+|---|---|---|
+| `FBreakerQuestFlagSet` | `Save/BreakerQuestJournal.h` | `UPROPERTY` flags + counters. Presence-only, monotonic, no remove. |
+| `UBreakerQuestJournal` | same | Runtime owner. `SetFlag`, `AddProgress`, restore, write-through. |
+| `FBreakerQuestDefinition` | `Save/BreakerQuestContent.h` | Id, title, giver, objectives, reward — **content, never serialized**. |
+| `EBreakerQuestState` | same | `NotOffered / Offered / Active / ReadyToTurnIn / Complete`, **derived**. |
+| `UBreakerQuestLibrary` | same | Fallback registry, `ComputeQuestState`, flag registry, kill tracking. |
+
+`ComputeQuestState` is a pure function of the flag set. **No quest state is
+stored anywhere.** The save format did not fork to gain a quest system: it
+gained `QuestCounters`, and a counter is intermediate state that sets a flag on
+reaching its threshold (Campaign-And-Story.md 6.4).
+
+The persisted surface is now `QuestFlags` (unchanged) plus `QuestCounters` (new,
+additive). Per §2.1/§2.2's split, everything here is **per-character**; the
+account tier still does not exist.
+
+### 11.3 `SaveVersion` is read (§5.1, §5.2)
+
+`UBreakerSaveGame::CurrentSaveVersion` is **2**. `MigrateToCurrent` runs at the
+top of `LoadGameState`, before any field is read, and honours §5.2:
+
+- steps one version at a time, never a switch on "old vs new";
+- pure on the deserialized struct — no world, no slot — so every step is unit-tested;
+- **refuses** a file from a newer build rather than repairing or overwriting it;
+- migrates in memory; the result is written back on the next normal save, not eagerly;
+- unknown flags are **preserved verbatim**, never dropped.
+
+The v1 → v2 step is §5.3's "affix renamed" case applied to flags:
+`Quest.AcceptedFirstContract` → `Quest.FirstContract.Accepted`, plus a backfill
+of `Quest.FirstContract.Offered` for anyone who had accepted. An existing
+`BreakerSave0` loads and means exactly what it meant before. Migration literals
+are **frozen** and deliberately do not reference the named constants, because a
+migration describes a file written in the past and must not follow a later
+rename.
+
+**Not done, deliberately:** `FBreakerProgressionState::SaveVersion` and
+`FBreakerItemInstance::SaveVersion` are still read by nothing. They belong to
+`Progression/` and `Items/`, outside this lane's ownership. §5.1's
+three-versions-three-jobs split is therefore one third implemented; the pattern
+to copy is in `BreakerSaveGame.cpp`.
+
+### 11.4 What flags now gate
+
+`HasQuestFlag` has callers. Dialogue choices and nodes carry `RequiredFlags`
+(ALL) / `BlockedByFlags` (ANY), NPCs carry ordered first-match `EntryOverrides`,
+and `UBreakerQuestLibrary::NotifyEnemyKilled` turns a kill into campaign state
+for ACTIVE quests only. The Quartermaster's first contract is offered, accepted,
+tracked against real kills by monster rank (O27), turned in at a gated node, and
+paid in gear. Flag names live in a validated registry (`BreakerQuestFlags`) and
+`ValidateQuestContent` fails the suite on a flag content references that the
+registry does not know.
+
+**Still missing:** objective presentation — no quest log, tracker or waypoint
+(`UI/`, Campaign-And-Story 6.3 #8) — and the account-vs-character scope split
+(#9). Neither is code this lane owns.

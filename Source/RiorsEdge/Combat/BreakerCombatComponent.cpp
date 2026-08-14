@@ -318,24 +318,47 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     Request.SourceDamageMultiplier *= GetComposedMoreMultiplier();
 }
 
+// Both writes go through UBreakerAttributeSet::ApplyClassResource rather than
+// the GAS generated SetClassResource. The generated setter ensure()s when there
+// is no owning AbilitySystemComponent, so every rig without one — which is every
+// automation test — could not exercise this path at all: Momentum generation,
+// Mana generation, the dodge refund and every gear ResourceOnKill grant were
+// proven only by the pure-maths layers either side of the write, never end to
+// end. ApplyClassResource is the null-safe write added for exactly this reason
+// (it is already how ApplyHealth/ApplyShield and the equipment kill-grant work),
+// and it routes through the SAME PreAttributeChange clamp — [Floor, Max] — so
+// the live behaviour is unchanged and the Overcast floor is honoured on the way
+// in rather than by a Min written here.
 bool UBreakerCombatComponent::SpendClassResource(float Cost)
 {
+    // Affordability is deliberately still measured against ZERO, not against
+    // ClassResourceFloor. This is the generic non-GAS helper; Overcast's debt
+    // allowance is spent by ability costs, which are GameplayEffects, and their
+    // affordability rule lives in UBreakerCasterAbility::CheckCost where it can
+    // refuse a cast that would breach the floor instead of truncating it.
     if (!Attributes || Cost < 0.0f || Attributes->GetClassResource() < Cost) return false;
-    Attributes->SetClassResource(Attributes->GetClassResource() - Cost);
+    Attributes->ApplyClassResource(Attributes->GetClassResource() - Cost);
     return true;
 }
 
 void UBreakerCombatComponent::AddClassResource(float Amount)
 {
-    if (Attributes && Amount > 0.0f) Attributes->SetClassResource(FMath::Min(Attributes->GetMaxClassResource(), Attributes->GetClassResource() + Amount));
+    // No Min against MaxClassResource here: PreAttributeChange applies it. One
+    // clamp policy, one place, so a future change to the cap rule cannot be
+    // half-applied.
+    if (Attributes && Amount > 0.0f) Attributes->ApplyClassResource(Attributes->GetClassResource() + Amount);
 }
 
 void UBreakerCombatComponent::RestoreVitals()
 {
     if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return;
-    Attributes->SetHealth(Attributes->GetMaxHealth());
-    Attributes->SetShield(Attributes->GetMaxShield());
+    // Same null-safe route as the damage and healing paths, and for the same
+    // reason: the generated setters ensure() with no ability system, which made
+    // the reset path unexercisable in automation exactly like the resource one.
+    Attributes->ApplyHealth(Attributes->GetMaxHealth());
+    Attributes->ApplyShield(Attributes->GetMaxShield());
     bDeathBroadcast = false;
+    OnVitalsRestored.Broadcast();
 }
 
 bool UBreakerCombatComponent::IsDead() const

@@ -716,4 +716,137 @@ bool FBreakerClosequarterRulesTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCasterResourceEfficiencyTest,
+    "RiorsEdge.Abilities.CasterResourceEfficiency",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCasterResourceEfficiencyTest::RunTest(const FString& Parameters)
+{
+    using UCaster = UBreakerCasterAbility;
+
+    // Owner ruling 2026-08-14 asks for a resource-efficiency affix. The cost
+    // path is the consumer: cost = Authored * CostMultiplier * WindowScalar.
+    TestEqual(TEXT("A neutral multiplier changes nothing"), UCaster::ComposeResourceCost(30.0f, 1.0f, 1.0f), 30.0f);
+    TestEqual(TEXT("20% efficiency is a 20% cost reduction"), UCaster::ComposeResourceCost(30.0f, 0.8f, 1.0f), 24.0f);
+    TestEqual(TEXT("A cost INCREASE is expressible too"), UCaster::ComposeResourceCost(30.0f, 1.25f, 1.0f), 37.5f);
+
+    // The interaction that had to be got right: efficiency and Unmake compose
+    // rather than fight. Unmake is a rewrite of the class's price, efficiency
+    // is the player's gear, and neither is allowed to win outright.
+    TestEqual(TEXT("Unmake is free no matter how efficient the player is"), UCaster::ComposeResourceCost(80.0f, 0.5f, 0.0f), 0.0f);
+    TestEqual(TEXT("Efficiency cannot make free cheaper than free"), UCaster::ComposeResourceCost(80.0f, 0.1f, 0.0f), 0.0f);
+    // Long Dark charges 50%; a 20% efficiency roll takes that to 40%, not to
+    // 50%-or-80%-whichever-ran-last.
+    TestEqual(TEXT("Long Dark and efficiency multiply"), UCaster::ComposeResourceCost(30.0f, 0.8f, 0.5f), 12.0f);
+
+    // No division anywhere in the composition, so a zero scalar (Unmake) and a
+    // zero multiplier are both merely cheap rather than undefined.
+    TestEqual(TEXT("A zero multiplier is free, not a divide by zero"), UCaster::ComposeResourceCost(30.0f, 0.0f, 1.0f), 0.0f);
+    TestEqual(TEXT("Negative efficiency never becomes a refund"), UCaster::ComposeResourceCost(30.0f, -2.0f, 1.0f), 0.0f);
+
+    // The two-argument form is the same function with a neutral multiplier, so
+    // the existing Unmake rules cannot drift from the composed one.
+    TestEqual(TEXT("CostUnderWindow is the composition at neutral efficiency"),
+        UCaster::CostUnderWindow(35.0f, 0.5f), UCaster::ComposeResourceCost(35.0f, 1.0f, 0.5f));
+
+    // The floor exists so no stack of affixes reaches a free Caster by the gear
+    // route: Mana IS the cooldown, and a zero cost deletes the class's pacing.
+    TestTrue(TEXT("Costs may be reduced but never eliminated by gear"), UCaster::MinimumResourceCostMultiplier > 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilitySelectionTest,
+    "RiorsEdge.Abilities.Selection",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilitySelectionTest::RunTest(const FString& Parameters)
+{
+    using EResult = EBreakerAbilitySelectionResult;
+    const EBreakerAbilitySlot One = EBreakerAbilitySlot::ClassAbilityOne;
+    const EBreakerAbilitySlot Two = EBreakerAbilitySlot::ClassAbilityTwo;
+    const EBreakerAbilitySlot Ult = EBreakerAbilitySlot::Ultimate;
+
+    // THE CATALOGUE. Six Caster abilities are implemented against three keys,
+    // and before this the default table was the only thing anything read — so
+    // exactly one of the five class abilities was reachable at a time.
+    const TArray<FName> CasterOne = UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Caster, One);
+    TestTrue(TEXT("Cleave is selectable"), CasterOne.Contains(TEXT("Caster.Cleave")));
+    TestTrue(TEXT("Closequarter is selectable — it was dead content"), CasterOne.Contains(TEXT("Caster.Closequarter")));
+    TestTrue(TEXT("Rot is selectable"), CasterOne.Contains(TEXT("Caster.Rot")));
+    TestTrue(TEXT("Siphon is selectable"), CasterOne.Contains(TEXT("Caster.Siphon")));
+    TestTrue(TEXT("Fracture is selectable"), CasterOne.Contains(TEXT("Caster.Fracture")));
+    TestTrue(TEXT("Resonance is selectable"), CasterOne.Contains(TEXT("Caster.Resonance")));
+    TestFalse(TEXT("The ultimate is not a class-ability choice"), CasterOne.Contains(TEXT("Caster.Unmake")));
+    TestEqual(TEXT("Both class slots offer the same catalogue"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Caster, Two).Num(), CasterOne.Num());
+
+    const TArray<FName> CasterUltimate = UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Caster, Ult);
+    TestEqual(TEXT("Caster has exactly one ultimate"), CasterUltimate.Num(), 1);
+    TestTrue(TEXT("And it is Unmake"), CasterUltimate.Contains(TEXT("Caster.Unmake")));
+
+    // Class separation is structural, not a naming convention.
+    TestFalse(TEXT("A Caster ability is not in the Swift catalogue"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, One).Contains(TEXT("Caster.Cleave")));
+    TestTrue(TEXT("The registry knows who grants what"),
+        UBreakerAbilityDefinition::ClassGrantsAbility(EBreakerClassId::Caster, TEXT("Caster.Rot")));
+    TestFalse(TEXT("A Swift is not granted Rot"),
+        UBreakerAbilityDefinition::ClassGrantsAbility(EBreakerClassId::Swift, TEXT("Caster.Rot")));
+    TestEqual(TEXT("A classless character has no catalogue"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::None, One).Num(), 0);
+
+    // The validation rules, pure and world-free.
+    TestEqual(TEXT("A valid pick is allowed"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Caster.Siphon"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::Allowed));
+    TestEqual(TEXT("No class means nothing is equippable"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::None, One, TEXT("Caster.Siphon"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::NoClassChosen));
+    // A stale save carrying a deleted id must be refused by name, not crash or
+    // silently equip the fallback.
+    TestEqual(TEXT("An unknown id is refused"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Caster.NoSuchThing"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::UnknownAbility));
+    TestEqual(TEXT("Another class's ability is refused"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Swift.Skim"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::WrongClass));
+    // Slot discipline both ways: the ultimate is a locked third choice, not a
+    // third class-ability slot.
+    TestEqual(TEXT("An ultimate may not take a class slot"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Caster.Unmake"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::WrongSlot));
+    TestEqual(TEXT("A class ability may not take the ultimate slot"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, Ult, TEXT("Caster.Cleave"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::WrongSlot));
+    TestEqual(TEXT("The ultimate is allowed in its own slot"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, Ult, TEXT("Caster.Unmake"), NAME_None, NAME_None, NAME_None)), static_cast<int32>(EResult::Allowed));
+
+    // Duplicates: refused across slots, allowed as a no-op re-selection of the
+    // slot that already holds it, so a picker redrawing its own state is fine.
+    TestEqual(TEXT("The same ability twice is refused"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, Two, TEXT("Caster.Cleave"), TEXT("Caster.Cleave"), NAME_None, NAME_None)), static_cast<int32>(EResult::AlreadyEquipped));
+    TestEqual(TEXT("Re-selecting the slot's own ability is allowed"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Caster.Cleave"), TEXT("Caster.Cleave"), NAME_None, NAME_None)), static_cast<int32>(EResult::Allowed));
+    TestEqual(TEXT("Swapping the two class slots is a legal move"), static_cast<int32>(UBreakerAbilityComponent::ValidateSelection(
+        EBreakerClassId::Caster, One, TEXT("Caster.Rot"), TEXT("Caster.Cleave"), NAME_None, NAME_None)), static_cast<int32>(EResult::Allowed));
+
+    // Every refusal carries player-facing text, and success carries none.
+    TestTrue(TEXT("A refusal explains itself"), !UBreakerAbilityComponent::DescribeSelectionResult(EResult::WrongSlot).IsEmpty());
+    TestTrue(TEXT("Success says nothing"), UBreakerAbilityComponent::DescribeSelectionResult(EResult::Allowed).IsEmpty());
+
+    // The fallback table is a DEFAULT, not the answer: an equipped id wins.
+    const UBreakerAbilityDefinition* Defaulted = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, Two, NAME_None);
+    TestTrue(TEXT("Nothing equipped resolves to the class default"), Defaulted && Defaulted->AbilityId == TEXT("Caster.Rot"));
+    const UBreakerAbilityDefinition* Chosen = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Caster, Two, TEXT("Caster.Closequarter"));
+    TestTrue(TEXT("A chosen ability beats the default table"), Chosen && Chosen->AbilityId == TEXT("Caster.Closequarter"));
+
+    // NO COOLDOWNS EVER (Class-Kits §2.1): whichever two the player picks, the
+    // selection path cannot smuggle one in, because every Caster definition is
+    // cost-gated and UBreakerCasterAbility clears the cooldown effect class.
+    for (const UBreakerAbilityDefinition* Definition : UBreakerAbilityDefinition::GetClassAbilities(EBreakerClassId::Caster, One))
+    {
+        TestFalse(FString::Printf(TEXT("%s has no cooldown"), *Definition->AbilityId.ToString()), Definition->HasCooldown());
+    }
+    for (const UBreakerAbilityDefinition* Definition : UBreakerAbilityDefinition::GetClassAbilities(EBreakerClassId::Caster, Ult))
+    {
+        TestFalse(TEXT("The ultimate has no cooldown either"), Definition->HasCooldown());
+    }
+    return true;
+}
+
 #endif

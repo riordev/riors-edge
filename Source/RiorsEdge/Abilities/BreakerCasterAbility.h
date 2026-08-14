@@ -48,6 +48,36 @@ public:
     // Unmake scalar (1.0 when no window is open). Never negative.
     static float CostUnderWindow(float AuthoredCost, float WindowScalar);
 
+    // Pure rule: the FULL price composition, resource efficiency included.
+    //
+    //     cost = Authored * CostMultiplier * WindowScalar
+    //
+    // Order is irrelevant to the arithmetic (it is a product) and is stated
+    // this way because the two factors mean different things: CostMultiplier is
+    // the player's gear/tree efficiency, WindowScalar is Unmake rewriting the
+    // price of the class. They MULTIPLY rather than fight, and the composition
+    // is deliberately free of any division, so:
+    //   * Unmake's 0 scalar makes a cast free no matter how efficient the
+    //     player is — efficiency cannot make "free" cheaper than free, and
+    //     nothing anywhere divides by a scalar that may be zero;
+    //   * Long Dark's 0.5 scalar and a 20% efficiency roll read 0.4x, not
+    //     0.5x-or-0.8x-whichever-ran-last.
+    // Efficiency is floored (see MinimumResourceCostMultiplier) so no stack of
+    // affixes can reach a free Caster by the gear route; only Unmake, a
+    // deliberate ultimate, may set the price to zero.
+    static float ComposeResourceCost(float AuthoredCost, float CostMultiplier, float WindowScalar);
+
+    // Costs may be reduced, never eliminated, by the affix layer. Defence in
+    // depth: the aggregated attribute is floored on its own side too, and a
+    // cost of exactly zero would make Mana stop being the cooldown, which is
+    // the one thing the whole class is built on.
+    static constexpr float MinimumResourceCostMultiplier = 0.10f;
+
+    // The live resource-efficiency multiplier for this ability's owner. Read
+    // fresh on every call and never cached: the player re-gears mid-fight, and
+    // a cached cost would quote a price the bank is not being charged.
+    UFUNCTION(BlueprintPure, Category="Abilities") float GetResourceCostMultiplier() const;
+
     // Pure rule: may this cast happen? Floor-aware (spec D8). A default floor
     // of 0 is exactly the strict rule this replaced.
     static bool CanCastAt(float CurrentMana, float Cost, float Floor = 0.0f);
