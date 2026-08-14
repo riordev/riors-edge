@@ -164,3 +164,30 @@ Implementation notes tied to these rulings:
 - O2: wave mode + time-to-kill instrumentation in the gym (same commit).
 - O5: `EBreakerDamageFamily::Elemental` stays as the pipeline family; the
   Rift/Time/Void split arrives with the resistance model.
+
+## 2026-08-14 — O29, O30, O31 (endgame gear depth, the archetype axes, content shape)
+
+| # | Decision |
+|---|----------|
+| O29 | **THE ENDGAME POWER SOURCE IS GEAR DEPTH.** Item level runs to **120**, past the character cap of 50 and past the area-level ceiling, which is what makes "all endgame character power comes from gear" actually function rather than merely be stated. Affix modifiers stay **within tier ranges** — the tier ladder simply widens from T8..T-1 to **T12..T-1** — and values are **tuned up significantly across the whole ladder, with a materially bigger jump between the high tiers.** The T-band is therefore no longer linear: the curve is back-loaded so a top-tier roll is an event rather than one more step. This is the answer to the 74x gap recorded at the end of `Power-Curve.md`. A paragon-style post-cap tree is REJECTED — it collides with the locked no-post-cap-character-power rule and is pure accumulation against O27. |
+| O30 | **The Core tree is open to redesign, organised around the axes a build is actually built on.** Owner's taxonomy, to be scouted and costed rather than implemented blind — **GUNS**: ailment/element, poison, bleed, flat damage, crit, fire rate, movement. **ABILITIES**: stacking, multispell, cooldown reduction, AoE, poison, bleed, flat damage, crit. **MINIONS**: drones, turrets, deployables generally. Weapon archetypes should fit some axes more naturally than others. Stated design intent: three knobs (two trees plus gear) becomes **several** knobs, and subclasses exist to solidify and empower identities the axes already create rather than to introduce separate ones. |
+| O31 | **Content shape: a cross between Destiny and Path of Exile.** Raids are **puzzles rewarded for team play** — many distinct encounters that force players into different situations. Builds may excel in some situations and be weak in others, but **every build must be able to make an impact and feel player power**. No encounter may have a build that cannot participate. |
+
+Implementation notes tied to these rulings:
+- O29: item level 120 moves `MaxSupportedItemLevel`, `BestTierForItemLevel`,
+  `ValueForTier`, `TierCapForRarity` and `GetDropItemLevel`'s clamp together.
+  `RiorsEdge.Combat.PowerCurve.EndgameClamp` asserts the endgame gap is still
+  OPEN and is EXPECTED TO FAIL once this lands — that failure is the signal to
+  delete the test and rewrite `Power-Curve.md` §1 to describe what now carries
+  endgame power.
+- O29: affix tier values are save-relevant only through `Tier` and `Value` on a
+  rolled affix, both of which are already stored per-item, so widening the
+  ladder does not invalidate existing saves — but every item rolled before it
+  keeps the values it rolled, and will read as weak. That is correct and should
+  not be migrated.
+- O30: `EBreakerBuildCondition` is movement-only today, which is why no node can
+  key off combat or status state. Several axes in the taxonomy (ailment, crit,
+  stacking) need it widened before they can be authored honestly.
+- O30: minions/deployables do not exist in any form. The Gunsmith kit designs
+  them; nothing is built.
+
