@@ -1,6 +1,10 @@
 # Core Constellations — six universal trees authored, FIVE shipping, SEVEN CLUSTERS LIVE
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** mixed — §10's 15-node subset is the vertical slice; the rest of
+this document (the full live 30-node/seven-cluster tree beyond the slice's
+10-point cap, and the O30 redesign direction) is post-slice (see
+`Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 > **The title of this document is no longer true and is left standing on
 > purpose.** Six constellations are authored below; five were the plan of
@@ -39,7 +43,7 @@ Status: design pass 1, propagated against `Docs/Design/Decisions.md` (O1–O23, 
 
 Scope: the six universal Core Tree constellations spent with Core Points — Precision, Volley, Affliction, Elements, Bulwark, Kinesis. Class trees and affixes are out of scope and are governed by `Docs/Layer-Ownership.md`.
 
-> **PLAN OF RECORD.** The vertical slice and the first release ship **FIVE** constellations — Precision, Volley, Affliction, Bulwark, Kinesis. **Elements is authored in parallel against the three-element model (O5, renamed by O19: Rift, Entropy, Void)** and slots in when the resistance step lands in the §6.1 damage order. Elements is a designed-but-unshipped sixth, not a cut one.
+> **PLAN OF RECORD — RULED BY O38.** The vertical slice and the first release ship **FIVE** constellations — Precision, Volley, Affliction, Bulwark, Kinesis. **Elements is authored in parallel against the three-element model (O5, renamed by O19: Rift, Entropy, Void)** and slots in when the resistance step lands in the §6.1 damage order. Elements is a designed-but-unshipped sixth, not a cut one — **O38 (2026-08-14) ratifies exactly this as owner ruling** ("Elements is designed-not-cut"), closing `Design-Overview.md`'s open question S1.
 
 ---
 
@@ -49,14 +53,14 @@ These are inherited, not proposed. Nothing below may violate them.
 
 | Constraint | Source |
 |---|---|
-| Level cap 50, hard stop; all endgame power from gear | Master Sheet §7.1 |
+| Level cap 50, hard stop; all endgame power from gear — gear depth to item level 120 is what makes this literally true | O27, O29 (supersedes the old "Master Sheet §7.1" citation — O28 retires the master sheet as authority) |
 | ~65 Core Points = two full constellations plus one partial | §7.2, §7.4 |
-| Air jump (Kinesis) and Parry (Bulwark) are the ONLY tree-granted verbs | §5.2, §7.6 |
+| **Parry (Bulwark) is the ONLY tree-granted verb.** Air jump is **base kit for everyone** (two jumps); Swift's third jump, if built, is class-innate, not tree-granted. **Supersedes the prior "air jump and Parry are the only two tree-granted verbs" framing.** | **O25** (was §5.2, §7.6) |
 | Dash, slide, wall ride, block, dodge are base kit — trees improve, never unlock | §5.2 |
 | **No stamina pool exists.** Block and dodge are passive chance layers; Parry has its own short cooldown and is the only defensive input | **O1** |
 | **Three elements: Rift, Entropy, Void.** Three reaction pairs, three resist stats | **O5 (renamed by O19)** |
 | **Max one More multiplier per constellation**, on Convergence/Keystone only; build-wide hard cap 3 | **O3 (+ extension, §2.4)** |
-| Crit is the only multiplier of its kind; no parallel multiplier via nodes | §6.3 |
+| **Amended by O34:** crit and weak point are the two site multipliers (crit build-gated, weak point skill-gated); no node may author a third | §6.3, **O34** (see `Damage-Pipeline.md` §4a) |
 | Flat sums → one additive Increased bucket → More multipliers reserved for trees/Anomalous | Item-Foundation locked rule |
 | More multipliers compose as an **unordered product**; 2–3 per build, hard cap 3 | **O3** |
 | **Aberrant signature affixes may NOT author a More.** Anomalous is the only item-layer More source | **O3 + O11 extension** |
@@ -273,7 +277,7 @@ Slow Bleed intentionally *conflicts* with the Tick Frequency affix rather than m
 >
 > **BLOCKED (unchanged).** Elements still cannot ship until an elemental resistance step exists in the damage pipeline. Master Sheet §6.1: "there is no elemental resistance step. Combat-Foundation has Armor only." §3.2 blocks Elemental Damage Reduction; §3.7 blocks the three status effects under whatever names they take. O5 fixes *which* elements exist; it does not build the pipeline.
 >
-> **PLAN OF RECORD.** The slice and the first release ship **five** constellations without Elements. **Elements is authored in parallel against the three-element model** and slots in when the resistance step lands. Authoring may proceed on paper; **no node may be authored as a Data Asset until its dependency tag is cleared.**
+> **PLAN OF RECORD — RULED BY O38.** The slice and the first release ship **five** constellations without Elements. **Elements is authored in parallel against the three-element model** and slots in when the resistance step lands. Authoring may proceed on paper; **no node may be authored as a Data Asset until its dependency tag is cleared.** O38 ratifies this timing as owner ruling, not merely an author's plan.
 >
 > **[REMAP — O5]** tags below mark nodes whose identity depended on a fourth element or on the old element names. No new mechanics are invented for them here.
 
@@ -414,7 +418,7 @@ No new mechanics are introduced by this retirement. **FLAG [O19]:** E10's cost a
 
 **Theme:** you are hardest to hit when you are hardest to predict. Kinesis is deliberately the *least* raw-speed constellation in the document — Master Sheet §7.10 risk 2 forbids it from making non-Swift characters the best movers, and risk 7 forbids balancing encounters around it. So Kinesis owns **evasion quality and aerial capability**, and hands raw traversal speed to Swift/Kinetic and to boots affixes.
 
-**Owns:** dodge quality, movement efficiency, slide handling, aerial (§7.6). **Does not grant** dodge, slide, dash, or wall ride.
+**Owns:** dodge quality, movement efficiency, slide handling, aerial (§7.6). **Does not grant** dodge, slide, dash, wall ride, or — **per O25** — air jump: two jumps are base kit for everyone, not gated by this constellation. (K3/K4 below predate O25 and are flagged accordingly.)
 
 > **O1 propagation.** Kinesis holds no stamina references and needs no retagging — but its whole Lane A now sits on a **passive** Dodge. Read every "a successful Dodge" below as *"when a passive Dodge roll succeeds against an incoming hit,"* never as *"when the player presses dodge."* This is a real change in feel: Kinesis's evasion payoffs now fire on chance rather than on input, so their frequency is governed by Dodge % from gear rather than by player timing. Nodes are re-expressed in place; no value is authored.
 
@@ -425,8 +429,8 @@ No new mechanics are introduced by this retirement. **FLAG [O19]:** E10's cost a
 | K0 | **Light Footing** | Gateway | 1 | Your Dodge chance is not reduced while airborne or sliding. (Baseline applies a penalty to evasion outside neutral stance.) |
 | K1 | **Reflex** | **Convergence** | **3** | After a successful Dodge, your Dodge chance against the next hit within 1.2s is increased by 10% / 18% / 25% of its own value. A **More** multiplier on a conditional window, not a flat addition to the affix bucket. **PROMOTED [O21]** — moved from Lane A Minor to Kinesis's Convergence tier; now Kinesis's single compliant More (§2.4 rule 1). Effect verbatim; cost unchanged (Minor 3 → Convergence 3). Requires two lanes, per §2.3 rule 4. **GAP [O21]:** same rank-ladder problem as P3 — the 10/18/25% ladder is carried verbatim into a 1-rank tier and frozen under O2. Note this More scales Dodge *chance*, not damage, and under O1 Dodge is a passive chance layer — whether a chance-space More counts against O3's build-wide cap of 3 is an unanswered question, logged in Open Questions. |
 | K2 | **Phantom Step** | Notable | 2 | A successful Dodge grants 0.25s of full i-frames. **I-frame duration is tree-only** (§3.8, Layer-Ownership) — this is the only node in the game that grants it, and no affix may. Internal cooldown 2.0s so it cannot be chained through a burst. **NEEDS-RECOST [O1/O2]** — under O1 the trigger is a passive proc, so i-frames are granted by luck rather than by input. The 2.0s internal cooldown is now the *only* thing bounding i-frame uptime and it was costed against a player-initiated dodge; value frozen. |
-| K3 | **Loft** | Minor ×3 | 3 | **Grants nothing yet.** Air jump preserves 10% / 20% / 30% more horizontal speed. Inert until K4, deliberately, mirroring Bulwark's Read node. |
-| K4 | **AIR JUMP** | Notable | 2 | **VERB GRANT.** Unlocks a single mid-air jump, refreshed on landing, on wall contact, and on a successful Dodge. Air jump is the *only* verb this constellation grants. Per §3.3, "Additional Air Jump" is explicitly not an affix; `Air Jump Speed Retention %` on gear scales it for players who own it. |
+| K3 | **Loft** | Minor ×3 | 3 | **Grants nothing yet.** Air jump preserves 10% / 20% / 30% more horizontal speed. Inert until K4, deliberately, mirroring Bulwark's Read node. **[O25-SWEEP]** Air jump itself is now base kit (O25, below) — this node's inert-until-K4 relationship needs the same reconciliation flagged at K4. Not resolved in this pass. |
+| K4 | **AIR JUMP** | Notable | 2 | **[O25-SUPERSEDED].** Two jumps are now **BASE KIT for every character** (`JumpMaxCount = 2`, O25) — this node's original framing as a Core-tree "VERB GRANT" is no longer the design. **Parry (Bulwark B4) is the only tree-granted verb** under the current ruling; a third jump, if built, is Swift-class-innate (O25) and belongs in Swift's kit, not Kinesis. **As shipped in code today** (`Core.Kinesis.AirJump`, unchanged as of this reconciliation pass — verified against `BreakerProgressionLibrary.cpp`) the node still carries a `GrantedAbilityIds` entry named "AirJump" and the `Progression.Verb.AirJump` tag on top of the base two-jump kit — **but per `Layer-Ownership.md`'s own FOR-THE-OWNER audit, nothing in the game reads that tag or that ability id, so the node does not actually hand out a third jump.** Its only *live* effect is +15% Air Control (an affix-layer effect wearing a verb's name). That is a code/design gap this pass flags but does not close, since code is out of this lane's scope — most likely fix is renaming/re-specifying it as the air-control notable it actually is, or cutting it and redistributing its points. Original text, preserved: "Unlocks a single mid-air jump, refreshed on landing, on wall contact, and on a successful Dodge. Per §3.3, 'Additional Air Jump' is explicitly not an affix; `Air Jump Speed Retention %` on gear scales it for players who own it." |
 | K5 | **Carve** | Minor ×3 | 3 | You may steer a slide 15° / 25° / 35° further from your entry vector without cancelling it. Control, not speed — §5.4 forbids self-acceleration beyond sprint and forbids wall riding generating speed. |
 | K6 | **Slipstream** | Notable | 2 | Ending a slide by jumping preserves the slide's full speed into the jump instead of the standard reduction. Preserves; does not generate. Explicitly does **not** remove the combat tradeoffs of sliding (reduced accuracy, fixed camera height) — Progression-Architecture asks for exactly this restraint. |
 | K7 | **Link — Weave** | Link | 1 | Connects A ↔ B. A successful Dodge while airborne refreshes your air jump immediately rather than on landing. **NEEDS-RECOST [O1/O2]** — same passive-trigger problem as K10's refund clause. **GAP [O20]:** the note "the two must be costed as one system" now spans the split — K10's refund clause is a REDESIGN item while K7 stays a recost item, so K7's re-cost cannot close until K10's redesign lands. Flagged, not resolved. |
@@ -440,7 +444,7 @@ No new mechanics are introduced by this retirement. **FLAG [O19]:** E10's cost a
 
 **Balance notes — identity theft.** Kinesis contains no raw movement speed, no dash cooldown reduction, no dash charges, no wall-ride duration. All four exist as affixes (§3.3) or belong to Swift/Kinetic. What Kinesis owns that neither can produce: i-frames (K2), the air jump verb (K4), slide steering (K5), and evasion-preserves-state (K9, now a Lane A Minor per O21). None of those is expressible as a percentage on an item, which is the test in Layer-Ownership.
 
-**Movement tax check (§7.10 risk 7).** Every Kinesis node improves an action the player already has. A character with zero Kinesis points can still dodge, slide, dash, and wall ride. Only air jump is gated, and no encounter may require it — that is a level-design constraint that should be written into the arena checklist, not assumed.
+**Movement tax check (§7.10 risk 7).** Every Kinesis node improves an action the player already has. A character with zero Kinesis points can still dodge, slide, dash, wall ride, **and — per O25 — double-jump: air jump (two jumps total) is base kit for everyone, not gated by this tree.** **[O25-SWEEP]** The line that used to read "only air jump is gated" is retired; see K4's [O25-SUPERSEDED] flag above for the one remaining code/design gap. No encounter may require anything Kinesis merely improves — that is a level-design constraint that should be written into the arena checklist, not assumed.
 
 ---
 
@@ -616,13 +620,13 @@ Per CONTEXT.md and §7.9: the slice ships approximately **15 skill nodes** with 
 1. All 15 nodes load from Data Assets. No node ID, cost, rank count, or effect magnitude is hardcoded in C++ (§7.9).
 2. The 10-point cap comes from the progression curve Data Asset and can be changed to 65 without a recompile.
 3. Allocation is rejected when: points are insufficient; a prerequisite is unmet; a rank cap is exceeded; or a node's constellation-spend gate is unmet.
-4. Deallocation at a Forge refunds every point and correctly revokes granted abilities, effects, and tags — including the two verbs.
-5. **Read at rank 3 with Parry unpurchased produces no observable effect and no error.** Likewise Loft without Air Jump. This is the inert-node test and it is the one most likely to be silently broken.
-6. Parry and Air Jump survive a save/load round trip: the saved build stores IDs and ranks only, and the verbs are re-granted on load (§7.9, CONTEXT.md save format).
+4. Deallocation at a Forge refunds every point and correctly revokes granted abilities, effects, and tags — including Parry, the one tree-granted verb under O25 (**[O25-SUPERSEDED]** — was "the two verbs"; see K4, §8, for the still-open code/design gap on the other one).
+5. **Read at rank 3 with Parry unpurchased produces no observable effect and no error.** Likewise Loft without the K4 node (§8 — **[O25-SUPERSEDED]**: K4's framing as an "Air Jump" verb grant is superseded by O25; the inert-until-prerequisite *pattern* under test survives regardless of what K4 is ultimately called or does). This is the inert-node test and it is the one most likely to be silently broken.
+6. Parry and the K4 node (§8 — **[O25-SUPERSEDED]**) survive a save/load round trip: the saved build stores IDs and ranks only, and whatever they grant is re-granted on load (§7.9, CONTEXT.md save format). **Parry is the only tree-granted verb under O25**; K4's own save/load behaviour is still worth testing as shipped, pending a code-side reconciliation of the node itself.
 7. Fixate's **More** multiplier lands in the More bucket, not the additive Increased bucket. Verifiable in the damage log: a character with +40% Increased weapon damage and 6 Fixate stacks deals `base × 1.40 × 1.18`, not `base × 1.58`.
 8. Last Round's extra projectiles deal full damage and apply **zero** statuses. Verifiable against a target dummy with a 100% Bleed Chance weapon: one bleed application per trigger pull, not one per pellet.
 9. Phantom Step's i-frames respect their 2.0s internal cooldown under sustained fire from three gym enemies.
-10. Air Jump refreshes on landing, on wall contact, and on a successful Dodge — and on nothing else. Specifically it must not refresh on dash.
+10. The K4 node's granted ability (§8 — **[O25-SUPERSEDED]**; not the base-kit double jump itself) refreshes on landing, on wall contact, and on a successful Dodge — and on nothing else. Specifically it must not refresh on dash.
 11. No slice node's effect is reproducible by any affix in the slice affix pool (§3.14). Manual audit, recorded in the slice sign-off.
 12. Respec, allocate, respec, reload — final state matches a fresh allocation of the same build exactly.
 13. **O1 conformance.** No slice node, ability, or Data Asset references `Stamina` or `MaxStamina`; neither attribute exists. Block and Dodge resolve as passive chance layers with no player input bound to either. Parry is the only defensive input, on its own cooldown, and no other ability reads or writes that cooldown except Riposte (B7, not in the slice).
