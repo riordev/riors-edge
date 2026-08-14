@@ -35,6 +35,23 @@ enum class EBreakerAggregatedAttribute : uint8
     // multiplicatively at the weapon. Base 1.0, so a 20% gear roll and a 15%
     // tree allocation read 1.35 — never 1.20 * 1.15.
     DamageMultiplier,
+    // --- Movement composition ---------------------------------------------
+    // Three multiplier-shaped attributes, base 1.0, exactly like
+    // DamageMultiplier. They exist for the same reason it does: before them
+    // UBreakerCharacterMovementComponent read gear and tree movement
+    // multipliers separately and MULTIPLIED them, so +20% boots and +20% of
+    // tree read x1.44 against a locked rule that says x1.40. Routing both
+    // layers through one aggregated attribute makes the additive bucket
+    // structural rather than a convention the movement layer has to remember.
+    //
+    // DashCooldownReduction is a REDUCTION, not a cooldown: the composed value
+    // is the divisor (x1.20 == a 20% shorter dash cooldown). Storing it that
+    // way is what lets it share the additive bucket at all — an attribute
+    // holding the cooldown in seconds would have to fold percentages into a
+    // duration, and two layers doing that could not be additive.
+    SlideSpeedMultiplier,
+    AirControlMultiplier,
+    DashCooldownReduction,
     Count
 };
 

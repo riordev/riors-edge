@@ -21,6 +21,12 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitDamageMultiplier(1.0f);
     InitDamageOverTimeMultiplier(1.0f);
     InitMoveSpeed(650.0f);
+    // Multiplier-shaped, so 1.0 is "nothing contributed". The movement
+    // component divides by DashCooldownReduction, which is why
+    // PreAttributeChange gives it a hard floor rather than clamping at zero.
+    InitSlideSpeedMultiplier(1.0f);
+    InitAirControlMultiplier(1.0f);
+    InitDashCooldownReduction(1.0f);
 }
 
 void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -40,6 +46,9 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(DamageMultiplier);
     BREAKER_REPLICATE(DamageOverTimeMultiplier);
     BREAKER_REPLICATE(MoveSpeed);
+    BREAKER_REPLICATE(SlideSpeedMultiplier);
+    BREAKER_REPLICATE(AirControlMultiplier);
+    BREAKER_REPLICATE(DashCooldownReduction);
 #undef BREAKER_REPLICATE
 }
 
@@ -65,6 +74,11 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     else if (Attribute == GetCriticalMultiplierAttribute()) NewValue = FMath::Max(1.0f, NewValue);
     else if (Attribute == GetDamageMultiplierAttribute() || Attribute == GetDamageOverTimeMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetMoveSpeedAttribute()) NewValue = FMath::Max(0.0f, NewValue);
+    else if (Attribute == GetSlideSpeedMultiplierAttribute() || Attribute == GetAirControlMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
+    // The movement component DIVIDES the dash cooldown by this. A floor rather
+    // than a clamp at zero, because a hostile or badly-rolled -100% would
+    // otherwise be a divide by zero rather than a very long cooldown.
+    else if (Attribute == GetDashCooldownReductionAttribute()) NewValue = FMath::Max(0.05f, NewValue);
 }
 
 void UBreakerAttributeSet::CaptureAttributeBases()
@@ -79,7 +93,21 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::MoveSpeed)] = GetMoveSpeed();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageOverTimeMultiplier)] = GetDamageOverTimeMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = GetDamageMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::SlideSpeedMultiplier)] = GetSlideSpeedMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
     Aggregator.CaptureBases(Values);
+}
+
+void UBreakerAttributeSet::SetAggregatedAttributeBase(EBreakerAggregatedAttribute Attribute, float Value)
+{
+    // Capture first so a caller that arrives before equipment or progression
+    // does not leave every OTHER base uncaptured — SetBase flips the captured
+    // flag, and a later CaptureAttributeBases would then be a silent no-op
+    // against attributes that were never snapshotted.
+    CaptureAttributeBases();
+    Aggregator.SetBase(Attribute, Value);
+    RecomputeAggregatedAttributes();
 }
 
 void UBreakerAttributeSet::ApplyAttributeContribution(EBreakerAttributeContributor Contributor, const FBreakerAttributeContribution& Contribution)
@@ -136,6 +164,13 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     // this line existed: nothing wrote it, which is why no amount of gear or
     // skill-point spending changed how hard a weapon hit.
     WriteAttributeValue(GetDamageMultiplierAttribute(), DamageMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier));
+
+    // The three movement multipliers the movement component now reads instead
+    // of composing gear and tree together itself. Same reason as
+    // DamageMultiplier above: two layers multiplied is not the locked rule.
+    WriteAttributeValue(GetSlideSpeedMultiplierAttribute(), SlideSpeedMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::SlideSpeedMultiplier));
+    WriteAttributeValue(GetAirControlMultiplierAttribute(), AirControlMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::AirControlMultiplier));
+    WriteAttributeValue(GetDashCooldownReductionAttribute(), DashCooldownReduction, Aggregator.Compose(EBreakerAggregatedAttribute::DashCooldownReduction));
 }
 
 UAbilitySystemComponent* UBreakerAttributeSet::FindOwningAbilitySystemSafe() const
@@ -180,4 +215,7 @@ BREAKER_ON_REP(CriticalMultiplier)
 BREAKER_ON_REP(DamageMultiplier)
 BREAKER_ON_REP(DamageOverTimeMultiplier)
 BREAKER_ON_REP(MoveSpeed)
+BREAKER_ON_REP(SlideSpeedMultiplier)
+BREAKER_ON_REP(AirControlMultiplier)
+BREAKER_ON_REP(DashCooldownReduction)
 #undef BREAKER_ON_REP

@@ -192,7 +192,9 @@ The rules the new path enforces:
   end in the same numbers regardless of sequence.
 
 The attributes on this path are MaxHealth, MaxClassResource, CriticalChance,
-CriticalMultiplier, MoveSpeed, DamageOverTimeMultiplier and **DamageMultiplier**.
+CriticalMultiplier, MoveSpeed, DamageOverTimeMultiplier, **DamageMultiplier**
+and — since the movement conformance pass — **SlideSpeedMultiplier**,
+**AirControlMultiplier** and **DashCooldownReduction**.
 Attributes a single system owns outright (Shield, Armor) stay off it.
 `FBreakerEquipmentStats` and `FBreakerNodeStats` are otherwise unchanged: the
 movement, combat and loot consumers still read the composed multipliers from
@@ -271,21 +273,21 @@ something a player can observe.
 | Affix | Health | MaxHealth attribute | yes |
 | Affix | ResourceRegen | `UBreakerEquipmentComponent::TickComponent` writes ClassResource (server) | yes |
 | Affix | MaxResource | MaxClassResource attribute; Momentum/Mana clamp and the HUD bar read it | yes |
-| Affix | MoveSpeed | MoveSpeed attribute **and** `GearMoveSpeedMultiplier()` | yes — see OPEN below |
+| Affix | MoveSpeed | MoveSpeed attribute → `GetComposedMoveSpeedMultiplier()` | yes |
 | Affix | DropChance | `ABreakerEnemy` loot roll (`RollRarity`) | yes |
 | Affix | PhysicalDamageReduction | `UBreakerCombatComponent::ReceiveDamage` | yes |
 | Affix | ElementalDamageReduction | none — no stats field, no consumer, deliberately absent from the pool | **no, reserved for O5** |
 | Affix | CriticalChance | CriticalChance attribute → weapon/Cleave | yes |
 | Affix | CriticalDamage | CriticalMultiplier attribute | yes |
-| Affix | SlideSpeed | `GearSlideSpeedMultiplier()` | yes |
-| Affix | AirControl | `GearAirControlMultiplier()` (steer rate) | yes |
-| Affix | DashCooldownReduction | `GearDashCooldownMultiplier()` | yes |
+| Affix | SlideSpeed | SlideSpeedMultiplier attribute → movement | yes |
+| Affix | AirControl | AirControlMultiplier attribute → steer rate | yes |
+| Affix | DashCooldownReduction | DashCooldownReduction attribute → dash | yes |
 | Affix | WeaponDamage | DamageMultiplier attribute (this pass) | yes |
 | Node | CriticalChance | CriticalChance attribute | yes |
 | Node | CriticalDamage | CriticalMultiplier attribute | yes |
-| Node | MoveSpeed | MoveSpeed attribute **and** `GearMoveSpeedMultiplier()` | yes — see OPEN below |
-| Node | SlideSpeed | `GearSlideSpeedMultiplier()` | yes |
-| Node | AirControl | `GearAirControlMultiplier()` | yes |
+| Node | MoveSpeed | MoveSpeed attribute → `GetComposedMoveSpeedMultiplier()` | yes |
+| Node | SlideSpeed | SlideSpeedMultiplier attribute → movement | yes |
+| Node | AirControl | AirControlMultiplier attribute → steer rate | yes |
 | Node | DodgeChance | `UBreakerCombatComponent` defense state | yes |
 | Node | BlockChance | `UBreakerCombatComponent` defense state | yes |
 | Node | Health | MaxHealth attribute | yes |
@@ -299,15 +301,31 @@ refactor that drops either fails loudly. They stay in the pool.
 affix in the pool rolls it, it lies to nobody — it is left in place, commented,
 for the O5 resistance model.
 
-OPEN: `UBreakerCharacterMovementComponent` still multiplies the gear and tree
-movement multipliers together (`GearMoveSpeedMultiplier()` and friends) rather
-than adding their Increased percentages, which contradicts the rule above.
-That is a movement-layer change and needs an owner ruling. Damage was the same
-bug class and is fixed; movement is the last instance. Related: the composed
-`MoveSpeed` ATTRIBUTE currently has no gameplay consumer at all — the movement
-component caps speed from its own WalkSpeed/SprintSpeed times those
-multipliers — so the correctly-aggregated attribute is only read by tests and
-the same ruling should decide which of the two is authoritative.
+RESOLVED (movement conformance pass): `UBreakerCharacterMovementComponent` no
+longer multiplies the gear and tree movement multipliers together. Slide speed,
+air control and dash cooldown reduction gained aggregated attributes of their
+own, both layers bid raw percentages into them, and the movement component reads
+the composed attributes (`GetComposedMoveSpeedMultiplier()` and friends); the
+private `GearMoveSpeedMultiplier()` helpers are deleted, exactly as
+`GearWeaponDamageMultiplier` was. **This is a felt change** — +20% gear with
++20% tree now reads x1.40 rather than x1.44 — and the before/after table at
+representative investment levels is in `Docs/Movement-Design.md`.
+
+The composed `MoveSpeed` attribute also gained its first gameplay consumer. It
+holds a SPEED, not a multiplier, and `WalkSpeed` is authored `EditAnywhere` on
+the movement component, so the movement component publishes its `WalkSpeed` as
+the attribute's base through
+`UBreakerAttributeSet::SetAggregatedAttributeBase` and reads back
+`composed / base`. An attribute-set constant would have gone stale the moment
+the owner retuned `WalkSpeed`, and a composed speed that disagrees with the
+speed the character actually walks at is the same class of lie the unaggregated
+`DamageMultiplier` was.
+
+`DashCooldownReduction` is stored as a DIVISOR (x1.20 == a 20% shorter
+cooldown), because that is the only shape two layers can share additively. No
+node stat target authors dash cooldown yet, so gear is currently its only
+bidder — the attribute exists so that the first node to add one is additive from
+the day it lands rather than repeating this bug.
 
 ## Gym drops
 

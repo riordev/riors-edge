@@ -62,32 +62,66 @@ Next actions, in priority order:
    stand-ins exist). All of these need the owner: downloading fonts and
    authoring `.uasset`s is editor work.
 3. **Owner decisions, none blocking code:**
-   - **Movement is the LAST multiplicative gear x tree violation.**
-     `GearMoveSpeedMultiplier()` and friends compose percentages
-     multiplicatively against the locked one-additive-bucket rule. Damage was
-     the same bug class and is fixed. Conforming makes +20/+20 read x1.40 not
-     x1.44 — a movement FEEL change, which is why it is a ruling. Related:
-     the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all, and
-     SlideSpeed/AirControl/DashCooldown never reach the attribute set.
+   - **The endgame power source. This is the biggest open question in the
+     project.** Power-Curve §1 claims drop item level is what keeps gear
+     improving past the level cap; `GetDropItemLevel` clamps to 50 because
+     affix tiers are only authored that far, while the chassis climbs to area
+     level 100. Measured by `RiorsEdge.Combat.PowerCurve.EndgameClamp`: the
+     baseline TTK swing from area level 50 to 100 is **74x with nothing to
+     answer it**. The 8.7x build band is the price of entry at 50, not
+     progression past it. Five options with their costs are tabulated at the
+     end of `Docs/Design/Power-Curve.md`; two of them collide with the locked
+     "no post-cap character power" rule and would need an O-ledger amendment.
+   - **Movement's multiplicative gear x tree violation is CONFORMED — judge
+     the feel.** It was the last one. +20% gear with +20% tree now reads
+     x1.40 rather than x1.44, so movement is measurably slower at HIGH
+     investment and bit-identical when only one layer is invested (sprint at
+     +20/+20: 1584 -> 1540 cm/s, -2.8%; at +30/+24, -4.5%). Nothing was
+     retuned; only the composition changed. Full before/after table in
+     `Docs/Movement-Design.md`. If it feels wrong the fix is to retune the
+     CONTENT (affix ranges, node percentages), not to put the multiplication
+     back.
    - **Subclass commitment.** The branch strip browses; committing needs a
      branch field on the progression state or tree, a one-way setter with a
      permanence-or-Forge rule, save versioning, and a ruling on whether
      unselected branches become unpurchasable — which collides with O15.
-   - **Swift's third jump** (O25) is unimplemented and needs a kit design:
-     when it unlocks and whether it is free.
+   - **Swift's third jump** (O25) is BUILT as a mechanism; the THRESHOLD is
+     still the open ruling. `SwiftThirdJumpUnlockLevel` is an EditAnywhere
+     O2 PLACEHOLDER at character level 20, free. Nothing raises
+     `CharacterLevel` yet, so at 20 it is unreachable in the gym — set it to 1
+     to feel it. Decisions.md still records the third jump as unbuilt; that
+     file is append-only and owner-only, so it needs an entry from you.
    - Overdrive's +25% damage window is a 4th More against the O3 budget of 3
      (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
      page, which gates Damage-Pipeline sign-off and also decides whether
      recoil should be client-predicted; the held items in Decisions.md.
 4. **Content gaps that are content, not code:**
-   - **Swift's FRENZY branch is unauthored.** Class-Kits 1.3-1.5 names
-     Frenzy / Kinetic / Marksman; only two exist in
-     `UBreakerProgressionLibrary`, so the branch strip shows two chips.
+   - Swift's FRENZY branch and the ELEMENTS constellation are now AUTHORED
+     (10 and 6 nodes). Frenzy carries the Redline condition, which gives the
+     three Swift branches three distinct conditions — airborne/wall/slide,
+     unconditional, Redline — so the branch strip is a choice rather than a
+     preference. Every Class-Kits §1.3 node is a Momentum-LOOP rewrite and the
+     loop is not a node stat target, so each ships the doc rule as a tag plus
+     an authored stat line; §1.3.1 tabulates which half is which.
+   - **`EBreakerBuildCondition` is movement-only, and that has now blocked
+     content twice.** It cost Elements its More multiplier (the only
+     authorable form would have been an unconditional generalist strictly
+     better than Fixate and Barrage) and it is why no node can key off combat
+     or status state. Widening it is cheap and unblocks a whole axis.
+   - **Elements is pre-resistance and therefore overlaps Affliction.** There
+     is no resistance stat, no buildup track and no reaction matrix, so its
+     nodes pay in DoT and damage with the elemental rule carried as a tag.
+     E10 Resonance is deliberately unauthored: with no elements in the
+     pipeline its restriction half cannot exist, so it could only ship as
+     pure upside.
    - Caster's Rot / Siphon / Fracture / Resonance need Combat/ systems that
      do not exist (zones, partial healing, a projectile base, status
      consumption). Overdrive keystone branch stubs and the inert node tags
-     (ledger in `BreakerAbilityStateComponent.h`).
-   - Elements constellation has no nodes; the cluster renders sealed.
+     (ledger in `BreakerAbilityStateComponent.h`). NOTE: node tags now publish
+     to the ASC as diffed loose tags, so Bloodrhythm is the first branch
+     keystone whose ultimate rewrite actually resolves; Overpressure and
+     Culling still carry no keystone tag, leaving Terminal Velocity and
+     Standing Wave unreachable.
 5. **Real gym map authored in-editor.** The stock First Person template
    geometry still crowds the runtime-spawned field, and the owner has now
    twice reported that the SPACE reads wrong ("walk speed feels weird but i
@@ -230,7 +264,39 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - A parallel design sprint produced nine docs under `Docs/Design/` (class kits, constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, synthesis overview). `Design-Overview.md` §7 is the ranked owner-decision list; consult it before authoring content in any of those domains.
 - `UBreakerStatusComponent` runs snapshot Bleed/Poison DoTs with stack caps; gym enemies grant rolled loot to the player's backpack on death.
 - Five weapon archetypes exist (Rifle, SMG, Sniper, Shotgun, Rocket); Rocket is a replicated projectile (`ABreakerRocketProjectile`) with radial falloff damage that ignores its instigator pending the self-damage design pass. Loadout slots carry assignable archetypes (`SetSlotArchetype`), picked from the loadout screen.
-- Gear multipliers are consumed by `UBreakerCharacterMovementComponent` (move/slide speed, air control via steer rate, dash cooldown) — affixes now change moment-to-moment movement.
+- MOVEMENT IS CONFORMED TO THE ONE-ADDITIVE-BUCKET RULE, and it is a FELT
+  change. `UBreakerCharacterMovementComponent` used to multiply the gear
+  multiplier by the tree multiplier for move speed, slide speed, air control and
+  dash cooldown, so +20/+20 read x1.44 against a locked x1.40 — the last
+  instance of the bug class the damage pass fixed. `EBreakerAggregatedAttribute`
+  gained `SlideSpeedMultiplier`, `AirControlMultiplier` and
+  `DashCooldownReduction` (base 1.0, replicated, both layers bid raw
+  percentages); the movement component now reads the composed ATTRIBUTES
+  (`GetComposedMoveSpeedMultiplier()` and friends) and the private
+  `GearMoveSpeedMultiplier()` helpers are deleted. The composed `MoveSpeed`
+  attribute, previously written by the aggregator and read by NOBODY, is its
+  first consumer: the movement component publishes its EditAnywhere `WalkSpeed`
+  as that attribute's base (`SetAggregatedAttributeBase`) and reads back
+  composed/base, so the attribute genuinely is the character's walk speed
+  instead of a stale 650 constant. Sprint at +20/+20 goes 1584 -> 1540 cm/s
+  (-2.8%); one-layer-only builds are bit-identical. Dash cooldown is unchanged
+  today because no node target authors it — the attribute exists so the first
+  one that does is additive from day one. Before/after table in
+  `Docs/Movement-Design.md`. Never playtested.
+- SWIFT'S THIRD JUMP EXISTS (O25). Two jumps stay base kit for every class
+  (`BaseJumpCount`, written onto `ACharacter::JumpMaxCount` at runtime); Swift
+  alone gets a third, gated on `SwiftThirdJumpUnlockLevel` (EditAnywhere,
+  **O2 PLACEHOLDER 20, free** — the threshold is still an open owner ruling; the
+  MECHANISM is what shipped). The grant reads the permanent class from
+  `UBreakerProgressionComponent`, recomputes on `OnProgressionChanged` AND polls
+  the live state from the tick as a backstop (the Mana component's pattern), and
+  a swap away from Swift returns two jumps and clamps `JumpCurrentCount`
+  immediately. The third jump is a course correction, not a repeat: it rotates
+  horizontal velocity partway onto input with magnitude preserved exactly
+  (`SwiftThirdJumpRedirectAlpha`, O2 PLACEHOLDER 0.55), vertical untouched.
+  Nothing raises `CharacterLevel`, so at threshold 20 it is unreachable in the
+  gym — set it to 1 to feel it. Covered by `RiorsEdge.Movement.JumpGrant`,
+  `RiorsEdge.Movement.AdditiveComposition`, `RiorsEdge.Movement.ComposedAttributes`.
 - MOVEMENT WEIGHT PASS (owner: "movement should be less floaty"): the jump arc is now asymmetric and the character has landing consequence. `GravityScale` 1.35 -> 1.60, a continuous gravity curve (`ApexGravityMultiplier` 1.50 at the apex, `FallGravityMultiplier` 1.80 once falling) applied inside `NewFallVelocity`, a 2400 cm/s terminal velocity, variable jump height (release cuts the rise to 55%, driven by `JumpHoldWindow` written onto `ACharacter::JumpMaxHoldTime` at BeginPlay with the engine's hold-to-rise suppressed in `DoJump`), a landing horizontal-speed ramp in `ProcessLanded` with an `OnLandingImpact` presentation delegate, and quicker ground stops (braking 1800 -> 2400, friction 7.5 -> 8.5). No verb changed. Wall ride is exempt from the fall curve; dash clears the cut; a queued slide is exempt from the landing cost. Jump impulse, air control and air steer rate are deliberately unchanged. All values are `EditAnywhere` under the **Weight** category with old values in comments; the before/after table, the revert list and the tuning order live in `Docs/Movement-Design.md`. NOT PLAYTESTED — automation and arithmetic only.
 - Save/resume exists: `UBreakerSaveGame` (slot `BreakerSave0`) stores progression state, equipped items, backpack, and weapon slot archetypes; autoloaded in character BeginPlay, autosaved in EndPlay and on class lock.
 - Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
@@ -284,7 +350,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 ## Verification status
 
-The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 114-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
+The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8. The 117-test project automation suite passes on Windows (run headless: `UnrealEditor-Cmd.exe <project> -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`, then grep the log for `Result={Fail}`). NOTE: builds fail with "Live Coding is active" while the editor is open — close it (or Ctrl+Alt+F11 in-editor) before running Build.bat. A live Windows startup loads `Lvl_FirstPerson`, selects `BreakerGameMode`, uses the `BP_BreakerCharacter` C++ child, opens on the title menu, and exposes the Playtest Gym HUD, targets, enemies, two-slot weapon loadout, reset, report, diagnostics, pause, settings, and loadout controls. Generated build folders are intentionally ignored by Git.
 
 When C++ changes are made, verify with Unreal Build Tool on the relevant platform. Do not claim editor behavior has been playtested unless it actually has been tested in Play In Editor or a packaged build.
 
@@ -369,7 +435,7 @@ The user's future affix system is intentionally different from the Godot attachm
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
-- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 114 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; 117 pass. NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
 - Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
 - `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
 - The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after green tests. All work to date is committed and pushed through addfd85.

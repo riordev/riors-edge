@@ -483,6 +483,17 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MoveSpeed)]);
+        // Slide speed and air control join gear's percentages in the same
+        // additive bucket, exactly as move speed already did. Until this
+        // existed the movement component multiplied the tree multiplier by the
+        // gear multiplier, so +20/+20 read x1.44 against a locked x1.40.
+        //
+        // There is deliberately NO dash-cooldown line here: EBreakerNodeStatTarget
+        // has no dash entry, so no node can author one. The attribute exists and
+        // gear bids into it; a tree dash node only needs the enum entry and one
+        // line here, and it will be additive from the first day it exists.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::SlideSpeedMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::SlideSpeed)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AirControl)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
         if (!FMath::IsNearlyEqual(DamageMoreProduct, 1.0f))

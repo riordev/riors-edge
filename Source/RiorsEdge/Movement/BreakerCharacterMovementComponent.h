@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Progression/BreakerProgressionTypes.h"
 #include "BreakerCharacterMovementComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWallRideStateChanged, bool, bNowWallRiding);
@@ -68,6 +69,28 @@ public:
     // credit a dash exactly once.
     UFUNCTION(BlueprintPure, Category="Movement") float GetLastDashTime() const { return static_cast<float>(LastDashTime); }
 
+    // --- Composed movement stats (the locked one-additive-bucket rule) -----
+    // These four used to multiply the gear multiplier by the tree multiplier,
+    // which made +20% gear and +20% tree read x1.44 against a rule that says
+    // x1.40. They now read the composed ATTRIBUTE, which is where both layers
+    // bid into one additive Increased bucket. The attribute set is the single
+    // source of truth; the additive fallback below only runs for a movement
+    // component with no attribute set at all (a bare test object).
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedMoveSpeedMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedSlideSpeedMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedAirControlMultiplier() const;
+    // Cooldown SCALE, so 0.80 is a 20% shorter dash cooldown. The attribute
+    // stores the reduction (x1.20) because that is the shape an additive
+    // bucket can hold; this is its reciprocal, which is what the dash wants.
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetComposedDashCooldownMultiplier() const;
+
+    // --- Jump budget (ruling O25) ------------------------------------------
+    // Two jumps for everyone, a third for Swift. Recomputed from the PERMANENT
+    // class on OnProgressionChanged and polled as a backstop, so a dev class
+    // swap can never strand a non-Swift character with three jumps.
+    UFUNCTION(BlueprintPure, Category="Movement|Jump") int32 GetGrantedJumpCount() const { return GrantedJumpCount; }
+    UFUNCTION(BlueprintCallable, Category="Movement|Jump") void RefreshJumpGrant();
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 700.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1100.0f;
 
@@ -116,6 +139,40 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0")) float LandingHeavyFallSpeed = 950.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="1")) float LandingMaxFallSpeed = 2400.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weight", meta=(ClampMin="0", ClampMax="1")) float LandingMinimumSpeedScale = 0.78f;
+
+    // --- Jump budget (ruling O25) ------------------------------------------
+    // "TWO JUMPS are base kit for everyone and Swift innately unlocks a third
+    // later — innate to the class, not a tree purchase." Before this the count
+    // was a single constant on ABreakerCharacter and the third jump did not
+    // exist in any form. The MECHANISM is what this change delivers; the
+    // numbers below are placeholders.
+
+    // Base kit, every class, every level. Written onto
+    // ACharacter::JumpMaxCount, so this is the one authority on the budget —
+    // a Blueprint override of JumpMaxCount is deliberately overwritten, because
+    // O25 is a rule and not a per-Blueprint preference.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1")) int32 BaseJumpCount = 2;
+    // Master switch. False restores exactly the pre-O25 behaviour (two jumps
+    // for everyone including Swift) with no other change.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump") bool bSwiftThirdJumpEnabled = true;
+    // O2 PLACEHOLDER — THE THRESHOLD IS AWAITING AN OWNER RULING. CONTEXT.md
+    // lists "when it unlocks and whether it is free" as open. 20 and free (no
+    // resource cost, no cooldown, no point spend) is a stand-in chosen so the
+    // grant is visibly a LATER unlock rather than part of the starting kit; it
+    // carries no design authority. What this change delivers is the mechanism:
+    // a class-gated, level-gated jump budget that reacts to a class change.
+    // NOTE for a playtest: nothing raises CharacterLevel yet, so at the shipped
+    // 20 the third jump is unreachable in the gym. Set it to 1 to feel it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1", ClampMax="50")) int32 SwiftThirdJumpUnlockLevel = 20;
+    // O2 PLACEHOLDER. The third jump must not read as "the second jump again".
+    // It blends horizontal velocity toward the current input direction while
+    // PRESERVING its magnitude, so it is a course correction, not a speed
+    // source — Swift's identity is redirection (Skim is the same verb) and
+    // Master 5.4 forbids self-acceleration. 0 makes the third jump identical
+    // to the second; 1 would snap it fully onto input, which reads as a dash.
+    // Deliberately restrained: O26 says movement gets no further dedicated
+    // passes, so this executes O25 and adds nothing else.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="0", ClampMax="1")) float SwiftThirdJumpRedirectAlpha = 0.55f;
 
     // Forgiving Source-style air steering: turns existing momentum toward
     // input without increasing its magnitude or allowing a free reversal.
@@ -185,6 +242,25 @@ public:
     // Multiplicative composition of the active temporary multipliers.
     static float ComposeSpeedMultipliers(const TArray<float>& Multipliers);
 
+    // The locked aggregation rule, expressed over two 1.0-based layer
+    // multipliers that are each already a single additive bucket: the shared
+    // bucket is the SUM of the two fractional parts, so +20% gear and +20% tree
+    // is x1.40. Multiplying them (x1.44) is the bug this replaces — the same
+    // bug class the damage pass fixed when it deleted GearWeaponDamageMultiplier.
+    // Only used when there is no attribute set to read from; the composed
+    // attribute is the real source of truth and produces the same number.
+    static float ComposeAdditiveMultiplier(float LayerA, float LayerB);
+
+    // Jump budget as a pure rule (ruling O25). Two for everyone, three for
+    // Swift at or past the unlock level. Swapping AWAY from Swift returns two,
+    // which is the case that must never be missed: a dev class swap that left
+    // three jumps behind would be a permanent illegal grant.
+    static int32 ResolveJumpCount(EBreakerClassId PermanentClass, int32 CharacterLevel, int32 BaseCount, bool bThirdJumpEnabled, int32 UnlockLevel);
+    // Rotates HorizontalVelocity partway toward Direction, magnitude preserved
+    // exactly. Alpha 0 is a no-op, 1 is a full redirect. A zero or vertical
+    // direction leaves the velocity alone.
+    static FVector BlendHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float Alpha);
+
     // Every non-spatial half of the wall-ride entry decision, lifted out of
     // TickComponent so it can be tested without a world. Only the wall trace
     // itself stays in the component. This verb broke silently once; the rule
@@ -232,17 +308,33 @@ private:
     mutable TMap<FName, FSpeedMultiplierEntry> SpeedMultipliers;
     void PruneSpeedMultipliers() const;
 
-    // Gear-rolled movement multipliers, read from the owner's equipment
-    // component: move/slide speed, air control, dash cooldown.
+    // The composed attribute set is the source of truth for the four movement
+    // stats above. Equipment and progression are still resolved, but only as
+    // the fallback for a component with no attribute set (a bare test object).
+    class UBreakerAttributeSet* GetAttributes() const;
     class UBreakerEquipmentComponent* GetEquipment() const;
-    float GearMoveSpeedMultiplier() const;
-    float GearSlideSpeedMultiplier() const;
-    float GearAirControlMultiplier() const;
-    float GearDashCooldownMultiplier() const;
-    mutable TWeakObjectPtr<class UBreakerEquipmentComponent> CachedEquipment;
-    // Tree-node movement multipliers compose multiplicatively with gear.
     class UBreakerProgressionComponent* GetProgression() const;
+    mutable TWeakObjectPtr<class UBreakerAttributeSet> CachedAttributes;
+    mutable TWeakObjectPtr<class UBreakerEquipmentComponent> CachedEquipment;
     mutable TWeakObjectPtr<class UBreakerProgressionComponent> CachedProgression;
+    // WalkSpeed is authored HERE, not on the attribute set, so the composed
+    // MoveSpeed attribute would otherwise be a number close to the walk speed
+    // but never equal to it. Published once, as soon as the ability system has
+    // actually registered the set (which is after this component's BeginPlay).
+    bool bPublishedMoveSpeedBase = false;
+    void PublishMoveSpeedBase();
+
+    // O25 jump budget. ObservedClass/ObservedLevel are the poll backstop, in
+    // the precedent of UBreakerManaComponent::AdvanceLoop: DevForceClass does
+    // broadcast today, but a grant that can outlive its class is exactly the
+    // kind of thing that must not depend on one caller remembering to.
+    UFUNCTION() void HandleProgressionChanged();
+    int32 GrantedJumpCount = 2;
+    EBreakerClassId ObservedClass = EBreakerClassId::None;
+    int32 ObservedLevel = 0;
+    bool bBoundProgression = false;
+    // Applies the third jump's course correction, if this jump is one.
+    void ApplyBonusJumpRedirect();
 
     bool bWantsToSprint = false;
     bool bSlideRequested = false;
