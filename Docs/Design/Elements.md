@@ -1,6 +1,7 @@
 # The elements — Rift, Entropy, Void
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 **Verified against code on 2026-08-14.** Every implementation claim in this
 document reads true: `EBreakerStatTarget::ElementalDamageReduction` exists at
@@ -14,10 +15,22 @@ six nodes are authored physical-only exactly as §5 of the blocker list
 describes.
 
 Authority: **O5** (per-element resistances, applied after armour and before
-shields) and **O19** (the elements are Rift / Entropy / Void; "Time" is
+shields), **O19** (the elements are Rift / Entropy / Void; "Time" is
 renamed; Void Whisperer IS the Void specialist; Rift damage takes a hotter,
-whiter cyan; **saturated teal is a property of objects, not of damage**).
+whiter cyan; **saturated teal is a property of objects, not of damage**), and
+**O38** (shipping timing — see the ruling stamp immediately below).
 Fiction comes from `Docs/Design/Story-Source.md` §1.5 and §1.6.
+
+> **RULED, NOT PENDING — O38.** Elements' shipping timing is a ruling now, not
+> an author's assumption: **the slice and first release ship five
+> constellations; Elements is designed-not-cut and explicitly POST-SLICE.**
+> This ratifies `Core-Constellations.md`'s existing "plan of record" language
+> and answers `Design-Overview.md`'s open question S1. The affix pool
+> continues to refuse elemental lines until the resistance system lands —
+> that technical gate is unchanged and is detailed in full under "What must
+> be built before any of this ships" below; being blocked on the resistance
+> model is a fact about readiness, not about whether or when this ships.
+> Rift/Entropy/Void naming stands (O19).
 
 Everything below is **AUTHORED** unless marked TRANSCRIBED. Every number is an
 `O2 PLACEHOLDER`.
@@ -187,7 +200,11 @@ Rules the matrix must obey, all of which already exist:
 ## What must be built before any of this ships
 
 Stated plainly because three separate docs currently describe elements as
-BLOCKED and none of them lists the blockers in one place:
+BLOCKED and none of them lists the blockers in one place. **This list is a
+technical-readiness gate, not an open question about shipping timing — O38
+already rules the timing (post-slice, designed-not-cut; see the stamp near
+the top of this document).** What follows is what has to land before that
+already-planned build actually happens:
 
 1. **The resistance model.** O5 places per-element resistance after armour and
    before shields in the damage order. `EBreakerStatTarget::ElementalDamageReduction`
