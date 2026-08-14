@@ -4,7 +4,9 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerStatusComponent.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
@@ -133,6 +135,12 @@ ABreakerEnemy::ABreakerEnemy()
     Attributes = CreateDefaultSubobject<UBreakerAttributeSet>(TEXT("Attributes"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
     Status = CreateDefaultSubobject<UBreakerStatusComponent>(TEXT("Status"));
+    // Every enemy carries the modifier component and the overwhelmingly common
+    // case is an EMPTY one — no halo, no clocks, no cost beyond the object.
+    // Universal rather than opt-in because a modifier must be composable onto
+    // ANY enemy (Encounter-Design §1.0: modifiers are a field of the taxonomy,
+    // not a subclass).
+    ModifierComponent = CreateDefaultSubobject<UBreakerEnemyModifierComponent>(TEXT("Modifiers"));
 }
 
 void ABreakerEnemy::BeginPlay()
@@ -142,6 +150,11 @@ void ABreakerEnemy::BeginPlay()
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
     if (LeashOrigin.IsNearlyZero()) LeashOrigin = GetActorLocation();
+    // Captured once, before anything can have scaled them, so Fleetfoot
+    // multiplies a base rather than compounding on itself.
+    if (BaseMoveSpeed < 0.0f) BaseMoveSpeed = MoveSpeed;
+    if (BaseWeaveStrength < 0.0f) BaseWeaveStrength = WeaveStrength;
+    if (WeakPointVisual) WeakPointBaseScale = WeakPointVisual->GetRelativeScale3D().X;
     // Health was the literal constant 220 here at every level until O27. It is
     // now a function of the area level this monster belongs to.
     ApplyChassis();
@@ -159,10 +172,125 @@ void ABreakerEnemy::ApplyChassis()
 
     if (Attributes)
     {
+        // The modifier count step composes with the archetype ratio and the
+        // rank row rather than replacing either: rank says what a
+        // ModifierBearing enemy is worth, the archetype says what a Lattice is
+        // worth, and the count step is Encounter-Design §1.1's "+0.35x per
+        // modifier beyond the first". Three inputs, one product, no second
+        // source of truth for any of them.
         Attributes->SetMaxHealth(UBreakerMonsterChassisLibrary::GetMonsterHealth(
-            AreaLevel, MonsterRank, Chassis, ArchetypeHealthMultiplier));
+            AreaLevel, MonsterRank, Chassis, ArchetypeHealthMultiplier * ModifierCountHealthMultiplier));
         if (Combat) Combat->RestoreVitals();
     }
+}
+
+float ABreakerEnemy::GetMonsterMaxHealth() const
+{
+    return Attributes ? Attributes->GetMaxHealth() : 0.0f;
+}
+
+bool ABreakerEnemy::UsesCoverDiscipline() const
+{
+    return UBreakerEnemyFamilyLibrary::StageUsesCover(Family, SeveranceStage);
+}
+
+bool ABreakerEnemy::FlinchesWhenHit() const
+{
+    return UBreakerEnemyFamilyLibrary::StageFlinches(Family, SeveranceStage);
+}
+
+int32 ABreakerEnemy::ConfigureWithModifiers(int32 Seed)
+{
+    if (!ModifierComponent) return 0;
+    // The family gate is passed down, so a Vestige never rolls a tactical
+    // modifier and an Altered never rolls an alien-body one.
+    const TArray<EBreakerEnemyModifier> Granted = ModifierComponent->RollAndApplyModifiers(Seed, Family);
+    if (!Granted.IsEmpty())
+    {
+        MonsterRank = UBreakerEnemyModifierLibrary::GetRankForModifierCount(Granted.Num());
+        ModifierCountHealthMultiplier = UBreakerEnemyModifierLibrary::GetModifierCountHealthMultiplier(
+            Granted.Num(), ModifierComponent->Params);
+        ApplyChassis();
+        // The ward is sized off max health, so it has to be re-derived AFTER
+        // the chassis rebuild that the rank promotion just caused.
+        ModifierComponent->SetModifiers(Granted);
+        StateLabel = TEXT("PATROL");
+    }
+    return Granted.Num();
+}
+
+bool ABreakerEnemy::ConfigureWithExactModifiers(const TArray<EBreakerEnemyModifier>& InModifiers)
+{
+    if (!ModifierComponent || !ModifierComponent->SetModifiers(InModifiers)) return false;
+    MonsterRank = UBreakerEnemyModifierLibrary::GetRankForModifierCount(InModifiers.Num());
+    ModifierCountHealthMultiplier = UBreakerEnemyModifierLibrary::GetModifierCountHealthMultiplier(
+        InModifiers.Num(), ModifierComponent->Params);
+    ApplyChassis();
+    ModifierComponent->SetModifiers(InModifiers);
+    return true;
+}
+
+void ABreakerEnemy::SetModifierShield(float Amount)
+{
+    if (!Attributes) return;
+    const float Clamped = FMath::Max(0.0f, Amount);
+    Attributes->SetMaxShield(Clamped);
+    Attributes->SetShield(Clamped);
+}
+
+void ABreakerEnemy::AddModifierShield(float Amount)
+{
+    if (!Attributes || Amount <= 0.0f) return;
+    Attributes->SetShield(FMath::Min(Attributes->GetMaxShield(), Attributes->GetShield() + Amount));
+}
+
+void ABreakerEnemy::ApplyModifierMovementProfile(float SpeedMultiplier, float WeaveStrengthOverride)
+{
+    if (BaseMoveSpeed < 0.0f) BaseMoveSpeed = MoveSpeed;
+    if (BaseWeaveStrength < 0.0f) BaseWeaveStrength = WeaveStrength;
+    MoveSpeed = BaseMoveSpeed * FMath::Max(0.0f, SpeedMultiplier);
+    WeaveStrength = WeaveStrengthOverride >= 0.0f ? WeaveStrengthOverride : BaseWeaveStrength;
+}
+
+void ABreakerEnemy::ApplyModifierSlowToTarget(float SpeedMultiplier, float Duration)
+{
+    AActor* Target = ModifierTrackedTarget.Get();
+    if (!Target || Duration <= 0.0f) return;
+    // Through the movement layer's own keyed push/pop, so the slow composes
+    // with everything else that touches speed and expires on its own clock
+    // instead of needing this enemy to survive long enough to remove it.
+    if (UBreakerCharacterMovementComponent* Movement =
+        Target->FindComponentByClass<UBreakerCharacterMovementComponent>())
+    {
+        Movement->PushSpeedMultiplier(TEXT("Modifier.Anchored"), SpeedMultiplier, Duration);
+    }
+}
+
+void ABreakerEnemy::SetModifierUntargetable(bool bUntargetable)
+{
+    const ECollisionEnabled::Type Mode = bUntargetable
+        ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryOnly;
+    if (BodyHitBox) BodyHitBox->SetCollisionEnabled(Mode);
+    if (WeakPoint) WeakPoint->SetCollisionEnabled(Mode);
+    SetBodyVisible(!bUntargetable);
+}
+
+void ABreakerEnemy::ConfigureAsSplitCopy(int32 InAreaLevel, float HealthFraction)
+{
+    bDropsLoot = false;
+    bRespawns = false;
+    // A copy that chain-detonates would make Splitting a pack-clearing gift.
+    bExplodesOnDeath = false;
+    SetActorScale3D(GetActorScale3D() * 0.7f);
+    // Rank Trash, no modifiers: this is what stops a split from splitting.
+    MonsterRank = EBreakerMonsterRank::Trash;
+    ModifierCountHealthMultiplier = 1.0f;
+    SetAreaLevel(InAreaLevel);
+    if (Attributes)
+    {
+        Attributes->SetHealth(Attributes->GetMaxHealth() * FMath::Clamp(HealthFraction, 0.01f, 1.0f));
+    }
+    StateLabel = TEXT("SPLIT");
 }
 
 void ABreakerEnemy::SetAreaLevel(int32 NewAreaLevel)
@@ -206,12 +334,46 @@ void ABreakerEnemy::ConfigureElite()
     StateLabel = TEXT("ELITE PATROL");
 }
 
-FString ABreakerEnemy::GetEnemyStateLabel() const { return StateLabel; }
+FString ABreakerEnemy::GetEnemyStateLabel() const
+{
+    // The modifier banner rides on the state label the HUD already prints over
+    // every enemy's head. That is deliberate: Encounter-Design §1.2's first
+    // acceptance test is that a modifier is identifiable within 1.5s of the
+    // enemy entering view, and an unannounced modifier is an unfair death
+    // rather than a challenge. Reusing the existing readout means the
+    // announcement cannot be forgotten by a UI pass that does not know about
+    // modifiers, and an unmodified enemy's label is byte-identical to before.
+    FString Label = StateLabel;
+    if (ModifierComponent)
+    {
+        const FString Banner = ModifierComponent->GetBanner();
+        if (!Banner.IsEmpty()) Label = Banner + TEXT("\n") + Label;
+    }
+    // The family line is printed only for the ALTERED. A Vestige is the
+    // baseline and labelling every trash mob "VESTIGE" would be noise; an
+    // Altered is the exception, and Story-Source §1.5's severance stage is
+    // meant to be READABLE, so the stage rides where the player is already
+    // looking. This is also the only place the militia's engage-on-sight
+    // tragedy is visible in gameplay: the readout says what stage it is, and
+    // the player still has to kill it.
+    if (Family == EBreakerEnemyFamily::Altered)
+    {
+        Label = UBreakerEnemyFamilyLibrary::GetFamilyBanner(Family, SeveranceStage) + TEXT("\n") + Label;
+    }
+    return Label;
+}
 
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (!HasAuthority() || bDead || !GetWorld()) return;
+    if (!HasAuthority() || !GetWorld()) return;
+    if (bDead)
+    {
+        // A Volatile corpse still has a fuse to run, and its strobe is the only
+        // warning the player gets. Everything else about a dead enemy stops.
+        if (ModifierComponent) ModifierComponent->AdvanceModifiers(DeltaSeconds);
+        return;
+    }
 
     ABreakerCharacter* NearestPlayer = nullptr;
     float NearestDistanceSq = TNumericLimits<float>::Max();
@@ -231,6 +393,16 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     if (NearestPlayer && GameMode && GameMode->IsInSafeZone(NearestPlayer->GetActorLocation()))
     {
         NearestPlayer = nullptr;
+    }
+
+    // The modifier layer's only view of the world: a bare AActor* whose
+    // POSITION it may read. It never learns what class this is, let alone what
+    // level or gear it carries (O27).
+    ModifierTrackedTarget = NearestPlayer;
+    if (ModifierComponent)
+    {
+        ModifierComponent->SetTrackedTarget(NearestPlayer);
+        ModifierComponent->AdvanceModifiers(DeltaSeconds);
     }
 
     const float Distance = FMath::Sqrt(NearestDistanceSq);
@@ -325,23 +497,56 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
         OutDirection = (ToPlayer + Lateral * Weave).GetSafeNormal2D();
     }
 
-    // (c) Committed lunge: once inside LungeRange, a short burst straight
-    // at the player on a cooldown. Telegraphed via StateLabel so the
-    // playtest HUD shows the tell.
-    const bool bLungeActive = (Now - LungeStartTime) < LungeDuration;
-    if (bLungeActive)
+    // (c) SKITTER's committed leap (Encounter-Design §2.1). Three stages:
+    // wind-up, committed burst, cooldown.
+    //
+    // What changed from the shipping version, and why: the lunge had no
+    // wind-up and re-solved its direction every frame, so it TRACKED the player
+    // through the whole burst. That made it unanswerable by movement — there
+    // was nothing to step out of — and O1 leaves the player no other defensive
+    // input. §2.1 is explicit that "the leap direction is locked at wind-up —
+    // it cannot track", and that the wind-up EXPOSES the weak point, so the
+    // correct answer becomes "step sideways and shoot the thing it just showed
+    // you". Both halves are now real.
+    const bool bLungeActive = !bLungeWindingUp && (Now - LungeStartTime) < LungeDuration;
+
+    if (bLungeWindingUp)
+    {
+        // Crouched and slow. It has already chosen where it is going.
+        OutSpeedScale = LungeWindupMoveScale;
+        OutDirection = ToPlayer;
+        StateLabel = TEXT("WIND-UP");
+        if (WeakPointVisual)
+        {
+            const float Alpha = LungeWindupSeconds > 0.0f
+                ? FMath::Clamp(static_cast<float>(Now - LungeWindupStartTime) / LungeWindupSeconds, 0.0f, 1.0f)
+                : 1.0f;
+            WeakPointVisual->SetRelativeScale3D(FVector(
+                FMath::Lerp(WeakPointBaseScale, WeakPointBaseScale * LungeWeakPointSwell, Alpha)));
+        }
+        if ((Now - LungeWindupStartTime) >= LungeWindupSeconds)
+        {
+            bLungeWindingUp = false;
+            LungeStartTime = Now;
+            // THE COMMITMENT. Locked here, once, and never touched again for
+            // the duration of the burst.
+            LungeLockedDirection = ToPlayer;
+            if (WeakPointVisual) WeakPointVisual->SetRelativeScale3D(FVector(WeakPointBaseScale));
+        }
+    }
+    else if (bLungeActive)
     {
         OutSpeedScale = LungeSpeedMultiplier;
-        OutDirection = ToPlayer;   // no weave mid-commit
+        OutDirection = LungeLockedDirection.IsNearlyZero() ? ToPlayer : LungeLockedDirection;
         StateLabel = TEXT("LUNGE");
     }
     else if (Distance <= LungeRange && Distance > AttackRange
         && (Now - LungeStartTime) >= (LungeDuration + LungeCooldown))
     {
-        LungeStartTime = Now;
-        OutSpeedScale = LungeSpeedMultiplier;
-        OutDirection = ToPlayer;
-        StateLabel = TEXT("LUNGE");
+        bLungeWindingUp = true;
+        LungeWindupStartTime = Now;
+        OutSpeedScale = LungeWindupMoveScale;
+        StateLabel = TEXT("WIND-UP");
     }
 }
 
@@ -357,6 +562,9 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     Damage.SetInstigator(this);
     TargetCombat->ReceiveDamage(Damage);
     LastAttackTime = GetWorld()->GetTimeSeconds();
+    // Anchored's slow and Cascading's hazard both hang off a LANDED hit rather
+    // than a swing, so a whiff costs the player nothing.
+    if (ModifierComponent) ModifierComponent->NotifyAttackLanded(TargetPawn->GetActorLocation());
 }
 
 void ABreakerEnemy::SetBodyVisible(bool bVisible)
@@ -370,6 +578,17 @@ void ABreakerEnemy::SetBodyVisible(bool bVisible)
 
 void ABreakerEnemy::HandleDeath()
 {
+    // WAKEFUL runs first, and it runs by an explicit call rather than by
+    // binding OnDeath alongside this handler. Delegate broadcast order is
+    // registration order, which is an accident of component initialisation and
+    // not a contract — and a modifier that SUPPRESSES a death cannot be allowed
+    // to run after the death has already dropped loot and fed the TTK sample.
+    if (ModifierComponent && ModifierComponent->TryConsumeWakefulRevive(bLastHitWasWeakPoint))
+    {
+        EnterWakefulDowned();
+        return;
+    }
+
     bDead = true;
     StateLabel = TEXT("DEAD");
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -415,13 +634,60 @@ void ABreakerEnemy::HandleDeath()
         EngagedSeconds = 0.0f;
     }
 
+    // Volatile's fuse and Splitting's copies. After the loot and the TTK
+    // sample, because the kill is real — these are what the corpse does next.
+    if (HasAuthority() && ModifierComponent) ModifierComponent->NotifyOwnerDied();
+
     if (bRespawns) GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
-    else SetLifeSpan(2.0f);
+    // Long enough for a Volatile fuse to finish before the actor goes away. The
+    // old 2.0s was already comfortably past the 1.2s placeholder fuse; this
+    // makes the dependency explicit instead of a coincidence.
+    else SetLifeSpan(FMath::Max(2.0f,
+        ModifierComponent && ModifierComponent->HasModifier(EBreakerEnemyModifier::Volatile)
+            ? ModifierComponent->Params.VolatileFuseSeconds + 1.0f : 0.0f));
+}
+
+void ABreakerEnemy::EnterWakefulDowned()
+{
+    // Down, not dead: no loot, no ammo, no chain detonation, no TTK sample, and
+    // the enemy is NOT marked bDead — the kill has not happened yet.
+    StateLabel = TEXT("DOWNED");
+    if (BodyCollision) BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (BodyHitBox) BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (WeakPoint) WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SetBodyVisible(false);
+
+    const float Delay = ModifierComponent ? ModifierComponent->GetWakefulReviveDelay() : 4.0f;
+    FTimerHandle ReviveTimer;
+    GetWorldTimerManager().SetTimer(ReviveTimer, this, &ThisClass::FinishWakefulRevive,
+        FMath::Max(0.01f, Delay), false);
+}
+
+void ABreakerEnemy::FinishWakefulRevive()
+{
+    const float Fraction = ModifierComponent ? ModifierComponent->GetWakefulReviveHealthFraction() : 0.35f;
+    if (BodyCollision) BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    if (BodyHitBox) BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    if (WeakPoint) WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    SetBodyVisible(true);
+    if (Combat) Combat->RestoreVitals();
+    if (Attributes) Attributes->SetHealth(Attributes->GetMaxHealth() * Fraction);
+    // The ward does NOT come back with it: a Wakeful Warded enemy would be two
+    // full health bars twice, which is exactly the durability stacking §1.3's
+    // three-modifier rule exists to prevent.
+    if (Attributes && ModifierComponent && ModifierComponent->HasModifier(EBreakerEnemyModifier::Warded))
+    {
+        Attributes->SetShield(0.0f);
+    }
+    StateLabel = TEXT("RISEN");
 }
 
 void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
 {
     if (!GetWorld() || (Result.HealthDamage <= 0.0f && Result.ShieldDamage <= 0.0f)) return;
+    // Wakeful denies its revive to a weak-point killing blow, so the LAST hit's
+    // weak-point flag has to survive until HandleDeath reads it.
+    bLastHitWasWeakPoint = Result.bWeakPoint;
     const double Now = GetWorld()->GetTimeSeconds();
     if (FirstDamageTime < 0.0) FirstDamageTime = Now;
     if (LastDamageEventTime >= 0.0)

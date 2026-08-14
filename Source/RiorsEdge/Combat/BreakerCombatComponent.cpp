@@ -48,6 +48,17 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // Flat strippers (Rot, Disruptor) come off here, clamped at zero: negative
     // armour would invert the mitigation formula into a damage bonus.
     Defense.Armor = GetEffectiveArmor();
+    // Facing-dependent armour (Encounter-Design §7). Applied AFTER the flat
+    // strippers and before the mitigation curve, so a Rot puddle and a flank
+    // compose the way a player would expect rather than fighting over the same
+    // number. Off by default (multiplier 1.0), so nothing that has not opted in
+    // can change.
+    if (Request.bHasSourceLocation && !FMath::IsNearlyEqual(RearArcArmorMultiplier, 1.0f))
+    {
+        Defense.Armor *= UBreakerDamageLibrary::GetFacingArmorMultiplier(
+            GetOwner()->GetActorForwardVector(), GetOwner()->GetActorLocation(),
+            Request.SourceLocation, RearArcArmorMultiplier, RearArcCosine);
+    }
     // Gear-rolled physical damage reduction folds into the incoming
     // multiplier so the resolution order stays single-path.
     if (Request.DamageFamily == EBreakerDamageFamily::Physical)
@@ -94,14 +105,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     return Result;
 }
 
-void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result) const
+void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
 {
     AActor* Dealer = Request.Instigator.Get();
-    // Self-damage would otherwise let a listener that deals damage on hit
-    // re-enter its own dealer component without bound.
-    if (!Dealer || Dealer == GetOwner()) return;
-    UBreakerCombatComponent* DealerCombat = Dealer->FindComponentByClass<UBreakerCombatComponent>();
-    if (!DealerCombat) return;
 
     FBreakerHitContext Context;
     Context.Instigator = Dealer;
@@ -112,8 +118,31 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.DamageFamily = Request.DamageFamily;
     Context.WorldLocation = GetOwner() ? GetOwner()->GetActorLocation() : Request.SourceLocation;
 
+    // Victim side first, and unconditionally: a hit with no instigator at all
+    // (an environmental hazard, a test) is still a hit the victim took, and the
+    // Reflective modifier's "there is nobody to answer" case has to be a live
+    // broadcast with a null Instigator rather than silence.
+    OnDamageTaken.Broadcast(Context);
+
+    // Self-damage would otherwise let a listener that deals damage on hit
+    // re-enter its own dealer component without bound.
+    if (!Dealer || Dealer == GetOwner()) return;
+    UBreakerCombatComponent* DealerCombat = Dealer->FindComponentByClass<UBreakerCombatComponent>();
+    if (!DealerCombat) return;
+
     DealerCombat->OnHitDealt.Broadcast(Context);
     if (Result.bKilled) DealerCombat->OnKillDealt.Broadcast(Context);
+}
+
+bool UBreakerCombatComponent::IsRearArcHit(const FVector& SourceLocation) const
+{
+    if (!GetOwner()) return false;
+    // Asks the same pure function the damage path asks, with a rear multiplier
+    // of zero, so "did that land on the seams" can never disagree with what the
+    // armour step actually did.
+    return UBreakerDamageLibrary::GetFacingArmorMultiplier(
+        GetOwner()->GetActorForwardVector(), GetOwner()->GetActorLocation(),
+        SourceLocation, 0.0f, RearArcCosine) < 1.0f;
 }
 
 void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds)

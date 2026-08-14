@@ -6,6 +6,25 @@ float UBreakerDamageLibrary::CalculateArmorMitigation(float Armor, float ArmorPe
     return FMath::Clamp(EffectiveArmor / (EffectiveArmor + 100.0f), 0.0f, 0.80f);
 }
 
+float UBreakerDamageLibrary::GetFacingArmorMultiplier(const FVector& Forward, const FVector& SelfLocation,
+    const FVector& SourceLocation, float RearArmorMultiplier, float RearCosine)
+{
+    // A multiplier of exactly 1 is the off switch and must never cost a
+    // normalise: every hit in the game runs through this.
+    if (FMath::IsNearlyEqual(RearArmorMultiplier, 1.0f)) return 1.0f;
+
+    // Facing is a 2D question. A player who gets above an enemy has not
+    // flanked it, and letting Z into the dot would say they had.
+    const FVector2D Facing(Forward.X, Forward.Y);
+    const FVector2D ToSource(SourceLocation.X - SelfLocation.X, SourceLocation.Y - SelfLocation.Y);
+    if (Facing.IsNearlyZero() || ToSource.IsNearlyZero()) return 1.0f;
+
+    const float Dot = FVector2D::DotProduct(Facing.GetSafeNormal(), ToSource.GetSafeNormal());
+    // Dot > threshold means the source is in FRONT: full armour. Below it, the
+    // source is on the flank or behind and the arc applies.
+    return Dot > FMath::Clamp(RearCosine, -1.0f, 1.0f) ? 1.0f : FMath::Max(0.0f, RearArmorMultiplier);
+}
+
 FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRequest& Request, const FBreakerDefenseState& Defense)
 {
     FBreakerDamageResult Result;

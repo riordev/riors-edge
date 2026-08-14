@@ -184,6 +184,22 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     }
 }
 
+bool ABreakerRangedEnemy::CommandVolley()
+{
+    if (!GetWorld() || !HasAuthority() || IsDeadEnemy()) return false;
+    // Already committed: a doubled order must not restart the wind-up, because
+    // restarting it would RESET the tell the player is already reading and
+    // effectively shorten the warning to nothing.
+    if (bWindingUp) return false;
+    bWindingUp = true;
+    WindupStartTime = GetWorld()->GetTimeSeconds();
+    // The ordinary cadence gate is bypassed — that is the point of the order —
+    // but the telegraph is not. StateLabel says ORDERED rather than AIMING so
+    // the player can tell a commanded volley from a routine one.
+    StateLabel = TEXT("ORDERED");
+    return true;
+}
+
 void ABreakerRangedEnemy::FireVolley(const AActor* Target)
 {
     UWorld* World = GetWorld();

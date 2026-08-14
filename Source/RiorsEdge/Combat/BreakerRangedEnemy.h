@@ -37,6 +37,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged") EBreakerRangedBand GetBand() const { return Band; }
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged") bool IsWindingUp() const { return bWindingUp; }
 
+    // THE FIELD MARSHAL's FIRE order (Encounter-Design §3.4 phase 2): "both
+    // Lattices volley simultaneously at the player's position, ignoring their
+    // own cadence."
+    //
+    // It starts a WIND-UP rather than firing immediately, and that is the
+    // load-bearing decision. Firing on command would mean six projectiles
+    // appearing with no tell, which O1's passive defence has no answer to and
+    // which §0 forbids. Commanding the wind-up instead makes the boss's own
+    // 2.0s apparatus raise the FIRST half of the telegraph and the Lattices'
+    // 0.85s emitter bloom the second — the player who reads the raise has over
+    // two and a half seconds to leave the spot the volley converges on.
+    //
+    // Returns false if it was already winding up, so a doubled order cannot
+    // restart and thereby SHORTEN a tell already in progress.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Ranged")
+    bool CommandVolley();
+
     // --- Engagement band (O2 PLACEHOLDER) ----------------------------------
     // The archetype's whole identity. Inside [Min, Max] it strafes and shoots;
     // beyond Max it advances; inside Min it backs off. Encounter-Design §2.2

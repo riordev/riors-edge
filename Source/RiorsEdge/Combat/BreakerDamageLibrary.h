@@ -17,6 +17,19 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat|Damage")
     static float CalculateArmorMitigation(float Armor, float ArmorPenetration);
 
+    // Facing-dependent armour, Encounter-Design §7. Pure and world-free for the
+    // same reason ResolveDamage is: "is this hit in the rear arc" is geometry,
+    // and geometry with an actor in it is geometry nobody can test.
+    //
+    // Returns the multiplier to apply to armour BEFORE the mitigation step, so
+    // a rear multiplier of 0 means the hit lands on unarmoured flesh and a
+    // multiplier of 1 means the arc did nothing. RearCosine is the cosine of
+    // the boundary: 0 splits front from back exactly, positive values widen the
+    // vulnerable arc onto the flanks.
+    UFUNCTION(BlueprintPure, Category="Combat|Damage")
+    static float GetFacingArmorMultiplier(const FVector& Forward, const FVector& SelfLocation,
+        const FVector& SourceLocation, float RearArmorMultiplier, float RearCosine);
+
     UFUNCTION(BlueprintPure, Category="Combat|Status")
     // Instigator is the actor that applied the status; it is carried weakly on
     // the tick request so attacker-side hit events fire for DoT damage too.
