@@ -42,6 +42,14 @@ Vocabulary after O8:
 
 ---
 
+**Campaign consumer.** `Docs/Design/Campaign-And-Story.md` (reconciled against
+O28) consumes the rift skeleton (§3.2), the eight objective archetypes (§3.4),
+the closing ritual (§3.5) and the Frontier handoff (§4) to author the story
+mission list. It authors no mode value. It also records one collision this
+document does not: the SEAL ending closes every rift permanently while the
+Frontier is a rift-shaped mode the player runs afterwards — see that document's
+§5.2 and OPEN QUESTION 1.
+
 ## 2. Content type map
 
 | Mode | Players | Instanced | Repeatable | Primary reward | Nearest-term |

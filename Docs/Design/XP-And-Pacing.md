@@ -11,6 +11,16 @@ O9 (§5.1 Rank vocabulary), O18 (§3 TTK/TTD seed targets), and O23 (§5.1
 Veteran flag). No new numeric values were authored — O2 freeze. The O18 figures
 are recorded verbatim as an owner ruling, not authored here.
 
+**Campaign consumer.** `Docs/Design/Campaign-And-Story.md` (reconciled against
+O28) consumes this document's act bands, the §7 Core Point list (CANON [O7]) and
+the §8 area-level rule to author the story mission list. It authors no curve
+value and changes nothing here; where it needed a reading rather than a change,
+it is labelled RECONCILED there. Two such readings are worth knowing about while
+reading §7: entry #2 (First Forge interaction) is read as first *respec*, and
+entry #14 (the Survivor) is read as *bring them to an Anchor* at 44, with the
+first meeting happening in early Act III per Master §13.5. Neither reading moves
+a row.
+
 This document resolves four items marked OPEN in the master sheet:
 
 - Progression 7.11 — "Experience curve shape — flat, accelerating, or plateauing near 30"
