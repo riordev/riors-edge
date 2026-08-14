@@ -190,6 +190,31 @@ namespace BreakerUI
 
     inline constexpr float HudCrosshairBox = 80.0f;
 
+    // --- Minimap (UI-HUD-Spec section 6) -----------------------------------
+    // LANDSCAPE, and that is the whole design decision. Level-Design section 5
+    // gives the field a 25000 cm long axis against roughly 8000 cm of occupied
+    // width, with every station strung along the spawn-forward axis. A square
+    // minimap over that field spends most of its area on empty flank, so the
+    // plate is 320x176 — a 1.82:1 window whose long side is the field's long
+    // side, and the map is FIELD-ALIGNED (forward = right) rather than
+    // rotating, because a rotating map throws that alignment away every time
+    // the player turns.
+    //
+    // Both dimensions are on the 8px grid (40 and 22 cells).
+    inline constexpr float HudMinimapWidth = 320.0f;
+    inline constexpr float HudMinimapHeight = 176.0f;
+    // Centimetres of world per SPEC pixel. 56 puts the half-window at 8960 cm
+    // forward and 4928 cm lateral, which is chosen so the encounter pocket
+    // (8500 cm out) is on the map from the safe ring rather than one pixel off
+    // its edge, and so one 8px grid step is 448 cm — near enough a combat
+    // pocket's quarter-radius to be a usable unit.
+    inline constexpr float HudMinimapCmPerPixel = 56.0f;
+    // Graticule pitch, in world cm. The combat pocket radius, so the grid is a
+    // statement about fighting distance rather than an arbitrary ruler.
+    inline constexpr float HudMinimapGridCm = 2000.0f;
+    inline constexpr float HudMinimapBlipSize = 5.0f;
+    inline constexpr float HudMinimapPlayerSize = 9.0f;
+
     // Damage number sizes, section 4 of the HUD spec.
     // The spec's 40/64/80 were authored for a 1920x1080 mock viewed at desk
     // distance. In the game they cover the target you are shooting at, which

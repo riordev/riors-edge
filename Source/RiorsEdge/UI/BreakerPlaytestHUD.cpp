@@ -214,6 +214,8 @@ void ABreakerPlaytestHUD::DrawHUD()
     // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
 
+    TickCapturePreview(Character);
+
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
     const UBreakerPlaytestComponent* Playtest = Character->GetPlaytest();
     const bool bRecentShot = Weapon && Weapon->GetSecondsSinceLastShot() < 0.14f;
@@ -238,21 +240,57 @@ void ABreakerPlaytestHUD::DrawHUD()
     const float RestingCrosshairSize = bAiming ? 4.0f : 8.0f;
     DrawCrosshair(Center, BreakerUI::TextPrimary,
         S(bRecentShot ? 12.0f : RestingCrosshairSize), S(bRecentShot ? 2.5f : 1.5f));
-    if (bRecentShot && Shot && Shot->bHit)
+    // The preview forces the hit marker on, because the absorbed tick state is
+    // the single most important mark in this pass and nothing in a headless run
+    // pulls a trigger to produce one.
+    const bool bPreviewHit = IsCapturePreview();
+    if ((bRecentShot && Shot && Shot->bHit) || bPreviewHit)
     {
-        // Diagonal ticks, gold on a weak point and harm-red otherwise. The
-        // crosshair itself never changes colour, so aim is never re-learned.
-        const FLinearColor TickColor = Shot->bWeakPoint ? BreakerUI::Gold : BreakerUI::Harm;
-        const float Inner = S(6.0f);
-        const float Outer = S(14.0f);
+        // ABSORBED is the THIRD tick state, and it exists because the owner
+        // shot a Warden in its armoured front and read "the game is broken"
+        // rather than "wrong angle": a hit registered, the marker fired, and
+        // no health moved. It is told by GEOMETRY as well as colour, per
+        // FIELDPLATE 01 — the ticks pull outward and gain a bracket — because
+        // colour alone at the crosshair is what the weak-point tick already
+        // uses and two colour states at one mark do not read in a fight.
+        // Full Orange, not OrangeDeep. The deep step is FIELDPLATE's pressed /
+        // track-fill value and it was the first thing tried here; looked at, it
+        // is too dark to hold at 2px over the world, which is the one place a
+        // hit marker has to survive any background. Orange is the weapon/heat
+        // family — the same accent BLOCKED already carries on the player's own
+        // side of the same event — and the GEOMETRY is what separates it from
+        // the gold weak-point tick, which is the FIELDPLATE-correct division of
+        // labour anyway.
+        const bool bAbsorbed = bPreviewHit || LastShotMitigatedFraction >= BreakerUI::DamageAbsorbedThreshold;
+        const FLinearColor TickColor = bAbsorbed ? BreakerUI::Orange
+            : (Shot && Shot->bWeakPoint) ? BreakerUI::Gold : BreakerUI::Harm;
+        const float Inner = bAbsorbed ? S(13.0f) : S(6.0f);
+        const float Outer = bAbsorbed ? S(23.0f) : S(14.0f);
+        const float Diagonal = 0.7071f;
         for (int32 Index = 0; Index < 4; ++Index)
         {
             const float DX = (Index & 1) ? 1.0f : -1.0f;
             const float DY = (Index & 2) ? 1.0f : -1.0f;
-            const float Diagonal = 0.7071f;
             DrawLine(Center.X + DX * Inner * Diagonal, Center.Y + DY * Inner * Diagonal,
                      Center.X + DX * Outer * Diagonal, Center.Y + DY * Outer * Diagonal,
                      TickColor, S(2.0f));
+        }
+        if (bAbsorbed)
+        {
+            // Four short brackets closing the tick ends into a box: the round
+            // stopped at a surface. Deliberately the OPPOSITE motion to the
+            // weak-point tick, which opens outward on a clean hit.
+            const float Corner = S(9.0f);
+            const float Reach = Outer * Diagonal;
+            for (int32 Index = 0; Index < 4; ++Index)
+            {
+                const float DX = (Index & 1) ? 1.0f : -1.0f;
+                const float DY = (Index & 2) ? 1.0f : -1.0f;
+                DrawLine(Center.X + DX * Reach, Center.Y + DY * Reach,
+                         Center.X + DX * (Reach - Corner), Center.Y + DY * Reach, TickColor, S(2.5f));
+                DrawLine(Center.X + DX * Reach, Center.Y + DY * Reach,
+                         Center.X + DX * Reach, Center.Y + DY * (Reach - Corner), TickColor, S(2.5f));
+            }
         }
     }
 
@@ -272,6 +310,14 @@ void ABreakerPlaytestHUD::DrawHUD()
 
     // --- Top centre: wave banner ------------------------------------------
     DrawWaveBanner(Center);
+
+    // --- Top right: the field plate ---------------------------------------
+    // Must follow DrawEnemyHealthBars, which fills EnemyBlips from the one
+    // enemy iteration the HUD makes.
+    DrawMinimap(Character,
+        Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudMinimapWidth),
+        S(BreakerUI::HudSafeMargin),
+        S(BreakerUI::HudMinimapWidth), S(BreakerUI::HudMinimapHeight));
 
     // --- Centre: feedback only, nothing persistent ------------------------
     DrawSkimBurst(Center);
@@ -513,10 +559,24 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         const FVector2D ResourceLabelSize = MeasureSpecText(Row.Label, 11.0f);
         const FVector2D StateWordSize = MeasureSpecText(Row.StateWord, BreakerUI::HudResourceStatePixels);
         const float ResourceBaseline = Y + Pad + ResourceLabelSize.Y;
+        const float StateWordRight = InnerX + ResourceLabelSize.X + S(BreakerUI::Space8) + StateWordSize.X;
         DrawSpecText(Row.StateWord, InnerX + ResourceLabelSize.X + S(BreakerUI::Space8),
             ResourceBaseline - StateWordSize.Y, Row.StateColor, BreakerUI::HudResourceStatePixels);
-        DrawSpecTextRight(FString::Printf(TEXT("%.0f M/S"), Character->GetHorizontalSpeed() / 100.0f),
-            InnerRight, Y + Pad, BreakerUI::TextMuted, 11.0f);
+
+        // AUDIT (2026-08-14): the third thing on this row is right-aligned to
+        // the plate edge and knew nothing about the two left-aligned strings
+        // beside it — the same shape as the wave banner's collision, one row
+        // down. It has slack today with MOMENTUM/SETTLED, and none of that
+        // slack is guaranteed: a longer class label or state word closes it
+        // silently. The speed readout is the least important of the three and
+        // is playtest chrome, so it YIELDS when it does not fit rather than
+        // printing through the state word.
+        const FString SpeedText = FString::Printf(TEXT("%.0f M/S"), Character->GetHorizontalSpeed() / 100.0f);
+        const FVector2D SpeedSize = MeasureSpecText(SpeedText, 11.0f);
+        if (InnerRight - SpeedSize.X >= StateWordRight + S(BreakerUI::Space8))
+        {
+            DrawSpecTextRight(SpeedText, InnerRight, Y + Pad, BreakerUI::TextMuted, 11.0f);
+        }
 
         const float TrackY = Y + Pad + S(20.0f);
         const float TrackH = S(BreakerUI::HudMomentumTrackHeight);
@@ -530,7 +590,6 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         DrawRect(BreakerUI::BorderEmphasis, InnerX, WeaponRowY, InnerW, S(1.0f));
 
         const int32 Slot = Weapon->GetCurrentSlot();
-        DrawSpecText(Weapon->GetArchetypeName().ToUpper(), InnerX, WeaponRowY + S(6.0f), BreakerUI::TextPrimary, 18.0f);
 
         const FString StateText = Weapon->IsReloading() ? TEXT("RELOADING")
             : Weapon->IsSwapping() ? TEXT("SWAPPING")
@@ -562,6 +621,19 @@ void ABreakerPlaytestHUD::DrawCombatCluster(const ABreakerCharacter* Character, 
         DrawSpecTextRight(MagazineText, InnerRight - ReserveSize.X - S(BreakerUI::Space4), AmmoTop,
             Weapon->GetMagazineAmmo() > 0 ? BreakerUI::TextPrimary : BreakerUI::Harm,
             BreakerUI::HudMagazinePixels);
+
+        // AUDIT (2026-08-14): the weapon name is left-aligned and the ammo pair
+        // is right-aligned on the SAME row, and until now neither knew about
+        // the other — a third instance of the wave banner's shape. The ammo
+        // block is the one that must never move (it is a fixed-column readout
+        // by design), so it is measured FIRST and the name is fitted into what
+        // is left. Stepping the name's size down is measured too, so nothing
+        // here depends on a layout pass.
+        const float NameLimit = (InnerRight - ReserveSize.X - S(BreakerUI::Space4) - MagazineSize.X)
+            - S(BreakerUI::Space16) - InnerX;
+        const FString WeaponName = Weapon->GetArchetypeName().ToUpper();
+        DrawSpecText(WeaponName, InnerX, WeaponRowY + S(6.0f), BreakerUI::TextPrimary,
+            FitSpecPixels(WeaponName, 18.0f, NameLimit, 11.0f));
     }
 
     // --- Row 3: three ability squares, anchored to the bottom pad (§3) ----
@@ -690,29 +762,233 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 // --------------------------------------------------------------------------
 // Wave banner, centred at 48px from the top. Top rail, because a wave is a
 // transient status and not a system that owns the plate.
+//
+// THE COLLISION, and why it is fixed by measuring. The owner's screenshot shows
+// "WAVE 01" and "4 HOSTILE" printed on top of one another. The cause is exactly
+// the MOMENTUMSETTLED defect: a plate at a fixed 260px with its divider at a
+// fixed 55% of that, and a 28px title that renders wider than the 143px gutter
+// left of the divider. The title starts at a fixed inset and runs as far as it
+// runs; the count is right-aligned and runs backwards as far as IT runs; the
+// two meet in the middle with nothing in the code that knows they are on the
+// same row. A two-digit hostile count widens the right half and closes what
+// little slack was left.
+//
+// Nudging the divider or widening the plate would only move the magnitude of
+// the same bug — the next long string re-opens it. So both strings are
+// MEASURED, the content is laid out left-to-right from those measurements, and
+// the PLATE is sized from the content rather than the content being trusted to
+// fit the plate. 260px survives as a MINIMUM so the banner does not visibly
+// breathe between "9 HOSTILE" and "12 HOSTILE"; past that it grows.
+//
+// Both strings also share ONE BASELINE derived from their measured glyph
+// heights, the same fix the ammo pair and the resource row already carry, so a
+// change to either size cannot drift them apart again.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawWaveBanner(const FVector2D& Center)
 {
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
-    if (!GameMode || GameMode->GetCurrentWave() <= 0) return;
+    const bool bPreview = IsCapturePreview() && (!GameMode || GameMode->GetCurrentWave() <= 0);
+    if (!bPreview && (!GameMode || GameMode->GetCurrentWave() <= 0)) return;
 
-    const bool bActive = GameMode->IsWaveActive();
-    const FString Title = FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave());
-    const FString Status = bActive
-        ? FString::Printf(TEXT("%d HOSTILE"), GameMode->GetWaveEnemiesAlive())
-        : FString(TEXT("CLEAR — F4"));
+    // The preview CYCLES the three shapes this row can take — the owner's own
+    // screenshot, a two-digit count (the widest active case), and the cleared
+    // state with its em dash — so a four-shot capture run photographs all of
+    // them instead of proving one string fits.
+    const int32 PreviewCase = bPreview
+        ? FMath::Abs(FMath::FloorToInt(static_cast<float>(GetWorld()->GetTimeSeconds()) / 2.0f)) % 3 : 0;
+    const bool bActive = bPreview ? PreviewCase != 2 : GameMode->IsWaveActive();
+    const FString Title = !bPreview ? FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave())
+        : PreviewCase == 0 ? FString(TEXT("WAVE 01"))
+        : PreviewCase == 1 ? FString(TEXT("WAVE 12")) : FString(TEXT("WAVE 07"));
+    const FString Status = !bPreview
+        ? (bActive ? FString::Printf(TEXT("%d HOSTILE"), GameMode->GetWaveEnemiesAlive())
+                   : FString(TEXT("CLEAR — F4")))
+        : PreviewCase == 0 ? FString(TEXT("4 HOSTILE"))
+        : PreviewCase == 1 ? FString(TEXT("24 HOSTILE")) : FString(TEXT("CLEAR — F4"));
 
-    const float PlateW = S(260.0f);
+    constexpr float TitlePixels = 28.0f;
+    constexpr float StatusPixels = 16.0f;
+    const FVector2D TitleSize = MeasureSpecText(Title, TitlePixels);
+    const FVector2D StatusSize = MeasureSpecText(Status, StatusPixels);
+
+    const float Pad = S(BreakerUI::Space16);
+    const float Gap = S(BreakerUI::Space16);
+    const float DividerW = S(BreakerUI::BorderThin);
+    const float ContentW = TitleSize.X + Gap + DividerW + Gap + StatusSize.X;
+
+    const float PlateW = FMath::Max(S(260.0f), ContentW + Pad * 2.0f);
     const float PlateH = S(56.0f);
     const float PlateX = Center.X - PlateW * 0.5f;
     const float PlateY = S(BreakerUI::HudSafeMargin);
     DrawPlate(PlateX, PlateY, PlateW, PlateH, bActive ? BreakerUI::Orange : BreakerUI::Cyan, EBreakerRail::Top);
 
-    DrawSpecText(Title, PlateX + S(BreakerUI::Space16), PlateY + S(14.0f), BreakerUI::TextPrimary, 28.0f);
-    // Vertical divider, then the count: two facts, one plate.
-    DrawRect(BreakerUI::BorderEmphasis, PlateX + PlateW * 0.55f, PlateY + S(14.0f), S(1.0f), PlateH - S(26.0f));
-    DrawSpecTextRight(Status, PlateX + PlateW - S(BreakerUI::Space16), PlateY + S(20.0f),
-        bActive ? BreakerUI::Orange : BreakerUI::Cyan, 16.0f);
+    // Centred as a block, so at the minimum width the two halves sit either
+    // side of the plate's centre rather than pinned to its edges.
+    const float ContentX = PlateX + (PlateW - ContentW) * 0.5f;
+    const float Baseline = PlateY + (PlateH + TitleSize.Y) * 0.5f;
+
+    DrawSpecText(Title, ContentX, Baseline - TitleSize.Y, BreakerUI::TextPrimary, TitlePixels);
+    // Vertical divider, then the count: two facts, one plate. Its X now comes
+    // out of the title's measured width instead of a percentage of the plate.
+    const float DividerX = ContentX + TitleSize.X + Gap;
+    DrawRect(BreakerUI::BorderEmphasis, DividerX, PlateY + Pad, DividerW, PlateH - Pad * 2.0f);
+    DrawSpecText(Status, DividerX + DividerW + Gap, Baseline - StatusSize.Y,
+        bActive ? BreakerUI::Orange : BreakerUI::Cyan, StatusPixels);
+}
+
+// --------------------------------------------------------------------------
+// UI-HUD-Spec section 6 — the minimap.
+//
+// LANDSCAPE AND FIELD-ALIGNED. Level-Design section 5 strings every station
+// along one forward axis across a 25000 cm long axis; the occupied width is
+// roughly a third of that. A square window over that field spends most of its
+// area on empty flank, so the plate is 320x176 with the field's forward axis
+// running along its LONG side, and the map does not rotate with the player.
+// A rotating map would throw the alignment away on every turn, and the one
+// thing a player needs from this field is "how far along am I".
+//
+// COST. It iterates nothing. DrawEnemyHealthBars already walks every enemy
+// once per frame and now fills EnemyBlips as it goes; this reads that array.
+// The array is a member, so after the first few frames it never allocates.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawMinimap(const ABreakerCharacter* Character, float X, float Y, float Width, float Height)
+{
+    if (!Character) return;
+
+    // Cyan rail: FIELDPLATE 01 names the player/system accent as "the only
+    // accent allowed on chrome", and a minimap is a player-system readout.
+    // TEAL IS FORBIDDEN HERE by the same section and by O19 — teal is a noun
+    // for rift geometry and suppression hardware, so the day a rift lands on
+    // this map it can be teal precisely because nothing else on the plate is.
+    DrawPlate(X, Y, Width, Height, BreakerUI::Cyan);
+
+    const float Rail = S(BreakerUI::RailThickness);
+    const float InnerX = X + Rail;
+    const float InnerY = Y + S(BreakerUI::BorderThin);
+    const float InnerW = Width - Rail - S(BreakerUI::BorderThin);
+    const float InnerH = Height - S(BreakerUI::BorderThin) * 2.0f;
+    const float CenterX = InnerX + InnerW * 0.5f;
+    const float CenterY = InnerY + InnerH * 0.5f;
+
+    // World cm -> plate pixels. Scaled by S() like every other geometry value,
+    // so the map covers the same amount of WORLD at every resolution instead
+    // of showing more field on a bigger monitor.
+    const float PixelsPerCm = S(1.0f) / BreakerUI::HudMinimapCmPerPixel;
+    const FVector Origin = Character->GetActorLocation();
+
+    // World +X is the field's forward axis and maps to plate +X (right); world
+    // +Y maps to plate +Y. Both are simple scales because the map does not
+    // rotate — that is the whole point of aligning it to the field.
+    auto ToPlate = [Origin, PixelsPerCm, CenterX, CenterY](const FVector& World)
+    {
+        return FVector2D(CenterX + static_cast<float>(World.X - Origin.X) * PixelsPerCm,
+                         CenterY + static_cast<float>(World.Y - Origin.Y) * PixelsPerCm);
+    };
+    auto Inside = [InnerX, InnerY, InnerW, InnerH](const FVector2D& P)
+    {
+        return P.X >= InnerX && P.X <= InnerX + InnerW && P.Y >= InnerY && P.Y <= InnerY + InnerH;
+    };
+
+    // --- Graticule: one line per combat-pocket radius of world ------------
+    // Anchored to WORLD coordinates, not to the plate, so the grid slides past
+    // as the player moves. A grid pinned to the plate would be decoration; a
+    // grid pinned to the world is the thing that says you are travelling.
+    {
+        const float GridPx = BreakerUI::HudMinimapGridCm * PixelsPerCm;
+        if (GridPx >= S(8.0f))
+        {
+            const float FirstX = CenterX - FMath::Fmod(static_cast<float>(Origin.X), BreakerUI::HudMinimapGridCm) * PixelsPerCm;
+            for (float GX = FirstX - FMath::CeilToFloat(InnerW * 0.5f / GridPx) * GridPx; GX <= InnerX + InnerW; GX += GridPx)
+            {
+                if (GX < InnerX) continue;
+                DrawRect(BreakerUI::Panel20, GX, InnerY, FMath::Max(S(1.0f), 1.0f), InnerH);
+            }
+            const float FirstY = CenterY - FMath::Fmod(static_cast<float>(Origin.Y), BreakerUI::HudMinimapGridCm) * PixelsPerCm;
+            for (float GY = FirstY - FMath::CeilToFloat(InnerH * 0.5f / GridPx) * GridPx; GY <= InnerY + InnerH; GY += GridPx)
+            {
+                if (GY < InnerY) continue;
+                DrawRect(BreakerUI::Panel20, InnerX, GY, InnerW, FMath::Max(S(1.0f), 1.0f));
+            }
+        }
+    }
+
+    // --- The safe ring ----------------------------------------------------
+    // Drawn as a segmented outline rather than a fill: the ring is a boundary,
+    // and a filled disc would compete with the blips sitting on top of it.
+    // Segments outside the plate are simply not drawn, which is the cheapest
+    // correct clip Canvas offers for a shape it has no primitive for.
+    if (const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr)
+    {
+        const FVector RingCenter = GameMode->GetSafeZoneCenter();
+        const float RingRadius = GameMode->GetSafeZoneRadius();
+        if (RingRadius > 0.0f)
+        {
+            constexpr int32 Segments = 40;
+            const FLinearColor RingColor = BreakerUI::Alpha(BreakerUI::Cyan, 0.65f);
+            FVector2D Previous = FVector2D::ZeroVector;
+            for (int32 Index = 0; Index <= Segments; ++Index)
+            {
+                const float Angle = 2.0f * UE_PI * static_cast<float>(Index) / Segments;
+                const FVector2D Point = ToPlate(RingCenter +
+                    FVector(FMath::Cos(Angle) * RingRadius, FMath::Sin(Angle) * RingRadius, 0.0f));
+                if (Index > 0 && Inside(Previous) && Inside(Point))
+                {
+                    DrawLine(Previous.X, Previous.Y, Point.X, Point.Y, RingColor, FMath::Max(S(1.5f), 1.0f));
+                }
+                Previous = Point;
+            }
+        }
+    }
+
+    // --- Hostiles ---------------------------------------------------------
+    // Harm red, square, and never a dot: a square survives at 5px where a
+    // circle turns into a smudge, and the system has no radius above 4px
+    // anyway. Off-map hostiles are CLAMPED to the rim at half size rather than
+    // dropped — direction of threat is the single most useful thing a minimap
+    // reports, and a field this long puts most of a wave off the window.
+    const float Blip = S(BreakerUI::HudMinimapBlipSize);
+    for (const FBreakerHUDMapBlip& Enemy : EnemyBlips)
+    {
+        const FVector2D Point = ToPlate(Enemy.World);
+        const bool bOnMap = Inside(Point);
+        const float Size = bOnMap ? (Enemy.bBoss ? Blip * 1.8f : Blip) : Blip * 0.6f;
+        const FVector2D Drawn(
+            FMath::Clamp(Point.X, InnerX + Size * 0.5f, InnerX + InnerW - Size * 0.5f),
+            FMath::Clamp(Point.Y, InnerY + Size * 0.5f, InnerY + InnerH - Size * 0.5f));
+
+        DrawRect(bOnMap ? BreakerUI::Harm : BreakerUI::Alpha(BreakerUI::Harm, 0.55f),
+            Drawn.X - Size * 0.5f, Drawn.Y - Size * 0.5f, Size, Size);
+        // Rank is an EDGE, never a fill: the harm colour has to keep meaning
+        // "hostile" whatever the rank does, exactly as the enemy bars do it.
+        if (bOnMap && (Enemy.bElite || Enemy.bBoss))
+        {
+            DrawBorder(Drawn.X - Size * 0.5f - S(2.0f), Drawn.Y - Size * 0.5f - S(2.0f),
+                Size + S(4.0f), Size + S(4.0f), BreakerUI::Gold, FMath::Max(S(1.0f), 1.0f));
+        }
+    }
+
+    // --- The player -------------------------------------------------------
+    // A triangle, because it is the only mark here that has to report a
+    // DIRECTION as well as a position, and the map does not rotate so the
+    // triangle is the entire facing readout.
+    {
+        const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
+        const FVector2D Facing(Forward.X, Forward.Y);
+        const FVector2D Side(-Facing.Y, Facing.X);
+        const float R = S(BreakerUI::HudMinimapPlayerSize);
+        const FVector2D Nose(CenterX + Facing.X * R, CenterY + Facing.Y * R);
+        const FVector2D Left(CenterX - Facing.X * R * 0.55f + Side.X * R * 0.62f,
+                             CenterY - Facing.Y * R * 0.55f + Side.Y * R * 0.62f);
+        const FVector2D Right(CenterX - Facing.X * R * 0.55f - Side.X * R * 0.62f,
+                              CenterY - Facing.Y * R * 0.55f - Side.Y * R * 0.62f);
+        DrawTriangle(Nose, Left, Right, BreakerUI::Cyan);
+    }
+
+    // Scale statement. A map with no unit is a picture, and the whole reason
+    // the grid pitch is the combat pocket radius is so this line can say what
+    // one cell buys.
+    DrawSpecText(FString::Printf(TEXT("GRID %.0fM"), BreakerUI::HudMinimapGridCm / 100.0f),
+        InnerX + S(BreakerUI::Space8), InnerY + InnerH - S(16.0f), BreakerUI::TextMuted, 11.0f);
 }
 
 
@@ -786,12 +1062,46 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // would jump sideways in the stack as it settled.
         const float StackOffset = S(SizePixels * BreakerHUD::DamageClusterOffsetRatio);
 
+        // ABSORBED. The Warden's whole mechanic is that its FRONT is the wrong
+        // place to shoot, and until now the only report of that was the health
+        // bar not moving — which reads as a broken game, not as a wrong angle.
+        //
+        // The number RECEDES rather than changing family: it drops to
+        // text/muted, whatever it would otherwise have been. The first pass
+        // used OrangeDeep and it was WRONG when looked at — an absorbed crit
+        // in OrangeDeep sits one value step from an ordinary crit in Orange,
+        // so the two states that most need separating were the two that read
+        // most alike. Muted grey is unambiguous against all three of white,
+        // gold and orange, and it says the right thing on sight: this one did
+        // not land. The mitigation caption underneath carries the accent, so
+        // the eye still gets one orange mark to catch.
+        //
+        // The SIZE hierarchy is untouched. A crit that gets absorbed is still
+        // a crit and still 52px — the sizes are the only thing separating a
+        // body shot from a weak point from a crit, and losing them here would
+        // delete that separation exactly when the player most needs it.
+        const bool bAbsorbed = Number->MitigatedFraction >= BreakerUI::DamageAbsorbedThreshold;
+        if (bAbsorbed) Face = BreakerUI::TextMuted;
+
         // Spawn oversized, settle to 100%: the pop is the hit confirmation.
         if (Age < PopSeconds) SizePixels *= PopScale;
 
+        const float NumberY = Screen.Y - Rise - Neighbours * StackOffset;
         DrawOutlinedNumber(BreakerUI::FormatDamage(Number->Value),
-            Screen.X, Screen.Y - Rise - Neighbours * StackOffset,
-            Face, SizePixels, Fade);
+            Screen.X, NumberY, Face, SizePixels, Fade);
+
+        if (bAbsorbed)
+        {
+            // Caption under the number, at caption weight so it annotates
+            // rather than competes — the same relationship the class-resource
+            // state word has to its track. Position is MEASURED off the
+            // number's own glyph height, not a fixed nudge, so it holds at
+            // every one of the three damage sizes and at every UI scale.
+            const FString Caption = FString::Printf(TEXT("ABSORBED -%.0f%%"), Number->MitigatedFraction * 100.0f);
+            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
+            DrawOutlinedNumber(Caption, Screen.X, NumberY + NumberHeight,
+                BreakerUI::Orange, 13.0f, Fade);
+        }
     }
 }
 
@@ -802,6 +1112,12 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character)
 {
+    // ORDERING CONTRACT: this runs before DrawMinimap, and it is the ONE enemy
+    // iteration the HUD makes. Reset (not Empty) keeps the capacity, so the
+    // array stops allocating after the first busy frame — DrawHUD runs every
+    // frame and a container built inside it is a per-frame allocation.
+    EnemyBlips.Reset();
+
     UWorld* World = GetWorld();
     if (!World || !Character) return;
     const FVector ViewerLocation = Character->GetActorLocation();
@@ -810,6 +1126,17 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     {
         const ABreakerEnemy* Enemy = *It;
         if (!Enemy) continue;
+
+        // Collected BEFORE the health-bar culls, because the two readouts want
+        // different ranges: a bar is pointless past 50 m, and a minimap is
+        // mostly useful for the hostiles that are further away than that.
+        if (!Enemy->IsDeadEnemy())
+        {
+            FBreakerHUDMapBlip& Blip = EnemyBlips.AddDefaulted_GetRef();
+            Blip.World = Enemy->GetActorLocation();
+            Blip.bElite = Enemy->GetMonsterRank() == EBreakerMonsterRank::Elite;
+            Blip.bBoss = Enemy->GetMonsterRank() == EBreakerMonsterRank::Boss;
+        }
 
         const float Distance = FVector::Distance(ViewerLocation, Enemy->GetActorLocation());
         if (Distance > BreakerHUD::EnemyBarMaxDistance) continue;
@@ -929,7 +1256,23 @@ void ABreakerPlaytestHUD::DrawLootPickups(const ABreakerCharacter* Character)
         const FLinearColor Accent = BreakerUI::RarityColor(Item.Rarity);
         const TArray<FString> AffixLines = BreakerHUD::DescribeItemLines(Item);
 
-        const float PanelW = S(300.0f);
+        // AUDIT (2026-08-14): the panel was a fixed 300px and every line inside
+        // it was drawn at its own measured width with nothing checking the two
+        // agreed. Item names and affix lines are generated content — an
+        // Anomalous name plus a tier suffix is not bounded by anything — so
+        // this is the same fixed-gutter defect with the collision against the
+        // panel edge instead of against a sibling. Measured: the panel is sized
+        // from its widest line, with 300 as a MINIMUM so a two-affix Standard
+        // drop does not draw a narrow sliver.
+        const FString TitleLine = Focused->GetDisplayLabel().ToString();
+        const FString MetaLine = FString::Printf(TEXT("%s · i%d · F TAKE"),
+            *BreakerHUD::RarityLabel(Item.Rarity), Item.ItemLevel);
+        float WidestLine = FMath::Max(MeasureSpecText(TitleLine, 20.0f).X, MeasureSpecText(MetaLine, 11.0f).X);
+        for (const FString& Line : AffixLines)
+        {
+            WidestLine = FMath::Max(WidestLine, MeasureSpecText(Line, 13.0f).X);
+        }
+        const float PanelW = FMath::Max(S(300.0f), WidestLine + S(BreakerUI::Space16) * 2.0f);
         const float PanelH = S(64.0f) + AffixLines.Num() * S(16.0f) + S(24.0f);
         const float PanelX = FMath::Clamp(Projected.X - PanelW * 0.5f, S(8.0f), Canvas->ClipX - PanelW - S(8.0f));
         const float PanelY = FMath::Clamp(Projected.Y - PanelH - S(12.0f), S(8.0f), Canvas->ClipY - PanelH - S(8.0f));
@@ -943,10 +1286,8 @@ void ABreakerPlaytestHUD::DrawLootPickups(const ABreakerCharacter* Character)
         }
 
         const float TextX = PanelX + S(BreakerUI::Space16);
-        DrawSpecText(Focused->GetDisplayLabel().ToString(), TextX, PanelY + S(BreakerUI::Space16), Accent, 20.0f);
-        DrawSpecText(FString::Printf(TEXT("%s · i%d · F TAKE"),
-            *BreakerHUD::RarityLabel(Item.Rarity), Item.ItemLevel),
-            TextX, PanelY + S(44.0f), BreakerUI::TextMuted, 11.0f);
+        DrawSpecText(TitleLine, TextX, PanelY + S(BreakerUI::Space16), Accent, 20.0f);
+        DrawSpecText(MetaLine, TextX, PanelY + S(44.0f), BreakerUI::TextMuted, 11.0f);
 
         float LineY = PanelY + S(64.0f);
         for (const FString& Line : AffixLines)
@@ -1264,6 +1605,27 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
         }
     }
 
+    // HOW MUCH DISAPPEARED. FBreakerDamageResult does not carry a mitigation
+    // field and inventing one would mean a change in Combat/; it does not need
+    // to, because the ratio is already fully determined by two fields it does
+    // carry. RawDamage is post-crit, post-weak-point and pre-defence;
+    // MitigatedDamage is that same number after armour, after the incoming
+    // multiplier and after a block roll. One minus the ratio is exactly the
+    // share of the hit the target ate — which for the Warden IS the frontal
+    // armour, because nothing else on it moves either factor.
+    //
+    // Deliberately NOT "armour": the field is honest about being mitigation of
+    // any origin, so an Overcast debuff or a future damage-reduction modifier
+    // reads through the same channel instead of lying about its cause.
+    const float Raw = Shot.DamageResult.RawDamage;
+    const float Mitigated = Raw > UE_SMALL_NUMBER
+        ? FMath::Clamp(1.0f - Shot.DamageResult.MitigatedDamage / Raw, 0.0f, 1.0f) : 0.0f;
+    if (Shot.bHit)
+    {
+        LastShotMitigatedFraction = Mitigated;
+        LastShotHitTime = ShotTime;
+    }
+
     // Same event feeds the floating numbers: one subscription, two readouts.
     const float Applied = Shot.DamageResult.ShieldDamage + Shot.DamageResult.HealthDamage;
     const float Shown = Applied > 0.0f ? Applied : Shot.DamageResult.MitigatedDamage;
@@ -1274,6 +1636,7 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     Number.Value = Shown;
     Number.bCritical = Shot.DamageResult.bCritical;
     Number.bWeakPoint = Shot.bWeakPoint || Shot.DamageResult.bWeakPoint;
+    Number.MitigatedFraction = Mitigated;
     Number.Time = ShotTime;
 
     if (DamageNumbers.Num() < MaxDamageNumbers)
@@ -1285,6 +1648,71 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     {
         DamageNumbers[NextDamageNumberIndex] = Number;
         NextDamageNumberIndex = (NextDamageNumberIndex + 1) % MaxDamageNumbers;
+    }
+}
+
+// --------------------------------------------------------------------------
+// -BreakerCaptureHUD. Dev-only, command-line-gated, and it exists for a
+// specific reason: the states this HUD got WRONG are precisely the states a
+// headless capture run cannot reach on its own. -BreakerAutoPlay drops the
+// player into the gym and then nothing pulls a trigger and nothing presses F4,
+// so the wave banner and every damage number were literally unphotographable —
+// and both of them shipped broken, which is not a coincidence.
+//
+// It fabricates nothing about layout: the numbers and the banner go through
+// exactly the same drawing paths the real ones do, at values chosen to be the
+// worst realistic case (six-figure damage under O29, a two-digit hostile
+// count, a heavily absorbed hit). What is faked is only the EVENT.
+// --------------------------------------------------------------------------
+bool ABreakerPlaytestHUD::IsCapturePreview() const
+{
+    // Parsed once. FParse over the whole command line every frame would be a
+    // string scan per frame for a switch that cannot change.
+    static const bool bPreview = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureHUD"));
+    return bPreview;
+}
+
+void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
+{
+    if (!IsCapturePreview() || !Character || !GetWorld()) return;
+    const double Now = GetWorld()->GetTimeSeconds();
+    // Re-seeded on the damage numbers' own lifetime, so the capture always
+    // catches them mid-rise rather than after they have expired.
+    if (Now - LastPreviewSpawnTime < BreakerHUD::DamageNumberLifetime * 0.6) return;
+    LastPreviewSpawnTime = Now;
+
+    const FVector Eye = Character->GetActorLocation();
+    const FVector Forward = Character->GetActorForwardVector();
+    const FVector Right = Character->GetActorRightVector();
+
+    struct FPreviewHit { float Value; bool bCrit; bool bWeak; float Mitigated; float Side; float Up; };
+    // Body, weak point, crit, and an absorbed crit — the four reads that have
+    // to stay distinguishable from one another at a glance.
+    static const FPreviewHit Hits[] = {
+        { 8420.0f,   false, false, 0.00f, -1.30f,  40.0f },
+        { 26800.0f,  false, true,  0.00f, -0.35f,  95.0f },
+        { 148200.0f, true,  false, 0.00f,  0.55f, 150.0f },
+        { 71500.0f,  true,  false, 0.47f,  1.55f,  60.0f },
+    };
+    for (const FPreviewHit& Hit : Hits)
+    {
+        FBreakerHUDDamageNumber Number;
+        Number.World = Eye + Forward * 620.0f + Right * (Hit.Side * 150.0f) + FVector(0.0f, 0.0f, Hit.Up);
+        Number.Value = Hit.Value;
+        Number.bCritical = Hit.bCrit;
+        Number.bWeakPoint = Hit.bWeak;
+        Number.MitigatedFraction = Hit.Mitigated;
+        Number.Time = Now;
+        if (DamageNumbers.Num() < MaxDamageNumbers)
+        {
+            DamageNumbers.Add(Number);
+            NextDamageNumberIndex = DamageNumbers.Num() % MaxDamageNumbers;
+        }
+        else
+        {
+            DamageNumbers[NextDamageNumberIndex] = Number;
+            NextDamageNumberIndex = (NextDamageNumberIndex + 1) % MaxDamageNumbers;
+        }
     }
 }
 
@@ -1325,6 +1753,15 @@ void ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character, 
     const float ChipH = S(20.0f);
     const float ChipY = BottomY - ChipH;
     float ChipX = X;
+    // AUDIT (2026-08-14): this row ran rightward with no bound at all. Three
+    // stacked DoTs and it walks out from under the vitals plate and off toward
+    // the wave banner; enough of them and it leaves the screen. It is the same
+    // defect the others are — a fixed start with no knowledge of what shares
+    // the row — just with the collision at the far end instead of the near one.
+    // The row is bounded to the vitals plate it annotates, and the overflow is
+    // COUNTED rather than silently dropped.
+    const float RowRight = X + S(BreakerUI::HudVitalsWidth);
+    int32 Dropped = 0;
     for (const FBreakerActiveStatus& Active : Status->GetActiveStatuses())
     {
         FString ShortName = Active.Spec.StatusTag.IsValid() ? Active.Spec.StatusTag.GetTagName().ToString() : TEXT("STATUS");
@@ -1334,12 +1771,28 @@ void ABreakerPlaytestHUD::DrawStatusReadout(const ABreakerCharacter* Character, 
 
         const FVector2D TextSize = MeasureSpecText(Text, 11.0f);
         const float ChipW = TextSize.X + S(BreakerUI::Space16) + S(BreakerUI::Space4);
+        // Reserve room for a "+N" overflow chip while anything is still to come.
+        if (ChipX + ChipW > RowRight - S(36.0f))
+        {
+            ++Dropped;
+            continue;
+        }
         DrawRect(BreakerHUD::PlateFace, ChipX, ChipY, ChipW, ChipH);
         DrawBorder(ChipX, ChipY, ChipW, ChipH, BreakerUI::BorderEmphasis, S(1.0f));
         // Statuses are incoming harm: the chip's marker is the harm accent.
         DrawRect(BreakerUI::Harm, ChipX, ChipY, S(BreakerUI::Space4), ChipH);
         DrawSpecText(Text, ChipX + S(BreakerUI::Space8) + S(BreakerUI::Space4), ChipY + S(BreakerUI::Space4), BreakerUI::Harm, 11.0f);
         ChipX += ChipW + S(BreakerUI::Space8);
+    }
+
+    if (Dropped > 0)
+    {
+        const FString More = FString::Printf(TEXT("+%d"), Dropped);
+        const FVector2D MoreSize = MeasureSpecText(More, 11.0f);
+        const float MoreW = MoreSize.X + S(BreakerUI::Space16);
+        DrawRect(BreakerHUD::PlateFace, ChipX, ChipY, MoreW, ChipH);
+        DrawBorder(ChipX, ChipY, MoreW, ChipH, BreakerUI::BorderEmphasis, S(1.0f));
+        DrawSpecText(More, ChipX + S(BreakerUI::Space8), ChipY + S(BreakerUI::Space4), BreakerUI::Harm, 11.0f);
     }
 }
 
@@ -1427,6 +1880,19 @@ void ABreakerPlaytestHUD::DrawSpecText(const FString& Text, float X, float Y, co
     }
     DrawText(Text, Face, X, Y, GEngine ? GEngine->GetSmallFont() : nullptr,
         S(BreakerUI::CanvasTextScale(SpecPixels)), false);
+}
+
+float ABreakerPlaytestHUD::FitSpecPixels(const FString& Text, float DesiredPixels, float MaxWidth, float MinPixels)
+{
+    if (Text.IsEmpty() || MaxWidth <= 0.0f) return DesiredPixels;
+    // Down one spec pixel at a time. The type scale is small integers and the
+    // loop is bounded by (Desired - Min), so this is a handful of measures in
+    // the worst case and usually exactly one.
+    for (float Pixels = DesiredPixels; Pixels > MinPixels; Pixels -= 1.0f)
+    {
+        if (MeasureSpecText(Text, Pixels).X <= MaxWidth) return Pixels;
+    }
+    return MinPixels;
 }
 
 void ABreakerPlaytestHUD::DrawSpecTextRight(const FString& Text, float RightX, float Y, const FLinearColor& Color, float SpecPixels, float TextAlpha)
