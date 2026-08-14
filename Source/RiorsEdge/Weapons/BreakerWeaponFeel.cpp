@@ -119,6 +119,16 @@ float FBreakerWeaponFeel::MovementSpreadDegrees(const FBreakerRecoilProfile& Pro
     return Profile.MoveSpreadDegrees * Speed * AimScale;
 }
 
+float FBreakerWeaponFeel::AimMoveSpeedMultiplier(const FBreakerRecoilProfile& Profile, float AimAlpha)
+{
+    // Clamped to 1.0 at the top: this channel may only ever slow the player
+    // down. An archetype that authored 1.3 here would make sighting a weapon
+    // FASTER than hip firing it, which inverts the entire trade the ADS bill
+    // exists to create.
+    const float Aimed = FMath::Clamp(Profile.AimMoveSpeedMultiplier, 0.05f, 1.0f);
+    return FMath::Lerp(1.0f, Aimed, FMath::Clamp(AimAlpha, 0.0f, 1.0f));
+}
+
 FBreakerRecoilProfile FBreakerWeaponFeel::ProfileAtAimAlpha(const FBreakerRecoilProfile& Profile, float AimAlpha)
 {
     const float Alpha = FMath::Clamp(AimAlpha, 0.0f, 1.0f);
@@ -130,6 +140,10 @@ FBreakerRecoilProfile FBreakerWeaponFeel::ProfileAtAimAlpha(const FBreakerRecoil
     Blended.AimRecoilMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimRecoilMultiplier, 0.0f, 1.0f), Alpha);
     Blended.AimBloomMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimBloomMultiplier, 0.0f, 1.0f), Alpha);
     Blended.AimViewmodelMultiplier = FMath::Lerp(1.0f, FMath::Clamp(Profile.AimViewmodelMultiplier, 0.0f, 1.0f), Alpha);
+    // AimMoveSpeedMultiplier is deliberately NOT blended here. It is a live
+    // per-frame query rather than a per-shot one, so AimMoveSpeedMultiplier()
+    // does its own ramp against the alpha; blending it here as well would
+    // charge the movement penalty twice for a half-raised weapon.
     return Blended;
 }
 

@@ -17,7 +17,45 @@ enum class EBreakerWeaponArchetype : uint8
     Sniper,
     Shotgun,
     Rocket,
+    // O27 breadth pass. APPENDED, never inserted: the archetype is stored as a
+    // uint8 in UBreakerSaveGame and replicated as one, so renumbering the
+    // existing five would silently rearm every saved loadout with a different
+    // gun. New archetypes go on the end, forever.
+    BurstRifle,
+    Machinegun,
+    Sidearm,
     Count UMETA(Hidden)
+};
+
+// ---------------------------------------------------------------------------
+// One pellet's worth of a shot.
+//
+// WHY THIS EXISTS. `FBreakerShotResult` carried ONE impact for a whole spread,
+// which meant the shot contract could not answer "where did the shotgun
+// actually land". Two consequences were recorded in the code: the tracer
+// renderer had nothing per-pellet to draw, so the shotgun deliberately drew no
+// streak at all, and anything wanting a per-pellet reading (impact sparks,
+// future per-pellet numbers, per-pellet procs) had to guess.
+//
+// This is ADDITIVE. Every single-impact field on FBreakerShotResult keeps the
+// exact meaning it had before — see the back-compatibility note there — so the
+// HUD, the telemetry and the damage-numbers path are untouched by it.
+// ---------------------------------------------------------------------------
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerPelletImpact
+{
+    GENERATED_BODY()
+
+    // False for a pellet that hit nothing. Missing pellets are still RECORDED,
+    // because where a pellet went when it missed is exactly the information a
+    // spread of tracers is made of.
+    UPROPERTY(BlueprintReadOnly) bool bHit = false;
+    UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
+    // Where this pellet's ray ended: the impact when it hit, the end of its
+    // maximum range when it did not. Always finite, always usable as a draw
+    // target.
+    UPROPERTY(BlueprintReadOnly) FVector End = FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> HitActor = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -26,6 +64,13 @@ struct RIORSEDGE_API FBreakerShotResult
     GENERATED_BODY()
 
     UPROPERTY(BlueprintReadOnly) bool bFired = false;
+    // ---- Single-impact accessors, UNCHANGED --------------------------------
+    // These are the pre-per-pellet contract and they keep their exact previous
+    // semantics: bHit/bWeakPoint are the OR across the spread, ImpactPoint /
+    // HitActor / TraceEnd are the last pellet that landed, and DamageResult is
+    // the spread's summed damage. Every existing consumer (the HUD's damage
+    // numbers and impact spark, the Mana component's per-shot generation, the
+    // playtest telemetry) reads only these, and none of them changed.
     UPROPERTY(BlueprintReadOnly) bool bHit = false;
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) FVector TraceStart = FVector::ZeroVector;
@@ -33,6 +78,27 @@ struct RIORSEDGE_API FBreakerShotResult
     UPROPERTY(BlueprintReadOnly) FVector ImpactPoint = FVector::ZeroVector;
     UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> HitActor = nullptr;
     UPROPERTY(BlueprintReadOnly) FBreakerDamageResult DamageResult;
+
+    // ---- Per-pellet record, ADDITIVE ---------------------------------------
+    // One entry per pellet of the trigger pull, in fire order, hits and misses
+    // alike. A single-projectile weapon records exactly one entry, so consumers
+    // never need a special case for "is this a shotgun"; a projectile weapon
+    // records none, because it put a real actor in the world instead.
+    //
+    // Rides the cosmetic multicast with the rest of the struct. The definition
+    // clamps PelletsPerShot to 32, which bounds the payload.
+    UPROPERTY(BlueprintReadOnly) TArray<FBreakerPelletImpact> Pellets;
+
+    // How many pellets this trigger pull put in the air (0 for a projectile).
+    int32 GetPelletCount() const { return Pellets.Num(); }
+    // How many of them landed. Equals GetPelletCount() minus the misses; the
+    // legacy bHit is exactly (GetLandedPelletCount() > 0).
+    int32 GetLandedPelletCount() const
+    {
+        int32 Landed = 0;
+        for (const FBreakerPelletImpact& Pellet : Pellets) { if (Pellet.bHit) ++Landed; }
+        return Landed;
+    }
     // Recoil pattern position of this shot: 0 is the first shot of a burst.
     // Replicated with the cosmetic event so every machine kicks identically.
     UPROPERTY(BlueprintReadOnly) int32 BurstShotIndex = 0;
@@ -161,6 +227,40 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FRotator GetViewmodelRotationOffset() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FBreakerRecoilProfile GetRecoilProfile() const { return ResolveRecoilProfile(); }
 
+    // ---- The ADS mobility bill: the weapons half ---------------------------
+    //
+    // THE GAP, STATED EXACTLY. ADS is supposed to cost time and mobility. It
+    // charges the time (AimInSeconds) and it charges cone while moving
+    // (MoveSpreadDegrees x AimMoveSpreadMultiplier), but it has never charged
+    // MOVEMENT SPEED, because `Source/RiorsEdge/Movement/` has no aim awareness
+    // whatsoever: `UBreakerCharacterMovementComponent::GetMaxSpeed()` composes
+    // walk/sprint speed with the gear multiplier and the temporary-multiplier
+    // stack, and nothing in that chain has ever heard of the weapon.
+    //
+    // This side is now closed. The archetype authors its own aimed speed
+    // penalty (`FBreakerRecoilProfile::AimMoveSpeedMultiplier`), the weapon
+    // composes it against live ADS progress so snapping to sights does not
+    // instantly bolt the player to the floor, and it is published here as one
+    // query with no world side effects.
+    //
+    // WHAT IS STILL MISSING, on the OTHER side of the boundary and owned by
+    // whoever holds Movement/: exactly one consumer.
+    // `UBreakerCharacterMovementComponent::GetMaxSpeed()` must multiply its
+    // grounded cap by `GetAimMoveSpeedMultiplier()` from the owner's weapon
+    // component (or the character must push it as a keyed temporary multiplier
+    // on aim state changes). Until that lands this returns an honest number
+    // that nobody reads, which is a visible gap rather than a silent one.
+    // Sliding and the boosted-speed ceiling deliberately have no opinion here;
+    // whether an aimed slide is slowed is a movement-feel ruling, not a weapon
+    // one.
+    UFUNCTION(BlueprintPure, Category="Weapon|Aim")
+    float GetAimMoveSpeedMultiplier() const;
+    // The fully-sighted penalty this archetype authors, ignoring current aim
+    // state. The loadout screen and tuning read this; movement wants the
+    // composed one above.
+    UFUNCTION(BlueprintPure, Category="Weapon|Aim")
+    float GetArchetypeAimMoveSpeedMultiplier() const { return ResolveRecoilProfile().AimMoveSpeedMultiplier; }
+
     // ---- Presentation ------------------------------------------------------
     // VISUAL ONLY, and deliberately NOT where the trace starts.
     //
@@ -250,6 +350,11 @@ private:
     // When the aim button went down. ADS benefits ramp from here.
     double AimStartTime = -1000.0;
     bool bTriggerHeld = false;
+    // Rounds fired since this fire-burst began, for ShotsPerBurst weapons only.
+    // Deliberately NOT the same counter as BurstShotIndex below: that one is
+    // the RECOIL pattern's position and resets on trigger rest, this one is the
+    // magazine cadence's position and resets at the end of each burst cycle.
+    int32 RoundsInFireBurst = 0;
     int32 ShotSequence = 0;
     double LastShotTime = -1000.0;
     FTimerHandle AutomaticFireTimer;
@@ -286,7 +391,19 @@ private:
     void UpdateFeelTickEnabled();
     void StoreActiveSlotAmmunition();
     void InitializeSlotAmmunition();
-    void FireOnce();
+    // Returns whether a round actually left the weapon, which the burst chain
+    // needs so a shot refused by the reload/swap/cadence gates does not count
+    // against the burst.
+    bool FireOnce();
+    // Timer entry point: UE timers need a void() signature.
+    void FireOnceTimer();
+    // Burst-cadence weapons only. One-shot timer chain rather than the
+    // repeating timer the other automatics use, because the interval alternates
+    // between the in-burst fire interval and the between-burst cycle gap.
+    // Non-burst weapons keep the repeating timer exactly as before, so their
+    // cadence cannot drift by a callback's worth per shot.
+    void AdvanceBurstFire();
+    void ScheduleBurstFire(float DelaySeconds);
     void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.

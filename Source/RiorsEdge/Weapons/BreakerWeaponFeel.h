@@ -102,6 +102,19 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
     float AimMoveSpreadMultiplier = 2.2f;
 
+    // Ground-speed scale while fully sighted. 1.0 is no penalty at all, which
+    // is what the game does TODAY, so leaving this at 1.0 anywhere reproduces
+    // current behaviour exactly.
+    //
+    // This is the third item on the ADS bill and the only one the weapon layer
+    // cannot collect on its own: nothing in Movement/ reads it yet. See the
+    // gap note on `UBreakerWeaponComponent::GetAimMoveSpeedMultiplier`, which
+    // names the one function that has to consume it. Authored per archetype
+    // because "how much does sighting this weapon root you" is exactly the
+    // kind of thing that should separate an SMG from a sniper. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0.1", ClampMax="1"))
+    float AimMoveSpeedMultiplier = 0.72f;
+
     // ---- Recovery ----------------------------------------------------------
 
     // Dead time after the last shot before the aim starts settling back.
@@ -267,6 +280,20 @@ public:
      * times as much, which is the entire reason hip fire exists.
      */
     static float MovementSpreadDegrees(const FBreakerRecoilProfile& Profile, float SpeedFraction, float AimAlpha);
+
+    /**
+     * Ground-speed scale for the aim state the weapon is currently in: 1.0 at
+     * the hip, the profile's authored AimMoveSpeedMultiplier fully sighted,
+     * linear between. Composed against AimAlpha rather than the aim BUTTON for
+     * the same reason every other ADS benefit is — a player who taps aim and
+     * keeps running must not be slammed to aimed speed for one frame, and the
+     * penalty must arrive at exactly the pace the benefits do.
+     *
+     * Never returns above 1.0: this is a penalty channel, and a profile
+     * authored above 1.0 would turn ADS into a speed BUFF, which is the one
+     * outcome that would make the hip/ADS trade worse than having no penalty.
+     */
+    static float AimMoveSpeedMultiplier(const FBreakerRecoilProfile& Profile, float AimAlpha);
 
     /**
      * The profile as it stands partway into ADS. Every aim benefit is

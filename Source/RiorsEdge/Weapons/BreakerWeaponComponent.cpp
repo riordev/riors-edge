@@ -64,6 +64,9 @@ namespace
             Profile.AimInSeconds = 0.14f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.30f;                // O2 PLACEHOLDER
             Profile.AimMoveSpreadMultiplier = 1.8f;           // O2 PLACEHOLDER
+            // Loosest aimed speed penalty of the original five, for the same
+            // reason it has the loosest aimed movement cone.
+            Profile.AimMoveSpeedMultiplier = 0.88f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Sniper:
             // One enormous, slow kick that has to be re-aimed rather than
@@ -98,6 +101,8 @@ namespace
             Profile.AimInSeconds = 0.38f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 1.10f;                // O2 PLACEHOLDER
             Profile.AimMoveSpreadMultiplier = 3.0f;           // O2 PLACEHOLDER
+            // Scoped and moving is nearly standing still, which is the point.
+            Profile.AimMoveSpeedMultiplier = 0.50f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Shotgun:
             // A shove. Note FirstShotSpreadMultiplier stays at 1.0: the pellet
@@ -131,6 +136,9 @@ namespace
             Profile.AimInSeconds = 0.16f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.25f;                // O2 PLACEHOLDER
             Profile.AimMoveSpreadMultiplier = 2.0f;           // O2 PLACEHOLDER
+            // Barely slowed. Strafing into contact is the shotgun's whole job
+            // and a speed penalty would delete it.
+            Profile.AimMoveSpeedMultiplier = 0.85f;           // O2 PLACEHOLDER
             break;
         case EBreakerWeaponArchetype::Rocket:
             // Heaviest single kick in the table and the slowest settle. Almost
@@ -159,6 +167,133 @@ namespace
             Profile.ViewmodelSpringDamping = 16.0f;           // O2 PLACEHOLDER
             Profile.AimInSeconds = 0.30f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.30f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpeedMultiplier = 0.65f;           // O2 PLACEHOLDER
+            break;
+        // ---- O27 breadth additions -----------------------------------------
+        // "Choices should beat accumulation but there should be significantly
+        // more options in all avenues." Each of these three occupies a niche
+        // none of the original five did, and the recoil pattern is the main
+        // lever that makes it FELT rather than merely tabulated.
+        case EBreakerWeaponArchetype::BurstRifle:
+            // VOLLEY. The learnable-pattern weapon, taken to its limit: a
+            // near-pure vertical ladder with almost no horizontal component and
+            // an aggressive in-burst ramp, so the three rounds of a burst climb
+            // a straight line the player can pre-aim down. The whole ladder is
+            // then paid off in the cycle gap — RecoveryDelaySeconds plus the
+            // settle is comfortably shorter than BurstCycleSeconds — so every
+            // burst starts from the same place and the pattern is a skill
+            // rather than a tax. This is the opposite pole from the SMG, whose
+            // pattern is a wander you ride; this one you memorise.
+            Profile.VerticalKickDegrees = 0.85f;              // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.05f;            // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 6;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.03f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.02f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 2.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 1.6f;               // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 6.0f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 1.0f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.6f;               // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.09f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 11.0f;              // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 22.0f; // O2 PLACEHOLDER
+            // Bloom is nearly absent. A burst weapon is punished by its own
+            // cadence, not by a widening cone, and the burst always resets.
+            Profile.BloomPerShotDegrees = 0.05f;              // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 0.6f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 4.0f;     // O2 PLACEHOLDER
+            Profile.AimBloomMultiplier = 0.4f;                // O2 PLACEHOLDER
+            // Under the burst cycle gap, so shot 0 of every burst is the
+            // dead-accurate first shot. That IS the archetype.
+            Profile.BurstResetSeconds = 0.22f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 3.4f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.5f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 2.8f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 300.0f;        // O2 PLACEHOLDER
+            Profile.AimInSeconds = 0.22f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.55f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 2.4f;           // O2 PLACEHOLDER
+            Profile.AimMoveSpeedMultiplier = 0.70f;           // O2 PLACEHOLDER
+            break;
+        case EBreakerWeaponArchetype::Machinegun:
+            // BULWARK. The sustained-fire weapon, and the only one whose recoil
+            // is designed to be UNRIDEABLE past a point: a modest per-shot kick
+            // with the longest ramp and the highest ceilings in the table, so
+            // the first second is controllable and the fifth is not. Bloom does
+            // most of the punishing — it is the only archetype whose held cone
+            // grows past the shotgun's — which is what turns "hold the trigger"
+            // into "hold the trigger in bursts, planted".
+            Profile.VerticalKickDegrees = 0.34f;              // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.30f;            // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 11;             // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.22f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.14f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 22.0f;                   // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 2.6f;               // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 11.0f;               // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 6.0f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.68f;              // O2 PLACEHOLDER
+            Profile.RecoveryDelaySeconds = 0.18f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 5.5f;               // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 11.0f; // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.10f;              // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 4.2f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 2.0f;     // O2 PLACEHOLDER
+            Profile.AimBloomMultiplier = 0.6f;                // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.5f;                 // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 2.6f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 1.5f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 1.9f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 240.0f;        // O2 PLACEHOLDER
+            // The heaviest weapon in the table to bring up and the most rooted
+            // once it is up — harsher than the sniper on speed, because the
+            // sniper's answer to being rushed is to stop aiming and this one's
+            // is to keep firing. It is also the least punished for HIP firing
+            // while moving relative to its own aimed cost, which is why the
+            // aimed movement multiplier is the biggest in the table.
+            Profile.AimInSeconds = 0.42f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.80f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 3.2f;           // O2 PLACEHOLDER
+            Profile.AimMoveSpeedMultiplier = 0.45f;           // O2 PLACEHOLDER
+            break;
+        case EBreakerWeaponArchetype::Sidearm:
+            // MARK. The tempo weapon. The smallest kick in the table, fully
+            // settled between shots at any realistic trigger speed, so the
+            // pattern is not a pattern at all — the limiter is the player's
+            // click rate and their aim, and nothing else. It exists to pair
+            // with the swap layer: fastest swap-in, fastest reload, deepest
+            // reserve. The gun you finish a fight with, not the one you start
+            // it with.
+            Profile.VerticalKickDegrees = 0.30f;              // O2 PLACEHOLDER
+            Profile.HorizontalKickDegrees = 0.10f;            // O2 PLACEHOLDER
+            Profile.HorizontalPatternPeriod = 4;              // O2 PLACEHOLDER
+            Profile.VerticalRandomFraction = 0.10f;           // O2 PLACEHOLDER
+            Profile.HorizontalRandomDegrees = 0.05f;          // O2 PLACEHOLDER
+            Profile.ClimbRampShots = 5.0f;                    // O2 PLACEHOLDER
+            Profile.ClimbRampMultiplier = 1.25f;              // O2 PLACEHOLDER
+            Profile.MaxVerticalDegrees = 4.0f;                // O2 PLACEHOLDER
+            Profile.MaxHorizontalDegrees = 1.6f;              // O2 PLACEHOLDER
+            Profile.AimRecoilMultiplier = 0.65f;              // O2 PLACEHOLDER
+            // The fastest settle in the table by a distance: it must be back on
+            // target before a fast trigger finger gets there.
+            Profile.RecoveryDelaySeconds = 0.03f;             // O2 PLACEHOLDER
+            Profile.RecoveryInterpSpeed = 16.0f;              // O2 PLACEHOLDER
+            Profile.RecoveryConstantDegreesPerSecond = 30.0f; // O2 PLACEHOLDER
+            Profile.BloomPerShotDegrees = 0.16f;              // O2 PLACEHOLDER
+            Profile.MaxBloomDegrees = 1.8f;                   // O2 PLACEHOLDER
+            Profile.BloomRecoveryDegreesPerSecond = 5.0f;     // O2 PLACEHOLDER
+            Profile.AimBloomMultiplier = 0.5f;                // O2 PLACEHOLDER
+            Profile.BurstResetSeconds = 0.20f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickUnits = 2.2f;                // O2 PLACEHOLDER
+            Profile.ViewmodelKickLateralUnits = 0.7f;         // O2 PLACEHOLDER
+            Profile.ViewmodelKickPitchDegrees = 2.0f;         // O2 PLACEHOLDER
+            Profile.ViewmodelSpringStiffness = 340.0f;        // O2 PLACEHOLDER
+            // Snaps up faster than anything else and barely slows you: a
+            // sidearm you cannot bring up in a hurry is not a sidearm.
+            Profile.AimInSeconds = 0.10f;                     // O2 PLACEHOLDER
+            Profile.MoveSpreadDegrees = 0.35f;                // O2 PLACEHOLDER
+            Profile.AimMoveSpreadMultiplier = 1.6f;           // O2 PLACEHOLDER
+            Profile.AimMoveSpeedMultiplier = 0.92f;           // O2 PLACEHOLDER
             break;
         default:
             // Rifle: the struct defaults. A learnable climb with a gentle
@@ -174,10 +309,17 @@ namespace
         const int32 Index = static_cast<int32>(Archetype);
         if (!Prototypes[Index])
         {
+            // Indexed by archetype. MUST stay the same length as the enum: a
+            // missing row is an out-of-bounds read on the first equip of a new
+            // weapon, not a compile error.
+            static_assert(static_cast<int32>(EBreakerWeaponArchetype::Count) == 8,
+                "Add a prototype name row when you add an archetype.");
             const FName Names[] =
             {
                 TEXT("PrototypeRifleDefinition"), TEXT("PrototypeSMGDefinition"), TEXT("PrototypeSniperDefinition"),
-                TEXT("PrototypeShotgunDefinition"), TEXT("PrototypeRocketDefinition")
+                TEXT("PrototypeShotgunDefinition"), TEXT("PrototypeRocketDefinition"),
+                TEXT("PrototypeBurstRifleDefinition"), TEXT("PrototypeMachinegunDefinition"),
+                TEXT("PrototypeSidearmDefinition")
             };
             Prototypes[Index] = NewObject<UBreakerWeaponDefinition>(GetTransientPackage(), Names[Index]);
             Prototypes[Index]->AddToRoot();
@@ -264,6 +406,99 @@ namespace
                 Definition->bProjectile = true;
                 Definition->ProjectileSpeed = 3200.0f;
                 Definition->ExplosionRadius = 350.0f;
+                break;
+
+            // ---- O27 breadth additions ----------------------------------
+            // Every number below is the ITEM LEVEL 1 anchor and rides
+            // WeaponBase(ilvl) = ArchetypeBase * (1+w)^(ilvl-1) through the
+            // shared GetScaledBaseDamage path exactly like the original five.
+            // Nothing here scales around the curve. All O2 PLACEHOLDER.
+            case EBreakerWeaponArchetype::BurstRifle:
+                // VOLLEY — the discipline weapon. Its cadence axis is the one
+                // no other archetype has: fixed three-round bursts with a
+                // 0.34 s gap you cannot shorten, so DPS is bounded by the CYCLE
+                // rather than by the trigger, and the whole gun is built around
+                // making each burst land. Per-round damage sits above the rifle
+                // and below the sniper; sustained DPS lands under the rifle,
+                // which is the price of the accuracy. Magazine is exactly nine
+                // bursts, so ammunition is counted in bursts and a reload
+                // never strands the player mid-burst.
+                Definition->WeaponId = TEXT("BurstRifle");
+                Definition->DisplayName = FText::FromString(TEXT("Volley"));
+                Definition->Damage = 29.0f;
+                Definition->WeakPointMultiplier = 1.9f;
+                Definition->RoundsPerMinute = 720.0f;   // WITHIN a burst only.
+                Definition->bAutomatic = true;
+                Definition->ShotsPerBurst = 3;
+                Definition->BurstCycleSeconds = 0.34f;
+                Definition->HipSpreadDegrees = 1.6f;
+                Definition->AimSpreadDegrees = 0.12f;
+                Definition->MagazineSize = 27;          // nine whole bursts
+                Definition->StartingReserveAmmo = 108;  // four magazines
+                Definition->ReloadDuration = 2.0f;
+                // Between the rifle and the sniper, matching where it fights.
+                Definition->FalloffStart = 3600.0f;
+                Definition->FalloffEnd = 8500.0f;
+                Definition->MinimumFalloffMultiplier = 0.80f;
+                Definition->MaximumRange = 13000.0f;
+                Definition->SwapInDuration = 0.55f;
+                break;
+            case EBreakerWeaponArchetype::Machinegun:
+                // BULWARK — the sustained-fire weapon, and an AMMUNITION
+                // ECONOMY archetype before it is anything else: a 120-round
+                // magazine is four SMG magazines in one trigger pull, and it
+                // pays for it with the longest reload in the game and a reserve
+                // that is only two and a half magazines deep. It is the one
+                // weapon that can hold a lane through a whole wave without
+                // reloading, and the one that is genuinely helpless if it has
+                // to. Per-round damage is the lowest in the table; sustained
+                // DPS is the highest, and only while planted.
+                Definition->WeaponId = TEXT("Machinegun");
+                Definition->DisplayName = FText::FromString(TEXT("Bulwark"));
+                Definition->Damage = 11.0f;
+                Definition->WeakPointMultiplier = 1.4f;
+                Definition->RoundsPerMinute = 700.0f;
+                Definition->bAutomatic = true;
+                Definition->HipSpreadDegrees = 3.2f;
+                Definition->AimSpreadDegrees = 0.8f;
+                Definition->MagazineSize = 120;
+                Definition->StartingReserveAmmo = 300;
+                Definition->ReloadDuration = 4.2f;      // the whole cost
+                // A long shallow curve: it reaches further than the rifle but
+                // gives ground the entire way, which is what makes it a
+                // suppression weapon rather than a long-range one.
+                Definition->FalloffStart = 2200.0f;
+                Definition->FalloffEnd = 9000.0f;
+                Definition->MinimumFalloffMultiplier = 0.55f;
+                Definition->MaximumRange = 11000.0f;
+                Definition->SwapInDuration = 0.95f;     // heaviest to bring up
+                break;
+            case EBreakerWeaponArchetype::Sidearm:
+                // MARK — the tempo weapon. It exists to make the SWAP a
+                // decision: 0.18 s swap-in against the rifle's 0.5 and the
+                // machinegun's 0.95, a 1.1 s reload, and by far the deepest
+                // reserve in the table, so it is the answer to a dry primary
+                // rather than a second primary. Semi-automatic, so its DPS
+                // ceiling is the player's trigger; and it is the one archetype
+                // whose damage barely falls off inside the 9-19 m band the gym
+                // actually fights in, which is what keeps it relevant rather
+                // than charitable.
+                Definition->WeaponId = TEXT("Sidearm");
+                Definition->DisplayName = FText::FromString(TEXT("Mark"));
+                Definition->Damage = 21.0f;
+                Definition->WeakPointMultiplier = 1.8f;
+                Definition->RoundsPerMinute = 420.0f;
+                Definition->bAutomatic = false;
+                Definition->HipSpreadDegrees = 1.1f;
+                Definition->AimSpreadDegrees = 0.30f;
+                Definition->MagazineSize = 14;
+                Definition->StartingReserveAmmo = 210;  // fifteen magazines
+                Definition->ReloadDuration = 1.1f;
+                Definition->FalloffStart = 1600.0f;
+                Definition->FalloffEnd = 4000.0f;
+                Definition->MinimumFalloffMultiplier = 0.52f;
+                Definition->MaximumRange = 7000.0f;
+                Definition->SwapInDuration = 0.18f;     // the whole point
                 break;
             default:
                 Definition->DisplayName = FText::FromString(TEXT("Rifle"));
@@ -393,6 +628,15 @@ float UBreakerWeaponComponent::GetSpeedFraction() const
 {
     if (!GetOwner() || MoveSpreadReferenceSpeed <= 0.0f) return 0.0f;
     return FMath::Clamp(static_cast<float>(GetOwner()->GetVelocity().Size2D()) / MoveSpreadReferenceSpeed, 0.0f, 1.0f);
+}
+
+float UBreakerWeaponComponent::GetAimMoveSpeedMultiplier() const
+{
+    // Composed against LIVE aim progress, not the aim button, so the penalty
+    // arrives at exactly the pace every other ADS benefit does. Nothing reads
+    // this yet — see the gap note on the declaration for the one function in
+    // Movement/ that has to.
+    return FBreakerWeaponFeel::AimMoveSpeedMultiplier(ResolveRecoilProfile(), GetAimAlpha());
 }
 
 float UBreakerWeaponComponent::GetMovementSpreadDegrees() const
@@ -701,6 +945,9 @@ FString UBreakerWeaponComponent::GetArchetypeName() const
         case EBreakerWeaponArchetype::Sniper: return TEXT("SNIPER");
         case EBreakerWeaponArchetype::Shotgun: return TEXT("SHOTGUN");
         case EBreakerWeaponArchetype::Rocket: return TEXT("ROCKET");
+        case EBreakerWeaponArchetype::BurstRifle: return TEXT("VOLLEY");
+        case EBreakerWeaponArchetype::Machinegun: return TEXT("BULWARK");
+        case EBreakerWeaponArchetype::Sidearm: return TEXT("MARK");
         default: return TEXT("RIFLE");
     }
 }
@@ -714,13 +961,60 @@ void UBreakerWeaponComponent::StartFire()
         return;
     }
     bTriggerHeld = true;
-    FireOnce();
+    RoundsInFireBurst = 0;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (Definition && Definition->bAutomatic)
+    const bool bBurstWeapon = Definition && Definition->ShotsPerBurst > 1;
+    const bool bFired = FireOnce();
+    if (bFired && bBurstWeapon) ++RoundsInFireBurst;
+
+    if (!Definition || !Definition->bAutomatic) return;
+    if (bBurstWeapon)
     {
-        GetWorld()->GetTimerManager().SetTimer(AutomaticFireTimer, this, &ThisClass::FireOnce,
-            FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute), true);
+        // A one-shot chain, because the interval alternates. Non-burst weapons
+        // keep the repeating timer below untouched: a repeating timer holds
+        // exact cadence, while a chain re-arms from the callback and would shed
+        // a callback's latency off every shot.
+        ScheduleBurstFire(RoundsInFireBurst >= Definition->ShotsPerBurst
+            ? FMath::Max(Definition->BurstCycleSeconds, FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute))
+            : FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute));
+        return;
     }
+    GetWorld()->GetTimerManager().SetTimer(AutomaticFireTimer, this, &ThisClass::FireOnceTimer,
+        FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute), true);
+}
+
+void UBreakerWeaponComponent::ScheduleBurstFire(float DelaySeconds)
+{
+    if (!GetWorld()) return;
+    GetWorld()->GetTimerManager().SetTimer(AutomaticFireTimer, this, &ThisClass::AdvanceBurstFire,
+        FMath::Max(DelaySeconds, UE_KINDA_SMALL_NUMBER), false);
+}
+
+void UBreakerWeaponComponent::AdvanceBurstFire()
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (!bTriggerHeld || !Definition || Definition->ShotsPerBurst <= 1) return;
+
+    // A burst that ran out of magazine, or was interrupted by a reload or a
+    // swap, starts a fresh burst rather than resuming a stale one — otherwise
+    // reloading mid-burst would hand the player a one-round burst.
+    if (RoundsInFireBurst >= Definition->ShotsPerBurst) RoundsInFireBurst = 0;
+
+    const bool bFired = FireOnce();
+    if (bFired) ++RoundsInFireBurst;
+
+    const float Interval = FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute);
+    // Not firing (reloading, swapping, dry) re-checks at the fire interval
+    // rather than giving up, so the trigger stays live across a reload.
+    if (!bFired) { ScheduleBurstFire(Interval); return; }
+    ScheduleBurstFire(RoundsInFireBurst >= Definition->ShotsPerBurst
+        ? FMath::Max(Definition->BurstCycleSeconds, Interval)
+        : Interval);
+}
+
+void UBreakerWeaponComponent::FireOnceTimer()
+{
+    FireOnce();
 }
 
 void UBreakerWeaponComponent::StopFire()
@@ -732,6 +1026,10 @@ void UBreakerWeaponComponent::StopFire()
         return;
     }
     bTriggerHeld = false;
+    // Releasing the trigger ends the burst. A burst weapon must not resume a
+    // half-finished burst on the next pull: the first round of every pull is
+    // shot 0 of a fresh burst, which is what makes the pattern learnable.
+    RoundsInFireBurst = 0;
     // Guarded like every other timer touch in this component: an owned but
     // worldless component (a test fixture, a CDO) has no timer manager, and
     // StopFire was the one place that assumed it did.
@@ -786,11 +1084,11 @@ bool UBreakerWeaponComponent::CanFire() const
     return GetWorld()->GetTimeSeconds() - LastShotTime + UE_KINDA_SMALL_NUMBER >= FBreakerWeaponMath::FireInterval(Definition->RoundsPerMinute);
 }
 
-void UBreakerWeaponComponent::FireOnce()
+bool UBreakerWeaponComponent::FireOnce()
 {
-    if (!CanFire()) return;
+    if (!CanFire()) return false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition) return;
+    if (!Definition) return false;
 
     const FBreakerRecoilProfile RecoilProfile = ResolveRecoilProfile();
     // A burst is a run of shots with no meaningful gap. Let the trigger rest
@@ -833,7 +1131,7 @@ void UBreakerWeaponComponent::FireOnce()
     {
         FireProjectile(Definition, ViewLocation, ViewRotation, Spread, FiredBurstIndex, RecoilSeed, ShotAimAlpha);
         if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
-        return;
+        return true;
     }
 
     FBreakerShotResult Shot;
@@ -859,13 +1157,28 @@ void UBreakerWeaponComponent::FireOnce()
     const float ScaledBaseDamage = FMath::Max(0.0f, Definition->Damage) * LevelScalar;
 
     const int32 PelletCount = FMath::Max(1, Definition->PelletsPerShot);
+    // One record per pellet, hits and misses alike. Reserved once: a spread is
+    // a fixed size and this is on the fire path.
+    Shot.Pellets.Reserve(PelletCount);
     for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
         const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
         const FVector PelletEnd = ViewLocation + Direction * Definition->MaximumRange;
         if (PelletIndex == 0) Shot.TraceEnd = PelletEnd;
+
+        // Added BEFORE the trace so that every code path below — miss,
+        // continue, geometry with no combat component — still leaves exactly
+        // one entry per pellet. A spread with a hole in it would silently drop
+        // a tracer, which is the failure this whole change exists to remove.
+        FBreakerPelletImpact& Pellet = Shot.Pellets.AddDefaulted_GetRef();
+        Pellet.End = PelletEnd;
+
         FHitResult Hit;
         if (!GetWorld()->LineTraceSingleByChannel(Hit, ViewLocation, PelletEnd, ECC_GameTraceChannel2, Params)) continue;
+
+        Pellet.bHit = true;
+        Pellet.End = Hit.ImpactPoint;
+        Pellet.HitActor = Hit.GetActor();
 
         Shot.bHit = true;
         Shot.HitActor = Hit.GetActor();
@@ -880,6 +1193,7 @@ void UBreakerWeaponComponent::FireOnce()
             || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
                 MarkedTarget != nullptr && Hit.GetActor() == MarkedTarget, Hit.Distance, LeadMinimumRangeCm);
         Shot.bWeakPoint |= bPelletWeakPoint;
+        Pellet.bWeakPoint = bPelletWeakPoint;
 
         if (UBreakerCombatComponent* TargetCombat = Hit.GetActor() ? Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
         {
@@ -931,6 +1245,7 @@ void UBreakerWeaponComponent::FireOnce()
     MulticastShotCosmetics(Shot);
 
     if (MagazineAmmo <= 0 && ReserveAmmo > 0) StartReload();
+    return true;
 }
 
 bool UBreakerWeaponComponent::ResolveWeakPointHit(const FHitResult& Hit, const FVector& RayOrigin, const FVector& RayDirection) const

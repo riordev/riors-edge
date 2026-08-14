@@ -4,7 +4,21 @@ The first weapon pipeline is a server-authoritative hitscan prototype with a Dat
 
 ## Playable archetypes
 
-The player carries two weapons. Keys 1-2 select the equipped primary and secondary slots; the current gym loadout is rifle / scattergun. All three clean-clone fallback definitions remain available to the future loadout and pickup systems, but only two may be equipped at once. These remain prototype values rather than balance commitments.
+The player carries two weapons. Keys 1-2 select the equipped primary and
+secondary slots; the current gym loadout is rifle / scattergun. **Eight**
+clean-clone fallback archetypes now exist — rifle, SMG, marksman, scattergun,
+rocket, and the O27 breadth additions Volley, Bulwark and Mark — all available
+to the loadout screen and the future pickup system, but only two may be
+equipped at once. These remain prototype values rather than balance
+commitments.
+
+`EBreakerWeaponArchetype` is stored as a uint8 in `UBreakerSaveGame` and
+replicated as one, so new archetypes are **appended, never inserted**:
+renumbering the existing five would silently rearm every saved loadout with a
+different gun. The prototype-name table in `BreakerWeaponComponent.cpp` is
+indexed by the enum and carries a `static_assert` on the count, because a
+missing row is an out-of-bounds read on first equip rather than a compile
+error.
 
 ### Rifle
 
@@ -31,6 +45,71 @@ The player carries two weapons. Keys 1-2 select the equipped primary and seconda
 - 150 rounds per minute, semi-automatic.
 - Eight-round magazine and 40 reserve.
 - Very tight aimed spread and strong long-range retention.
+
+### Volley (burst rifle) [O27]
+
+- 29 base damage, 1.9x weak point. **Three-round bursts** at 720 RPM inside the
+  burst, then a **0.34 s cycle gap you cannot shorten**.
+- 27-round magazine — exactly nine bursts, so ammunition is counted in bursts
+  and a reload never strands the player mid-burst. 108 reserve, 2.0 s reload.
+- Falloff between the rifle and the sniper (36 m to 85 m, floor 0.80).
+- **Niche: cadence and discipline.** No other archetype's DPS is bounded by a
+  cycle rather than by the trigger. Per round it out-hits the rifle; sustained
+  it lands *under* the rifle, and that gap is the price of the accuracy — a
+  test asserts it, because a burst weapon that also wins DPS deletes the rifle.
+  Its recoil is the most learnable pattern in the game: a near-pure vertical
+  ladder (vertical kick is 17x the horizontal) that settles inside its own
+  cycle gap, so every burst starts from the same place and pre-aiming down the
+  ladder is a real skill rather than a tax.
+
+### Bulwark (machinegun) [O27]
+
+- 11 base damage — the lowest in the table — 1.4x weak point, 700 RPM.
+- **120-round magazine**, four SMG magazines in one trigger pull, against a
+  **4.2 s reload** and the slowest swap-in in the game (0.95 s).
+- 300 reserve: deep in rounds, *shallow in magazines* (2.5), which is the
+  actual constraint.
+- Long shallow falloff (22 m to 90 m, floor 0.55): it reaches further than the
+  rifle but gives ground the whole way, which makes it a suppression weapon
+  rather than a long-range one.
+- **Niche: ammunition economy and sustained fire.** The only weapon that can
+  hold a lane through an entire wave without reloading, and the most helpless
+  if it has to reload mid-fight. Its recoil is deliberately *unrideable past a
+  point*: the longest climb ramp in the table (22 shots to full) with the
+  highest ceilings, and the largest `MaxBloomDegrees` of any archetype — the
+  shotgun included — so held fire, not the kick, is what punishes. Highest
+  sustained DPS in the table and only while planted.
+
+### Mark (sidearm) [O27]
+
+- 21 base damage, 1.8x weak point, 420 RPM semi-automatic — trigger-limited,
+  so its DPS ceiling is the player's click rate and their aim.
+- **0.18 s swap-in** (rifle 0.5, Bulwark 0.95), 1.1 s reload, 14-round
+  magazine, and the deepest reserve in the table in magazines (15).
+- **Niche: tempo.** It exists to make the *swap* a decision and to be the
+  answer to a dry primary, not a second primary. It pairs directly with the
+  existing swap-tempo layer and the Secondary "damage on swap-in" affix design.
+  The smallest kick in the table with by far the fastest settle
+  (`RecoveryConstantDegreesPerSecond` 30, delay 0.03 s), so the pattern is not
+  a pattern at all: it is back on target before a fast trigger finger gets
+  there.
+
+`RiorsEdge.Weapons.ArchetypeBreadth` pins each niche as a RELATIONSHIP rather
+than a value (O2 freezes the numbers), and asserts that no two archetypes share
+a cadence/magazine/pellet/spread/burst/swap fingerprint — a stat re-roll of an
+existing gun is exactly what O27 says not to add. All values are O2 PLACEHOLDER
+and **none of the three has been playtested**.
+
+**Burst cadence is a new mechanic**, not a re-skin:
+`UBreakerWeaponDefinition::ShotsPerBurst` / `BurstCycleSeconds` (1 / 0 = inert,
+which is every pre-existing archetype). Burst weapons run a one-shot timer
+chain rather than the repeating timer the other automatics use, because their
+interval alternates; non-burst weapons keep the repeating timer untouched so
+their cadence cannot shed a callback's latency per shot.
+
+**Known content gap:** `ABreakerCharacter::ApplyWeaponPresentation` has no case
+for the three new archetypes, so they all wear the rifle's placeholder
+proportions. That is a Characters/ change and a placeholder either way.
 
 The composite placeholder model changes proportions per archetype and provides muzzle flash, procedural kick, ADS alignment, ammunition state, and hit/weak-point feedback. Authored meshes, animation, VFX, and audio remain Blueprint presentation work.
 
@@ -106,6 +185,8 @@ One knob per playtest complaint, highest leverage first:
 | Weak points feel stingy | `WeakPointToleranceCm` (component) | 14 | Wider forgiveness halo. 0 = old exact test |
 | Falloff is too high | `MinimumFalloffMultiplier` (per definition) | rifle 0.72 | Raises the floor without moving where the curve starts |
 | Hip fire is the worse option | `AimMoveSpreadMultiplier` (per profile) | 2.2 | Widens aimed movement further, growing hip fire's band |
+| ADS still has no cost | `AimMoveSpeedMultiplier` (per profile) | rifle 0.72 | LOWERING it slows an aimed player further — **inert until Movement/ consumes it**, see the two-sided gap below |
+| A spread reads as one round | `MaxSpreadStreaks` (renderer) | 4 | More sub-streaks per blast, out of a 12-slot pool |
 
 Feel is not verifiable by automation. The tests prove the maths — accumulation,
 clamping, monotone recovery to exactly zero, compensation credit, the ADS
@@ -217,13 +298,60 @@ the moving opener while ADS still wins sustained fire. Per archetype the sniper
 must be planted (1.10 / 3.0x), the shotgun barely cares (0.25 / 2.0x), the SMG
 is the one legitimate run-and-gun ADS weapon (0.30 / 1.8x).
 
-**Not done, and needing an owner ruling:** ADS does not slow the player down.
-`Source/RiorsEdge/Movement` has no aim awareness at all, and
-`ABreakerCharacter::StartAim`/`StopAim` only forward to the weapon and nudge
-the viewmodel rest pose. A movement-speed
-penalty while aimed is the other half of this bill and is the natural next
-lever if the trade still reads weak; it is a Movement/Characters change, not a
-Weapons one.
+### The ADS movement-speed penalty: a TWO-SIDED gap, weapons side now closed
+
+The third item on the ADS bill is movement SPEED, and it has never been
+charged. This is deliberately recorded as a two-sided gap because that is what
+it is: one half is a weapon-authoring question and the other is a movement
+question, and they are owned by different layers.
+
+**Side one — the weapon publishes the penalty. BUILT.**
+
+- `FBreakerRecoilProfile::AimMoveSpeedMultiplier` (EditAnywhere, O2
+  PLACEHOLDER) is the ground-speed scale while fully sighted, authored per
+  archetype because "how much does sighting this weapon root you" is exactly
+  the kind of thing that should separate an SMG from a sniper.
+- `FBreakerWeaponFeel::AimMoveSpeedMultiplier(Profile, AimAlpha)` composes it
+  against live ADS progress, so the penalty arrives at exactly the pace every
+  other ADS benefit does — tapping aim and running does not bolt the player to
+  the floor for a frame. It is **clamped to 1.0 at the top**: this is a penalty
+  channel, and an archetype that authored 1.3 would make sighting a weapon
+  *faster* than hip firing it, inverting the whole trade.
+- `UBreakerWeaponComponent::GetAimMoveSpeedMultiplier()` is the query the
+  movement layer consumes; `GetArchetypeAimMoveSpeedMultiplier()` is the
+  authored fully-sighted value for UI and tuning.
+
+| Archetype | Aimed speed | Why |
+|---|---|---|
+| Mark (sidearm) | 0.92 | A sidearm you cannot move with is not a sidearm |
+| SMG | 0.88 | Stays the one legitimate run-and-gun ADS weapon |
+| Shotgun | 0.85 | Strafing into contact is its whole job |
+| Rifle | 0.72 | The baseline |
+| Volley | 0.70 | Between the rifle and the sniper, like everything else about it |
+| Rocket | 0.65 | Mass |
+| Sniper | 0.50 | Scoped and moving is nearly standing still, which is the point |
+| Bulwark | 0.45 | Most rooted in the table: its answer to being rushed is to keep firing |
+
+Setting every one of these to 1.0 reproduces today's behaviour exactly, which
+is the A/B that makes this safe to land before the other side exists.
+
+**Side two — something has to READ it. NOT BUILT, and outside this layer.**
+`Source/RiorsEdge/Movement/` still has no aim awareness whatsoever:
+`UBreakerCharacterMovementComponent::GetMaxSpeed()` composes walk/sprint speed
+with the gear multiplier and the temporary-multiplier stack, and nothing in
+that chain has ever heard of the weapon. Exactly one consumer is missing: that
+function must multiply its grounded cap by `GetAimMoveSpeedMultiplier()` from
+the owner's weapon component, or `ABreakerCharacter` must push it as a keyed
+temporary multiplier on aim state changes (`PushSpeedMultiplier` already
+exists). Sliding and the boosted-speed ceiling deliberately have no opinion
+here; whether an aimed slide is slowed is a movement-feel ruling, not a weapon
+one.
+
+**Until that lands the query returns an honest number that nobody reads**,
+which is a visible gap rather than a silent one.
+`RiorsEdge.Weapons.AimMoveSpeed` proves the ramp, the clamp, the 1.0-is-a-no-op
+property and the archetype ordering; it cannot prove that anything consumes it,
+and it does not pretend to.
 
 All values above are O2 PLACEHOLDER and **none of this has been playtested**.
 `RiorsEdge.Weapons.ArchetypeFalloff`, `.WeakPointTolerance` and `.HipFireTrade`
@@ -341,12 +469,12 @@ What it is now:
   the star's whole problem given that `FBreakerShotResult` carries no impact
   normal. The flash fires on EVERY hit, traced or not: hit confirmation is
   feedback, tracer density is decoration.
-- **Pellet weapons get no streak.** `FBreakerShotResult` carries one impact
+- **Pellet weapons got no streak.** `FBreakerShotResult` carried one impact
   point for a whole spread, so the shotgun previously drew a single line for
   eight pellets — a lie about where they went, and its own inconsistency. It
-  now gets the impact flash only. **Known gap, deliberately not forced from the
-  HUD:** doing this properly needs `FBreakerShotResult` to carry per-pellet
-  impacts, which is the weapon layer's contract to change.
+  got the impact flash only. **CLOSED by the per-pellet pass below**; the
+  section is left as written because the trade it records is why that pass
+  exists.
 - Projectile weapons still record no tracer at all.
 
 `ABreakerRocketProjectile` was rebuilt on the same honesty. The old build had
@@ -381,6 +509,85 @@ a purely visual complaint, so say it plainly: automation cannot see the screen.
 longer exist, and gained coverage of the head/trail split, the shortened
 streak, the screen-width floor, and tracer cadence. It proves none of these
 things look good.
+
+## Per-pellet impacts, and how a spread shares the tracer pool
+
+### The contract change, and why it is additive
+
+`FBreakerShotResult` carried ONE impact for a whole spread, so the shot
+contract could not answer "where did the shotgun actually land". Two
+consequences were recorded in the code: the tracer renderer had nothing
+per-pellet to draw, so the shotgun deliberately drew no streak at all; and any
+consumer wanting a per-pellet reading had to guess.
+
+It now carries `TArray<FBreakerPelletImpact> Pellets` — one entry per pellet of
+the trigger pull, **in fire order, hits and misses alike**. A missed pellet is
+still recorded, because where a pellet went when it missed is exactly the
+information a cone is made of. A single-projectile weapon records exactly one
+entry, so no consumer needs an "is this a shotgun" branch; a projectile weapon
+records none, because it put a real actor in the world instead.
+
+**Back compatibility is the point of the design, not a footnote.** Every
+pre-existing field keeps its exact previous semantics:
+
+| Field | Meaning, unchanged | Equivalent in the new record |
+|---|---|---|
+| `bHit` | any pellet landed | `GetLandedPelletCount() > 0` |
+| `bWeakPoint` | OR across the spread | OR of `Pellets[i].bWeakPoint` |
+| `ImpactPoint` / `TraceEnd` / `HitActor` | the LAST pellet that landed | last `Pellets[i]` with `bHit` |
+| `DamageResult` | the spread's summed damage | unchanged, still summed in the loop |
+
+So the HUD damage numbers, the Mana component's per-shot generation and the
+playtest telemetry are untouched by this change, and a replicated shot from a
+build without the array behaves exactly like a projectile shot.
+`RiorsEdge.Weapons.PerPelletImpacts` states each of those equations as a test.
+The per-pellet record is filled BEFORE each trace and completed after, so every
+path through the loop — miss, no combat component, early continue — still
+leaves exactly one entry per pellet. A spread with a hole in it would silently
+drop a tracer, which is the failure this whole change exists to remove.
+
+### How a spread shares a fixed pool
+
+`ABreakerTracerRenderer` is a fixed pool: **12 tracer slots** and 24 impact
+sparks, `CreateDefaultSubobject`ed once, recycled oldest-first. Round-robin
+eviction is graceful for single rounds and is NOT graceful for a spread — half
+a cone vanishing mid-flight is worse than no cone — and a definition may author
+up to 32 pellets, so "one streak per pellet" would consume the pool in a single
+trigger pull.
+
+**The policy: a per-spread budget, an even subsample, and thinner streaks.**
+
+- `MaxSpreadStreaks` = **4** slots of 12. At least two whole spreads fit at
+  once and no spread can ever evict itself. At the shotgun's 85 RPM (0.7 s
+  between shells) against the 0.20 s flight ceiling, two is already unreachable
+  in practice.
+- The subsample is **even and inclusive of both ends**, so streak 0 is always
+  pellet 0 and the last streak is always the last pellet: the drawn cone is
+  exactly as wide as the real one and never narrower. Indices are strictly
+  increasing, so no slot is wasted redrawing a pellet.
+- `SpreadThicknessScale` = **0.55**. Four full-thickness streaks read as four
+  rifle rounds fired at once; thinner sub-streaks read as shot. The scale is
+  applied to the *authored* thickness, so the screen-width floor still holds
+  and the far half of a cone cannot strobe out of existence.
+- **Impact flashes follow the pellets that actually landed**, not the streak
+  subsample, because hit confirmation is feedback the player acts on while
+  tracer density is decoration. Budgeted at `MaxSpreadSparks` = 8 of 24, so a
+  32-pellet definition cannot wrap the spark pool inside one trigger pull.
+- **Spreads are exempt from the tracer cadence.** A shell is one event;
+  skipping two shells in three would read as the gun misfiring.
+
+The selection maths is pure and header-inline (`BreakerHUD::SpreadStreakCount`
+/ `SpreadStreakPellet` in `BreakerTracerRenderer.h`), because whether the pool
+overflows is arithmetic and is therefore the one part of a visual change
+automation can genuinely prove. `RiorsEdge.Weapons.TracerSpreadPool` walks
+every legal pellet count 1-32 and asserts the budget holds, every streak
+indexes a real pellet, no two streaks share one, and both ends are always
+drawn.
+
+Every value above is O2 PLACEHOLDER. **None of it has been playtested, and
+automation cannot see whether a spread of four thin streaks actually reads as a
+shotgun blast on screen** — that exact blind spot has already let two visual
+passes ship.
 
 ## Base damage scales with item level [O27, Power-Curve.md §3]
 

@@ -37,6 +37,18 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1")) float RoundsPerMinute = 600.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing") bool bAutomatic = true;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1", ClampMax="32")) int32 PelletsPerShot = 1;
+    // Burst cadence (O27 breadth). 1 means "not a burst weapon" and the whole
+    // mechanic is inert, which is what every pre-existing archetype is.
+    //
+    // Above 1, a held trigger fires this many rounds at RoundsPerMinute and
+    // then waits BurstCycleSeconds before the next burst. That gap is the whole
+    // point: it is a cadence axis no other archetype has, it makes each burst
+    // one decision rather than a stream, and it lets the recoil pattern be a
+    // hard ladder that is fully paid off before the next burst starts.
+    // Requires bAutomatic; a semi-automatic burst weapon is just a burst per
+    // click, which is also legal.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="1", ClampMax="10")) int32 ShotsPerBurst = 1;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="0")) float BurstCycleSeconds = 0.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="0")) float HipSpreadDegrees = 1.2f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Firing", meta=(ClampMin="0")) float AimSpreadDegrees = 0.25f;
 

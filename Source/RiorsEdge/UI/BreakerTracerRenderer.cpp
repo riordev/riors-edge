@@ -100,7 +100,7 @@ void ABreakerTracerRenderer::BeginPlay()
     BuildMaterials(SparkMeshes, SparkMaterials);
 }
 
-void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End)
+void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale)
 {
     // Round-robin. Overwriting the oldest slot is the right failure: when
     // twelve rounds really are in the air the one that disappears is the one
@@ -110,7 +110,47 @@ void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End)
     Slot.End = End;
     Slot.StartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     Slot.bActive = true;
+    Slot.ThicknessScale = ThicknessScale;
     NextTracerSlot = (NextTracerSlot + 1) % TracerSlots;
+}
+
+void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End)
+{
+    ClaimTracerSlot(Start, End, 1.0f);
+}
+
+int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets)
+{
+    const int32 PelletCount = Pellets.Num();
+    if (PelletCount <= 0) return 0;
+
+    // --- Streaks: a budgeted, thinner subsample -----------------------------
+    // See the pool-sharing note in the header. The budget is what guarantees
+    // this can never wrap the pool and evict its own earlier streaks, which is
+    // the difference between "shares the pool" and "silently drops pellets".
+    const int32 StreakCount = BreakerHUD::SpreadStreakCount(PelletCount, MaxSpreadStreaks);
+    for (int32 StreakIndex = 0; StreakIndex < StreakCount; ++StreakIndex)
+    {
+        const int32 PelletIndex = BreakerHUD::SpreadStreakPellet(StreakIndex, StreakCount, PelletCount);
+        ClaimTracerSlot(Start, Pellets[PelletIndex].End, SpreadThicknessScale);
+    }
+
+    // --- Flashes: every landed pellet, up to the spark budget ---------------
+    // Hit confirmation is feedback the player acts on, so this is deliberately
+    // NOT the same subsample as the streaks: it follows the pellets that
+    // actually landed. It is still budgeted, because a 32-pellet definition
+    // would otherwise wrap the 24-slot spark pool inside one trigger pull.
+    int32 Flashes = 0;
+    for (const FBreakerPelletImpact& Pellet : Pellets)
+    {
+        if (!Pellet.bHit) continue;
+        if (Flashes >= MaxSpreadSparks) break;
+        const float FlightSeconds = BreakerHUD::TracerFlightSeconds(
+            Flight, static_cast<float>((Pellet.End - Start).Size()));
+        AddImpact(Pellet.End, Pellet.bWeakPoint, FlightSeconds);
+        ++Flashes;
+    }
+    return StreakCount;
 }
 
 void ABreakerTracerRenderer::AddImpact(const FVector& Location, bool bWeakPoint, float DelaySeconds)
@@ -209,8 +249,13 @@ void ABreakerTracerRenderer::Tick(float DeltaSeconds)
         // would also make a 2.4 m primitive visibly wedge-shaped, which reads
         // as a cone rather than as a round.
         const float Distance = static_cast<float>(FVector::Dist(ViewLocation, Sample.Head));
+        // The per-slot scale is applied to the AUTHORED thickness and not to
+        // the result, so the screen-width floor still holds: a spread pellet at
+        // 40 m is thinner than a bullet in world terms but is still at least a
+        // pixel wide, which is what stops the far half of a cone strobing out
+        // of existence between frames.
         const float Thickness = BreakerHUD::TracerThicknessCm(
-            Look.ThicknessCm, Distance, Look.MinScreenFraction, VerticalHalfFOV);
+            Look.ThicknessCm * Slot.ThicknessScale, Distance, Look.MinScreenFraction, VerticalHalfFOV);
         // A round dims very slightly as it goes downrange, so the streak has a
         // direction even in a still frame.
         const float Fade = FMath::Lerp(1.0f, 0.78f, Sample.HeadFraction);
