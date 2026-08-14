@@ -523,11 +523,12 @@ Exit test: Class-Kits §1.7 criteria 5–7.
 C6 Resonance → C4 Siphon (channel) → C2 Closequarter → Unmake + three variants.
 Cleave first because it is the only melee verb in the game and melee damage submission does not
 exist yet.
-**PARTLY DONE, out of the listed order:** Cleave, Closequarter, and Unmake shipped together
-because all three were buildable without new `Combat/` systems, while Rot / Siphon / Fracture /
-Resonance each need one (zones, healing, a projectile base, status consumption). D8 is now
-resolved, so Overcast is live for the three shipped abilities — see the status block at the top
-of §5.
+**DONE, out of the listed order:** Cleave, Closequarter and Unmake shipped first because all
+three were buildable without new `Combat/` systems. The four systems Rot / Siphon / Fracture /
+Resonance were each blocked on — zones, partial healing, a projectile base, status consumption —
+have since been built, and all four abilities ship on them. D8 is resolved, so Overcast is live
+across the whole kit. See the status block at the top of §5 for what remains (keystone halves
+and the HUD cycle readout).
 Exit test: Class-Kits §2.7 criteria 1–7.
 
 **Phase 4 — Verbs.** Air Jump (Kinesis K4) → Parry (Bulwark B4). Deliberately after Swift and
@@ -925,9 +926,17 @@ only (Class-Kits §2.1). Do not author cooldown GEs for this class.
 > cooldowns ever, and Unmake's cost rewrite), **C1 Cleave**, **C2 Closequarter**, and the
 > **Unmake** ultimate with its four variant rows. `UBreakerManaComponent` exists and its
 > Overcast incoming-damage penalty is wired into `UBreakerCombatComponent`.
-> Not built: C3 Rot, C4 Siphon, C5 Fracture, C6 Resonance, and the Edgework-on-Closequarter
-> and Cascade keystone halves. Each is blocked on a Combat/ system that does not exist
-> (zone actor, partial healing, projectile base, status consumption).
+> **THE FOUR BLOCKING `Combat/` SYSTEMS NOW EXIST**, and all six Caster class abilities are
+> built: the zone primitive (`ABreakerZoneActor` + `UBreakerZoneMath`), partial healing through
+> the damage contract (`ApplyHealing` + `ResolveHealing`), the shared projectile base
+> (`ABreakerProjectileBase`), and status consumption (`UBreakerStatusComponent`'s consumption
+> block + `UBreakerStatusConsumption`). **C3 Rot, C4 Siphon, C5 Fracture and C6 Resonance** ship
+> on top of them; see the as-built notes on §5.3–§5.6.
+> Still not built: the Edgework-on-Closequarter and Cascade keystone halves, VW7's conditional
+> second armour strip, MS2's advance-on-hit, and the HUD cycle readout (`UI/`).
+> **Reachability caveat:** the Caster has three keys and no ability-loadout UI, so
+> `DefaultAbilityIdForSlot` decides which of the five class abilities is playable. It now
+> returns Cleave + Rot, the starters Class-Kits names.
 >
 > **D8 IS RESOLVED — OVERCAST IS REACHABLE.** `ClassResourceFloor` (default 0) landed on the
 > attribute set, `PreAttributeChange` clamps `ClassResource` to `[Floor, Max]`, the Mana
@@ -1078,7 +1087,32 @@ SB7.
 (3) `bBypassDefensiveRolls`. (4) GA + cost GE. (5) SB10 data variant. (6) Test: blink never places
 the player outside navigable space or through a wall.
 
-## 5.3 C3 — Rot *(starter, Void Whisperer)*
+## 5.3 C3 — Rot *(starter, Void Whisperer)* — **BUILT**
+
+> **As built** (`Combat/BreakerZoneActor.{h,cpp}`, `Combat/BreakerZoneMath.{h,cpp}`,
+> `Abilities/BreakerAbility_Rot.{h,cpp}`).
+> - The zone actor is the spec's API plus `AdvanceZone(DeltaSeconds)` and
+>   `ReleaseAllOccupants()`, and its membership/cadence/expiry arithmetic is
+>   split into the world-free `UBreakerZoneMath` — the
+>   `BreakerRangedBehavior.h` precedent. The cadence SUBTRACTS the interval
+>   rather than resetting it, because a resetting accumulator makes a zone tick
+>   slower at 60fps than at 30, and that is asserted in automation.
+> - `FBreakerZoneSpec` carries a whole `FBreakerDamageRequest` rather than a
+>   damage number, so the caster's snapshot travels with the zone and every
+>   tick submits through `ReceiveDamage` with the caster as Instigator.
+> - `PushArmorReduction`/`Pop` landed on `UBreakerCombatComponent`, keyed by
+>   FName (the codebase's existing modifier-chain key type) rather than by
+>   FGameplayTag. The zone keys its strip by ZONE TAG, so two overlapping Rots
+>   strip 40 between them, and effective armour is clamped at zero.
+> - VW4's anti-stack check is in the ability's spawn path via the static
+>   `ABreakerZoneActor::FindRefreshableZone` — one place, not per ability.
+> - NOT built: VW7's extra 40 against already-DoTted targets (needs a
+>   per-occupant condition on the strip), and VW8's follow variant is wired
+>   (`SetFollowActor`) but no node grants it.
+> - Rot is now the Caster's second default ability slot, displacing
+>   Closequarter, because Class-Kits names Cleave and Rot as the starters.
+
+## 5.3.1 (original ticket)
 
 **Design source.** §2.2 C3. Cost 25 Mana, no CD. "4 m radius zone at the aim point, 6s duration.
 Enemies inside take Poison and have their Armour reduced by a flat 40."
@@ -1130,7 +1164,27 @@ ability base. (3) `PushArmorReduction` with a zero floor. (4) GA + cost GE.
 (5) VW7 / VW8 data variants. (6) Test: two overlapping Rots do not double-reduce armour and do not
 drive it negative.
 
-## 5.4 C4 — Siphon *(Void Whisperer, granted by VW7)*
+## 5.4 C4 — Siphon *(Void Whisperer, granted by VW7)* — **BUILT**
+
+> **As built** (`Abilities/BreakerAbility_Siphon.{h,cpp}`, healing in
+> `Combat/BreakerCombatComponent` + `UBreakerDamageLibrary::ResolveHealing`).
+> - `ApplyHealing`/`FBreakerHealResult` landed as specified, with the
+>   resolution split out as a PURE function so overheal and shield routing are
+>   provable with no world. `FBreakerHealRequest` carries the multiplier and
+>   the overheal-to-shield flag, so Leech and Siphon are one code path.
+>   `OnHealed` fires on the target and `OnHealingDealt` on the healer.
+> - Healing never resurrects, and a negative heal is not damage.
+> - The channel heals on damage LANDED (`HealthDamage + ShieldDamage`), not on
+>   damage requested, so a dodged or fully mitigated tick pays nothing.
+> - The channel's ticks are NOT flagged `bIsDamageOverTime`: a channel is a
+>   repeated direct hit from a live ability, not a snapshotting status, and
+>   flagging it would suppress Mana generation and exempt it from the passive
+>   defensive layer.
+> - NOT built: the `_Channel` base class. Siphon is the project's only channel;
+>   its two rules (`HealForTick`, `ShouldBreakChannel`) are static and tested
+>   and are exactly what a base would hold when a second channel appears.
+
+## 5.4.1 (original ticket)
 
 **Design source.** §2.2 C4. Cost 30 Mana, no CD. "5s channel on one target: deals Void damage over
 time and heals the caster for a portion. Channel breaks on the caster taking damage above a
@@ -1180,7 +1234,28 @@ with `MulticastShotCosmetics`.
 (3) GA + cost GE. (4) VW6 data variant. (5) Test: channel breaks exactly at the threshold, and
 Mana generation from Void ticks is **zero** (§2.7.3).
 
-## 5.5 C5 — Fracture *(Multispell, granted by MS7)*
+## 5.5 C5 — Fracture *(Multispell, granted by MS7)* — **BUILT**
+
+> **As built** (`Combat/BreakerProjectileBase.{h,cpp}`,
+> `Combat/BreakerStatusCycleComponent.{h,cpp}`,
+> `Abilities/BreakerAbility_Fracture.{h,cpp}`).
+> - `ABreakerProjectileBase` is extracted and `ABreakerEnemyProjectile` is
+>   re-expressed on it with every shipped number preserved.
+>   `ABreakerRocketProjectile` is deliberately left alone: it is in `Weapons/`,
+>   which this lane does not own, and its explosion and detonation-flash
+>   lifetime make the fold a behaviour change rather than a refactor.
+> - The projectile carries a LIST of statuses (`FBreakerCarriedStatus`), which
+>   is what lets MS7's two-cycle-positions upgrade be one projectile.
+> - The cycle component lives in `Combat/` rather than `Classes/` (Combat owns
+>   statuses; Classes owns resource loops) with the spec's API. It is seeded
+>   from a data list, never from hardcoded Bleed/Poison branches, honouring
+>   Class-Kits §2.5's "distinct status types, never named elements".
+> - The status is snapshotted at CAST, not at impact, per the DoT ruling.
+> - NOT built: the HUD cycle readout (SI-4, `UI/` is not this lane) and MS2's
+>   advance-on-hit (the flag exists; wiring it needs the projectile to call
+>   back into the cycle on impact).
+
+## 5.5.1 (original ticket)
 
 **Design source.** §2.2 C5. Cost 30 Mana, no CD. "Projectile that applies one status, cycling
 deterministically through the caster's available status types on each cast. The cycle order is
@@ -1218,7 +1293,28 @@ only for the HUD.
 **Tasks.** (1) `ABreakerProjectileBase` extraction. (2) `UBreakerStatusCycleComponent`.
 (3) HUD cycle readout (SI-4). (4) GA + cost GE. (5) MS2 / MS7 data variants.
 
-## 5.6 C6 — Resonance *(Multispell, granted by MS8)*
+## 5.6 C6 — Resonance *(Multispell, granted by MS8)* — **BUILT**
+
+> **As built** (`Combat/BreakerStatusComponent` consumption block,
+> `Combat/BreakerStatusConsumption.{h,cpp}`,
+> `Abilities/BreakerAbility_Resonance.{h,cpp}`).
+> - All four status hooks landed, plus `ConsumeStatus(Tag, bOutFound)` for
+>   conversion effects and a distinct `OnStatusConsumed` event so a listener
+>   can tell a detonation from a natural expiry. Consuming a status that is not
+>   present is a legal no-op that reports not-found.
+> - `ConsumeAllStatuses` moves the array out BEFORE broadcasting, so a listener
+>   that reapplies a status (Cascade) lands in an empty list rather than into
+>   the array being iterated.
+> - The damage curve is the pluggable strategy the ticket asked for
+>   (`Linear` / `FixedPlusThreshold`), pure and world-free.
+> - §2.7.5's 2.2x bound is tested AND PASSES with the shipping placeholder
+>   values, which required a flat base term: with per-status damage alone the
+>   2-to-6 ratio is exactly 3.0 and breaches the cap before any node is taken.
+> - Resonance refuses a cast on a target with no statuses (the Closequarter
+>   dead-key precedent) rather than charging 40 Mana for nothing.
+> - MS8 and MS9 are data fields on the ability; no node grants them yet.
+
+## 5.6.1 (original ticket)
 
 **Design source.** §2.2 C6. Cost 40 Mana, no CD. "Detonates every status currently on the target
 for a burst of damage, consuming them. Damage scales with the *number* of distinct status types,

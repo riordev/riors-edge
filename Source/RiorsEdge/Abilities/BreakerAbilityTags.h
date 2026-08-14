@@ -40,11 +40,28 @@ namespace BreakerAbilityTags
     // "cooldown of zero" (spec D3).
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Cleave);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Closequarter);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Rot);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Siphon);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Fracture);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Resonance);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Caster_Unmake);
 
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Cleave);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Closequarter);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Siphon);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ultimate_Unmake);
+
+    // The zone C3 Rot places. Identity for the zone's anti-stack rule (VW4)
+    // and the key its armour strip is pushed under, so two overlapping Rots
+    // are one puddle and one strip.
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Zone_Caster_Rot);
+
+    // NOTE on status tags: Status.Bleed / Status.Poison / Status.Void are
+    // authored in Config/DefaultGameplayTags.ini and are deliberately NOT
+    // redeclared natively here. They predate this namespace, the status
+    // component and Cleave both reach them through RequestGameplayTag, and two
+    // declaration sites for one tag is exactly the drift this namespace's
+    // header comment warns about.
 
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Caster_Edgework);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Keystone_Caster_LongDark);

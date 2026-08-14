@@ -51,11 +51,63 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat|Status") const TArray<FBreakerActiveStatus>& GetActiveStatuses() const { return ActiveStatuses; }
     UFUNCTION(BlueprintPure, Category="Combat|Status") bool HasStatus(FGameplayTag StatusTag) const;
 
+    // --- Consumption ------------------------------------------------------
+    // Reading a status is not the same verb as CONSUMING one, and until this
+    // block existed the component could only be read. That is the difference
+    // between status as a damage-over-time footnote and status as a build axis:
+    // Resonance detonates, Multispell sequences, and Affliction deepens, and
+    // all three need to take a status away and be told exactly what they took.
+
+    // Distinct TYPES, never stacks. Class-Kits C6 makes this an explicit
+    // anti-stacking rule: Resonance scales on how many different statuses are
+    // on the target, so a 10-stack Bleed counts once.
+    UFUNCTION(BlueprintPure, Category="Combat|Status") int32 GetDistinctStatusTypeCount() const;
+
+    // Removes everything and RETURNS what was removed, so the detonator can
+    // compute its damage from the same data it just destroyed rather than
+    // reading the list twice and racing itself. Returns an empty array when
+    // there was nothing to consume — consuming nothing is a legal no-op, not an
+    // error, because Cascade and Resonance both fire into whatever is there.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
+    TArray<FBreakerActiveStatus> ConsumeAllStatuses();
+
+    // Single-type consumption for conversion effects. bOutFound distinguishes
+    // "consumed a status worth nothing" from "there was no such status".
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
+    FBreakerActiveStatus ConsumeStatus(FGameplayTag StatusTag, bool& bOutFound);
+
+    // MS8's rewrite: do not consume, shorten. A scalar of 0 removes outright,
+    // which is the same observable outcome as consumption and keeps the two
+    // paths from disagreeing about what "gone" means.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
+    void ScaleRemainingDurations(float Scalar);
+
+    // Affliction A1 Deepen. Additive against the authored cap; lowering the cap
+    // trims live stacks immediately so the readout cannot show more stacks than
+    // the cap allows.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
+    void SetStackCapDelta(int32 Delta);
+
+    UFUNCTION(BlueprintPure, Category="Combat|Status") int32 GetEffectiveStackCap() const;
+
+    // Drives the DoT clocks. Called from TickComponent, and directly by tests
+    // so the whole component is exercisable without a world — the same
+    // precedent as UBreakerAbilityStateComponent::AdvanceTime.
+    UFUNCTION(BlueprintCallable, Category="Combat|Status") void AdvanceStatuses(float DeltaSeconds);
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="1")) int32 MaximumStacksPerStatus = 10;
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusApplied;
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusExpired;
+    // Deliberately NOT OnStatusExpired: a listener must be able to tell a
+    // detonation from a status that simply ran out. Support's Charge loop and
+    // the Affliction nodes both care about the difference.
+    UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusConsumed;
 
 private:
     UPROPERTY() TArray<FBreakerActiveStatus> ActiveStatuses;
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> Combat;
+    // Additive against MaximumStacksPerStatus. Separate from the authored cap
+    // so a node granting +2 stacks does not permanently rewrite the value an
+    // owner authored.
+    int32 StackCapDelta = 0;
 };

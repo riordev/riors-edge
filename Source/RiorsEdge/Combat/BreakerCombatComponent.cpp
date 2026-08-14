@@ -27,6 +27,11 @@ void UBreakerCombatComponent::BeginPlay()
     }
 }
 
+void UBreakerCombatComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
+{
+    Attributes = InAttributes;
+}
+
 void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -40,7 +45,9 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     FBreakerDefenseState Defense;
     Defense.Health = Attributes->GetHealth();
     Defense.Shield = Attributes->GetShield();
-    Defense.Armor = Attributes->GetArmor();
+    // Flat strippers (Rot, Disruptor) come off here, clamped at zero: negative
+    // armour would invert the mitigation formula into a damage bonus.
+    Defense.Armor = GetEffectiveArmor();
     // Gear-rolled physical damage reduction folds into the incoming
     // multiplier so the resolution order stays single-path.
     if (Request.DamageFamily == EBreakerDamageFamily::Physical)
@@ -70,8 +77,12 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         OnDamageReceived.Broadcast(Result);
         return Result;
     }
-    Attributes->SetShield(Result.RemainingShield);
-    Attributes->SetHealth(Result.RemainingHealth);
+    // Same null-safe route the healing path uses: identical to the generated
+    // setters when there is an ability system, and writable (rather than an
+    // ensure) when there is not, which is what lets automation exercise a
+    // whole damage submission instead of only the pure resolver.
+    Attributes->ApplyShield(Result.RemainingShield);
+    Attributes->ApplyHealth(Result.RemainingHealth);
     LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     OnDamageReceived.Broadcast(Result);
     if (Result.bKilled && !bDeathBroadcast)
@@ -185,6 +196,84 @@ float UBreakerCombatComponent::GetComposedIncomingDamageMultiplier() const
     float Product = 1.0f;
     for (const TPair<FName, float>& Entry : IncomingDamageModifiers) Product *= Entry.Value;
     return Product;
+}
+
+void UBreakerCombatComponent::PushArmorReduction(FName Key, float FlatAmount)
+{
+    if (Key.IsNone()) return;
+    // Re-pushing the same key REPLACES. This is the whole anti-stack rule: two
+    // overlapping Rots share a key, so the second one refreshes the first
+    // instead of doubling the strip (Ability-Implementation-Spec §5.3 task 6).
+    ArmorReductions.Add(Key, FMath::Max(0.0f, FlatAmount));
+}
+
+void UBreakerCombatComponent::PopArmorReduction(FName Key)
+{
+    ArmorReductions.Remove(Key);
+}
+
+float UBreakerCombatComponent::GetComposedArmorReduction() const
+{
+    float Total = 0.0f;
+    for (const TPair<FName, float>& Entry : ArmorReductions) Total += Entry.Value;
+    return Total;
+}
+
+float UBreakerCombatComponent::GetEffectiveArmor() const
+{
+    const float Base = Attributes ? Attributes->GetArmor() : 0.0f;
+    return FMath::Max(0.0f, Base - GetComposedArmorReduction());
+}
+
+FBreakerHealResult UBreakerCombatComponent::ApplyHealing(const FBreakerHealRequest& Request)
+{
+    FBreakerHealResult Result;
+    if (!Attributes || !GetOwner() || !GetOwner()->HasAuthority()) return Result;
+    // Healing is not revival. A heal landing on a corpse would resurrect it
+    // without any of the state a real revive has to restore.
+    if (IsDead()) return Result;
+
+    FBreakerVitalsState Vitals;
+    Vitals.Health = Attributes->GetHealth();
+    Vitals.MaxHealth = Attributes->GetMaxHealth();
+    Vitals.Shield = Attributes->GetShield();
+    Vitals.MaxShield = Attributes->GetMaxShield();
+
+    Result = UBreakerDamageLibrary::ResolveHealing(Request, Vitals);
+    if (Result.RequestedAmount <= 0.0f) return Result;
+
+    // Null-safe writes: the generated setters ensure() without an owning
+    // ability system, which would make every heal untestable in automation.
+    Attributes->ApplyHealth(Result.RemainingHealth);
+    if (Result.ShieldGranted > 0.0f) Attributes->ApplyShield(Result.RemainingShield);
+    OnHealed.Broadcast(Result);
+
+    // Healer-side dispatch, mirroring DispatchHitDealt. Self-heals report on
+    // the same component once, not twice: a listener that heals on heal would
+    // otherwise re-enter itself without bound.
+    AActor* Healer = Request.Healer.Get();
+    if (Healer && Healer != GetOwner())
+    {
+        if (UBreakerCombatComponent* HealerCombat = Healer->FindComponentByClass<UBreakerCombatComponent>())
+        {
+            FBreakerHealContext Context;
+            Context.Healer = Healer;
+            Context.Target = GetOwner();
+            Context.Result = Result;
+            Context.SourceTag = Request.SourceTag;
+            HealerCombat->OnHealingDealt.Broadcast(Context);
+        }
+    }
+    return Result;
+}
+
+FBreakerHealResult UBreakerCombatComponent::ApplyHealingAmount(float Amount, AActor* Healer, FGameplayTag SourceTag)
+{
+    FBreakerHealRequest Request;
+    Request.Amount = Amount;
+    Request.SourceTag = SourceTag;
+    Request.SetHealer(Healer);
+    return ApplyHealing(Request);
 }
 
 void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Request)

@@ -102,6 +102,15 @@ public:
     // (spec D3); this is the generation/regen write the loop components have
     // always done, made testable.
     void ApplyClassResource(float NewValue);
+    // Null-safe writes of the two vitals, for the same reason and by the same
+    // route as ApplyClassResource above. Used by the healing path in
+    // UBreakerCombatComponent so a heal is exercisable in automation without a
+    // world and an ability system — the generated setters ensure() when there
+    // is no owning ASC, which is what made the whole vitals path untestable.
+    // NOT a damage path: damage still goes through ReceiveDamage, and nothing
+    // outside the combat component may call these.
+    void ApplyHealth(float NewValue);
+    void ApplyShield(float NewValue);
 
     float GetAttributeBase(EBreakerAggregatedAttribute Attribute) const { return Aggregator.GetBase(Attribute); }
     float GetComposedAttribute(EBreakerAggregatedAttribute Attribute) const { return Aggregator.Compose(Attribute); }
