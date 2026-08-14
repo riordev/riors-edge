@@ -1,11 +1,12 @@
 # Art and Modelling Plan — Rior's Edge (Project Breaker)
 
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
+
 Owner: Art / Character direction
 Status: Design pass. No assets authored yet.
 Scope: Vertical slice only, with production hooks for Act I–II.
 Reads from: `CONTEXT.md`, `Docs/Layer-Ownership.md`, `Docs/Character-Progression-Architecture.md`, and — **for history only** — `Docs/Design/Master-Sheet-Import.txt`.
-
-**Last reconciled against: O32**
 
 **AUTHORITY CORRECTION (O28).** This document was written treating the master
 sheet's LOCKED decisions as law. **They are not.** `Master-Sheet-Import.txt` is
@@ -429,7 +430,7 @@ The code rig is that fallback, and it costs nothing because it ships no assets.
 5. Dash — a short, hard camera-space lurch. **Redirect, not launch.** Dash "redirects momentum" per 5.3, and the animation must not imply a rocket.
 6. Air / falling
 7. Fire (per archetype), reload (per archetype), aim-down-sights transition
-8. Air jump (Kinesis-granted) — off-hand snap. Must look *earned*, since it is one of only two tree-granted verbs in the game.
+8. Air jump — off-hand snap. **RULED [O25] — base kit for everyone (two jumps); no longer Kinesis-granted.** Author it as default competence every player will see constantly, not as an earned unlock. (Swift's later third jump is a separate, unimplemented, class-innate ability — also not tree-granted.)
 
 **Explicitly not in the motion set:** no dodge roll, no parry-as-dodge, no grapple throw, no melee lunge that reads as a traversal verb.
 
@@ -494,7 +495,7 @@ The obvious art instinct — a dodge-roll animation, a shield-raise stance — w
 
 **Parry is the only defensive player input**, and it runs on **its own short cooldown**. Art consequences:
 
-- Parry, when built, is the single defensive verb that gets an authored anticipatory pose and a distinct readable timing. It is tree-granted (Bulwark) and is one of only two tree-granted verbs, so it must look *earned* in the same way air jump does.
+- Parry, when built, is the single defensive verb that gets an authored anticipatory pose and a distinct readable timing. It is tree-granted (Bulwark), and **RULED [O25] — Parry is now the only tree-granted verb in the game**: air jump is base kit (two jumps for everyone) and Swift's later third jump is a class-innate unlock, so neither is tree-granted any longer. Parry alone should look *earned*; the movement verbs around it read as default competence instead.
 - Parry must be visually unmistakable from a block, because block has no animation at all. There is no shared "defensive" vocabulary between them — one is a proc, the other is a verb.
 - Do not author parry until it is built; do not pre-author a generic "defend" pose that parry might inherit. The risk this section exists to prevent — a dodge roll or shield-raise that lies about the control scheme — applies equally to a speculative shared defensive pose.
 
@@ -659,6 +660,8 @@ The slice arena is a local rift, not the Anchor. Direction:
 ## 5. Five weapon archetype visual identities
 
 Code currently ships Rifle, SMG, Sniper, Shotgun, Rocket (`CONTEXT.md`). Master sheet 12.3 scopes the slice to three archetypes: hitscan baseline (DONE), multi-shot (shotgun), movement-interacting (rocket).
+
+**Reconciliation note (O40 pass).** The code enum `EBreakerWeaponArchetype` is canonical: **Rifle, SMG, Sniper, Shotgun, Rocket** (the original five, which is what the vertical slice ships against — see `Vertical-Slice.md`), plus **BurstRifle, Machinegun, Sidearm** from the O27 breadth pass. The archetype names here and in §5.1 already match the code; `Docs/Weapon-Foundation.md`'s prior **Scattergun** / **Marksman** naming has been aligned to **Shotgun** / **Sniper** to match. This is a code-alignment fix made during the O40 reconciliation pass, not a numbered ruling in its own right.
 
 **Design principle: the archetype is readable from the silhouette in the corner of the eye.** In a looter shooter the player swaps weapons constantly; the first-person silhouette is the swap confirmation. Each archetype gets one dominant, unmistakable silhouette feature that no other archetype uses.
 
