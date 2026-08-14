@@ -148,6 +148,12 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 - Class selection framework: BREAKER CLASS menu screen locks one of the five classes permanently via `ChoosePermanentClassById` (Data-Asset-driven kits still to come).
 - The gym encounter includes one elite (`ConfigureElite`): 1.5x scale, tripled health, doubled damage, drops never below Exceptional.
 - Inventory backpack sorts best-rarity-first with per-slot filter chips and auto-height cards.
+- Weapons have a mechanical feel layer (`Weapons/BreakerWeaponFeel.h`, pure maths so it is unit-testable): per-archetype recoil with a learnable pattern and a settle that lands on exactly zero, player compensation credited against the recovery budget, ADS tightening four axes, first-shot accuracy with bloom, and a substepped viewmodel spring. The round goes where the crosshair was when fired; the kick moves the aim for the NEXT one, and that invariant is tested. Weak points carry a world-space forgiveness halo (`WeakPointToleranceCm`, 14 cm) after a geometry bug left the bottom of the head unhittable from the front. Falloff is softened per archetype with the ORDERING pinned by test rather than the values. ADS pays aim-in time and a movement spread penalty, so hip fire is the mobile close option rather than strictly worse; it has no ADS movement-speed penalty yet because `Movement/` has no aim awareness.
+- `ABreakerRangedEnemy` (LATTICE) holds a 9-19 m band, strafes while firing, has no contact attack, and throws a real replicated projectile at 1100 cm/s against a 950 cm/s sprint with a 0.85 s telegraph and 0.35 lead — enough that holding a lane is punished and any direction change beats it. It SUBCLASSES `ABreakerEnemy`, so loot, waves, health bars and TTK sampling work unchanged; it declares itself through `IsRangedForTelemetry()` so its kills get their own TTK bucket instead of polluting the melee average.
+- Rounds are drawn by `ABreakerTracerRenderer` (UI/), a pooled client-side world actor — 12 tracers plus 24 impact sparks allocated once and recycled, nothing spawned per bullet. Additive unlit material so it still depth-tests against the world, which the previous canvas approach could not. The shotgun deliberately draws no streak, because the shot result carries one impact for a whole spread.
+- Movement carries weight without floatiness: gravity 1.38 on the rise (eased twice from playtest), a 1.80x fall multiplier, a blended apex band, terminal velocity, variable jump height, a landing speed cost, tighter braking. Wall ride was BROKEN — its entry gate equalled walk speed and is read after wall contact, so it never entered at any angle — now 450 with a regression test. Dash broadcasts `OnDashStarted` for an FOV punch scaled by speed and a direction-signed camera roll.
+- Damage scaling is real and unified: `EBreakerNodeStatTarget::Damage` exists, `DamageMultiplier` is an aggregated attribute rather than a permanently-1.0 constant, and gear plus tree plus a per-spent-point baseline (`IncreasedDamagePerSpentPoint`, EditAnywhere, zeroable) all land in ONE additive Increased bucket. Before this, a skill node was structurally incapable of raising weapon damage.
+- The skill matrix sizes from the measured viewport once per rebuild, scrolls in both axes, and leads each node card with what a point BUYS (`DAMAGE 1.06x -> 1.10x`) projected through a copy of the live aggregator so it cannot drift from the real numbers. A branch strip browses subclasses; committing to one does not exist in the data model.
 - The FIELDPLATE UI system is implemented. `Source/RiorsEdge/UI/BreakerUIStyle.h` is the single token header (sRGB palette, rarity ramp, 4/8/16/24/40/64 spacing scale, rail and border widths, type scale, HUD geometry) and both the canvas HUD and the Slate front end read from it — a colour authored twice is a bug. `ABreakerPlaytestHUD` is rebuilt to `Docs/Design/UI-HUD-Spec.md`: one 440x184 bottom-right cluster on a 3px orange rail, notched momentum track whose block texture changes per state, 56px ability squares with ready/window/cooldown-wedge/unaffordable states, 420-wide vitals plate with fixed 84px value column and armour chips, top-centre wave banner, spec'd damage-number scale with cluster stacking, 180x8 enemy bars, and the violet ultimate frame with edge bands and step-down. All HUD geometry is authored in the spec's 1080p pixels and scaled by `ViewportHeight/1080`. Two known gaps, both content not code: the three OFL faces (Saira Condensed / Barlow / JetBrains Mono) are not imported, so the type *scale* is honoured and the *faces* are not; and no ability glyphs exist, so each square falls back to the ability's short name in its state colour.
 
 ## Verification status
@@ -251,51 +257,65 @@ grants) gate on the DEV checkbox on the BREAKER CLASS screen.
 
 Next actions, in priority order:
 
-1. **Awaiting owner ruling — TTK re-anchor ("tune it")**: session 4
-   measured trash 2.61s / elite 6.18s engaged-TTK vs targets <1s / ~3s.
-   Solve enemy chassis backwards from O18 (trash ~90-100 HP). Two riders
-   from the ranged archetype: it deliberately ships at the base 220 health
-   instead of Encounter-Design §2.2's 1.6x, which should be applied once the
-   re-anchor lands; and `UBreakerPlaytestComponent` still books ranged and
-   melee kills into the SAME trash TTK bucket, so the sample is now mixed —
-   it needs an archetype dimension before the numbers are read again.
-2. **UI follow-ups** (the style-guide implementation itself is done — see
-   the FIELDPLATE bullet above and the five `Docs/Design/UI-*.md` specs):
-   import the three OFL font families and point the tokens at them;
-   commission the nine ability glyphs per `UI-Ability-Icons-Spec.md`;
-   re-zone Inventory to the 1920 three-column layout and the skill tree to
-   the path board / constellation map (both specs list exactly what
-   remains). Slate panel-transition and purchase-confirm motion is also
-   unimplemented.
-3. Caster: the Spellblade abilities, Unmake, and Overcast (spec D8) are all
-   live. What remains is Rot/Siphon/Fracture/Resonance and the Combat/
-   systems they need (zones, partial healing, a projectile base, status
-   consumption). Also: Overdrive keystone branch stubs and the remaining
-   inert node tags (ledger in `BreakerAbilityStateComponent.h`). Overcast
-   itself has never been PLAYTESTED — it is proven by automation only, and
-   the D8 client-prediction spike is still owed (moot today: all three
-   Caster abilities are ServerOnly).
-4. (DONE) Equipment + progression now share one attribute application path
-   in `UBreakerAttributeSet`. Follow-up worth an owner ruling: the shared
-   MoveSpeed/SlideSpeed/AirControl multipliers that
-   `UBreakerCharacterMovementComponent` reads still compose gear and tree
-   percentages MULTIPLICATIVELY (`GearMoveSpeedMultiplier()` and friends),
-   which contradicts the locked one-additive-Increased-bucket rule the
-   MoveSpeed attribute now follows. That file is owned by the movement
-   layer, so it was left alone. Damage was the same bug class and is now
-   fixed; movement is the LAST instance. Two things for the same ruling:
-   the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all (the
-   movement component caps from its own WalkSpeed/SprintSpeed), and
-   SlideSpeed/AirControl/DashCooldown never reach the attribute set at all.
-   Also unsurfaced: the inventory totals panel's WEAPON DAMAGE row still
-   prints the gear-only figure, so skill-tree damage is invisible in the UI
-   (`UI/BreakerMenu.cpp` ~1003 — should read the DamageMultiplier attribute).
-5. Real gym map authored in-editor (the stock First Person template
-   geometry still crowds the runtime-spawned field) — editor work.
-6. Pending owner decisions beyond TTK: Overdrive's +25% damage window is a
-   4th More vs the O3 budget of 3 (flag in `BreakerAbility_Overdrive.h`);
-   the replication position page (O22, owner-authored, gates Damage-
-   Pipeline sign-off); the held items in Decisions.md's pending list.
+1. **AWAITING OWNER RULING — TTK re-anchor.** Session 5 is the strongest
+   sample yet and it splits: **elite 3.01s is ON TARGET**; melee trash
+   **1.81s vs <1s** is ~1.8x slow (34 kills, engagement-gapped, ranged
+   separated out). The correction is one ratio: trash health ~220 -> ~120,
+   or an equivalent damage raise. Health is the better lever — it leaves
+   weapon damage free as the gear/tree tuning surface. Two riders when the
+   ruling lands: set `WeakPointToleranceCm = 0` for the measuring run (the
+   new forgiveness halo adds 8-14% damage per hit at a 50-60% weak-point
+   rate), and apply Encounter-Design 2.2's 1.6x to the ranged archetype,
+   which deliberately ships at the base 220 chassis. The ranged/melee bucket
+   mixing noted last session is FIXED — the report now splits melee, ranged
+   and elite.
+2. **Assets are now the binding constraint on feel, not code.** In order of
+   how much they block: AUDIO (nothing exists — recoil, bloom and viewmodel
+   kick are all built and land on silence); the three OFL faces (Saira
+   Condensed / Barlow / JetBrains Mono — everything renders in Roboto, the
+   type scale is already correct so it is a swap); weapon and character
+   meshes (recoil currently kicks a grey box); muzzle flash and impact VFX
+   (hooks and timings fire into nothing); the nine ability glyph SVGs (code
+   stand-ins exist). All of these need the owner: downloading fonts and
+   authoring `.uasset`s is editor work.
+3. **Owner decisions, none blocking code:**
+   - **Movement is the LAST multiplicative gear x tree violation.**
+     `GearMoveSpeedMultiplier()` and friends compose percentages
+     multiplicatively against the locked one-additive-bucket rule. Damage was
+     the same bug class and is fixed. Conforming makes +20/+20 read x1.40 not
+     x1.44 — a movement FEEL change, which is why it is a ruling. Related:
+     the composed MoveSpeed ATTRIBUTE has no gameplay consumer at all, and
+     SlideSpeed/AirControl/DashCooldown never reach the attribute set.
+   - **Subclass commitment.** The branch strip browses; committing needs a
+     branch field on the progression state or tree, a one-way setter with a
+     permanence-or-Forge rule, save versioning, and a ruling on whether
+     unselected branches become unpurchasable — which collides with O15.
+   - **Swift's third jump** (O25) is unimplemented and needs a kit design:
+     when it unlocks and whether it is free.
+   - Overdrive's +25% damage window is a 4th More against the O3 budget of 3
+     (flagged in `BreakerAbility_Overdrive.h`); the O22 replication position
+     page, which gates Damage-Pipeline sign-off and also decides whether
+     recoil should be client-predicted; the held items in Decisions.md.
+4. **Content gaps that are content, not code:**
+   - **Swift's FRENZY branch is unauthored.** Class-Kits 1.3-1.5 names
+     Frenzy / Kinetic / Marksman; only two exist in
+     `UBreakerProgressionLibrary`, so the branch strip shows two chips.
+   - Caster's Rot / Siphon / Fracture / Resonance need Combat/ systems that
+     do not exist (zones, partial healing, a projectile base, status
+     consumption). Overdrive keystone branch stubs and the inert node tags
+     (ledger in `BreakerAbilityStateComponent.h`).
+   - Elements constellation has no nodes; the cluster renders sealed.
+5. **Real gym map authored in-editor.** The stock First Person template
+   geometry still crowds the runtime-spawned field, and the owner has now
+   twice reported that the SPACE reads wrong ("walk speed feels weird but i
+   think its a map scope issue"). Editor work.
+6. **Known smaller gaps, each recorded at the code:** the shotgun draws no
+   tracer because `FBreakerShotResult` carries one impact for a whole spread
+   (per-pellet impacts are a weapon-contract change); ADS has no movement
+   SPEED penalty because `Movement/` has no aim awareness, which is the
+   other half of the hip/ADS trade; `DevForceClass` keeps a stale
+   `ClassDefinition` after a dev swap; Slate panel-transition and
+   purchase-confirm motion are unimplemented.
 
 ## Session workflow facts (read before working)
 
@@ -317,11 +337,13 @@ Next actions, in priority order:
 - `Docs/Character-Progression-Architecture.md` — class, Core Tree, status, and GAS architecture
 - `Docs/Layer-Ownership.md` — which layer owns verbs, scaling, and identity
 - `Docs/Combat-Foundation.md` — damage order, armour, shields, critical DoTs, attributes, and stamina
-- `Docs/Weapon-Foundation.md` — hitscan flow, prototype rifle, weak points, and target dummy
+- `Docs/Weapon-Foundation.md` — hitscan flow, archetypes, weak points and the forgiveness halo, falloff, the hip/ADS trade, recoil and bloom, and round presentation
+- `Docs/Movement-Design.md` — the movement verbs, the weight pass with its before/after table and revert list, and the wall-ride entry rule
+- `Docs/Playtest-Gym-v1.md` — what the gym spawns, the enemy archetypes including LATTICE, and how to reach each of them
 - `Docs/Vertical-Slice.md` — vertical-slice scope and definition of done
 - `Docs/Item-Foundation.md` — item instances, item level, affix tiers, loot rolls, equipment, and the stat aggregation rule
 - `Docs/Playtest-Feedback-Log.md` — owner playtest findings and actions taken
-- `Docs/Design/` — the design corpus: Decisions.md is the append-only rulings ledger (read first); Design-Overview.md maps the space; per-domain docs cover classes (Class-Kits + Gunsmith/Tank/Support), constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, damage pipeline, and the ability implementation spec
+- `Docs/Design/` — the design corpus: Decisions.md is the append-only rulings ledger (read first); Design-Overview.md maps the space; per-domain docs cover classes (Class-Kits + Gunsmith/Tank/Support), constellations, XP/pacing, encounters, game modes, UI/UX, save architecture, art plan, damage pipeline, and the ability implementation spec. The five `UI-*.md` files are the FIELDPLATE visual authority: `UI-Style-Guide-Fieldplate.md` (palette, type scale, shape, motion), plus the HUD, Inventory, Skill Tree and Ability Icon specs, each carrying its own implementation-status section recording exactly what is built and what is not
 
 ## Handoff discipline
 

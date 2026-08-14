@@ -74,6 +74,24 @@ Implementation notes tied to these rulings:
 
 ## Owner choices currently pending (presented, not ruled)
 
+- **TTK re-anchor [O18/O2]** — session 5 measured melee trash 1.81s vs a
+  <1s target and elite 3.01s vs ~3s (ON target). The correction is one
+  ratio: trash health ~220 -> ~120 or an equivalent damage raise. Health is
+  the recommended lever; it leaves weapon damage as the gear/tree tuning
+  surface. Set `WeakPointToleranceCm = 0` for the measuring run.
+- **Movement's multiplicative gear x tree composition** — the last instance
+  of the bug class fixed everywhere else. Conforming to the one-additive-
+  bucket rule changes movement FEEL (+20/+20 becomes x1.40, not x1.44),
+  which is why it is a ruling and not a fix. Related: the composed MoveSpeed
+  attribute has no gameplay consumer at all.
+- **Subclass commitment** — the branch strip browses; committing needs a
+  branch field, a permanence-or-Forge rule, save versioning, and a decision
+  on whether unselected branches become unpurchasable. That last part
+  collides with O15 (branches freely mixed, no mutually exclusive tiers).
+- **Swift's third jump (O25)** — unimplemented; needs a kit design for when
+  it unlocks and whether it costs anything.
+
+
 - **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
   collides with the Frontier content type (GAP [O8]). HELD per owner.
 - **Sealed / Bare modifier scope** vs Support and Leech generation
