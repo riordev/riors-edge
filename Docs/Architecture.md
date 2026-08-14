@@ -1,6 +1,7 @@
 # Architecture
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 C++ owns framework contracts, network-sensitive rules, GAS integration, movement/combat primitives, inventory algorithms, and save formats. Blueprint owns asset assembly, animation, VFX/audio hooks, encounter scripting, and tuning. Data Assets and Data Tables own weapons, affixes, loot tables, abilities, skill nodes, enemies, and balance values.
 

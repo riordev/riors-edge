@@ -1,6 +1,7 @@
 # Save / State Architecture
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Status: design target, with one slice as-built. Nothing below is implemented
 EXCEPT what §11 records: quest state, write-through persistence on flag change,

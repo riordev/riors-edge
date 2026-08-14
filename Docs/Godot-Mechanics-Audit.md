@@ -1,5 +1,13 @@
 # Godot mechanics audit
 
+**Historical.** This document audits the pre-Unreal Godot prototype
+(`riors-arena`); it predates the current Unreal build. O40(a) closes its Dash
+section specifically — the current Unreal single-dash-on-cooldown model is
+FINAL, and the Godot dual-charge model is historical. The rest of the audit is
+broader than dash and is retained for reference only; none of it describes
+current, live design.
+**Last reconciled against: O40**
+
 Source reviewed: `riors-arena-v0.1.132-src.zip`. Its internal files identify it as Rior's Arena v0.1.128/114-era source. The lightweight extracted reference is ignored by Git under `References/GodotArena`.
 
 This records behavior supported by source code. It is not a recommendation to copy the Godot architecture line for line.

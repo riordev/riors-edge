@@ -1,6 +1,7 @@
 # The Anchor Hub — the settlement, the loop through it, and the boundary it stands on
 
-**Last reconciled against: O32**
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 **Nothing in O29–O32 touches this document's subject.** They rule gear depth,
 the Core-tree axes, content shape and legendary cadence; this document authors a

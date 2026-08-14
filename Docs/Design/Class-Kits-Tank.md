@@ -1,6 +1,7 @@
 # Class Kit — TANK / Grit (full treatment)
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 > ## NOTHING IN THIS DOCUMENT IS BUILT.
 >

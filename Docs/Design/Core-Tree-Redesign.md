@@ -1,6 +1,7 @@
 # Core Tree Redesign — scouting the build axes (O30)
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 > **CORRECTION, 2026-08-14: the headline count in §1.1 was wrong by six.** The
 > live Core roster is **seven clusters and 30 nodes**, not 24. The §1.1 table

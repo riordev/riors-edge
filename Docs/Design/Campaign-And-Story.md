@@ -1,6 +1,7 @@
 # Campaign and Story — the spine, the missions, and the handoff
 
-**Last reconciled against: O32**
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 **O29 closes §5.3's endgame question.** The five options this document was
 written around are resolved: the answer is **gear depth** — item level runs to

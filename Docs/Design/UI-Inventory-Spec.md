@@ -1,6 +1,7 @@
 # FIELDPLATE — Loadout / inventory screen spec
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Owner-authored design canvas, transcribed from `Inventory.dc.html` on
 2026-08-13. Reads on top of `UI-Style-Guide-Fieldplate.md`.

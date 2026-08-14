@@ -1,5 +1,12 @@
 # Production roadmap — RETIRED
 
+**HISTORICAL — RETIRED BY O28.** This document's five milestones are no
+longer the operative plan. `Docs/Design/Decisions.md` is the only ruling
+ledger; `CONTEXT.md`'s next-actions list is the operative plan (playtest →
+report → fix). Kept for its history; do not plan from this document.
+
+**Last reconciled against: O40**
+
 **This document no longer governs anything.** Retired by ruling **O28**
 (`Docs/Design/Decisions.md`).
 

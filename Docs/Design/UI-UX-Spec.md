@@ -1,6 +1,7 @@
 # UI / UX Specification — Rior's Edge (Project Breaker)
 
-**Last reconciled against: O32**
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Status: design pass 1. Authored against the Master Sheet, `CONTEXT.md`,
 `Docs/Character-Progression-Architecture.md`, and `Docs/Layer-Ownership.md`.

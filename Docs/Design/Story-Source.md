@@ -4,6 +4,9 @@
 rather than editing it here; local edits will be lost and, worse, will make
 this copy disagree with the document the owner is actually writing in.
 
+**Scope:** post-slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
+
 ## SCOPE — read this before citing anything below
 
 The owner's instruction, verbatim: *"the doc is a master doc but it is NOT

@@ -1,6 +1,7 @@
 # Level Design — the spatial grammar
 
-**Last reconciled against: O32** (`Docs/Design/Decisions.md` O1, O2, O24, O25, O26 read for content; O27–O32 read for conflicts, none found — this document authors space, not power).
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40** (`Docs/Design/Decisions.md` O1, O2, O24, O25, O26 read for content; O27–O32 read for conflicts, none found — this document authors space, not power).
 
 Owner: level and space. Status: the grammar is derived here; the runtime field
 in `Source/RiorsEdge/Game/BreakerGameMode.cpp` is built against it. Every
