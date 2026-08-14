@@ -201,6 +201,18 @@ bool UBreakerAbilityComponent::TryEquipAbility(EBreakerAbilitySlot Slot, FName A
     // component owns the registry rules the checks above enforce. If
     // progression refuses (the ability is not unlocked yet), its own reason is
     // what the player sees — restating that rule here is how two copies drift.
+    //
+    // KNOWN BLOCKER, and it is not in this file: for a CASTER this call always
+    // refuses today. UBreakerProgressionComponent::IsAbilityUnlocked answers
+    // from ClassDefinition->StartingClassAbilityIds / BaseUltimateId or from a
+    // purchased node's GrantedAbilityIds, and
+    // UBreakerProgressionLibrary::GetFallbackClassDefinition returns nullptr
+    // for every class but Swift — so a Caster has a null ClassDefinition and no
+    // ability reads as unlocked. Everything on this side of the seam works and
+    // is tested; the fix is a Caster row in that fallback class definition
+    // (Progression/, another lane), naming Cleave/Rot as starters and
+    // Caster.Unmake as the ultimate, with §2.3-2.5's grant nodes supplying the
+    // rest. Until then the default table is still what a Caster plays with.
     if (!Progression->EquipAbility(Slot, AbilityId, OutFailureReason))
     {
         return false;
