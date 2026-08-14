@@ -789,7 +789,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // Spawn oversized, settle to 100%: the pop is the hit confirmation.
         if (Age < PopSeconds) SizePixels *= PopScale;
 
-        DrawOutlinedNumber(BreakerUI::FormatTicker(Number->Value),
+        DrawOutlinedNumber(BreakerUI::FormatDamage(Number->Value),
             Screen.X, Screen.Y - Rise - Neighbours * StackOffset,
             Face, SizePixels, Fade);
     }
