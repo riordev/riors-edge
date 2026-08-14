@@ -1,9 +1,12 @@
 #include "UI/BreakerMenu.h"
 
+#include "Abilities/BreakerAbilityComponent.h"
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Characters/BreakerCharacter.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerForgeLibrary.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -640,7 +643,7 @@ void SBreakerMenu::HandleEscape()
         if (Character.IsValid()) Character->ResumeFromMenu();
         return;
     }
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities)
     {
         Rebuild(RootScreen);
     }
@@ -663,6 +666,13 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         if (Board == TEXT("CORE")) { SkillBoardTab = 1; }
         else if (Board == TEXT("COMPARE")) { SkillBoardTab = 0; SkillBranchIndex = -1; }
         else if (Board.StartsWith(TEXT("BRANCH"))) { SkillBoardTab = 0; SkillBranchIndex = FCString::Atoi(*Board.RightChop(6)); }
+        // FORGE and ABILITIES have no -BreakerCaptureMenu= string of their own
+        // (that mapping lives in Characters/BreakerCharacter.cpp, out of this
+        // pass's territory); reuse the existing sub-view switch instead, e.g.
+        // -BreakerCaptureMenu=INVENTORY -BreakerCaptureBoard=FORGE. Harmless
+        // for the skill screen: neither string matches CORE/COMPARE/BRANCH*.
+        else if (Board == TEXT("FORGE")) { Screen = EBreakerMenuScreen::Forge; }
+        else if (Board == TEXT("ABILITIES")) { Screen = EBreakerMenuScreen::Abilities; }
     }
     Rebuild(Screen);
 }
@@ -735,6 +745,8 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
         case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
         case EBreakerMenuScreen::SkillTrees: ContentHost->SetContent(BuildSkillTreesScreen()); break;
+        case EBreakerMenuScreen::Forge: ContentHost->SetContent(BuildForgeScreen()); break;
+        case EBreakerMenuScreen::Abilities: ContentHost->SetContent(BuildAbilitiesScreen()); break;
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
@@ -872,6 +884,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
     };
     AddTab(TEXT("EQUIPMENT"), EBreakerMenuScreen::Inventory);
     AddTab(TEXT("SKILL TREES"), EBreakerMenuScreen::SkillTrees);
+    AddTab(TEXT("FORGE"), EBreakerMenuScreen::Forge);
+    AddTab(TEXT("ABILITIES"), EBreakerMenuScreen::Abilities);
     return Tabs;
 }
 
@@ -1248,6 +1262,36 @@ namespace
             case EBreakerClassId::Support:  return TEXT("SUPPORT");
             default:                        return TEXT("UNCLASSED");
         }
+    }
+
+    // O39 SLICE CLASS HONESTY: is this class a real choice, or would picking
+    // it permanently strand a character on nothing? A RUNTIME QUERY, not a
+    // hardcoded list, so a class unlocks itself the day its kit lands with no
+    // edit here.
+    //
+    // Deliberately NOT UBreakerProgressionLibrary::GetFallbackClassDefinition
+    // != nullptr: that function is Swift-only today ("Only Swift is authored
+    // in full for the slice", Progression/BreakerProgressionLibrary.cpp) and
+    // would misclassify Caster as unimplemented — contradicting O39's own
+    // text ("today Swift and Caster") and the fact that Caster is fully
+    // playable on E/T/G. THE ABILITY CATALOGUE is the query that actually
+    // answers "does this class have a kit": UBreakerAbilityDefinition's
+    // fallback registry has rows for Swift and Caster and nothing else
+    // (Abilities/BreakerAbilityDefinition.cpp), and it is the same registry
+    // the ABILITIES tab reads to build its picker — one fact, two screens.
+    bool ClassHasImplementedKit(EBreakerClassId ClassId)
+    {
+        static const EBreakerAbilitySlot Slots[] =
+        {
+            EBreakerAbilitySlot::ClassAbilityOne,
+            EBreakerAbilitySlot::ClassAbilityTwo,
+            EBreakerAbilitySlot::Ultimate
+        };
+        for (const EBreakerAbilitySlot Slot : Slots)
+        {
+            if (UBreakerAbilityDefinition::GetClassAbilities(ClassId, Slot).Num() > 0) return true;
+        }
+        return false;
     }
 
     // The two bulk-discard thresholds the header offers, indexed by arm. One
@@ -1858,6 +1902,29 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         };
         AddDevChip(30);
         AddDevChip(50);
+        // Reach (Decisions.md O40c): DevGrantLegendaries shipped with zero
+        // callers (Items/BreakerEquipmentComponent.cpp:517) — without a UI
+        // hook the three authored legendaries (O32) are unreachable outside
+        // Blueprint/console/automation. Same dev gate as GRANT TEST GEAR,
+        // dropped into the backpack rather than equipped, same reason: only
+        // one Anomalous piece can be worn at a time.
+        DevRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 4.0f, 0.0f)
+        [
+            SNew(SButton)
+            .ButtonColorAndOpacity(PanelRaised)
+            .ContentPadding(FMargin(9.0f, 4.0f))
+            .OnClicked(FOnClicked::CreateLambda([this]()
+            {
+                constexpr int32 ItemLevel = 50;
+                if (Character.IsValid() && Character->GetEquipment()) Character->GetEquipment()->DevGrantLegendaries(ItemLevel);
+                InventoryStatus = FText::FromString(FString::Printf(TEXT("Granted every legendary to the backpack at ilvl %d."), ItemLevel));
+                Rebuild(EBreakerMenuScreen::Inventory);
+                return FReply::Handled();
+            }))
+            [
+                MenuText(FText::FromString(TEXT("GRANT LEGENDARIES ilvl 50")), 9, Primary, true)
+            ]
+        ];
     }
 
     // ---- Backpack zone -----------------------------------------------------
@@ -2180,8 +2247,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
 
     for (const FClassEntry& Entry : Classes)
     {
+        const bool bImplemented = ClassHasImplementedKit(Entry.ClassId);
+        // O39: outside dev mode a class with no kit is LOCKED — choosing it
+        // would permanently strand a character on nothing, since class
+        // selection is one-way. Dev mode bypasses this the same way it
+        // already bypasses the already-chosen-class lock below.
+        const bool bDesignLocked = !bImplemented && !bDevClassSwap;
         const bool bIsCurrent = Entry.ClassId == CurrentClass;
-        const bool bSelectable = CurrentClass == EBreakerClassId::None || bDevClassSwap;
+        const bool bSelectable = !bDesignLocked && (CurrentClass == EBreakerClassId::None || bDevClassSwap);
         const EBreakerClassId CapturedClass = Entry.ClassId;
         const bool bCapturedDevSwap = bDevClassSwap;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
@@ -2220,6 +2293,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
                     // it can be clicked.
                     + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, (bIsCurrent || bSelectable) ? Primary : Disabled, true)]
                     + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[MenuText(FText::FromString(Entry.Resource), BreakerUI::TypeCaption, bIsCurrent ? Cyan : (bSelectable ? Muted : Disabled), true)]
+                    // The honesty tag: disabled text token, geometry intact,
+                    // shown whether or not a class already happens to be
+                    // chosen — it is a fact about the CLASS, not about
+                    // whether this particular row is clickable right now.
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                    [
+                        bDesignLocked
+                            ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("IN DESIGN")), BreakerUI::TypeCaption, Disabled, true))
+                            : SNullWidget::NullWidget
+                    ]
                 ]
                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Branches), BreakerUI::TypeCaption, (bIsCurrent || bSelectable) ? Muted : Disabled, true)]
                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[MenuText(FText::FromString(Entry.Pitch), BreakerUI::TypeCaption, (bIsCurrent || bSelectable) ? SoftText : Disabled)]
@@ -4272,6 +4355,556 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         Metrics.PanelWidth,
         Metrics.PanelHeight,
         /*bFillHeight=*/true);
+}
+
+namespace
+{
+    FString ForgeCurrencyName(EBreakerForgeCurrency Currency)
+    {
+        switch (Currency)
+        {
+            case EBreakerForgeCurrency::Slag:  return TEXT("SLAG");
+            case EBreakerForgeCurrency::Flux:  return TEXT("FLUX");
+            case EBreakerForgeCurrency::Sigil: return TEXT("SIGIL");
+            default:                           return TEXT("?");
+        }
+    }
+
+    FString DescribeForgeCost(const FBreakerForgeCost& Cost)
+    {
+        return Cost.IsFree() ? FString(TEXT("FREE")) : FString::Printf(TEXT("%d %s"), Cost.Amount, *ForgeCurrencyName(Cost.Currency));
+    }
+
+    // EBreakerForgeResult (Items/BreakerForgeLibrary.h) carries no FText, unlike
+    // the ability selection API's DescribeSelectionResult — this is that
+    // mapping's Forge-side twin, kept in one place so the tab's copy cannot
+    // drift per button.
+    FString DescribeForgeResult(EBreakerForgeResult Result)
+    {
+        switch (Result)
+        {
+            case EBreakerForgeResult::Success:      return TEXT("DONE.");
+            case EBreakerForgeResult::NotAtForge:    return TEXT("NOT AT A FORGE.");
+            case EBreakerForgeResult::InvalidItem:   return TEXT("ITEM NOT FOUND.");
+            case EBreakerForgeResult::InvalidAffix:  return TEXT("NO SUCH AFFIX LINE.");
+            case EBreakerForgeResult::AtTierCeiling: return TEXT("ALREADY AT ITS TIER CEILING.");
+            case EBreakerForgeResult::Unaffordable:  return TEXT("CANNOT AFFORD THE COST.");
+            default:                                 return TEXT("UNKNOWN RESULT.");
+        }
+    }
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
+{
+    // Reach (Decisions.md O37/O40c): Items/BreakerForgeLibrary.h's three verbs
+    // plus salvage and the wallet had zero UI callers — CONTEXT.md called this
+    // "the biggest built-but-unreachable item in the project." Utilitarian
+    // FIELDPLATE per the brief: plates, rails, the existing type scale: no new
+    // tokens invented for this tab.
+    UBreakerEquipmentComponent* Equipment = Character.IsValid() ? Character->GetEquipment() : nullptr;
+    const FWideScreenMetrics Metrics = MeasureWideScreen();
+
+    const FBreakerForgeWallet EmptyWallet;
+    const FBreakerForgeWallet& Wallet = Equipment ? Equipment->GetForgeWallet() : EmptyWallet;
+
+    // Resolve the selection by walking both containers fresh every rebuild —
+    // no separate cache, so an id whose item was just salvaged, discarded, or
+    // consumed by a previous Forge op simply resolves to "nothing selected"
+    // on the very next rebuild instead of needing an explicit clear anywhere.
+    FBreakerItemInstance SelectedItem;
+    bool bSelectedFound = false;
+    bool bSelectedEquipped = false;
+    if (Equipment && ForgeSelectedItemId.IsValid())
+    {
+        for (const FBreakerItemInstance& HeldItem : Equipment->GetEquipped())
+        {
+            if (HeldItem.IsValid() && HeldItem.ItemId == ForgeSelectedItemId)
+            {
+                SelectedItem = HeldItem; bSelectedFound = true; bSelectedEquipped = true; break;
+            }
+        }
+        if (!bSelectedFound)
+        {
+            for (const FBreakerItemInstance& HeldItem : Equipment->GetBackpack())
+            {
+                if (HeldItem.ItemId == ForgeSelectedItemId) { SelectedItem = HeldItem; bSelectedFound = true; break; }
+            }
+        }
+    }
+
+    // ---- Header: tab strip, wallet, BACK -----------------------------------
+    auto MakeCurrencyChip = [](EBreakerForgeCurrency Currency, int32 Amount) -> TSharedRef<SWidget>
+    {
+        return MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(ForgeCurrencyName(Currency)), BreakerUI::TypeCaption, Muted, true)]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Amount))), BreakerUI::TypeH2, Primary, true)],
+            PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space4));
+    };
+    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Forge)];
+    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Slag, Wallet.Get(EBreakerForgeCurrency::Slag))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Flux, Wallet.Get(EBreakerForgeCurrency::Flux))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Sigil, Wallet.Get(EBreakerForgeCurrency::Sigil))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+    ];
+
+    // ---- Left: pick a held item (equipped or backpack) ---------------------
+    auto MakeSelectRow = [this](const FBreakerItemInstance& Item) -> TSharedRef<SWidget>
+    {
+        const bool bRowSelected = ForgeSelectedItemId == Item.ItemId;
+        const FGuid CapturedId = Item.ItemId;
+        return SNew(SBox).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        [
+            MakeRarityCard(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bRowSelected ? PanelHover : PanelRaised)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, CapturedId]()
+                {
+                    ForgeSelectedItemId = CapturedId;
+                    ForgeStatus = FText::GetEmpty();
+                    Rebuild(EBreakerMenuScreen::Forge);
+                    return FReply::Handled();
+                }))
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                    [
+                        MenuText(FText::FromString(RarityName(Item.Rarity)), BreakerUI::TypeCaption, RarityColor(Item.Rarity), true)
+                    ]
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(ItemSlotLabel(Item)), BreakerUI::TypeCaption, bRowSelected ? Primary : Muted, true)]
+                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)), BreakerUI::TypeCaption, SoftText, true)]
+                ],
+                Item.Rarity, true)
+        ];
+    };
+
+    TSharedRef<SVerticalBox> PickerList = SNew(SVerticalBox);
+    PickerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("EQUIPPED")), BreakerUI::TypeCaption, Muted, true)];
+    static const EBreakerEquipSlot ForgeWearOrder[] =
+    {
+        EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist,
+        EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary,
+    };
+    bool bAnyEquipped = false;
+    for (const EBreakerEquipSlot Slot : ForgeWearOrder)
+    {
+        FBreakerItemInstance Item;
+        if (Equipment && Equipment->GetEquippedItem(Slot, Item))
+        {
+            bAnyEquipped = true;
+            PickerList->AddSlot().AutoHeight()[MakeSelectRow(Item)];
+        }
+    }
+    if (!bAnyEquipped) PickerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("NOTHING EQUIPPED")), BreakerUI::TypeCaption, Disabled)];
+
+    PickerList->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("BACKPACK")), BreakerUI::TypeCaption, Muted, true)];
+    TArray<FBreakerItemInstance> BackpackItems = Equipment ? Equipment->GetBackpack() : TArray<FBreakerItemInstance>();
+    Algo::Reverse(BackpackItems);
+    BackpackItems.StableSort([](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
+    {
+        return static_cast<uint8>(A.Rarity) > static_cast<uint8>(B.Rarity);
+    });
+    if (BackpackItems.IsEmpty()) PickerList->AddSlot().AutoHeight()[MenuText(FText::FromString(TEXT("BACKPACK EMPTY")), BreakerUI::TypeCaption, Disabled)];
+    for (const FBreakerItemInstance& Item : BackpackItems)
+    {
+        PickerList->AddSlot().AutoHeight()[MakeSelectRow(Item)];
+    }
+
+    // ---- Right: the selected item's Forge operations -----------------------
+    TSharedRef<SVerticalBox> OpsColumn = SNew(SVerticalBox);
+    if (!bSelectedFound)
+    {
+        OpsColumn->AddSlot().AutoHeight()
+        [
+            MakePlate(
+                MenuText(FText::FromString(TEXT("SELECT A HELD ITEM ON THE LEFT TO SALVAGE OR CRAFT IT.")), BreakerUI::TypeCaption, Muted),
+                PanelRaised, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space16))
+        ];
+    }
+    else
+    {
+        TSharedRef<SVerticalBox> ForgePanel = SNew(SVerticalBox);
+        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f)
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("%s %s"), *RarityName(SelectedItem.Rarity), *ItemSlotLabel(SelectedItem))), BreakerUI::TypeH2, RarityColor(SelectedItem.Rarity), true)
+            ]
+            + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), SelectedItem.ItemLevel)), BreakerUI::TypeCaption, Primary, true)]
+        ];
+        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        [
+            MenuText(FText::FromString(bSelectedEquipped ? TEXT("CURRENTLY EQUIPPED") : TEXT("IN BACKPACK")), BreakerUI::TypeCaption, Muted, true)
+        ];
+
+        // ---- TEMPER: one row per affix line --------------------------------
+        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        [
+            MenuText(FText::FromString(TEXT("TEMPER — ONE AFFIX, ONE TIER BETTER")), BreakerUI::TypeCaption, Cyan, true)
+        ];
+        if (SelectedItem.Affixes.IsEmpty())
+        {
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("NO AFFIXES TO TEMPER.")), BreakerUI::TypeCaption, Disabled)];
+        }
+        for (int32 AffixIndex = 0; AffixIndex < SelectedItem.Affixes.Num(); ++AffixIndex)
+        {
+            const FBreakerRolledAffix& Affix = SelectedItem.Affixes[AffixIndex];
+            const int32 TargetTier = Affix.Tier - 1;
+            const int32 Ceiling = UBreakerForgeLibrary::TemperCeilingForItem(SelectedItem);
+            // TemperCost returns a deceptive {Slag, 0} — indistinguishable from
+            // free — both for a bad index AND for a line already at its tier
+            // ceiling, so the ceiling has to be checked independently rather
+            // than trusted from Cost.IsFree() alone.
+            const bool bAtCeiling = TargetTier < Ceiling;
+            const FBreakerForgeCost CostTemper = UBreakerForgeLibrary::TemperCost(SelectedItem, AffixIndex);
+            const bool bAffordableTemper = Wallet.CanAfford(CostTemper);
+            const FGuid CapturedId = SelectedItem.ItemId;
+            const int32 CapturedAffixIndex = AffixIndex;
+
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(DescribeAffix(Affix)), BreakerUI::TypeCaption, SoftText)]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    SNew(SBox).WidthOverride(150.0f)
+                    [
+                        bAtCeiling
+                            ? StaticCastSharedRef<SWidget>(SNew(SBox).HAlign(HAlign_Right)[MenuText(FText::FromString(TEXT("MAXED")), BreakerUI::TypeCaption, Disabled, true)])
+                            : StaticCastSharedRef<SWidget>(BorderWrap(
+                                SNew(SButton)
+                                .ButtonColorAndOpacity(PanelRaised)
+                                .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
+                                .OnClicked(FOnClicked::CreateLambda([this, CapturedId, CapturedAffixIndex]()
+                                {
+                                    if (Character.IsValid() && Character->GetEquipment())
+                                    {
+                                        // Forge-proximity gating arrives with the
+                                        // hub, same interim rule as Progression::
+                                        // RespecAtForge's menu-side shim above:
+                                        // pass true unconditionally so the verb is
+                                        // testable from the menu today.
+                                        const EBreakerForgeResult Result = Character->GetEquipment()->TemperItem(CapturedId, CapturedAffixIndex, /*bIsAtForge=*/true);
+                                        ForgeStatus = FText::FromString(FString::Printf(TEXT("TEMPER: %s"), *DescribeForgeResult(Result)));
+                                    }
+                                    Rebuild(EBreakerMenuScreen::Forge);
+                                    return FReply::Handled();
+                                }))
+                                [
+                                    MenuText(FText::FromString(FString::Printf(TEXT("TEMPER · %s"), *DescribeForgeCost(CostTemper))), BreakerUI::TypeCaption, bAffordableTemper ? Amber : Harm, true)
+                                ],
+                                bAffordableTemper ? Amber : HarmDeep))
+                    ]
+                ]
+            ];
+        }
+
+        // ---- REFORGE / ATTUNE: whole-item verbs -----------------------------
+        const FBreakerForgeCost CostReforge = UBreakerForgeLibrary::ReforgeCost(SelectedItem);
+        const bool bAffordableReforge = Wallet.CanAfford(CostReforge);
+        const FBreakerForgeCost CostAttune = UBreakerForgeLibrary::AttuneCost(SelectedItem);
+        const bool bAffordableAttune = Wallet.CanAfford(CostAttune);
+        const FGuid CapturedSelectedId = SelectedItem.ItemId;
+
+        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(PanelRaised)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                {
+                    if (Character.IsValid() && Character->GetEquipment())
+                    {
+                        const EBreakerForgeResult Result = Character->GetEquipment()->ReforgeItem(CapturedSelectedId, /*bIsAtForge=*/true);
+                        ForgeStatus = FText::FromString(FString::Printf(TEXT("REFORGE: %s"), *DescribeForgeResult(Result)));
+                    }
+                    Rebuild(EBreakerMenuScreen::Forge);
+                    return FReply::Handled();
+                }))
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(TEXT("REFORGE — REROLL EVERY AFFIX VALUE")), BreakerUI::TypeBody, Primary, true)]
+                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(DescribeForgeCost(CostReforge)), BreakerUI::TypeBody, bAffordableReforge ? Amber : Harm, true)]
+                ],
+                BorderEmphasis)
+        ];
+        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(PanelRaised)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                {
+                    if (Character.IsValid() && Character->GetEquipment())
+                    {
+                        const EBreakerForgeResult Result = Character->GetEquipment()->AttuneItem(CapturedSelectedId, /*bIsAtForge=*/true);
+                        ForgeStatus = FText::FromString(FString::Printf(TEXT("ATTUNE: %s"), *DescribeForgeResult(Result)));
+                    }
+                    Rebuild(EBreakerMenuScreen::Forge);
+                    return FReply::Handled();
+                }))
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(TEXT("ATTUNE — REROLL WHICH AFFIXES IT CARRIES")), BreakerUI::TypeBody, Primary, true)]
+                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(DescribeForgeCost(CostAttune)), BreakerUI::TypeBody, bAffordableAttune ? Amber : Harm, true)]
+                ],
+                BorderEmphasis)
+        ];
+
+        // ---- SALVAGE: backpack only, destroys the item ----------------------
+        if (!bSelectedEquipped)
+        {
+            const FBreakerForgeWallet SalvagePreview = UBreakerForgeLibrary::SalvageValue(SelectedItem);
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+            [
+                MenuText(FText::FromString(FString::Printf(TEXT("SALVAGE — DESTROYS THE ITEM · PAYS %d SLAG · %d FLUX · %d SIGIL"),
+                    SalvagePreview.Get(EBreakerForgeCurrency::Slag), SalvagePreview.Get(EBreakerForgeCurrency::Flux), SalvagePreview.Get(EBreakerForgeCurrency::Sigil))),
+                    BreakerUI::TypeCaption, Harm, true)
+            ];
+            ForgePanel->AddSlot().AutoHeight()
+            [
+                BorderWrap(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(Panel)
+                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                    .ToolTipText(FText::FromString(TEXT("Destroys this item and pays its salvage value into the wallet.")))
+                    .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                    {
+                        if (Character.IsValid() && Character->GetEquipment())
+                        {
+                            const bool bOk = Character->GetEquipment()->SalvageFromBackpack(CapturedSelectedId);
+                            ForgeStatus = FText::FromString(bOk ? TEXT("SALVAGE: DONE.") : TEXT("SALVAGE: ITEM NOT FOUND."));
+                            if (bOk) ForgeSelectedItemId.Invalidate();
+                        }
+                        Rebuild(EBreakerMenuScreen::Forge);
+                        return FReply::Handled();
+                    }))
+                    [
+                        MenuText(FText::FromString(TEXT("SALVAGE")), BreakerUI::TypeCaption, Harm, true)
+                    ],
+                    HarmDeep)
+            ];
+        }
+
+        if (!ForgeStatus.IsEmpty())
+        {
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MenuText(ForgeStatus, BreakerUI::TypeCaption, Amber, true)];
+        }
+
+        OpsColumn->AddSlot().AutoHeight()[MakePlate(ForgePanel, PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space16))];
+    }
+
+    TSharedRef<SHorizontalBox> Body = SNew(SHorizontalBox);
+    Body->AddSlot().AutoWidth()
+    [
+        SNew(SBox).WidthOverride(420.0f)[SNew(SScrollBox) + SScrollBox::Slot()[PickerList]]
+    ];
+    Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SScrollBox) + SScrollBox::Slot()[OpsColumn]
+    ];
+
+    return BuildZonedFrame(
+        FText::FromString(TEXT("FORGE")),
+        FText::FromString(TEXT("SALVAGE · TEMPER · REFORGE · ATTUNE")),
+        HeaderRight,
+        Body,
+        SNullWidget::NullWidget,
+        Metrics.PanelWidth,
+        Metrics.PanelHeight);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
+{
+    // Reach (Decisions.md O37): a picker over UBreakerAbilityComponent's
+    // selection API (GetSelectableAbilityIds / GetEquippedAbilityId /
+    // PreviewSelection / TryEquipAbility), which shipped with zero callers
+    // anywhere in the project. "WHAT A UI MUST CALL, in order" is documented
+    // at Abilities/BreakerAbilityComponent.h:99-122; this screen is that
+    // caller.
+    UBreakerAbilityComponent* Abilities = Character.IsValid() ? Character->GetAbilities() : nullptr;
+    UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const EBreakerClassId PermanentClass = Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None;
+    const FWideScreenMetrics Metrics = MeasureWideScreen();
+
+    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Abilities)];
+    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+    ];
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+
+    if (!Abilities || PermanentClass == EBreakerClassId::None)
+    {
+        Body->AddSlot().AutoHeight()
+        [
+            MakePlate(
+                MenuText(FText::FromString(TEXT("CHOOSE A CLASS ON THE BREAKER CLASS SCREEN FIRST — THERE IS NOTHING TO EQUIP WITHOUT ONE.")), BreakerUI::TypeCaption, Muted),
+                PanelRaised, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space16))
+        ];
+    }
+    else
+    {
+        struct FSlotEntry { EBreakerAbilitySlot Slot; const TCHAR* Label; };
+        static const FSlotEntry SlotEntries[] =
+        {
+            { EBreakerAbilitySlot::ClassAbilityOne, TEXT("CLASS ABILITY 1") },
+            { EBreakerAbilitySlot::ClassAbilityTwo, TEXT("CLASS ABILITY 2") },
+            { EBreakerAbilitySlot::Ultimate,        TEXT("ULTIMATE") },
+        };
+
+        for (const FSlotEntry& SlotEntry : SlotEntries)
+        {
+            const EBreakerAbilitySlot Slot = SlotEntry.Slot;
+            // GetEquippedAbilityId is the PLAYER'S raw pick (what the picker
+            // must mark as selected); GetAbilityIdForSlot is what actually
+            // resolves once fallback is applied (what the HUD activates). The
+            // header is explicit that a picker needs the former, not the
+            // latter, "or the player cannot tell 'I picked Cleave' from
+            // 'Cleave is what you get when you pick nothing'."
+            const FName EquippedChoiceId = Abilities->GetEquippedAbilityId(Slot);
+            const FName GrantedId = Abilities->GetAbilityIdForSlot(Slot);
+            const UBreakerAbilityDefinition* GrantedDefinition = GrantedId.IsNone() ? nullptr : UBreakerAbilityDefinition::FindFallback(GrantedId);
+
+            TSharedRef<SVerticalBox> SlotBody = SNew(SVerticalBox);
+            SlotBody->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotEntry.Label), BreakerUI::TypeH2, Primary, true)]
+                + SHorizontalBox::Slot().AutoWidth()
+                [
+                    MenuText(FText::FromString(FString::Printf(TEXT("ACTIVE: %s"), GrantedDefinition ? *GrantedDefinition->DisplayName.ToString() : TEXT("NONE"))),
+                        BreakerUI::TypeCaption, GrantedDefinition ? Cyan : Muted, true)
+                ]
+            ];
+
+            const TArray<FName> Catalogue = Abilities->GetSelectableAbilityIds(Slot);
+            if (Catalogue.IsEmpty())
+            {
+                SlotBody->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                [
+                    MenuText(FText::FromString(TEXT("NO ABILITIES REGISTERED FOR THIS SLOT YET.")), BreakerUI::TypeCaption, Disabled)
+                ];
+            }
+            for (const FName AbilityId : Catalogue)
+            {
+                const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(AbilityId);
+                const bool bIsEquippedChoice = EquippedChoiceId == AbilityId;
+                // Cheap, definite blockers only (already sitting in the other
+                // slot, wrong class/slot, unknown id). What this CANNOT see is
+                // UBreakerProgressionComponent::IsAbilityUnlocked, which only
+                // runs inside TryEquipAbility — so a Caster pick previews as
+                // fine here and the true "not unlocked" reason only appears
+                // after the click. That is the API's own documented seam
+                // (Abilities/BreakerAbilityComponent.h), not a bug in this
+                // screen: "verify with Swift, and show refusal reasons
+                // honestly for Caster."
+                const EBreakerAbilitySelectionResult Preview = Abilities->PreviewSelection(Slot, AbilityId);
+                const bool bPreviewBlocked = !bIsEquippedChoice && Preview != EBreakerAbilitySelectionResult::Allowed;
+                const bool bImplemented = Definition && Definition->IsImplemented();
+                const FName CapturedId = AbilityId;
+
+                SlotBody->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+                [
+                    BorderWrap(
+                        SNew(SButton)
+                        .ButtonColorAndOpacity(bIsEquippedChoice ? PanelHover : PanelRaised)
+                        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                        .OnClicked(FOnClicked::CreateLambda([this, Slot, CapturedId]()
+                        {
+                            if (Character.IsValid() && Character->GetAbilities())
+                            {
+                                FText FailureReason;
+                                const bool bOk = Character->GetAbilities()->TryEquipAbility(Slot, CapturedId, FailureReason);
+                                // Surfaced verbatim: FailureReason is the exact
+                                // player-facing text TryEquipAbility fills in,
+                                // e.g. a Caster's "That ability has not been
+                                // unlocked." — this screen states it rather
+                                // than substituting its own copy.
+                                AbilityStatus = bOk ? FText::FromString(TEXT("EQUIPPED.")) : FailureReason;
+                            }
+                            Rebuild(EBreakerMenuScreen::Abilities);
+                            return FReply::Handled();
+                        }))
+                        [
+                            SNew(SVerticalBox)
+                            + SVerticalBox::Slot().AutoHeight()
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().FillWidth(1.0f)
+                                [
+                                    MenuText(Definition ? Definition->DisplayName : FText::FromName(CapturedId),
+                                        BreakerUI::TypeBody, bIsEquippedChoice ? Primary : SoftText, true)
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth()
+                                [
+                                    bIsEquippedChoice
+                                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("EQUIPPED")), BreakerUI::TypeCaption, Cyan, true))
+                                        : SNullWidget::NullWidget
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                                [
+                                    // "AbilityId is recorded even when the
+                                    // ability has no implementation yet" is
+                                    // already the HUD's rule for a granted
+                                    // slot (BreakerAbilityComponent.h); the
+                                    // catalogue gets the same honesty rather
+                                    // than quietly offering a pick that will
+                                    // do nothing in combat.
+                                    !bImplemented
+                                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(TEXT("NOT IMPLEMENTED")), BreakerUI::TypeCaption, Disabled, true))
+                                        : SNullWidget::NullWidget
+                                ]
+                            ]
+                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                            [
+                                MenuText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, Muted)
+                            ]
+                            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                            [
+                                bPreviewBlocked
+                                    ? StaticCastSharedRef<SWidget>(MenuText(UBreakerAbilityComponent::DescribeSelectionResult(Preview), BreakerUI::TypeCaption, Harm, true))
+                                    : SNullWidget::NullWidget
+                            ]
+                        ],
+                        bIsEquippedChoice ? Cyan : BorderRest,
+                        bIsEquippedChoice ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+                ];
+            }
+
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+            [
+                MakePlate(SlotBody, PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space16))
+            ];
+        }
+
+        if (!AbilityStatus.IsEmpty())
+        {
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(AbilityStatus, BreakerUI::TypeCaption, Amber, true)];
+        }
+    }
+
+    const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · TWO CLASS ABILITIES + ONE ULTIMATE"), *ClassDisplayName(PermanentClass));
+
+    return BuildZonedFrame(
+        FText::FromString(TEXT("ABILITIES")),
+        FText::FromString(MetaLine),
+        HeaderRight,
+        SNew(SScrollBox) + SScrollBox::Slot()[Body],
+        SNullWidget::NullWidget,
+        Metrics.PanelWidth,
+        Metrics.PanelHeight);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
