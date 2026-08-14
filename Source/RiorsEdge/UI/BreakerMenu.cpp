@@ -67,6 +67,27 @@ namespace
             .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
     }
 
+    // A number in a fixed-width column, right-aligned by JUSTIFICATION rather
+    // than by the box's HAlign. Owner: "numbers are cut off in some fashion".
+    // An SBox with HAlign_Right (or _Left, or _Center) arranges its child at
+    // the child's DESIRED width — for an STextBlock that is its MEASURED width
+    // — and Slate clips the drawn run to that same box, while measuring and
+    // rasterising round independently. A value whose last glyph lands on the
+    // rounding boundary gets shaved. HAlign_Fill hands the text block the whole
+    // column to draw into and lets justification place the glyphs, which is the
+    // fix MakeMarkerLabel already carries for the marker captions.
+    TSharedRef<SWidget> MenuValueColumn(const FText& Text, float Width, int32 Size, const FLinearColor& Color)
+    {
+        return SNew(SBox).WidthOverride(Width).HAlign(HAlign_Fill)
+        [
+            SNew(STextBlock)
+                .Text(Text)
+                .Justification(ETextJustify::Right)
+                .ColorAndOpacity(Color)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), Size))
+        ];
+    }
+
     TSharedRef<SWidget> SolidBlock(const FLinearColor& Color)
     {
         return SNew(SBorder)
@@ -882,8 +903,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
                 bActive ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
-    AddTab(TEXT("EQUIPMENT"), EBreakerMenuScreen::Inventory);
-    AddTab(TEXT("SKILL TREES"), EBreakerMenuScreen::SkillTrees);
+    // GEAR / SKILLS rather than EQUIPMENT / SKILL TREES. The header is one row
+    // of AutoWidth slots that an SHorizontalBox will not shrink, so an
+    // overlong label here does not wrap or ellipsize — it pushes BACK off the
+    // right edge, which capture confirmed at a 1920 viewport. Shortening the
+    // two longest tabs is the cheapest width to buy back, and neither loses
+    // meaning.
+    AddTab(TEXT("GEAR"), EBreakerMenuScreen::Inventory);
+    AddTab(TEXT("SKILLS"), EBreakerMenuScreen::SkillTrees);
     AddTab(TEXT("FORGE"), EBreakerMenuScreen::Forge);
     AddTab(TEXT("ABILITIES"), EBreakerMenuScreen::Abilities);
     return Tabs;
@@ -901,11 +928,24 @@ TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicke
             SNew(SButton)
             .ButtonColorAndOpacity(bPrimary ? PanelHover : Panel)
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-            .HAlign(HAlign_Left)
+            // HAlign_Fill, not HAlign_Left. An SButton arranges its child at
+            // the child's DESIRED width under any non-Fill alignment, and for
+            // an STextBlock that is its measured width — which Slate then
+            // clips the drawn run to, rounding measurement and rasterisation
+            // independently. This is the same defect that once clipped the
+            // skill board's rank numbers, and it reaches every button on every
+            // screen; the tightest instance is BACK inside a hard 88px box in
+            // the compact header. Filling gives the label the button's real
+            // width and lets justification place it.
+            .HAlign(HAlign_Fill)
             .VAlign(VAlign_Center)
             .OnClicked(OnClicked)
             [
-                MenuText(Label, BreakerUI::TypeBody, bPrimary ? Primary : SoftText, true)
+                SNew(STextBlock)
+                    .Text(Label)
+                    .Justification(ETextJustify::Left)
+                    .ColorAndOpacity(bPrimary ? Primary : SoftText)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
             ],
             bPrimary ? Cyan : BorderEmphasis)
     ];
@@ -1540,11 +1580,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                 [
                     // Fixed value column so the numbers form a straight edge
-                    // and never reflow as they tick.
-                    SNew(SBox).WidthOverride(104.0f).HAlign(HAlign_Right)
-                    [
-                        MenuText(FText::FromString(Value), BreakerUI::TypeCaption, ValueColor, true)
-                    ]
+                    // and never reflow as they tick. Same clipping fix as the
+                    // skill rail's totals plate — see MenuValueColumn.
+                    MenuValueColumn(FText::FromString(Value), 104.0f, BreakerUI::TypeCaption, ValueColor)
                 ]
             ];
         };
@@ -2584,12 +2622,41 @@ namespace
         {
             return Fail(TEXT("MAX RANK"), TEXT("MAXED"));
         }
-        if (Node->RequiredTreeInvestment > TreeSpent)
+        // O37 COMMITMENT, and it belongs BEFORE the investment gate because it
+        // is the stronger and more surprising of the two — a player who has not
+        // committed should be told to commit, not told to invest more into a
+        // node that commitment alone will not open.
+        //
+        // THIS WAS MISSING ENTIRELY, and it made the board lie. The screen
+        // keeps its own mirror of the purchase rules, and the mirror checked
+        // rank, investment, prerequisites, exclusions and points — but not
+        // bCornerstone/CommittedBranch and not the tree's
+        // CornerstoneInvestmentGate. So with a keystone's tier gate met the
+        // board painted it AMBER, counted it in the footer's "N PURCHASABLE",
+        // and the detail card promised the buy — and then the click failed
+        // against UBreakerProgressionComponent::CanPurchaseNode, which does
+        // check both. Promising a purchase and refusing it is worse than
+        // showing it locked.
+        if (Node->bCornerstone && Progression->GetProgressionState().CommittedBranch != Tree->TreeId)
         {
             if (OutTierGated) *OutTierGated = true;
             return Fail(
-                FString::Printf(TEXT("TIER OPENS AT %d INVESTED (%d SO FAR)"), Node->RequiredTreeInvestment, TreeSpent),
-                FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, Node->RequiredTreeInvestment));
+                TEXT("COMMIT TO THIS BRANCH TO UNLOCK ITS KEYSTONE"),
+                TEXT("COMMIT REQUIRED"));
+        }
+        // The component takes the MAX of the node's own investment requirement
+        // and, for a cornerstone, the tree's cornerstone gate — which defaults
+        // to 8 against a tier-3 authored requirement of 4. Mirroring only the
+        // node's own number was the second half of the same divergence.
+        const int32 EffectiveInvestmentGate = FMath::Max(
+            Node->RequiredTreeInvestment,
+            Node->bCornerstone ? Tree->CornerstoneInvestmentGate : 0);
+        if (EffectiveInvestmentGate > TreeSpent)
+        {
+            if (OutTierGated) *OutTierGated = true;
+            return Fail(
+                FString::Printf(TEXT("TIER OPENS AT %d INVESTED (%d SO FAR)"), EffectiveInvestmentGate, TreeSpent),
+                FString::Printf(TEXT("%d / %d INVESTED"), TreeSpent, EffectiveInvestmentGate));
         }
         for (const FBreakerNodePrerequisite& Prereq : Node->Prerequisites)
         {
@@ -2872,6 +2939,9 @@ namespace
         bool bOwned = false;
         bool bPurchasable = false;
         bool bMaxed = false;
+        // Identity, so the rail can be restored to the same node after the
+        // screen rebuilds. Everything else here is presentation.
+        FName NodeId = NAME_None;
     };
 
     // "DAMAGE   1.06x -> 1.10x   +4%", one per stat the purchase moves.
@@ -2896,6 +2966,7 @@ namespace
         FSkillNodeView View;
         if (!Node) return View;
         const ESkillMarkerKind Kind = ClassifyNode(Node);
+        View.NodeId = Node->NodeId;
         View.Name = Node->DisplayName.IsEmpty() ? Node->NodeId.ToString().ToUpper() : Node->DisplayName.ToString().ToUpper();
         View.Kind = MarkerKindLabel(Kind) + (Node->bCornerstone ? TEXT("  ·  CORNERSTONE") : TEXT(""));
         View.bOwned = Rank > 0;
@@ -3076,10 +3147,9 @@ namespace
                 [
                     // Fixed value column, so the numbers form a straight edge
                     // and a longer label can never push a value off the plate.
-                    SNew(SBox).WidthOverride(96.0f).HAlign(HAlign_Right)
-                    [
-                        MenuText(FText::FromString(Value), BreakerUI::TypeCaption, ValueColor, true)
-                    ]
+                    // See MenuValueColumn for why the alignment lives on the
+                    // text rather than on the box.
+                    MenuValueColumn(FText::FromString(Value), 96.0f, BreakerUI::TypeCaption, ValueColor)
                 ]
             ];
         };
@@ -3219,9 +3289,37 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // target. It is filled through SetContent on hover and never from a
     // per-frame attribute, and its width never changes, so populating it
     // cannot reflow the board.
+    // The rail opens on whatever it was last showing, rebuilt from live data
+    // rather than restored as a stale widget — so a purchase leaves the card on
+    // screen AND updates its rank, cost and before/after to reflect the buy.
+    // Previously the host was re-created empty on every rebuild and Slate does
+    // not re-fire OnHovered for a stationary cursor, so buying a node blanked
+    // the only surface that explained it.
+    TSharedRef<SWidget> InitialDetail = MakeSkillDetailPlaceholder();
+    if (!SkillDetailNodeId.IsNone())
+    {
+        for (const UBreakerProgressionTree* Tree : Trees)
+        {
+            if (!Tree) continue;
+            int32 Spent = 0, Total = 0;
+            ProgressionTreeInvestment(Progression, Tree, Spent, Total);
+            const UBreakerProgressionNode* Found = nullptr;
+            for (const UBreakerProgressionNode* Node : Tree->Nodes)
+            {
+                if (Node && Node->NodeId == SkillDetailNodeId) { Found = Node; break; }
+            }
+            if (!Found) continue;
+            FString LockReason;
+            const bool bPurchasable = SkillNodeIsPurchasable(Progression, Tree, Found, Spent, LockReason);
+            InitialDetail = MakeSkillDetailCard(MakeSkillNodeView(
+                Found, ProgressionGetNodeRank(Progression, Found->NodeId, Found->Currency),
+                bPurchasable, LockReason, Spent, Snapshot));
+            break;
+        }
+    }
     SAssignNew(SkillDetailHost, SBox)
     [
-        MakeSkillDetailPlaceholder()
+        InitialDetail
     ];
 
     // What the board is actually DRAWING. The class board draws one branch at
@@ -3276,8 +3374,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             .ContentPadding(FMargin(0.0f))
             .HAlign(HAlign_Center)
             .VAlign(VAlign_Center)
+            // Hovering also REMEMBERS which node the rail is showing. The host
+            // is re-created by SAssignNew on every rebuild, and a purchase
+            // rebuilds — so the detail card was thrown away on every buy and
+            // Slate will not re-fire OnHovered for a cursor that has not moved.
+            // The rail went blank at the exact moment the player most wanted to
+            // read what they had just bought. Owner: "I dont see any layers or
+            // details to them."
             .OnHovered(FSimpleDelegate::CreateLambda([this, View]()
             {
+                SkillDetailNodeId = View.NodeId;
                 if (SkillDetailHost.IsValid()) SkillDetailHost->SetContent(MakeSkillDetailCard(View));
             }))
             .OnClicked(FOnClicked::CreateLambda([this, Tree, Node, bPurchasable, LockReason]()
@@ -3424,7 +3530,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         // 96 of label under a 64px marker plus breathing room, so a label can
         // no longer run down through the tier hairline beneath it — which is
         // exactly what "numbers clip" looked like on the board.
-        const float LabelHeight = 96.0f;
+        // Four lines, not three: a keystone now prints a KEYSTONE caption above
+        // its name, and a Canvas slot does not clip an overflowing child — it
+        // would have overprinted the tier hairline below instead of truncating,
+        // which is the harder defect to recognise as a defect.
+        const float LabelHeight = 114.0f;
         const float TierHeight = 216.0f;
 
         TArray<float> ColumnWidth;
@@ -3603,14 +3713,42 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     // marker already says "not yet". Node-specific reasons
                     // (a prerequisite by name, points you cannot afford) still
                     // print, because those ARE about this node.
+                    // KEYSTONES ARE THE EXCEPTION to the tier-gate suppression
+                    // above. Owner: "i dont see keystones in the skill trees".
+                    // A tier-gated keystone printed the EMPTY string, so the
+                    // single most important node on a branch was the only one
+                    // that said nothing at all about itself — no name for what
+                    // it is, no reason it is locked. The tier hairline argument
+                    // does not apply here, because the reason is not the shared
+                    // tier: it is commitment, which is a per-branch choice the
+                    // player has to be told about somewhere on the board.
+                    const bool bIsKeystone = (Kind == ESkillMarkerKind::Keystone);
                     const FString StateLine = bMaxed
                         ? FString(TEXT("MAXED"))
                         : (bPurchasable
                             ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
-                            : (bOwned ? RankLabel(Rank, Node->MaxRank) : (bTierGated ? FString() : ShortReason)));
+                            : (bOwned ? RankLabel(Rank, Node->MaxRank)
+                                      : ((bTierGated && !bIsKeystone) ? FString() : ShortReason)));
                     const FLinearColor StateColor = bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted));
 
                     TSharedRef<SVerticalBox> Label = SNew(SVerticalBox);
+                    // The word itself, on the board. It existed only inside
+                    // MakeSkillDetailCard, which is reachable ONLY by hovering
+                    // the marker — so the board never once said "keystone" to a
+                    // player who was looking at it rather than pointing at it.
+                    // Amber even while locked, deliberately: this caption is
+                    // what the eye is meant to find when scanning a branch, and
+                    // muting it would restore the problem it exists to solve.
+                    if (bIsKeystone)
+                    {
+                        Label->AddSlot().AutoHeight()
+                        [
+                            SNew(STextBlock)
+                            .Text(FText::FromString(TEXT("KEYSTONE")))
+                            .ColorAndOpacity(Amber)
+                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                        ];
+                    }
                     Label->AddSlot().AutoHeight()
                     [
                         SNew(STextBlock)
@@ -3742,6 +3880,133 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         int32 TreeTotal = 0;
         ProgressionTreeInvestment(Progression, CoreTree, TreeSpent, TreeTotal);
 
+        // ---- Expanded constellation ------------------------------------
+        // Owner: "the constellations dont expand like they should I dont see
+        // any layers or details to them". The map was the WHOLE surface: seven
+        // static plates, each a row of anonymous 36px chips carrying a bare
+        // rank integer and one "N NODES · N PURCHASABLE" line. No node name, no
+        // tier, no cost, no effect — nothing to read and nothing to open. There
+        // was no expand code to be broken; it had never been built.
+        //
+        // Expanding reuses the class board's vocabulary rather than inventing a
+        // second one: the same marker silhouettes, the same name / effect /
+        // state label stack, banded by TIER so the depth the data always had is
+        // finally visible. The map stays exactly one click away.
+        if (!SkillExpandedConstellation.IsNone())
+        {
+            TArray<const UBreakerProgressionNode*> Members;
+            FString ConstellationName = SkillExpandedConstellation.ToString().ToUpper();
+            for (const UBreakerProgressionNode* Node : CoreTree->Nodes)
+            {
+                if (Node && Node->Constellation == SkillExpandedConstellation) Members.Add(Node);
+            }
+            Members.Sort([](const UBreakerProgressionNode& A, const UBreakerProgressionNode& B)
+            {
+                if (A.Tier != B.Tier) return A.Tier < B.Tier;
+                return A.NodeId.LexicalLess(B.NodeId);
+            });
+
+            TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    SNew(SBox).WidthOverride(220.0f)
+                    [
+                        MakeButton(FText::FromString(TEXT("< ALL CONSTELLATIONS")),
+                            FOnClicked::CreateLambda([this]()
+                            {
+                                SkillExpandedConstellation = NAME_None;
+                                Rebuild(EBreakerMenuScreen::SkillTrees);
+                                return FReply::Handled();
+                            }), false)
+                    ]
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(ConstellationName), BreakerUI::TypeH2, Primary, true)
+                ]
+            ];
+
+            int32 LastTier = -1;
+            for (const UBreakerProgressionNode* Node : Members)
+            {
+                if (Node->Tier != LastTier)
+                {
+                    LastTier = Node->Tier;
+                    // The layer the flat map never showed. Tier is the axis the
+                    // cluster data was already sorted by and never rendered.
+                    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space8)
+                    [
+                        MenuText(FText::FromString(FString::Printf(TEXT("TIER %d"), LastTier)),
+                            BreakerUI::TypeCaption, Muted, true)
+                    ];
+                }
+
+                const int32 Rank = ProgressionGetNodeRank(Progression, Node->NodeId, Node->Currency);
+                FString LockReason;
+                const bool bPurchasable = SkillNodeIsPurchasable(Progression, CoreTree, Node, TreeSpent, LockReason);
+                const bool bOwned = Rank > 0;
+                const bool bMaxed = Rank >= Node->MaxRank;
+                const ESkillMarkerKind Kind = ClassifyNode(Node);
+                const FSkillNodeView View = MakeSkillNodeView(Node, Rank, bPurchasable, LockReason, TreeSpent, Snapshot);
+
+                const FLinearColor Fill = (bOwned || bPurchasable) ? PanelHover : PanelRaised;
+                const FLinearColor Ring = bOwned ? Cyan : (bPurchasable ? Amber : BorderEmphasis);
+                TSharedRef<SWidget> Marker = WireMarker(CoreTree, Node, View, bPurchasable, LockReason, Fill, Ring,
+                    MarkerRingThickness(Kind, bOwned || bPurchasable),
+                    MakeMarkerCore(Kind, bOwned ? Cyan : (bPurchasable ? Amber : Muted), Fill, 44.0f));
+                if (MarkerIsDiamond(Kind)) Marker = RotateFortyFive(Marker);
+
+                const FString StateText = bMaxed
+                    ? FString(TEXT("MAXED"))
+                    : (bPurchasable ? FString::Printf(TEXT("%d PT -> RANK %d"), Node->CostPerRank, Rank + 1)
+                                    : (bOwned ? RankLabel(Rank, Node->MaxRank) : LockReason));
+
+                TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
+                Text->AddSlot().AutoHeight()
+                [
+                    MenuText(FText::FromString(View.Name), BreakerUI::TypeBody,
+                        (bOwned || bPurchasable) ? Primary : Disabled, true)
+                ];
+                Text->AddSlot().AutoHeight()
+                [
+                    SNew(STextBlock)
+                        .Text(FText::FromString(CompactEffectLine(Node)))
+                        .ColorAndOpacity((bOwned || bPurchasable) ? SoftText : Disabled)
+                        .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+                        .AutoWrapText(true)
+                ];
+                if (!StateText.IsEmpty())
+                {
+                    Text->AddSlot().AutoHeight()
+                    [
+                        MenuText(FText::FromString(StateText), BreakerUI::TypeCaption,
+                            bMaxed ? Cyan : (bPurchasable ? Amber : (bOwned ? Cyan : Muted)), true)
+                    ];
+                }
+
+                Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Marker]
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                        .Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text]
+                ];
+            }
+
+            if (Members.Num() == 0)
+            {
+                Body->AddSlot().AutoHeight()
+                [
+                    MenuText(FText::FromString(TEXT("NO NODES AUTHORED IN THIS CONSTELLATION")),
+                        BreakerUI::TypeCaption, Muted, true)
+                ];
+            }
+            return MakePlate(Body, PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16), false, BreakerUI::BorderRest);
+        }
+
         struct FConstellationCluster
         {
             FString Name;
@@ -3804,7 +4069,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
         }
 
         const float BoardWidth = 1060.0f;
-        const float BoardHeight = 800.0f;
+        // Grows with the plates. The plate positions are authored against a
+        // fixed canvas, so making plates taller pushed the lowest one (ELEMENTS,
+        // at the bottom of the map) through the board's own bottom edge — its
+        // chip grid and node count were cut off, which was visible in capture.
+        // +96 covers the OPEN CONSTELLATION control's 56 plus headroom for the
+        // half-plate that hangs below the lowest authored centre. PlateHeight
+        // itself is computed further down (it needs the cluster contents), so
+        // this cannot read it directly.
+        const float BoardHeight = 800.0f + 96.0f;
         const float PlateWidth = 300.0f;
         // A cluster's chips wrap at six per row inside a 300px plate, so the
         // plate has to be tall enough for however many rows that makes. The
@@ -3831,7 +4104,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             WidestClusterRows = FMath::Max(WidestClusterRows,
                 FMath::DivideAndRoundUp(FMath::Max(1, Cluster.Nodes.Num()), ChipsPerRow));
         }
-        const float PlateHeight = 108.0f + WidestClusterRows * (ChipSize + BreakerUI::Space8);
+        // +56 for the OPEN CONSTELLATION control. A Canvas slot does not clip an
+        // overflowing child, so getting this wrong overprints the plate below
+        // rather than truncating visibly — the failure mode that is hardest to
+        // recognise as one.
+        const float PlateHeight = 108.0f + 56.0f + WidestClusterRows * (ChipSize + BreakerUI::Space8);
 
         TSharedRef<SCanvas> Canvas = SNew(SCanvas);
 
@@ -3921,18 +4198,32 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     MenuText(FText::FromString(Cluster.bHub ? TEXT("HUB") : TEXT("")), BreakerUI::TypeCaption, Cyan, true)
                 ]
             ];
-            if (Cluster.Nodes.Num() == 0)
+            // SEALED IS A PROPERTY OF THE CONSTELLATION, NOT OF ITS EMPTINESS.
+            // Both sealed lines used to live inside the `Num() == 0` branch, and
+            // Elements has six authored nodes — so the plate rendered teal, with
+            // the teal reserved for sealed hardware, and never once said the
+            // word SEALED or named Rift / Entropy / Void. It read as an ordinary
+            // constellation coloured differently for no stated reason. O38 makes
+            // Elements post-slice, so being sealed is exactly what a player most
+            // needs told about it.
+            if (Cluster.bSealed)
             {
                 Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(Cluster.bSealed ? TEXT("SEALED") : TEXT("NO NODES AUTHORED")),
-                        BreakerUI::TypeCaption, Cluster.bSealed ? BreakerUI::TealHardware : Muted, true)
+                    MenuText(FText::FromString(TEXT("SEALED")), BreakerUI::TypeCaption, BreakerUI::TealHardware, true)
                 ];
-                if (Cluster.bSealed)
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(TEXT("RIFT / ENTROPY / VOID")), BreakerUI::TypeCaption, Muted, true)
+                ];
+            }
+            if (Cluster.Nodes.Num() == 0)
+            {
+                if (!Cluster.bSealed)
                 {
-                    Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                    Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                     [
-                        MenuText(FText::FromString(TEXT("RIFT / ENTROPY / VOID")), BreakerUI::TypeCaption, Muted, true)
+                        MenuText(FText::FromString(TEXT("NO NODES AUTHORED")), BreakerUI::TypeCaption, Muted, true)
                     ];
                 }
             }
@@ -3943,6 +4234,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 [
                     MenuText(FText::FromString(FString::Printf(TEXT("%d NODES · %d PURCHASABLE"), Cluster.Nodes.Num(), ClusterPurchasable)),
                         BreakerUI::TypeCaption, ClusterPurchasable > 0 ? Amber : Muted, true)
+                ];
+                // The affordance, stated. A plate that opens has to say so —
+                // the chips are individually clickable to BUY, so nothing about
+                // the plate previously suggested it was itself a way in.
+                const FName ClusterId = Cluster.Constellation;
+                Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+                    [
+                        MakeButton(FText::FromString(TEXT("OPEN CONSTELLATION")),
+                            FOnClicked::CreateLambda([this, ClusterId]()
+                            {
+                                SkillExpandedConstellation = ClusterId;
+                                Rebuild(EBreakerMenuScreen::SkillTrees);
+                                return FReply::Handled();
+                            }), false)
+                    ]
                 ];
             }
 
@@ -4134,7 +4442,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     // Below this width the header band's controls stop fitting on one 88px
     // row, so the labels compact rather than running off the plate. Sampled
     // from the viewport, once, like every other number on this screen.
-    const bool bCompactHeader = Metrics.PanelWidth < 1500.0f;
+    // 1900, not 1500. Measured by capture at a 1920 viewport (PanelWidth 1840,
+    // comfortably above the old threshold) where RESPEC was still drawn off the
+    // right edge as "RESPEC C". The header packs a title, four screen tabs, two
+    // board tabs, two point chips, DEV, RESPEC and BACK into one row of
+    // AutoWidth slots, and an SHorizontalBox does not shrink an oversized
+    // AutoWidth child — it draws it straight through the panel edge. The old
+    // threshold was set by reasoning; this one was set by looking.
+    const bool bCompactHeader = Metrics.PanelWidth < 1900.0f;
 
     TSharedRef<SHorizontalBox> BoardTabs = SNew(SHorizontalBox);
     auto AddBoardTab = [this, &BoardTabs, bCoreBoard](const FString& Label, int32 TabIndex)
@@ -4255,7 +4570,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     return FReply::Handled();
                 }))
                 [
-                    MenuText(FText::FromString(TEXT("DEV: GRANT POINTS")), BreakerUI::TypeCaption, Amber, true)
+                    // Shortened when the header is compact. The header is one
+                    // row of AutoWidth slots that an SHorizontalBox will not
+                    // shrink, so the only way to keep BACK on screen is to
+                    // spend fewer pixels earlier in the row — and a dev-only
+                    // control is the right place to spend them.
+                    MenuText(FText::FromString(bCompactHeader ? TEXT("DEV: POINTS") : TEXT("DEV: GRANT POINTS")),
+                        BreakerUI::TypeCaption, Amber, true)
                 ],
                 Amber)
         ];

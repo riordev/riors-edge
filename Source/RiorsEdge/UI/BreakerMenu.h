@@ -162,6 +162,14 @@ private:
     // through SetContent; it is never driven by a per-frame attribute, and it
     // never changes width, so the board cannot reflow when it populates.
     TSharedPtr<SBox> SkillDetailHost;
+    // Which node the detail rail is showing. Survives the screen rebuild that a
+    // purchase triggers; the card itself is rebuilt from live data, never
+    // restored as a stale widget.
+    FName SkillDetailNodeId = NAME_None;
+    // Which Core constellation is opened to its node list. NAME_None is the
+    // seven-plate map. Survives a purchase rebuild, so buying inside an
+    // expanded constellation does not throw the player back to the map.
+    FName SkillExpandedConstellation = NAME_None;
     EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
     bool bRebuildScheduled = false;
     // Forge tab: which held item (equipped or backpack, found by id in either
