@@ -1,6 +1,7 @@
 # Ability Implementation Spec — engineering design for every class ability
 
-**Last reconciled against: O32** (2026-08-14).
+**Scope:** mixed — judge per section; slice covers currently-built verbs and abilities (Swift, Caster, Parry), post-slice covers unbuilt class kits and future ability systems (the Gunsmith / Tank / Support one-pagers, §5–§8) (see `Vertical-Slice.md`).
+**Last reconciled against: O40** (2026-08-14).
 
 Status: engineering design. **No balance values are authored here.** Every number in this
 document is quoted from `Docs/Design/Class-Kits.md` or `Docs/Design/Core-Constellations.md`.
@@ -9,7 +10,12 @@ flagged **GAP [O2]** and left unfilled — O2 (`Docs/Design/Decisions.md`) freez
 authoring until wave-mode instrumentation reports.
 
 Scope: 30 class abilities (6 × 5 classes), 5 ultimates, 15 branch-keystone ultimate rewrites,
-and the two tree-granted verbs (Air Jump — Kinesis K4; Parry — Bulwark B4).
+and the one tree-granted verb (Parry — Bulwark B4). **[O25-SUPERSEDED]** this line used to read
+"the two tree-granted verbs (Air Jump — Kinesis K4; Parry — Bulwark B4)": **O25** (2026-08-13)
+rules Air Jump is not a Core Tree grant — two jumps are base kit for every character
+(`JumpMaxCount = 2`, already live) — so it is out of this document's Core-Tree-verb scope; §9.1
+below is retained, marked superseded, as a historical record. Swift's third jump is a
+class-innate Swift-kit grant, not Core Tree scope; see §9.1's marker for detail.
 
 Detail level mirrors the prototyping order in Class-Kits §0 and Master 7.5:
 **Swift authored in full, Caster authored in full, Gunsmith / Tank / Support one-page.**
@@ -573,10 +579,14 @@ across the whole kit. See the status block at the top of §5 for what remains (k
 and the HUD cycle readout).
 Exit test: Class-Kits §2.7 criteria 1–7.
 
-**Phase 4 — Verbs.** Air Jump (Kinesis K4) → Parry (Bulwark B4). Deliberately after Swift and
-Caster: they are Core Tree grants, not class abilities, and the slice's fifteen-node set
+**Phase 4 — Verb.** ~~Air Jump (Kinesis K4) →~~ Parry (Bulwark B4) only. **[O25-SUPERSEDED]**:
+two jumps are base kit for every character (`JumpMaxCount = 2`, already live), so Air Jump was
+never Core Tree build work — see §9.1's superseded marker below. Deliberately after Swift and
+Caster: Parry is a Core Tree grant, not a class ability, and the slice's fifteen-node set
 (Core-Constellations §10.1) needs the granting machinery from Phase 0 to already be proven.
-Exit test: Core-Constellations §10.3 criteria 4, 5, 6, 10.
+Exit test: Core-Constellations §10.3 criteria 4, 5, 6, 10 — each of those already carries its own
+`[O25-SUPERSEDED]` annotation there for its Air-Jump/K4 half; only the Parry half of each still
+gates this phase.
 
 **Phase 5 — Gunsmith / Tank / Support.** One-page treatments only. Deployable framework is the
 long pole; build it once for Gunsmith and reuse it for Tank's Anchor Point.
@@ -1681,14 +1691,23 @@ nothing per-ability), all magnitudes, and Gunsmith/Tank/Support's nine More mult
 
 ---
 
-# 9. The two tree-granted verbs
+# 9. The tree-granted verb
 
-These are **Core Tree** grants, not class abilities. They do not occupy a class ability slot and
-they are not in `FBreakerAbilityLoadout` — which means the granting path is different from
-everything above and must be built deliberately.
+> **[O25-SUPERSEDED]** This section originally scoped two tree-granted verbs, Air Jump and Parry.
+> **O25** (2026-08-13) rules two jumps base kit for every character (`JumpMaxCount = 2` in
+> `ABreakerCharacter`, already correct and live) and makes Swift's third jump a class-innate
+> Swift-kit grant, not a Core Tree purchase — so Air Jump was never Core Tree implementation work.
+> **Parry is the only tree-granted verb.** §9.1 below (the Air Jump implementation plan) is
+> retained in place and marked superseded so the history stays auditable; build only against §9.2
+> (Parry). This uses the same `[O25-SUPERSEDED]` annotation Core-Constellations §10.3 already
+> carries on its criteria 4–6 and 10.
 
-**Shared requirement.** Both are granted by a `UBreakerProgressionNode` purchase in the Core Tree,
-must survive save/load (the save stores IDs and ranks only, and the verbs are re-granted on load —
+Parry is a **Core Tree** grant, not a class ability. It does not occupy a class ability slot and
+is not in `FBreakerAbilityLoadout` — which means the granting path is different from everything
+above and must be built deliberately.
+
+**Requirement.** Parry is granted by a `UBreakerProgressionNode` purchase in the Core Tree,
+must survive save/load (the save stores IDs and ranks only, and it is re-granted on load —
 Core-Constellations §10.3.6), and must be revoked correctly on respec (§10.3.4). The granting
 mechanism: `UBreakerAbilityComponent::RefreshGrantedAbilities` also walks `CoreNodeRanks` and
 grants any node carrying a `GrantedAbility` reference — so extend `UBreakerProgressionNode` with:
@@ -1703,9 +1722,21 @@ TObjectPtr<UBreakerAbilityDefinition> GrantedAbility;   // null for the vast maj
 (+parry window) and Kinesis's K3 Loft (+air jump speed retention) are purchasable *before* their
 verb and must then produce no observable effect and no error. Implement both as passive GEs
 modifying an attribute that simply has no consumer until the verb exists — never as a direct call
-into the verb's ability. Write the test first.
+into the verb's ability. Write the test first. **[O25-SUPERSEDED, Loft/Air-Jump half only]** — air
+jump has no gating verb to be "before" any more, since O25 makes it base kit; K3 Loft's own
+inert-until-K4 framing is retired along with §9.1 below. The B3 Read / Parry half of this test is
+unaffected and still governs.
 
-## 9.1 AIR JUMP — Kinesis K4 (Notable, 2 points)
+## 9.1 AIR JUMP — Kinesis K4 (Notable, 2 points) — **[O25-SUPERSEDED]**
+
+> **SUPERSEDED BY O25 (2026-08-13).** Air Jump is not a Core Tree grant. Two jumps are base kit
+> for every character from level one — `JumpMaxCount = 2` in `ABreakerCharacter` is correct and
+> already live; there was never a design/code contradiction to fix, and there is no K4 purchase
+> gating a second jump. Swift's third jump, if/when built, is a **class-innate Swift-kit unlock**
+> (see `Docs/Design/Class-Kits.md`, Swift), not this Core Tree node. The implementation plan below
+> is retained unedited for audit history — the same treatment Core-Constellations §10.3 gives its
+> own K4-related criteria (4–6, 10), each already carrying an `[O25-SUPERSEDED]` annotation there
+> — and must not be built as written.
 
 **Design source.** Core-Constellations §8 K4. "Unlocks a single mid-air jump, refreshed on landing,
 on wall contact, and on a successful Dodge."
@@ -1847,8 +1878,14 @@ Risk key: **L** = existing systems only · **M** = one new hook or a bounded new
 | U5 | Mark | Support | `_Instant` | ServerOnly | GAP | `UBreakerMarkComponent` (shared with S6) | M |
 | U6 | Suppress | Support | `_Zone` | ServerOnly | GAP | zone actor, `PushSpeedMultiplier`, `PushAccuracyMultiplier` | M |
 | — | **Conduit** | Support | `_Ultimate` | ServerOnly | 100 / — | radius target query incl. self, `PushLethalDamagePrevention`, `PushFlatDamageBonus` | H |
-| V1 | **Air Jump** | Kinesis | *movement verb* | CMC prediction | — / — | `TryAirJump`, `RefreshAirJump`, **saved-move flag**, `OnDodgeEvaded` | H |
+| V1 | **Air Jump** *(SUPERSEDED — O25, see §9.1)* | Kinesis | *movement verb* | CMC prediction | — / — | `TryAirJump`, `RefreshAirJump`, **saved-move flag**, `OnDodgeEvaded` | H |
 | V2 | **Parry** | Bulwark | `_Window` | LocalPredicted | — / GAP | **parry step in `ReceiveDamage`**, `ApplyStagger`, `OnParrySucceeded`, input action | H |
+
+*V1 is superseded by O25 — see §9.1's marker. The double jump actually live in the game is the
+engine-level `JumpMaxCount = 2` on `ABreakerCharacter`, not the custom `TryAirJump` /
+`RefreshAirJump` system this row scopes; that system is retained here only as a historical risk
+estimate for a design that predates O25, not a build target. Swift's third jump, if built, is
+class-innate and does not belong in this Core Tree table at all.*
 
 ### 10.1 The fifteen keystone rewrites
 
@@ -1914,7 +1951,7 @@ array) for their More.
 | 5 | `UBreakerCombatComponent::ApplyHealing` + `FBreakerHealResult` | ~9 (all of Medic, Leech, Siphon, Triage, Vein) |
 | 6 | `UBreakerMarkComponent` | ~7 (S6, M5, M8, M11, Support Mark, Warden branch, Blackout) |
 | 7 | Deployable system + density cap | ~7 (five Gunsmith, Anchor Point, Field Assembly) |
-| 8 | Movement push/pop overrides (`TryRedirect`, `CancelVelocity`, `TryBlinkTo`, `TryAirJump`, dash/wall-ride/speed overrides) | ~7 |
+| 8 | Movement push/pop overrides (`TryRedirect`, `CancelVelocity`, `TryBlinkTo`, ~~`TryAirJump`~~ **[O25-SUPERSEDED, see §9.1]**, dash/wall-ride/speed overrides) | ~7 |
 | 9 | `FBreakerDamageRequest::Instigator` | Grit self-damage, Support assists, rocket self-damage (O13), all kill attribution |
 | 10 | `ApplyStagger` | Ground Zero, Parry, B6 Unyielding |
 
@@ -1992,10 +2029,20 @@ structure and can be written **before** O2 lifts:
 | Hard Stop / K10 immunity uptime ≤ 0.6s per 6s | Master 7.10.4 |
 | `TryRedirect` never increases horizontal speed | Master 5.4 |
 | Blink never places the player inside geometry | §5.2 |
-| Air jump refreshes on land / wall / dodge and **not** on dash | Core-Constellations §10.3.10 |
-| Read at rank 3 without Parry, Loft at rank 3 without Air Jump: no effect, no error | §10.3.5 |
+| ~~Air jump refreshes on land / wall / dodge and **not** on dash~~ **[O25-SUPERSEDED]** — see §9.1 | Core-Constellations §10.3.10 |
+| Read at rank 3 without Parry: no effect, no error. ~~Loft at rank 3 without Air Jump: no effect, no error~~ **[O25-SUPERSEDED]** — see §9.1 | §10.3.5 |
 | Verbs survive save/load; respec revokes them | §10.3.4, §10.3.6 |
 | Parry negates exactly one hit inside the window, zero outside, under 200ms latency | §9.2 |
 | Deployable density never exceeds the cap under Field Assembly + any nodes | Class-Kits §3 |
 | Overheal generates zero Charge under all node combinations | Class-Kits §5 |
 | Content validation: every shipped ability definition has real values or is on the §11 GAP list | O2 enforcement |
+
+---
+
+**`[O25-SUPERSEDED]` note on the two rows above marked against Air Jump/Loft:** both describe the
+pre-O25 tree-gated air-jump design retained at §9.1. Air-jump refresh-on-land/wall/dodge is no
+longer a Core Tree acceptance criterion — the live mechanic is the base-kit `JumpMaxCount = 2` —
+and the Loft half of the inert-node test has no gate left to test against, since air jump is
+always available to everyone. The Read-without-Parry half of the inert-node test is unaffected and
+still governs. This matches the `[O25-SUPERSEDED]` annotations already on Core-Constellations
+§10.3 criteria 5 and 10.

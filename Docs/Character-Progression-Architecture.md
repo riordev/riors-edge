@@ -1,6 +1,7 @@
 # Character and progression architecture
 
-Last reconciled against: O32
+**Scope:** mixed — judge per section; the "As built" status, progression currencies, and locked decisions describe the current slice, while most of the five-class / six-constellation architecture above them is post-slice design intent, explicitly flagged in this document's own opening note as mostly not yet built (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Design source reviewed: `riors-edge-progression.md` supplied by the project owner.
 

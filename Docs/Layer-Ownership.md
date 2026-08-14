@@ -1,6 +1,7 @@
 # Layer ownership
 
-Last reconciled against: O32
+**Scope:** slice — this rule governs systems already live in code (checked against the current build throughout; see the "FOR THE OWNER" section below) and is written to extend unchanged into post-slice endgame gear rather than needing a separate treatment (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Class trees, the universal Core Tree, and equipment affixes are three separate systems that can all express "the player is better at something." Without an explicit rule they become three competing ways to author the same modifier, and the class fantasy, the constellation choice, and the loot chase all dilute each other.
 
