@@ -1,6 +1,7 @@
 # Combat foundation
 
-Last reconciled against: O32
+**Scope:** slice (see `Vertical-Slice.md`).
+**Last reconciled against: O40**
 
 Source: `Source/RiorsEdge/Combat/`. The canonical resolution spec is
 `Docs/Design/Damage-Pipeline.md`; where this file and that one disagree, that
