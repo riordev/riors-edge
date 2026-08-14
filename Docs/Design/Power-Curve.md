@@ -1,5 +1,7 @@
 # The power curve
 
+Last reconciled against: O32
+
 Authority: ruling **O27** in `Decisions.md`. This document is the architecture
 behind it. Every constant here is an `O2 PLACEHOLDER` shape, not a balance
 sheet — the point of the document is that the numbers become *derivable* rather
@@ -58,10 +60,15 @@ now true, and it is true in three specific places:
    the two cancel term for term across the whole game rather than only across
    the first fifty levels.
 3. **The affix tier ladder widened from T8..T-1 to T12..T-1** and stopped being
-   linear. Item level 50 now reaches only T8; T1 opens at item level 111. The
-   curve is back-loaded so the step grows from +14.8% at the bottom to +36.5% at
-   the top, which is what makes a top-tier roll an event rather than one more
-   step. Full derivation and the value table are in `Docs/Item-Foundation.md`.
+   linear. The curve is back-loaded so the step grows from +14.8% at the bottom
+   to +36.5% at the top, which is what makes a top-tier roll an event rather
+   than one more step. The item-level-to-tier mapping is **two-slope** after an
+   owner ruling ("the item level tier capping at 8 might make for awkward
+   feeling progression, let's bring that to 6"): **T12 -> T6 across item levels
+   1-50** at ~8.2 levels per tier, then **T6 -> T1 across 50-120** at ~14. So a
+   player finishing the levelling game has crossed HALF the ladder rather than a
+   third of it, and **T1 opens at item level 120 exactly**. Full derivation and
+   the value table are in `Docs/Item-Foundation.md`.
 
 Three properties of that choice are worth stating, because each was a live
 alternative O29 rejected:
@@ -105,10 +112,12 @@ difficulty lives, per O27:
 
 ### 3. Player offence — the multiplicand and the multipliers
 
-This is the part that was missing entirely, and it has two halves.
+This is the part that was missing entirely when this document was written. Both
+halves are now **BUILT** — see the "§3 multiplicand" section below for what
+shipped; the architecture is kept here because it is what the code implements.
 
 **Base weapon damage scales with item level.** This is the primary power axis
-in any ARPG and it does not exist yet:
+in any ARPG:
 
 ```
 WeaponBase(ilvl) = ArchetypeBase * (1 + w)^(ilvl - 1)
@@ -164,39 +173,58 @@ per hit by 8–14%, so a measuring run should set `WeakPointToleranceCm = 0`.
 
 ## Choices over accumulation
 
-O27 is explicit that choices must beat accumulation. Two concrete consequences:
+O27 is explicit that choices must beat accumulation. Two concrete consequences,
+**both now acted on**:
 
-- `IncreasedDamagePerSpentPoint` currently contributes about +69% at a full
-  point budget, against roughly +19% from every damage node combined — so *how
-  many* points you have spent matters about 3.5× more than *where*. That is
-  backwards for a build game. The baseline drops to near zero and the power
-  moves into nodes.
-- Nodes need to offer real, differentiated choices rather than a uniform
-  percentage. This game's pillar is movement, so conditional damage that keys
-  off the movement state (airborne, sliding, wall-riding, at Redline Momentum)
-  is the obvious place for build identity to live, and it is currently absent.
+- `IncreasedDamagePerSpentPoint` used to contribute about +69% at a full point
+  budget, against roughly +19% from every damage node combined — so *how many*
+  points you had spent mattered about 3.5× more than *where*. That is backwards
+  for a build game. **It is now 0.25%/point** (EditAnywhere, zeroable): a floor
+  so a purely defensive purchase is not literally zero offence, and because
+  every build spends its whole budget it cannot differentiate two builds.
+  `RiorsEdge.Progression.PowerBand` asserts that removing it widens the band
+  rather than narrowing it, which is the assertion that notices if anyone
+  raises it back toward 1.0.
+- Nodes needed real, differentiated choices rather than a uniform percentage.
+  This game's pillar is movement, so conditional damage keyed off the movement
+  state is where build identity lives. **Built**: `EBreakerBuildCondition` is
+  `Always / Airborne / Sliding / WallRiding / Redline / RecentlyDashed`, with
+  five conditional affix lines and six conditional node lines against it.
+  **It is still MOVEMENT-ONLY**, which is the constraint O30 names: no node or
+  affix can key off combat or status state, and that has now blocked content
+  twice.
 
 ## More options in every avenue
 
-The slice is far too thin for builds to be interesting, and O27 calls this out
-directly. Concretely, today:
+The slice was far too thin for builds to be interesting, and O27 calls this out
+directly. **What this section described has been fixed; the diagnosis is kept
+because it is the standard the pool is held to.** As it stood:
 
-- **One damage affix exists** (`Offense.WeaponDamage`), and it rolls on 4 of 8
-  slots — helmet, body, boots and waist are structurally incapable of
+- **One damage affix existed** (`Offense.WeaponDamage`), rolling on 4 of 8
+  slots — helmet, body, boots and waist were structurally incapable of
   increasing damage.
-- Twelve affix types total, of which one is offensive.
+- Twelve affix types total, of which one was offensive.
 - No conditional or build-defining affixes at all.
 
-The pool needs breadth on every axis — flat and increased damage, crit in both
+**Now: 24 lines, 11 offensive, damage on all eight slots**, with per-slot
+identity, five conditional lines, four rollable Anomalous rule rewrites and
+three authored legendaries. `RiorsEdge.Items.Affixes.Breadth` asserts that no
+slot is structurally incapable of raising damage and that every slot has a
+conditional line of its own, so this failure cannot come back silently. The full
+pool table is in `Docs/Item-Foundation.md`.
+
+The standard the pool is still held to: breadth on every axis — flat and increased damage, crit in both
 directions, conditional damage tied to the movement pillar, and per-slot
 identity so that gearing is a set of decisions rather than a search for one
 line.
 
-## Implementation status (2026-08-13)
+## Implementation status
 
-The implementation order was: monster chassis by area level, weapon base damage
-by item level, then the affix and node breadth that makes the variance band
-reachable. **The third item is built.** The first two are not.
+**ALL THREE ITEMS ARE BUILT** (chassis 2026-08-13, weapon curve 2026-08-13,
+breadth 2026-08-13/14). The section below is the running log, oldest entry
+first; where an entry says something is not built, a later entry supersedes it
+and says so. One thing in the chain is still open and it is neither of the
+curves — see "the last clamp" at the end of this document.
 
 **BUILT — §4 the build variance band, §"Choices over accumulation", §"More
 options in every avenue".**
@@ -207,8 +235,9 @@ options in every avenue".**
   them — it is a floor so that a defensive purchase is not literally zero
   offence, and nothing more.
 - The affix pool went 12 lines / 1 offensive / 4 of 8 slots to **18 lines, 9
-  offensive, damage on all 8 slots**, with per-slot identity. Full table in
-  `Docs/Item-Foundation.md`.
+  offensive, damage on all 8 slots**, with per-slot identity. (It has since
+  reached **24 lines, 11 offensive** — Fire Rate, then the four non-damage
+  lines, then Resource Efficiency.) Full table in `Docs/Item-Foundation.md`.
 - **Conditional damage exists**, keyed to the movement pillar: five affixes and
   six node lines that pay out only while airborne, sliding, wall riding, at
   Redline, or shortly after a dash. `FBreakerBuildConditionState`
@@ -222,9 +251,12 @@ options in every avenue".**
 - Node content: Core 15 -> **24** (a new Velocity constellation of six, plus
   Called Shot, Salvo and Barrage), Swift Kinetic 8 -> 11, Marksman 8 -> 10.
 
-**The band, measured** (`RiorsEdge.Progression.PowerBand`, composed through the
-real aggregator; both characters level 50, both measured in the same instant —
-airborne, recently dashed, at Redline):
+**The band as it measured on 2026-08-13, BEFORE O29** (`RiorsEdge.Progression
+.PowerBand`, composed through the real aggregator; both characters level 50 in
+item level 50 gear at T5 and T1, both measured in the same instant — airborne,
+recently dashed, at Redline). **These figures are historical**: O29 widened the
+ladder and the fixture has since moved to item level 120 at T3 and T1. See "the
+band moved" below.
 
 | Layer | Baseline 50 | Optimized 50 | Ratio | Doc target |
 |---|---|---|---|---|
@@ -240,13 +272,12 @@ so it is multiplied by the additive bucket rather than added after it; it is
 kept deliberately small (1.16x) so it colours the band rather than carrying it.
 **O3 was not broken to reach the band**, exactly as §4 predicted.
 
-**NOT BUILT.** The two structural gaps this document names first are untouched
-by this pass and remain the next work: monster health and damage are still
-constants rather than functions of area level, and weapon base damage still
-does not scale with item level. Until those land, the band is a statement about
-the multiplier stack only — an optimized character deals 8.74x a baseline
-character's damage, against an enemy whose health does not yet know what level
-the area is.
+**NOT BUILT, as of that entry** — superseded the same week, and both entries
+follow. The two structural gaps this document names first were untouched by that
+pass: monster health and damage were still constants rather than functions of
+area level, and weapon base damage still did not scale with item level. Until
+they landed the band was a statement about the multiplier stack only.
+**Both landed.** Read on.
 ### §2 Monster chassis — BUILT
 
 `Source/RiorsEdge/Combat/BreakerMonsterChassis.{h,cpp}` is the curve, as pure
@@ -294,8 +325,12 @@ playtest walks the curve by turning a number up rather than by levelling a
 character. Wave escalation is the same arithmetic it always was
 (`10 + wave × 2`), now expressed through those two properties.
 
-`EnemyLevel` still drives loot item level and now follows area level, clamped
-to 50 because affix tiers are authored to 50 while the chassis keeps climbing.
+`EnemyLevel` still drives loot item level and follows area level. **It is still
+clamped to 50, on the actor** (`ABreakerEnemy::ApplyChassis`:
+`EnemyLevel = FMath::Clamp(EnemyLevel, 1, 50)`), and the field's comment still
+gives the retired reason — affix tiers being authored only to 50. O29 authored
+them to 120. **That clamp is now the one thing standing between the item system
+and the endgame curve**; see "the last clamp" below.
 
 Three automation tests (`RiorsEdge.Combat.Chassis.*`) cover monotonicity and
 the geometric identity, the rank table and its ordering, and the ruling
@@ -325,9 +360,11 @@ every area level, and the whole table collapses to its first row — at which
 point the remaining 1.81× to O18's <1s target is a weapon-side anchor
 question, exactly as O27 says it should be.
 
-**Until the weapon curve lands, the gym is only playable at low area level.**
-`GymAreaLevel` defaults to 10 to preserve today's drop item level; set it to 1
-to recover today's exact combat feel while the second curve is built.
+**That was true only until the weapon curve landed, which it has.** With
+`w = g = 0.09` the table above collapses to its first row for a baseline build
+in on-level gear, and `RiorsEdge.Combat.PowerCurve.Composition` asserts exactly
+that across area levels 1-50. `GymAreaLevel` defaults to 10; set it to 1 to
+recover the level-1 combat feel exactly.
 
 ### §3 multiplicand — built
 
@@ -352,9 +389,14 @@ DoT's base per tick.
 - One shared exponent means the archetype table keeps its shape: a sniper
   out-hits an SMG per shot at every level by the same ratio.
 - Item level reaches the weapon through the owner's equipment component, weapon
-  slot 1 <-> `Primary` and slot 2 <-> `Secondary`. OPEN: an item instance
-  carries no weapon archetype, so which of the five guns a Primary item *is*
-  is still unanswered; only item level crosses the boundary today.
+  slot 1 <-> `Primary` and slot 2 <-> `Secondary`. ~~OPEN: an item instance
+  carries no weapon archetype~~ **CLOSED**:
+  `FBreakerItemInstance::WeaponArchetype` is drawn on a weapon drop before its
+  affixes and armed on equip by
+  `UBreakerWeaponComponent::SyncArchetypesToEquipment`, so a dropped Primary is
+  a specific gun and not a stat sheet. There are **eight** archetypes, not
+  five — Rifle, SMG, Sniper, Shotgun, Rocket Launcher, Burst Rifle, Machinegun,
+  Sidearm.
 
 Details and the full rationale are in `Docs/Weapon-Foundation.md`; coverage is
 `RiorsEdge.Weapons.ItemLevelCurve`, `.ItemLevelTracksMonsterHealth`,
@@ -362,10 +404,11 @@ Details and the full rationale are in `Docs/Weapon-Foundation.md`; coverage is
 
 ### §4 and the affix/node breadth — BUILT
 
-See the §4 entry above: the band measures 8.74x, the accumulation baseline is
-cut to 0.25%/point, the affix pool is 18 lines with damage on all eight slots,
-and `RiorsEdge.Progression.PowerBand` pins the ratio so a future tuning pass
-cannot flatten builds silently.
+See the §4 entry above: the accumulation baseline is cut to 0.25%/point, the
+affix pool has damage on all eight slots, and `RiorsEdge.Progression.PowerBand`
+pins the ratio so a future tuning pass cannot flatten builds silently. The band
+measured 8.74x when that entry was written; O29 moved it and the test is now
+red — see "the build variance band moved" below for the current reading.
 
 ## CLOSED: the endgame power source is gear depth [O29 2026-08-14]
 
@@ -433,12 +476,25 @@ the endgame should get gradually easier or harder, not a correction.
 curve end to end. Items roll to level 120, the tier ladder covers it, the weapon
 damage curve evaluates it, the Forge prices it, and every clamp to 50 is gone.
 
-**NOT fixed, and it is one line in another lane:** `GetDropItemLevel` still
-clamps to 50, so no drop actually carries the endgame curve yet. Until the owner
-makes that change the 74x gap is still live in the shipping game even though
-nothing in the item system blocks it any more. `EndgameComposition` reports the
-clamp in its log rather than failing on it, because a red test in another lane's
-column is a worse handoff than a loud line in the log.
+**NOT fixed — THE LAST CLAMP, and it moved rather than closed.**
+`UBreakerMonsterChassisLibrary::GetDropItemLevel` **has** been fixed: it is now
+`Clamp(ClampAreaLevel(AL), 1, MaxItemLevel)`, i.e. the identity across 1-100,
+and `EndgameComposition` takes its green branch on it.
+
+But `ABreakerEnemy::ApplyChassis` calls that function and then immediately
+re-clamps its own field:
+
+    EnemyLevel = GetDropItemLevel(AreaLevel) + (IsElite() ? EliteDropItemLevelBonus : 0);
+    EnemyLevel = FMath::Clamp(EnemyLevel, 1, 50);
+
+and `EnemyLevel` is what `GrantLoot` hands to `RollDrop` and `RollItem`. So
+**no drop in the shipping game carries an item level above 50**, the 74x gap is
+still live in play, and nothing in the suite fails on it — `EndgameComposition`
+checks the library function, which is now correct, and never touches the actor.
+The item system, the weapon curve and the Forge all support the endgame; the
+enemy does not hand it out. Whether that clamp is a leftover or a deliberate
+hold until item levels 101-120 have a source is an owner call, recorded at the
+end of `Docs/Item-Foundation.md`.
 
 **OPEN: item level 101-120 has no source.** Drop item level derives from area
 level and area level stops at 100, so the top twenty item levels are reachable
@@ -448,26 +504,35 @@ content - either the reward at the end of the chase, or twenty levels of dead
 ladder. Owner ruling.
 
 **OPEN: the build variance band moved, and O27 is its subject.**
-`RiorsEdge.Progression.PowerBand` now measures **23.70x** against the authored
-8-10x, and fails deliberately rather than being retuned. Two things happened:
+`RiorsEdge.Progression.PowerBand` fails deliberately rather than being retuned.
+Two things happened, and only the first is arithmetic:
 
 - The back-loaded ladder widened the distance between a mediocre roll and a
-  perfect one. The fixture's T1/T5 ratio went from 180/91.4 = 1.97x to
-  400/120.9 = 3.31x, and that compounds through the flat and crit lanes.
-- More importantly, **the fixture now describes a character that cannot exist.**
-  It builds item level 50 gear at T5 and T1, and `BestTierForItemLevel(50)` is
-  now T8 - neither tier is obtainable at that item level at any rarity. The
-  8-10x band was measured on a pairing the loot pipeline could produce before
-  O29 and cannot produce after it.
+  perfect one, and that compounds through the flat and crit lanes.
+- More importantly, **the original fixture described a character that cannot
+  exist.** It built item level 50 gear at T5 and T1, and at item level 50 the
+  two-slope mapping reaches only T6 — neither tier is obtainable there at any
+  rarity. The 8-10x band was measured on a pairing the loot pipeline could
+  produce before O29 and cannot produce after it.
+
+**The fixture has since moved to where builds actually compete**: item level
+**120**, baseline **T3** against optimized **T1** — a gear spread of about
+1.85x, close to the 1.97x the old T5-vs-T1 fixture had. It still fails, at
+around **15x** against the authored 8-10x, and the extra did NOT come from the
+gear spread. It came from absolute affix values roughly doubling, which moves
+flat crit chance and the additive bucket into a different part of their own
+curves for the optimized build specifically. That is a real consequence of O29,
+not a fixture artefact. (The **23.70x** this section previously recorded was the
+pre-move measurement at the impossible ilvl 50 fixture; it is superseded.)
 
 So the honest reading is not that the band broke. **O29 moved where the band
 lives**: the spread between a decent item and a perfect one is no longer
 available at the character cap, it is available in the endgame, which is exactly
-what "all endgame character power comes from gear" is supposed to mean. Three
-rulings would each resolve it - the band widens because the endgame is longer,
-the fixture moves to item level 120 with tiers the ladder can produce (T3 vs T1
-reproduces roughly the old 1.97x gear spread), or the ceiling anchors come back
-down.
+what "all endgame character power comes from gear" is supposed to mean. Two
+rulings would each resolve it — the band target moves because the endgame is
+longer, or the content retunes (crit and the additive bucket come down) until
+the composed band lands back at 8-10x on the new ladder. **Widening the asserted
+range is not a third option**; that is choosing the first without saying so.
 
 Two smaller consequences, both reported rather than retuned:
 
@@ -494,3 +559,28 @@ Two smaller consequences, both reported rather than retuned:
 `RiorsEdge.Combat.PowerCurve.EndgameClamp` asserted the gap was still open and
 carried an instruction to delete it when someone closed it. It is deleted, and
 `RiorsEdge.Combat.PowerCurve.EndgameComposition` stands in its place.
+
+## FOR THE OWNER — open on this document (2026-08-14)
+
+Ranked by how much each blocks the others. None is decided here.
+
+1. **The enemy's item level clamp.** `ABreakerEnemy::ApplyChassis` clamps
+   `EnemyLevel` to 50 after `GetDropItemLevel` correctly returns up to 100. It
+   is one line, it has no test on it, and until it moves the O29 endgame does
+   not exist in play. Lifting it to `UBreakerAffixLibrary::MaxItemLevel` makes
+   the measured composition describe the shipping game; leaving it holds the
+   endgame closed until item 3 below is answered.
+2. **The build variance band.** Authored 8-10x, measuring ~15x, deliberately
+   red. Either the target moves or the content retunes. Every measured figure
+   in this document and in `Item-Foundation.md` moves with the answer.
+3. **Item levels 101-120 have no source.** Drop item level derives from area
+   level and area level ceilings at 100, so the top twenty levels are reachable
+   only through O6's TierBonus (0..+5, which does not cover it) or the Forge.
+   Worth `1.09^20 = 5.6x` base damage: either the reward at the end of the
+   chase, or twenty levels of dead ladder.
+4. **PROLIFIC exceeds the rewrite ceiling** (x1.462 against x1.35) because its
+   value IS a tier step and the steps grew. Raise the ceiling or re-specify the
+   rewrite; `RiorsEdge.Progression.RuleBandImpact` fails until one happens.
+5. **`EBreakerBuildCondition` is movement-only.** O30's taxonomy (ailment,
+   crit, stacking) needs it widened before those axes can be authored honestly.
+   Cheap to widen; it has blocked content twice.

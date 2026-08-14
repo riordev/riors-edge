@@ -1,6 +1,13 @@
 # Character and progression architecture
 
+Last reconciled against: O32
+
 Design source reviewed: `riors-edge-progression.md` supplied by the project owner.
+
+This document is the ARCHITECTURE ANALYSIS. Most of it is intent that has not
+been built, and that is correct — it is the plan the implementation is measured
+against. The "As built" section near the end states exactly which parts exist,
+so nothing here should be read as a claim of implementation.
 
 ## Design verdict
 
@@ -32,7 +39,19 @@ Runtime actors receive the resulting abilities, effects, tags, and attribute mod
 
 ### Caster
 
-Resource: Mana. Its loop should reward active spell use, kills, and precision without becoming infinite during dense encounters.
+Resource: Mana. **The loop is INVERTED from what this paragraph originally
+described** (owner ruling 2026-08-14, superseding Class-Kits §2.1's accumulating
+bank): **the bar starts FULL and drains as spells are cast.** Passive
+regeneration is the primary recovery path; spell use, kills and precision are
+**accelerators on top of it**, not the income. The concern below — "without
+becoming infinite during dense encounters" — is now expressed as a generation
+CAP on the accelerators rather than as the shape of the loop.
+
+Two consequences for the branch designs that follow: any node described as
+"generates Mana when X" is an accelerator, not the thing that makes the class
+function; and **efficiency is now a first-class resource stat** alongside
+regeneration, because a spend-down resource is governed by cost and recovery
+rather than by income. `Core.ResourceEfficiency` is the gear expression of it.
 
 Branches:
 
@@ -111,6 +130,10 @@ Architecture note: support must remain viable in solo play. Every support branch
 
 Exact totals belong in progression curves or Data Assets, not C++ constants.
 
+**NOT BUILT, and the gap is structural rather than a missing table:** nothing in
+the project writes `CharacterLevel`, so no point is ever granted by levelling.
+See "As built" below for what actually happens instead.
+
 ## Universal Core Tree contracts
 
 ### Precision
@@ -137,13 +160,13 @@ Owns armour, mitigation, and Parry, and deepens the universal Block layer. Block
 
 ### Kinesis
 
-Owns dodge quality, modest movement efficiency, slide handling, and optional aerial investment. Dodge, slide, dash, and wall ride are all base kit; Kinesis improves them rather than unlocking them. **[RULED O1 2026-08-12]:** dodge is a *passive chance layer* (a chance to fully evade an incoming hit), so "dodge quality" means rule rewrites and i-frame behavior hung off the evade proc, not improvements to an input. Air jump remains a verb unlock and is this tree's one genuine grant. Kinesis should not turn advanced traversal into a universal requirement.
+Owns dodge quality, modest movement efficiency, slide handling, and optional aerial investment. Dodge, slide, dash, and wall ride are all base kit; Kinesis improves them rather than unlocking them. **[RULED O1 2026-08-12]:** dodge is a *passive chance layer* (a chance to fully evade an incoming hit), so "dodge quality" means rule rewrites and i-frame behavior hung off the evade proc, not improvements to an input. ~~Air jump remains a verb unlock and is this tree's one genuine grant.~~ **[RULED O25 2026-08-13]: two jumps are base kit for every class, so Kinesis grants NO verb at all.** Swift's third jump is class-innate, not a Kinesis purchase. The fallback tree still carries a `Core.Kinesis.AirJump` node granting a verb tag nothing reads; what it actually does is +15% Air Control, and it is flagged for the owner in `Docs/Layer-Ownership.md`. Kinesis should not turn advanced traversal into a universal requirement.
 
 Recommended revisions:
 
 - ~~Dodge uses a dedicated input action; avoid double-tap detection as the only control.~~ **[RULED O1 2026-08-12]:** superseded — dodge takes no input at all. Parry is the only defensive input and is the only one needing an input slot.
 - Fleetfoot should use restrained additive or diminishing-return scaling. Five ranks at 3% each is already significant in a grounded shooter.
-- Aerial should not grant one air jump per rank. Consider one verb-unlock node plus later quality upgrades.
+- ~~Aerial should not grant one air jump per rank. Consider one verb-unlock node plus later quality upgrades.~~ **Superseded by O25**: there is no air-jump unlock to rank. Aerial investment can only be quality.
 - Slipstream may improve slide control/recovery without eliminating every combat tradeoff while sliding.
 - Phantom Step should reward a narrowly defined successful evade event with an internal cooldown.
 
@@ -165,15 +188,25 @@ Each target should have one authoritative status component or ability-system int
 - proc coefficient and spread ancestry;
 - boss/elite resistance policy.
 
-Proposed semantics from the concept:
+Proposed semantics from the concept. **The elemental names below are
+PLACEHOLDER**: O5 and O19 rule the elements **Rift, Entropy and Void**, not
+fire/ice/lightning, and every Ignite/Chill/Shock name in this corpus is to be
+re-flavoured onto them when the resistance model is implemented.
 
 - Bleed and Poison: physical DoTs, bypass shields, reduced by armour.
-- Fire: elemental DoT with target-type interactions.
+  **BUILT** — these two are the only statuses that exist.
+- Fire: elemental DoT with target-type interactions. Placeholder name; unbuilt.
 - Frost: buildup-driven slow/freeze; bosses retain slow but reject hard freeze.
-- Void: healing and armour reduction, not a DoT.
-- Shock: instantaneous chain event.
+  Placeholder name; unbuilt.
+- Void: healing and armour reduction, not a DoT. Void is a real element under
+  O19; this status is unbuilt.
+- Shock: instantaneous chain event. Placeholder name; unbuilt.
 
-The current statement that Bleed and Poison both ignore shields yet are halved by armour needs a formal damage-resolution order. Define shield routing, armour mitigation, resistance, critical eligibility, and damage amplification once in the damage pipeline.
+~~needs a formal damage-resolution order~~ **RESOLVED**: the order is authored
+once in `Docs/Design/Damage-Pipeline.md` and implemented in
+`UBreakerDamageLibrary::ResolveDamage`. Physical shield-bypassing DoTs take half
+armour through the one global rule rather than through a second pipeline. The
+resistance step is specified and **not built**, because no element model exists.
 
 ## Unreal data model
 
@@ -238,7 +271,7 @@ Use ordinary C++ systems for:
 2. **Universal-tree identity theft.** Core nodes must not outperform the class branch whose fantasy they overlap. Kinesis should not make non-Swift characters the best movers; Elements should not make non-Casters the best reaction specialists.
 3. **Mandatory cornerstones.** If one cornerstone is universally superior, the apparent six-way choice collapses.
 4. **Defensive invulnerability loops.** Parry refunds, dodge refunds, leech, overshields, block, and free respec can combine into permanent safety.
-5. **Boss invalidation.** DoT stacking and percent mitigation/armour reduction need boss caps without making status builds feel disabled.
+5. **Boss invalidation.** DoT stacking and percent mitigation/armour reduction need boss caps without making status builds feel disabled. **HALF-ADDRESSED:** the boss caps DoT stacks at 3 (against the ordinary 10), and there is **no boss armour-reduction cap at all** — Damage-Pipeline §2 specifies one and nothing implements it. What the boss has instead is a phase-3 armour halving and an exposed rear weak point, which is a different answer to the same problem.
 6. **Solo support viability.** Charge generation and abilities cannot depend entirely on allies.
 7. **Movement tax.** Do not balance ordinary encounters around Kinetic/Kinesis traversal mastery.
 8. **Resource generation now rides on RNG [O1].** With block and dodge as passive chance layers, Tank's Grit (mitigation → Grit) and Swift's Momentum (evasion → Momentum) generate on random procs rather than on player-initiated actions. That makes both resource loops variance-driven: generation rate is no longer under player control, and streaks in either direction change how a fight plays. Recorded as a **tuning risk to be measured by the wave-mode instrumentation (O2)** — not solved here, and no rates or smoothing rules may be authored until that instrumentation reports.
@@ -278,9 +311,64 @@ Gunsmith, Tank, and Support depend on deployables, threat/AI, shielding, healing
   better, but no tree grants them. Parry is the only defensive input and
   runs on its own short cooldown.
 
+## As built (2026-08-14)
+
+What exists in `Source/RiorsEdge/Progression/` and around it, against the
+architecture above:
+
+- **The three layers are separate**, as specified. Class identity, the Core
+  tree and equipment affixes have distinct data models and distinct currencies,
+  and gear and nodes reach the attribute set through one shared contribution
+  path rather than each writing absolute values.
+- **Trees are live at runtime** with C++ fallback content (the zero-setup
+  convention): a Core slice tree and three Swift trees — Kinetic, Marksman and
+  Frenzy. Purchase validation covers prerequisites, ranks, currency, required
+  class, mutual exclusion, tree-investment gates and cornerstone gates.
+  Node effects aggregate into the attribute set; granted tags are published.
+- **Respec is Forge-gated** (`RespecAtForge` refuses away from one and refunds
+  by rank x cost), matching the locked decision.
+- **Two class ability slots plus one ultimate** exist as specified, and the
+  Ultimate slot accepts only the class's authored ultimate id.
+- **More multipliers are real on nodes** and the O3 cap of three at 1.30x each
+  is enforced in code, twice — per layer at selection, and globally on the
+  composed product.
+
+What does NOT exist, stated so nothing here reads as built:
+
+- **No XP loop.** `FBreakerProgressionState::CharacterLevel` is declared with a
+  default of 1 and **nothing in the project ever writes it**. The Class Point
+  and Core Point curves above (30 / ~65, one per level) therefore describe a
+  progression the game cannot perform; what actually happens is
+  `ApplySliceDefaultsIfFresh`, which grants a flat **10 class points and 12 core
+  points** to a fresh character. That is a playtest scaffold, not the curve.
+  Every level-gated design in this corpus — Swift's third jump included —
+  inherits this.
+- **Only Swift has a class definition.** `GetFallbackClassDefinition` returns
+  content for Swift and null for the other four, so three of the five selectable
+  classes grant nothing. Caster is playable through the ability registry rather
+  than through an authored class definition, and its branch TREES are
+  unauthored.
+- **Subclass commitment does not exist in the data model.** The branch strip
+  browses; there is no branch field, no one-way setter and no
+  permanence-or-Forge rule. Committing collides with O15 (branches freely mixed,
+  no mutually exclusive tiers), which is why it is a ruling and not a task.
+- **`EBreakerBuildCondition` is movement-only** — `Always / Airborne / Sliding /
+  WallRiding / Redline / RecentlyDashed`. No node can key off combat or status
+  state, which has now blocked content twice and which O30's taxonomy needs
+  widened before ailment, crit or stacking axes can be authored honestly.
+- **Deployables, Grit, Scrap and Charge do not exist in any form.** The Gunsmith,
+  Tank and Support sections above are design only.
+
 ## Decisions still open
 
-- Are branch nodes freely mixed with investment gates, or mutually exclusive at major tiers?
+- ~~Are branch nodes freely mixed with investment gates, or mutually exclusive at major tiers?~~ **RULED [O15 2026-08-12]: freely mixed with investment gates. No mutually exclusive tiers.** Implemented — gates are `RequiredTreeInvestment` plus a cornerstone gate, and mutual exclusion exists as a mechanism but is not used to build tiers.
 - ~~What dedicated input slots do Block and Dodge use?~~ RESOLVED [O1 2026-08-12]: none — both are passive. Only Parry needs an input slot.
-- Can snapshot DoTs trigger ordinary on-hit effects on each tick, or only explicitly DoT-compatible effects?
+- Can snapshot DoTs trigger ordinary on-hit effects on each tick, or only explicitly DoT-compatible effects? **Damage-Pipeline §3 states the rule** (DoT-compatible only) and **nothing enforces it** — `ProcCoefficient` has exactly one consumer, the Mana loop.
 - Does multiplayer scale enemy count, enemy health, elite density, or a mixture? Initial policy values are placeholders.
+- **When does Swift's third jump unlock, and does it cost anything? [O25]** The
+  mechanism is built and the gate defaults to reachable because nothing moves
+  `CharacterLevel`. Unanswerable in practice until an XP loop exists.
+- **Does the Core tree get O30's redesign?** O30 opens it to a redesign
+  organised around GUNS / ABILITIES / MINIONS axes, to be scouted and costed
+  rather than implemented blind. The six constellations described above are the
+  current shape, not the ruled one.
