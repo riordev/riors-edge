@@ -127,6 +127,48 @@ the slot, not the glyph — so dropping in authored SVG/texture glyphs later
 replaces the marks without touching any state or colour code, which is what the
 handoff note asks for.
 
-**Unverified:** nobody has looked at these on a screen. They compile and they
-are dimensioned to the spec; whether each one *reads* at 56px in motion is an
-open question for the next playtest.
+## What has been LOOKED AT, and what has not (2026-08-14)
+
+**Last reconciled against: O32**
+
+The earlier line here — "nobody has looked at these on a screen" — is no longer
+true and is corrected rather than deleted, because the correction is partial and
+the boundary matters.
+
+**Verified by looking.** The ability squares are part of the bottom-right combat
+cluster, which has been captured at 1920×1080 through the screenshot harness and
+read. The plate, the 56px box, the rest border, the key hint and the resting
+glyph mark are all confirmed to draw at the authored geometry and to sit
+correctly in the cluster's base row. The slot accent colours are confirmed
+(Caster class slots cyan, ultimate violet, never teal).
+
+**NOT verified, and split by whether it is possible.**
+
+*Not yet done, but doable:*
+
+- **The four state overlays have never been photographed in their active
+  states.** Ready-border, window-active corner ticks, the cooldown wedge and the
+  unaffordable treatment all require an ability to actually be on cooldown, in a
+  window, or unaffordable at the moment of capture. `-BreakerCaptureHUD`
+  fabricates damage numbers and the wave banner for exactly this reason and does
+  **not** currently fabricate ability states. That is the obvious next extension
+  of the switch, and this is the second time a readout has been unverifiable
+  purely because a headless run cannot reach its state — the first two shipped
+  broken.
+
+*Structurally impossible for the harness:*
+
+- Nothing here is hover-driven, so this spec is unusually well served — the
+  no-mouse limit that blocks the node detail cards and the discard modal does
+  not apply.
+
+*Impossible for any capture, and only a playtest answers it:*
+
+- **Whether each mark READS at 56px in motion.** A still frame shows that six
+  distinguishable silhouettes exist; it cannot show whether a player glancing at
+  the corner mid-fight tells Skim from Lead. That was the original question and
+  it is unchanged.
+- Whether the cooldown wedge's sweep is legible at combat pace.
+
+These are stand-ins, not the commissioned art. The nine authored glyph SVGs
+remain an owner asset task (`CONTEXT.md` next-action 2).
