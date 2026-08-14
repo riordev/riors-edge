@@ -11,8 +11,17 @@ class RIORSEDGE_API UBreakerLootLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
-    // Steps 1-2 of the roll pipeline: rarity from weighted table, with drop
-    // chance bonus shifting weight out of Standard.
+    // The UNGATED rarity roll: the weighted table with the Drop Chance bonus
+    // shifting weight out of Standard, and every gate open.
+    //
+    // NOT the drop pipeline. `Items/BreakerDropTable.h` is, and content must
+    // call `UBreakerDropTableLibrary::RollDrop` — which runs a per-rank DROP
+    // CHANCE step first and gates the high rarities on item level and monster
+    // rank. This overload existing as the whole pipeline is precisely what the
+    // owner's "every single enemy dropped an item" / "way way too many
+    // Aberrants" playtest was reporting. It survives for callers that
+    // legitimately have no rank and no item level (dev grants, fixtures,
+    // crafting previews) and delegates to the same one weight table.
     UFUNCTION(BlueprintPure, Category="Items|Loot")
     static EBreakerItemRarity RollRarity(int32 RandomSeed, float DropChanceBonusPercent);
 

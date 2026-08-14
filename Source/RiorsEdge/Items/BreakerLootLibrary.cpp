@@ -1,6 +1,7 @@
 #include "Items/BreakerLootLibrary.h"
 
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerDropTable.h"
 #include "Items/BreakerItemRules.h"
 
 namespace
@@ -22,29 +23,25 @@ namespace
 
 EBreakerItemRarity UBreakerLootLibrary::RollRarity(int32 RandomSeed, float DropChanceBonusPercent)
 {
-    // Prototype weights; retune after a real time-to-kill exists. Drop
-    // chance drains weight from Standard into the higher tiers.
-    float StandardWeight = 62.0f;
-    float UncommonWeight = 25.0f;
-    float ExceptionalWeight = 10.0f;
-    float AberrantWeight = 2.5f;
-    float AnomalousWeight = 0.5f;
-
-    const float Bonus = FMath::Clamp(DropChanceBonusPercent, 0.0f, 100.0f) / 100.0f;
-    const float Shifted = StandardWeight * Bonus * 0.5f;
-    StandardWeight -= Shifted;
-    UncommonWeight += Shifted * 0.55f;
-    ExceptionalWeight += Shifted * 0.30f;
-    AberrantWeight += Shifted * 0.12f;
-    AnomalousWeight += Shifted * 0.03f;
-
-    FRandomStream Random(RandomSeed);
-    float Roll = Random.FRand() * (StandardWeight + UncommonWeight + ExceptionalWeight + AberrantWeight + AnomalousWeight);
-    if ((Roll -= StandardWeight) < 0.0f) return EBreakerItemRarity::Standard;
-    if ((Roll -= UncommonWeight) < 0.0f) return EBreakerItemRarity::Uncommon;
-    if ((Roll -= ExceptionalWeight) < 0.0f) return EBreakerItemRarity::Exceptional;
-    if ((Roll -= AberrantWeight) < 0.0f) return EBreakerItemRarity::Aberrant;
-    return EBreakerItemRarity::Anomalous;
+    // THE UNGATED ROLL. This function used to hold the weight table inline, and
+    // it was the ENTIRE loot pipeline: `ABreakerEnemy::GrantLoot` called it on
+    // every death and spawned whatever came back. That is the shape the owner's
+    // playtest report describes from both ends — every kill dropped, and a flat
+    // 2.5% Aberrant weight applied at area level 1 to a trash mob exactly as it
+    // did to a boss at 50.
+    //
+    // The table now lives in FBreakerDropTableParams so the owner can retune it
+    // without a recompile (O2), and the gates live beside it. This overload is
+    // kept because a caller that genuinely has no rank and no item level to
+    // supply — a dev grant, a test fixture, a crafting preview — should not have
+    // to invent one; it delegates with every gate open, so its behaviour is the
+    // table's behaviour and there is one weight table in the project rather than
+    // two that can drift.
+    //
+    // CONTENT should not call this. Content calls
+    // UBreakerDropTableLibrary::RollDrop, which runs the chance step first.
+    return UBreakerDropTableLibrary::RollGatedRarity(RandomSeed, MAX_int32, EBreakerMonsterRank::Boss,
+        DropChanceBonusPercent, FBreakerDropTableParams());
 }
 
 FBreakerItemInstance UBreakerLootLibrary::RollItem(FName DefinitionId, EBreakerEquipSlot Slot, EBreakerItemRarity Rarity, int32 ItemLevel, int32 RandomSeed)
