@@ -1,5 +1,7 @@
 # Item Foundation
 
+Last reconciled against: O32
+
 The first pass at the itemization prerequisites the master sheet calls out as
 "cheap now, miserable to retrofit": item instances, item level, the roll
 pipeline, and the equipment/stat-recalculation path. Source lives under
@@ -163,13 +165,28 @@ above T1, preserving what the spike MEANT rather than what it measured.
 `UBreakerAffixLibrary`:
 
 - `ValueForTier` - the curve above.
-- `BestTierForItemLevel` - **1-120 onto T12..T1, one tier per 10 levels.**
-  Level 1 rolls only T12; **the character cap of 50 reaches only T8**; the
-  area-level ceiling of 100 reaches T3; T1 opens at ilvl 111. Reaching 50 is no
-  longer the end of gear progression, which is the whole of O29 in one line.
-  T0/T-1 still never come from item level - crafting or a rule rewrite only.
+- `BestTierForItemLevel` - **1-120 onto T12..T1 on TWO SLOPES, not one.** Owner
+  ruling after playtesting O29 ("the item level tier capping at 8 might make for
+  awkward feeling progression, let's bring that to 6"): a single slope of one
+  tier per 10 levels put the character cap at T8, so a player who finished the
+  levelling game had crossed only a third of the ladder and every tier they had
+  met was in its shallow lower half. The levelling band is therefore steeper
+  than the endgame band:
+
+  | Band | Item levels | Tiers | Rate |
+  |---|---|---|---|
+  | The campaign | 1 -> 50 | T12 -> T6 | ~8.2 levels per tier |
+  | The chase | 50 -> 120 | T6 -> T1 | ~14 levels per tier |
+
+  Level 1 rolls only T12; **the character cap of 50 reaches T6** — half the
+  ladder, standing on the shoulder of the curve where the steps start to be
+  worth something; the area-level ceiling of 100 reaches T3; **T1 opens at
+  ilvl 120 exactly**. The endgame is longer per tier BECAUSE each of those tiers
+  is worth more, not as a tax. Both the anchor (T6 at the cap) and the two
+  slopes are `O2 PLACEHOLDER`. T0/T-1 still never come from item level -
+  crafting or a rule rewrite only.
 - `TierCapForRarity` - **RE-DERIVED against 11 steps rather than 7.** Standard
-  caps at **T4** (it used to be denied the top 2 of 7 steps, 29% of the ladder;
+  caps at **T4** (verified in code) (it used to be denied the top 2 of 7 steps, 29% of the ladder;
   29% of 11 steps is 3.1), Uncommon at **T2**, the rest reach T-1. The
   Standard/Uncommon gap stays exactly two tiers. Uncommon moves off T1
   deliberately: on the old ladder T1 was only +14% over T2 and cost little to
@@ -194,12 +211,16 @@ armour, boots and waist were structurally incapable of raising damage. That is
 the concrete reason "full level 50 gear" did not feel like anything, and O27
 rules it out.
 
-**Eighteen lines, nine of them offensive:**
+**TWENTY-FOUR lines, eleven of them offensive** (counted from
+`BuildSliceAffixPool` on 2026-08-14; the pool grew twice after the first
+breadth pass — four non-damage lines, then Resource Efficiency with the Mana
+inversion):
 
 | Line | Bucket | Condition | Slots |
 |---|---|---|---|
 | Health, Resource Regen, Max Resource, Move Speed, Drop Chance, Physical DR | as before | — | all 8 |
-| Slide Speed / Air Control / Dash CDR | Increased | — | boots+waist / boots+neck / boots+gloves |
+| **Resource Efficiency** | Increased | — | all 8 |
+| Slide Speed / Air Control / Dash CDR | Increased | — | boots+waist+**both weapons** / boots+neck / boots+gloves+**both weapons** |
 | Critical Chance | Flat | — | helmet, gloves, neck, weapons |
 | Critical Damage | Flat | — | helmet, gloves, neck, weapons |
 | **Weapon Damage** | Increased | — | **all 8** |
@@ -215,8 +236,22 @@ rules it out.
 | **Resource on Kill** | Flat | — | helmet, gloves, neck, waist, both weapons |
 | **Damage over Time** | Increased | — | helmet, body, gloves, neck, primary |
 
-The last four landed in the 2026-08-14 non-damage breadth pass, taking the pool
-to **22 lines**; see that section for why each one has a live consumer.
+How the pool got here, because the line count in this document has been wrong
+twice: **12** lines (one offensive) -> **18** in the first O27 breadth pass ->
+**19** when Fire Rate arrived with the weapon-drop pass -> **23** in the
+2026-08-14 non-damage breadth pass (Armour, Health on Kill, Resource on Kill,
+Damage over Time — see that section for why each has a live consumer) ->
+**24** with Resource Efficiency.
+
+**Resource Efficiency** arrived with the owner's Mana inversion ruling: once a
+class resource is spent DOWN rather than banked UP, efficiency and regeneration
+are the two stats that decide how often a caster gets to act, and only
+regeneration existed — which left Maximum Resource holding up a whole class's
+gearing on its own. It is authored as an Increased percentage OF THE REDUCTION
+(12.0 == casts cost 12% less), and it is deliberately a peer of Resource
+Regeneration rather than a better version: efficiency pays a build casting
+expensive spells rarely, regeneration one casting cheap spells constantly.
+O2 PLACEHOLDER 2% (T12) -> 26% (T1).
 
 Elemental DR is still excluded until a resistance model exists.
 
@@ -366,11 +401,17 @@ on-level elite killing, and because a drop lands in one of eight random slots,
 three in *useful* slots is materially longer than that. That is the shape O11's
 cap wants.
 
-**A number to look at hard, flagged rather than hidden:** a legendary is 25% of
-an Anomalous drop in one of the three slots that has one, so **~57 hours per
-legendary** at area level 50. Against O4's 300-400 hours to a finished build
-that is defensible; for a vertical slice it is probably too long, and
-`LegendaryChanceWithinAnomalous` (0.25) is the single knob that moves it.
+**The legendary cadence — RULED [O32 2026-08-14].** A legendary is 25% of an
+Anomalous drop in one of the three slots that has one, so **~57 hours per
+legendary** at area level 50. This document previously proposed raising
+`LegendaryChanceWithinAnomalous` (0.25). **O32 rules that it is NOT raised.**
+The 57 hours is mostly an artefact of there being three legendaries covering
+three of eight slots; the same arithmetic against a full set of eight gives
+**~21 hours**, which is a reasonable cadence for a named item against O4's
+300-400 hour horizon. **Authoring more legendaries is the fix**, and the
+effective wait falls on its own as the pool fills. To playtest a legendary
+before the pool is full, use `DevGrantLegendaries` rather than bending the drop
+rate.
 
 ### Coverage
 
@@ -382,14 +423,25 @@ a gate that leaks one in ten thousand is not a gate), `.Determinism` (a seed
 reproduces the drop decision, the rarity and the item; and the chance step does
 not bias the rarity step), `.LootPerHour` (the sweep above).
 
-### Built against MaxItemLevel 50
+### Reconciled with O29: the gates did NOT scale, deliberately
 
-O29 was unmerged in this worktree: item level clamps to **50**, the tier ladder
-is T8..T-1 and `TierCapForRarity` is Standard T3 / Uncommon T1 / rest T-1. When
-O29's 120-level, T12..T-1 ladder lands, **the rarity gates want revisiting
-upward, not sideways** — a longer ladder makes each rarity step worth more, so
-the item-level unlocks (8 / 25 / 40) should scale with the new range and the two
-top weights should if anything fall again.
+This section used to say the drop pipeline was built against `MaxItemLevel` 50
+and that the rarity gates should scale upward with the new range. **O29 has
+landed and the gates did not move, on purpose.** The reasoning is at
+`FBreakerDropTableParams`:
+
+Scaling 8 / 25 / 40 proportionally onto a 120-level range gives roughly
+19 / 60 / 96, which would put Aberrant past the end of the campaign and
+Anomalous at the area-level ceiling — a player would finish the entire levelling
+game having never seen either rarity, so the ladder would be introduced only
+after the content that teaches it. **These gates pace the player's INTRODUCTION
+to rarity, and that introduction still happens across item levels 1-50
+regardless of how far the tier ladder now runs.**
+
+What O29 does argue for is the top two WEIGHTS falling again, because a longer
+tier ladder makes each rarity step worth more than it was. That is a tuning
+question with a measurable answer (the hours-per-Aberrant figure in the
+projection) and it wants a playtest, not a guess. Recorded, not acted on.
 
 ## Roll pipeline
 
@@ -414,8 +466,17 @@ been given a gated rarity:
    worth proportionally less.
 5. Value within the tier band.
 
-Step 6 (Aberrant/Anomalous fixed signatures) is not built; signatures need
-their own design pass.
+Step 6 (fixed signatures) is **partly built**: a LEGENDARY carries a guaranteed
+signature (`FBreakerLegendaryDefinition::GuaranteedAffixIds`, filled in by
+`RollLegendary`). What is still unbuilt is a signature on an ordinary
+**Aberrant or Anomalous** drop — O11 reserves Aberrant's "1-2 unique modifier
+affixes" for the owner to name and design, and the Focused slot is the seat
+those will occupy. That is a design pass, not a code gap.
+
+Step 7, ANOMALOUS ONLY: the rule rewrite is drawn last, after every affix, so
+that every rarity below Anomalous consumes exactly the draws it always did and
+no previously-recorded roll moves. A legendary is picked here too, after slot
+and item level are resolved.
 
 ## Equipment
 
@@ -423,10 +484,12 @@ their own design pass.
 plus a backpack, replicates both, and folds equipped affixes into
 `UBreakerAttributeSet`: MaxHealth (preserving the health fraction), Max
 Class Resource, Crit Chance/Multiplier, and MoveSpeed. Gear resource regen
-ticks on the server. Movement multipliers (slide/air-control/dash) are
-exposed on `GetStats()` for the movement component to consume — that wiring
-is not connected yet. Physical DR from gear folds into the incoming damage
-multiplier inside `UBreakerCombatComponent::ReceiveDamage`.
+ticks on the server. Movement multipliers (slide / air control / dash cooldown)
+**are consumed**: each has its own aggregated attribute and
+`UBreakerCharacterMovementComponent` reads the composed value — see the
+movement conformance note in the consumption audit below; the "not connected
+yet" this section used to carry is resolved. Physical DR from gear folds into
+the incoming damage multiplier inside `UBreakerCombatComponent::ReceiveDamage`.
 
 ## Unified attribute application
 
@@ -524,13 +587,39 @@ Afterburn +8%/rank x3 (recently dashed), Swift Kinetic Downforce +11%/rank x2
 x1.22, Culling x1.18 (all unconditional), Terminal Velocity x1.30 (airborne),
 Overpressure x1.20 (sliding), Redline Doctrine x1.20 (at Redline).
 
-**The band test is the guard rail.** `RiorsEdge.Progression.PowerBand`
-(`Tests/BreakerPowerBandTests.cpp`) composes a baseline and an optimized
-level-50 character out of the real affix pool and the real trees, through the
-real `FBreakerAttributeAggregator`, and asserts the composed ratio lands in
-Power-Curve §4's 8-10x band. It logs the ratio layer by layer, so a future
-tuning pass can see WHICH layer moved rather than only that the band broke.
-Current: flat 1.16x, increased 2.35x, more 1.93x, crit 1.66x, composed 8.74x.
+**The band test is the guard rail, and it is RED [O29].**
+`RiorsEdge.Progression.PowerBand` (`Tests/BreakerPowerBandTests.cpp`) composes a
+baseline and an optimized character out of the real affix pool and the real
+trees, through the real `FBreakerAttributeAggregator`, and asserts the composed
+ratio lands in Power-Curve §4's 8-10x band. It logs the ratio layer by layer, so
+a tuning pass can see WHICH layer moved rather than only that the band broke.
+
+O29 moved where the band lives, and the fixture moved with it: both characters
+are now built at **item level 120**, baseline **T3** against optimized **T1**
+(constants `PowerBandItemLevel`, `PowerBandBaselineTier`,
+`PowerBandOptimizedTier`). At the old ilvl 50 / T5 / T1 fixture the pairing was
+one the loot pipeline can no longer produce — `BestTierForItemLevel(50)` is T6,
+so neither T5 nor T1 is rollable there at any rarity.
+
+**The band is left FAILING rather than retuned**, on the same precedent as the
+old `PowerCurve.EndgameClamp`: a red test that states an open decision is more
+honest than a green one that hides it by moving the goalposts. The test's own
+note records the post-O29 figure at around **15x** against the authored 8-10x.
+The extra did not come from the gear spread (T3-vs-T1 at ilvl 120 is ~1.85x,
+close to the old fixture's 1.97x) — it came from absolute affix values roughly
+doubling, which moves flat crit chance and the additive bucket into a different
+part of their own curves for the optimized build specifically.
+
+**Do not "fix" this by widening the asserted range.** Two ways out, both owner
+rulings: the band target moves (8-10x was authored before the endgame existed,
+and a longer ladder arguably should separate builds further), or the content
+retunes so crit and the additive bucket land the composed band back at 8-10x.
+
+The pre-O29 measurement this document used to quote — flat 1.16x, increased
+2.35x, more 1.93x, crit 1.66x, composed 8.74x — was taken against the old
+ladder and the old fixture and is kept here only as the historical anchor. Every
+number in this section wants a suite run to restate; none has been re-measured
+since the fixture moved.
 
 Coverage: `Source/RiorsEdge/Tests/BreakerAttributeAggregationTests.cpp` —
 including `RiorsEdge.Attributes.Damage.NodePurchaseRaisesWeaponDamage`, which
@@ -562,6 +651,8 @@ something a player can observe.
 | Affix | LifeOnKill | `OnKillDealt` → `UBreakerCombatComponent::ApplyHealing` | yes (2026-08-14) |
 | Affix | ResourceOnKill | `OnKillDealt` → ClassResource | yes (2026-08-14) |
 | Affix | DamageOverTime | DamageOverTimeMultiplier attribute → DoT snapshots | yes (2026-08-14) |
+| Affix | FireRate | FireRateMultiplier attribute → `GetEffectiveRoundsPerMinute()`, through which every fire-timing site runs | yes |
+| Affix | ResourceEfficiency | Bid as a NEGATIVE Increased into `ResourceCostMultiplier` (base 1.0, clamped 0.25-2.0) → `UBreakerCasterAbility::GetResourceCostMultiplier`, floored at 0.10 so no stack makes a cast free | yes (2026-08-14), **Caster only** |
 | Node | CriticalChance | CriticalChance attribute | yes |
 | Node | CriticalDamage | CriticalMultiplier attribute | yes |
 | Node | MoveSpeed | MoveSpeed attribute → `GetComposedMoveSpeedMultiplier()` | yes |
@@ -643,9 +734,14 @@ longer produces an Exceptional out of nowhere.
   legendary sections. What is still missing from crafting is the "add an affix"
   verb (deliberately: an item's affix COUNT is rarity's job and adding one would
   make rarity craftable) and any UI at all. Pickup actors and loot UI exist.
-- Movement affix multipliers are computed but not yet consumed by
-  `UBreakerCharacterMovementComponent`.
-- Save persistence for items (structs are save-shaped and versioned).
+- ~~Movement affix multipliers are computed but not yet consumed~~ **RESOLVED**
+  — the movement component reads the composed attributes.
+- ~~Save persistence for items~~ **BUILT** — `UBreakerSaveGame` stores
+  `EquippedItems` and `BackpackItems` (slot `BreakerSave0`, autoloaded in the
+  character's BeginPlay, autosaved in EndPlay and on class lock), and
+  `MigrateToCurrent` gives `SaveVersion` a meaning. **The Forge wallet is NOT
+  in the save**, so currency does not survive a session — that is the one item
+  gap left in persistence.
 - All values are placeholder until the gym feedback pass re-anchors them.
 - **Added Damage prints without a unit.** `SBreakerMenu::DescribeAffix` decides
   the "%" suffix from the bucket, with a hard-coded exception for the two crit
@@ -781,11 +877,25 @@ Anomalous rule rewrites") without anything implementing it.
 
 | Rarity | Affixes | Tier cap | Qualitative rule |
 |---|---|---|---|
-| Standard | 1-2 | T3 | — |
-| Uncommon | 2-3 | T1 | — |
+| Standard | 1-2 | T4 | — |
+| Uncommon | 2-3 | T2 | — |
 | Exceptional | 3-5 | T-1 | — |
 | **Aberrant** | 4-6 | T-1 | **FOCUSED** — one affix rolls a tier better |
-| **Anomalous** | 5-6 | T-1 | **A RULE REWRITE**, exactly one. Equip cap 1 |
+| **Anomalous** | 5-6 | T-1 | **A ROLLED RULE REWRITE**, exactly one. Equip cap 1 |
+
+The tier caps are the O29 re-derivation (T4 / T2, not the pre-O29 T3 / T1); see
+the tier scale section for why Uncommon moved off T1.
+
+**RARITY AND LEGENDARY ARE DIFFERENT AXES [O32].** Anomalous is a RARITY: the
+fifth tier, gating affix count and the tier ceiling, and carrying one rule
+rewrite ROLLED from the generic pool of four. **Legendary is a separate field**
+(`FBreakerItemInstance::LegendaryId`) naming a specific authored item with a
+fixed slot, guaranteed affixes and a HAND-AUTHORED rule that is never rolled.
+Every legendary rolls AT Anomalous rarity; **most Anomalous drops are not
+legendaries.** The two are stored separately (`Rule` and `LegendaryId`) because
+a rule is a mechanic and a legendary is an identity — two legendaries could one
+day share a rewrite, and the display name, the signature and the drop table all
+key off the identity.
 
 **ABERRANT IS FOCUSED.** Its first affix rolls against a ceiling one tier above
 what item level alone allows, and never *worse* than the ordinary ceiling — a
@@ -857,7 +967,7 @@ Load-bearing. Deriving the rewrite from `Rarity` would hand one to every
 Anomalous item that already exists in a save, in a test fixture, and in the two
 power-band loadouts — which build every piece at Anomalous purely to lift the
 tier cap. An item earns a rewrite when it is *rolled* one.
-`RiorsEdge.Progression.PowerBand.RuleImpact` asserts exactly this, so a future
+`RiorsEdge.Progression.RuleBandImpact` asserts exactly this, so a future
 refactor that "simplifies" the field away fails loudly.
 
 ## Three build-defining legendaries (2026-08-14)
@@ -981,7 +1091,7 @@ place you go" is one rule rather than two.
 | Currency | Source | Buys |
 |---|---|---|
 | **Slag** | Every rarity, scaled by item level | Reforges; tempers into T12..T5 |
-| **Flux** | Uncommon and above, rarity-pure | Attunes; tempers into T3..T1 |
+| **Flux** | Uncommon and above, rarity-pure | Attunes; tempers into **T4..T1** |
 | **Sigil** | **Aberrant and above only**, rarity-pure | **T0 and T-1, and nothing else** |
 
 Item level scales the **Slag** yield only. Flux and Sigil stay rarity-pure so
@@ -996,8 +1106,9 @@ shortest route from "minimal crafting" to "crafting replaces looting".
 
 Rules worth keeping in view:
 
-- **Rarity still caps crafting.** A Standard item stops at T3 no matter how much
-  Sigil the player holds. Otherwise crafting would erase rarity's meaning in the
+- **Rarity still caps crafting.** A Standard item stops at **T4** (its
+  `TierCapForRarity` ceiling since O29) no matter how much Sigil the player
+  holds. Otherwise crafting would erase rarity's meaning in the
   same session this pass gave it one.
 - **A refused craft costs nothing.** `FBreakerForgeWallet::Spend` is
   all-or-nothing; the Forge gate and the ceiling check both run before any spend.
@@ -1016,7 +1127,9 @@ Rules worth keeping in view:
   finally gives the discard pile a purpose.
 
 Coverage: `RiorsEdge.Items.Forge.Wallet`, `.Salvage`, `.TemperReachesTheSpike`
-(walks an affix all the way to T-1 and asserts it is worth the authored 1.8x),
+(walks an affix all the way to T-1 and asserts it is worth the authored spike,
+read from `TierSpikeTopMultiplier` — **3.6x since O29**, not the 1.8x this
+document used to quote),
 `.ReforgeAndAttune`, `.Loop` (salvage → temper an **equipped** item → the
 composed MaxHealth attribute moves, which is the assertion that the Forge is a
 gameplay system and not a data editor).
@@ -1034,8 +1147,8 @@ The first breadth pass took offence from one line to nine and left the other axe
 where it found them: survivability was Physical DR alone, the resource family was
 two lines that both did the same thing slowly, and damage-over-time had six skill
 nodes bidding on it and **no gear support at all** — the same one-sided gap the
-damage pass found on the other side. Four lines, taking the pool from 18 to
-**22**:
+damage pass found on the other side. Four lines, taking the pool from 19 to
+**23** (Resource Efficiency later made it 24):
 
 | Line | Bucket | Slots | Live consumer |
 |---|---|---|---|
@@ -1086,40 +1199,106 @@ behaviour, and the note is at the code. **The one-line fix belongs in `Combat/`*
 (have those two functions use `ApplyClassResource`), which is another lane's
 directory this pass.
 
-## Band impact of this pass
+## Band impact of the rule rewrites
 
-**The 8-10x build variance band is UNCHANGED at 8.74x**, and that is by
-construction rather than by luck: `FBreakerItemInstance::Rule` defaults to `None`
-and the two power-band loadouts are authored affix by affix, so neither character
-carries a rewrite even though every piece is built at Anomalous to lift the tier
-cap. The four new affixes are not in either loadout either.
+The band is unchanged **by the rarity pass**, and that is by construction rather
+than by luck: `FBreakerItemInstance::Rule` defaults to `None` and the two
+power-band loadouts are authored affix by affix, so neither character carries a
+rewrite even though every piece is built at Anomalous to lift the tier cap. The
+newer affixes are not in either loadout either.
 
 Which means the band test alone would say **nothing** about whether the rewrites
-are balanced, so `RiorsEdge.Progression.PowerBand.RuleImpact` measures the thing
-that actually matters — the STEP one Anomalous rewrite is worth on top of a build
-that has already done everything else right, measured both in the optimized
-build's rotation (airborne / recently dashed / at Redline) and standing still:
+are balanced. `RiorsEdge.Progression.RuleBandImpact` (**renamed** off
+`RiorsEdge.Progression.PowerBand.RuleImpact` — UE's automation tree cannot hold
+a leaf test at a node that is also a parent, so the old path was silently
+swallowing `RiorsEdge.Progression.PowerBand` itself and the 8-10x assertion had
+not run since this test was added) measures the thing that actually matters: the
+STEP one Anomalous rewrite is worth on top of a build that has already done
+everything else right, measured both in the optimized build's rotation
+(airborne / recently dashed / at Redline) and standing still.
 
-| Rewrite | Step in rotation | Step standing still | Band with it |
-|---|---|---|---|
-| UNBOUND | x1.000 | **x1.645** | 8.74x |
-| OVERFLOW | x1.044 | x1.083 | 9.12x |
-| PROLIFIC | x1.079 | x1.074 | 9.43x |
-| RELENTLESS | x1.000 | x1.000 | 8.74x |
+The properties it asserts, all `O2 PLACEHOLDER` bounds: a rewrite never *lowers*
+an optimized build (in the rotation or grounded), it is worth at most **x1.35**
+on top of one, and it is **smaller than the band it lives in** — a rewrite that
+outweighed the band would make every other decision a rounding error, which is
+O27 inverted.
 
-Read that table carefully. **UNBOUND is worth nothing in the rotation and 1.65x
-standing still**, which is exactly right: its whole job is to free conditional
+The shape of the answers, which is what should survive a retune even though the
+figures will not:
+
+| Rewrite | Where it pays |
+|---|---|
+| UNBOUND | Nothing in the rotation; the largest step in the table standing still |
+| OVERFLOW | A small step in both, larger grounded |
+| PROLIFIC | A small step in both, and it grew with the ladder |
+| RELENTLESS | Exactly 1.000 in both — it is purely defensive and the band measures damage; its effect is asserted separately through the mitigation formula |
+
+Read that carefully: **UNBOUND is worth nothing in the rotation and the most
+standing still**, which is exactly right — its whole job is to free conditional
 lines, so it is worthless to a player already holding every condition and
 transformative to one who is not. Measuring it only in the rotation would have
-reported the largest rewrite in the table as inert. **RELENTLESS is 1.000 in
-both** because it is purely defensive and the band measures damage — its effect
-is asserted separately, all the way through the mitigation formula.
+reported the largest rewrite in the table as inert.
 
-The test asserts three properties per rewrite, all `O2 PLACEHOLDER` bounds: it
-never *lowers* an optimized build, it is worth at most **x1.35** on top of one,
-and it is **smaller than the band it lives in** — a rewrite that outweighed the
-8.7x band would make every other decision a rounding error, which is O27
-inverted.
+**PROLIFIC got materially stronger without anybody editing it**, because its
+whole value IS the size of a tier step and O29 grew the steps (T1 -> T0 went
+from 1.4x to 2.2x). It was last measured at x1.462 against the authored x1.35
+ceiling, and the test **fails on it deliberately** rather than the ceiling being
+widened — that is a balance ruling, not test maintenance.
 
-The band is therefore 8.74x for a character with no rewrite and at most 9.43x for
-one carrying the best rewrite for its build. Both are inside the 8-10x band.
+**Every numeric step in this section predates the fixture move to item level
+120** (baseline T3 vs optimized T1) and none has been re-measured since. Treat
+the figures as needing a suite run, and the ordering above as the design.
+
+## FOR THE OWNER — contradictions this audit could not resolve (2026-08-14)
+
+Recorded rather than decided, per the audit rules. Each states both readings and
+what each would cost.
+
+1. **NO DROP CAN CARRY THE ENDGAME CURVE, and the reason is not the one this
+   document and Power-Curve.md both name.** `GetDropItemLevel` no longer clamps
+   to 50 — that was fixed — but `ABreakerEnemy::ApplyChassis` immediately
+   re-clamps its own field: `EnemyLevel = FMath::Clamp(EnemyLevel, 1, 50)`
+   (`Combat/BreakerEnemy.cpp`), and `EnemyLevel` is what `GrantLoot` passes to
+   `RollDrop` and `RollItem`. The field's own comment still gives the retired
+   reason ("affix tiers are authored to 50"). So the item system rolls to 120,
+   the weapon curve evaluates to 120, the Forge prices to 120 — and every item
+   the shipping game actually drops stops at 50.
+   *Reading A*: it is a leftover and the clamp should become
+   `UBreakerAffixLibrary::MaxItemLevel`. Cost: one line in `Combat/`, plus a
+   test that asserts it, and the endgame gap really closes.
+   *Reading B*: it is a deliberate hold until the owner rules on item levels
+   101-120 having no source. Cost: nothing, but the O29 chase does not exist in
+   the playable game and `EndgameComposition` describes an intended game rather
+   than the shipping one.
+   **Nothing in the suite currently fails on this** — `EndgameComposition`
+   checks the library function, which is now correct, and never touches the
+   actor.
+
+2. **The build variance band, `RiorsEdge.Progression.PowerBand`, is RED.** The
+   authored target is 8-10x; the test's own note records ~15x after O29. The
+   test refuses to widen its own range because that would choose an answer
+   silently. *Reading A*: the band moves — a longer ladder should separate
+   builds further, and 8-10x was authored before the endgame existed. Cost: two
+   constants and an amended Power-Curve §4. *Reading B*: the content retunes —
+   crit and the additive bucket come down until the composed band lands back at
+   8-10x on the new ladder. Cost: a pass over the pool's ceiling anchors and the
+   crit lines, and every measured figure in this document moves with it.
+
+3. **PROLIFIC breaches the rewrite ceiling.** Last measured x1.462 against the
+   authored x1.35, because its value IS a tier step and O29 grew the steps.
+   *Reading A*: the ceiling was authored against a linear ladder and should
+   rise. *Reading B*: PROLIFIC is re-specified (a fractional uplift, or the T0
+   spike re-sited). Cost is small either way; the point is that it is a balance
+   ruling, not a test fix.
+
+4. **Item levels 101-120 still have no source.** Unchanged from the note in the
+   item-level section, restated here because it composes with item 1: if the
+   enemy clamp is lifted to 120, drops still stop at area level 100, so the top
+   twenty levels remain Forge-only. Worth `1.09^20 = 5.6x` base damage.
+
+5. **Two code comments in `Items/` are stale and would mislead the next reader**
+   (not fixable from this lane — `Source/` is off limits to this pass):
+   `BreakerForgeLibrary.h`'s header still says the spikes are "T0 at 1.4x T1 and
+   T-1 at 1.8x" and that "a Standard item stops at T3"; `BreakerAffixLibrary.h`'s
+   `BestTierForItemLevel` declaration still says "one tier per 10 levels", which
+   the two-slope implementation below it replaced.
