@@ -1207,27 +1207,20 @@ void ABreakerCharacter::InteractWithNearbyNPC()
     // The travel point, before NPCs. It is a large fixed structure and the
     // vendors stand near it, so if both are in range the player who walked up
     // to the gate meant the gate.
+    //
+    // EVERY case routes through the picker, including the single-destination
+    // one. F used to travel DIRECTLY when exactly one destination existed and
+    // refuse with a log when more than one did, because no picker existed —
+    // and the owner asked for "a navigation place to click into and select
+    // where youd like to go". Since every point offers exactly one destination
+    // today, the single-destination path is the ONLY one anyone would ever
+    // see, so keeping the direct-travel shortcut would mean the navigation
+    // screen shipped unreachable.
     if (ABreakerTravelPoint* Travel = FindNearbyTravelPoint())
     {
-        const TArray<FBreakerTravelDestination> Destinations = Travel->GetAvailableDestinations();
-        if (Destinations.Num() == 1)
-        {
-            // Exactly one destination today (the gym), so F travels directly
-            // rather than opening a picker with a single row in it. The moment
-            // a second destination is authored this needs a real selection UI,
-            // and it says so out loud below rather than silently taking the
-            // first entry and making the others unreachable.
-            Travel->SelectDestination(Destinations[0].Id, this);
-            return;
-        }
-        if (Destinations.Num() > 1)
-        {
-            UE_LOG(LogTemp, Warning,
-                TEXT("Travel point offers %d destinations and there is no selection UI yet, so F would have to "
-                     "guess. Nothing happened. Build the picker before authoring a second destination."),
-                Destinations.Num());
-            return;
-        }
+        OpenMenu(false);
+        if (MenuWidget.IsValid()) MenuWidget->ShowTravel(Travel);
+        return;
     }
 
     ABreakerNPC* NPC = FindNearbyNPC();

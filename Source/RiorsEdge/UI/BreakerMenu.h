@@ -38,7 +38,18 @@ enum class EBreakerMenuScreen : uint8
     // own value: each has its own header, its own back target and its own
     // rebuild triggers.
     CharacterSelect,
-    CharacterCreate
+    CharacterCreate,
+    // The Anchor's navigation screen. Owner: "the anchor as the hub and a
+    // navigation place to click into and select where youd like to go". A peer
+    // of Dialogue rather than a mode of it: both are opened by the F key on a
+    // world interactable and both leave by resuming the game, but a travel
+    // point is not an NPC and its screen reads a destination list, not a
+    // dialogue graph.
+    //
+    // APPENDED at the end of the enum on purpose. The values are logged by
+    // Rebuild and mapped from a capture string in Characters/, so inserting in
+    // the middle would renumber every screen above it for no gain.
+    Travel
 };
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
@@ -53,6 +64,17 @@ public:
     void ShowPauseMenu();
     void ShowInventory();
     void ShowDialogue(class ABreakerNPC* NPC);
+    // The travel picker's front door, in the same shape as ShowDialogue: the
+    // caller has already opened the menu (OpenMenu(false)) and hands us the
+    // interactable the player walked into. Sets RootScreen to Pause for the
+    // same reason ShowDialogue does — this screen is entered from GAMEPLAY, so
+    // its "root" is the pause menu, and Escape resumes the game rather than
+    // dropping the player onto the title.
+    //
+    // Safe with any number of destinations, including one and including zero:
+    // the screen says what it has. The caller is free to keep travelling
+    // directly when there is exactly one — see the note in BuildTravelScreen.
+    void ShowTravel(class ABreakerTravelPoint* InTravelPoint);
     void HandleEscape();
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
@@ -116,6 +138,8 @@ private:
     void EnsureRosterLoaded();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
+    // The Anchor's navigation screen: one card per available destination.
+    TSharedRef<SWidget> BuildTravelScreen();
     // Reach: Items/BreakerForgeLibrary.h's three crafting verbs plus salvage,
     // wired to a wallet readout. See the FORGE tab note on EBreakerMenuScreen.
     TSharedRef<SWidget> BuildForgeScreen();
@@ -173,7 +197,10 @@ private:
     TSharedRef<SWidget> BuildSettingsKeybindSection();
     TSharedRef<SWidget> BuildSettingsVideoSection();
     TSharedRef<SWidget> BuildSettingsAudioSection();
-    // One keybind row: label, resolved key, conflict badge, BIND, DEFAULT.
+    // One keybind row: label, THE KEY CONTROL, conflict badge, DEFAULT.
+    // Four columns, not five. The separate BIND button is gone — owner: "this
+    // should show the current bind you click and replace it this is ugly" — so
+    // the key display IS the control and the row has one thing to click.
     TSharedRef<SWidget> MakeKeybindRow(FName Action, const TMap<FName, TArray<FKey>>& DefaultKeys,
         const TMap<FName, FKey>& FlatDefaults);
     // Loads the model on first use and caches the project's default keybinds
@@ -315,5 +342,19 @@ private:
     FText AbilityStatus;
     TWeakObjectPtr<class ABreakerNPC> DialogueNPC;
     FName DialogueNodeId = NAME_None;
+    // Travel screen state. Weak for the same reason DialogueNPC is: the actor
+    // is owned by the world and can be destroyed while the menu is up, and a
+    // screen holding a dangling interactable is worse than a screen that
+    // notices it is gone and leaves.
+    TWeakObjectPtr<class ABreakerTravelPoint> TravelPoint;
+    // Which destination card draws the selected ring. Preset by ShowTravel to
+    // the first available destination so the screen never opens with nothing
+    // marked, and moved by a click before the travel attempt — so a refused
+    // travel (a destination that went away between the build and the click)
+    // leaves the player looking at the row they actually chose.
+    FName SelectedTravelDestinationId = NAME_None;
+    // Echoed under the destination list. Only ever populated by a REFUSED
+    // travel; a successful one closes the menu.
+    FText TravelStatus;
     EBreakerMenuScreen RootScreen = EBreakerMenuScreen::Main;
 };

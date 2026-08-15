@@ -17,6 +17,7 @@
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerTravelPoint.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Fonts/FontMeasure.h"
 #include "Styling/CoreStyle.h"
@@ -662,6 +663,27 @@ void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
     Rebuild(EBreakerMenuScreen::Dialogue);
 }
 
+void SBreakerMenu::ShowTravel(ABreakerTravelPoint* InTravelPoint)
+{
+    TravelPoint = InTravelPoint;
+    TravelStatus = FText::GetEmpty();
+    // Open with the first available destination marked. The screen is never
+    // shown with nothing selected — a picker whose selected state only appears
+    // after you have already clicked something is telling you what you just
+    // did, not what you are about to do.
+    SelectedTravelDestinationId = NAME_None;
+    if (InTravelPoint)
+    {
+        const TArray<FBreakerTravelDestination> Available = InTravelPoint->GetAvailableDestinations();
+        if (Available.Num() > 0) SelectedTravelDestinationId = Available[0].Id;
+    }
+    // Pause, not Main, and for the same reason ShowDialogue does it: this
+    // screen is entered from gameplay by walking into a thing and pressing F,
+    // so "back" from here is the paused game, never the title.
+    RootScreen = EBreakerMenuScreen::Pause;
+    Rebuild(EBreakerMenuScreen::Travel);
+}
+
 void SBreakerMenu::HandleEscape()
 {
     // A listening keybind row eats Escape before the screen does. Escape
@@ -679,7 +701,11 @@ void SBreakerMenu::HandleEscape()
         Rebuild(EBreakerMenuScreen::Settings);
         return;
     }
-    if (CurrentScreen == EBreakerMenuScreen::Dialogue)
+    // Both world-interactable screens leave the same way: back to the game,
+    // having done nothing. Escape on the travel screen must NOT travel — it is
+    // the "I walked up to the wrong thing" key, and a picker that departed on
+    // the way out would be the single worst button in the game.
+    if (CurrentScreen == EBreakerMenuScreen::Dialogue || CurrentScreen == EBreakerMenuScreen::Travel)
     {
         if (Character.IsValid()) Character->ResumeFromMenu();
         return;
@@ -797,6 +823,9 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
     // A confirmation modal belongs to the screen that raised it; leaving the
     // screen answers it with "no".
     if (CurrentScreen != EBreakerMenuScreen::Inventory) DiscardModalIndex = -1;
+    // Same rule for the travel refusal line: it describes one screen's last
+    // click and means nothing anywhere else.
+    if (CurrentScreen != EBreakerMenuScreen::Travel) TravelStatus = FText::GetEmpty();
     // Same rule for the rebind flow: a "press a key" state belongs to the
     // settings screen, and leaving it answers the prompt with "never mind".
     // Without this, a row left listening would keep swallowing every keypress
@@ -830,6 +859,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Forge: ContentHost->SetContent(BuildForgeScreen()); break;
         case EBreakerMenuScreen::Abilities: ContentHost->SetContent(BuildAbilitiesScreen()); break;
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
+        case EBreakerMenuScreen::Travel: ContentHost->SetContent(BuildTravelScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 }
@@ -1559,32 +1589,52 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
     const bool bListening = ListeningKeybindAction == Action;
     const bool bPending = PendingKeybindAction == Action && PendingKeybindKey.IsValid();
 
-    // TRAP 1, and it has been reported three times in this file: a fixed box
-    // carrying a CHANGING label is sized to the LONGEST label it can ever hold,
-    // never to the one it happens to show first. This button cycles through
-    // "BIND" (4), "PRESS A KEY…" (12) and "BIND ANYWAY" (11); 200px covers the
-    // longest at TypeBody bold plus MakeButton's 16px content padding on each
-    // side, with room for the ellipsis glyph.
-    constexpr float BindButtonWidth = 200.0f;
+    // ---- THE KEY CONTROL, and its width budget ---------------------------
+    // The key display IS the button now. There is no separate BIND column:
+    // owner, "this should show the current bind you click and replace it this
+    // is ugly". So one control per row carries three states in the same box —
+    // the current key at rest, "PRESS A KEY…" while listening, and the conflict
+    // confirm — and the box is sized to the longest of them.
+    //
+    // TRAP 1, reported FOUR times in this file: a fixed box carrying a CHANGING
+    // label is sized to the LONGEST string it can ever hold, never to the one
+    // it happens to show first. Every candidate, measured at its own type size
+    // against Roboto Bold (~0.65em per uppercase glyph, so ~9.1px at TypeBody
+    // and ~7.2px at TypeCaption):
+    //
+    //   "MIDDLE MOUSE BUTTON"  19 glyphs, TypeBody    ~173 + 34 chrome = 207
+    //   "RIGHT MOUSE BUTTON"   18 glyphs, TypeBody    ~164 + 34 chrome = 198
+    //   "BIND ANYWAY"          11 glyphs, TypeBody    ~100 + 34 chrome = 134
+    //   "PRESS A KEY…"         12 glyphs, TypeBody    ~110 + 34 chrome = 144
+    //   "W  S  A  D  UP  DOWN  RIGHT  LEFT"
+    //                          33 glyphs, TypeCaption ~237, no chrome  = 237
+    //
+    // The chrome is the control's 16px content padding on each side plus its
+    // 1px ring on each side. The COMPOSITE string is the widest thing this
+    // column ever holds — it is plain text, not a control, so it pays no
+    // padding, and it is still 30px wider than the longest single key name.
+    // Sizing to the longest SINGLE key is the exact mistake that produced the
+    // four clipping reports; 260 clears the composite string with ~23px spare.
+    constexpr float KeyControlWidth = 260.0f;
     constexpr float DefaultButtonWidth = 110.0f;
-    // Sized against "LEFT MOUSE BUTTON" / "MIDDLE MOUSE BUTTON", the longest
-    // single-key display names FKey::GetDisplayName produces, and against the
-    // composite row's four short names joined ("W  A  S  D").
-    // 260, not 210: MOVE joins its four keyboard defaults into one string
-    // ("W  A  S  D" plus the arrow aliases the context also binds) and 210
-    // shaved the leading glyph. Sized to the longest string this column can
-    // actually hold rather than to the longest SINGLE key name, which is the
-    // mistake that has now produced clipped text four times in this file.
-    constexpr float KeyColumnWidth = 260.0f;
-    // Budget check, because this is the row that decides the panel width:
-    // 210 label + 210 key + 200 bind + 8 gap + 110 default = 738, inside a 1040
-    // plate whose interior is roughly 980 after the rail, border, 24px padding
-    // and the scroll bar. That leaves ~225 for the badge below, which clears
-    // the longest string it can hold.
+    // ROW BUDGET, re-measured for the four-column layout (the old note said
+    // five columns totalling 738 and was stale the moment BIND was deleted):
+    //
+    //   210 label + 260 key + 16 gap + [badge fills] + 8 gap + 110 default
+    //   = 604 of fixed width.
+    //
+    // The plate is 1040 wide; its interior is roughly 1040 - 3 rail - 2 border
+    // - 48 padding - 16 scroll bar = 971. That leaves ~367 for the badge, whose
+    // longest string is "SHARED: " plus the longest action label
+    // ("SCOPED SENSITIVITY", 18) = 26 glyphs at TypeCaption ~187. Comfortable,
+    // and 134px MORE headroom than the five-column layout had — which is the
+    // point of deleting a column.
 
-    FString BindLabel = TEXT("BIND");
-    if (bListening) BindLabel = TEXT("PRESS A KEY…");
-    else if (bPending) BindLabel = TEXT("BIND ANYWAY");
+    // What the control says. Rest is the key itself; listening replaces it in
+    // place; a pending conflict replaces it with its own confirm.
+    FString KeyControlLabel = KeyLabel;
+    if (bListening) KeyControlLabel = TEXT("PRESS A KEY…");
+    else if (bPending) KeyControlLabel = TEXT("BIND ANYWAY");
 
     TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
     Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
@@ -1595,18 +1645,108 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
                 bListening ? Cyan : Primary, true)
         ]
     ];
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
-    [
-        MenuValueColumn(FText::FromString(KeyLabel), KeyColumnWidth, BreakerUI::TypeCaption,
-            Resolved.IsValid() || bComposite ? (bOverridden ? Cyan : SoftText) : Disabled)
-    ];
-    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+    // ---- The key column --------------------------------------------------
+    // Composite rows are PLAIN TEXT and not clickable: there is nothing a
+    // single FKey could replace a two-dimensional axis or four movement keys
+    // with, so the row shows what it is bound to and the badge beside it says
+    // which of the two reasons applies. Boxed to the control's own height so
+    // the rows keep a straight edge either way.
+    if (bComposite)
+    {
+        Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+        [
+            SNew(SBox)
+            .WidthOverride(KeyControlWidth)
+            .HeightOverride(BreakerUI::MinHitTarget + BreakerUI::Space8)
+            .HAlign(HAlign_Fill)
+            .VAlign(VAlign_Center)
+            [
+                // HAlign_Fill on the box plus justification inside, never
+                // HAlign_Left — see MenuValueColumn for why an alignment other
+                // than Fill shaves the boundary glyph.
+                SNew(STextBlock)
+                    .Text(FText::FromString(KeyLabel))
+                    .Justification(ETextJustify::Left)
+                    .ColorAndOpacity(SoftText)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+            ]
+        ];
+    }
+    else
+    {
+        // THE CONTROL. Built from BorderWrap + SButton — the same two-part
+        // vocabulary MakeButton itself is made of — rather than through
+        // MakeButton, because this control needs a THIRD colour state that
+        // MakeButton's primary/secondary pair cannot express: an overridden key
+        // reads cyan at rest, which is the only tell that a row is off its
+        // default other than the DEFAULT button appearing next to it.
+        const bool bArmed = bListening || bPending;
+        const FLinearColor LabelColor = bArmed
+            ? (bPending ? Amber : Cyan)
+            : (Resolved.IsValid() ? (bOverridden ? Cyan : Primary) : Disabled);
+        Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+        [
+            SNew(SBox)
+            .WidthOverride(KeyControlWidth)
+            .HeightOverride(BreakerUI::MinHitTarget + BreakerUI::Space8)
+            [
+                BorderWrap(
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(bArmed ? PanelHover : PanelRaised)
+                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+                    // HAlign_Fill for the clipping reason MakeButton documents.
+                    .HAlign(HAlign_Fill)
+                    .VAlign(VAlign_Center)
+                    .OnClicked(FOnClicked::CreateLambda([this, Action]()
+                    {
+                        if (PendingKeybindAction == Action && PendingKeybindKey.IsValid())
+                        {
+                            // CONFLICT CONFIRM, rehomed onto this control. It
+                            // used to be the BIND button's third label, and
+                            // that button no longer exists; putting it here
+                            // rather than on a new adjacent affordance keeps
+                            // the row at one clickable thing and matches the
+                            // armed-chip pattern already in this file, where a
+                            // control swaps its own label to CONFIRM rather
+                            // than growing a neighbour.
+                            const FKey Confirmed = PendingKeybindKey;
+                            PendingKeybindAction = NAME_None;
+                            PendingKeybindKey = FKey();
+                            if (UBreakerGameSettings* Live = GameSettings.Get())
+                            {
+                                Live->SetKeybindOverride(Action, Confirmed);
+                                Live->Save();
+                                KeybindStatus = FText::FromString(FString::Printf(TEXT("%s BOUND TO %s — THE KEY IS NOW SHARED."),
+                                    *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString(),
+                                    *Confirmed.GetDisplayName().ToString().ToUpper()));
+                                bKeybindStatusIsClash = true;
+                            }
+                            Rebuild(EBreakerMenuScreen::Settings);
+                            return FReply::Handled();
+                        }
+                        BeginKeybindListen(Action);
+                        return FReply::Handled();
+                    }))
+                    [
+                        SNew(STextBlock)
+                            .Text(FText::FromString(KeyControlLabel))
+                            .Justification(ETextJustify::Left)
+                            .ColorAndOpacity(LabelColor)
+                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
+                    ],
+                    bArmed ? (bPending ? Amber : Cyan) : BorderEmphasis,
+                    bArmed ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+            ]
+        ];
+    }
+    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
     [
         MenuText(
             bComposite
                 // Short, because widening the key column squeezed this trailing slot and
                 // the badge clipped in turn. "NOT REBINDABLE" was redundant anyway: the
-                // row has no BIND button, which says it louder than the words did.
+                // key is drawn as plain text rather than as a control, which says it
+                // louder than the words did.
                 ? FText::FromString(bAxisBound ? TEXT("ANALOG AXIS") : TEXT("MULTI-KEY"))
                 : (ClashWith != NAME_None
                     ? FText::FromString(FString::Printf(TEXT("SHARED: %s"),
@@ -1617,43 +1757,14 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
 
     if (bComposite)
     {
-        // Keeps the column edges straight without pretending the control is
-        // there and disabled — there is nothing to disable.
-        Row->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BindButtonWidth + BreakerUI::Space8 + DefaultButtonWidth)];
+        // Keeps the column edges straight without pretending a control is
+        // there and disabled — there is nothing to disable, and an action with
+        // no override has nothing to reset either.
+        Row->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::Space8 + DefaultButtonWidth)];
         return Row;
     }
 
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-    [
-        SNew(SBox).WidthOverride(BindButtonWidth)
-        [
-            MakeButton(FText::FromString(BindLabel), FOnClicked::CreateLambda([this, Action]()
-            {
-                if (PendingKeybindAction == Action && PendingKeybindKey.IsValid())
-                {
-                    // The confirm half of the arm/confirm. The player has been
-                    // shown who owns the key; this is them saying "share it".
-                    const FKey Confirmed = PendingKeybindKey;
-                    PendingKeybindAction = NAME_None;
-                    PendingKeybindKey = FKey();
-                    if (UBreakerGameSettings* Live = GameSettings.Get())
-                    {
-                        Live->SetKeybindOverride(Action, Confirmed);
-                        Live->Save();
-                        KeybindStatus = FText::FromString(FString::Printf(TEXT("%s BOUND TO %s — THE KEY IS NOW SHARED."),
-                            *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString(),
-                            *Confirmed.GetDisplayName().ToString().ToUpper()));
-                        bKeybindStatusIsClash = true;
-                    }
-                    Rebuild(EBreakerMenuScreen::Settings);
-                    return FReply::Handled();
-                }
-                BeginKeybindListen(Action);
-                return FReply::Handled();
-            }), bListening || bPending)
-        ]
-    ];
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
     [
         SNew(SBox).WidthOverride(DefaultButtonWidth)
         [
@@ -1749,7 +1860,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsKeybindSection()
     // to make. Saying so beats a screen that appears to rebind and does not.
     Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
     [
-        MenuText(FText::FromString(TEXT("CLICK A ROW, THEN PRESS ANY KEY OR MOUSE BUTTON.  ESC CANCELS.\nREBINDS SAVE TO YOUR PROFILE. LIVE INPUT STILL USES THE DEFAULT KEYS UNTIL THE INPUT PASS READS THEM.")),
+        MenuText(FText::FromString(TEXT("CLICK A KEY, THEN PRESS THE ONE YOU WANT INSTEAD.  ESC CANCELS.\nREBINDS SAVE TO YOUR PROFILE. LIVE INPUT STILL USES THE DEFAULT KEYS UNTIL THE INPUT PASS READS THEM.")),
             BreakerUI::TypeCaption, Muted)
     ];
     return Section;
@@ -1984,9 +2095,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
         MenuText(FText::FromString(TEXT("CHANGES SAVE IMMEDIATELY  |  ESC BACK")), BreakerUI::TypeCaption, SoftText)
     ];
 
-    // Wider than the 720 default: the keybind rows carry five columns
-    // (action, key, badge, BIND, DEFAULT) whose fixed widths total 738, and the
-    // badge needs the rest — see the budget note in MakeKeybindRow. BuildFrame
+    // Wider than the 720 default: the keybind rows carry four columns
+    // (action, the key control, badge, DEFAULT) whose fixed widths and gaps
+    // total 604, and the badge needs the rest — see the budget note in
+    // MakeKeybindRow. Deleting the BIND column bought back 134px of that
+    // budget; the plate stays at 1040 because the badge is what was tight, not
+    // the plate. BuildFrame
     // is still the fixed-height plate with the scrolling body: the four
     // sections are far taller than any viewport, and a plate that grew to fit
     // them is trap 2 in this file, not a fix.
@@ -2011,7 +2125,7 @@ void SBreakerMenu::BeginKeybindListen(FName Action)
     bKeybindStatusIsClash = false;
 
     // Ask for keyboard focus explicitly. The click that got us here has
-    // already put Slate focus on the BIND button — a descendant of this
+    // already put Slate focus on the key control — a descendant of this
     // widget, which is enough for OnPreviewKeyDown to run on the way down —
     // but the button is about to be destroyed by the rebuild below, and a
     // focus path whose tail has been deleted is exactly the state this file's
@@ -6961,6 +7075,131 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         MenuText(FText::FromString(TEXT("Choices marked [Leave] end the conversation  |  ESC to walk away")), 9, SoftText)
     ];
     return BuildFrame(FText::FromString(TEXT("CONVERSATION")), NPC->GetDisplayName(), Body, 780.0f);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
+{
+    ABreakerTravelPoint* Point = TravelPoint.Get();
+    if (!Point)
+    {
+        // The interactable went away while its screen was up. Same answer the
+        // dialogue screen gives to a missing node: leave, rather than draw an
+        // empty picker the player can only escape from.
+        if (Character.IsValid()) Character->ResumeFromMenu();
+        return SNew(SBox);
+    }
+
+    // The FILTERED list, never the raw registry. GetAvailableDestinations drops
+    // disabled entries and the point's own ExcludedDestinationId, so a card can
+    // never exist for a place SelectDestination would refuse — or for the place
+    // the player is already standing in.
+    const TArray<FBreakerTravelDestination> Destinations = Point->GetAvailableDestinations();
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+
+    if (Destinations.Num() == 0)
+    {
+        // Said out loud rather than drawn as an empty list, which reads as a
+        // broken screen. Reachable today only if a point excludes the sole
+        // enabled destination.
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+        [
+            MakePlate(
+                MenuText(FText::FromString(TEXT("NOWHERE TO GO FROM HERE YET.")), BreakerUI::TypeBody, Muted, true),
+                PanelRaised, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space16))
+        ];
+    }
+
+    for (const FBreakerTravelDestination& Destination : Destinations)
+    {
+        const FName DestinationId = Destination.Id;
+        const bool bSelected = SelectedTravelDestinationId == DestinationId;
+
+        TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
+        Card->AddSlot().AutoHeight()
+        [
+            MenuText(Destination.DisplayName, BreakerUI::TypeH2, bSelected ? Primary : SoftText, true)
+        ];
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            SNew(STextBlock)
+                .Text(FText::FromString(Destination.Description))
+                .ColorAndOpacity(bSelected ? SoftText : Muted)
+                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+                // Wraps rather than clips: a description is authored prose of
+                // unknown length, and this is the one place on the screen whose
+                // width the text does not get to decide.
+                .AutoWrapText(true)
+        ];
+
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
+                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
+                .HAlign(HAlign_Fill)
+                .OnClicked(FOnClicked::CreateLambda([this, DestinationId]()
+                {
+                    // The selection moves FIRST, so a refused travel leaves the
+                    // ring on the card the player actually chose rather than on
+                    // whatever was marked before.
+                    SelectedTravelDestinationId = DestinationId;
+                    ABreakerTravelPoint* Live = TravelPoint.Get();
+                    if (!Live) { if (Character.IsValid()) Character->ResumeFromMenu(); return FReply::Handled(); }
+
+                    // The travel point does not teleport anyone — it broadcasts
+                    // OnDestinationSelected and whoever bound it decides what
+                    // travel means. So a TRUE here means the request was
+                    // accepted, which is the menu's cue to get out of the way.
+                    if (Live->SelectDestination(DestinationId, Character.Get()))
+                    {
+                        if (Character.IsValid()) Character->ResumeFromMenu();
+                        return FReply::Handled();
+                    }
+                    // FALSE means unknown or disabled — a card built before the
+                    // destination went away. The menu stays open and says so
+                    // instead of closing on a departure that never happened.
+                    TravelStatus = FText::FromString(TEXT("THAT DESTINATION IS NO LONGER AVAILABLE."));
+                    Rebuild(EBreakerMenuScreen::Travel);
+                    return FReply::Handled();
+                }))
+                [
+                    Card
+                ],
+                // Selected carries the 2px accent ring, unselected the neutral
+                // 1px one — the same selected-state vocabulary the tab strip
+                // and the class banners use. Never a colour-only difference.
+                bSelected ? Cyan : BorderEmphasis,
+                bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+        ];
+    }
+
+    // Always present, so the list cannot change height when a refusal lands.
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        SNew(SBox).HeightOverride(20.0f)
+        [
+            MenuText(TravelStatus, BreakerUI::TypeCaption, Harm, true)
+        ]
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(TEXT("CLICK A DESTINATION TO TRAVEL  |  ESC STAYS HERE")), BreakerUI::TypeCaption, SoftText)
+    ];
+
+    // BuildFrame, at the dialogue screen's width — the two are the same kind of
+    // screen and should not be two sizes. Fixed-height plate with a scrolling
+    // body, which is what BuildFrame now IS: a content-sized panel here would
+    // resize the plate every time the destination count changed, which is the
+    // jitter this frame was rebuilt to remove.
+    // The subtitle counts rather than naming the place: the point knows where
+    // it does NOT go (ExcludedDestinationId) but carries no display name for
+    // where it IS, and inventing one here would be a second source of truth for
+    // location names.
+    const FString Subtitle = FString::Printf(TEXT("%d DESTINATION%s"),
+        Destinations.Num(), Destinations.Num() == 1 ? TEXT("") : TEXT("S"));
+    return BuildFrame(FText::FromString(TEXT("TRAVEL")), FText::FromString(Subtitle), Body, 780.0f);
 }
 
 FReply SBreakerMenu::GoBack()
