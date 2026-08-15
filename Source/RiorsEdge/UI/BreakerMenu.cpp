@@ -4199,6 +4199,25 @@ namespace
         // board printed "+4% STAT" — the one stat the owner most wanted to see
         // was the one with no name.
         case EBreakerNodeStatTarget::Damage:         return TEXT("DAMAGE");
+        // ---- The O30 widening. 21 targets landed at once, and this switch's
+        // `default` would have printed "STAT" for every one of them — the same
+        // defect the Damage line above records, at twenty-one times the scale.
+        // Named here in the SAME pass that added them rather than after.
+        case EBreakerNodeStatTarget::AbilityDamage:  return TEXT("ABILITY DAMAGE");
+        case EBreakerNodeStatTarget::AbilityCost:    return TEXT("ABILITY COST");
+        case EBreakerNodeStatTarget::AbilityCooldown:return TEXT("ABILITY COOLDOWN");
+        case EBreakerNodeStatTarget::AbilityArea:    return TEXT("ABILITY AREA");
+        case EBreakerNodeStatTarget::AbilityDuration:return TEXT("ABILITY DURATION");
+        case EBreakerNodeStatTarget::WeaponDamage:   return TEXT("WEAPON DAMAGE");
+        case EBreakerNodeStatTarget::MeleeDamage:    return TEXT("MELEE DAMAGE");
+        case EBreakerNodeStatTarget::IncomingDamageReduction: return TEXT("DAMAGE TAKEN");
+        case EBreakerNodeStatTarget::Armor:          return TEXT("ARMOUR");
+        case EBreakerNodeStatTarget::Lifesteal:      return TEXT("LIFESTEAL");
+        case EBreakerNodeStatTarget::MaxClassResource:  return TEXT("MAX RESOURCE");
+        case EBreakerNodeStatTarget::ClassResourceRegen:return TEXT("RESOURCE REGEN");
+        case EBreakerNodeStatTarget::ClassResourceDecay:return TEXT("RESOURCE DECAY");
+        case EBreakerNodeStatTarget::FireRate:       return TEXT("FIRE RATE");
+        case EBreakerNodeStatTarget::DashCooldown:   return TEXT("DASH COOLDOWN");
         default:                                     return TEXT("STAT");
         }
     }
@@ -4220,6 +4239,25 @@ namespace
         case EBreakerNodeStatTarget::Health:         return TEXT("HP");
         case EBreakerNodeStatTarget::DamageOverTime: return TEXT("DOT");
         case EBreakerNodeStatTarget::Damage:         return TEXT("DMG");
+        // Same widening, abbreviated: this label sits in a fixed pixel width on
+        // the board marker, so every string here is kept to roughly the length
+        // of the ones above it. "ABILITY COOLDOWN" would clip; "ABL CD" does
+        // not — and clipped text has been reported four times in this file.
+        case EBreakerNodeStatTarget::AbilityDamage:  return TEXT("ABL DMG");
+        case EBreakerNodeStatTarget::AbilityCost:    return TEXT("ABL COST");
+        case EBreakerNodeStatTarget::AbilityCooldown:return TEXT("ABL CD");
+        case EBreakerNodeStatTarget::AbilityArea:    return TEXT("ABL AREA");
+        case EBreakerNodeStatTarget::AbilityDuration:return TEXT("ABL TIME");
+        case EBreakerNodeStatTarget::WeaponDamage:   return TEXT("WPN DMG");
+        case EBreakerNodeStatTarget::MeleeDamage:    return TEXT("MELEE");
+        case EBreakerNodeStatTarget::IncomingDamageReduction: return TEXT("DMG TAKEN");
+        case EBreakerNodeStatTarget::Armor:          return TEXT("ARMOUR");
+        case EBreakerNodeStatTarget::Lifesteal:      return TEXT("LEECH");
+        case EBreakerNodeStatTarget::MaxClassResource:  return TEXT("MAX RES");
+        case EBreakerNodeStatTarget::ClassResourceRegen:return TEXT("RES REGEN");
+        case EBreakerNodeStatTarget::ClassResourceDecay:return TEXT("RES DECAY");
+        case EBreakerNodeStatTarget::FireRate:       return TEXT("FIRE RATE");
+        case EBreakerNodeStatTarget::DashCooldown:   return TEXT("DASH CD");
         default:                                     return TEXT("STAT");
         }
     }

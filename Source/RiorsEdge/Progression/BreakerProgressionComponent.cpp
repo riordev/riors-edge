@@ -635,7 +635,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             const float Value = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
 
             const bool bConditional = Effect.Condition != EBreakerBuildCondition::Always;
-            const bool bLive = Conditions.IsActive(Effect.Condition);
+            // COMPOSITION (owner ruling, 2026-08-15: "conditions do compose
+            // yes"). An effect may now require several conditions at once, and
+            // SatisfiesAll is also where an unsatisfiable requirement becomes
+            // LOUD — a condition nothing can currently evaluate warns once
+            // rather than silently never paying, which is the failure mode that
+            // produced the third jump and the phantom keystones.
+            const bool bLive = Conditions.SatisfiesAll(Effect.Condition, Effect.AlsoRequires);
             if (bConditional && Effect.StatTarget == EBreakerNodeStatTarget::Damage
                 && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
             {
@@ -733,6 +739,35 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AirControl)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
+
+        // ---- The six lanes whose attributes ALREADY EXISTED ---------------
+        // Every one of these was a stat the aggregator could already carry and
+        // gear already bid into, with no way for a NODE to reach it — which is
+        // why 53 of 97 authored tree nodes shipped with no effect. One line
+        // each. The comment above about there being deliberately no dash line
+        // was true when it was written and is now answered: EBreakerNodeStatTarget
+        // has a dash entry, so this is that entry's one line.
+        //
+        // All six join the SAME additive Increased bucket gear bids into, which
+        // is the point — a tree line and an affix line on one stat compose
+        // additively rather than multiplying, the bug class fixed everywhere
+        // else in this codebase.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ResourceCostMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityCost)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxClassResource, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MaxClassResource)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ClassResourceRegen, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ClassResourceRegen)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::FireRate)]);
+        // NO DASH LANE, and the roadmap that asked for one was wrong about why.
+        // EBreakerAggregatedAttribute has no dash entry at all: dash cooldown
+        // lives on FBreakerEquipmentStats and is read directly by
+        // UBreakerCharacterMovementComponent::GetComposedDashCooldownMultiplier.
+        // So the node target exists and there is nowhere for it to bid — which
+        // means a DashCooldown node is authored-but-inert, and
+        // BreakerStatTargetHasAggregationLane must keep reporting it as having
+        // no lane. Adding the attribute is a separate, larger change: the
+        // movement component would have to stop reading equipment directly, or
+        // the two layers would multiply instead of sharing one bucket, which is
+        // the exact bug fixed everywhere else in this codebase.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
         if (!FMath::IsNearlyEqual(DamageMoreProduct, 1.0f))
         {
             OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, DamageMoreProduct);
