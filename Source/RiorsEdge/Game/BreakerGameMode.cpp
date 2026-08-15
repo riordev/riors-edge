@@ -94,6 +94,11 @@ void ABreakerGameMode::TeleportPawnToHub(APawn* Pawn)
 void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
 {
     if (!RequestingPawn) return;
+    if (DestinationId == ABreakerTravelPoint::HubDestinationId)
+    {
+        TeleportPawnToHub(RequestingPawn);
+        return;
+    }
     if (DestinationId != ABreakerTravelPoint::GymDestinationId) return;
 
     // A TELEPORT, not a rebuild. The gym field is already fully built at
@@ -137,7 +142,16 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
             GetWorld(), FTransform(Frame.Forward.Rotation(), HubOrigin)))
     {
+        HubTravel->ExcludedDestinationId = ABreakerTravelPoint::HubDestinationId;
         HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+    }
+    // The return gate, beside the safe pad where a player who has finished a
+    // run is already standing. Travel was one-way without it.
+    if (ABreakerTravelPoint* GymTravel = GetWorld()->SpawnActor<ABreakerTravelPoint>(
+            ABreakerTravelPoint::StaticClass(), FTransform(Frame.At(600.0f, -600.0f, 0.0f))))
+    {
+        GymTravel->ExcludedDestinationId = ABreakerTravelPoint::GymDestinationId;
+        GymTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
     }
     LogGymSummary();
     BuildCaptureTour();

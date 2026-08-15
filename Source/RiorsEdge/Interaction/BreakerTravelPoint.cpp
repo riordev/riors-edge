@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 
 const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
+const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
 
 ABreakerTravelPoint::ABreakerTravelPoint()
 {
@@ -34,7 +35,10 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
     TArray<FBreakerTravelDestination> Available;
     for (const FBreakerTravelDestination& Destination : GetFallbackRegistry())
     {
-        if (Destination.bEnabled)
+        // A travel point never offers the place it stands in. Without this the
+        // hub's gate would list "The Anchor" and teleport the player half a
+        // metre, which reads as a broken button rather than as a no-op.
+        if (Destination.bEnabled && Destination.Id != ExcludedDestinationId)
         {
             Available.Add(Destination);
         }
@@ -76,7 +80,23 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Gym.DisplayName = FText::FromString(TEXT("The Gym"));
     Gym.Description = TEXT("The wave-mode playtest field — safe pad, Anchor camp, elite arena, F1-F4.");
     Gym.bEnabled = true;
+
+    // THE WAY BACK. Travel shipped one-way: the hub is where a session starts
+    // and the gym was the only destination, so a player who travelled had no
+    // route home and the hub's vendors and story start became unreachable for
+    // the rest of the session. A destination the player can enter and not
+    // leave is a trap, not a location.
+    //
+    // Both directions are ONE registry rather than a per-point list, and the
+    // point filters by where it is — see ExcludedDestinationId. That keeps the
+    // "what places exist" question answered in exactly one place.
+    FBreakerTravelDestination Hub;
+    Hub.Id = ABreakerTravelPoint::HubDestinationId;
+    Hub.DisplayName = FText::FromString(TEXT("The Anchor"));
+    Hub.Description = TEXT("The hub — vendors, the Forge Keeper, and the way into the story.");
+    Hub.bEnabled = true;
     Registry.Add(Gym);
+    Registry.Add(Hub);
 
     return Registry;
 }

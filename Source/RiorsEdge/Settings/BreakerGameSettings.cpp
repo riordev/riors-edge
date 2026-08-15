@@ -3,6 +3,9 @@
 #include "Engine/Engine.h"
 #include "GameFramework/GameUserSettings.h"
 #include "AudioDevice.h"
+#include "Input/BreakerInputConfig.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
 #include "Misc/ConfigCacheIni.h"
 
 // ---------------------------------------------------------------------------
@@ -85,6 +88,171 @@ bool UBreakerGameSettingsLibrary::FindKeybindConflict(FName Action, FKey Key, co
         }
     }
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Keybind DEFAULTS — where the Defaults map ResolveActionKey takes comes from.
+// ---------------------------------------------------------------------------
+
+const TArray<FName>& UBreakerGameSettingsLibrary::BindableActionNames()
+{
+    // UBreakerInputConfig's UPROPERTY order (Input/BreakerInputConfig.h:16-34)
+    // with DefaultMappingContext (not an action) dropped. Movement first,
+    // combat second, the camera/sensitivity nudges third, playtest keys last —
+    // the same grouping the asset's Category tags already declare.
+    static const TArray<FName> Names = {
+        TEXT("Move"), TEXT("Look"), TEXT("Jump"), TEXT("Sprint"), TEXT("Dash"), TEXT("Slide"),
+        TEXT("Fire"), TEXT("Aim"), TEXT("Reload"),
+        TEXT("AbilityOne"), TEXT("AbilityTwo"), TEXT("Ultimate"),
+        TEXT("FOVUp"), TEXT("FOVDown"), TEXT("SensitivityUp"), TEXT("SensitivityDown"),
+        TEXT("PlaytestReset"), TEXT("PlaytestReport"), TEXT("PlaytestDiagnostics")
+    };
+    return Names;
+}
+
+FText UBreakerGameSettingsLibrary::DescribeAction(FName Action)
+{
+    // An explicit table rather than a de-camel-casing pass. "FOVUp" and
+    // "AbilityOne" both come out wrong from any generic splitter, and the two
+    // sensitivity nudges want to say what they nudge.
+    static const TMap<FName, FString> Labels = {
+        { TEXT("Move"),                TEXT("MOVE") },
+        { TEXT("Look"),                TEXT("LOOK") },
+        { TEXT("Jump"),                TEXT("JUMP") },
+        { TEXT("Sprint"),              TEXT("SPRINT") },
+        { TEXT("Dash"),                TEXT("DASH") },
+        { TEXT("Slide"),               TEXT("SLIDE") },
+        { TEXT("Fire"),                TEXT("FIRE") },
+        { TEXT("Aim"),                 TEXT("AIM") },
+        { TEXT("Reload"),              TEXT("RELOAD") },
+        { TEXT("AbilityOne"),          TEXT("ABILITY 1") },
+        { TEXT("AbilityTwo"),          TEXT("ABILITY 2") },
+        { TEXT("Ultimate"),            TEXT("ULTIMATE") },
+        { TEXT("FOVUp"),               TEXT("FOV UP") },
+        { TEXT("FOVDown"),             TEXT("FOV DOWN") },
+        { TEXT("SensitivityUp"),       TEXT("SENSITIVITY UP") },
+        { TEXT("SensitivityDown"),     TEXT("SENSITIVITY DOWN") },
+        { TEXT("PlaytestReset"),       TEXT("PLAYTEST RESET") },
+        { TEXT("PlaytestReport"),      TEXT("PLAYTEST REPORT") },
+        { TEXT("PlaytestDiagnostics"), TEXT("PLAYTEST DIAGNOSTICS") }
+    };
+    if (const FString* Label = Labels.Find(Action))
+    {
+        return FText::FromString(*Label);
+    }
+    // An action nobody authored a label for still gets a readable row rather
+    // than a blank one.
+    return FText::FromString(Action.ToString().ToUpper());
+}
+
+void UBreakerGameSettingsLibrary::ResolveDefaultKeysByAction(
+    const TArray<TPair<FName, const UInputAction*>>& ActionsByName,
+    const TArray<FEnhancedActionKeyMapping>& Mappings,
+    TMap<FName, TArray<FKey>>& OutKeysByAction)
+{
+    OutKeysByAction.Empty();
+
+    // Pointer -> name first, so the mapping list is walked ONCE. A mapping
+    // context has a handful of entries today but it is the thing that grows
+    // with the game, and the actions list grows with it — the nested-loop
+    // version is quadratic in exactly the two dimensions that both move.
+    TMap<const UInputAction*, FName> NameByAction;
+    for (const TPair<FName, const UInputAction*>& Pair : ActionsByName)
+    {
+        if (Pair.Value)
+        {
+            NameByAction.Add(Pair.Value, Pair.Key);
+        }
+    }
+
+    for (const FEnhancedActionKeyMapping& Mapping : Mappings)
+    {
+        const FName* Name = NameByAction.Find(Mapping.Action.Get());
+        if (!Name || !Mapping.Key.IsValid())
+        {
+            continue;
+        }
+        // AddUnique: an axis action commonly appears twice on the same key
+        // with different modifiers (a negate pass plus a swizzle), and the
+        // screen wants the KEYS a player presses, not the modifier stack.
+        OutKeysByAction.FindOrAdd(*Name).AddUnique(Mapping.Key);
+    }
+}
+
+TMap<FName, FKey> UBreakerGameSettingsLibrary::FirstKeyPerAction(const TMap<FName, TArray<FKey>>& KeysByAction)
+{
+    TMap<FName, FKey> Flat;
+    for (const TPair<FName, TArray<FKey>>& Pair : KeysByAction)
+    {
+        if (Pair.Value.Num() > 0)
+        {
+            Flat.Add(Pair.Key, Pair.Value[0]);
+        }
+    }
+    return Flat;
+}
+
+void UBreakerGameSettingsLibrary::ListConfigActions(const UBreakerInputConfig* Config,
+    TArray<TPair<FName, const UInputAction*>>& OutActionsByName)
+{
+    OutActionsByName.Empty();
+    if (!Config)
+    {
+        return;
+    }
+    // Written out rather than walked reflectively. The reflection version
+    // would be shorter and would silently pick up any future UInputAction
+    // property under a name nobody chose for display; this one fails loudly
+    // (a missing row) when the asset gains an action, which is the failure
+    // mode that gets noticed.
+    auto Add = [&OutActionsByName](const TCHAR* Name, const UInputAction* Action)
+    {
+        OutActionsByName.Add(TPair<FName, const UInputAction*>(FName(Name), Action));
+    };
+    Add(TEXT("Move"), Config->Move);
+    Add(TEXT("Look"), Config->Look);
+    Add(TEXT("Jump"), Config->Jump);
+    Add(TEXT("Sprint"), Config->Sprint);
+    Add(TEXT("Dash"), Config->Dash);
+    Add(TEXT("Slide"), Config->Slide);
+    Add(TEXT("Fire"), Config->Fire);
+    Add(TEXT("Aim"), Config->Aim);
+    Add(TEXT("Reload"), Config->Reload);
+    Add(TEXT("AbilityOne"), Config->AbilityOne);
+    Add(TEXT("AbilityTwo"), Config->AbilityTwo);
+    Add(TEXT("Ultimate"), Config->Ultimate);
+    Add(TEXT("FOVUp"), Config->FOVUp);
+    Add(TEXT("FOVDown"), Config->FOVDown);
+    Add(TEXT("SensitivityUp"), Config->SensitivityUp);
+    Add(TEXT("SensitivityDown"), Config->SensitivityDown);
+    Add(TEXT("PlaytestReset"), Config->PlaytestReset);
+    Add(TEXT("PlaytestReport"), Config->PlaytestReport);
+    Add(TEXT("PlaytestDiagnostics"), Config->PlaytestDiagnostics);
+}
+
+TMap<FName, TArray<FKey>> UBreakerGameSettingsLibrary::ProjectDefaultKeybinds()
+{
+    // ABreakerCharacter::InputConfig is protected (Characters/BreakerCharacter
+    // .h:163, inside the protected block that opens at :97), so the settings
+    // screen cannot read the config off the pawn it already holds. Loading the
+    // asset by path is the alternative that does not require editing
+    // BreakerCharacter.h. The path is the one the Content tree actually has:
+    // Content/ProjectBreaker/Input/DA_PlayerInputConfig.uasset.
+    static const TCHAR* ConfigPath = TEXT("/Game/ProjectBreaker/Input/DA_PlayerInputConfig.DA_PlayerInputConfig");
+
+    TMap<FName, TArray<FKey>> Empty;
+    const UBreakerInputConfig* Config = LoadObject<UBreakerInputConfig>(nullptr, ConfigPath);
+    if (!Config || !Config->DefaultMappingContext)
+    {
+        return Empty;
+    }
+
+    TArray<TPair<FName, const UInputAction*>> ActionsByName;
+    ListConfigActions(Config, ActionsByName);
+
+    TMap<FName, TArray<FKey>> KeysByAction;
+    ResolveDefaultKeysByAction(ActionsByName, Config->DefaultMappingContext->GetMappings(), KeysByAction);
+    return KeysByAction;
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,8 @@
 #include "UObject/StrongObjectPtr.h"
 // Complete type: the roster is held by value in a TStrongObjectPtr below.
 #include "Save/BreakerCharacterRoster.h"
+// Complete type: the settings model is held the same way, for the same reason.
+#include "Settings/BreakerGameSettings.h"
 
 class ABreakerCharacter;
 class SBorder;
@@ -55,6 +57,26 @@ public:
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
     void HandleConfirmKey();
+    // THE REBIND CAPTURE SEAM, and it is deliberately public and unused inside
+    // this class.
+    //
+    // The settings screen's "press a key" flow captures through Slate
+    // (OnPreviewKeyDown / OnPreviewMouseButtonDown below), which is sound for
+    // the case that actually occurs — the player CLICKED a row one event
+    // earlier, so Slate focus is on a descendant of this widget and preview
+    // runs on the way down. But this project has already been bitten twice by
+    // assuming Slate focus: under FInputModeGameAndUI
+    // (Characters/BreakerCharacter.cpp:1050-1054) the menu does not reliably
+    // hold it, which is why the title gate had to move onto a player-input
+    // BindKey with bExecuteWhenPaused (BreakerCharacter.cpp:344-352).
+    //
+    // If capture turns out not to fire, this is the entry point that fixes it
+    // without touching this file: one line next to the Enter/Space binds,
+    //   PlayerInputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this,
+    //       &ThisClass::MenuRebindKey).bExecuteWhenPaused = true;
+    // forwarding the pressed key here. Harmless to call at any time: it does
+    // nothing unless a row is actively listening.
+    void HandleRebindKey(const FKey& Key);
     // Dev capture only: jump straight to a screen so a screenshot run can see
     // it. Every menu in this project has been authored, reworked and shipped
     // without anyone looking at it, which is how the skill tree reached the
@@ -136,6 +158,34 @@ private:
     // reaches us rather than being swallowed by the game viewport.
     virtual bool SupportsKeyboardFocus() const override { return true; }
     virtual FReply OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    // Mouse capture for the rebind flow. "Rebindable to whatever" includes the
+    // two keys the game is most played with — Fire is LMB and Aim is RMB — and
+    // a mouse button never arrives as a key event, so a keyboard-only listener
+    // could not rebind either of them. Preview, so the click is consumed before
+    // whatever button is under the cursor treats it as a press.
+    virtual FReply OnPreviewMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& PointerEvent) override;
+
+    // ---- Settings screen -------------------------------------------------
+    // The screen's section builders. Split out because the four sections have
+    // nothing to do with each other and one function carrying all of them
+    // would be the longest in the file.
+    TSharedRef<SWidget> BuildSettingsInputSection();
+    TSharedRef<SWidget> BuildSettingsKeybindSection();
+    TSharedRef<SWidget> BuildSettingsVideoSection();
+    TSharedRef<SWidget> BuildSettingsAudioSection();
+    // One keybind row: label, resolved key, conflict badge, BIND, DEFAULT.
+    TSharedRef<SWidget> MakeKeybindRow(FName Action, const TMap<FName, TArray<FKey>>& DefaultKeys,
+        const TMap<FName, FKey>& FlatDefaults);
+    // Loads the model on first use and caches the project's default keybinds
+    // alongside it. Both are needed by every settings rebuild, and the
+    // defaults involve a synchronous asset load that must not happen per row.
+    void EnsureSettingsLoaded();
+    void BeginKeybindListen(FName Action);
+    void CancelKeybindListen();
+    // The whole rebind decision: conflict check, the arm/confirm step, the
+    // write, the save. Shared by the keyboard and mouse capture paths and by
+    // HandleRebindKey, so all three behave identically.
+    void CommitKeybind(const FKey& Key);
 
     TWeakObjectPtr<ABreakerCharacter> Character;
     // False until the title is dismissed. Deliberately NOT persisted: the
@@ -145,6 +195,30 @@ private:
     // strong reference — a raw pointer here would be collected out from under
     // the character-select screen between rebuilds.
     TStrongObjectPtr<UBreakerCharacterRoster> Roster;
+    // The settings MODEL. A UObject held by a Slate widget, so it needs the
+    // same explicit strong reference the roster does. Loaded lazily on the
+    // first settings rebuild rather than in Construct: most sessions never
+    // open the screen, and LoadOrDefaults touches GConfig.
+    TStrongObjectPtr<UBreakerGameSettings> GameSettings;
+    // The project's default keybinds, resolved once per settings-screen entry
+    // from DA_PlayerInputConfig's mapping context. Every row and every
+    // conflict check reads this; re-resolving it per row would mean a
+    // synchronous asset load per row.
+    TMap<FName, TArray<FKey>> DefaultKeybinds;
+    // NAME_None unless a row is in its "PRESS A KEY…" state. Exactly one row
+    // can listen at a time, which is why this is a name and not a set.
+    FName ListeningKeybindAction;
+    // The arm half of the conflict arm/confirm, the same two-click shape the
+    // inventory cleanup and O37's COMMIT already use. A rebind that clashes
+    // does not silently steal the key and does not silently refuse: the first
+    // press names the clash and parks it here, and only a second, deliberate
+    // click on the same row commits it.
+    FName PendingKeybindAction;
+    FKey PendingKeybindKey;
+    // The line echoed under the keybind list. Harm-red when it is reporting a
+    // clash, muted otherwise.
+    FText KeybindStatus;
+    bool bKeybindStatusIsClash = false;
     FGuid SelectedCharacterId;
     // Two-step delete, the same arm/confirm shape the inventory's destructive
     // cleanup and O37's COMMIT control already use. Deleting a character is

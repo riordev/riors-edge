@@ -38,6 +38,12 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Landing);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SkimDiscipline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AirWork);
+    // Kinetic tier 4 (K9-K11). Every one of these is a rule the Momentum loop,
+    // the damage-taken path or UBreakerAbility_Skim must learn to read; none
+    // authors a stat effect. See the block comment above GetSwiftKineticTree.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MomentumShield);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SpendToLive);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_NoGround);
 
     // Swift / Marksman
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_LongLens);
@@ -48,6 +54,12 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_PierceDiscipline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Sightline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Lead);
+    // Marksman tier 4 (M9-M11). Node_MarksmanCalledShot is a DIFFERENT node
+    // from Core's Node_CalledShot and shares only a display name — see the tag
+    // definition in the .cpp for why neither is renamed.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Reserve);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Overpenetration);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MarksmanCalledShot);
 
     // Swift / FRENZY (Class-Kits §1.3). The branch the design document has
     // always named and the library never authored, which is why the skill
@@ -62,6 +74,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SlipcutMastery);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AmmunitionEconomy);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Bloodrhythm);
+    // Frenzy tier 4 (F9-F11).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SecondWind);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_RedlineTrigger);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_NoSafety);
 
     // Core / ELEMENTS (Core-Constellations §6, O5 + O19: Rift / Entropy / Void).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Conductive);
@@ -71,9 +87,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Penetrance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ReactionChain);
 
-    // Caster / SPELLBLADE (Class-Kits §2.3). Tiers 1-3 only, the same slice cut
-    // as Swift's three branches (§7) — SB9-SB11's tier-4 rewrites are not
-    // authored, matching the Frenzy/Kinetic/Marksman precedent.
+    // Caster / SPELLBLADE (Class-Kits §2.3). Tiers 1-3 only — SB9-SB11's
+    // tier-4 rewrites are not authored. This WAS the same cut Swift used; it
+    // no longer is, since Swift's nine tier-4 rewrites have since landed. The
+    // Caster trio is the remaining half of that gap, not a settled shape.
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_ContactCharge);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_FollowThrough);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Close);
@@ -123,11 +140,18 @@ class RIORSEDGE_API UBreakerProgressionLibrary : public UBlueprintFunctionLibrar
 public:
     // The ~15-node Core constellation slice subset (Core-Constellations §10.1).
     static UBreakerProgressionTree* GetCoreSliceTree();
-    // Swift KINETIC branch, tiers 1-3 (Class-Kits §1.4).
+    // Swift's three branches now carry tiers 1-4: the slice's tiers 1-3 plus
+    // the Tier-4 rewrite trio each branch's Class-Kits table specifies. The
+    // keystones still sit at tier 3 under the slice's compressed ladder rather
+    // than §0.2's tier 5, which makes a keystone reachable earlier than its own
+    // branch's rewrites — recorded, not fixed, above GetSwiftKineticTree.
+    // Caster's three branches remain tiers 1-3.
+    //
+    // Swift KINETIC branch, tiers 1-4 (Class-Kits §1.4).
     static UBreakerProgressionTree* GetSwiftKineticTree();
-    // Swift MARKSMAN branch, tiers 1-3 (Class-Kits §1.5).
+    // Swift MARKSMAN branch, tiers 1-4 (Class-Kits §1.5).
     static UBreakerProgressionTree* GetSwiftMarksmanTree();
-    // Swift FRENZY branch, tiers 1-3 (Class-Kits §1.3).
+    // Swift FRENZY branch, tiers 1-4 (Class-Kits §1.3).
     static UBreakerProgressionTree* GetSwiftFrenzyTree();
 
     // Caster SPELLBLADE branch, tiers 1-3 (Class-Kits §2.3).

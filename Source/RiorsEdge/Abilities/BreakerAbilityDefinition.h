@@ -118,4 +118,21 @@ public:
     // selection has to pass: a Swift may not equip Cleave however the id got
     // into the request.
     static bool ClassGrantsAbility(EBreakerClassId ClassId, FName AbilityId);
+
+    // O39's question, answered where the facts are.
+    //
+    // "Does this class have a kit?" is NOT "does the registry have a row for
+    // it" — it is "does any of those rows EXECUTE". The two answers were the
+    // same thing for as long as the registry held only Swift and Caster, whose
+    // every row is implemented, and they stopped being the same thing the
+    // moment Gunsmith, Tank and Support were registered as DATA with no
+    // `UGameplayAbility` behind them. A class-selection screen asking the
+    // row-count question would now offer three classes whose every ability is
+    // a null grant — the precise failure O39 exists to prevent, arrived at
+    // through a query that used to be correct.
+    //
+    // This predicate asks the durable question instead, and it stays correct as
+    // each ability lands: the day a real Turret class exists, Gunsmith flips to
+    // true here on its own, with no list to remember to edit.
+    static bool ClassHasImplementedKit(EBreakerClassId ClassId);
 };

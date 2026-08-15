@@ -2,8 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
+// Complete type: FEnhancedActionKeyMapping appears by value in a TArray
+// parameter of ResolveDefaultKeysByAction below, which is the pure half of the
+// keybind-defaults lookup and therefore has to be callable from a test.
+#include "EnhancedActionKeyMapping.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "BreakerGameSettings.generated.h"
+
+class UBreakerInputConfig;
+class UInputAction;
 
 // Window mode the player picks from the settings screen. Kept as our own
 // enum rather than engine EWindowMode::Type so the model layer does not leak
@@ -81,6 +88,60 @@ public:
     UFUNCTION(BlueprintPure, Category = "Settings|Keybinds")
     static bool FindKeybindConflict(FName Action, FKey Key, const TMap<FName, FKey>& Overrides,
         const TMap<FName, FKey>& Defaults, FName& OutConflictingAction);
+
+    // ---- Keybind DEFAULTS ------------------------------------------------
+    //
+    // ResolveActionKey/FindKeybindConflict above both take a Defaults map and
+    // say nothing about where it comes from. This block is where it comes
+    // from: the project's own input config data asset
+    // (Content/ProjectBreaker/Input/DA_PlayerInputConfig, referenced from
+    // ABreakerCharacter::InputConfig, Characters/BreakerCharacter.h:163) and
+    // the mapping context hanging off it.
+    //
+    // These four are PLAIN STATICS rather than UFUNCTIONs: a
+    // TMap<FName, TArray<FKey>> and a TArray<TPair<>> are not Blueprint value
+    // types, and forcing them into BP-legal shapes would cost the one thing
+    // this split exists to buy — a pure resolver a world-free test can call
+    // with hand-built mappings.
+
+    // Every action the settings screen offers for rebinding, in the order it
+    // lists them. Mirrors UBreakerInputConfig's UPROPERTY order
+    // (Input/BreakerInputConfig.h:16-34) so the screen reads like the asset.
+    static const TArray<FName>& BindableActionNames();
+
+    // A human label for one action name. The screen shows these; the test
+    // proves every name in BindableActionNames() has one.
+    static FText DescribeAction(FName Action);
+
+    // THE PURE HALF. Given "which UInputAction is called what" and a flat list
+    // of key mappings, produce every default key each action holds — plural,
+    // because a mapping context binds a 2D-axis action (Move) to four separate
+    // keys with modifiers, and collapsing that to one key silently would make
+    // the screen lie about WASD. The caller decides what to do with an action
+    // that has more than one.
+    // Actions with no mapping at all are ABSENT from the output rather than
+    // present-and-empty: "this action has no default" and "this action has a
+    // default of nothing" are the same statement, and one representation of it
+    // is enough.
+    static void ResolveDefaultKeysByAction(
+        const TArray<TPair<FName, const UInputAction*>>& ActionsByName,
+        const TArray<FEnhancedActionKeyMapping>& Mappings,
+        TMap<FName, TArray<FKey>>& OutKeysByAction);
+
+    // Flattens the above to the one-key-per-action shape ResolveActionKey and
+    // FindKeybindConflict take. First mapping wins.
+    static TMap<FName, FKey> FirstKeyPerAction(const TMap<FName, TArray<FKey>>& KeysByAction);
+
+    // THE IMPURE HALF: pairs BindableActionNames() against the config's own
+    // UInputAction pointers, then hands both to ResolveDefaultKeysByAction.
+    static void ListConfigActions(const UBreakerInputConfig* Config,
+        TArray<TPair<FName, const UInputAction*>>& OutActionsByName);
+
+    // Loads the project's input config off disk and resolves its defaults.
+    // Returns empty if the asset is missing or has no mapping context, which
+    // is a legitimate state (a build with no input asset cooked) and not an
+    // error the settings screen should refuse to open over.
+    static TMap<FName, TArray<FKey>> ProjectDefaultKeybinds();
 };
 
 // The settings MODEL and persistence layer: input (sensitivity, scoped

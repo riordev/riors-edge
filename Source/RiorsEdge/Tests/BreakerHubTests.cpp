@@ -22,14 +22,34 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
 {
     const TArray<FBreakerTravelDestination>& Registry = ABreakerTravelPoint::GetFallbackRegistry();
 
-    // Exactly one destination is enabled today (the owner's brief: "for now
-    // the only option in that interactable should be the gym").
+    // TWO destinations now, and the second one is not scope creep — it is the
+    // WAY BACK. The registry shipped with the gym alone, per the brief ("for
+    // now the only option in that interactable should be the gym"), and that
+    // made travel one-way: a player who left the hub was stranded in the gym
+    // with the vendors and the story start unreachable for the rest of the
+    // session. A place you can enter and not leave is a trap, not a location.
+    //
+    // The count is still pinned exactly rather than loosened to "at least
+    // one", because the reason for pinning it has not changed: a third
+    // destination appearing without anyone updating this test means nobody
+    // checked whether the selection UI exists yet, and ABreakerCharacter's
+    // interact path deliberately refuses to guess past one.
     int32 EnabledCount = 0;
     for (const FBreakerTravelDestination& Destination : Registry)
     {
         if (Destination.bEnabled) ++EnabledCount;
     }
-    TestEqual(TEXT("Exactly one destination is enabled"), EnabledCount, 1);
+    TestEqual(TEXT("Exactly two destinations are enabled: the gym and the way back"), EnabledCount, 2);
+
+    // A travel point never offers the place it stands in, which is what keeps
+    // each point at exactly one option and therefore inside the no-picker-yet
+    // rule above.
+    FBreakerTravelDestination Found;
+    TestTrue(TEXT("The hub is a real destination"),
+        ABreakerTravelPoint::FindDestination(ABreakerTravelPoint::HubDestinationId, Found));
+    TestTrue(TEXT("The hub destination is enabled"), Found.bEnabled);
+    TestTrue(TEXT("The gym and the hub are different destinations"),
+        ABreakerTravelPoint::HubDestinationId != ABreakerTravelPoint::GymDestinationId);
 
     // Ids are unique. Nothing in the registry today would break this, but a
     // second entry added later without checking this test would be a silent

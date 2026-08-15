@@ -84,17 +84,60 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Core slice ships exactly the authored 30"), Core->Nodes.Num(), 30);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
-    // Swift branches, tiers 1-3 only: no tier 4/5 content leaked into the slice.
-    TestEqual(TEXT("Frenzy ships ten nodes"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 10);
-    TestEqual(TEXT("Kinetic ships eleven nodes"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 11);
-    TestEqual(TEXT("Marksman ships ten nodes"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 10);
+    // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
+    // and "every Swift node is tier 1-3").
+    //
+    // The old pins described a TRUNCATED Swift: the slice authored tiers 1-3
+    // and dropped every Tier-4 rewrite node Class-Kits §1.3-1.5 specifies —
+    // F9-F11, K9-K11, M9-M11. Those nine are now authored, three per branch, so
+    // each count rises by exactly three and the tier ceiling rises from 3 to 4.
+    // Nothing was relaxed to make new content pass: the equalities are still
+    // exact, and they are still the only thing standing between authored
+    // content and silent drift. The number moved because somebody added nine
+    // nodes on purpose and said so in this diff.
+    //
+    // Tier 5 is STILL excluded, and that is not an oversight either — §0.2's
+    // fifth tier is the keystone tier, and all three Swift keystones already
+    // shipped at tier 3 under the slice's compressed ladder. See the block
+    // comment above GetSwiftKineticTree for that recorded inversion.
+    TestEqual(TEXT("Frenzy ships thirteen nodes: ten, plus F9-F11"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
+    TestEqual(TEXT("Kinetic ships fourteen nodes: eleven, plus K9-K11"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 14);
+    TestEqual(TEXT("Marksman ships thirteen nodes: ten, plus M9-M11"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
         UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
     {
+        int32 TierFourCount = 0;
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {
-            TestTrue(TEXT("Swift slice node is tier 1-3"), Node->Tier >= 1 && Node->Tier <= 3);
+            const FString Context = Node->NodeId.ToString();
+            TestTrue(TEXT("Swift branch node is tier 1-4"), Node->Tier >= 1 && Node->Tier <= 4);
+            if (Node->Tier != 4) continue;
+            ++TierFourCount;
+
+            // The rewrite tier's grammar, stated as an assertion rather than a
+            // comment: §0.2 prices tier 4 at one rank for two points.
+            TestEqual(*(Context + TEXT(" tier-4 rewrite is single rank")), Node->MaxRank, 1);
+            TestEqual(*(Context + TEXT(" tier-4 rewrite costs 2")), Node->CostPerRank, 2);
+            // O3: a class-layer More may live only on a branch keystone, and
+            // all three of Swift's are already spent. A More appearing at
+            // tier 4 would be a fourth against a budget of three.
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                TestTrue(*(Context + TEXT(" tier-4 rewrite authors no More multiplier")),
+                    Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
+            }
+            // O30 keeps EBreakerBuildCondition movement-only, so every one of
+            // these nine rewrites ships as a rule tag with no stat effect. If a
+            // later pass gives one of them a real stat line this fails, which
+            // is the point: that is a content decision, not a refactor.
+            TestEqual(*(Context + TEXT(" tier-4 rewrite is a rule tag, not a stat line")), Node->Effects.Num(), 0);
+            TestTrue(*(Context + TEXT(" tier-4 rewrite carries its rule as a tag")), Node->GrantedTags.Num() > 0);
+            // A rewrite with no prerequisite is a rewrite of nothing. The
+            // generic loop above already proves prerequisites resolve inside
+            // the same tree and sit at or below this node's tier.
+            TestTrue(*(Context + TEXT(" tier-4 rewrite builds on an earlier node")), Node->Prerequisites.Num() > 0);
         }
+        TestEqual(TEXT("Each Swift branch ships exactly three tier-4 rewrites"), TierFourCount, 3);
     }
 
     // O3: More multipliers may be authored only on branch keystones and

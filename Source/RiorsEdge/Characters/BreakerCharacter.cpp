@@ -351,6 +351,14 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     // input binding without that flag is dead in exactly that state.
     PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ThisClass::ConfirmMenuKey).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ThisClass::ConfirmMenuKey).bExecuteWhenPaused = true;
+    // KEY CAPTURE FOR REBINDING, on the path that is PROVEN to work while
+    // paused. The settings screen also listens through Slate's preview chain,
+    // and that may well be enough — but the title gate failed twice tonight on
+    // exactly that assumption, and a rebind row that silently never captures
+    // is indistinguishable from a frozen menu. AnyKey is safe here because
+    // SBreakerMenu::HandleRebindKey is inert unless a row is actually
+    // listening, and it treats Escape as cancel rather than as a binding.
+    PlayerInputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ThisClass::MenuRebindKey).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
     PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
@@ -1285,6 +1293,11 @@ void ABreakerCharacter::GrantQuestRewardForFlag(FName Flag)
         Equipment->AddToBackpack(UBreakerLootLibrary::RollItem(TEXT("QuestReward"), Slot, Paid.Reward.MinimumRarity, Paid.Reward.ItemLevel, Seed));
     }
     UE_LOG(LogTemp, Log, TEXT("Quest '%s' turned in; %d reward item(s) granted"), *Paid.QuestId.ToString(), Paid.Reward.ItemCount);
+}
+
+void ABreakerCharacter::MenuRebindKey(FKey Key)
+{
+    if (MenuWidget.IsValid()) MenuWidget->HandleRebindKey(Key);
 }
 
 void ABreakerCharacter::ConfirmMenuKey()

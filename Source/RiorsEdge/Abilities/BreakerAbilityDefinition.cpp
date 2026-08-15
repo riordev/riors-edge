@@ -58,6 +58,85 @@ namespace
     }
 }
 
+// ---------------------------------------------------------------------------
+// TAGS FOR THE THREE DESIGNED-BUT-UNBUILT CLASSES — FILE-LOCAL, AND THEY SHOULD
+// NOT STAY THAT WAY.
+// ---------------------------------------------------------------------------
+// Every Swift and Caster tag is declared in `Abilities/BreakerAbilityTags.h`,
+// whose header comment states the convention plainly: the ability infrastructure
+// owns its own vocabulary so content authoring cannot silently drop a tag the
+// fallback registry depends on. These belong there too. They are declared here
+// instead for one reason and it is not a design one — this pass had write access
+// to the registry and not to the tag header — and the split is recorded rather
+// than hidden.
+//
+// **COORDINATOR: MOVE THESE.** Promote each line below to a
+// `UE_DECLARE_GAMEPLAY_TAG_EXTERN` in `BreakerAbilityTags.h` plus a
+// `UE_DEFINE_GAMEPLAY_TAG` in `BreakerAbilityTags.cpp`, keeping the tag STRINGS
+// byte-identical, then delete this block and swap the references below. The
+// strings are what a save, a Data Asset and a granted GameplayEffect key off;
+// the C++ symbol names are not. Nothing else has to change.
+//
+// The keystone tags follow the `Keystone.<Class>.<Name>` shape the three
+// existing sets use, so `RiorsEdge.Abilities.KeystoneReachability` sees them
+// the same way it sees Caster's — and today it takes that test's HONEST
+// EMPTINESS arm, because none of these three classes has a branch tree and so
+// no node anywhere COULD grant one. The day a Gunsmith, Tank or Support branch
+// tree is authored, that arm stops applying and the suite goes red until each
+// keystone is sited on a real cornerstone node. That is the intended alarm.
+namespace
+{
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_SidearmRig, "Ability.Class.Gunsmith.SidearmRig");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_Overhaul, "Ability.Class.Gunsmith.Overhaul");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_Turret, "Ability.Class.Gunsmith.Turret");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_AmmoCrate, "Ability.Class.Gunsmith.AmmoCrate");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_MineCluster, "Ability.Class.Gunsmith.MineCluster");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_Disruptor, "Ability.Class.Gunsmith.Disruptor");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Gunsmith_FieldAssembly, "Ability.Class.Gunsmith.FieldAssembly");
+    // Only the two ARMORY abilities carry cooldowns; the four deployables are
+    // cost-gated and author no cooldown tag at all, so the HUD can tell
+    // "cost-gated" from "cooldown of zero" (spec D3, Class-Kits-Gunsmith §1.5).
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Gunsmith_SidearmRig, "Cooldown.Class.Gunsmith.SidearmRig");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Gunsmith_Overhaul, "Cooldown.Class.Gunsmith.Overhaul");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Gunsmith_Machinist, "Keystone.Gunsmith.Machinist");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Gunsmith_Foundry, "Keystone.Gunsmith.Foundry");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Gunsmith_Minefield, "Keystone.Gunsmith.Minefield");
+
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_Rend, "Ability.Class.Tank.Rend");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_Bloodline, "Ability.Class.Tank.Bloodline");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_AnchorPoint, "Ability.Class.Tank.AnchorPoint");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_Provoke, "Ability.Class.Tank.Provoke");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_BreachCharge, "Ability.Class.Tank.BreachCharge");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_GroundZero, "Ability.Class.Tank.GroundZero");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Tank_Hold, "Ability.Class.Tank.Hold");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_Rend, "Cooldown.Class.Tank.Rend");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_Bloodline, "Cooldown.Class.Tank.Bloodline");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_AnchorPoint, "Cooldown.Class.Tank.AnchorPoint");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_Provoke, "Cooldown.Class.Tank.Provoke");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_BreachCharge, "Cooldown.Class.Tank.BreachCharge");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Tank_GroundZero, "Cooldown.Class.Tank.GroundZero");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Tank_Vein, "Keystone.Tank.Vein");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Tank_Wall, "Keystone.Tank.Wall");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Tank_Detonation, "Keystone.Tank.Detonation");
+
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Patch, "Ability.Class.Support.Patch");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Purge, "Ability.Class.Support.Purge");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Cadence, "Ability.Class.Support.Cadence");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Metronome, "Ability.Class.Support.Metronome");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Mark, "Ability.Class.Support.Mark");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Suppress, "Ability.Class.Support.Suppress");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Ability_Class_Support_Conduit, "Ability.Class.Support.Conduit");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Patch, "Cooldown.Class.Support.Patch");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Purge, "Cooldown.Class.Support.Purge");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Cadence, "Cooldown.Class.Support.Cadence");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Metronome, "Cooldown.Class.Support.Metronome");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Mark, "Cooldown.Class.Support.Mark");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Cooldown_Class_Support_Suppress, "Cooldown.Class.Support.Suppress");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Support_Triage, "Keystone.Support.Triage");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Support_Downbeat, "Keystone.Support.Downbeat");
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Keystone_Support_Blackout, "Keystone.Support.Blackout");
+}
+
 const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallbackRegistry()
 {
     static TArray<UBreakerAbilityDefinition*> Registry;
@@ -303,6 +382,501 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     }
     Registry.Add(Unmake);
 
+    // ==================================================================
+    // GUNSMITH, TANK AND SUPPORT — DATA ONLY. NOTHING BELOW EXECUTES.
+    // ==================================================================
+    // READ THIS BEFORE ASSUMING ANY OF THE FOLLOWING WORKS.
+    //
+    // **Every definition below leaves `AbilityClass` null**, which is not an
+    // oversight and is not a TODO that slipped: no `UGameplayAbility` subclass
+    // exists for any of these twenty-one rows, and `IsImplemented()` returning
+    // false is the honest answer. `UBreakerAbilityComponent` records such a slot
+    // as UNIMPLEMENTED rather than granting nothing silently, which is exactly
+    // the behaviour wanted here — the alternative, pointing these at some
+    // nearest-fit existing ability, would make a Turret cast Skim.
+    //
+    // **These rows do not make the three classes selectable, and must not.**
+    // O39 (slice class honesty) keeps a class off the class screen until it has
+    // an implemented kit, and `GetFallbackClassDefinition` still returns
+    // `nullptr` for all three, so nothing reads as unlocked and no character can
+    // lock into a class that grants nothing. `DefaultAbilityIdForSlot` is
+    // likewise NOT extended below — `RiorsEdge.Abilities.*` asserts today that
+    // a Tank slot resolves to null, and that assertion is correct until the
+    // abilities execute. Registering the class definitions and the default
+    // loadout rows is a single, later, deliberate step, and it should happen on
+    // the day the abilities run and not before.
+    //
+    // So what are these FOR? Three things a null registry cannot do: the picker
+    // and the HUD can enumerate a real catalogue through `GetClassAbilities`;
+    // the costs, cooldowns and slot affinities are pinned by a test instead of
+    // living only in prose; and the keystone variant rows exist so the ultimate
+    // rewrites are structure rather than a promise. Costs and cooldowns are
+    // QUOTED from the three class-kit documents — see the per-row citations —
+    // and every one of those documents is under a blanket O2 PLACEHOLDER
+    // banner, so nothing here is authored balance either.
+    //
+    // O30: DEPLOYABLES AND MINIONS DO NOT EXIST IN ANY FORM. Four of the six
+    // Gunsmith abilities and one Tank ability are deployables. Their rows below
+    // are DATA describing a system the ledger says is unbuilt; no actor, no
+    // density cap, no lifetime, no targeting is created by anything here.
+
+    // ------------------------------------------------------------------
+    // GUNSMITH — Scrap. Costs and cooldowns quoted from
+    // Docs/Design/Class-Kits-Gunsmith.md §3.
+    //
+    // THE CLASS'S DEFINING ERGONOMIC IS VISIBLE IN THIS TABLE AND NOWHERE ELSE
+    // IN CODE: the two Armory abilities cost NOTHING and carry a cooldown; the
+    // four deployables cost Scrap and carry NO cooldown. Two clocks in one kit,
+    // which is what makes "one of each" a real loadout shape rather than a
+    // default. A future editor pass that "tidies" a cooldown onto a deployable
+    // deletes the class's ergonomic, so the split is stated here as well as in
+    // the design doc.
+    // ------------------------------------------------------------------
+
+    // G1 Sidearm Rig — §3 row G1: no cost, 10s cooldown. STARTER (Armory).
+    UBreakerAbilityDefinition* SidearmRig = MakeFallback(TEXT("FallbackAbility_Gunsmith_SidearmRig"));
+    SidearmRig->AbilityId = TEXT("Gunsmith.SidearmRig");
+    SidearmRig->ClassId = EBreakerClassId::Gunsmith;
+    SidearmRig->DisplayName = FText::FromString(TEXT("Sidearm Rig"));
+    SidearmRig->Description = FText::FromString(TEXT("The next magazine deals bonus flat damage and pierces one more target."));
+    SidearmRig->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    SidearmRig->AbilityTag = Ability_Class_Gunsmith_SidearmRig;
+    SidearmRig->CooldownTag = Cooldown_Class_Gunsmith_SidearmRig;
+    SidearmRig->ResourceCost = 0.0f;
+    SidearmRig->CooldownSeconds = 10.0f;
+    // WindowDuration stays 0 DELIBERATELY. Sidearm Rig's window is counted in
+    // SHOTS, not seconds — it ends when the magazine empties or on reload,
+    // whichever comes first — and that is what makes it a magazine-economy
+    // ability rather than a burst window. Authoring a seconds value here would
+    // be inventing a second, contradictory expiry.
+    Registry.Add(SidearmRig);
+
+    // G2 Overhaul — §3 row G2: no cost, 18s cooldown, 10s window.
+    UBreakerAbilityDefinition* Overhaul = MakeFallback(TEXT("FallbackAbility_Gunsmith_Overhaul"));
+    Overhaul->AbilityId = TEXT("Gunsmith.Overhaul");
+    Overhaul->ClassId = EBreakerClassId::Gunsmith;
+    Overhaul->DisplayName = FText::FromString(TEXT("Overhaul"));
+    Overhaul->Description = FText::FromString(TEXT("Converts reserve ammunition into magazine capacity, and settles the unspent remainder back."));
+    Overhaul->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Overhaul->AbilityTag = Ability_Class_Gunsmith_Overhaul;
+    Overhaul->CooldownTag = Cooldown_Class_Gunsmith_Overhaul;
+    Overhaul->ResourceCost = 0.0f;
+    Overhaul->CooldownSeconds = 18.0f;
+    Overhaul->WindowDuration = 10.0f;
+    Registry.Add(Overhaul);
+
+    // G3 Turret — §3 row G3: 40 Scrap, no cooldown. STARTER (Field Tech).
+    UBreakerAbilityDefinition* Turret = MakeFallback(TEXT("FallbackAbility_Gunsmith_Turret"));
+    Turret->AbilityId = TEXT("Gunsmith.Turret");
+    Turret->ClassId = EBreakerClassId::Gunsmith;
+    Turret->DisplayName = FText::FromString(TEXT("Turret"));
+    Turret->Description = FText::FromString(TEXT("An emplacement that fires on the nearest target it can see. Consistent, never optimal."));
+    Turret->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Turret->AbilityTag = Ability_Class_Gunsmith_Turret;
+    Turret->ResourceCost = 40.0f;
+    Turret->CooldownSeconds = 0.0f;
+    Turret->WindowDuration = 30.0f;   // the emplacement's lifetime, for the HUD
+    Registry.Add(Turret);
+
+    // G4 Ammo Crate — §3 row G4: 30 Scrap, no cooldown.
+    UBreakerAbilityDefinition* AmmoCrate = MakeFallback(TEXT("FallbackAbility_Gunsmith_AmmoCrate"));
+    AmmoCrate->AbilityId = TEXT("Gunsmith.AmmoCrate");
+    AmmoCrate->ClassId = EBreakerClassId::Gunsmith;
+    AmmoCrate->DisplayName = FText::FromString(TEXT("Ammo Crate"));
+    AmmoCrate->Description = FText::FromString(TEXT("A crate of reserve ammunition. You are a valid interactor with your own, at full value."));
+    AmmoCrate->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    AmmoCrate->AbilityTag = Ability_Class_Gunsmith_AmmoCrate;
+    AmmoCrate->ResourceCost = 30.0f;
+    AmmoCrate->CooldownSeconds = 0.0f;
+    AmmoCrate->WindowDuration = 45.0f;
+    Registry.Add(AmmoCrate);
+
+    // G5 Mine Cluster — §3 row G5: 35 Scrap, no cooldown.
+    UBreakerAbilityDefinition* MineCluster = MakeFallback(TEXT("FallbackAbility_Gunsmith_MineCluster"));
+    MineCluster->AbilityId = TEXT("Gunsmith.MineCluster");
+    MineCluster->ClassId = EBreakerClassId::Gunsmith;
+    MineCluster->DisplayName = FText::FromString(TEXT("Mine Cluster"));
+    MineCluster->Description = FText::FromString(TEXT("Three proximity charges that arm on a delay. The cluster is one placement, not three."));
+    MineCluster->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    MineCluster->AbilityTag = Ability_Class_Gunsmith_MineCluster;
+    MineCluster->ResourceCost = 35.0f;
+    MineCluster->CooldownSeconds = 0.0f;
+    MineCluster->WindowDuration = 60.0f;
+    Registry.Add(MineCluster);
+
+    // G6 Disruptor — §3 row G6: 45 Scrap, no cooldown, 20s lifetime.
+    UBreakerAbilityDefinition* Disruptor = MakeFallback(TEXT("FallbackAbility_Gunsmith_Disruptor"));
+    Disruptor->AbilityId = TEXT("Gunsmith.Disruptor");
+    Disruptor->ClassId = EBreakerClassId::Gunsmith;
+    Disruptor->DisplayName = FText::FromString(TEXT("Disruptor"));
+    Disruptor->Description = FText::FromString(TEXT("A field that slows enemies inside it and strips a flat amount of their armour."));
+    Disruptor->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Disruptor->AbilityTag = Ability_Class_Gunsmith_Disruptor;
+    Disruptor->ResourceCost = 45.0f;
+    Disruptor->CooldownSeconds = 0.0f;
+    Disruptor->WindowDuration = 20.0f;
+    Registry.Add(Disruptor);
+
+    // FIELD ASSEMBLY — §3 ultimate: 100 Scrap (full bar), no cooldown, 20s.
+    UBreakerAbilityDefinition* FieldAssembly = MakeFallback(TEXT("FallbackAbility_Gunsmith_FieldAssembly"));
+    FieldAssembly->AbilityId = TEXT("Gunsmith.FieldAssembly");
+    FieldAssembly->ClassId = EBreakerClassId::Gunsmith;
+    FieldAssembly->DisplayName = FText::FromString(TEXT("Field Assembly"));
+    FieldAssembly->Description = FText::FromString(TEXT("Deploys every unlocked deployable type at once and raises the density cap for the window."));
+    FieldAssembly->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    FieldAssembly->AbilityTag = Ability_Class_Gunsmith_FieldAssembly;
+    FieldAssembly->ResourceCost = 100.0f;
+    FieldAssembly->CooldownSeconds = 0.0f;
+    FieldAssembly->WindowDuration = 20.0f;
+    {
+        // NOTE ON AbilityCostMultiplier ACROSS ALL FOUR ROWS: it stays 1.0.
+        // The field states what the window does to the price of the owner's
+        // OTHER abilities, which is Unmake's mechanic. Field Assembly does not
+        // discount casts — it performs one free mass placement at activation
+        // and then raises a DENSITY CAP, and the cap is a deployable-system
+        // concept with no field on this struct and no system behind it (O30).
+        // Leaving the multiplier at 1.0 is the accurate statement; setting it
+        // to 0 would silently make every subsequent Gunsmith cast free.
+        FBreakerAbilityVariant BaseRow;
+        BaseRow.VariantName = FText::FromString(TEXT("Field Assembly"));
+        BaseRow.WindowDuration = 20.0f;
+        FieldAssembly->Variants.Add(BaseRow);
+
+        // Machinist — the solo / no-deployable ultimate: places nothing and
+        // applies every unlocked type's effect to the player instead. The most
+        // bespoke of the fifteen keystone rewrites in the corpus; the class-kit
+        // document authors the SHAPE of its per-type mapping table and
+        // explicitly not its magnitudes, so no parametric delta is authored
+        // here either.
+        FBreakerAbilityVariant Machinist;
+        Machinist.KeystoneTag = Keystone_Gunsmith_Machinist;
+        Machinist.VariantName = FText::FromString(TEXT("Field Assembly - Machinist"));
+        Machinist.WindowDuration = 20.0f;
+        FieldAssembly->Variants.Add(Machinist);
+
+        // Foundry — deployables placed during the window never expire (their
+        // lifetime clock pauses). A lifetime pause is not a window duration, so
+        // this row carries the base 20s and the behaviour is a named C++ branch
+        // when the deployable system exists (spec D1's explicit allowance).
+        FBreakerAbilityVariant Foundry;
+        Foundry.KeystoneTag = Keystone_Gunsmith_Foundry;
+        Foundry.VariantName = FText::FromString(TEXT("Field Assembly - Foundry"));
+        Foundry.WindowDuration = 20.0f;
+        FieldAssembly->Variants.Add(Foundry);
+
+        // Minefield — placements are invisible and excluded from enemy
+        // perception until they act. Behavioural, not parametric.
+        FBreakerAbilityVariant Minefield;
+        Minefield.KeystoneTag = Keystone_Gunsmith_Minefield;
+        Minefield.VariantName = FText::FromString(TEXT("Field Assembly - Minefield"));
+        Minefield.WindowDuration = 20.0f;
+        FieldAssembly->Variants.Add(Minefield);
+    }
+    Registry.Add(FieldAssembly);
+
+    // ------------------------------------------------------------------
+    // TANK — Grit. Costs and cooldowns quoted from
+    // Docs/Design/Class-Kits-Tank.md §2. Every Tank ability costs Grit AND
+    // carries a cooldown, and the cooldown band (5-12s) is the longest of the
+    // five classes because Tank abilities are the most survivability-dense —
+    // the invulnerability audit leans on cooldown LENGTH as its primary guard,
+    // so shortening one of these numbers is a safety change, not a feel change.
+    // ------------------------------------------------------------------
+
+    // T1 Rend — §2 row T1: 25 Grit, 6s. STARTER (Leech).
+    UBreakerAbilityDefinition* Rend = MakeFallback(TEXT("FallbackAbility_Tank_Rend"));
+    Rend->AbilityId = TEXT("Tank.Rend");
+    Rend->ClassId = EBreakerClassId::Tank;
+    Rend->DisplayName = FText::FromString(TEXT("Rend"));
+    Rend->Description = FText::FromString(TEXT("Melee sweep that heals for a portion of the damage dealt; overheal becomes shield."));
+    Rend->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Rend->AbilityTag = Ability_Class_Tank_Rend;
+    Rend->CooldownTag = Cooldown_Class_Tank_Rend;
+    Rend->ResourceCost = 25.0f;
+    Rend->CooldownSeconds = 6.0f;
+    Registry.Add(Rend);
+
+    // T2 Bloodline — §2 row T2: 40 Grit, 12s, 8s window.
+    UBreakerAbilityDefinition* Bloodline = MakeFallback(TEXT("FallbackAbility_Tank_Bloodline"));
+    Bloodline->AbilityId = TEXT("Tank.Bloodline");
+    Bloodline->ClassId = EBreakerClassId::Tank;
+    Bloodline->DisplayName = FText::FromString(TEXT("Bloodline"));
+    Bloodline->Description = FText::FromString(TEXT("Doubles your Life on Hit and extends it to damage-over-time ticks. Multiplies what you have; grants nothing if you have none."));
+    Bloodline->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Bloodline->AbilityTag = Ability_Class_Tank_Bloodline;
+    Bloodline->CooldownTag = Cooldown_Class_Tank_Bloodline;
+    Bloodline->ResourceCost = 40.0f;
+    Bloodline->CooldownSeconds = 12.0f;
+    Bloodline->WindowDuration = 8.0f;
+    Registry.Add(Bloodline);
+
+    // T3 Anchor Point — §2 row T3: 30 Grit, 10s, 12s lifetime. STARTER (Bastion).
+    UBreakerAbilityDefinition* AnchorPoint = MakeFallback(TEXT("FallbackAbility_Tank_AnchorPoint"));
+    AnchorPoint->AbilityId = TEXT("Tank.AnchorPoint");
+    AnchorPoint->ClassId = EBreakerClassId::Tank;
+    AnchorPoint->DisplayName = FText::FromString(TEXT("Anchor Point"));
+    AnchorPoint->Description = FText::FromString(TEXT("A frontal cover panel with its own health. Blocks enemy fire; you and allies shoot through it from behind."));
+    AnchorPoint->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    AnchorPoint->AbilityTag = Ability_Class_Tank_AnchorPoint;
+    AnchorPoint->CooldownTag = Cooldown_Class_Tank_AnchorPoint;
+    AnchorPoint->ResourceCost = 30.0f;
+    AnchorPoint->CooldownSeconds = 10.0f;
+    AnchorPoint->WindowDuration = 12.0f;
+    Registry.Add(AnchorPoint);
+
+    // T4 Provoke — §2 row T4: 35 Grit, 12s, 4s forced-target window.
+    UBreakerAbilityDefinition* Provoke = MakeFallback(TEXT("FallbackAbility_Tank_Provoke"));
+    Provoke->AbilityId = TEXT("Tank.Provoke");
+    Provoke->ClassId = EBreakerClassId::Tank;
+    Provoke->DisplayName = FText::FromString(TEXT("Provoke"));
+    Provoke->Description = FText::FromString(TEXT("Forces nearby enemies to target you, and each one provoked adds flat damage to your next seconds."));
+    Provoke->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Provoke->AbilityTag = Ability_Class_Tank_Provoke;
+    Provoke->CooldownTag = Cooldown_Class_Tank_Provoke;
+    Provoke->ResourceCost = 35.0f;
+    Provoke->CooldownSeconds = 12.0f;
+    Provoke->WindowDuration = 4.0f;
+    Registry.Add(Provoke);
+
+    // T5 Breach Charge — §2 row T5: 30 Grit, 8s.
+    UBreakerAbilityDefinition* BreachCharge = MakeFallback(TEXT("FallbackAbility_Tank_BreachCharge"));
+    BreachCharge->AbilityId = TEXT("Tank.BreachCharge");
+    BreachCharge->ClassId = EBreakerClassId::Tank;
+    BreachCharge->DisplayName = FText::FromString(TEXT("Breach Charge"));
+    BreachCharge->Description = FText::FromString(TEXT("Thrown explosive with a short fuse. Full control of the self-knockback; the self-damage is reduced and never zero."));
+    BreachCharge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    BreachCharge->AbilityTag = Ability_Class_Tank_BreachCharge;
+    BreachCharge->CooldownTag = Cooldown_Class_Tank_BreachCharge;
+    BreachCharge->ResourceCost = 30.0f;
+    BreachCharge->CooldownSeconds = 8.0f;
+    Registry.Add(BreachCharge);
+
+    // T6 Ground Zero — §2 row T6: 45 Grit, 10s.
+    UBreakerAbilityDefinition* GroundZero = MakeFallback(TEXT("FallbackAbility_Tank_GroundZero"));
+    GroundZero->AbilityId = TEXT("Tank.GroundZero");
+    GroundZero->ClassId = EBreakerClassId::Tank;
+    GroundZero->DisplayName = FText::FromString(TEXT("Ground Zero"));
+    GroundZero->Description = FText::FromString(TEXT("Airborne slam that staggers, scaling with how far you fell. A normal jump is enough."));
+    GroundZero->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    GroundZero->AbilityTag = Ability_Class_Tank_GroundZero;
+    GroundZero->CooldownTag = Cooldown_Class_Tank_GroundZero;
+    GroundZero->ResourceCost = 45.0f;
+    GroundZero->CooldownSeconds = 10.0f;
+    Registry.Add(GroundZero);
+
+    // HOLD — §2.1 ultimate: 100 Grit (full bar), no cooldown, 10s base window.
+    UBreakerAbilityDefinition* Hold = MakeFallback(TEXT("FallbackAbility_Tank_Hold"));
+    Hold->AbilityId = TEXT("Tank.Hold");
+    Hold->ClassId = EBreakerClassId::Tank;
+    Hold->DisplayName = FText::FromString(TEXT("Hold"));
+    Hold->Description = FText::FromString(TEXT("Caps the damage any single hit can do to you, and triples Grit generation for the duration."));
+    Hold->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Hold->AbilityTag = Ability_Class_Tank_Hold;
+    Hold->ResourceCost = 100.0f;
+    Hold->CooldownSeconds = 0.0f;
+    Hold->WindowDuration = 10.0f;
+    {
+        // A PER-HIT CAP IS NOT DAMAGE REDUCTION, and the struct has no field for
+        // one. That is the right outcome rather than a gap to paper over: the
+        // cap is a `min` composed against other caps, never a product, and
+        // expressing it as a multiplier here is precisely the bug the audit's
+        // third guard exists to prevent. All four rows therefore carry the
+        // window and nothing else, and the cap lands as a named C++ branch on a
+        // hook that does not exist yet.
+        FBreakerAbilityVariant BaseRow;
+        BaseRow.VariantName = FText::FromString(TEXT("Hold"));
+        BaseRow.WindowDuration = 10.0f;
+        Hold->Variants.Add(BaseRow);
+
+        // Vein — the cap is REMOVED and incoming damage instead converts to
+        // healing at a reduced rate: a damped attrition window, explicitly not
+        // immunity. A Tank inside Vein still dies to enough incoming damage,
+        // and that is the guard rather than a caveat.
+        FBreakerAbilityVariant Vein;
+        Vein.KeystoneTag = Keystone_Tank_Vein;
+        Vein.VariantName = FText::FromString(TEXT("Hold - Vein"));
+        Vein.WindowDuration = 10.0f;
+        Hold->Variants.Add(Vein);
+
+        // Wall — the cap extends to nearby allies, and SOLO it is twice as
+        // effective on the Tank. Party and solo are two different good outcomes
+        // rather than a party bonus with a solo penalty, which is what the
+        // party branch owing the strongest solo conversion actually means.
+        FBreakerAbilityVariant Wall;
+        Wall.KeystoneTag = Keystone_Tank_Wall;
+        Wall.VariantName = FText::FromString(TEXT("Hold - Wall"));
+        Wall.WindowDuration = 10.0f;
+        Hold->Variants.Add(Wall);
+
+        // Detonation — ends early on command, releasing the absorbed damage as
+        // a radial blast. The only ability in the game needing a second input
+        // binding, and the one place the class exempts itself from its own
+        // self-damage: the exemption is on the ultimate, not on a repeatable
+        // ability, so the rocket case O13 governs is untouched.
+        FBreakerAbilityVariant Detonation;
+        Detonation.KeystoneTag = Keystone_Tank_Detonation;
+        Detonation.VariantName = FText::FromString(TEXT("Hold - Detonation"));
+        Detonation.WindowDuration = 10.0f;
+        Hold->Variants.Add(Detonation);
+    }
+    Registry.Add(Hold);
+
+    // ------------------------------------------------------------------
+    // SUPPORT — Charge. Costs and cooldowns quoted from
+    // Docs/Design/Class-Kits-Support.md §3. Costs run 20-40 and cooldowns 5-10s.
+    // Mark is deliberately the cheapest and shortest: it is the loop's ignition,
+    // and a loop whose ignition is expensive stalls at low Charge. Suppress is
+    // the most expensive because it is the only ability with no generation
+    // attached to it.
+    // ------------------------------------------------------------------
+
+    // U1 Patch — §3 row U1: 25 Charge, 6s. STARTER (Medic).
+    UBreakerAbilityDefinition* Patch = MakeFallback(TEXT("FallbackAbility_Support_Patch"));
+    Patch->AbilityId = TEXT("Support.Patch");
+    Patch->ClassId = EBreakerClassId::Support;
+    Patch->DisplayName = FText::FromString(TEXT("Patch"));
+    Patch->Description = FText::FromString(TEXT("Heals the ally under your crosshair, or yourself with no target. The self-cast is worth exactly the same."));
+    Patch->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Patch->AbilityTag = Ability_Class_Support_Patch;
+    Patch->CooldownTag = Cooldown_Class_Support_Patch;
+    Patch->ResourceCost = 25.0f;
+    Patch->CooldownSeconds = 6.0f;
+    Registry.Add(Patch);
+
+    // U2 Purge — §3 row U2: 30 Charge, 10s, 3s status immunity.
+    UBreakerAbilityDefinition* Purge = MakeFallback(TEXT("FallbackAbility_Support_Purge"));
+    Purge->AbilityId = TEXT("Support.Purge");
+    Purge->ClassId = EBreakerClassId::Support;
+    Purge->DisplayName = FText::FromString(TEXT("Purge"));
+    Purge->Description = FText::FromString(TEXT("Strips every status from the target and makes them immune to more for a moment. Self-castable."));
+    Purge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Purge->AbilityTag = Ability_Class_Support_Purge;
+    Purge->CooldownTag = Cooldown_Class_Support_Purge;
+    Purge->ResourceCost = 30.0f;
+    Purge->CooldownSeconds = 10.0f;
+    Purge->WindowDuration = 3.0f;   // the immunity window, which is the whole value
+    Registry.Add(Purge);
+
+    // U3 Cadence — §3 row U3: 30 Charge, 8s, 8s aura.
+    UBreakerAbilityDefinition* Cadence = MakeFallback(TEXT("FallbackAbility_Support_Cadence"));
+    Cadence->AbilityId = TEXT("Support.Cadence");
+    Cadence->ClassId = EBreakerClassId::Support;
+    Cadence->DisplayName = FText::FromString(TEXT("Cadence"));
+    Cadence->Description = FText::FromString(TEXT("An aura that follows you, improving reload and swap tempo for everyone inside it — starting with you."));
+    Cadence->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Cadence->AbilityTag = Ability_Class_Support_Cadence;
+    Cadence->CooldownTag = Cooldown_Class_Support_Cadence;
+    Cadence->ResourceCost = 30.0f;
+    Cadence->CooldownSeconds = 8.0f;
+    Cadence->WindowDuration = 8.0f;
+    Registry.Add(Cadence);
+
+    // U4 Metronome — §3 row U4: 35 Charge, 9s, 8s state.
+    UBreakerAbilityDefinition* Metronome = MakeFallback(TEXT("FallbackAbility_Support_Metronome"));
+    Metronome->AbilityId = TEXT("Support.Metronome");
+    Metronome->ClassId = EBreakerClassId::Support;
+    Metronome->DisplayName = FText::FromString(TEXT("Metronome"));
+    Metronome->Description = FText::FromString(TEXT("Consecutive hits by anyone you have buffed build a cadence ramp. Each holder builds their own."));
+    Metronome->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Metronome->AbilityTag = Ability_Class_Support_Metronome;
+    Metronome->CooldownTag = Cooldown_Class_Support_Metronome;
+    Metronome->ResourceCost = 35.0f;
+    Metronome->CooldownSeconds = 9.0f;
+    Metronome->WindowDuration = 8.0f;
+    Registry.Add(Metronome);
+
+    // U5 Mark — §3 row U5: 20 Charge, 5s, 10s mark. STARTER (Warden).
+    UBreakerAbilityDefinition* Mark = MakeFallback(TEXT("FallbackAbility_Support_Mark"));
+    Mark->AbilityId = TEXT("Support.Mark");
+    Mark->ClassId = EBreakerClassId::Support;
+    Mark->DisplayName = FText::FromString(TEXT("Mark"));
+    Mark->Description = FText::FromString(TEXT("Paints a target: it takes more damage from everyone, and the damage you do to it pays you Charge."));
+    Mark->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Mark->AbilityTag = Ability_Class_Support_Mark;
+    Mark->CooldownTag = Cooldown_Class_Support_Mark;
+    Mark->ResourceCost = 20.0f;
+    Mark->CooldownSeconds = 5.0f;
+    Mark->WindowDuration = 10.0f;
+    Registry.Add(Mark);
+
+    // U6 Suppress — §3 row U6: 40 Charge, 10s, 6s zone.
+    UBreakerAbilityDefinition* Suppress = MakeFallback(TEXT("FallbackAbility_Support_Suppress"));
+    Suppress->AbilityId = TEXT("Support.Suppress");
+    Suppress->ClassId = EBreakerClassId::Support;
+    Suppress->DisplayName = FText::FromString(TEXT("Suppress"));
+    Suppress->Description = FText::FromString(TEXT("A zone that slows enemies and spoils their aim. It deals no damage at all."));
+    Suppress->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Suppress->AbilityTag = Ability_Class_Support_Suppress;
+    Suppress->CooldownTag = Cooldown_Class_Support_Suppress;
+    Suppress->ResourceCost = 40.0f;
+    Suppress->CooldownSeconds = 10.0f;
+    Suppress->WindowDuration = 6.0f;
+    Registry.Add(Suppress);
+
+    // CONDUIT — §3.1 ultimate: 100 Charge (full bar), no cooldown, 12s base.
+    UBreakerAbilityDefinition* Conduit = MakeFallback(TEXT("FallbackAbility_Support_Conduit"));
+    Conduit->AbilityId = TEXT("Support.Conduit");
+    Conduit->ClassId = EBreakerClassId::Support;
+    Conduit->DisplayName = FText::FromString(TEXT("Conduit"));
+    Conduit->Description = FText::FromString(TEXT("For the duration your abilities cost nothing and reach every valid target near you — always including yourself."));
+    Conduit->SlotAffinity = EBreakerAbilitySlot::Ultimate;
+    Conduit->AbilityTag = Ability_Class_Support_Conduit;
+    Conduit->ResourceCost = 100.0f;
+    Conduit->CooldownSeconds = 0.0f;
+    Conduit->WindowDuration = 12.0f;
+    {
+        // THE ONE ULTIMATE OF THE THREE WHOSE KEYSTONES DIFFER PARAMETRICALLY,
+        // and the difference is real rather than cosmetic: two of the three
+        // rewrites STOP the free-cast window, because they replace casting
+        // rather than enabling it. That is exactly what AbilityCostMultiplier
+        // exists to say (Caster's Unmake authors 0.0 and 0.5 through the same
+        // field), so these rows carry behaviour and not just identity.
+        //
+        // Base — free casts, breadth not spam: cooldowns still apply, so the
+        // window removes the cost gate and not the cadence gate. Generation
+        // deliberately CONTINUES, which partially refunds the ultimate and,
+        // bounded by those cooldowns, cannot fully refund it.
+        FBreakerAbilityVariant BaseRow;
+        BaseRow.VariantName = FText::FromString(TEXT("Conduit"));
+        BaseRow.WindowDuration = 12.0f;
+        BaseRow.AbilityCostMultiplier = 0.0f;
+        Conduit->Variants.Add(BaseRow);
+
+        // Triage — becomes a continuous healing field with one lethal-hit save
+        // per target, and STOPS enabling free casts. Hence 1.0, not 0.0: the
+        // defensive ultimate buys a field, not a spending spree, and authoring
+        // 0.0 here would quietly hand it both.
+        FBreakerAbilityVariant Triage;
+        Triage.KeystoneTag = Keystone_Support_Triage;
+        Triage.VariantName = FText::FromString(TEXT("Conduit - Triage"));
+        Triage.WindowDuration = 12.0f;
+        Triage.AbilityCostMultiplier = 1.0f;
+        Conduit->Variants.Add(Triage);
+
+        // Downbeat — keeps the free casts and doubles the cadence effects,
+        // adding flat weapon damage for every buffed target. Flat is
+        // load-bearing: it enters the flat-sum stage before the additive
+        // Increased bucket and therefore cannot double-dip with gear.
+        FBreakerAbilityVariant Downbeat;
+        Downbeat.KeystoneTag = Keystone_Support_Downbeat;
+        Downbeat.VariantName = FText::FromString(TEXT("Conduit - Downbeat"));
+        Downbeat.WindowDuration = 12.0f;
+        Downbeat.AbilityCostMultiplier = 0.0f;
+        Conduit->Variants.Add(Downbeat);
+
+        // Blackout — marks and suppresses every enemy in radius INSTEAD of
+        // casting abilities, so the free-cast discount is meaningless and is
+        // not authored. The control ultimate, and the one that turns a full bar
+        // straight into damage.
+        FBreakerAbilityVariant Blackout;
+        Blackout.KeystoneTag = Keystone_Support_Blackout;
+        Blackout.VariantName = FText::FromString(TEXT("Conduit - Blackout"));
+        Blackout.WindowDuration = 12.0f;
+        Blackout.AbilityCostMultiplier = 1.0f;
+        Conduit->Variants.Add(Blackout);
+    }
+    Registry.Add(Conduit);
+
     return Registry;
 }
 
@@ -355,6 +929,23 @@ bool UBreakerAbilityDefinition::ClassGrantsAbility(EBreakerClassId ClassId, FNam
     if (ClassId == EBreakerClassId::None || AbilityId.IsNone()) return false;
     const UBreakerAbilityDefinition* Definition = FindFallback(AbilityId);
     return Definition && Definition->ClassId == ClassId;
+}
+
+bool UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId ClassId)
+{
+    if (ClassId == EBreakerClassId::None) return false;
+    // ONE implemented ability is enough to say a kit exists — the same
+    // any-of shape the class screen's own gate uses — because the question is
+    // whether locking into this class grants a player anything that runs, not
+    // whether the kit is finished. Deliberately does NOT consult
+    // GetFallbackClassDefinition: that is the progression layer's separate
+    // gate on the same decision, and two independent answers to "is this class
+    // real" is how the Caster null-definition bug stayed invisible.
+    for (const UBreakerAbilityDefinition* Definition : GetFallbackRegistry())
+    {
+        if (Definition && Definition->ClassId == ClassId && Definition->IsImplemented()) return true;
+    }
+    return false;
 }
 
 FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId, EBreakerAbilitySlot Slot)

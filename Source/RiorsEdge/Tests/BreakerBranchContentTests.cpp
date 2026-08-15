@@ -14,6 +14,11 @@
 // ELEMENTS constellation, whose empty roster is why the Core board drew it as a
 // sealed placeholder.
 //
+// EXTENDED for Swift's TIER-4 rewrite tier (Class-Kits §1.3-1.5, F9-F11 /
+// K9-K11 / M9-M11), which the slice dropped entirely. The Frenzy test's shape
+// pins were re-set to include it rather than relaxed, and the More-ceiling test
+// gained a block proving the nine new nodes add no More multiplier.
+//
 // The bar these tests hold is the one the project learned the hard way: a node
 // must be PURCHASABLE, its effect must actually LAND somewhere gameplay reads,
 // and a respec must give back exactly what it took. A node that only publishes
@@ -66,21 +71,32 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Frenzy is a Swift class-point branch"), Frenzy->Currency, EBreakerPointCurrency::ClassPoints);
     TestEqual(TEXT("Frenzy belongs to Swift"), Frenzy->RequiredClass, EBreakerClassId::Swift);
 
-    // Class-Kits §1.3 shape: three entry nodes, four loop nodes, two ability-tier
-    // nodes and one keystone, matching Kinetic and Marksman rather than the
-    // document's five-tier full-branch shape (the slice is tiers 1-3, §7).
-    int32 TierCounts[4] = {};
+    // FRENZY'S SHAPE, RE-PINNED DELIBERATELY (was {3, 4, 3} across tiers 1-3,
+    // with tier 4 asserted not to exist).
+    //
+    // The old counts pinned a branch that stopped at tier 3 because the slice
+    // dropped every Tier-4 rewrite node in Class-Kits §1.3 — F9 Second Wind,
+    // F10 Redline Trigger, F11 No Safety. All three are now authored, so the
+    // shape is {3, 4, 3, 3}: three entry nodes, four loop nodes, three
+    // ability-tier nodes INCLUDING the keystone (which the slice sites at tier
+    // 3, not §0.2's tier 5), and three rewrites. The pin caught this change
+    // because it was supposed to; it is re-set, not deleted, and the tier-4
+    // count below is a new pin of the same kind guarding the new content.
+    int32 TierCounts[5] = {};
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
-        if (!TestTrue(TEXT("Frenzy node is tier 1-3"), Node->Tier >= 1 && Node->Tier <= 3)) continue;
+        if (!TestTrue(TEXT("Frenzy node is tier 1-4"), Node->Tier >= 1 && Node->Tier <= 4)) continue;
         ++TierCounts[Node->Tier];
     }
     TestEqual(TEXT("Frenzy has three tier-1 entry nodes"), TierCounts[1], 3);
     TestEqual(TEXT("Frenzy has four tier-2 loop nodes"), TierCounts[2], 4);
     TestEqual(TEXT("Frenzy has three tier-3 nodes"), TierCounts[3], 3);
+    TestEqual(TEXT("Frenzy has three tier-4 rewrite nodes (F9-F11)"), TierCounts[4], 3);
 
     // Cost and rank curve must match the two branches already shipped, or the
-    // board teaches the player two different grammars.
+    // board teaches the player two different grammars. Tier 3 and tier 4 share
+    // one rule here — single rank, 2 or 3 points — because §0.2 prices tier-4
+    // rewrites at 2 and the slice's keystones at 3.
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
         const FString Context = Node->NodeId.ToString();
@@ -91,11 +107,38 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
         }
         else
         {
-            TestEqual(*(Context + TEXT(" tier-3 node is single rank")), Node->MaxRank, 1);
-            TestTrue(*(Context + TEXT(" tier-3 node costs 2 or 3")), Node->CostPerRank == 2 || Node->CostPerRank == 3);
+            TestEqual(*(Context + TEXT(" tier-3/4 node is single rank")), Node->MaxRank, 1);
+            TestTrue(*(Context + TEXT(" tier-3/4 node costs 2 or 3")), Node->CostPerRank == 2 || Node->CostPerRank == 3);
         }
         // O27: no node may be purely decorative.
         TestTrue(*(Context + TEXT(" grants an effect or a tag")), Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0);
+    }
+
+    // The three rewrites are named individually, because a count alone would
+    // pass if some future pass swapped one identity for another.
+    for (const FName RewriteId : {FName(TEXT("Swift.Frenzy.SecondWind")),
+        FName(TEXT("Swift.Frenzy.RedlineTrigger")), FName(TEXT("Swift.Frenzy.NoSafety"))})
+    {
+        const UBreakerProgressionNode* Rewrite = Frenzy->FindNode(RewriteId);
+        if (!TestNotNull(*(RewriteId.ToString() + TEXT(" is authored")), Rewrite)) continue;
+        TestEqual(*(RewriteId.ToString() + TEXT(" sits at tier 4")), Rewrite->Tier, 4);
+        // O30: every one of these is an ability / Momentum-loop / affix-rule
+        // rewrite, and EBreakerBuildCondition is movement-only, so each ships
+        // as a rule tag awaiting a named consumer and authors no stat effect.
+        // If that changes, this fails and somebody has to explain the number.
+        TestEqual(*(RewriteId.ToString() + TEXT(" is a rule tag, not a stat line")), Rewrite->Effects.Num(), 0);
+        TestTrue(*(RewriteId.ToString() + TEXT(" publishes its rule tag")), Rewrite->GrantedTags.Num() > 0);
+        // Every prerequisite resolves inside this tree, so a rewrite can never
+        // be stranded behind a node in a branch the player did not buy (O15
+        // keeps ordinary nodes freely mixable, but a DANGLING prerequisite
+        // would be unpurchasable outright).
+        TestTrue(*(RewriteId.ToString() + TEXT(" builds on an earlier node")), Rewrite->Prerequisites.Num() > 0);
+        for (const FBreakerNodePrerequisite& Prerequisite : Rewrite->Prerequisites)
+        {
+            const UBreakerProgressionNode* Required = Frenzy->FindNode(Prerequisite.NodeId);
+            if (!TestNotNull(*(RewriteId.ToString() + TEXT(" prerequisite resolves inside Frenzy")), Required)) continue;
+            TestTrue(*(RewriteId.ToString() + TEXT(" prerequisite sits at or below tier 4")), Required->Tier <= 4);
+        }
     }
 
     // --- Every node is purchasable, and the effects land -------------------
@@ -107,7 +150,8 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     Progression->IncreasedDamagePerSpentPoint = 0.0f;
     Progression->BindAttributes(Attributes);
     Progression->ApplySliceDefaultsIfFresh();
-    // A full Frenzy branch is 21 class points; the slice grant is 10.
+    // A full Frenzy branch is 27 class points (was 21, before F9-F11 added
+    // three single-rank nodes at 2 points each); the slice grant is 10.
     Progression->GrantPlaytestPoints(40, 0);
 
     const float BaseHealth = Attributes->GetMaxHealth();
@@ -149,6 +193,28 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Nothing conditional is live while standing still"), Stats.ActiveConditionalDamagePercent, 0.0f, 0.0001f);
     TestEqual(TEXT("Redline is worth 46% increased damage to a full Frenzy"), Stats.PotentialConditionalDamagePercent, 46.0f, 0.0001f);
 
+    // THE TIER-4 PINS ABOVE ARE ABOUT SHAPE; THESE TWO ARE ABOUT POWER.
+    //
+    // Both damage equalities immediately above are UNCHANGED by F9-F11, and
+    // that is the assertion, not an accident of the diff. Nine new nodes across
+    // Swift moved the branch's damage output by exactly zero, because every one
+    // of them is a rule rewrite waiting on a consumer. If a later pass gives a
+    // tier-4 node a stat line, those two equalities fail first and loudest —
+    // which is the correct place for that conversation to happen.
+    //
+    // The three rewrites publish their rules, so a consumer that learns to read
+    // them finds them there.
+    TestTrue(TEXT("Second Wind publishes its rule tag"), Stats.GrantedTags.HasTag(BreakerNodeTags::Node_SecondWind.GetTag()));
+    TestTrue(TEXT("Redline Trigger publishes its rule tag"), Stats.GrantedTags.HasTag(BreakerNodeTags::Node_RedlineTrigger.GetTag()));
+    TestTrue(TEXT("No Safety publishes its rule tag"), Stats.GrantedTags.HasTag(BreakerNodeTags::Node_NoSafety.GetTag()));
+    // WHAT THIS DOES NOT COVER, STATED PLAINLY. Nothing above proves those
+    // three rules DO anything: no Momentum component, no Damage Ramp affix and
+    // no Cadence Break ability exists in this fixture (the suite constructs no
+    // UWorld at all), so the tags are asserted to be PUBLISHED and nothing
+    // more. The same limitation the Caster branch tests carry, for the same
+    // reason. A tag with no consumer is inert by design here and is only a bug
+    // once its consumer ships and does not read it.
+    //
     // The keystone publishes the tag Overdrive's variant table already keys on,
     // so owning Bloodrhythm really does rewrite the ultimate.
     TestTrue(TEXT("Bloodrhythm publishes its keystone tag"),
@@ -270,10 +336,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
 {
-    // O3 is a hard cap of three composed More multipliers per BUILD. Frenzy adds
-    // a fifth More option to the content, which is the shape O27 asks for — more
-    // options than the cap, so which three you hold is a decision — but the cap
-    // itself must not move.
+    // O3 is a hard cap of three composed More multipliers per BUILD. The content
+    // carries SEVEN More options against that cap, which is the shape O27 asks
+    // for — more options than the cap, so which three you hold is a decision —
+    // but the cap itself must not move, and no content pass may add an eighth
+    // without an owner ruling. The tier-4 block at the end of this test is the
+    // guard added when Swift's rewrite tier landed.
     TArray<const UBreakerProgressionNode*> Nodes;
     for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
     {
@@ -314,6 +382,41 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     const FBreakerNodeStats Live = UBreakerProgressionComponent::AggregateStats(
         Nodes, RedlineOnly, nullptr, FBreakerBuildConditionState::All());
     TestEqual(TEXT("A Redline More pays x1.20 at Redline"), Live.DamageMoreMultiplier, 1.20f, 0.0001f);
+
+    // --- The ceiling against the TIER-4 REWRITES (F9-F11, K9-K11, M9-M11) ---
+    //
+    // A tier-4 rewrite node is exactly where a fourth More is tempting: it is
+    // the branch's most dramatic node and it is not the keystone, so O3's
+    // "one per branch keystone" rule is easy to forget. None of the nine
+    // authors one, and this is the guard that keeps it that way — a build that
+    // owns EVERY More in the content plus EVERY Swift tier-4 node must compose
+    // to precisely the same product as the same build without them.
+    TArray<FBreakerNodeRank> WithRewrites = Ranks;
+    for (const TCHAR* RewriteId : {TEXT("Swift.Frenzy.SecondWind"), TEXT("Swift.Frenzy.RedlineTrigger"), TEXT("Swift.Frenzy.NoSafety"),
+        TEXT("Swift.Kinetic.MomentumShield"), TEXT("Swift.Kinetic.SpendToLive"), TEXT("Swift.Kinetic.NoGround"),
+        TEXT("Swift.Marksman.Reserve"), TEXT("Swift.Marksman.Overpenetration"), TEXT("Swift.Marksman.CalledShot")})
+    {
+        WithRewrites.Add({FName(RewriteId), 1});
+    }
+    const FBreakerNodeStats Rewritten = UBreakerProgressionComponent::AggregateStats(
+        Nodes, WithRewrites, nullptr, FBreakerBuildConditionState::All());
+    TestEqual(TEXT("The nine tier-4 rewrites add no More source"), Rewritten.DamageMoreSourceCount, Stats.DamageMoreSourceCount);
+    TestEqual(TEXT("The nine tier-4 rewrites do not move the composed More product"),
+        Rewritten.DamageMoreMultiplier, Stats.DamageMoreMultiplier, 0.0001f);
+    // Restated absolutely rather than relatively, so this still means something
+    // if the baseline above is ever re-pinned: the worst case a single legal
+    // character can hold is 1.30 x 1.22 x 1.22 = 1.9349, against O3/O34's
+    // ceiling of 1.30^3 = 2.197. The Swift expansion did not touch either
+    // number, because Swift's three keystone Mores (1.20 / 1.20 / 1.18) are all
+    // smaller than the three Core Mores the aggregator keeps, and a character
+    // may hold only ONE keystone anyway.
+    TestTrue(TEXT("Worst case with the tier-4 content stays under the O3 ceiling"),
+        Rewritten.DamageMoreMultiplier <= AbsoluteCeiling + UE_KINDA_SMALL_NUMBER);
+    // WHAT THIS DOES NOT COVER: the aggregator is exercised with every
+    // condition forced true at once, which no real character can hold — it is
+    // an upper bound, not a reachable state. It also says nothing about
+    // Anomalous items, the other More source outside the class layer, which
+    // this pass did not touch.
     return true;
 }
 

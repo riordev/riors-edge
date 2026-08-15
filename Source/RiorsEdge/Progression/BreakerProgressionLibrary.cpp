@@ -44,6 +44,11 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SkimDiscipline, "Progression.Node.Swift.Kinetic.SkimDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_AirWork, "Progression.Node.Swift.Kinetic.AirWork");
 
+    // Kinetic TIER 4 — Class-Kits §1.4 K9-K11.
+    UE_DEFINE_GAMEPLAY_TAG(Node_MomentumShield, "Progression.Node.Swift.Kinetic.MomentumShield");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SpendToLive, "Progression.Node.Swift.Kinetic.SpendToLive");
+    UE_DEFINE_GAMEPLAY_TAG(Node_NoGround, "Progression.Node.Swift.Kinetic.NoGround");
+
     UE_DEFINE_GAMEPLAY_TAG(Node_LongLens, "Progression.Node.Swift.Marksman.LongLens");
     UE_DEFINE_GAMEPLAY_TAG(Node_Steady, "Progression.Node.Swift.Marksman.Steady");
     UE_DEFINE_GAMEPLAY_TAG(Node_Ledger, "Progression.Node.Swift.Marksman.Ledger");
@@ -52,6 +57,16 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_PierceDiscipline, "Progression.Node.Swift.Marksman.PierceDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Sightline, "Progression.Node.Swift.Marksman.Sightline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Lead, "Progression.Node.Swift.Marksman.Lead");
+
+    // Marksman TIER 4 — Class-Kits §1.5 M9-M11. M11's DISPLAY name, "Called
+    // Shot", collides with the Core Precision node of the same name and nothing
+    // else: separate node id, separate tag, separate currency. Same resolution
+    // as Frenzy's Trigger Discipline below — both names are transcribed from
+    // their design documents and renaming either to dodge the collision would
+    // put the code and the authority document out of step.
+    UE_DEFINE_GAMEPLAY_TAG(Node_Reserve, "Progression.Node.Swift.Marksman.Reserve");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Overpenetration, "Progression.Node.Swift.Marksman.Overpenetration");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MarksmanCalledShot, "Progression.Node.Swift.Marksman.CalledShot");
 
     UE_DEFINE_GAMEPLAY_TAG(Node_Downforce, "Progression.Node.Swift.Kinetic.Downforce");
     UE_DEFINE_GAMEPLAY_TAG(Node_Grind, "Progression.Node.Swift.Kinetic.Grind");
@@ -74,6 +89,11 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SlipcutMastery, "Progression.Node.Swift.Frenzy.SlipcutMastery");
     UE_DEFINE_GAMEPLAY_TAG(Node_AmmunitionEconomy, "Progression.Node.Swift.Frenzy.AmmunitionEconomy");
     UE_DEFINE_GAMEPLAY_TAG(Node_Bloodrhythm, "Progression.Node.Swift.Frenzy.Bloodrhythm");
+
+    // Frenzy TIER 4 — Class-Kits §1.3 F9-F11.
+    UE_DEFINE_GAMEPLAY_TAG(Node_SecondWind, "Progression.Node.Swift.Frenzy.SecondWind");
+    UE_DEFINE_GAMEPLAY_TAG(Node_RedlineTrigger, "Progression.Node.Swift.Frenzy.RedlineTrigger");
+    UE_DEFINE_GAMEPLAY_TAG(Node_NoSafety, "Progression.Node.Swift.Frenzy.NoSafety");
 
     UE_DEFINE_GAMEPLAY_TAG(Node_Conductive, "Progression.Node.Core.Conductive");
     UE_DEFINE_GAMEPLAY_TAG(Node_ChargeUp, "Progression.Node.Core.ChargeUp");
@@ -514,6 +534,58 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     return Tree;
 }
 
+// ---------------------------------------------------------------------------
+// SWIFT TIER 4 — THE REWRITE TIER, AUTHORED AS ONE PASS ACROSS ALL THREE
+// BRANCHES. Stated here once rather than nine times.
+//
+// Class-Kits §0.2 gives every branch a five-tier shape and §1.3-1.5 author the
+// Tier-4 rewrite trio for each Swift branch — F9-F11, K9-K11, M9-M11. The
+// shipped slice stopped at tier 3 and dropped all nine. They are authored here.
+// Caster's three branches were cut the same way and are NOT touched by this
+// pass; only Swift is expanded.
+//
+// EVERY ONE OF THE NINE SHIPS AS A GRANTED TAG AND NO STAT EFFECT. That is not
+// a shortfall to fix later, it is what the tier IS. Read the nine rows in
+// §1.3-1.5: "Cadence Break's bonus no longer resets on target swap", "Hard
+// Stop's window becomes full immunity, cost rises to 60", "Momentum does not
+// decay while ADS", "shots that kill continue with full remaining damage".
+// Every one is an ABILITY rewrite, a MOMENTUM-LOOP rewrite, or an AFFIX-rule
+// rewrite. Not one is a percentage, and §0.2's own rule — "no node in this
+// document is a flat percentage" — is loudest exactly here. There is no
+// EBreakerNodeStatTarget for Momentum decay, ability cost, incoming damage
+// reduction, ADS behaviour, or Damage Ramp stack rate, and O30 keeps
+// EBreakerBuildCondition movement-only so a combat / ammunition /
+// ability-state condition cannot be authored either. The precedent is the
+// whole Caster branch set added tonight and, before it, Swift's own Cadence
+// Break rule on Slipcut Mastery: carry the rule verbatim as a tag, name the
+// consumer it is waiting on, and author no number.
+//
+// WHY NO STAT HALF, given tiers 1-3 of Frenzy carry one. §1.3.1 authored a
+// stat half for each of TEN specific nodes and lists them in a table, because
+// a branch of pure tags is a branch a player can buy and cannot feel. A tier-3
+// branch had to pay for itself somehow. The tier-4 trio does not have that
+// problem: it sits on top of ten nodes that already pay, and inventing a
+// magnitude for it would be authoring balance under an O2 freeze on content
+// §1.3.1 does not record. Structure and identity here; numbers when the loops
+// that own them can read these tags.
+//
+// NO MORE MULTIPLIER IS AUTHORED IN THIS PASS. O3 confines a class-layer More
+// to a branch KEYSTONE, and all three Swift keystones already exist and are
+// already spent (Bloodrhythm x1.20 Redline, Overpressure x1.20 sliding,
+// Culling x1.18 unconditional). Swift's budget of three is full; a tier-4 More
+// would be a fourth. The composed worst case is unchanged by this pass.
+//
+// TIER NUMBER vs. GATE, A REAL INVERSION, RECORDED NOT PAPERED OVER. These
+// nodes carry Tier == 4, so GateForTier prices them at 6 points of branch
+// investment. The three shipped keystones carry Tier == 3 (gate 4) because the
+// slice compressed §0.2's five tiers into three. The consequence is that a
+// branch's keystone is now reachable EARLIER than its rewrites, which inverts
+// §0.2's ladder. Re-tiering the keystones to 5 would move authored gates and
+// costs under an O2 freeze and would break the commitment-gate investment
+// figures pinned in BreakerProgressionAuditTests; authoring the rewrites at
+// tier 3 would flatten the ladder entirely and hide the gap. So the honest
+// shape ships and the inversion is written down. Owner's to rule.
+// ---------------------------------------------------------------------------
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 {
     static UBreakerProgressionTree* Tree = nullptr;
@@ -592,6 +664,55 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 13.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Grind.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 4 (K9-K11), the rewrite tier -----------------------------------
+    // Kinetic's rewrites all move the same idea: the branch's airborne
+    // privileges start applying on the ground, and the branch's survival tool
+    // gets more expensive and more absolute. See the block comment above this
+    // function for why all three are tags with no stat line.
+
+    // K9. "Changes WHEN an existing stat applies, not its magnitude" is the
+    // design's own description, and it is precisely what no node effect can
+    // say: EBreakerNodeStatTarget has no incoming-damage-reduction entry at
+    // all (the node layer has never been able to author defence beyond flat
+    // Health), and the affix whose value it re-sites — Damage Reduction While
+    // Airborne — lives in the item layer, which a node may read but never
+    // duplicate (Class-Kits §6.4). WAITING ON: the damage-taken path learning
+    // to ask for this tag before it applies the airborne-only reduction.
+    Node = MakeNode(TEXT("Swift.Kinetic.MomentumShield"), TEXT("Momentum Shield"),
+        TEXT("At Redline, your Damage Reduction While Airborne applies with both feet on the ground."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.AirWork"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MomentumShield.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // K10. A cost-for-power rewrite of Hard Stop, which is itself not an
+    // ability but a rewrite of Skim consumed by UBreakerAbility_Skim::
+    // ShouldHardStop off the Skim Discipline tag — so this node is a rewrite
+    // OF a rewrite and the prerequisite below is load-bearing, not flavour.
+    // Both halves (immunity instead of reduction; 60 Momentum instead of 30)
+    // are ability-internal and have no node-stat expression. The
+    // invulnerability-loop risk the design flags is bounded by Hard Stop's own
+    // cooldown and raised cost, neither of which this node can state either.
+    // WAITING ON: UBreakerAbility_Skim reading this tag alongside the
+    // Skim Discipline one it already reads.
+    Node = MakeNode(TEXT("Swift.Kinetic.SpendToLive"), TEXT("Spend to Live"),
+        TEXT("Hard Stop's window becomes true immunity, and it costs twice the Momentum."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.SkimDiscipline"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SpendToLive.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // K11. Pure Momentum-loop rewrite with a real downside, the Kinetic twin
+    // of Frenzy's No Safety: airborne decay is removed outright and grounded
+    // decay is increased. Decay lives on UBreakerMomentumComponent and is not
+    // a node stat target in either direction, so neither half is authorable as
+    // an effect and authoring only the upside would ship a strictly-better
+    // node than designed. WAITING ON: the Momentum component reading this tag
+    // when it computes its decay rate.
+    Node = MakeNode(TEXT("Swift.Kinetic.NoGround"), TEXT("No Ground"),
+        TEXT("Momentum stops decaying the moment your feet leave the floor, and decays faster while they are on it."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoGround.GetTag());
     Tree->Nodes.Add(Node);
 
     // The branch keystone O3 permits. Sliding is the state Kinetic can hold
@@ -698,6 +819,52 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
     AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Deadeye.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 4 (M9-M11), the rewrite tier -----------------------------------
+    // Marksman is the branch that makes Momentum BANKABLE, and §1.5 is explicit
+    // that it "pays for that privilege with a Tier-4 node rather than getting
+    // it free" — so of the three branches, Marksman is the one whose identity
+    // was most damaged by the tier being dropped. Reserve is the node the
+    // branch description points at.
+
+    // M9. The stationary-Swift unlock. Momentum decay is a
+    // UBreakerMomentumComponent rule and ADS is a weapon state; neither is a
+    // node stat target, and the deliberate half-measure — the bar HOLDS while
+    // ADS but still does not GENERATE — is a distinction only the loop itself
+    // can draw. Authoring it as, say, Increased Damage while stationary would
+    // be a different node with a different fantasy. WAITING ON: the Momentum
+    // component reading this tag when it decides whether to decay.
+    Node = MakeNode(TEXT("Swift.Marksman.Reserve"), TEXT("Reserve"),
+        TEXT("Momentum stops decaying while you are aiming down sights. It still does not build there — this holds a bar, it does not fill one."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Reserve.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // M10. A projectile-behaviour rewrite: the shot keeps its FULL remaining
+    // damage through a kill instead of taking the Pierce falloff. The falloff
+    // is a weapon-layer curve, so "do not apply it" has no node-stat form —
+    // and expressing it as Increased Damage would be the affix-layer
+    // duplication §6.4 forbids, not to mention unconditional where the design
+    // is bounded by the Pierce cap. WAITING ON: the projectile path checking
+    // this tag before applying pierce falloff on a killing hit.
+    Node = MakeNode(TEXT("Swift.Marksman.Overpenetration"), TEXT("Overpenetration"),
+        TEXT("A shot that kills carries on at full damage instead of falling off, up to the pierce cap."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Overpenetration.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // M11. The one tier-4 node in the class whose CONDITION is expressible —
+    // Redline is a real EBreakerBuildCondition — and it still cannot be
+    // authored as an effect, because what the condition gates is a RANGE GATE
+    // ON AN ABILITY (Lead's 25 m drops to 10 m), not a magnitude. O30's rule
+    // bites from the other side here: a legal condition with nothing legal to
+    // condition. The prerequisite is Lead itself, since a node that rewrites
+    // Lead's rule with no Lead is a purchase that does nothing.
+    Node = MakeNode(TEXT("Swift.Marksman.CalledShot"), TEXT("Called Shot"),
+        TEXT("At Redline, Lead's range gate drops from 25 m to 10 m, so the mark pays at conversational distance."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Marksman.Lead"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarksmanCalledShot.GetTag());
     Tree->Nodes.Add(Node);
 
     // Marksman's branch keystone: the only unconditional More outside Core, and
@@ -820,6 +987,55 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AmmunitionEconomy.GetTag());
     Tree->Nodes.Add(Node);
 
+    // --- Tier 4 (F9-F11), the rewrite tier -----------------------------------
+    // Frenzy's rewrites are the branch saying its identity out loud: hold the
+    // rhythm through a target swap, convert Redline into cadence, and pay for
+    // cheap abilities with a bar that empties twice as fast. See the block
+    // comment above GetSwiftKineticTree for why all three are tags only.
+
+    // F9. A rewrite of Cadence Break's stacking rule. `Swift.CadenceBreak` is
+    // STILL not in the ability fallback registry — the same gap Slipcut
+    // Mastery records above — so this node rewrites an ability that does not
+    // exist yet, and its prerequisite is the node that will grant it the day
+    // it does. Deliberately authored anyway: the design's Frenzy is unreadable
+    // without its ability rewrite, and a tag waiting on a named consumer is
+    // the project's established way to say so. NO ability grant is added here
+    // for the same reason Slipcut Mastery carries none.
+    Node = MakeNode(TEXT("Swift.Frenzy.SecondWind"), TEXT("Second Wind"),
+        TEXT("Cadence Break's stack no longer breaks when you change targets. Only a full second without a hit resets it."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.SlipcutMastery"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SecondWind.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // F10. Reads an affix and changes its RULE — Damage Ramp's stacks accrue
+    // as though the weapon were a cadence tier faster — which §6.4 lists as
+    // compliant precisely because it adds no percentage. It is therefore
+    // un-authorable as an effect twice over: there is no stat target for a
+    // ramp's accrual rate, and inventing an Increased Damage line in its place
+    // would be the affix duplication that same section forbids. The Redline
+    // condition IS expressible; there is simply nothing legal to attach it to.
+    // WAITING ON: the Damage Ramp affix reading this tag when it accrues.
+    Node = MakeNode(TEXT("Swift.Frenzy.RedlineTrigger"), TEXT("Redline Trigger"),
+        TEXT("At Redline your weapon is treated as a cadence tier faster for Damage Ramp, so its stacks build twice as quickly."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineTrigger.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // F11. §1.3 calls this "the node that makes Frenzy read as a CLASS choice
+    // rather than a bonus", and both of its halves live on the Momentum loop:
+    // doubled decay and a 40% ability discount. Neither decay rate nor ability
+    // resource cost is a node stat target — Caster's whole branch set ran into
+    // the same wall from the cost side (there is no analogue of gear's
+    // Resource Cost Reduction on this enum) — and shipping only the discount
+    // would turn a node with a real downside into a pure upgrade, which is the
+    // exact inversion O2 exists to stop an agent making. WAITING ON: the
+    // Momentum component reading this tag for BOTH halves at once.
+    Node = MakeNode(TEXT("Swift.Frenzy.NoSafety"), TEXT("No Safety"),
+        TEXT("Abilities cost far less Momentum, and the bar drains twice as fast. A real downside, taken on purpose."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoSafety.GetTag());
+    Tree->Nodes.Add(Node);
+
     // The branch keystone O3 permits, and the only one of Swift's three that
     // ALSO rewrites the ultimate: `Keystone.Swift.Bloodrhythm` is already a row
     // in Overdrive's variant table, and the progression component now publishes
@@ -852,9 +1068,15 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
 // seven abilities (all granted as starters, per the O39 comment on
 // GetFallbackClassDefinition below) and the class-agnostic Core tree only.
 // This is the same content gap Frenzy was for Swift, and it is closed the
-// same way: tiers 1-3 only (the slice cut every Swift branch already uses,
-// §7), each branch's tier-4 rewrite trio dropped rather than authored, one
-// keystone per branch, and every magnitude an O2 PLACEHOLDER.
+// same way: tiers 1-3 only, each branch's tier-4 rewrite trio dropped rather
+// than authored, one keystone per branch, and every magnitude an O2
+// PLACEHOLDER.
+//
+// UPDATED: "the slice cut every Swift branch already uses" was true when this
+// was written and is not any more — Swift's nine Tier-4 rewrites (F9-F11,
+// K9-K11, M9-M11) have since been authored, so SB9-SB11 / VW9-VW11 /
+// MS9-MS11 are now the only branch content Class-Kits specifies and the
+// library omits. Recorded here rather than silently left reading as parity.
 //
 // THE ENUM GAP THIS BRANCH SET EXPOSES, STATED ONCE RATHER THAN PER NODE.
 // Swift's nodes are legible against EBreakerNodeStatTarget because Momentum

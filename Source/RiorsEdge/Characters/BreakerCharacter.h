@@ -260,6 +260,9 @@ private:
     // Enter/Space while a menu is open. Bound with bExecuteWhenPaused,
     // because the menu is only ever open while the game is paused.
     void ConfirmMenuKey();
+    // Forwards any key to the settings screen while a keybind row is
+    // listening. Inert otherwise - see SBreakerMenu::HandleRebindKey.
+    void MenuRebindKey(FKey Key);
     void ToggleInventoryMenu();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);

@@ -79,6 +79,10 @@ public:
     // it can bind BreakerTravelDestinations::Gym instead and get a compile
     // error if this registry ever renames it.
     static const FName GymDestinationId;
+    static const FName HubDestinationId;
+    // Which destination this point IS, so it does not offer to send the
+    // player where they already are. Set by whoever spawns it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FName ExcludedDestinationId;
 
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UCapsuleComponent> Body;
