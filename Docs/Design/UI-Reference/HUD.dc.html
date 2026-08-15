@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; padding:32px; font-family:Barlow,sans-serif; display:flex; flex-direction:column; gap:32px; align-items:center;">
+
+ <div style="width:1920px; display:flex; gap:16px; align-items:center;">
+   <div onClick="{{ toggleUlt }}" style="{{ ultBtn }}">{{ ultLabel }}</div>
+   <div onClick="{{ cycleMo }}" style="padding:10px 18px; border:1px solid #2A3E58; color:#9FB0C4; font-family:'Saira Condensed',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Momentum: {{ moName }}</div>
+   <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">1920×1080 · SAFE MARGIN 48PX · CLICK TO TEST STATES</div>
+ </div>
+
+ <div style="width:1920px; height:1080px; background:#0F1826; position:relative; overflow:hidden; border:1px solid #1F3047; flex-shrink:0;">
+
+  <svg width="1920" height="1080" style="position:absolute; inset:0;">
+    <defs>
+      <pattern id="vh" width="10" height="10" patternTransform="rotate(35)" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="10" stroke="#131E2E" stroke-width="5"></line>
+      </pattern>
+    </defs>
+    <rect width="1920" height="1080" fill="url(#vh)"></rect>
+    <text x="960" y="1010" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" letter-spacing="4" fill="#2A3E58">GAMEPLAY VIEW PLACEHOLDER</text>
+  </svg>
+
+  <div style="{{ ultFrameStyle }}"></div>
+  <sc-if value="{{ ultOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; left:0; right:0; top:0; height:120px; background:#B866FF; opacity:0.10;"></div>
+    <div style="position:absolute; left:0; right:0; bottom:0; height:120px; background:#B866FF; opacity:0.10;"></div>
+    <div style="position:absolute; left:50%; top:132px; margin-left:-130px; width:260px; border:1px solid #B866FF; background:#0A111C; padding:8px 0; text-align:center; font-family:'Saira Condensed',sans-serif; font-size:20px; text-transform:uppercase; letter-spacing:0.14em; color:#B866FF;">Overdrive active</div>
+  </sc-if>
+
+  <div style="position:absolute; left:50%; top:48px; margin-left:-260px; width:520px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+    <div style="background:#0A111C; border:1px solid #2A3E58; border-top:3px solid #FF8A3D; padding:10px 32px; display:flex; align-items:center; gap:20px;">
+      <div style="font-family:'Saira Condensed',sans-serif; font-size:28px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; line-height:1; color:#E6EDF5;">Wave 07</div>
+      <div style="width:1px; height:24px; background:#2A3E58;"></div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:16px; color:#FF8A3D;">14 HOSTILE</div>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:50%; top:50%; margin-left:-40px; margin-top:-40px; width:80px; height:80px;">
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#E6EDF5" stroke-width="2">
+      <path d="M40 22 L40 32"></path>
+      <path d="M40 48 L40 58"></path>
+      <path d="M22 40 L32 40"></path>
+      <path d="M48 40 L58 40"></path>
+      <circle cx="40" cy="40" r="1.5" fill="#E6EDF5" stroke="none"></circle>
+      <path d="M26 26 L32 32" stroke="#FFC64A"></path>
+      <path d="M54 26 L48 32" stroke="#FFC64A"></path>
+      <path d="M26 54 L32 48" stroke="#FFC64A"></path>
+      <path d="M54 54 L48 48" stroke="#FFC64A"></path>
+    </svg>
+  </div>
+
+  <div style="position:absolute; left:1080px; top:300px; display:flex; flex-direction:column; align-items:center; gap:4px;">
+    <div style="width:180px; height:8px; background:#0A111C; border:1px solid #2A3E58; display:flex; padding:1px; gap:1px;">
+      <div style="width:34%; background:#FF4040;"></div>
+      <div style="flex:1; background:#18263A;"></div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#9FB0C4;">HUSK REVENANT · LV 44</div>
+  </div>
+
+  <div style="position:absolute; left:1140px; top:200px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:64px; color:#FFC64A; -webkit-text-stroke:2px #14100A; letter-spacing:-0.02em;">1 842</div>
+  <div style="position:absolute; left:1290px; top:270px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:80px; color:#FF8A3D; -webkit-text-stroke:2px #16090A; letter-spacing:-0.03em;">3 204</div>
+  <div style="position:absolute; left:990px; top:250px; font-family:'JetBrains Mono',monospace; font-weight:500; font-size:40px; color:#DCE4EE; -webkit-text-stroke:2px #0A111C; letter-spacing:-0.01em;">612</div>
+  <div style="position:absolute; left:1240px; top:390px; font-family:'JetBrains Mono',monospace; font-weight:500; font-size:40px; color:#A8FBFF; -webkit-text-stroke:2px #08131A; letter-spacing:-0.01em;">744</div>
+
+  <div style="position:absolute; left:640px; top:640px; background:#0A111C; border:1px solid #26F2D9; border-left:3px solid #26F2D9; padding:8px 14px; display:flex; align-items:center; gap:12px;">
+    <div style="width:4px; height:28px; background:#26F2D9;"></div>
+    <div style="display:flex; flex-direction:column;">
+      <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#26F2D9; line-height:1.1;">Riftstep Greaves</div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ANOMALOUS · i68 · <span style="color:#E6EDF5;">F</span> TAKE</div>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:48px; bottom:48px; display:flex; flex-direction:column; gap:8px; width:360px;">
+    <div style="display:flex; gap:8px;">
+      <div style="background:#0A111C; border:1px solid #2A3E58; padding:4px 10px; display:flex; align-items:center; gap:6px;">
+        <div style="width:8px; height:8px; background:#FF8A3D;"></div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; color:#FF8A3D;">SCORCH 4.2</div>
+      </div>
+      <div style="background:#0A111C; border:1px solid #2A3E58; padding:4px 10px; display:flex; align-items:center; gap:6px;">
+        <div style="width:8px; height:8px; background:#B866FF;"></div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; color:#B866FF;">VOID MARK 2</div>
+      </div>
+    </div>
+    <div style="background:#0A111C; border:1px solid #2A3E58; border-left:3px solid #4FD8F5; padding:10px 14px; display:flex; flex-direction:column; gap:7px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="flex:1; height:11px; background:#18263A; padding:2px; display:flex;">
+          <div style="width:72%; background:#4FD8F5;"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px; color:#4FD8F5; width:84px; text-align:right;">806/1120</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="flex:1; height:8px; background:#18263A; padding:2px; display:flex;">
+          <div style="width:88%; background:#DCE4EE;"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:500; font-size:13px; color:#DCE4EE; width:84px; text-align:right;">2182/2480</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ARMOR</div>
+        <div style="display:flex; gap:3px;">
+          <div style="width:18px; height:5px; background:#FFC64A;"></div>
+          <div style="width:18px; height:5px; background:#FFC64A;"></div>
+          <div style="width:18px; height:5px; background:#18263A;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute; right:48px; bottom:48px; width:440px; background:#0A111C; border:1px solid #2A3E58; border-left:3px solid #FF8A3D; padding:12px; display:flex; flex-direction:column; gap:10px;">
+
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:{{ moColor }};">MOMENTUM</div>
+      <div style="font-family:'Saira Condensed',sans-serif; font-size:17px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:{{ moColor }}; line-height:1;">{{ moName }}</div>
+      <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:13px; color:#63768C;">{{ moSpeed }} M/S</div>
+    </div>
+    <div style="height:12px; background:#18263A; border:1px solid #2A3E58; display:flex; padding:2px; gap:2px; position:relative;">
+      <div style="{{ moFillStyle }}"></div>
+      <div style="position:absolute; left:33%; top:0; bottom:0; width:2px; background:#0F1826;"></div>
+      <div style="position:absolute; left:66%; top:0; bottom:0; width:2px; background:#0F1826;"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#3E4C5E;">
+      <div style="color:{{ segSettled }};">SETTLED</div>
+      <div style="color:{{ segRunning }};">RUNNING</div>
+      <div style="color:{{ segRedline }};">REDLINE</div>
+    </div>
+
+    <div style="display:flex; gap:12px; align-items:flex-end; border-top:1px solid #2A3E58; padding-top:12px;">
+      <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+        <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FF4040; line-height:1;">Blight Carbine</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ENTROPY · ABERRANT</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:4px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:44px; line-height:0.9; color:#E6EDF5; letter-spacing:-0.02em;">24</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:400; font-size:18px; color:#63768C;">/108</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px;">
+      <div style="width:56px; height:56px; background:#18263A; border:2px solid #4FD8F5; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center;">
+        <svg width="44" height="44" viewBox="0 0 52 52" fill="none" stroke="#4FD8F5" stroke-width="2"><path d="M8 38 L26 38 L42 16"></path><path d="M34 16 L42 16 L42 25"></path><path d="M8 44 L18 44"></path></svg>
+        <div style="position:absolute; bottom:2px; right:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#4FD8F5;">E</div>
+      </div>
+      <div style="width:56px; height:56px; background:#0F1826; border:1px solid #1F3047; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <svg width="44" height="44" viewBox="0 0 52 52" fill="none" stroke="#3E4C5E" stroke-width="2"><path d="M6 40 L20 33"></path><path d="M26 30 L32 27"></path><path d="M36 12 L46 18 L40 28 L30 22 Z"></path></svg>
+        <div style="position:absolute; left:0; right:0; bottom:0; height:58%; background:#060B12; opacity:0.72;"></div>
+        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:17px; color:#9FB0C4;">4.6</div>
+        <div style="position:absolute; bottom:2px; right:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#63768C;">T</div>
+      </div>
+      <div style="{{ ultSquareStyle }}">
+        <svg width="44" height="44" viewBox="0 0 52 52" fill="none" stroke="#B866FF" stroke-width="2">
+          <path d="M8 34 L8 42 L34 42 L34 34"></path>
+          <path d="M8 38 L26 38" stroke-width="4"></path>
+          <path d="M30 38 L38 38" stroke-width="4"></path>
+          <path d="M42 38 L46 38" stroke-width="4"></path>
+          <path d="M22 28 L28 16 L34 28"></path>
+        </svg>
+        <div style="position:absolute; bottom:2px; right:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#B866FF;">G</div>
+      </div>
+          </div>
+  </div>
+ </div>
+
+ <div style="width:1920px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; color:#E6EDF5;">
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF8A3D; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">1 · One cluster, one plate</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">The bottom-right group becomes a single 440×184 panel at 48px from both edges: one 1px #2A3E58 border, one 3px orange rail on the left edge, 12px interior padding, 10px between rows. Momentum bar on top, weapon name and magazine as one baseline-aligned row, three ability squares as the base. Grenades are not a Breaker resource, so that readout is gone and the row ends at the ultimate. Nothing floats loose any more — the cluster is one piece of equipment with three readouts, and the orange rail states that the whole unit belongs to the weapon.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">2 · Momentum in peripheral vision</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">The three states are separated by colour, fill height, and segment count, not by reading the word. 12px track, two 2px notches at 33% and 66%. The bar stays short on purpose: every class drops its own resource into this slot, so the row has to hold a different label and range without regrowing. Settled: cyan, low fill, single continuous bar. Running: gold, fill crosses the first notch, and the bar splits into 8px chevron-cut blocks so the texture itself changes. Redline: orange, past the second notch, blocks widen to 14px and the track border goes orange 2px. The state word is a confirmation for the centre of vision, never the carrier.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">3 · Ability squares without text</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">56×56, 4px radius, 12px gaps. Ready: 2px accent border, glyph at full accent. Window active: border stays 2px and the plate fill lifts to #1F3047 with two 8px corner ticks at top-left and bottom-right — geometry, not brightness. Cooldown: 1px neutral border, glyph to #3E4C5E, hard dark wedge sweeping clockwise plus the timer in mono. Unaffordable: deep red border, struck hex chip lower-centre, no sweep. Key hints sit in the bottom-right corner at 11px and inherit the state colour, so a glance at the letter also reports the state.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">4 · Damage numbers</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Mono 700 with −0.02em tracking and a 2px outline in a near-black tinted toward the number's own hue, so the outline never reads as grey mud. Body 40px / weight 500. Crit 80px / weight 700 orange, spawning at 140% for 60ms. Weak point 64px gold. Rift element uses #A8FBFF at body size, never teal. Thousands get a thin space, not a comma — the space survives at 40px where a comma turns into a dot. In crowds, numbers within 60px of one another stack vertically at 8px offsets instead of overlapping, and a fourth simultaneous number is dropped rather than drawn.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">5 · Ultimate treatment</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">A 3px violet frame inset 8px from the screen edge, plus a 120px violet band at 10% opacity along the top and bottom edges only — the sides stay clear so peripheral threat reading is untouched. A 260px title plate sits at 132px from the top, clear of the wave banner band, for the first 1.2s, then fades leaving the frame. On expiry the frame steps down 3px → 2px → 1px over the final 3 seconds, so the ultimate ending is visible without a timer.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Anchors</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Safe margin 48px on all sides. Vitals bottom-left, 420 wide: status chips above, then shield 11px over health 8px with values right-aligned in a fixed 84px column so they never shift, armour as three 18×5 chips. The column is 360 wide. Wave banner centred at 48px from the top. Crosshair 80×80 centred, hit ticks gold at 45°. Enemy bars 180×8 with the name at 11px beneath. Loot popups sit in world space with the rarity rail and the take key inline.</div>
+   </div>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1984,&quot;height&quot;:1600}}">
+class Component extends DCLogic {
+  state = { mo: 1, ult: false };
+  renderVals() {
+    const states = [
+      { name: 'Settled', color: '#4FD8F5', width: '22%', speed: '4.2' },
+      { name: 'Running', color: '#FFC64A', width: '54%', speed: '11.8' },
+      { name: 'Redline', color: '#FF8A3D', width: '92%', speed: '19.4' }
+    ];
+    const i = this.state.mo, s = states[i], ult = this.state.ult;
+    const block = i === 0 ? 0 : (i === 1 ? 8 : 14);
+    let fill = "height:100%; width:" + s.width + "; background:" + s.color + ";";
+    if (block) fill = "height:100%; width:" + s.width + "; background:repeating-linear-gradient(90deg," + s.color + " 0 " + block + "px, #18263A " + block + "px " + (block + 3) + "px);";
+    return {
+      moName: s.name, moColor: s.color, moSpeed: s.speed, moFillStyle: fill,
+      segSettled: i === 0 ? s.color : '#3E4C5E',
+      segRunning: i === 1 ? s.color : '#3E4C5E',
+      segRedline: i === 2 ? s.color : '#3E4C5E',
+      cycleMo: () => this.setState(st => ({ mo: (st.mo + 1) % 3 })),
+      ultOn: ult,
+      toggleUlt: () => this.setState(st => ({ ult: !st.ult })),
+      ultLabel: ult ? 'Ultimate: active' : 'Ultimate: off',
+      ultBtn: "padding:10px 18px; font-family:'Saira Condensed',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;"
+        + (ult ? "border:1px solid #B866FF; background:#1C1428; color:#B866FF;" : "border:1px solid #2A3E58; color:#9FB0C4;"),
+      ultFrameStyle: "position:absolute; inset:8px; pointer-events:none; transition:border-color 180ms ease-out;"
+        + (ult ? "border:3px solid #B866FF;" : "border:3px solid transparent;"),
+      ultSquareStyle: "width:56px; height:56px; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center;"
+        + (ult ? "background:#1F3047; border:2px solid #B866FF;" : "background:#18263A; border:2px solid #B866FF;")
+    };
+  }
+}
+</script>
+</body>
+</html>
