@@ -32,6 +32,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Save/BreakerCharacterRoster.h"
+#include "Game/BreakerGameInstance.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerQuestContent.h"
 #include "Combat/BreakerEnemy.h"
@@ -187,6 +188,10 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
 void ABreakerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    // BEFORE anything reads a save. A level load destroyed the pawn that knew
+    // which character was being played, so this one asks the session first —
+    // otherwise every load after the first would read the legacy single slot.
+    AdoptSessionCharacter();
     AbilitySystem->InitAbilityActorInfo(this, this);
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
@@ -268,6 +273,21 @@ void ABreakerCharacter::SaveGameState()
     UGameplayStatics::SaveGameToSlot(Save, ActiveSaveSlotName(), 0);
 }
 
+void ABreakerCharacter::AdoptSessionCharacter()
+{
+    // Runs on arrival in a new map. The pawn was destroyed by the level load
+    // and this is a fresh one, so it has no idea who it is until it asks the
+    // session — without this, travelling to the gym would silently load the
+    // legacy single slot and play the wrong character.
+    if (const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>())
+    {
+        if (Session->ActiveCharacterId.IsValid())
+        {
+            ActiveCharacterId = Session->ActiveCharacterId;
+        }
+    }
+}
+
 FString ABreakerCharacter::ActiveSaveSlotName() const
 {
     // The character's own slot once one has been chosen, and the legacy global
@@ -287,6 +307,27 @@ void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
     // silently played the WRONG character. Order matters here — the id has to
     // be set before the load, or the load reads the old global slot again.
     ActiveCharacterId = CharacterId;
+
+    // The id has to survive the level load, because OpenLevel destroys this
+    // pawn. The GameInstance is the only thing that outlives the transition,
+    // so it carries the id and the pawn on the other side reads it back.
+    if (UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>())
+    {
+        Session->ActiveCharacterId = CharacterId;
+    }
+
+    // FROM THE FRONT END, PLAY TRAVELS. It used to load the save and teleport,
+    // because the hub and the gym were both already built in the one map the
+    // game had. They are separate maps now, so the hub does not exist yet and
+    // there is nothing to teleport to — this is a level load.
+    if (UBreakerGameInstance::IsFrontEndMap(this))
+    {
+        UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::AnchorMapName()));
+        return;
+    }
+
+    // Already in a world (a PIE drop-in, or the old single-map path): load and
+    // resume exactly as before, so nothing that worked yesterday stops.
     LoadGameState();
     ResumeFromMenu();
 

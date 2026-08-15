@@ -58,6 +58,9 @@ public:
     // slot, which is what a capture run or a PIE drop-in still uses.
     UFUNCTION(BlueprintCallable, Category="Save") void EnterWorldAsCharacter(const FGuid& CharacterId);
     FString ActiveSaveSlotName() const;
+    // Reads the active character back off the GameInstance after a level
+    // load, because the pawn that knew it was destroyed by the load.
+    void AdoptSessionCharacter();
     FGuid ActiveCharacterId;
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.

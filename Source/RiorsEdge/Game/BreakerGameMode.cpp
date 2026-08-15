@@ -1,6 +1,7 @@
 #include "Game/BreakerGameMode.h"
 
 #include "Game/BreakerHubBuilder.h"
+#include "Game/BreakerGameInstance.h"
 #include "Interaction/BreakerTravelPoint.h"
 
 #include "Characters/BreakerCharacter.h"
@@ -95,27 +96,72 @@ void ABreakerGameMode::TeleportPawnToHub(APawn* Pawn)
 void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
 {
     if (!RequestingPawn) return;
+    // TRAVEL IS A LEVEL LOAD NOW, not a teleport. It was a teleport because
+    // there was one map and both places were in it; with three maps the
+    // destination does not exist until it is loaded.
+    if (UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>())
+    {
+        Session->PendingDestinationId = DestinationId;
+    }
     if (DestinationId == ABreakerTravelPoint::HubDestinationId)
     {
-        TeleportPawnToHub(RequestingPawn);
+        UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::AnchorMapName()));
         return;
     }
-    if (DestinationId != ABreakerTravelPoint::GymDestinationId) return;
-
-    // A TELEPORT, not a rebuild. The gym field is already fully built at
-    // player start, so travel must not re-run any of the Spawn* functions —
-    // doing so would duplicate the encounter, the targets and the course, and
-    // would reset wave mode under a player who is mid-run. The gym is the
-    // playtest instrument (F1-F4, the wave sampler, the TTK report) and this
-    // pass is explicitly not allowed to disturb it.
-    RequestingPawn->TeleportTo(Frame.Ground, RequestingPawn->GetActorRotation());
+    if (DestinationId == ABreakerTravelPoint::GymDestinationId)
+    {
+        UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
+        return;
+    }
+    // Any other id is refused rather than guessed at. The old teleport that
+    // stood here is gone with the one-map world it belonged to: the gym is a
+    // separate level now, so arriving there is a load, and the load is what
+    // builds it.
+    UE_LOG(LogTemp, Warning, TEXT("HandleHubTravelSelected: no map is registered for destination '%s'."),
+        *DestinationId.ToString());
 }
 
 void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
     if (bPlaytestTargetsSpawned || !NewPlayer || !NewPlayer->GetPawn() || !GetWorld()) return;
+
+    // WHAT THIS MAP IS FOR. Until tonight there was one map, so this function
+    // unconditionally built the entire gym — which is exactly why the owner
+    // reported "loading in still takes you to the game": the front end was a
+    // widget drawn over a gym that had already been constructed and was
+    // already ticking underneath it.
+    //
+    // The front end builds NOTHING. That is the whole point of the split, and
+    // it is why this returns before BuildFieldFrame rather than after: the
+    // frame is derived from the pawn and every spawner hangs off it, so an
+    // early return here is the one place that guarantees no field exists.
+    if (UBreakerGameInstance::IsFrontEndMap(this))
+    {
+        bPlaytestTargetsSpawned = true;
+        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] front end — no field built."));
+        return;
+    }
+
     BuildFieldFrame(NewPlayer->GetPawn());
+
+    // The Anchor builds the hub and stops. No gym field, no encounter, no
+    // waves — a social space with a gate, which is what a hub is.
+    if (UBreakerGameInstance::IsAnchorMap(this))
+    {
+        HubOrigin = Frame.Ground;
+        bHubBuilt = true;
+        if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
+                GetWorld(), FTransform(Frame.Forward.Rotation(), HubOrigin)))
+        {
+            HubTravel->ExcludedDestinationId = ABreakerTravelPoint::HubDestinationId;
+            HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+        }
+        bPlaytestTargetsSpawned = true;
+        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] anchor — hub built, no gym."));
+        return;
+    }
+
     // Order matters only in one place: the apron has to exist before anything
     // that stands on it, so SpawnExpandedField runs first now. It used to run
     // last, which is harmless for static meshes and was not for the enemies
@@ -138,14 +184,11 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // the whole in-game path — the travel point deliberately does not move
     // anyone itself (it has no idea where the gym is), so the game mode owns
     // the teleport because the game mode is what knows Frame.Ground.
-    HubOrigin = Frame.At(-6000.0f, 0.0f, 0.0f);
-    bHubBuilt = true;
-    if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
-            GetWorld(), FTransform(Frame.Forward.Rotation(), HubOrigin)))
-    {
-        HubTravel->ExcludedDestinationId = ABreakerTravelPoint::HubDestinationId;
-        HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
-    }
+    // NO HUB IN THE GYM ANY MORE. Owner: "the gym is still attatched to the
+    // anchor" — and it was, literally: the hub was built 6000 cm from the gym's
+    // origin IN THE SAME WORLD, so the two were one continuous space a player
+    // could walk between. They are separate maps now, and the gym builds only
+    // the gym.
     // The return gate, beside the safe pad where a player who has finished a
     // run is already standing. Travel was one-way without it.
     if (ABreakerTravelPoint* GymTravel = GetWorld()->SpawnActor<ABreakerTravelPoint>(
