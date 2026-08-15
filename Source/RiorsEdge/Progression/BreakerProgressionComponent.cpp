@@ -411,6 +411,57 @@ TArray<UBreakerProgressionTree*> UBreakerProgressionComponent::GetAvailableTrees
     return Trees;
 }
 
+void UBreakerProgressionComponent::RefreshLevelFromXp()
+{
+    // The one and only writer of CharacterLevel. Everything else reads it.
+    State.CharacterLevel = UBreakerExperienceLibrary::LevelForTotalXp(State.TotalExperience, ExperienceCurve);
+}
+
+int32 UBreakerProgressionComponent::AwardExperience(int32 Amount)
+{
+    if (Amount <= 0) return 0;
+    if (GetOwner() && !GetOwner()->HasAuthority()) return 0;
+
+    const int32 Before = State.CharacterLevel;
+    // Clamped at the total the cap costs rather than accumulating forever. The
+    // level cap is a HARD stop with no post-cap power (a locked decision), so
+    // banking XP past it would be storing a quantity nothing can ever spend —
+    // and would silently un-cap the day someone raised MaxCharacterLevel,
+    // handing every existing character a fistful of free levels.
+    const int32 Ceiling = UBreakerExperienceLibrary::TotalXpToReachLevel(
+        UBreakerExperienceLibrary::MaxCharacterLevel, ExperienceCurve);
+    State.TotalExperience = FMath::Min(State.TotalExperience + Amount, Ceiling);
+    RefreshLevelFromXp();
+
+    const int32 Gained = State.CharacterLevel - Before;
+    if (Gained > 0)
+    {
+        // A level-up that changes numbers and says nothing is the failure mode
+        // this project keeps rediscovering, so the event is raised here rather
+        // than left for a caller to remember.
+        OnLevelGained.Broadcast(State.CharacterLevel, Gained);
+        OnProgressionChanged.Broadcast();
+    }
+    return Gained;
+}
+
+int32 UBreakerProgressionComponent::AwardKillExperience(EBreakerMonsterRank Rank, int32 AreaLevel)
+{
+    const int32 Xp = UBreakerExperienceLibrary::XpForKill(Rank, AreaLevel, ExperienceCurve);
+    AwardExperience(Xp);
+    return Xp;
+}
+
+float UBreakerProgressionComponent::GetLevelProgressFraction() const
+{
+    return UBreakerExperienceLibrary::LevelProgressFraction(State.TotalExperience, ExperienceCurve);
+}
+
+int32 UBreakerProgressionComponent::GetXpToNextLevel() const
+{
+    return UBreakerExperienceLibrary::XpToNextLevel(State.CharacterLevel, ExperienceCurve);
+}
+
 void UBreakerProgressionComponent::GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints)
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return;

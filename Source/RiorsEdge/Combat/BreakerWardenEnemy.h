@@ -117,6 +117,49 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Telegraph", meta=(ClampMin="0"))
     float ShieldDrawBackCm = 46.0f;
 
+    // --- Facing turn rate (owner playtest: "the shield guys instantly turn to
+    // you so its hard to hit their weakspot") ------------------------------
+    // §2.3's whole axis for this archetype is "punishes frontal approach": the
+    // counterplay is to circle to the exposed side/back. ABreakerEnemy::Tick
+    // (Combat/BreakerEnemy.cpp) sets actor rotation with SetActorRotation(
+    // Facing.Rotation()) every frame — an unconditional snap, once per tick, to
+    // whatever DesiredFacing says — and TickEngagedBehaviour below used to feed
+    // it the raw direction-to-player every frame with no rate limit at all. A
+    // Warden that re-faces in a single tick has no blind arc a flanking player
+    // can ever reach, so the archetype's one axis silently did not exist.
+    //
+    // This is out of BreakerEnemy.cpp's reach (out of territory), so the cap is
+    // enforced by feeding SetActorRotation an ALREADY-RATE-LIMITED direction
+    // instead: TickEngagedBehaviour rotates the Warden's current forward
+    // toward the player by at most this many degrees per tick's DeltaSeconds,
+    // through ComputeCappedFacing below, before writing DesiredFacing.
+    //
+    // SEED ARITHMETIC (O2 placeholder, derived not guessed). Player sprint is
+    // 950 cm/s — the design-canon figure this codebase already cites at
+    // Combat/BreakerRangedEnemy.h:83 and Tests/BreakerBossAndArchetypeTests.cpp:182
+    // (the raw UBreakerCharacterMovementComponent::SprintSpeed literal is 1100,
+    // authored headroom above that canon figure, not the number to plan around).
+    // At the Warden's own sweep range (SweepRangeCm = 320cm — the distance at
+    // which "engaged" actually starts mattering for this archetype) a player
+    // strafing at full sprint sweeps an angle at v/r radians/sec:
+    //   omega_player = 950 / 320 = 2.969 rad/s = 170.1 deg/s.
+    // The cap must sit strictly below that or the counterplay is unbeatable by
+    // definition. 100 deg/s is ~59% of the player's angular ceiling: a clear,
+    // visible turn-rate deficit (the whole point — O2's "perceptible") while
+    // leaving the player roughly 1.7x angular headroom, enough to win the
+    // flank even with an imperfect strafe rather than a frame-perfect one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Facing", meta=(ClampMin="0"))
+    float MaxTurnRateDegreesPerSecond = 100.0f;   // O2 PLACEHOLDER (see arithmetic above)
+
+    // Pure maths behind the cap: rotates CurrentForward toward DesiredDirection
+    // by at most MaxDegreesPerSecond * DeltaSeconds, turning the short way
+    // round. World-free and deliberately usable with no Warden instance at
+    // all, matching the UBreakerRangedBehaviorLibrary / CanBeginWallRide /
+    // ComputeGravityMultiplier idiom for anything that has to be testable
+    // without a running game.
+    static FVector ComputeCappedFacing(const FVector& CurrentForward, const FVector& DesiredDirection,
+        float MaxDegreesPerSecond, float DeltaSeconds);
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickEngagedBehaviour(class ABreakerCharacter* Player, float Distance, float DeltaSeconds,

@@ -7,6 +7,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerModifierComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -631,6 +632,7 @@ void ABreakerEnemy::HandleDeath()
     SetBodyVisible(false);
     if (HasAuthority() && bDropsLoot) GrantLoot();
     if (HasAuthority()) GrantAmmo();
+    if (HasAuthority()) GrantExperience();
 
     // On-death chain detonation: hurts other enemies only, so packed
     // spawns cascade without turning the player's own kills against them.
@@ -730,6 +732,28 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
         EngagedSeconds += static_cast<float>(FMath::Min(Now - LastDamageEventTime, 1.5));
     }
     LastDamageEventTime = Now;
+}
+
+void ABreakerEnemy::GrantExperience()
+{
+    // XP pays on EVERY kill, unconditionally — unlike loot, which most trash
+    // deliberately does not drop, and unlike currency, which is gated by rank.
+    // That difference is the point: XP is the channel that always moves, so
+    // fighting always visibly progresses something even on the kills that pay
+    // nothing else.
+    //
+    // Deliberately NOT gated on bDropsLoot: that flag says "this spawn is not
+    // a loot source" (arena furniture, scripted spawns), which is a statement
+    // about ITEMS. A kill the player earned still teaches the game something.
+    APawn* PlayerPawn = GetWorld() && GetWorld()->GetFirstPlayerController()
+        ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+    UBreakerProgressionComponent* Progression = PlayerPawn
+        ? PlayerPawn->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression) return;
+
+    // Area level, not character level — see UBreakerExperienceLibrary::
+    // XpForKill for why the reward tracks the content rather than the player.
+    Progression->AwardKillExperience(MonsterRank, EnemyLevel);
 }
 
 void ABreakerEnemy::GrantLoot()

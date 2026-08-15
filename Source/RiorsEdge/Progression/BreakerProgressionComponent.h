@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Progression/BreakerProgressionTypes.h"
+#include "Progression/BreakerExperience.h"
 #include "BreakerProgressionComponent.generated.h"
 
 class UBreakerAttributeSet;
@@ -12,6 +13,10 @@ class UBreakerProgressionNode;
 class UBreakerProgressionTree;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerProgressionChanged);
+// NewLevel, and how many levels arrived at once — a single kill can cross more
+// than one level early on, and a tell that says "level 2" when the player
+// reached 4 is worse than no tell.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerLevelGained, int32, NewLevel, int32, LevelsGained);
 
 UCLASS(ClassGroup=Progression, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerProgressionComponent : public UActorComponent
@@ -117,6 +122,35 @@ public:
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|Playtest")
     void GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints);
+
+    // ---- The XP loop (O40b) --------------------------------------------
+    // Awards XP and re-derives the level. Returns the number of levels gained
+    // so the caller can fire a level-up tell — a silent level-up is the
+    // feel-first failure this project keeps finding.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|XP")
+    int32 AwardExperience(int32 Amount);
+
+    // Convenience for the kill path: rank and area level in, XP awarded out.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|XP")
+    int32 AwardKillExperience(EBreakerMonsterRank Rank, int32 AreaLevel);
+
+    UFUNCTION(BlueprintPure, Category="Progression|XP") int32 GetTotalExperience() const { return State.TotalExperience; }
+    UFUNCTION(BlueprintPure, Category="Progression|XP") int32 GetCharacterLevel() const { return State.CharacterLevel; }
+    UFUNCTION(BlueprintPure, Category="Progression|XP") float GetLevelProgressFraction() const;
+    UFUNCTION(BlueprintPure, Category="Progression|XP") int32 GetXpToNextLevel() const;
+
+    // The curve is EditAnywhere on the component so it can be retuned in the
+    // editor with no recompile, matching how every other tunable in this
+    // project is exposed. Every value inside it is O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Progression|XP") FBreakerExperienceCurve ExperienceCurve;
+
+    // Raised when a level is actually gained, never on ordinary XP gain.
+    UPROPERTY(BlueprintAssignable, Category="Progression|XP") FBreakerLevelGained OnLevelGained;
+
+    // Re-derives CharacterLevel from TotalExperience. The ONLY writer of
+    // CharacterLevel; called after an award and after a save load, so a
+    // retuned curve takes effect on existing characters.
+    void RefreshLevelFromXp();
     // Seeds the slice budget whenever the point economy is empty (no ranks in
     // either currency and nothing unspent), and locks Swift only if no class
     // is chosen — so both a new gym pawn and an existing save written before

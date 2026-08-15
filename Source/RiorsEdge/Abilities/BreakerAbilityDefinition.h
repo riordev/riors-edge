@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Abilities/GameplayAbility.h"  // TSubclassOf<UGameplayAbility> below needs the complete type
 #include "GameplayTagContainer.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerAbilityDefinition.generated.h"

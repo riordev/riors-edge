@@ -163,7 +163,17 @@ struct RIORSEDGE_API FBreakerProgressionState
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerClassId PermanentClass = EBreakerClassId::None;
+    // DERIVED from TotalExperience, never authoritative. It is kept in the
+    // struct because a great deal of code already reads it, but the XP total
+    // is the stored truth: re-deriving means a retuned curve moves every
+    // existing character's level instead of leaving saved levels the new curve
+    // can no longer afford. UBreakerProgressionComponent::RefreshLevelFromXp
+    // is the only thing that should write it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="50")) int32 CharacterLevel = 1;
+    // The XP loop O40(b) was waiting for. Cumulative and monotonic — never
+    // "XP into the current level", because that representation cannot survive
+    // a curve retune without stranding characters mid-level.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 TotalExperience = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentClassPoints = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentCorePoints = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> ClassNodeRanks;

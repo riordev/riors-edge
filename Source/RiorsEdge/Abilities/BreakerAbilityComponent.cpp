@@ -84,12 +84,46 @@ UBreakerAbilityDefinition* UBreakerAbilityComponent::ResolveDefinition(EBreakerC
 {
     if (UBreakerAbilityDefinition* Equipped = UBreakerAbilityDefinition::FindFallback(EquippedId))
     {
-        return Equipped->CanOccupySlot(Slot) ? Equipped : nullptr;
+        // The loadout id is not proof the ability is legitimately this
+        // character's: TryEquipAbility/ValidateSelection guard the WRITE, but
+        // nothing guarded the READ, and the loadout can carry a foreign-class
+        // id without ever going through that write. DevForceClass (Progression/)
+        // rewrites State.PermanentClass and ClassDefinition on a class switch
+        // but does not migrate State.AbilityLoadout, so a Swift character who
+        // dev-swaps to Caster keeps "Swift.Overdrive" sitting in the Ultimate
+        // slot; a stale/hand-edited save can carry the same thing. This is the
+        // ONE place a loadout id turns into an actually-granted GAS ability
+        // (RefreshGrants below is its only caller), so it is where the class
+        // check has to live for console/Blueprint/save-load paths to share it
+        // — owner playtest: "im also able to have abilities from other classes
+        // equipped".
+        if (Equipped->ClassId == ClassId && Equipped->CanOccupySlot(Slot))
+        {
+            return Equipped;
+        }
+        // WRONG CLASS and WRONG SLOT are different failures and must not share
+        // an answer. A foreign-class id is a STALE LOADOUT — the character
+        // never chose it, DevForceClass simply failed to migrate it — so the
+        // repair is the class default, exactly as for an unknown id, and the
+        // slice stays playable. A wrong-SLOT id is a caller ERROR: someone
+        // asked for the ultimate in a class-ability slot, and answering with a
+        // different ability would quietly satisfy a request nobody made.
+        // Refusing is the older rule and is asserted by
+        // RiorsEdge.Abilities.SlotResolution; folding the two together broke it.
+        if (Equipped->ClassId == ClassId)
+        {
+            return nullptr;
+        }
+        UE_LOG(LogTemp, Warning,
+            TEXT("BreakerAbilityComponent: refusing to grant '%s' (class %d) to a class-%d character; falling back ")
+            TEXT("to the class default. The loadout was not migrated across a class change."),
+            *EquippedId.ToString(), static_cast<int32>(Equipped->ClassId), static_cast<int32>(ClassId));
     }
-    // Nothing equipped OR an unknown id: fall back to the class default so
-    // the slice is playable no matter what a stale save's loadout carries.
-    // Granting the default beats granting nothing — an unknown id silently
-    // killing every ability is exactly the failure the owner hit.
+    // Nothing equipped, an unknown id, or (as above) a real id from the wrong
+    // class: fall back to the class default so the slice is playable no
+    // matter what a stale save's loadout carries. Granting the default beats
+    // granting nothing — an unknown id silently killing every ability is
+    // exactly the failure the owner hit.
     return UBreakerAbilityDefinition::FindFallback(UBreakerAbilityDefinition::DefaultAbilityIdForSlot(ClassId, Slot));
 }
 

@@ -136,6 +136,29 @@ void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
     if (SlamRingVisual) SlamRingVisual->SetVisibility(false, true);
 }
 
+FVector ABreakerWardenEnemy::ComputeCappedFacing(const FVector& CurrentForward, const FVector& DesiredDirection,
+    float MaxDegreesPerSecond, float DeltaSeconds)
+{
+    const FVector Current = CurrentForward.GetSafeNormal2D();
+    const FVector Desired = DesiredDirection.GetSafeNormal2D();
+    if (Desired.IsNearlyZero()) return Current;
+    if (Current.IsNearlyZero()) return Desired;
+
+    const float DotClamped = FMath::Clamp(FVector::DotProduct(Current, Desired), -1.0f, 1.0f);
+    const float AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(DotClamped));
+    const float MaxStepDegrees = FMath::Max(0.0f, MaxDegreesPerSecond) * FMath::Max(0.0f, DeltaSeconds);
+    if (AngleDegrees <= MaxStepDegrees || AngleDegrees <= KINDA_SMALL_NUMBER)
+    {
+        return Desired;
+    }
+
+    // Signed by the Z component of the cross product so the Warden turns the
+    // SHORT way toward the player rather than always pivoting one direction.
+    const float Cross = Current.X * Desired.Y - Current.Y * Desired.X;
+    const float SignedStepDegrees = (Cross >= 0.0f ? 1.0f : -1.0f) * MaxStepDegrees;
+    return Current.RotateAngleAxis(SignedStepDegrees, FVector::UpVector);
+}
+
 void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distance, float DeltaSeconds,
     FVector& OutDirection, float& OutSpeedScale)
 {
@@ -143,12 +166,16 @@ void ABreakerWardenEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     const double Now = GetWorld()->GetTimeSeconds();
     const FVector ToPlayer = (Player->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 
-    // §2.3: "advances slowly and ALWAYS faces the player". The facing is the
-    // mechanic — the armour geometry is only interesting because the Warden
-    // fights to keep its front toward you and the player fights to get around
-    // it. Setting DesiredFacing every frame is what makes circling it a real
-    // contest rather than a free win.
-    DesiredFacing = ToPlayer;
+    // §2.3: "advances slowly and ALWAYS faces the player" — but "always faces"
+    // cannot mean "faces instantly", or the frontal-approach punishment this
+    // archetype exists for has no counterplay (owner playtest: "the shield
+    // guys instantly turn to you so its hard to hit their weakspot"). The base
+    // Tick (BreakerEnemy.cpp) applies DesiredFacing with an unconditional
+    // SetActorRotation snap every frame; ComputeCappedFacing is what turns
+    // that into a rate-limited turn by feeding it an already-clamped step
+    // instead of the raw direction to the player. This is what makes circling
+    // it a real contest rather than a free win.
+    DesiredFacing = ComputeCappedFacing(GetActorForwardVector(), ToPlayer, MaxTurnRateDegreesPerSecond, DeltaSeconds);
     OutDirection = ToPlayer;
     OutSpeedScale = 1.0f;
     StateLabel = TEXT("ADVANCE");

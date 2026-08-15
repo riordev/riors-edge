@@ -102,6 +102,13 @@ public:
     // SHIPS with, without opening the tuning itself for writing.
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeHealthMultiplier() const { return ArchetypeHealthMultiplier; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeDamageMultiplier() const { return ArchetypeDamageMultiplier; }
+    // The same read-only-view discipline as the two above, extended to the two
+    // movement tunables an archetype is most likely to retune. Added because a
+    // subclass's tests could otherwise only assert them by being granted access
+    // to the protected tuning itself, which would hand every test write access
+    // to everything else on the chassis.
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetMoveSpeed() const { return MoveSpeed; }
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetWeaveStrength() const { return WeaveStrength; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackRange() const { return AttackRange; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetLungeRange() const { return LungeRange; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool DoesRespawn() const { return bRespawns; }
@@ -148,6 +155,8 @@ protected:
     UFUNCTION() void FinishWakefulRevive();
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
     void GrantLoot();
+    // The XP loop O40(b) was waiting for. Unconditional on every kill.
+    void GrantExperience();
     // Ammo economy: kills return reserve ammo to the killer (O2 placeholder).
     void GrantAmmo();
     void RespawnEnemy();
