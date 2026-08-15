@@ -2294,17 +2294,19 @@ namespace
     // the ABILITIES tab reads to build its picker — one fact, two screens.
     bool ClassHasImplementedKit(EBreakerClassId ClassId)
     {
-        static const EBreakerAbilitySlot Slots[] =
-        {
-            EBreakerAbilitySlot::ClassAbilityOne,
-            EBreakerAbilitySlot::ClassAbilityTwo,
-            EBreakerAbilitySlot::Ultimate
-        };
-        for (const EBreakerAbilitySlot Slot : Slots)
-        {
-            if (UBreakerAbilityDefinition::GetClassAbilities(ClassId, Slot).Num() > 0) return true;
-        }
-        return false;
+        // ASKS WHETHER THE ABILITIES EXECUTE, not whether rows exist. Counting
+        // registry rows was a safe proxy for exactly as long as every row had a
+        // real AbilityClass behind it, and it stopped being one the moment
+        // Gunsmith, Tank and Support gained 21 catalogued-but-unimplemented
+        // rows: this function immediately began reporting all three as
+        // implemented, which would have offered them on the class screen and
+        // let a player PERMANENTLY lock a character into a class that grants
+        // nothing. That is precisely the trap O39 exists to close.
+        //
+        // The progression layer would still have refused the lock, so the
+        // damage was presentational — but a class screen that offers a choice
+        // the game then rejects is its own defect.
+        return UBreakerAbilityDefinition::ClassHasImplementedKit(ClassId);
     }
 
     // The two bulk-discard thresholds the header offers, indexed by arm. One
