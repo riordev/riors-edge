@@ -1,6 +1,7 @@
 #include "UI/BreakerMenu.h"
 
 #include "Save/BreakerCharacterRoster.h"
+#include "Characters/BreakerCharacter.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 
@@ -819,7 +820,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
     ];
     PanelContent->AddSlot().FillHeight(1.0f)
     [
-        Body
+        // SCROLLED, not merely capped. MaxDesiredHeight let the plate grow to
+        // its content and then stop growing while the content kept going, so a
+        // third character drew CREATE and PLAY outside the panel entirely.
+        // Deliberately a plain SScrollBox: SWrapBox with UseAllottedSize inside
+        // a scroll box is banned in this project because it caused a bug the
+        // owner personally hit.
+        SNew(SScrollBox)
+        + SScrollBox::Slot()
+        [
+            Body
+        ]
     ];
 
     return SNew(SOverlay)
@@ -831,7 +842,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
-            SNew(SBox).WidthOverride(PanelWidth).MaxDesiredHeight(880.0f)
+            // FIXED height, derived from the viewport rather than from the
+            // content. This is the jitter fix: a content-sized plate that is
+            // also centred moves every time anything inside it changes size,
+            // which is once per click. A stable rectangle cannot.
+            SNew(SBox).WidthOverride(PanelWidth).HeightOverride(MeasureWideScreen().PanelHeight)
             [
                 // The screen plate carries the cyan identity rail: the front
                 // end belongs to the player/system family.
@@ -975,6 +990,19 @@ TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicke
             ],
             bPrimary ? Cyan : BorderEmphasis)
     ];
+}
+
+void SBreakerMenu::HandleConfirmKey()
+{
+    // The title gate, and only the title gate. This is the path that actually
+    // fires: it comes from the player input component, which works while the
+    // game is paused, rather than from Slate keyboard focus, which the menu
+    // widget does not reliably hold in a standalone session.
+    if (CurrentScreen == EBreakerMenuScreen::Main && !bTitleRevealed)
+    {
+        bTitleRevealed = true;
+        Rebuild(EBreakerMenuScreen::Main);
+    }
 }
 
 FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
@@ -2602,7 +2630,13 @@ TSharedRef<SWidget> SBreakerMenu::MakeCharacterRow(const FBreakerCharacterSummar
     const bool bArmedForDelete = (PendingDeleteCharacterId == Summary.CharacterId);
 
     TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)[MakeClassSilhouette(Summary.ClassId, true)];
+    // Half scale and no caption: at row size the caption clipped and the
+    // figure only needs to read as a figure. Full-size silhouettes are what
+    // made three characters taller than the panel.
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        MakeClassSilhouette(Summary.ClassId, true, 0.55f, /*bShowCaption=*/false)
+    ];
     Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
     Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
     [
@@ -2755,15 +2789,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSelectScreen()
                 if (!SelectedCharacterId.IsValid() || !Roster.IsValid()) return FReply::Handled();
                 Roster->LastPlayedCharacterId = SelectedCharacterId;
                 Roster->SaveRoster();
-                // GAP, recorded rather than faked: loading the selected
-                // character's save into the live pawn is the character-load
-                // path, and it does not exist yet — ABreakerCharacter still
-                // loads the single legacy slot at BeginPlay. Entering the world
-                // here would silently play the WRONG character, which is worse
-                // than not entering. Wired in the same pass as the hub.
-                CharacterScreenStatus = FText::FromString(
-                    TEXT("Character selected. Entering the world is wired with the hub."));
-                Rebuild(EBreakerMenuScreen::CharacterSelect);
+                // Into the world, as this character, in the hub. The gap this
+                // replaces was real: LoadGameState was hard-wired to the single
+                // legacy slot, so entering here would have played the wrong
+                // character rather than the selected one.
+                if (Character.IsValid())
+                {
+                    Character->EnterWorldAsCharacter(SelectedCharacterId);
+                }
                 return FReply::Handled();
             }), bCanPlay)
     ];

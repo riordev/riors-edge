@@ -73,6 +73,24 @@ void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
     Super::EndPlay(Reason);
 }
 
+void ABreakerGameMode::TeleportPawnToHub(APawn* Pawn)
+{
+    if (!Pawn) return;
+    if (!bHubBuilt)
+    {
+        // Loud rather than a silent no-op: a PLAY button that appears to do
+        // nothing is the failure this whole pass exists to remove. If the hub
+        // was never built the player stays where they are and the log says why.
+        UE_LOG(LogTemp, Warning,
+            TEXT("TeleportPawnToHub: the hub has not been built, so there is nowhere to go. ")
+            TEXT("The pawn was left where it was."));
+        return;
+    }
+    // Lifted clear of the ground so the capsule does not spawn intersecting the
+    // hub floor and get pushed somewhere unpredictable.
+    Pawn->TeleportTo(HubOrigin + FVector(0.0f, 0.0f, 120.0f), Pawn->GetActorRotation());
+}
+
 void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
 {
     if (!RequestingPawn) return;
@@ -114,8 +132,10 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // the whole in-game path — the travel point deliberately does not move
     // anyone itself (it has no idea where the gym is), so the game mode owns
     // the teleport because the game mode is what knows Frame.Ground.
+    HubOrigin = Frame.At(-6000.0f, 0.0f, 0.0f);
+    bHubBuilt = true;
     if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
-            GetWorld(), FTransform(Frame.Forward.Rotation(), Frame.At(-6000.0f, 0.0f, 0.0f))))
+            GetWorld(), FTransform(Frame.Forward.Rotation(), HubOrigin)))
     {
         HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
     }

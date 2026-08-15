@@ -54,6 +54,11 @@ public:
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAbilityComponent* GetAbilities() const { return Abilities; }
     UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
     UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
+    // Which character this pawn is. Invalid means the pre-roster global
+    // slot, which is what a capture run or a PIE drop-in still uses.
+    UFUNCTION(BlueprintCallable, Category="Save") void EnterWorldAsCharacter(const FGuid& CharacterId);
+    FString ActiveSaveSlotName() const;
+    FGuid ActiveCharacterId;
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;
@@ -249,6 +254,9 @@ private:
     void DecreaseSensitivity();
     void SavePlaytestSettings() const;
     void TogglePauseMenu();
+    // Enter/Space while a menu is open. Bound with bExecuteWhenPaused,
+    // because the menu is only ever open while the game is paused.
+    void ConfirmMenuKey();
     void ToggleInventoryMenu();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);

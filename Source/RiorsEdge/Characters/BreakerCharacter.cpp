@@ -31,6 +31,7 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
+#include "Save/BreakerCharacterRoster.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerQuestContent.h"
 #include "Combat/BreakerEnemy.h"
@@ -263,13 +264,44 @@ void ABreakerCharacter::SaveGameState()
         Save->QuestCounters = Quests->GetState().Counters;
     }
     Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
-    UGameplayStatics::SaveGameToSlot(Save, UBreakerSaveGame::DefaultSlotName(), 0);
+    UGameplayStatics::SaveGameToSlot(Save, ActiveSaveSlotName(), 0);
+}
+
+FString ABreakerCharacter::ActiveSaveSlotName() const
+{
+    // The character's own slot once one has been chosen, and the legacy global
+    // slot before that. Keeping the fallback is what lets a session that never
+    // touches the character screen (a capture run, a PIE drop-in) still load
+    // and save exactly as it always did.
+    return ActiveCharacterId.IsValid()
+        ? UBreakerCharacterRoster::SlotNameForCharacter(ActiveCharacterId)
+        : FString(UBreakerSaveGame::DefaultSlotName());
+}
+
+void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
+{
+    // THE PATH FROM THE CHARACTER SCREEN INTO THE GAME. Before this, PLAY
+    // selected a character and then had nowhere to go: LoadGameState was
+    // hard-wired to the single legacy slot, so entering the world would have
+    // silently played the WRONG character. Order matters here — the id has to
+    // be set before the load, or the load reads the old global slot again.
+    ActiveCharacterId = CharacterId;
+    LoadGameState();
+    ResumeFromMenu();
+
+    // Into the hub, not the gym. The hub is the persistent place a session
+    // starts from (the owner's reference is Destiny's Tower / a PoE hideout);
+    // the gym is one destination reachable from the hub's travel point.
+    if (ABreakerGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr)
+    {
+        Mode->TeleportPawnToHub(this);
+    }
 }
 
 void ABreakerCharacter::LoadGameState()
 {
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
-    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(UBreakerSaveGame::DefaultSlotName(), 0));
+    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(ActiveSaveSlotName(), 0));
     if (!Save) return;
     // Migrate BEFORE reading anything out of the payload. A file written by an
     // older build is not wrong, it is old; reading it with today's assumptions
@@ -309,6 +341,15 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ThisClass::EquipPrimaryWeapon);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ThisClass::EquipSecondaryWeapon);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ThisClass::TogglePauseMenu).bExecuteWhenPaused = true;
+    // THE SAME PATH ESCAPE USES, and for the same reason. The title gate was
+    // built on Slate keyboard focus (OnKeyDown, then OnPreviewKeyDown) and did
+    // not fire in a standalone session: under FInputModeGameAndUI the menu
+    // widget does not reliably hold keyboard focus, so no key event ever
+    // reached it. Escape worked the whole time because it is bound here, with
+    // bExecuteWhenPaused - the menu is open while the game is PAUSED, and an
+    // input binding without that flag is dead in exactly that state.
+    PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ThisClass::ConfirmMenuKey).bExecuteWhenPaused = true;
+    PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ThisClass::ConfirmMenuKey).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
     PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
@@ -1200,6 +1241,13 @@ void ABreakerCharacter::GrantQuestRewardForFlag(FName Flag)
         Equipment->AddToBackpack(UBreakerLootLibrary::RollItem(TEXT("QuestReward"), Slot, Paid.Reward.MinimumRarity, Paid.Reward.ItemLevel, Seed));
     }
     UE_LOG(LogTemp, Log, TEXT("Quest '%s' turned in; %d reward item(s) granted"), *Paid.QuestId.ToString(), Paid.Reward.ItemCount);
+}
+
+void ABreakerCharacter::ConfirmMenuKey()
+{
+    // Only the menu cares, and today only the title gate does. Guarded rather
+    // than unconditional so Enter keeps meaning nothing during play.
+    if (MenuWidget.IsValid()) MenuWidget->HandleConfirmKey();
 }
 
 void ABreakerCharacter::TogglePauseMenu()

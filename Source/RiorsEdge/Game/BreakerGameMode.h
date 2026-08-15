@@ -347,6 +347,13 @@ private:
     // Bound to the hub travel point. Teleports only — see the implementation
     // for why travel must never re-run the gym build.
     void HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn);
+public:
+    // Where a session starts. PLAY puts the chosen character here, and the
+    // hub's travel point is what reaches the gym from it.
+    UFUNCTION(BlueprintCallable, Category="Breaker|Hub") void TeleportPawnToHub(APawn* Pawn);
+private:
+    FVector HubOrigin = FVector::ZeroVector;
+    bool bHubBuilt = false;
     float ResolveGroundZ(const APawn* Pawn) const;
 
     // Vantage cameras for -BreakerCaptureTour. A screenshot of the spawn view

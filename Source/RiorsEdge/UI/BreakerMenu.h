@@ -52,6 +52,9 @@ public:
     void ShowInventory();
     void ShowDialogue(class ABreakerNPC* NPC);
     void HandleEscape();
+    // Enter/Space, routed from the input component rather than from Slate
+    // focus - see ABreakerCharacter::ConfirmMenuKey for why.
+    void HandleConfirmKey();
     // Dev capture only: jump straight to a screen so a screenshot run can see
     // it. Every menu in this project has been authored, reworked and shipped
     // without anyone looking at it, which is how the skill tree reached the
