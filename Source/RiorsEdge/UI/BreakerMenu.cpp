@@ -12,6 +12,9 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerForgeLibrary.h"
+// The legendary registry: the only items in the game that carry a display
+// name, which is what a card's line one wants.
+#include "Items/BreakerItemRules.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -70,6 +73,31 @@ namespace
         return SNew(STextBlock)
             .Text(Text)
             .ColorAndOpacity(Color)
+            .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
+    }
+
+    // Text that WRAPS at a known pixel width instead of running past the edge
+    // of its box.
+    //
+    // WrapTextAt, never AutoWrapText, and the distinction is the whole point:
+    // AutoWrapText wraps at the widget's ALLOTTED width, which is the widget
+    // measuring its own arrangement — the pattern that is banned in this file
+    // because it caused a real bug. WrapTextAt takes a number the caller
+    // computed before layout started, from a card width that came from the
+    // viewport. The wrap only ever changes HEIGHT, and every plate on this
+    // screen is now a fixed height, so nothing downstream can move.
+    //
+    // This is the answer to clipped text rather than a wider box, because a box
+    // sized to the longest string is only possible when the longest string is
+    // knowable; an affix name plus a rolled value plus a tier is not. Wrapping
+    // degrades to a second line, which is readable. Clipping does not.
+    TSharedRef<STextBlock> MenuWrappedText(const FText& Text, int32 Size, const FLinearColor& Color, float WrapAt,
+        bool bBold = false)
+    {
+        return SNew(STextBlock)
+            .Text(Text)
+            .ColorAndOpacity(Color)
+            .WrapTextAt(WrapAt)
             .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
     }
 
@@ -202,6 +230,93 @@ namespace
     }
 
     // ---------------------------------------------------------------------
+    // PLATE GEOMETRY PROBE — instrumentation for the reported screen jitter.
+    //
+    // Two fixes have now been guessed at and neither held, so this stops
+    // guessing and MEASURES. Wrapped around the screen plate in BuildFrame and
+    // BuildZonedFrame, it logs the plate's DESIRED size (what the content asks
+    // for) and its ARRANGED size (what Slate gave it) whenever either moves.
+    //
+    // Reading the log is the whole point, and the two outcomes are different
+    // bugs with different fixes:
+    //
+    //  * [MenuGeom] lines that appear only just after a [MenuRebuild] line, one
+    //    per rebuild — the plate is a different size on each build and, being
+    //    centred, lands in a different place. That is a REBUILD-TIME jitter and
+    //    the fix is a plate whose size does not come from its content.
+    //  * [MenuGeom] lines with ADVANCING frame numbers and no rebuild between
+    //    them — a genuine per-frame layout oscillation, i.e. something reads its
+    //    own arrangement. The frame delta and the two sizes name which axis.
+    //
+    // Cost is a float compare per paint and nothing at all when the geometry is
+    // steady, which is the state this screen is supposed to be in.
+    // ---------------------------------------------------------------------
+    class SBreakerPlateProbe : public SCompoundWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerPlateProbe) {}
+            SLATE_ARGUMENT(FString, Label)
+            SLATE_DEFAULT_SLOT(FArguments, Content)
+        SLATE_END_ARGS()
+
+        void Construct(const FArguments& InArgs)
+        {
+            Label = InArgs._Label;
+            ChildSlot
+            [
+                InArgs._Content.Widget
+            ];
+        }
+
+        virtual FVector2D ComputeDesiredSize(float LayoutScale) const override
+        {
+            const FVector2D Desired = SCompoundWidget::ComputeDesiredSize(LayoutScale);
+            Report(Desired, LastArranged);
+            return Desired;
+        }
+
+        virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+            FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle,
+            bool bParentEnabled) const override
+        {
+            Report(LastDesired, AllottedGeometry.GetLocalSize());
+            return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId,
+                InWidgetStyle, bParentEnabled);
+        }
+
+    private:
+        // Half a pixel: below that it is measurement rounding, not motion.
+        static constexpr float MotionEpsilon = 0.5f;
+
+        void Report(const FVector2D& Desired, const FVector2D& Arranged) const
+        {
+            const bool bMoved =
+                FMath::Abs(Desired.X - LastDesired.X) > MotionEpsilon ||
+                FMath::Abs(Desired.Y - LastDesired.Y) > MotionEpsilon ||
+                FMath::Abs(Arranged.X - LastArranged.X) > MotionEpsilon ||
+                FMath::Abs(Arranged.Y - LastArranged.Y) > MotionEpsilon;
+            if (!bMoved && bReported) return;
+
+            LastDesired = Desired;
+            LastArranged = Arranged;
+            ++ChangeCount;
+            bReported = true;
+            UE_LOG(LogTemp, Log,
+                TEXT("[MenuGeom] %s desired=%.1fx%.1f arranged=%.1fx%.1f change=%d frame=%llu dframes=%llu"),
+                *Label, Desired.X, Desired.Y, Arranged.X, Arranged.Y, ChangeCount,
+                static_cast<uint64>(GFrameCounter), static_cast<uint64>(GFrameCounter - LastFrame));
+            LastFrame = GFrameCounter;
+        }
+
+        FString Label;
+        mutable FVector2D LastDesired = FVector2D::ZeroVector;
+        mutable FVector2D LastArranged = FVector2D::ZeroVector;
+        mutable uint64 LastFrame = 0;
+        mutable int32 ChangeCount = 0;
+        mutable bool bReported = false;
+    };
+
+    // ---------------------------------------------------------------------
     // Screen metrics.
     //
     // The skill matrix used to be authored at a hard 1760x1000 and simply
@@ -310,6 +425,22 @@ namespace
         // Panel minus the rail, the gutter between them, and the scroll bar.
         Metrics.BoardViewWidth = FMath::Max(320.0f,
             Metrics.PanelWidth - Metrics.RailWidth - BreakerUI::Space24 - 20.0f);
+
+        // Jitter instrumentation, and this is the SUSPECT half of it: every
+        // panel on both wide screens is sized from this one reading. If
+        // GetViewportSize ever returns a different value on alternate frames
+        // — DPI, a resize settling, a letterbox recalculating — then every
+        // plate derived from it breathes, and the log says so in one line
+        // rather than being inferred from a screenshot. Logged on CHANGE only,
+        // so a steady viewport prints once per session.
+        static FVector2D LastViewport = FVector2D::ZeroVector;
+        if (!Viewport.Equals(LastViewport, 0.5))
+        {
+            LastViewport = Viewport;
+            UE_LOG(LogTemp, Log, TEXT("[MenuGeom] viewport=%.1fx%.1f panel=%.1fx%.1f frame=%llu"),
+                Viewport.X, Viewport.Y, Metrics.PanelWidth, Metrics.PanelHeight,
+                static_cast<uint64>(GFrameCounter));
+        }
         return Metrics;
     }
 
@@ -910,11 +1041,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildFrame(const FText& Title, const FText& Su
             // content. This is the jitter fix: a content-sized plate that is
             // also centred moves every time anything inside it changes size,
             // which is once per click. A stable rectangle cannot.
-            SNew(SBox).WidthOverride(PanelWidth).HeightOverride(MeasureWideScreen().PanelHeight)
+            SNew(SBreakerPlateProbe).Label(TEXT("BuildFrame"))
             [
-                // The screen plate carries the cyan identity rail: the front
-                // end belongs to the player/system family.
-                MakePlate(PanelContent, Panel, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space24))
+                SNew(SBox).WidthOverride(PanelWidth).HeightOverride(MeasureWideScreen().PanelHeight)
+                [
+                    // The screen plate carries the cyan identity rail: the front
+                    // end belongs to the player/system family.
+                    MakePlate(PanelContent, Panel, Cyan, FMargin(BreakerUI::Space24, BreakerUI::Space24))
+                ]
             ]
         ];
 }
@@ -953,12 +1087,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
     Root->AddSlot().FillHeight(1.0f).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)[Body];
     Root->AddSlot().AutoHeight()[Footer];
 
-    // bFillHeight claims the whole PanelHeight instead of shrinking to the
-    // body's desired height. The skill matrix needs it: its board is a
-    // VIEWPORT onto a larger surface, so it deliberately has no desired height
-    // of its own, and a plate that shrink-wrapped it would collapse to the
-    // height of the branch strip. The loadout still shrink-wraps, which is why
-    // this is a parameter and not a change of rule.
+    // THE SHRINK-WRAP BRANCH IS THE JITTER, and it survived the fix that was
+    // supposed to kill it.
+    //
+    // The previous pass made BuildFrame's plate a FIXED height for exactly this
+    // reason — "a content-sized plate that is also centred moves every time
+    // anything inside it changes size". That edit landed on BuildFrame and on
+    // the skill matrix (which passes bFillHeight=true) and NOWHERE ELSE. The
+    // loadout, the forge and the abilities screen all take this function's
+    // default, so all three kept a MaxDesiredHeight plate: a rectangle whose
+    // height is its content's height, centred by the VAlign_Center slot below.
+    // Equip an item, arm a discard chip, let InventoryStatus appear, filter the
+    // backpack — the body's desired height changes, the plate's height follows,
+    // and a centred plate whose height changed has moved by half the delta at
+    // both edges. That is the jitter the owner is still looking at.
+    //
+    // Every caller now passes true; the parameter is kept so the shape of the
+    // decision stays visible rather than being silently removed.
     TSharedRef<SBox> Plate = SNew(SBox).WidthOverride(PanelWidth);
     if (bFillHeight) Plate->SetHeightOverride(PanelHeight);
     else Plate->SetMaxDesiredHeight(PanelHeight);
@@ -973,7 +1118,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildZonedFrame(const FText& Title, const FTex
         ]
         + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(BreakerUI::Space40)
         [
-            Plate
+            SNew(SBreakerPlateProbe).Label(FString::Printf(TEXT("Zoned:%s"), *Title.ToString()))
+            [
+                Plate
+            ]
         ];
 }
 
@@ -2436,7 +2584,14 @@ namespace
         return Tier < 0 ? TEXT("T-1") : FString::Printf(TEXT("T%d"), Tier);
     }
 
-    // One affix as the player reads it: "Movement Speed  +5.0%  T4".
+    // One affix as the player reads it: "+5.0% Movement Speed  T4".
+    //
+    // VALUE FIRST, which is the reference's own order ("+22% slide speed") and
+    // is also what makes the line survive a narrow card: the value is short and
+    // fixed-ish, the name is long and variable, so leading with the value puts
+    // the wrap point inside the name where a line break is harmless. Name-first
+    // put the wrap point between the name and its number, which reads as two
+    // unrelated fragments.
     FString DescribeAffix(const FBreakerRolledAffix& Affix)
     {
         const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
@@ -2447,66 +2602,156 @@ namespace
         // printed as percentages, because that is what they mean.
         const bool bPercentStyleFlat = Definition &&
             (Definition->StatTarget == EBreakerStatTarget::CriticalChance || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
-        return FString::Printf(TEXT("%s  +%.1f%s  %s"), *Name, Affix.Value,
-            bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *TierLabel(Affix.Tier));
+        return FString::Printf(TEXT("+%.1f%s %s  %s"), Affix.Value,
+            bPercent || bPercentStyleFlat ? TEXT("%") : TEXT(""), *Name, *TierLabel(Affix.Tier));
     }
 
-    FString DescribeItem(const FBreakerItemInstance& Item)
-    {
-        TArray<FString> Lines;
-        Lines.Add(FString::Printf(TEXT("ITEM LEVEL %d"), Item.ItemLevel));
-        for (const FBreakerRolledAffix& Affix : Item.Affixes)
-        {
-            Lines.Add(DescribeAffix(Affix));
-        }
-        return FString::Join(Lines, TEXT("\n"));
-    }
+    // DescribeItem (a printf blob of item level plus every affix on one string)
+    // is GONE with the equipment column's rebuild: the reference's equipment
+    // row is a name, a level and a rarity tag, and its affix detail belongs on
+    // the backpack card where the deltas are. MakeAffixLines is the one place
+    // an affix list is built now.
 
-    // The affix list with per-affix deltas (UI-Inventory-Spec "Card anatomy"
-    // line 3): the glyph sits in a fixed column so the affix names keep a
-    // straight left edge whether or not a card is being compared.
+    // The affix list with per-affix deltas (reference, CARD ANATOMY line 3):
+    // "the affix list, each affix carrying its delta against the equipped
+    // piece: cyan up, red down, muted = for parity".
+    //
+    // THE LINE THAT CLIPPED. The affix text used to sit in a bare FillWidth
+    // slot with two fixed columns beside it, so on a 300px card the stat names
+    // came out as "Physical Damag+" and "Dash Cooldown+". It now WRAPS at a
+    // pixel width derived from the card's own width — computed before layout,
+    // never from an allotted size — so a long name takes a second line instead
+    // of losing its last word. The two right-hand columns stay fixed so the
+    // glyphs and magnitudes keep a straight edge, and the magnitude cannot be
+    // shaved by its own measured width (MenuValueColumn's comment has that
+    // mechanism).
     //
     // Deltas is UBreakerEquipmentComponent's answer, one row per affix in the
     // same order as Item.Affixes — this function decides nothing about better
     // or worse, it only picks a glyph and a colour. Pass an empty array for a
     // card with nothing to compare against (an equipped piece).
-    TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas)
+    TSharedRef<SWidget> MakeAffixLines(const FBreakerItemInstance& Item, const TArray<FBreakerAffixComparison>& Deltas,
+        float CardWidth)
     {
+        const float NameWrap = BreakerInventoryLayout::AffixNameWrapWidth(CardWidth);
         TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox);
-        Lines->AddSlot().AutoHeight()
-        [
-            MenuText(FText::FromString(FString::Printf(TEXT("ITEM LEVEL %d"), Item.ItemLevel)), BreakerUI::TypeCaption, SoftText)
-        ];
         for (int32 Index = 0; Index < Item.Affixes.Num(); ++Index)
         {
             FString Glyph;
+            FString Magnitude;
             FLinearColor GlyphColor = Muted;
             if (Deltas.IsValidIndex(Index))
             {
-                switch (Deltas[Index].Delta)
+                const FBreakerAffixComparison& Comparison = Deltas[Index];
+                Glyph = BreakerInventoryLayout::DeltaGlyph(Comparison.Delta);
+                Magnitude = BreakerInventoryLayout::FormatDelta(Comparison);
+                switch (Comparison.Delta)
                 {
-                    case EBreakerAffixDelta::Better: Glyph = BreakerUI::DeltaBetterGlyph; GlyphColor = Cyan; break;
-                    case EBreakerAffixDelta::Worse:  Glyph = BreakerUI::DeltaWorseGlyph;  GlyphColor = Harm; break;
-                    default:                         Glyph = BreakerUI::DeltaParityGlyph; GlyphColor = Muted; break;
+                    case EBreakerAffixDelta::Better: GlyphColor = Cyan; break;
+                    case EBreakerAffixDelta::Worse:  GlyphColor = Harm; break;
+                    default:                         GlyphColor = Muted; break;
                 }
             }
-            Lines->AddSlot().AutoHeight()
+            Lines->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
             [
                 SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().AutoWidth()
+                // VAlign_Top on the two right columns: when the name takes a
+                // second line the glyph and its magnitude stay with the FIRST
+                // line, which is the one carrying the stat.
+                + SHorizontalBox::Slot().FillWidth(1.0f)
+                [
+                    MenuWrappedText(FText::FromString(DescribeAffix(Item.Affixes[Index])),
+                        BreakerUI::TypeCaption, SoftText, NameWrap)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
                 [
                     SNew(SBox).WidthOverride(BreakerUI::DeltaGlyphColumn)
                     [
                         MenuText(FText::FromString(Glyph), BreakerUI::TypeCaption, GlyphColor, true)
                     ]
                 ]
-                + SHorizontalBox::Slot().FillWidth(1.0f)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
                 [
-                    MenuText(FText::FromString(DescribeAffix(Item.Affixes[Index])), BreakerUI::TypeCaption, SoftText)
+                    MenuValueColumn(FText::FromString(Magnitude), BreakerInventoryLayout::DeltaValueColumn,
+                        BreakerUI::TypeCaption, GlyphColor)
                 ]
             ];
         }
         return Lines;
+    }
+
+    // WHAT THE CARD CALLS THIS ITEM.
+    //
+    // The reference's line one is "name plus item level — the two things
+    // scanned first", and its sample names ("Riftstep Greaves") are authored
+    // copy. FBreakerItemInstance has no display name: the only named items in
+    // the game are the legendaries, which carry one on
+    // FBreakerLegendaryDefinition. Everything else is identified by what it is,
+    // which for a weapon is its ARCHETYPE (the one fact not already implied by
+    // where the card sits) and for armour is its slot.
+    //
+    // This is a CONTENT GAP, not a layout choice: line two still prints rarity
+    // and slot as the reference asks, so an unnamed piece of armour repeats its
+    // slot on both lines until item names exist.
+    FString ItemDisplayName(const FBreakerItemInstance& Item)
+    {
+        if (Item.IsLegendary())
+        {
+            const FBreakerLegendaryDefinition Legendary = UBreakerItemRuleLibrary::FindLegendary(Item.LegendaryId);
+            if (Legendary.IsValid() && !Legendary.DisplayName.IsEmpty())
+            {
+                return Legendary.DisplayName.ToString().ToUpper();
+            }
+        }
+        if (Item.IsWeapon())
+        {
+            return BreakerWeaponArchetypeNames::Short(Item.WeaponArchetype);
+        }
+        return SlotName(Item.Slot);
+    }
+
+    // Line two: rarity and slot. Aberrant and Anomalous say so in their own
+    // colour, because those two are the tiers with a cap behind them; the rest
+    // stay muted so a wall of loot does not become a wall of colour.
+    FString ItemRarityAndSlot(const FBreakerItemInstance& Item)
+    {
+        return FString::Printf(TEXT("%s · %s"), *RarityName(Item.Rarity), *ItemSlotLabel(Item));
+    }
+
+    FLinearColor RarityTagColor(EBreakerItemRarity Rarity)
+    {
+        return Rarity == EBreakerItemRarity::Aberrant || Rarity == EBreakerItemRarity::Anomalous
+            ? BreakerUI::RarityColor(Rarity) : Muted;
+    }
+
+    // A dashed hairline running DOWN. Mirror of DashedLine; the pair is what an
+    // empty slot's border is made of, since Slate has no dash pattern.
+    TSharedRef<SWidget> DashedColumn(float Height, const FLinearColor& Color, float Dash = 6.0f, float Gap = 6.0f)
+    {
+        TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+        const int32 Count = FMath::Clamp(FMath::CeilToInt(Height / (Dash + Gap)), 1, 240);
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, Gap)
+            [
+                SNew(SBox).HeightOverride(Dash)[SolidBlock(Color)]
+            ];
+        }
+        return Column;
+    }
+
+    // The dashed ring an EMPTY slot keeps: "empty slots keep full geometry with
+    // a dashed border and the slot name — the doll never looks broken, only
+    // unfinished". Four runs at known pixel sizes, never an allotted one.
+    TSharedRef<SWidget> DashedFrame(float Width, float Height, const FLinearColor& Color, const TSharedRef<SWidget>& Inner,
+        const FMargin& ContentPadding = FMargin(BreakerUI::Space16, BreakerUI::Space8))
+    {
+        return SNew(SOverlay)
+            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)[DashedLine(Width, Color)]
+            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)[DashedLine(Width, Color)]
+            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)[DashedColumn(Height, Color)]
+            + SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)[DashedColumn(Height, Color)]
+            + SOverlay::Slot().Padding(ContentPadding)[Inner];
     }
 
     // The five rarity beams, as the empty backpack draws them: one vertical
@@ -2561,36 +2806,97 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     // give ground before the backpack does — the backpack is where the cards
     // are, so it is the last thing that should be squeezed.
     const FWideScreenMetrics Metrics = MeasureWideScreen();
-    const float ZoneGutters = 2.0f * BreakerUI::Space24;
-    // Spec widths at 1760; scaled down together once the panel cannot hold
-    // them plus a usable backpack, floored where the copy stops fitting.
-    float CharacterColumnWidth = 560.0f;
-    float EquipmentColumnWidth = 400.0f;
-    {
-        const float MinimumBackpack = 640.0f;   // two 300px cards plus gutters
-        const float FixedRoom = Metrics.PanelWidth - ZoneGutters - MinimumBackpack;
-        const float SpecFixed = CharacterColumnWidth + EquipmentColumnWidth;
-        if (FixedRoom < SpecFixed)
-        {
-            const float Scale = FMath::Max(0.55f, FixedRoom / SpecFixed);
-            CharacterColumnWidth = FMath::Max(320.0f, CharacterColumnWidth * Scale);
-            EquipmentColumnWidth = FMath::Max(280.0f, EquipmentColumnWidth * Scale);
-        }
-    }
-    const float BackpackZoneWidth = FMath::Max(320.0f,
-        Metrics.PanelWidth - CharacterColumnWidth - EquipmentColumnWidth - ZoneGutters);
+    // The plate's INTERIOR is what the three zones divide, not the plate: the
+    // 1px ring, the 3px identity rail and the 24px content pad on each side
+    // are all spent before the first column starts. Dividing the outer width
+    // is how a 960 backpack becomes a 900 one and the third card falls off.
+    const float PlateInterior = Metrics.PanelWidth - BreakerUI::RailThickness
+        - 2.0f * BreakerUI::BorderThin - 2.0f * BreakerUI::Space24;
+    // Two 1px dividers between the three zones, and nothing else: the zones
+    // tile the interior, as the reference draws them.
+    const float ZoneGutters = 2.0f * BreakerUI::BorderThin;
+    const BreakerInventoryLayout::FColumns Columns =
+        BreakerInventoryLayout::SolveColumns(PlateInterior, ZoneGutters);
+    const float CharacterColumnWidth = Columns.Character;
+    const float EquipmentColumnWidth = Columns.Equipment;
+    const float BackpackZoneWidth = Columns.Backpack;
 
-    // One-click cards: an equipped slot unequips on click, a backpack item
-    // equips on click.
-    auto MakeSlotCard = [this, Equipment](EBreakerEquipSlot Slot) -> TSharedRef<SWidget>
+    // One equipment row, to the reference's CARD ANATOMY for the equipment
+    // column: a 44px icon square ringed in the rarity, the slot name over the
+    // item name, and the item level with its rarity tag pinned right. Clicking
+    // unequips.
+    auto MakeEquipRow = [this, Equipment, EquipmentColumnWidth](EBreakerEquipSlot Slot) -> TSharedRef<SWidget>
     {
         FBreakerItemInstance Item;
         const bool bHasItem = Equipment && Equipment->GetEquippedItem(Slot, Item);
-        const FLinearColor Accent = bHasItem ? RarityColor(Item.Rarity) : Disabled;
-        // An empty slot keeps its full geometry and its name: the doll never
-        // looks broken, only unfinished.
-        const FString Name = bHasItem ? RarityName(Item.Rarity) : TEXT("EMPTY");
-        const FString Details = bHasItem ? DescribeItem(Item) : TEXT("—");
+        const FLinearColor Accent = bHasItem ? RarityColor(Item.Rarity) : BorderEmphasis;
+
+        // The icon square. Empty for now — there is no item art — but it holds
+        // the geometry the reference gives it so the column does not re-space
+        // itself the day art lands.
+        TSharedRef<SWidget> Icon =
+            SNew(SBox).WidthOverride(BreakerUI::MinHitTarget).HeightOverride(BreakerUI::MinHitTarget)
+            [
+                BorderWrap(
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(BreakerUI::BgRaised)
+                    [
+                        SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+                    ],
+                    Accent)
+            ];
+
+        // An EMPTY slot keeps full geometry, a dashed border and its own name.
+        if (!bHasItem)
+        {
+            TSharedRef<SWidget> EmptyBody =
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Icon]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption, Muted, true)]
+                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                    [
+                        MenuText(FText::FromString(TEXT("EMPTY")), BreakerUI::TypeH2, Disabled, true)
+                    ]
+                ];
+
+            // The doomed-piece outline is registered for empty slots too: a
+            // legendary that claims a second slot can name one that is empty,
+            // and an outline that silently did nothing there would be a lie.
+            TSharedRef<SBorder> EmptyOutline = SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(Background)
+                .Padding(FMargin(BreakerUI::BorderSelected))
+                [
+                    DashedFrame(EquipmentColumnWidth - 2.0f * BreakerUI::BorderSelected,
+                        BreakerInventoryLayout::EquipRowHeight, BorderEmphasis, EmptyBody)
+                ];
+            EquipSlotOutlines.Add(Slot, EmptyOutline);
+            return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[EmptyOutline];
+        }
+
+        // The right stack: item level, and the rarity tag repeated under it for
+        // the two capped tiers ("on an equipped card the rarity tag repeats
+        // under the item level"). 96 is sized to ANOMALOUS, the longest tag,
+        // not to the first one that happened to be on screen.
+        constexpr float EquipRightColumn = 96.0f;
+        TSharedRef<SVerticalBox> RightStack = SNew(SVerticalBox);
+        RightStack->AddSlot().AutoHeight()
+        [
+            MenuValueColumn(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)),
+                EquipRightColumn, BreakerUI::TypeCaption, Primary)
+        ];
+        if (Item.Rarity == EBreakerItemRarity::Aberrant || Item.Rarity == EBreakerItemRarity::Anomalous)
+        {
+            RightStack->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                MenuValueColumn(FText::FromString(RarityName(Item.Rarity)),
+                    EquipRightColumn, BreakerUI::TypeCaption, RarityColor(Item.Rarity))
+            ];
+        }
 
         // The doomed-piece outline. It sits OUTSIDE the card's own ring so the
         // rarity ring is never overwritten, and it rests on the screen field
@@ -2603,7 +2909,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             [
                 MakeRarityCard(
                 SNew(SButton)
-                .ButtonColorAndOpacity(bHasItem ? PanelRaised : Panel)
+                .ButtonColorAndOpacity(PanelRaised)
                 .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
                 .OnClicked(FOnClicked::CreateLambda([this, Slot]()
                 {
@@ -2612,55 +2918,77 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                     return FReply::Handled();
                 }))
                 [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot().AutoHeight()
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Icon]
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                     [
-                        SNew(SHorizontalBox)
-                        + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption, Muted, true)]
-                        + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(Name), BreakerUI::TypeCaption, Accent, true)]
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(SlotName(Slot)), BreakerUI::TypeCaption,
+                                Item.IsWeapon() ? BreakerUI::Orange : Muted, true)
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            // Rarity on the rail and the NAME ONLY. The face
+                            // stays panel/10 at every tier. Wrapped at the room
+                            // left after the icon square, the right stack and
+                            // the plate's own chrome — "BODY ARMOUR" at H2 is
+                            // wider than it looks.
+                            MenuWrappedText(FText::FromString(ItemDisplayName(Item)), BreakerUI::TypeH2,
+                                RarityColor(Item.Rarity),
+                                FMath::Max(80.0f, EquipmentColumnWidth - BreakerUI::MinHitTarget - EquipRightColumn
+                                    - BreakerInventoryLayout::CardChrome - BreakerUI::Space16), true)
+                        ]
                     ]
-                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-                    [
-                        MenuText(FText::FromString(Details), BreakerUI::TypeCaption, bHasItem ? SoftText : Disabled)
-                    ]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[RightStack]
                 ],
-                bHasItem ? Item.Rarity : EBreakerItemRarity::Standard, bHasItem)
+                Item.Rarity, true)
             ];
 
         EquipSlotOutlines.Add(Slot, Outline);
-        return SNew(SBox).MinDesiredHeight(72.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[Outline];
+        return SNew(SBox).HeightOverride(BreakerInventoryLayout::EquipRowHeight + 2.0f * BreakerUI::BorderSelected)[Outline];
     };
 
-    // ---- Character column, 560 wide (UI-Inventory-Spec "Zones") -----------
-    // Render slot on top, gear totals pinned beneath it so the numbers are
-    // always on screen with the doll. The old single printf blob is gone:
-    // the spec wants aligned label/value rows with the value coloured by its
-    // function family.
+    // ---- Character column, 560 wide (reference, ZONES) --------------------
+    // "a full-body render slot (560x660, silhouette placeholder for now) with
+    // GEAR TOTALS pinned beneath it, so the numbers are always on screen with
+    // the doll". The render slot takes the fill and the totals are AutoHeight
+    // under it, which is what "pinned beneath" means in a column that stretches.
     TSharedRef<SVerticalBox> CharacterColumn = SNew(SVerticalBox);
     CharacterColumn->AddSlot().FillHeight(1.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
-        SNew(SBox).MinDesiredHeight(300.0f)
+        // 660 is the authored render height and it is a MINIMUM here: the
+        // column stretches with the plate and the silhouette centres in
+        // whatever it is given. The slot keeps full geometry while empty —
+        // the doll never looks broken, only unfinished.
+        SNew(SBox).MinDesiredHeight(BreakerInventoryLayout::RenderSlotHeight)
         [
-            // The render slot keeps full geometry while empty: the doll never
-            // looks broken, only unfinished.
             MakePlate(
                 SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
                 [
-                    MenuText(FText::FromString(TEXT("FULL-BODY RENDER SLOT\n\nSILHOUETTE PLACEHOLDER")), BreakerUI::TypeCaption, Muted)
+                    MenuText(FText::FromString(FString::Printf(
+                        TEXT("FULL-BODY RENDER SLOT\n%d x %d\nSILHOUETTE PLACEHOLDER"),
+                        FMath::RoundToInt(BreakerInventoryLayout::SpecCharacterColumn),
+                        FMath::RoundToInt(BreakerInventoryLayout::RenderSlotHeight))),
+                        BreakerUI::TypeCaption, Muted)
                 ],
                 BreakerUI::BgRaised, BorderEmphasis, FMargin(BreakerUI::Space16))
         ]
     ];
     {
+        // TWO COLUMNS of label/value, as the reference draws them. One column
+        // of twelve rows is 300px of totals under a 660px doll on a 1080 screen,
+        // which is the whole reason the reference pairs them up.
         TSharedRef<SVerticalBox> Totals = SNew(SVerticalBox);
         Totals->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             MenuText(FText::FromString(TEXT("GEAR TOTALS")), BreakerUI::TypeCaption, Muted, true)
         ];
-        auto AddTotalRow = [&Totals](const FString& Label, const FString& Value, const FLinearColor& ValueColor)
+        TArray<TSharedRef<SWidget>> TotalCells;
+        auto AddTotalRow = [&TotalCells](const FString& Label, const FString& Value, const FLinearColor& ValueColor)
         {
-            Totals->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
-            [
+            TotalCells.Add(
                 SNew(SHorizontalBox)
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
                 [
@@ -2669,11 +2997,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                 [
                     // Fixed value column so the numbers form a straight edge
-                    // and never reflow as they tick. Same clipping fix as the
-                    // skill rail's totals plate — see MenuValueColumn.
-                    MenuValueColumn(FText::FromString(Value), 104.0f, BreakerUI::TypeCaption, ValueColor)
-                ]
-            ];
+                    // and never reflow as they tick. Sized to the longest value
+                    // any of these rows can print ("+1234.5%"), not to the first
+                    // one seen. Same clipping fix as the skill rail's totals
+                    // plate — see MenuValueColumn.
+                    MenuValueColumn(FText::FromString(Value), 88.0f, BreakerUI::TypeCaption, ValueColor)
+                ]);
         };
         if (Equipment)
         {
@@ -2706,10 +3035,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         }
         else
         {
-            Totals->AddSlot().AutoHeight()
+            AddTotalRow(TEXT("NO EQUIPMENT"), TEXT("—"), Disabled);
+        }
+        // Pair the cells up. An odd count leaves the last cell alone in the
+        // left column rather than stretching it across both, so the label
+        // column never moves between builds.
+        for (int32 Index = 0; Index < TotalCells.Num(); Index += 2)
+        {
+            TSharedRef<SHorizontalBox> Pair = SNew(SHorizontalBox);
+            Pair->AddSlot().FillWidth(1.0f).Padding(0.0f, 0.0f, BreakerUI::Space24, 0.0f)[TotalCells[Index]];
+            Pair->AddSlot().FillWidth(1.0f)
             [
-                MenuText(FText::FromString(TEXT("NO EQUIPMENT COMPONENT")), BreakerUI::TypeCaption, Disabled, true)
+                TotalCells.IsValidIndex(Index + 1) ? TotalCells[Index + 1] : SNullWidget::NullWidget
             ];
+            Totals->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)[Pair];
         }
         CharacterColumn->AddSlot().AutoHeight()
         [
@@ -2717,33 +3056,55 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ];
     }
 
-    // ---- Equipment column, 400 wide ---------------------------------------
-    // Eight slots as full-width rows in wear order — head to foot, then
-    // trinkets, then weapons — rather than the old two-column split.
-    static const EBreakerEquipSlot WearOrder[] =
-    {
-        EBreakerEquipSlot::Helmet,
-        EBreakerEquipSlot::BodyArmour,
-        EBreakerEquipSlot::Gloves,
-        EBreakerEquipSlot::Waist,
-        EBreakerEquipSlot::Boots,
-        EBreakerEquipSlot::Necklace,
-        EBreakerEquipSlot::Primary,
-        EBreakerEquipSlot::Secondary,
-    };
+    // ---- Equipment column, 400 wide (reference, ZONES) --------------------
+    // "eight slots as full-width rows in WEAR ORDER: head to foot, then
+    // trinkets, then weapons". The order itself lives in
+    // BreakerInventoryLayout::WearOrder so a test can assert it without a
+    // widget — see the note there about the mockup contradicting its own prose.
     TSharedRef<SVerticalBox> EquipRows = SNew(SVerticalBox);
-    for (const EBreakerEquipSlot Slot : WearOrder)
+    for (const EBreakerEquipSlot Slot : BreakerInventoryLayout::WearOrder())
     {
-        EquipRows->AddSlot().AutoHeight()[MakeSlotCard(Slot)];
+        EquipRows->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MakeEquipRow(Slot)];
     }
     TSharedRef<SVerticalBox> EquipmentColumn = SNew(SVerticalBox);
     EquipmentColumn->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
-        MenuText(FText::FromString(TEXT("EQUIPPED — CLICK TO UNEQUIP")), BreakerUI::TypeCaption, Muted, true)
+        MenuText(FText::FromString(TEXT("EQUIPPED · 8 SLOTS · CLICK TO UNEQUIP")), BreakerUI::TypeCaption, Muted, true)
     ];
     EquipmentColumn->AddSlot().FillHeight(1.0f)
     [
         SNew(SScrollBox) + SScrollBox::Slot()[EquipRows]
+    ];
+    // The standing explainer the reference pins to the foot of this column.
+    // It states the rule ONCE, permanently, so the per-card LIMIT FULL tell is
+    // a reminder rather than the first the player has heard of a cap.
+    EquipmentColumn->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(FText::FromString(TEXT("EQUIP LIMITS")), BreakerUI::TypeCaption, Harm, true)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                // WRAPPED, not hand-broken. The three hard \n line breaks this
+                // replaces were each longer than the column and clipped to
+                // "ANOTI" / "RARIT" / "HOVI" — an author-chosen line break is a
+                // guess about a width nobody measured. The wrap width is the
+                // column's own, minus the plate's chrome.
+                //
+                // The caps come from the component, never from a literal here:
+                // the screen must not hold a second opinion about a rule that
+                // decides which of the player's items gets ejected.
+                MenuWrappedText(FText::FromString(FString::Printf(
+                    TEXT("ABERRANT %d · ANOMALOUS %d. EQUIPPING ANOTHER SWAPS THE LOWEST ITEM LEVEL OF THAT RARITY. THE PIECE IT EJECTS OUTLINES RED ON HOVER."),
+                    UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Aberrant),
+                    UBreakerEquipmentComponent::EquipLimitForRarity(EBreakerItemRarity::Anomalous))),
+                    BreakerUI::TypeCaption, SoftText,
+                    FMath::Max(120.0f, EquipmentColumnWidth - BreakerInventoryLayout::CardChrome))
+            ],
+            BreakerUI::BgRaised, Harm, FMargin(BreakerUI::Space16, BreakerUI::Space8))
     ];
 
     // Bottom: backpack grid — best rarity first, optional slot filter,
@@ -2760,19 +3121,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         return static_cast<uint8>(A.Rarity) > static_cast<uint8>(B.Rarity);
     });
     const int32 TotalBackpackCount = BackpackItems.Num();
-    // Cards per row is arithmetic on the measured zone, not a frozen 2: a
-    // wider window should show more loot, and a narrower one must not push the
-    // second card out through the panel edge.
-    const float BackpackCardWidth = 300.0f;
-    const int32 BackpackCardsPerRow = FMath::Clamp(
-        FMath::FloorToInt((BackpackZoneWidth + BreakerUI::Space8) / (BackpackCardWidth + BreakerUI::Space8)), 1, 4);
-    if (BackpackSlotFilter >= 0)
+    // "a 3-across card grid at 16px gaps" — three where three is READABLE, two
+    // where it is not. The owner's requirement is that the affixes can be read;
+    // the reference's count is a means to it, and the reference was drawn with
+    // narrower type than ours. SolveCardsPerRow holds the rule and a test pins
+    // it. Both numbers are settled before layout starts, which is what keeps
+    // SWrapBox off this screen.
+    // What the GRID actually gets, not what the zone is: the 16px gap between
+    // the equipment divider and this column, and the scroll bar the card list
+    // sits behind. Sizing the cards off the zone is how a third card ends up
+    // 32px past the edge it was measured against.
+    constexpr float ScrollBarAllowance = 16.0f;
+    const float BackpackGridWidth = FMath::Max(160.0f,
+        BackpackZoneWidth - BreakerUI::Space16 - ScrollBarAllowance);
+    const int32 BackpackCardsPerRow = BreakerInventoryLayout::SolveCardsPerRow(BackpackGridWidth);
+    const float BackpackCardWidth = BreakerInventoryLayout::BackpackCardWidth(BackpackGridWidth, BackpackCardsPerRow);
+    BackpackItems.RemoveAll([this](const FBreakerItemInstance& Item)
     {
-        BackpackItems.RemoveAll([this](const FBreakerItemInstance& Item)
-        {
-            return static_cast<int32>(Item.Slot) != BackpackSlotFilter;
-        });
-    }
+        return !BreakerInventoryLayout::PassesFilter(Item.Slot, BackpackFilter);
+    });
     for (const FBreakerItemInstance& Item : BackpackItems)
     {
         const FGuid ItemId = Item.ItemId;
@@ -2784,23 +3151,27 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             ? Equipment->PreviewEquip(Item)
             : UBreakerEquipmentComponent::PreviewEquipAgainst(TArray<FBreakerItemInstance>(), Item);
 
-        // Footer line one: the ordinary slot swap. Gold means "this costs you
-        // something", cyan means the action is free.
-        const FString DeltaLine = Preview.bSlotOccupied
-            ? FString::Printf(TEXT("EQUIP · REPLACES %s i%d"), *RarityName(Preview.SlotDisplaced.Rarity), Preview.SlotDisplaced.ItemLevel)
-            : FString(TEXT("EQUIP · SLOT EMPTY"));
-        const FLinearColor DeltaColor = Preview.bSlotOccupied ? Amber : Cyan;
-
-        // Footer line two, only when the rarity cap is already met: a SECOND
-        // consequence, so it gets a second line. The action is never blocked —
-        // it is disclosed (UI-Inventory-Spec "Limit tells"). Items carry no
-        // display name yet, so the ejected piece is named by rarity and slot,
-        // which is exactly how its own card is titled.
-        const bool bLimitTell = Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid();
-        const FString LimitLine = bLimitTell
-            ? FString::Printf(TEXT("LIMIT FULL %d/%d · EJECTS %s %s i%d"),
-                Preview.RarityCount, Preview.RarityLimit,
-                *RarityName(Preview.LimitDisplaced.Rarity), *SlotName(Preview.LimitDisplaced.Slot), Preview.LimitDisplaced.ItemLevel)
+        // THE FOOTER, and the reference gives it one line with two halves:
+        // "the footer line states the consequence of clicking", and when a cap
+        // is being spent "the footer reads LIMIT FULL 3/3 beside the name of
+        // the piece the swap ejects". The action is never blocked — it is
+        // disclosed.
+        const bool bLimitTell = BreakerInventoryLayout::ShouldShowLimitTell(Preview);
+        FString FooterLead = BreakerInventoryLayout::MakeFooterLead(Preview);
+        if (!bLimitTell && Preview.bSlotOccupied)
+        {
+            FooterLead += FString::Printf(TEXT(" %s i%d"),
+                *ItemDisplayName(Preview.SlotDisplaced), Preview.SlotDisplaced.ItemLevel);
+        }
+        // Harm for a cap being spent, gold for "this costs you something",
+        // cyan for a free action.
+        const FLinearColor FooterLeadColor = bLimitTell ? Harm : (Preview.bSlotOccupied ? Amber : Cyan);
+        // The right half names the ejected piece. Gold, because the eject is
+        // the cost, and the cap itself is what the harm-red half states.
+        const FString FooterTrail = bLimitTell
+            ? FString::Printf(TEXT("SWAPS %s %s i%d"),
+                *ItemDisplayName(Preview.LimitDisplaced), *SlotName(Preview.LimitDisplaced.Slot),
+                Preview.LimitDisplaced.ItemLevel)
             : FString();
         const EBreakerEquipSlot DoomedSlot = Preview.LimitDisplaced.Slot;
 
@@ -2814,15 +3185,20 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
 
         // Fixed rows of a KNOWN count, never a wrap box: SWrapBox measured by
         // allotted width inside a scroll box oscillates between two layouts
-        // every frame. The count comes from the measured backpack zone above,
-        // which is arithmetic done before layout rather than during it.
+        // every frame. Three across, at the reference's 16px gap.
         if (BackpackCardIndex % BackpackCardsPerRow == 0)
         {
             BackpackRow = SNew(SHorizontalBox);
             BackpackGrid->AddSlot().AutoHeight()[BackpackRow.ToSharedRef()];
         }
+        // Gap on the right of every card but the last in its row, and under
+        // every card. A trailing gap on the third card is what pushes a
+        // 3-across grid into needing 4-across room.
+        const bool bLastInRow = (BackpackCardIndex % BackpackCardsPerRow) == BackpackCardsPerRow - 1;
         ++BackpackCardIndex;
-        BackpackRow->AddSlot().AutoWidth().Padding(0.0f, 0.0f, 8.0f, 8.0f)
+        BackpackRow->AddSlot().AutoWidth()
+            .Padding(0.0f, 0.0f, bLastInRow ? 0.0f : BreakerInventoryLayout::BackpackCardGap,
+                BreakerInventoryLayout::BackpackCardGap)
         [
             SNew(SBox).WidthOverride(BackpackCardWidth)
             [
@@ -2866,35 +3242,80 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                             }))
                             [
                                 SNew(SVerticalBox)
+                                // LINE ONE: name plus item level, "the two
+                                // things scanned first". The name carries the
+                                // rarity colour; the face stays panel/10.
                                 + SVerticalBox::Slot().AutoHeight()
                                 [
                                     SNew(SHorizontalBox)
-                                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(RarityName(Item.Rarity)), BreakerUI::TypeH2, RarityColor(Item.Rarity), true)]
-                                    + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 22.0f, 0.0f)[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)), BreakerUI::TypeCaption, Primary, true)]
+                                    // THE ROW THAT COLLIDED. The name used to
+                                    // take a bare FillWidth slot, so "BODY
+                                    // ARMOUR" ran into the i50 beside it and
+                                    // into the discard X floating above that.
+                                    // It now wraps at a width that has both of
+                                    // them subtracted out of it.
+                                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                                    [
+                                        MenuWrappedText(FText::FromString(ItemDisplayName(Item)), BreakerUI::TypeH2,
+                                            RarityColor(Item.Rarity),
+                                            BreakerInventoryLayout::CardTitleWrapWidth(BackpackCardWidth), true)
+                                    ]
+                                    // DiscardClearance of right pad clears the
+                                    // discard X in the overlay above;
+                                    // ItemLevelColumn is sized to "i9999",
+                                    // which O29's item-level ceiling allows.
+                                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                                        .Padding(BreakerUI::Space8, 0.0f, BreakerInventoryLayout::DiscardClearance, 0.0f)
+                                    [
+                                        MenuValueColumn(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)),
+                                            BreakerInventoryLayout::ItemLevelColumn, BreakerUI::TypeCaption, Primary)
+                                    ]
                                 ]
+                                // LINE TWO: rarity and slot.
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                                 [
-                                    MenuText(FText::FromString(ItemSlotLabel(Item)), BreakerUI::TypeCaption, Muted, true)
+                                    MenuWrappedText(FText::FromString(ItemRarityAndSlot(Item)), BreakerUI::TypeCaption,
+                                        RarityTagColor(Item.Rarity),
+                                        BreakerInventoryLayout::CardContentWidth(BackpackCardWidth), true)
                                 ]
                                 + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                                 [
                                     // Line 3 of the card anatomy: every affix
                                     // carrying its delta against the equipped
                                     // piece in this slot.
-                                    MakeAffixLines(Item, Preview.AffixDeltas)
+                                    MakeAffixLines(Item, Preview.AffixDeltas, BackpackCardWidth)
                                 ]
-                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                                // THE FOOTER, above a 1px divider as the
+                                // reference draws it: structure reads off
+                                // borders in this system, never off gaps.
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)
                                 [
-                                    MenuText(FText::FromString(DeltaLine.ToUpper()), BreakerUI::TypeCaption, DeltaColor, true)
+                                    SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderEmphasis)]
                                 ]
-                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                                + SVerticalBox::Slot().AutoHeight()
                                 [
-                                    // Harm red, and only present when it is
-                                    // true: an always-visible limit line would
-                                    // stop meaning anything.
-                                    bLimitTell
-                                        ? StaticCastSharedRef<SWidget>(MenuText(FText::FromString(LimitLine), BreakerUI::TypeCaption, Harm, true))
-                                        : SNullWidget::NullWidget
+                                    SNew(SVerticalBox)
+                                    + SVerticalBox::Slot().AutoHeight()
+                                    [
+                                        MenuWrappedText(FText::FromString(FooterLead.ToUpper()), BreakerUI::TypeCaption,
+                                            FooterLeadColor, BreakerInventoryLayout::CardContentWidth(BackpackCardWidth), true)
+                                    ]
+                                    + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                                    [
+                                        // The ejected piece, and only when there
+                                        // is one: an always-present second line
+                                        // would stop meaning anything. Stacked
+                                        // rather than set beside the lead —
+                                        // a 300px card cannot hold two names on
+                                        // one row without clipping one of them,
+                                        // and clipping is the defect this file
+                                        // has been reported for five times.
+                                        bLimitTell
+                                            ? StaticCastSharedRef<SWidget>(MenuWrappedText(FText::FromString(FooterTrail),
+                                                BreakerUI::TypeCaption, Amber,
+                                                BreakerInventoryLayout::CardContentWidth(BackpackCardWidth), true))
+                                            : SNullWidget::NullWidget
+                                    ]
                                 ]
                             ],
                             Item.Rarity, true)
@@ -2918,19 +3339,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ];
     }
 
-    // Slot filter row: ALL plus one chip per equipment slot.
+    // FILTER CHIPS: ALL / ARMOUR / WEAPONS / TRINKETS, the four the reference
+    // names. FOUR CATEGORIES, not nine slots — nine slot chips are what made
+    // this bar overflow in the first place, and "which of my nine slots" is a
+    // question the equipment column already answers.
     //
-    // The chips are BUILT here and PACKED into rows below, once the bar knows
-    // how much width it has. Before this they lived in an SHorizontalBox
+    // The chips are still BUILT here and PACKED into rows below, once the bar
+    // knows how much width it has. Before that they lived in an SHorizontalBox
     // FillWidth slot beside the input legend, which is two bugs in one place:
     // an overflowing horizontal box does not wrap, it just keeps drawing, so
     // the row ran off the right edge of a 1920 screen AND printed through the
     // legend that shared the slot ("GLOVES / X DISCARD LMB NECKLACE").
     TArray<TSharedRef<SWidget>> FilterChips;
     TArray<float> FilterChipWidths;
-    auto AddFilterChip = [this, &FilterChips, &FilterChipWidths](const FString& Label, int32 FilterValue)
+    auto AddFilterChip = [this, &FilterChips, &FilterChipWidths](const FString& Label,
+        BreakerInventoryLayout::EBackpackFilter FilterValue)
     {
-        const bool bSelectedChip = BackpackSlotFilter == FilterValue;
+        const bool bSelectedChip = BackpackFilter == FilterValue;
         const float ChipBorder = bSelectedChip ? BreakerUI::BorderSelected : BreakerUI::BorderThin;
         FilterChipWidths.Add(MeasureChipWidth(Label, BreakerUI::Space8, ChipBorder));
         FilterChips.Add(
@@ -2940,7 +3365,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
                 .OnClicked(FOnClicked::CreateLambda([this, FilterValue]()
                 {
-                    BackpackSlotFilter = FilterValue;
+                    BackpackFilter = FilterValue;
                     Rebuild(EBreakerMenuScreen::Inventory);
                     return FReply::Handled();
                 }))
@@ -2950,11 +3375,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
                 bSelectedChip ? Cyan : BorderEmphasis,
                 ChipBorder));
     };
-    AddFilterChip(TEXT("ALL"), -1);
-    for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
-    {
-        AddFilterChip(SlotName(static_cast<EBreakerEquipSlot>(SlotIndex)), SlotIndex);
-    }
+    AddFilterChip(TEXT("ALL"), BreakerInventoryLayout::EBackpackFilter::All);
+    AddFilterChip(TEXT("ARMOUR"), BreakerInventoryLayout::EBackpackFilter::Armour);
+    AddFilterChip(TEXT("WEAPONS"), BreakerInventoryLayout::EBackpackFilter::Weapons);
+    AddFilterChip(TEXT("TRINKETS"), BreakerInventoryLayout::EBackpackFilter::Trinkets);
 
     // Clean-up chips. First click arms (gold, "CONFIRM"), second click opens
     // the confirmation modal — it never destroys anything directly. Any other
@@ -3191,16 +3615,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         *BreakerUI::FormatTicker(static_cast<float>(GearScore)));
 
     // ---- Zones -------------------------------------------------------------
+    // 560 | 400 | the rest, separated by 1px DIVIDERS rather than by gutters —
+    // the reference tiles the three zones edge to edge and reads the structure
+    // off the borders, which is the same rule the rest of FIELDPLATE follows
+    // ("depth comes from border value"). It is also why the arithmetic in
+    // SolveColumns adds up to the panel exactly: 560 + 400 + 960 = 1920.
     TSharedRef<SHorizontalBox> Body = SNew(SHorizontalBox);
     Body->AddSlot().AutoWidth()
     [
-        SNew(SBox).WidthOverride(CharacterColumnWidth)[CharacterColumn]
+        SNew(SBox).WidthOverride(CharacterColumnWidth).Padding(FMargin(0.0f, 0.0f, BreakerUI::Space16, 0.0f))[CharacterColumn]
     ];
-    Body->AddSlot().AutoWidth().Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    Body->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]];
+    Body->AddSlot().AutoWidth()
     [
-        SNew(SBox).WidthOverride(EquipmentColumnWidth)[EquipmentColumn]
+        SNew(SBox).WidthOverride(EquipmentColumnWidth).Padding(FMargin(BreakerUI::Space16, 0.0f))[EquipmentColumn]
     ];
-    Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    Body->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]];
+    Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
     [
         BackpackColumn
     ];
@@ -3214,7 +3645,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         Body,
         SNullWidget::NullWidget,
         Metrics.PanelWidth,
-        Metrics.PanelHeight);
+        Metrics.PanelHeight,
+        // THE JITTER FIX, and it is the one the previous pass missed. A plate
+        // whose height is its CONTENT's height, centred, moves every time the
+        // body changes size — which on this screen is every equip, every
+        // filter, every status line. Fixed height, so the rectangle cannot
+        // move. See the long note in BuildZonedFrame.
+        /*bFillHeight=*/true);
 
     if (DiscardModalIndex < 0) return Screen;
 
@@ -6852,7 +7289,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         Body,
         SNullWidget::NullWidget,
         Metrics.PanelWidth,
-        Metrics.PanelHeight);
+        Metrics.PanelHeight,
+        // Fixed height, never content height — see the shrink-wrap note in
+        // BuildZonedFrame. A forge selection changes the body's height, and a
+        // centred plate that changes height jumps.
+        /*bFillHeight=*/true);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
@@ -7037,7 +7478,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
         SNew(SScrollBox) + SScrollBox::Slot()[Body],
         SNullWidget::NullWidget,
         Metrics.PanelWidth,
-        Metrics.PanelHeight);
+        Metrics.PanelHeight,
+        // Fixed height — see the shrink-wrap note in BuildZonedFrame.
+        /*bFillHeight=*/true);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()

@@ -4,6 +4,9 @@
 #include "Widgets/SCompoundWidget.h"
 
 #include "Items/BreakerItemTypes.h"
+// The FIELDPLATE tokens: the layout namespace below picks its delta glyphs
+// from the same one place the builder draws them from.
+#include "UI/BreakerUIStyle.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "UObject/StrongObjectPtr.h"
 // Complete type: the roster is held by value in a TStrongObjectPtr below.
@@ -51,6 +54,265 @@ enum class EBreakerMenuScreen : uint8
     // the middle would renumber every screen above it for no gain.
     Travel
 };
+
+// ---------------------------------------------------------------------------
+// INVENTORY LAYOUT — the loadout screen's arithmetic and its text rules, split
+// out of the builder so they can be exercised with no widget, no world and no
+// Slate application.
+//
+// Everything here is a PRESENTATION rule from Docs/Design/UI-Reference/
+// Inventory.dc.html. Nothing here decides a game rule: which piece a swap
+// ejects, whether an affix is better or worse and what a rarity cap is are all
+// UBreakerEquipmentComponent's answers, arriving as FBreakerEquipPreview. This
+// namespace only chooses a width, a glyph and a sentence.
+// ---------------------------------------------------------------------------
+namespace BreakerInventoryLayout
+{
+    // The reference's ZONES section, authored at 1920x1080.
+    inline constexpr float SpecPanelWidth = 1920.0f;
+    inline constexpr float HeaderHeight = 88.0f;
+    inline constexpr float SpecCharacterColumn = 560.0f;
+    inline constexpr float SpecEquipmentColumn = 400.0f;
+    inline constexpr float SpecBackpackColumn = 960.0f;
+    // The render slot's authored box. Height is a MINIMUM here: the column
+    // stretches with the plate, and the doll is centred in whatever it gets.
+    inline constexpr float RenderSlotHeight = 660.0f;
+    inline constexpr float FilterBarHeight = 64.0f;
+    // "a 3-across card grid at 16px gaps". THREE IS THE TARGET, NOT THE RULE.
+    //
+    // The reference was drawn with its own type metrics; ours are wider, and a
+    // 300px card could not hold "Physical Damage Reduction" — the affix names
+    // truncated mid-word ("Physical Damag+"), which is the sixth report of
+    // clipped text in this file. The requirement the owner actually stated is
+    // LEGIBILITY; the grid count is a means to it. So the count is solved from
+    // the zone against a minimum readable card width, capping at three.
+    //
+    // It is still arithmetic done BEFORE layout starts, on a zone width that
+    // came from the viewport — the same rule that keeps SWrapBox off this
+    // screen. Nothing here reads an allotted size.
+    inline constexpr int32 MaxBackpackCardsPerRow = 3;
+    inline constexpr float BackpackCardGap = 16.0f;
+    // Floors. Below these the copy stops fitting rather than merely looking
+    // tight, and the backpack is the last zone that should give ground because
+    // it is where the cards are.
+    inline constexpr float MinBackpackColumn = 640.0f;
+    inline constexpr float MinCharacterColumn = 320.0f;
+    inline constexpr float MinEquipmentColumn = 280.0f;
+    // One equipment row: a 44px icon square (the system's minimum hit target)
+    // plus its two stacked text lines and 12px of interior padding.
+    inline constexpr float EquipRowHeight = 68.0f;
+
+    struct FColumns
+    {
+        float Character = SpecCharacterColumn;
+        float Equipment = SpecEquipmentColumn;
+        float Backpack = SpecBackpackColumn;
+    };
+
+    // Spec widths at the authored panel; scaled down TOGETHER once the panel
+    // cannot hold them plus a usable backpack, each floored independently.
+    inline FColumns SolveColumns(float PanelWidth, float Gutters)
+    {
+        FColumns Columns;
+        const float FixedRoom = PanelWidth - Gutters - MinBackpackColumn;
+        const float SpecFixed = SpecCharacterColumn + SpecEquipmentColumn;
+        if (FixedRoom < SpecFixed)
+        {
+            // FLOORED to whole pixels, and that is not cosmetic. Scaling both
+            // columns by a ratio makes their sum land a fraction of a pixel
+            // ABOVE the room they were given (560+400 at 760/960 sums to
+            // 760.00001), so the backpack came out at 639.99999 against its own
+            // 640 floor — a real test failure from a rounding error rather than
+            // from a layout mistake. Rounding each column down guarantees the
+            // sum never exceeds FixedRoom, so the floor below is exact.
+            // Whole-pixel column widths are also what Slate wants: a fractional
+            // width is where measure-versus-rasterise disagreements start, and
+            // this file has six reports of clipped text.
+            const float Scale = FMath::Max(0.55f, FixedRoom / SpecFixed);
+            Columns.Character = FMath::Max(MinCharacterColumn, FMath::FloorToFloat(SpecCharacterColumn * Scale));
+            Columns.Equipment = FMath::Max(MinEquipmentColumn, FMath::FloorToFloat(SpecEquipmentColumn * Scale));
+        }
+        Columns.Backpack = FMath::Max(320.0f, PanelWidth - Columns.Character - Columns.Equipment - Gutters);
+        return Columns;
+    }
+
+    // ---- THE READABILITY BUDGET -------------------------------------------
+    // Every number below exists so a card can print its affix lines. They are
+    // written as a BUDGET rather than as a card width, because that is the
+    // direction the requirement runs: the longest stat name decides how wide a
+    // card has to be, and the card width decides how many fit.
+    //
+    // Approximate advance of one glyph at TypeCaption in the engine's Slate
+    // face (Roboto Regular, 11px, ~0.63em). An ESTIMATE and deliberately so:
+    // the font measure service needs a renderer, and this has to be usable from
+    // a headless test. Getting it slightly wrong is safe in both directions —
+    // every text block that consumes it also wraps at a known pixel width, so
+    // an underestimate costs a second wrapped line, never a truncated word.
+    inline constexpr float CaptionAdvance = 6.9f;
+    // The longest affix DisplayName in the slice pool, in characters.
+    // "Physical Damage Reduction" is 25 today; one spare. Tests/
+    // BreakerInventoryLayoutTests.cpp asserts the pool against this, so an
+    // affix with a longer name fails a test instead of silently truncating on
+    // the most-read line of the screen.
+    inline constexpr int32 LongestAffixNameChars = 26;
+    inline float EstimateCaptionWidth(int32 Characters)
+    {
+        return static_cast<float>(Characters) * CaptionAdvance;
+    }
+    // The affix row's right-hand columns: the delta glyph and its magnitude.
+    // 48 holds "1234.5", which is the widest value O29's affix ladder rolls.
+    inline constexpr float DeltaValueColumn = 48.0f;
+    inline constexpr float AffixTailWidth =
+        BreakerUI::DeltaGlyphColumn + DeltaValueColumn + BreakerUI::Space4;
+    // Everything a card spends before its content starts: the 3px rarity rail,
+    // the 1px ring on both sides, and 16px of interior pad on both sides.
+    inline constexpr float CardChrome =
+        BreakerUI::RailThickness + 2.0f * BreakerUI::BorderThin + 2.0f * BreakerUI::Space16;
+    // Line one's right-hand furniture: the item-level column, its gap, and the
+    // clearance the discard X needs in the overlay above the card.
+    inline constexpr float ItemLevelColumn = 56.0f;
+    inline constexpr float DiscardClearance = 22.0f;
+
+    // THE RULE THIS SCREEN IS NOW HELD TO: a card is only worth drawing at a
+    // width where the longest stat name fits on one line beside its delta.
+    inline constexpr float MinAffixColumnWidth = LongestAffixNameChars * CaptionAdvance;
+    inline constexpr float MinReadableCardWidth = MinAffixColumnWidth + AffixTailWidth + CardChrome;
+
+    // How many cards a zone can hold READABLY. Three is the target and the cap;
+    // below the readable width it drops to two, then to one. One card that can
+    // be read beats three that cannot.
+    inline int32 SolveCardsPerRow(float ZoneWidth)
+    {
+        for (int32 Count = MaxBackpackCardsPerRow; Count > 1; --Count)
+        {
+            const float Gaps = BackpackCardGap * (Count - 1);
+            if ((ZoneWidth - Gaps) / static_cast<float>(Count) >= MinReadableCardWidth) return Count;
+        }
+        return 1;
+    }
+
+    // Width of one backpack card once the count is known. Floored so a card is
+    // never negative on an absurd window.
+    inline float BackpackCardWidth(float ZoneWidth, int32 CardsPerRow)
+    {
+        const int32 Count = FMath::Max(1, CardsPerRow);
+        const float Gaps = BackpackCardGap * (Count - 1);
+        return FMath::Max(140.0f, (ZoneWidth - Gaps) / static_cast<float>(Count));
+    }
+
+    // What is left of a card for text.
+    inline float CardContentWidth(float CardWidth)
+    {
+        return FMath::Max(80.0f, CardWidth - CardChrome);
+    }
+
+    // Where an affix line wraps. A pixel figure derived from a card width that
+    // was itself settled before layout — never an allotted size.
+    inline float AffixNameWrapWidth(float CardWidth)
+    {
+        return FMath::Max(80.0f, CardContentWidth(CardWidth) - AffixTailWidth);
+    }
+
+    // Where the item name on line one wraps: clear of the item level AND of the
+    // discard X floating over the card's top-right corner. The name collided
+    // with both before this existed.
+    inline float CardTitleWrapWidth(float CardWidth)
+    {
+        return FMath::Max(64.0f,
+            CardContentWidth(CardWidth) - ItemLevelColumn - BreakerUI::Space8 - DiscardClearance);
+    }
+
+    // WEAR ORDER, and it is the reference's PROSE order: "head to foot, then
+    // trinkets, then weapons". That deliberately differs from the mockup's own
+    // markup, which draws boots before necklace before waist — i.e. it simply
+    // walks EBreakerEquipSlot's declaration order and puts a trinket in the
+    // middle of the armour run. The prose is the rule; the mockup is one
+    // hand-built sample of it. Flagged rather than silently reconciled.
+    inline const TArray<EBreakerEquipSlot>& WearOrder()
+    {
+        static const TArray<EBreakerEquipSlot> Order = {
+            EBreakerEquipSlot::Helmet,
+            EBreakerEquipSlot::BodyArmour,
+            EBreakerEquipSlot::Gloves,
+            EBreakerEquipSlot::Waist,
+            EBreakerEquipSlot::Boots,
+            EBreakerEquipSlot::Necklace,
+            EBreakerEquipSlot::Primary,
+            EBreakerEquipSlot::Secondary,
+        };
+        return Order;
+    }
+
+    // The filter bar's four chips: ALL / ARMOUR / WEAPONS / TRINKETS. Four
+    // CATEGORIES, not nine slots — the reference names these four, and nine
+    // slot chips are what forced the bar to wrap into rows in the first place.
+    enum class EBackpackFilter : int32
+    {
+        All = -1,
+        Armour = 0,
+        Weapons = 1,
+        Trinkets = 2,
+    };
+
+    inline bool PassesFilter(EBreakerEquipSlot Slot, EBackpackFilter Filter)
+    {
+        switch (Filter)
+        {
+            case EBackpackFilter::Armour:
+                return Slot == EBreakerEquipSlot::Helmet || Slot == EBreakerEquipSlot::BodyArmour
+                    || Slot == EBreakerEquipSlot::Gloves || Slot == EBreakerEquipSlot::Waist
+                    || Slot == EBreakerEquipSlot::Boots;
+            case EBackpackFilter::Weapons:
+                return FBreakerItemInstance::IsWeaponSlot(Slot);
+            case EBackpackFilter::Trinkets:
+                return Slot == EBreakerEquipSlot::Necklace;
+            default:
+                return true;
+        }
+    }
+
+    // The glyph column. The COMPONENT decides better/worse/parity; this only
+    // picks the mark, which is why it takes the decision rather than the two
+    // values. See BreakerUIStyle.h for why these are ASCII today.
+    inline const TCHAR* DeltaGlyph(EBreakerAffixDelta Delta)
+    {
+        switch (Delta)
+        {
+            case EBreakerAffixDelta::Better: return BreakerUI::DeltaBetterGlyph;
+            case EBreakerAffixDelta::Worse:  return BreakerUI::DeltaWorseGlyph;
+            default:                         return BreakerUI::DeltaParityGlyph;
+        }
+    }
+
+    // "each carrying its delta against the equipped piece". The magnitude is
+    // printed unsigned — the glyph beside it already carries the sign, and a
+    // "- -40" would read as a typo. Parity prints nothing but the glyph.
+    inline FString FormatDelta(const FBreakerAffixComparison& Comparison)
+    {
+        if (Comparison.Delta == EBreakerAffixDelta::Parity) return FString();
+        return FString::Printf(TEXT("%.1f"), FMath::Abs(Comparison.GetDifference()));
+    }
+
+    // LIMIT TELLS. A card discloses a cap ejection only when the component
+    // says the cap is exceeded AND names the piece that leaves — a tell with
+    // no named victim is worse than no tell, because the player cannot check
+    // it against the equipment column.
+    inline bool ShouldShowLimitTell(const FBreakerEquipPreview& Preview)
+    {
+        return Preview.bExceedsRarityLimit && Preview.LimitDisplaced.IsValid();
+    }
+
+    // The footer's left half: "LIMIT FULL 3/3" when a cap is being spent,
+    // otherwise what the ordinary slot swap costs.
+    inline FString MakeFooterLead(const FBreakerEquipPreview& Preview)
+    {
+        if (ShouldShowLimitTell(Preview))
+        {
+            return FString::Printf(TEXT("LIMIT FULL %d/%d"), Preview.RarityCount, Preview.RarityLimit);
+        }
+        return Preview.bSlotOccupied ? TEXT("EQUIP · REPLACES") : TEXT("EQUIP · SLOT EMPTY");
+    }
+}
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
 {
@@ -258,8 +520,9 @@ private:
     FText CharacterScreenStatus;
     TSharedPtr<SBox> ContentHost;
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
-    // -1 shows every slot; otherwise an EBreakerEquipSlot index.
-    int32 BackpackSlotFilter = -1;
+    // ALL / ARMOUR / WEAPONS / TRINKETS, the reference's four filter chips.
+    BreakerInventoryLayout::EBackpackFilter BackpackFilter =
+        BreakerInventoryLayout::EBackpackFilter::All;
     // Two-click arm for the destructive cleanup buttons. A click sets
     // PendingCleanupArm and rebuilds; Rebuild() moves it into
     // CleanupArmedIndex and clears the pending value, so any other
