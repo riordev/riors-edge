@@ -14,13 +14,68 @@ The current character concept proposes five classes—Caster, Swift, Gunsmith, T
 
 Locked progression decisions: class selection is permanent per character; characters equip two class abilities and one ultimate; solo is the primary balance target with parties up to five; DoTs can crit and snapshot offensive stats at application; respecs require a Forge; the level cap is 50 with a hard stop and no post-cap power progression, so all endgame character power comes from gear; dash, slide, wall ride, block, and dodge are all base kit, with trees improving them rather than unlocking them; TWO JUMPS are base kit for everyone and Swift innately unlocks a third later (O25, superseding the earlier air-jump-is-tree-granted line), leaving parry as the only tree-granted verb. Movement is a big part of the game but is NOT the centre of the design and gets no further dedicated passes for now (O26).
 
-## Current milestone and next actions (updated 2026-08-14)
+## Current milestone and next actions (updated 2026-08-15, overnight session)
 
-Current milestone: **Vertical-slice systems — Swift AND Caster playable
-end-to-end, framed by the O33 identity stack** (four avenues: class verbs,
-Core axes, gear, legendary rewrites — class is never the sole trunk).
-Movement gym, combat sandbox, loot loop, and the progression framework are
-all live; presentation is deliberately blockout.
+Current milestone: **THE GAME HAS A FRONT DOOR AND A HOME.** It opens on a
+title screen, not the gym: press a key → PLAY / SETTINGS / QUIT → character
+select (five slots, create/delete) → PLAY drops the chosen character into the
+HUB, and the hub's travel gate reaches the gym and back. Framed by the O33
+identity stack (four avenues: class verbs, Core axes, gear, legendary
+rewrites — class is never the sole trunk). Presentation is deliberately
+blockout.
+
+### What the overnight session changed (2026-08-15, owner asleep)
+
+Backup taken first: `Documents\riors-edge-backups\riors-edge-20260814-2222.bundle`
+(full history, `git bundle verify` clean), a worktree copy beside it, and tag
+`backup/20260814-2222`.
+
+- **XP EXISTS, so O40(b)'s condition is met.** A pure curve, XP on every kill,
+  levels RE-DERIVED from a stored cumulative total so a retuned curve moves
+  existing characters instead of stranding them. Measured: first level in 20
+  trash kills, ~35 h to cap at area 25. **O40(b) is not self-executing** —
+  CharacterLevel gates re-open BY RULING, and Swift's third jump is still at 1.
+- **Characters are real.** A GUID-keyed save per character, max 5, two-step
+  delete, and the pre-roster single save is ADOPTED rather than orphaned.
+- **Caster has three branch trees** (27 nodes) and **Swift has tier 4** (9
+  nodes). Both classes are now structurally complete per Class-Kits.
+- **The settings screen is the settings model's first consumer** — input,
+  keybinds, video, audio, with conflicts surfaced as arm/confirm.
+- **Gunsmith / Tank / Support**: three resource loops (Scrap, Grit, Charge),
+  21 catalogued ability rows, a reconciliation doc. **Still unselectable, on
+  purpose** (O39) — not one of the 21 executes.
+- Enemy labels decluttered, damage numbers now fed by every damage source,
+  Warden turn-rate capped, cross-class ability equip closed, the Severed
+  Drudge added, crafting currency drops from kills.
+
+### The three things most worth the owner's attention
+
+1. **S4 — the hook-and-condition vocabulary — is now THE bottleneck, and it is
+   measurable.** All 9 Swift tier-4 nodes and nearly every Caster branch node
+   ship as rule TAGS WITH NO EFFECT, because `EBreakerNodeStatTarget` has no
+   entry for Momentum decay, ability cost, incoming damage reduction, pierce
+   falloff or ability range, and `EBreakerBuildCondition` is still
+   movement-only (O30). Each carries a `WAITING ON:` comment naming exactly
+   what it needs. **Roughly two thirds of the authored tree content currently
+   does nothing.** Widening the enums is the single highest-leverage unblock
+   in the project.
+2. **A tier/gate inversion, created by finishing Swift.** Tier-4 nodes gate at
+   6 points invested; the branch keystones sit at tier 3 (gate 4) because the
+   slice compressed five tiers into three. A keystone is therefore reachable
+   EARLIER than its own branch's rewrites. Re-tiering moves authored gates
+   under O2 and breaks a pinned investment assertion — owner's ruling.
+3. **Two things are saved and inert, and say so on screen**: keybind overrides
+   (nothing reads them — wiring them means rebuilding the Enhanced Input
+   mapping context at runtime) and all three audio volumes (the project has no
+   audio at all). Neither is a bug; both are honest gaps.
+
+### Unverified by automation, needs the owner's hands
+
+The capture harness cannot press a key or move a mouse. **Enter on the title,
+the keybind capture path, and whether the menu jitter is actually gone** are
+all diagnosed-and-fixed rather than observed. The jitter fix in particular was
+root-caused from the `[MenuRebuild]` log — one rebuild per click, not a loop,
+which pointed at the centred content-sized plate rather than at re-entrancy.
 
 The whole loop works in Play In Editor today: spawn at the safe ring →
 talk to camp NPCs (F) → fight the encounter/waves (F4) → loot ground drops
