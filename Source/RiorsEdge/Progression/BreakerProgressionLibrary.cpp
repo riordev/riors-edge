@@ -81,6 +81,39 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_Catalyst, "Progression.Node.Core.Catalyst");
     UE_DEFINE_GAMEPLAY_TAG(Node_Penetrance, "Progression.Node.Core.Penetrance");
     UE_DEFINE_GAMEPLAY_TAG(Node_ReactionChain, "Progression.Node.Core.ReactionChain");
+
+    // Caster / SPELLBLADE (Class-Kits §2.3).
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_ContactCharge, "Progression.Node.Caster.Spellblade.ContactCharge");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_FollowThrough, "Progression.Node.Caster.Spellblade.FollowThrough");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Close, "Progression.Node.Caster.Spellblade.Close");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Debt, "Progression.Node.Caster.Spellblade.Debt");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_MomentumTransfer, "Progression.Node.Caster.Spellblade.MomentumTransfer");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Bloodprice, "Progression.Node.Caster.Spellblade.Bloodprice");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Blink, "Progression.Node.Caster.Spellblade.Blink");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edge, "Progression.Node.Caster.Spellblade.Edge");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edgework, "Progression.Node.Caster.Spellblade.Edgework");
+
+    // Caster / VOID WHISPERER (Class-Kits §2.4).
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Seep, "Progression.Node.Caster.VoidWhisperer.Seep");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_StandingWater, "Progression.Node.Caster.VoidWhisperer.StandingWater");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Patience, "Progression.Node.Caster.VoidWhisperer.Patience");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Lingering, "Progression.Node.Caster.VoidWhisperer.Lingering");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Attrition, "Progression.Node.Caster.VoidWhisperer.Attrition");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Drain, "Progression.Node.Caster.VoidWhisperer.Drain");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Zonework, "Progression.Node.Caster.VoidWhisperer.Zonework");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Wellspring, "Progression.Node.Caster.VoidWhisperer.Wellspring");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_LongDark, "Progression.Node.Caster.VoidWhisperer.LongDark");
+
+    // Caster / MULTISPELL (Class-Kits §2.5).
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Variance, "Progression.Node.Caster.Multispell.Variance");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Cycle, "Progression.Node.Caster.Multispell.Cycle");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Reservoir, "Progression.Node.Caster.Multispell.Reservoir");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Chain, "Progression.Node.Caster.Multispell.Chain");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Payment, "Progression.Node.Caster.Multispell.Payment");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Sequence, "Progression.Node.Caster.Multispell.Sequence");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Fracture, "Progression.Node.Caster.Multispell.Fracture");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Resonance, "Progression.Node.Caster.Multispell.Resonance");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Cascade, "Progression.Node.Caster.Multispell.Cascade");
 }
 
 namespace
@@ -813,6 +846,298 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     return Tree;
 }
 
+// ---------------------------------------------------------------------------
+// CASTER. Class-Kits §2 names three branches — Spellblade, Void Whisperer,
+// Multispell — and until now none of them existed: Caster played through its
+// seven abilities (all granted as starters, per the O39 comment on
+// GetFallbackClassDefinition below) and the class-agnostic Core tree only.
+// This is the same content gap Frenzy was for Swift, and it is closed the
+// same way: tiers 1-3 only (the slice cut every Swift branch already uses,
+// §7), each branch's tier-4 rewrite trio dropped rather than authored, one
+// keystone per branch, and every magnitude an O2 PLACEHOLDER.
+//
+// THE ENUM GAP THIS BRANCH SET EXPOSES, STATED ONCE RATHER THAN PER NODE.
+// Swift's nodes are legible against EBreakerNodeStatTarget because Momentum
+// converts into crit / damage / speed — combat and movement stats the enum
+// already models. Caster's Mana loop does not: "generate Mana at the
+// weak-point rate instead of the weapon-hit rate", "Overcast's negative
+// floor extends", "zones refresh instead of stack", "the cycle advances on
+// hit instead of on cast" are RESOURCE-ECONOMY and ABILITY-BEHAVIOR rewrites,
+// and neither a resource-generation-rate target nor a maximum-resource target
+// exists on EBreakerNodeStatTarget (MS3 Reservoir's "+15/+25 Maximum Mana" is
+// the clearest single case — there is no analogue of gear's "Maximum
+// Resource" affix on this enum at all). None of that is expressible, so
+// EVERY non-keystone node below ships as its Class-Kits rule verbatim, as a
+// GrantedTag, with NO stat effect — the same pattern the Swift.CadenceBreak
+// comment established for one node, here for a whole class's worth of
+// content. This is not a content shortfall to fix later; it is the honest
+// reading of "a node may only author effects the enum can express."
+//
+// ABILITY GRANTS ARE NOT RE-AUTHORED HERE, DELIBERATELY. Class-Kits gates
+// four of Caster's six abilities behind Tier-3 "Grants" nodes (SB7/VW7/MS7/
+// MS8). GetFallbackClassDefinition(Caster) already lists all seven ability
+// ids as StartingClassAbilityIds — the O39 fix for a null-class-definition
+// bug that predates this file — and Tests/BreakerProgressionAuditTests.cpp's
+// CasterAbilitiesUnlockTest equips every one of them with ZERO node
+// purchases. Gating them behind these new tree nodes would un-equip that
+// test's abilities on a fresh Caster and is out of scope for a branch-content
+// pass; it is recorded as the divergence it is. Each Tier-3 node below still
+// carries the REST of its design row — the rule-rewrite half distinct from
+// the grant — as a tag.
+UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
+{
+    static UBreakerProgressionTree* Tree = nullptr;
+    if (Tree) return Tree;
+
+    Tree = MakeTree(TEXT("Caster.Spellblade"), TEXT("Caster — Spellblade"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster);
+
+    // --- Tier 1 (SB1-SB3) ---------------------------------------------------
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Spellblade.ContactCharge"), TEXT("Contact Charge"),
+        TEXT("Melee hits generate Mana at the weak-point rate instead of the weapon-hit rate."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_ContactCharge.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Spellblade.FollowThrough"), TEXT("Follow Through"),
+        TEXT("Cleave's Bleed generates its status-application Mana even when Bleed is already present, and refunds Mana on kill."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Spellblade.Close"), TEXT("Close"),
+        TEXT("Weapon hits at close range generate double Mana. Defines the branch's play distance."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Close.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 2 (SB4-SB6) ---------------------------------------------------
+    Node = MakeNode(TEXT("Caster.Spellblade.Debt"), TEXT("Debt"),
+        TEXT("Overcast's negative Mana floor extends further below zero. More rope to Overcast on."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.ContactCharge"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Debt.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // RESOLVED [O1] pattern: Closequarter's follow-up cancels the TARGET's
+    // passive block/evade ROLL, not the player's own — re-expressed against
+    // the passive chance layer exactly as Kinetic's Evade Conversion is,
+    // except here it is the enemy's roll being suppressed, which has no
+    // authorable stat on the caster's own sheet.
+    Node = MakeNode(TEXT("Caster.Spellblade.MomentumTransfer"), TEXT("Momentum Transfer"),
+        TEXT("Closequarter's arrival briefly suppresses the target's passive block and evade rolls on the next melee hit."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.FollowThrough"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_MomentumTransfer.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Spellblade.Bloodprice"), TEXT("Bloodprice"),
+        TEXT("While Mana is negative, melee hits restore health equal to a portion of damage dealt."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Close"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Bloodprice.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 3 (SB7-SB8) ---------------------------------------------------
+    // "Grants C2 Closequarter" is not authored (see the block comment above);
+    // the no-target blink rewrite is the real content of this node.
+    Node = MakeNode(TEXT("Caster.Spellblade.Blink"), TEXT("Blink"),
+        TEXT("Closequarter may be cast with no target to blink in the aim direction."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.MomentumTransfer"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Blink.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Spellblade.Edge"), TEXT("Edge"),
+        TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit. Rule change; no damage percentage (Class-Kits SB8 is explicit)."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // The branch keystone O3 permits (1 of 3 for Caster). Class-Kits SB12
+    // prices its More at melee damage only — "melee-only is the tax" — and
+    // EBreakerBuildCondition is movement-only (O30): there is no way to key a
+    // MorePercent effect to "this hit was melee" without inventing an enum
+    // value, which is out of scope here. Authoring it unconditional would not
+    // be a placeholder magnitude, it would be a STRONGER node than designed
+    // (a free generalist where the doc taxes a delivery method), which is the
+    // exact kind of invention O2 forbids. So, like Core's Reaction Chain
+    // (E10) before it: the More slot is RESERVED, not spent. The keystone
+    // still exists, is still a cornerstone, and still grants the ability
+    // layer's tag so Unmake's Edgework row resolves.
+    Node = MakeNode(TEXT("Caster.Spellblade.Edgework"), TEXT("Edgework"),
+        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit. Melee damage's 1.30x More is a recorded gap — see the code comment; no condition exists to tax it honestly."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+    Node->bCornerstone = true;
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edgework.GetTag());
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
+    Tree->Nodes.Add(Node);
+
+    return Tree;
+}
+
+UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree()
+{
+    static UBreakerProgressionTree* Tree = nullptr;
+    if (Tree) return Tree;
+
+    Tree = MakeTree(TEXT("Caster.VoidWhisperer"), TEXT("Caster — Void Whisperer"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster);
+
+    // --- Tier 1 (VW1-VW3) ----------------------------------------------------
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.VoidWhisperer.Seep"), TEXT("Seep"),
+        TEXT("Status applications generate more Mana than the base rate."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Seep.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Standing Water"),
+        TEXT("Zones generate Mana per second while at least one enemy is inside, independent of enemy count."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_StandingWater.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
+        TEXT("Passive Mana regeneration doubles while the caster has not fired a weapon recently. Flagged NEEDS-RE-SITING under the Mana inversion (Class-Kits §2.1.1) -- it now doubles the PRIMARY income, not a trickle bonus; O2 freeze holds its magnitude regardless."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 2 (VW4-VW6) ----------------------------------------------------
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
+        TEXT("A second overlapping zone refreshes duration instead of stacking. Explicit anti-stack rule."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Attrition"),
+        TEXT("Enemies killed while affected by a Caster damage-over-time effect refund Mana."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Seep"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Attrition.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Drain"), TEXT("Drain"),
+        TEXT("Siphon's channel no longer breaks on damage below a fraction of the caster's max health."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Patience"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Drain.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 3 (VW7-VW8) -----------------------------------------------------
+    // "Grants C3 Rot upgrade path / grants C4 Siphon" is not authored (see the
+    // block comment above); Rot's flat armour-reduction rewrite is the real
+    // content, and it stays flat rather than percentage to protect the boss
+    // cap (Class-Kits VW7, Master 7.10.5).
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Zonework"), TEXT("Zonework"),
+        TEXT("Rot's Armour reduction gains an additional flat amount against targets already affected by a damage-over-time effect."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Zonework.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Wellspring"), TEXT("Wellspring"),
+        TEXT("A zone may be placed on the caster's own position and move with them for its duration. One at a time."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Lingering"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Wellspring.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // The branch keystone O3 permits (2 of 3 for Caster). Class-Kits VW12 is
+    // the node the codebase already anticipated: its More targets
+    // DamageOverTime, and UBreakerProgressionComponent::AggregateStats only
+    // composes a MorePercent effect into DamageMoreMultiplier when
+    // StatTarget == Damage (see its own comment, "audit item 2" /
+    // "Class-Kits' VW12"). EBreakerNodeStatTarget and EBreakerNodeStatBucket
+    // both HAVE the vocabulary for this effect -- DamageOverTime +
+    // MorePercent is a legal pair -- so this is authored exactly as
+    // specified, unlike Edgework/Cascade below. It is presently a SILENT
+    // NO-OP at runtime (the aggregator logs a warning once) until O34's open
+    // question -- whether Increased Damage and Increased DoT share one bucket
+    // for DoT ticks, or keep multiplying -- is ruled on. Not redesigned, not
+    // retargeted to plain Damage, not moved to a different bucket; recorded
+    // here exactly as Class-Kits leaves it.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. A MORE multiplier to damage over time -- see the code comment; O34 leaves it un-composed pending an aggregation-bucket ruling."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+    AddEffect(Node, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30, per Class-Kits VW12's stated ceiling
+    Node->bCornerstone = true;
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_LongDark.GetTag());
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());
+    Tree->Nodes.Add(Node);
+
+    return Tree;
+}
+
+UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
+{
+    static UBreakerProgressionTree* Tree = nullptr;
+    if (Tree) return Tree;
+
+    Tree = MakeTree(TEXT("Caster.Multispell"), TEXT("Caster — Multispell"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster);
+
+    // --- Tier 1 (MS1-MS3) ----------------------------------------------------
+    UBreakerProgressionNode* Node = MakeNode(TEXT("Caster.Multispell.Variance"), TEXT("Variance"),
+        TEXT("Applying a status type the target does not already have generates a multiple of the base Mana rate. The core sequencing incentive stated as a resource rule."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Variance.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Multispell.Cycle"), TEXT("Cycle"),
+        TEXT("Fracture's status cycle advances on hit rather than on cast, so a missed cast does not waste a position."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cycle.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // "The one intentional stat node" per Class-Kits MS3 -- and the one
+    // Caster node this pass genuinely cannot author even as a placeholder
+    // number, because EBreakerNodeStatTarget has no Maximum-Resource
+    // counterpart to gear's "Maximum Resource" affix. Ships as a tag; the
+    // rule is real, the enum gap is the same one the block comment above
+    // names.
+    Node = MakeNode(TEXT("Caster.Multispell.Reservoir"), TEXT("Reservoir"),
+        TEXT("Maximum Mana rises. Class-Kits' own flagged exception: the one intentional stat node in the Caster kit, and the enum has no Maximum Resource target to carry it."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Reservoir.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 2 (MS4-MS6) ----------------------------------------------------
+    Node = MakeNode(TEXT("Caster.Multispell.Chain"), TEXT("Chain"),
+        TEXT("A target carrying two distinct status types spreads the newest one to the nearest enemy on application. Proc coefficient 0 on the spread; the spread cannot itself spread."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Variance"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Chain.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Multispell.Payment"), TEXT("Payment"),
+        TEXT("Resonance refunds Mana per distinct status consumed."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Cycle"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Payment.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Multispell.Sequence"), TEXT("Sequence"),
+        TEXT("Applying three distinct status types to one target within a short window generates a Mana lump sum, once per target on a cooldown."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Sequence.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // --- Tier 3 (MS7-MS8) ----------------------------------------------------
+    // "Grants C5 Fracture / grants C6 Resonance" is not authored (see the
+    // block comment above); each node's rewrite half is the real content.
+    Node = MakeNode(TEXT("Caster.Multispell.Fracture"), TEXT("Fracture"),
+        TEXT("Fracture applies two cycle positions at once instead of one."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Fracture.GetTag());
+    Tree->Nodes.Add(Node);
+
+    Node = MakeNode(TEXT("Caster.Multispell.Resonance"), TEXT("Resonance"),
+        TEXT("Resonance no longer consumes the statuses it detonates; it halves their remaining duration instead."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Payment"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Resonance.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // The branch keystone O3 permits (3 of 3 for Caster; Caster's budget is
+    // now fully allocated across its three branches, same shape as Swift's).
+    // Class-Kits MS12 conditions its More on "targets carrying 3+ distinct
+    // status types" -- a STACKING condition, which O30 explicitly names as
+    // one of the axes EBreakerBuildCondition cannot express (it is
+    // movement-only). Exactly the Reaction Chain (E10) situation again: the
+    // only authorable form would be unconditional, which is a strictly
+    // stronger generalist than the designed node and not a placeholder value
+    // this pass may invent. The slot is reserved, not spent; the keystone
+    // still exists, is still a cornerstone, and still grants the ability
+    // layer's tag so Unmake's Cascade row resolves.
+    Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
+        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage vs. 3+ status targets' 1.25x More is a recorded gap -- see the code comment; no stacking condition exists to key it honestly."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));
+    Node->bCornerstone = true;
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cascade.GetTag());
+    Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag());
+    Tree->Nodes.Add(Node);
+
+    return Tree;
+}
+
 const TArray<UBreakerProgressionTree*>& UBreakerProgressionLibrary::GetAllFallbackTrees()
 {
     static TArray<UBreakerProgressionTree*> Trees;
@@ -822,6 +1147,9 @@ const TArray<UBreakerProgressionTree*>& UBreakerProgressionLibrary::GetAllFallba
         Trees.Add(GetSwiftFrenzyTree());
         Trees.Add(GetSwiftKineticTree());
         Trees.Add(GetSwiftMarksmanTree());
+        Trees.Add(GetCasterSpellbladeTree());
+        Trees.Add(GetCasterVoidWhispererTree());
+        Trees.Add(GetCasterMultispellTree());
     }
     return Trees;
 }
@@ -864,20 +1192,32 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         // locked no matter what UBreakerAbilityComponent::TryEquipAbility
         // asked for (see its own comment at the call site). The catalogue
         // below lists all SEVEN ids the ability registry actually implements
-        // (Abilities/BreakerAbilityDefinition.cpp), mirrored exactly. No
-        // Caster branch tree is authored to gate the other five behind a node
-        // purchase -- that would repeat the exact "grants nothing reachable"
-        // failure this pass exists to fix -- so they are catalogued directly
-        // here instead of invented as tree content that does not exist.
+        // (Abilities/BreakerAbilityDefinition.cpp), mirrored exactly. STILL
+        // TRUE after Spellblade/Void Whisperer/Multispell were authored below:
+        // gating any of these five behind an unpurchased tree node would
+        // repeat the exact "grants nothing reachable" failure this comment
+        // was written to fix, and would un-equip
+        // Tests/BreakerProgressionAuditTests.cpp's CasterAbilitiesUnlockTest,
+        // which equips all seven with zero node purchases. The new branch
+        // trees' Tier-3 nodes therefore carry their OTHER Class-Kits content
+        // (the rule-rewrite half of "Grants X") and leave the grant itself
+        // exactly as catalogued here.
         Caster->StartingClassAbilityIds = {
             TEXT("Caster.Cleave"), TEXT("Caster.Rot"),             // Class-Kits §2.2 starters
             TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
             TEXT("Caster.Fracture"), TEXT("Caster.Resonance"),
             TEXT("Caster.Unmake")};
         Caster->BaseUltimateId = TEXT("Caster.Unmake");
-        // Honest emptiness (O39): BranchTrees stays empty because no Caster
-        // branch tree is authored, rather than pointing at content that does
-        // not exist.
+        // O39's "honest emptiness" is closed: Spellblade, Void Whisperer and
+        // Multispell are now authored (Class-Kits §2.3-2.5), so BranchTrees
+        // is populated exactly like Swift's, Core tree included. The seven
+        // ability ids above are UNCHANGED by this -- see the block comment on
+        // GetCasterSpellbladeTree() for why the Tier-3 "Grants" nodes below
+        // do not also re-grant them.
+        Caster->BranchTrees.Add(GetCasterSpellbladeTree());
+        Caster->BranchTrees.Add(GetCasterVoidWhispererTree());
+        Caster->BranchTrees.Add(GetCasterMultispellTree());
+        Caster->BranchTrees.Add(GetCoreSliceTree());
         return Caster;
     }
 

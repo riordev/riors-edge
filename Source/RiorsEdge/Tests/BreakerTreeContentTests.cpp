@@ -14,9 +14,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
 {
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();
-    // Class-Kits §1.3-1.5 names THREE Swift branches. Frenzy is now authored,
-    // so the branch strip shows three chips instead of two.
-    TestEqual(TEXT("Core tree plus three Swift branches exist"), Trees.Num(), 4);
+    // Core, plus THREE Swift branches (Class-Kits §1.3-1.5), plus THREE Caster
+    // branches (§2.3-2.5). Caster shipped with no branch trees at all until
+    // now — it played through abilities and the Core tree only — so this count
+    // moving from 4 to 7 is the whole point of that pass rather than drift.
+    // Counted rather than sampled deliberately: a tree silently failing to
+    // register is exactly the class of gap this file exists to catch.
+    TestEqual(TEXT("Core tree plus three Swift and three Caster branches exist"), Trees.Num(), 7);
 
     TSet<FName> SeenNodeIds;
     for (const UBreakerProgressionTree* Tree : Trees)

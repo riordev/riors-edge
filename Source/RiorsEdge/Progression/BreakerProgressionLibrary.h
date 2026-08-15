@@ -70,6 +70,41 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Catalyst);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Penetrance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ReactionChain);
+
+    // Caster / SPELLBLADE (Class-Kits §2.3). Tiers 1-3 only, the same slice cut
+    // as Swift's three branches (§7) — SB9-SB11's tier-4 rewrites are not
+    // authored, matching the Frenzy/Kinetic/Marksman precedent.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_ContactCharge);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_FollowThrough);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Close);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Debt);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_MomentumTransfer);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Bloodprice);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Blink);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edge);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edgework);
+
+    // Caster / VOID WHISPERER (Class-Kits §2.4).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Seep);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_StandingWater);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Patience);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Lingering);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Attrition);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Drain);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Zonework);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Wellspring);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_LongDark);
+
+    // Caster / MULTISPELL (Class-Kits §2.5).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Variance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cycle);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Reservoir);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Chain);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Payment);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Sequence);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Fracture);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Resonance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cascade);
 }
 
 // Zero-setup fallback skill-tree content, the same convention the weapon
@@ -94,6 +129,13 @@ public:
     static UBreakerProgressionTree* GetSwiftMarksmanTree();
     // Swift FRENZY branch, tiers 1-3 (Class-Kits §1.3).
     static UBreakerProgressionTree* GetSwiftFrenzyTree();
+
+    // Caster SPELLBLADE branch, tiers 1-3 (Class-Kits §2.3).
+    static UBreakerProgressionTree* GetCasterSpellbladeTree();
+    // Caster VOID WHISPERER branch, tiers 1-3 (Class-Kits §2.4).
+    static UBreakerProgressionTree* GetCasterVoidWhispererTree();
+    // Caster MULTISPELL branch, tiers 1-3 (Class-Kits §2.5).
+    static UBreakerProgressionTree* GetCasterMultispellTree();
 
     // Core tree plus every class tree. The UI enumerates from here.
     UFUNCTION(BlueprintPure, Category="Progression|Content")

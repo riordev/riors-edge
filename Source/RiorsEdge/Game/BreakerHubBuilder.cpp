@@ -36,6 +36,18 @@ struct FBreakerHubFrame
     }
 };
 
+// UNITY-BUILD COLLISION, and it is why these helpers carry a Hub prefix.
+// This file's anonymous namespace duplicates BreakerGameMode.cpp's private
+// shape helpers by design (they are file-local there, so they cannot be
+// shared), and an anonymous namespace is per-TRANSLATION-UNIT — which would
+// be fine if each .cpp were its own TU. Unreal's unity build concatenates
+// several .cpp files into one, at which point the two anonymous namespaces
+// merge and every shared name is a redefinition.
+//
+// This did not show up for several builds because adaptive unity EXCLUDES
+// recently-changed files from the blob: the collision only appears once the
+// file stops being edited, i.e. on a clean build or on someone else's machine.
+// Renaming is the fix that does not depend on build settings.
 namespace
 {
     // O24 (Docs/Design/Decisions.md): overgrown Earth — vegetation over
@@ -58,13 +70,13 @@ namespace
     const FLinearColor HubPaletteOffWhite (0.58f, 0.57f, 0.51f);
     const FLinearColor HubPaletteMoss     (0.14f, 0.26f, 0.11f);
 
-    const TCHAR* ShapeCube     = TEXT("/Engine/BasicShapes/Cube.Cube");
-    const TCHAR* ShapeCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+    const TCHAR* HubShapeCube     = TEXT("/Engine/BasicShapes/Cube.Cube");
+    const TCHAR* HubShapeCylinder = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
     // Same stock-material-plus-dynamic-instance trick as
-    // BreakerGameMode.cpp's ApplyShapeColor: the basic shape material exposes
+    // BreakerGameMode.cpp's HubApplyShapeColor: the basic shape material exposes
     // one "Color" vector param, so no content assets are needed for palette.
-    void ApplyShapeColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
+    void HubApplyShapeColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
     {
         if (!Mesh) return;
         UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
@@ -77,7 +89,7 @@ namespace
         }
     }
 
-    AStaticMeshActor* SpawnShape(UWorld* World, const TCHAR* ShapePath, const FVector& Location, const FVector& Scale,
+    AStaticMeshActor* HubSpawnShape(UWorld* World, const TCHAR* ShapePath, const FVector& Location, const FVector& Scale,
         const FRotator& Rotation, const FLinearColor& Color, bool bCollides, const TCHAR* Label)
     {
         if (!World) return nullptr;
@@ -87,7 +99,7 @@ namespace
         Mesh->SetMobility(EComponentMobility::Movable);
         Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, ShapePath));
         Mesh->SetWorldScale3D(Scale);
-        ApplyShapeColor(Mesh, Color);
+        HubApplyShapeColor(Mesh, Color);
         if (!bCollides) Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Mesh->SetMobility(EComponentMobility::Static);
         Actor->SetActorEnableCollision(bCollides);
@@ -96,7 +108,7 @@ namespace
         return Actor;
     }
 
-    void AttachPropLight(AActor* Owner, const FVector& RelativeOffset, const FLinearColor& Color, float Intensity, float Radius)
+    void HubAttachPropLight(AActor* Owner, const FVector& RelativeOffset, const FLinearColor& Color, float Intensity, float Radius)
     {
         if (!Owner) return;
         UPointLightComponent* Light = NewObject<UPointLightComponent>(Owner);
@@ -132,7 +144,7 @@ void UBreakerHubBuilder::BuildPlazaAndBoundary(UWorld* World, const FBreakerHubF
     // The bounded social space itself: a wide flat plaza (the "everyone
     // hangs out here" read) with a ring of pillars marking its edge rather
     // than walls, so it stays legible as open ground from any approach.
-    SpawnShape(World, ShapeCube, Frame.At(0.0f, 0.0f, -16.0f),
+    HubSpawnShape(World, HubShapeCube, Frame.At(0.0f, 0.0f, -16.0f),
         FVector(PlazaHalfExtent * 2.0f / 100.0f, PlazaHalfExtent * 2.0f / 100.0f, 0.32f),
         Frame.Forward.Rotation(), HubPaletteEarth, true, TEXT("Runtime_HubPlaza"));
 
@@ -140,19 +152,19 @@ void UBreakerHubBuilder::BuildPlazaAndBoundary(UWorld* World, const FBreakerHubF
     {
         const float Angle = Pillar * (360.0f / BoundaryPillarCount);
         const FVector Offset = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector) * BoundaryRadius;
-        SpawnShape(World, ShapeCylinder, Frame.At(0.0f, 0.0f, 130.0f) + Offset,
+        HubSpawnShape(World, HubShapeCylinder, Frame.At(0.0f, 0.0f, 130.0f) + Offset,
             FVector(0.4f, 0.4f, 2.6f), FRotator::ZeroRotator, HubPaletteConcrete, true, TEXT("Runtime_HubBoundary"));
     }
 
     // A central landmark so the plaza reads as a destination, not just an
     // empty rectangle — a weathered obelisk, in the same overgrown-Earth
     // idiom as the gym's ruin dressing (moss over stone).
-    if (AStaticMeshActor* Obelisk = SpawnShape(World, ShapeCube, Frame.At(0.0f, 0.0f, 260.0f),
+    if (AStaticMeshActor* Obelisk = HubSpawnShape(World, HubShapeCube, Frame.At(0.0f, 0.0f, 260.0f),
         FVector(0.9f, 0.9f, 5.2f), FRotator(0.0f, Frame.Forward.Rotation().Yaw, 0.0f), HubPaletteStone, true, TEXT("Runtime_HubLandmark")))
     {
-        AttachPropLight(Obelisk, FVector(0, 0, 260.0f), FLinearColor(0.85f, 0.78f, 0.60f), 1200.0f, 1400.0f);
+        HubAttachPropLight(Obelisk, FVector(0, 0, 260.0f), FLinearColor(0.85f, 0.78f, 0.60f), 1200.0f, 1400.0f);
     }
-    SpawnShape(World, ShapeCylinder, Frame.At(0.0f, 0.0f, 20.0f),
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(0.0f, 0.0f, 20.0f),
         FVector(1.6f, 1.6f, 0.4f), FRotator::ZeroRotator, HubPaletteMoss, false, TEXT("Runtime_HubLandmark"));
 }
 
@@ -166,10 +178,10 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
     // the exact same NPC construction as the gym camp (SpawnForgeKeeper /
     // SpawnQuartermaster, unmodified) so their dialogue, flags and vendor
     // hooks carry over with no new code.
-    if (AStaticMeshActor* Forge = SpawnShape(World, ShapeCube, Frame.At(VendorForward, -VendorLateral, 110.0f),
+    if (AStaticMeshActor* Forge = HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, -VendorLateral, 110.0f),
         FVector(1.6f, 1.6f, 2.2f), FRotator::ZeroRotator, HubPaletteRust, true, TEXT("Runtime_HubForge")))
     {
-        AttachPropLight(Forge, FVector(0, 0, 40.0f), FLinearColor(1.0f, 0.62f, 0.26f), 900.0f, 700.0f);
+        HubAttachPropLight(Forge, FVector(0, 0, 40.0f), FLinearColor(1.0f, 0.62f, 0.26f), 900.0f, 700.0f);
     }
     ABreakerNPC::SpawnForgeKeeper(World, Frame.At(VendorForward - 80.0f, -VendorLateral, 100.0f), (-Frame.Right).Rotation());
 
@@ -184,12 +196,12 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
     // i.e. it IS the main story quest of the vertical slice. No new flag,
     // no new dialogue, no parallel quest mechanism was added; the vendor was
     // simply given a permanent home.
-    SpawnShape(World, ShapeCube, Frame.At(VendorForward, VendorLateral, 60.0f),
+    HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, VendorLateral, 60.0f),
         FVector(2.4f, 1.2f, 1.2f), FRotator::ZeroRotator, HubPaletteOffWhite, true, TEXT("Runtime_HubVendorStall"));
-    if (AStaticMeshActor* Crate = SpawnShape(World, ShapeCube, Frame.At(VendorForward - 200.0f, VendorLateral, 55.0f),
+    if (AStaticMeshActor* Crate = HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward - 200.0f, VendorLateral, 55.0f),
         FVector(1.1f, 1.1f, 1.1f), FRotator(0.0f, 12.0f, 0.0f), HubPaletteAmber, true, TEXT("Runtime_HubSupplyCrate")))
     {
-        AttachPropLight(Crate, FVector(0, 0, 90.0f), FLinearColor(1.0f, 0.68f, 0.28f), 700.0f, 600.0f);
+        HubAttachPropLight(Crate, FVector(0, 0, 90.0f), FLinearColor(1.0f, 0.68f, 0.28f), 700.0f, 600.0f);
     }
     ABreakerNPC::SpawnQuartermaster(World, Frame.At(VendorForward - 80.0f, VendorLateral, 100.0f), Frame.Right.Rotation());
 }
@@ -202,9 +214,9 @@ ABreakerTravelPoint* UBreakerHubBuilder::BuildTravelPoint(UWorld* World, const F
     // A small gate structure around the travel point so it reads as "the
     // way out" rather than another prop — two flanking posts framing the
     // actor, no teal (that stays reserved for rift objects).
-    SpawnShape(World, ShapeCylinder, Frame.At(TravelPointForward, -220.0f, 160.0f),
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(TravelPointForward, -220.0f, 160.0f),
         FVector(0.5f, 0.5f, 3.2f), FRotator::ZeroRotator, HubPaletteConcrete, true, TEXT("Runtime_HubGate"));
-    SpawnShape(World, ShapeCylinder, Frame.At(TravelPointForward, 220.0f, 160.0f),
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(TravelPointForward, 220.0f, 160.0f),
         FVector(0.5f, 0.5f, 3.2f), FRotator::ZeroRotator, HubPaletteConcrete, true, TEXT("Runtime_HubGate"));
 
     FActorSpawnParameters Params;
