@@ -74,6 +74,13 @@ private:
     // instantaneous results, so they have to be latched when broadcast
     // rather than polled from a persistent state.
     UFUNCTION() void HandlePlayerDamageReceived(const FBreakerDamageResult& Result);
+    UFUNCTION() void HandleLevelGained(int32 NewLevel, int32 LevelsGained);
+    void EnsureProgressionBinding(const ABreakerCharacter* Character);
+    // The experience rail: a thin bar under the combat cluster carrying the
+    // level, the fraction into it, and the XP remaining. Progression that only
+    // exists in a save file is progression the player cannot feel.
+    void DrawExperienceRail(const ABreakerCharacter* Character);
+    void DrawLevelUpBanner(const FVector2D& Center);
     void EnsureDamageBinding(const ABreakerCharacter* Character);
 
     // Same bind/rebind discipline for shots: the tracer trail is the only
@@ -125,6 +132,13 @@ private:
     void DrawMarkedTarget(const ABreakerCharacter* Character);
 
     UPROPERTY() TObjectPtr<UBreakerCombatComponent> BoundCombat;
+    UPROPERTY() TObjectPtr<class UBreakerProgressionComponent> BoundProgression;
+    // Latched from OnLevelGained. A level-up is the single most earned moment
+    // in the progression loop and it gets its own banner rather than sharing
+    // the ability callout, which retires itself after three shows.
+    double LevelUpTime = -1000.0;
+    int32 LevelUpShownLevel = 0;
+    int32 LevelUpShownGain = 0;
     UPROPERTY() TObjectPtr<UBreakerWeaponComponent> BoundWeapon;
     UPROPERTY() TObjectPtr<UBreakerAbilityComponent> BoundAbilities;
     double LastDodgeTime = -1000.0;

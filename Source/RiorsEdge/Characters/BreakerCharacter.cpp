@@ -37,6 +37,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerTravelPoint.h"
 #include "Items/BreakerLootPickup.h"
 #include "Game/BreakerGameMode.h"
 #include "EngineUtils.h"
@@ -1144,6 +1145,23 @@ ABreakerNPC* ABreakerCharacter::FindNearbyNPC() const
     return Nearest;
 }
 
+ABreakerTravelPoint* ABreakerCharacter::FindNearbyTravelPoint() const
+{
+    if (!GetWorld()) return nullptr;
+    ABreakerTravelPoint* Nearest = nullptr;
+    float NearestDistanceSq = TNumericLimits<float>::Max();
+    for (TActorIterator<ABreakerTravelPoint> It(GetWorld()); It; ++It)
+    {
+        const float DistanceSq = FVector::DistSquared(GetActorLocation(), It->GetActorLocation());
+        if (DistanceSq <= FMath::Square(It->GetInteractionRange()) && DistanceSq < NearestDistanceSq)
+        {
+            NearestDistanceSq = DistanceSq;
+            Nearest = *It;
+        }
+    }
+    return Nearest;
+}
+
 ABreakerLootPickup* ABreakerCharacter::FindNearbyPickup() const
 {
     if (!GetWorld()) return nullptr;
@@ -1176,6 +1194,32 @@ void ABreakerCharacter::InteractWithNearbyNPC()
         if (HasAuthority()) Pickup->TryPickup(this);
         else ServerPickupLoot(Pickup);
         return;
+    }
+
+    // The travel point, before NPCs. It is a large fixed structure and the
+    // vendors stand near it, so if both are in range the player who walked up
+    // to the gate meant the gate.
+    if (ABreakerTravelPoint* Travel = FindNearbyTravelPoint())
+    {
+        const TArray<FBreakerTravelDestination> Destinations = Travel->GetAvailableDestinations();
+        if (Destinations.Num() == 1)
+        {
+            // Exactly one destination today (the gym), so F travels directly
+            // rather than opening a picker with a single row in it. The moment
+            // a second destination is authored this needs a real selection UI,
+            // and it says so out loud below rather than silently taking the
+            // first entry and making the others unreachable.
+            Travel->SelectDestination(Destinations[0].Id, this);
+            return;
+        }
+        if (Destinations.Num() > 1)
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("Travel point offers %d destinations and there is no selection UI yet, so F would have to "
+                     "guess. Nothing happened. Build the picker before authoring a second destination."),
+                Destinations.Num());
+            return;
+        }
     }
 
     ABreakerNPC* NPC = FindNearbyNPC();

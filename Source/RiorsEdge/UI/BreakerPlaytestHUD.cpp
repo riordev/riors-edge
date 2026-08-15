@@ -4,6 +4,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
@@ -106,6 +107,8 @@ namespace BreakerHUD
     // balance — it changes nothing about damage, only how it is counted on
     // screen. O2 PLACEHOLDER.
     static constexpr float DamageNumberMergeWindow = 0.18f;
+    // How long the level-up banner holds. Presentation, not balance.
+    static constexpr float LevelUpBannerSeconds = 3.2f;   // O2 PLACEHOLDER
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
     static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
 
@@ -221,6 +224,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     EnsureDamageBinding(Character);
     EnsureWeaponBinding(Character);
     EnsureAbilityBinding(Character);
+    EnsureProgressionBinding(Character);
     // Everything below, ability callouts included, is suppressed while the
     // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
@@ -332,6 +336,8 @@ void ABreakerPlaytestHUD::DrawHUD()
 
     // --- Centre: feedback only, nothing persistent ------------------------
     DrawSkimBurst(Center);
+    DrawExperienceRail(Character);
+    DrawLevelUpBanner(Center);
     DrawAbilityCallout(Center);
     DrawDefenseFeedback(Center);
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
@@ -1425,6 +1431,74 @@ void ABreakerPlaytestHUD::EnsureWeaponBinding(const ABreakerCharacter* Character
     if (BoundWeapon) BoundWeapon->OnShot.RemoveDynamic(this, &ABreakerPlaytestHUD::HandlePlayerShot);
     Weapon->OnShot.AddDynamic(this, &ABreakerPlaytestHUD::HandlePlayerShot);
     BoundWeapon = Weapon;
+}
+
+void ABreakerPlaytestHUD::DrawExperienceRail(const ABreakerCharacter* Character)
+{
+    const UBreakerProgressionComponent* Progression = Character ? Character->GetProgression() : nullptr;
+    if (!Progression || !Canvas) return;
+
+    const int32 Level = Progression->GetCharacterLevel();
+    const float Fraction = Progression->GetLevelProgressFraction();
+    const int32 ToNext = Progression->GetXpToNextLevel();
+
+    // Bottom-centre, above the ability cluster's baseline and clear of it: the
+    // XP rail is glanceable, not a thing to read mid-fight, so it gets width
+    // and almost no height.
+    const float RailW = S(420.0f);
+    const float RailH = S(6.0f);
+    const float RailX = Canvas->ClipX * 0.5f - RailW * 0.5f;
+    const float RailY = Canvas->ClipY - S(46.0f);
+
+    DrawRect(BreakerUI::Panel10, RailX, RailY, RailW, RailH);
+    DrawRect(BreakerUI::Cyan, RailX, RailY, RailW * FMath::Clamp(Fraction, 0.0f, 1.0f), RailH);
+
+    // At the cap the bar reads full and the caption says so, rather than
+    // showing a full bar next to a number that will never move again.
+    const FString Caption = ToNext > 0
+        ? FString::Printf(TEXT("LEVEL %d   %s XP TO NEXT"), Level,
+            *BreakerUI::FormatDamage(static_cast<float>(FMath::Max(0,
+                ToNext - FMath::RoundToInt(Fraction * static_cast<float>(ToNext))))))
+        : FString::Printf(TEXT("LEVEL %d   MAX"), Level);
+    DrawSpecTextCentered(Caption, Canvas->ClipX * 0.5f, RailY - S(16.0f), BreakerUI::TextMuted, 11.0f);
+}
+
+void ABreakerPlaytestHUD::DrawLevelUpBanner(const FVector2D& Center)
+{
+    if (LevelUpShownLevel <= 0 || !Canvas) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float Age = static_cast<float>(Now - LevelUpTime);
+    if (Age < 0.0f || Age >= BreakerHUD::LevelUpBannerSeconds) return;
+
+    // Fades out over its last third rather than snapping off, so the eye is
+    // not pulled back to a thing that has already gone.
+    const float Fade = Age > BreakerHUD::LevelUpBannerSeconds * 0.66f
+        ? 1.0f - (Age - BreakerHUD::LevelUpBannerSeconds * 0.66f) / (BreakerHUD::LevelUpBannerSeconds * 0.34f)
+        : 1.0f;
+    const FString Text = LevelUpShownGain > 1
+        ? FString::Printf(TEXT("LEVEL %d   (+%d)"), LevelUpShownLevel, LevelUpShownGain)
+        : FString::Printf(TEXT("LEVEL %d"), LevelUpShownLevel);
+    DrawSpecTextCentered(TEXT("LEVEL UP"), Center.X, Center.Y - S(120.0f), BreakerUI::Alpha(BreakerUI::Gold, Fade), 22.0f);
+    DrawSpecTextCentered(Text, Center.X, Center.Y - S(94.0f), BreakerUI::Alpha(BreakerUI::TextPrimary, Fade), 15.0f);
+}
+
+void ABreakerPlaytestHUD::EnsureProgressionBinding(const ABreakerCharacter* Character)
+{
+    UBreakerProgressionComponent* Progression = Character ? Character->GetProgression() : nullptr;
+    if (!Progression || BoundProgression == Progression) return;
+    if (BoundProgression) BoundProgression->OnLevelGained.RemoveDynamic(this, &ABreakerPlaytestHUD::HandleLevelGained);
+    Progression->OnLevelGained.AddDynamic(this, &ABreakerPlaytestHUD::HandleLevelGained);
+    BoundProgression = Progression;
+}
+
+void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
+{
+    LevelUpTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    LevelUpShownLevel = NewLevel;
+    // Carried so the banner can say "+2 LEVELS" rather than lying by one: a
+    // single kill can cross more than one level early on, and a tell that says
+    // "level 2" when the player reached 4 is worse than no tell.
+    LevelUpShownGain = LevelsGained;
 }
 
 void ABreakerPlaytestHUD::EnsureAbilityBinding(const ABreakerCharacter* Character)

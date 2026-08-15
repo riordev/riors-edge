@@ -62,6 +62,9 @@ public:
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;
+    // The hub gate. Shares the F key with NPCs and loot; see
+    // InteractWithNearbyNPC for the precedence and the reason for it.
+    UFUNCTION(BlueprintPure, Category="Interaction") class ABreakerTravelPoint* FindNearbyTravelPoint() const;
     // Ground loot: the nearest pickup within its interaction range, or null.
     // F prefers a pickup over NPC dialogue when both are in range — picking
     // items up is by far the more frequent action.
