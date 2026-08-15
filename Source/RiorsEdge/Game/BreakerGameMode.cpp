@@ -12,6 +12,7 @@
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerSkirmisherEnemy.h"
+#include "Combat/BreakerAlteredEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
 #include "Interaction/BreakerNPC.h"
 #include "Playtest/BreakerKillTelemetryComponent.h"
@@ -464,6 +465,7 @@ void ABreakerGameMode::LogGymSummary() const
     int32 Ranged = 0;
     int32 Wardens = 0;
     int32 Skirmishers = 0;
+    int32 Drudges = 0;
     int32 Lattices = 0;
     int32 Bosses = 0;
     int32 ModifierBearing = 0;
@@ -481,6 +483,12 @@ void ABreakerGameMode::LogGymSummary() const
         else if (It->IsA<ABreakerWardenEnemy>()) { ++Wardens; AnchorLocations.Add(It->GetActorLocation()); }
         else if (It->IsA<ABreakerSkirmisherEnemy>()) { ++Skirmishers; RangedLocations.Add(It->GetActorLocation()); }
         else if (It->IsA<ABreakerRangedEnemy>()) { ++Lattices; RangedLocations.Add(It->GetActorLocation()); }
+        // Counted by name because it is otherwise indistinguishable from a
+        // Skitter in this line, and "is the new archetype actually in the
+        // world" is exactly the question a headless smoke run asks. Not a
+        // Warden-class anchor: it has no frontal armour and no shield, so it
+        // does not enter the 5.3 anchor cap.
+        else if (It->IsA<ABreakerAlteredEnemy>()) { ++Drudges; }
         if (It->IsElite()) ++Elites;
         if (const UBreakerEnemyModifierComponent* Modifiers = It->GetModifierComponent();
             Modifiers && Modifiers->GetModifierCount() > 0)
@@ -492,10 +500,10 @@ void ABreakerGameMode::LogGymSummary() const
     int32 Targets = 0;
     for (TActorIterator<ABreakerTargetDummy> It(const_cast<UWorld*>(World)); It; ++It) ++Targets;
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | skitter/other %d | lattice %d | warden %d | skirmisher %d | boss %d | elite %d | modifier-bearing %d (%d modifiers) | target dummies %d"),
+        TEXT("[BreakerGym] area level %d | melee %d | ranged %d | skitter/other %d | lattice %d | warden %d | skirmisher %d | drudge %d | boss %d | elite %d | modifier-bearing %d (%d modifiers) | target dummies %d"),
         GymAreaLevel, Melee, Ranged,
-        Melee + Ranged - Lattices - Wardens - Skirmishers - Bosses,
-        Lattices, Wardens, Skirmishers, Bosses, Elites, ModifierBearing, ModifierTotal, Targets);
+        Melee + Ranged - Lattices - Wardens - Skirmishers - Bosses - Drudges,
+        Lattices, Wardens, Skirmishers, Drudges, Bosses, Elites, ModifierBearing, ModifierTotal, Targets);
     // The §5.3 caps, asserted rather than assumed. They are the difference
     // between "dense" and "unplayable", and this check has already earned its
     // keep once: it caught two Skirmishers standing alongside two Lattices in
@@ -1176,6 +1184,29 @@ void ABreakerGameMode::SpawnCombatEncounter()
         UBreakerKillTelemetryComponent::AttachTo(Warden);
     }
 
+    // THE SEVERED DRUDGE (O40c reachability). ABreakerAlteredEnemy shipped and
+    // was tested and was spawned by NOTHING, which is the exact defect O40(c)
+    // exists to prevent: content in the codebase that no player can reach.
+    //
+    // ENCOUNTER-DESIGN GATE, stated rather than skirted: the document gates all
+    // Altered content behind the Act II turn beat. The gym is a playtest
+    // instrument, not campaign content, so this is legitimate — and the Drudge
+    // must not be added to anything that reads as campaign progression until
+    // that beat exists.
+    //
+    // Placed on the pocket's OPEN side, off the corridor axis, and then moved to
+    // whatever ground near there carries no hard cover: its weak point is a
+    // dorsal ridge at 129 cm rather than a head, so the answer to it is a circle,
+    // and a 2.0x-health body with its back to a slab has no answer at all. It is
+    // also a MELEE body against 5.3's live-enemy ceiling — one, not two, keeps
+    // the standing encounter at eleven live against a cap of twelve.
+    for (int32 Index = 0; Index < GymDrudgeCount; ++Index)
+    {
+        const FVector DrudgeAround = Frame.At(EncounterPocketDistance - CombatPocketRadius * 0.25f,
+            (Index % 2 == 0 ? -1.0f : 1.0f) * (CombatPocketRadius * 0.45f), 120.0f);
+        SpawnDrudge(DrudgeAround, 2.4f + Index * 0.8f, GymAreaLevel);
+    }
+
     // ONE Skirmisher, and its placement is the whole point. It goes AT the
     // pocket's cover ring, not at an arbitrary bearing: the pocket's four cover
     // blocks sit on a CoverPitchMax ring around the pocket centre, and a
@@ -1465,7 +1496,7 @@ void ABreakerGameMode::TickSupplyCrate(float DeltaSeconds)
     }
 }
 
-void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& Stream)
+void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& Stream, bool bRimRuins)
 {
     UWorld* World = GetWorld();
     if (!World) return;
@@ -1483,7 +1514,12 @@ void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& St
     // NOT a closed ring: a closed pocket is an arena, and an arena the player
     // cannot leave at speed removes the route choice the pocket exists to
     // create.
-    for (int32 Segment = 0; Segment < 5; ++Segment)
+    // bRimRuins false is the ELITE ARENA. The arc sits 1800-2200 cm from centre
+    // and the Field Marshal's gallery offsets are +/-1900 with alcoves at
+    // +/-1700, so in the arena this arc is geometry the boss gives orders into.
+    // SpawnBossTest has warned about exactly that since it was written; leaving
+    // the arc out is the fix rather than the warning.
+    for (int32 Segment = 0; bRimRuins && Segment < 5; ++Segment)
     {
         const float Angle = BaseYaw + Segment * 37.0f;
         const FVector Radial = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector);
@@ -1495,35 +1531,15 @@ void ABreakerGameMode::SpawnCombatPocket(float Fwd, float Rgt, FRandomStream& St
             Segment % 2 == 0 ? PaletteConcrete : PaletteStone, true, TEXT("Runtime_PocketRuin"));
     }
 
-    // Cover inside the pocket, spaced on CoverPitchMax rather than scattered.
-    // Four blocks on a 1700 cm ring means a player crossing the pocket always
-    // has the next piece inside one telegraph-plus-flight window.
-    for (int32 Block = 0; Block < 4; ++Block)
-    {
-        const float Angle = BaseYaw + 45.0f + Block * 90.0f;
-        const FVector Offset = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector) * (CoverPitchMax * 0.5f);
-        const FVector CoverLocation = Frame.At(Fwd, Rgt, 55.0f) + Offset;
-        SpawnShape(World, ShapeCube, CoverLocation,
-            FVector(Stream.FRandRange(1.8f, 2.6f), Stream.FRandRange(0.9f, 1.5f), 1.1f),
-            FRotator(0.0f, Angle + Stream.FRandRange(-30.0f, 30.0f), 0.0f),
-            PaletteStone, true, TEXT("Runtime_PocketCover"));
-        // These four blocks are the staggered cover chain a Skirmisher is meant
-        // to work: on a CoverPitchMax ring, so a player crossing the pocket
-        // always has the next piece inside one telegraph-plus-flight window,
-        // and so does the enemy.
-        RegisterCoverAnchor(CoverLocation);
-    }
-
-    // One full-height pillar per pocket: the only thing here that breaks a
-    // LATTICE sight line outright (Encounter-Design 3.3 gives the boss arena
-    // two for the same reason). Off centre, so it never covers the whole rim.
-    const FVector PillarLocation =
-        Frame.At(Fwd, Rgt, 250.0f) + Frame.Forward.RotateAngleAxis(BaseYaw + 200.0f, FVector::UpVector) * (CombatPocketRadius * 0.45f);
-    SpawnShape(World, ShapeCylinder, PillarLocation,
-        FVector(1.4f, 1.4f, 5.0f), FRotator::ZeroRotator, PaletteConcrete, true, TEXT("Runtime_PocketPillar"));
-    // Full height, so it is the only thing in the pocket that blocks a sight
-    // line outright rather than at a crouch. The best cover in the pocket.
-    RegisterCoverAnchor(PillarLocation);
+    // THE POCKET'S COVER MOVED OUT OF HERE. It used to be four blocks and a
+    // pillar authored inline, registered as bare positions, and invisible to
+    // anything that wanted to reason about the field: nothing could tell the
+    // 500 cm pillar from the 110 cm blocks, and nothing outside the pocket had
+    // any cover at all. Both are now the cover field's job
+    // (Game/BreakerCoverRegistry.h, SpawnCoverField below), which places the
+    // same cluster at every pocket centre plus an outer ring, classifies each
+    // piece, and can be measured. What is left in this function is dressing:
+    // the broken rim arc, the overgrowth and the fallen prop.
 
     for (int32 Bush = 0; Bush < 6; ++Bush)
     {
@@ -1696,7 +1712,9 @@ void ABreakerGameMode::SpawnExpandedField()
     SpawnCombatPocket(RangeFiringLineDistance + DashRefreshDistance, -FieldHalfExtent * 0.55f, Stream);
     // Fourth pocket IS the elite arena: same radius, same grammar, marked with
     // the ring in SpawnAnchorCamp and reused by wave mode.
-    SpawnCombatPocket(ArenaDistance, 0.0f, Stream);
+    // bRimRuins false: see SpawnCombatPocket. The arena's cover is authored to
+    // Encounter-Design 3.3 by the cover field instead.
+    SpawnCombatPocket(ArenaDistance, 0.0f, Stream, false);
 
     // --- 4. Sniper sightline lane -----------------------------------------
     // Runs down the left flank with three distance markers. Its width is
@@ -1731,40 +1749,194 @@ void ABreakerGameMode::SpawnExpandedField()
         SpawnFieldSlab(World, Frame, LaneStart, LaneStart + 10000.0f,
             Lateral - 30.0f, Lateral + 30.0f, 45.0f, 45.0f, PaletteStone, TEXT("Runtime_SniperLaneKerb"));
     }
-    // One ranged-band pocket halfway down the lane: RangedSightlineDepth of
-    // clear ground behind a single piece of hard cover, which is the minimum
-    // geometry a LATTICE needs to use its whole 900-1900 band instead of
-    // backing into a kerb.
-    const FVector LaneCoverLocation = Frame.At(LaneStart + RangedSightlineDepth, LaneRight + 500.0f, 150.0f);
-    SpawnShape(World, ShapeCube, LaneCoverLocation,
-        FVector(2.6f, 0.5f, 3.0f), FRotator(0.0f, 8.0f, -4.0f), PaletteConcrete, true, TEXT("Runtime_LaneCover"));
-    RegisterCoverAnchor(LaneCoverLocation);
+    // The lane's one piece of hard cover — RangedSightlineDepth of clear ground
+    // behind it, the minimum a LATTICE needs to use its whole 900-1900 band
+    // instead of backing into a kerb — is now placed by the cover field, which
+    // is also what knows to keep every other piece off this lane.
 
-    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] cover anchors recorded: %d (pitch limit %.0f cm, Level-Design G23)"),
-        CoverAnchors.Num(), CoverPitchMax);
+    // --- 5. THE COVER FIELD ------------------------------------------------
+    // Last, because it measures the band it is filling and the exclusions it
+    // measures against are the stations built above.
+    SpawnCoverField();
 }
 
-void ABreakerGameMode::RegisterCoverAnchor(const FVector& WorldLocation)
+FBreakerCoverFieldParams ABreakerGameMode::MakeCoverFieldParams() const
 {
-    CoverAnchors.Add(WorldLocation);
+    // EVERY grammar number is transported, never re-authored. Level-Design 3 is
+    // the single source of truth for CoverPitchMax, CombatPocketRadius,
+    // DashCorridorWidth, RangedSightlineDepth, SafeZoneRadius and ArenaDistance,
+    // and the cover field is derived from them — so retuning the grammar
+    // retunes the cover with it instead of leaving two numbers to drift apart.
+    FBreakerCoverFieldParams Params;
+    Params.CoverPitchMaxCm = CoverPitchMax;
+    Params.DashCorridorWidthCm = DashCorridorWidth;
+    Params.CombatPocketRadiusCm = CombatPocketRadius;
+    Params.RangedSightlineDepthCm = RangedSightlineDepth;
+    Params.SafeZoneRadiusCm = SafeZoneRadius;
+    Params.ArenaDistanceCm = ArenaDistance;
+
+    Params.ClusterPitchCm = CoverClusterPitch;
+    Params.ClusterRingRadiusCm = CoverClusterRingRadius;
+    Params.ChestHeightCm = CoverChestHeight;
+    Params.FullHeightCm = CoverFullHeight;
+    Params.PocketPillarHeightCm = FMath::Max(CoverFullHeight, 500.0f);
+    Params.PocketInnerRingRadiusCm = CoverPitchMax * 0.5f;
+    Params.WidestEnemyBodyCm = 120.0f;   // the SEVERED DRUDGE's overridden capsule
+
+    // The contested band: from the target range's firing line to past the elite
+    // arena, stopping short of the sniper lane and the wall-ride corridor.
+    Params.BandNearCm = RangeFiringLineDistance - 600.0f;
+    Params.BandFarCm = ArenaDistance + CombatPocketRadius;
+    Params.BandHalfWidthCm = CoverBandHalfWidth;
+
+    // The instrument corridor: the firing line, its four dummies (laterals
+    // -850 .. +350) and the player's line in to the standing encounter.
+    Params.CorridorNearCm = RangeFiringLineDistance - 600.0f;
+    Params.CorridorFarCm = EncounterPocketDistance + CombatPocketRadius;
+    Params.CorridorShoulderPitchCm = CoverPitchMax;
+
+    // THE POCKETS. SpawnExpandedField builds four; the first is the standing
+    // encounter and sits ON the corridor, so it gets flank line breaks rather
+    // than a cluster, and the fourth IS the elite arena, which is authored to
+    // Encounter-Design 3.3 separately.
+    Params.CorridorPocketCentres.Add(FVector2D(EncounterPocketDistance, 0.0f));
+    Params.PocketCentres.Add(FVector2D(EncounterPocketDistance + DashRefreshDistance, FieldHalfExtent * 0.55f));
+    Params.PocketCentres.Add(FVector2D(RangeFiringLineDistance + DashRefreshDistance, -FieldHalfExtent * 0.55f));
+    Params.EncounterFlankOffsetCm = FMath::Min(CoverPitchMax - 100.0f, 1600.0f);
+
+    // THE JUMP-GAP RUN, taken from SpawnJumpGapRun's own arithmetic rather than
+    // restated: trench at EncounterPocketDistance + CombatPocketRadius + 2200,
+    // platforms DashCorridorWidth wide with the take-off 1600 cm behind it and
+    // the trench floor 2.6 platform widths to each side.
+    const float TrenchFwd = EncounterPocketDistance + CombatPocketRadius + 2200.0f;
+    Params.JumpRunNearCm = TrenchFwd - 2000.0f;
+    // +1200 rather than the run's full 1600 cm landing depth plus its ramp: the
+    // elite arena's marker ring starts at 15000 and the third jump lane's
+    // landing ends at 16400, so the two stations PHYSICALLY OVERLAP in the field
+    // this pass inherited. A box drawn to the run's true far edge swallows the
+    // arena's own §3.3 pillars. 16000 covers the trench, the take-offs and the
+    // first two landings, and the third landing is protected instead by the
+    // arena exclusion, which reaches 3904 cm from the arena centre and therefore
+    // covers everything from 13096 forward. Reported to the owner as a station
+    // collision rather than papered over.
+    Params.JumpRunFarCm = TrenchFwd + SwiftThreeJumpGap + 1200.0f;
+    Params.JumpRunHalfWidthCm = DashCorridorWidth * 2.6f;
+
+    // THE MOVEMENT LANES, likewise taken from the spawners that build them.
+    Params.SniperLaneRightCm = -FieldHalfExtent * 0.62f;
+    Params.SniperLaneHalfWidthCm = DashCorridorWidth * 0.5f;
+    Params.WallLaneRightCm = FieldHalfExtent * 0.62f;
+    Params.WallLaneHalfWidthCm = WallRideCorridorWidth * 0.5f + 125.0f;
+
+    // The lane's own hard cover, in the position the shipped field gave it.
+    Params.LaneCoverForwardCm = RangeFiringLineDistance - 1500.0f + RangedSightlineDepth;
+    Params.LaneCoverRightCm = Params.SniperLaneRightCm + 500.0f;
+
+    Params.Seed = ModifierSeedBase;
+    return Params;
+}
+
+void ABreakerGameMode::SpawnCoverField()
+{
+    UWorld* World = GetWorld();
+    if (!World || !bFieldFrameSet || !bBuildCoverField) return;
+
+    const FBreakerCoverFieldParams Params = MakeCoverFieldParams();
+    const TArray<FBreakerCoverPiece> Pieces = UBreakerCoverLayoutLibrary::BuildCoverField(Params);
+
+    for (const FBreakerCoverPiece& Piece : Pieces)
+    {
+        // Sunk 5 cm so the bottom face is never coplanar with the apron. The
+        // face is hidden either way, but the field has already shipped one
+        // z-fighting report and the fix costs nothing. A chest-high piece is
+        // still 115 cm proud, under MantleStepHeight 145, so it stays climbable.
+        const float CentreZ = Piece.HeightCm * 0.5f - 5.0f;
+        const FVector Location = Frame.At(Piece.Forward, Piece.Right, CentreZ);
+        SpawnShape(World, ShapeCube, Location,
+            FVector(Piece.HalfLengthCm * 2.0f / 100.0f, Piece.HalfDepthCm * 2.0f / 100.0f, Piece.HeightCm / 100.0f),
+            FRotator(0.0f, Frame.Forward.Rotation().Yaw + Piece.YawDegrees, 0.0f),
+            Piece.Class == EBreakerCoverClass::FullHeight ? PaletteConcrete : PaletteStone,
+            true, Piece.Class == EBreakerCoverClass::FullHeight ? TEXT("Runtime_CoverFull") : TEXT("Runtime_CoverChest"));
+        RegisterCoverAnchor(Location, Piece.Class, Piece.HeightCm);
+    }
+
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] %s"),
+        *UBreakerCoverLayoutLibrary::DescribeCoverField(Pieces, Params));
+    FString Reason;
+    if (!UBreakerCoverLayoutLibrary::IsLayoutLegal(Pieces, Params, Reason))
+    {
+        // Loud, never silent. Every rule named here has a reason written beside
+        // it in Level-Design 3/4 or Encounter-Design 3.3, and a field that
+        // breaks one is a field that measures the wrong thing.
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerGym] COVER FIELD IS ILLEGAL: %s"), *Reason);
+    }
+}
+
+FVector ABreakerGameMode::FindFlankableGround(const FVector& Around, float SearchRadius) const
+{
+    // A SEVERED DRUDGE is answered by getting BEHIND it: its weak point is a
+    // dorsal ridge at 129 cm, not a head, so the whole archetype is a circle.
+    // Spawning one with its back against a 400 cm slab deletes the answer and
+    // leaves a 2.0x-health body with no counterplay, which is the opposite of
+    // what this archetype is for. This walks a ring of candidates and returns
+    // the first whose flanking circle is clear of hard cover.
+    FBreakerCoverAnchor Anchor;
+    if (!CoverRegistry.FindNearest(Around, DrudgeFlankClearanceCm, Anchor)) return Around;
+    for (int32 Step = 1; Step <= 12; ++Step)
+    {
+        // A spiral rather than a ring: bearing turns by the golden angle and the
+        // radius grows, so twelve candidates cover the neighbourhood evenly
+        // instead of all landing on one arc.
+        const float Bearing = Step * 137.5f;
+        const float Radius = DrudgeFlankClearanceCm * (0.6f + 0.5f * Step);
+        if (Radius > SearchRadius) break;
+        const FVector Candidate = Around
+            + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Bearing, FVector::UpVector) * Radius;
+        if (!CoverRegistry.FindNearest(Candidate, DrudgeFlankClearanceCm, Anchor)) return Candidate;
+    }
+    // No clear circle anywhere nearby. Honest answer: put it where it was asked
+    // for and say so, rather than silently walking it across the field.
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerGym] no cover-free circle of %.0f cm within %.0f cm of (%.0f, %.0f); the Drudge there will be harder to flank."),
+        DrudgeFlankClearanceCm, SearchRadius, Around.X, Around.Y);
+    return Around;
+}
+
+ABreakerAlteredEnemy* ABreakerGameMode::SpawnDrudge(const FVector& Around, float PatrolPhase, int32 AreaLevel)
+{
+    UWorld* World = GetWorld();
+    if (!World || !bSpawnDrudges) return nullptr;
+
+    // Z is the CALLER'S. The standing encounter builds its point on the field
+    // frame; wave mode builds its arena around wherever the player is standing,
+    // which may not be the frame's ground plane at all. Forcing the frame's Z
+    // here would drop a wave Drudge through a platform the playtester is fighting
+    // on. Enemies ground-snap every tick regardless.
+    const FVector SpawnLocation = FindFlankableGround(Around, CombatPocketRadius);
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    ABreakerAlteredEnemy* Drudge = World->SpawnActor<ABreakerAlteredEnemy>(
+        ABreakerAlteredEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+    if (!Drudge) return nullptr;
+    Drudge->ConfigureEncounter(SpawnLocation, PatrolPhase);
+    Drudge->SetAreaLevel(AreaLevel);
+    UBreakerKillTelemetryComponent::AttachTo(Drudge);
+    return Drudge;
+}
+
+void ABreakerGameMode::RegisterCoverAnchor(const FVector& WorldLocation, EBreakerCoverClass Class, float HeightCm)
+{
+    CoverRegistry.Add(WorldLocation, Class, HeightCm);
 }
 
 bool ABreakerGameMode::FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const
 {
-    float BestDistanceSquared = MaxDistance * MaxDistance;
-    bool bFound = false;
-    for (const FVector& Anchor : CoverAnchors)
-    {
-        // 2D: cover is chosen on the ground plane, and a pillar's registered
-        // point is at its mid-height, which would otherwise cost it 250 cm of
-        // spurious distance against a block registered at 55.
-        const float DistanceSquared = FVector::DistSquared2D(Anchor, Around);
-        if (DistanceSquared > BestDistanceSquared) continue;
-        BestDistanceSquared = DistanceSquared;
-        OutAnchor = Anchor;
-        bFound = true;
-    }
-    return bFound;
+    // The 2D-ness and the "no cover here is a real answer" contract both live in
+    // FBreakerCoverRegistry now, which is where they can be tested.
+    FBreakerCoverAnchor Anchor;
+    if (!CoverRegistry.FindNearest(Around, MaxDistance, Anchor)) return false;
+    OutAnchor = Anchor.Location;
+    return true;
 }
 
 ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVector& Around,
@@ -1777,8 +1949,16 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
     // is Relocating, so the first thing it does is look for a point whose line
     // from the threat is blocked; starting on the blocked side means it finds
     // one on frame one instead of walking across open ground to get there.
+    // FULL-HEIGHT FIRST. A 120 cm block does not break a line of sight — the
+    // Skirmisher's own cover search traces from the threat and the trace is
+    // real — so ducking behind chest-high cover leaves it visible and it is a
+    // plain shooter again. Chest-high is the fallback rather than the answer,
+    // and the log below says which one it got.
     FVector Anchor = Around;
-    const bool bHasCover = FindCoverAnchorNear(Around, CoverPitchMax, Anchor);
+    FBreakerCoverAnchor Chosen;
+    bool bHasCover = CoverRegistry.FindNearestOfClass(Around, CoverPitchMax, EBreakerCoverClass::FullHeight, Chosen);
+    if (!bHasCover) bHasCover = CoverRegistry.FindNearest(Around, CoverPitchMax, Chosen);
+    if (bHasCover) Anchor = Chosen.Location;
     FVector SpawnLocation = Anchor;
     if (bHasCover)
     {
@@ -1806,6 +1986,16 @@ ABreakerSkirmisherEnemy* ABreakerGameMode::SpawnSkirmisherNearCover(const FVecto
         UE_LOG(LogTemp, Warning,
             TEXT("[BreakerGym] Skirmisher spawned with NO cover anchor within %.0f cm of (%.0f, %.0f) — it will degrade to an open-ground shooter."),
             CoverPitchMax, Around.X, Around.Y);
+    }
+    else if (Chosen.Class != EBreakerCoverClass::FullHeight)
+    {
+        // Not a warning: chest-high cover is legitimate ground for it, and the
+        // instrument corridor carries nothing else on purpose. It is recorded
+        // because a run whose Skirmishers all found chest-high cover is a
+        // different measurement from one where they found line breaks.
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerGym] Skirmisher anchored on CHEST-HIGH cover (%.0f cm) at (%.0f, %.0f); no line break within %.0f cm."),
+            Chosen.HeightCm, Chosen.Location.X, Chosen.Location.Y, CoverPitchMax);
     }
     return Skirmisher;
 }
@@ -1876,6 +2066,34 @@ void ABreakerGameMode::StartNextWave()
     // --- Melee, including the elite promotions ------------------------------
     // An elite is a PROMOTED body, not an extra one, which is what keeps the
     // density ceiling honest: the solver counts elites inside Skitters.
+    // THE DRUDGE IN WAVE MODE, as a SUBSTITUTION. BreakerWaveBudget.h has no
+    // Drudge row and this lane may not add one, so a Drudge is rendered in place
+    // of a melee body the solver already paid for — exactly the precedent the
+    // solver itself sets for elites and modifier carriers, which are promoted
+    // Skitters folded into Composition.Skitters rather than extra bodies. That
+    // keeps 5.3's density ceiling honest without touching the solver.
+    //
+    // WHAT THE SOLVER WOULD NEED, if the owner wants a Drudge to be a real
+    // archetype rather than a re-skin — reported, not made:
+    //   FBreakerWaveBudgetParams: int32 DrudgeCost = 2;  int32 DrudgeFromWave = 3;
+    //   FBreakerWaveComposition:  int32 Drudges = 0;  folded into TotalEnemies()
+    //                             and counted as melee, not as a ranged source.
+    // Cost 2 rather than the Skitter's 1: 2.0x health and no lunge is roughly
+    // two Skitters' worth of time-to-kill and none of a Skitter's pressure.
+    //
+    // Substituted from the END of the melee list so the elite and carrier
+    // promotions, which take the low indices, are never turned into Drudges —
+    // the Drudge overrides its own capsule and chassis and a promoted one would
+    // be reading two archetypes at once.
+    int32 WaveDrudges = 0;
+    if (bSpawnDrudges && CurrentWave >= DrudgeFromWave)
+    {
+        WaveDrudges = FMath::Clamp(CurrentWave / FMath::Max(1, DrudgeWaveDivisor), 0, MaximumDrudgesPerWave);
+        WaveDrudges = FMath::Min(WaveDrudges,
+            FMath::Max(0, Composition.Skitters - Composition.Elites - Composition.ModifierCarriers));
+    }
+    const int32 FirstDrudgeIndex = Composition.Skitters - WaveDrudges;
+
     for (int32 Index = 0; Index < Composition.Skitters; ++Index)
     {
         const int32 Pack = Index / 4;
@@ -1884,6 +2102,16 @@ void ABreakerGameMode::StartNextWave()
         // ring the player circles is the same radius everywhere in the field.
         const FVector PackCenter = ArenaCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(PackAngle, FVector::UpVector) * (CombatPocketRadius * 0.55f);
         const FVector SpawnLocation = PackCenter + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 160.0f;
+        if (WaveDrudges > 0 && Index >= FirstDrudgeIndex)
+        {
+            if (ABreakerAlteredEnemy* Drudge = SpawnDrudge(SpawnLocation, Index * 1.3f, AreaLevel))
+            {
+                Drudge->ConfigureWave(AreaLevel);
+                SetEnemyDropsLoot(Drudge, Composition.bDropsLoot);
+                WaveEnemies.Add(Drudge);
+            }
+            continue;
+        }
         FActorSpawnParameters Params;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
         ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);

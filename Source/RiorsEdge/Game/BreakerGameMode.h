@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "Game/BreakerWaveBudget.h"
+#include "Game/BreakerCoverRegistry.h"
 #include "BreakerGameMode.generated.h"
 
 UCLASS(Blueprintable)
@@ -322,6 +323,64 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Ammo", meta=(ClampMin="0")) float SupplyCrateDwellSeconds = 2.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Ammo", meta=(ClampMin="0")) float SupplyCrateCooldownSeconds = 8.0f;
 
+    // --- THE COVER FIELD (Game/BreakerCoverRegistry.h) ---------------------
+    // Owner: "redesign the playground to make it have proper cover and over
+    // [open] space for the wave mechanics for testing as well."
+    //
+    // The layout itself is pure maths in UBreakerCoverLayoutLibrary and is
+    // proved by RiorsEdge.Game.ArenaLayout.*; what lives here is the handful of
+    // numbers that are genuinely NEW rather than transported out of the spatial
+    // grammar above. Everything the grammar already owns -- CoverPitchMax,
+    // CombatPocketRadius, DashCorridorWidth, ArenaDistance, SafeZoneRadius -- is
+    // passed through by MakeCoverFieldParams and is NOT re-authored here, so
+    // retuning the grammar retunes the cover field with it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover") bool bBuildCoverField = true;
+    // CHEST-HIGH. The standing capsule is 176 cm and the crouched capsule is
+    // roughly half of it, so 120 hides a crouched body and leaves a standing
+    // one's sights clear. Under MantleStepHeight 145 on purpose: this is cover
+    // you can take the high ground on rather than cover that fights the kit.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover", meta=(ClampMin="0")) float CoverChestHeight = 120.0f;   // O2 PLACEHOLDER
+    // FULL-HEIGHT. Standing 176 + jump apex 178 = 354, so anything under that
+    // can be seen over at the top of a jump and is chest cover with extra steps.
+    // 400 is the same arithmetic MinCeilingClearance is built on.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover", meta=(ClampMin="0")) float CoverFullHeight = 400.0f;   // O2 PLACEHOLDER
+    // Cluster pitch, 2 x CoverPitchMax. See the derivation in
+    // BreakerCoverRegistry.h: it is simultaneously the largest pitch whose
+    // lattice circumradius lands inside CoverPitchMax and the smallest that
+    // leaves DashCorridorWidth of clear ground between two clusters.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover", meta=(ClampMin="500")) float CoverClusterPitch = 3400.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover", meta=(ClampMin="100")) float CoverClusterRingRadius = 700.0f;   // O2 PLACEHOLDER
+    // The contested band the cover field fills: from the target range's firing
+    // line to past the elite arena, stopping short of the sniper lane and the
+    // wall-ride corridor so neither movement instrument is touched.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Cover", meta=(ClampMin="0")) float CoverBandHalfWidth = 5800.0f;   // O2 PLACEHOLDER
+
+    // --- THE SEVERED DRUDGE in the gym (O40c reachability) -----------------
+    // ABreakerAlteredEnemy shipped, was tested, and was spawned by NOTHING --
+    // the same defect O40(c) exists to prevent: content that exists in the
+    // codebase and cannot be reached by a player. It is a heavy, slow,
+    // low-and-wide melee body (capsule 120 cm across against the standard 90,
+    // 150 cm tall against 180, MoveSpeed 250, 2.0x health) whose weak point is a
+    // DORSAL ridge at 129 cm rather than a head -- so the whole archetype is
+    // "get behind it", and it needs FLANKING ROOM rather than a corridor.
+    //
+    // ENCOUNTER-DESIGN GATE, stated rather than skirted: the document gates ALL
+    // Altered content behind the Act II turn beat. The gym is a playtest
+    // instrument and not campaign content, which is why spawning it here is
+    // legitimate; nothing in this file feeds campaign progression, and the
+    // Drudge must not be added to anything that does until that beat exists.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge") bool bSpawnDrudges = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge", meta=(ClampMin="0")) int32 GymDrudgeCount = 1;   // O2 PLACEHOLDER
+    // First wave a Drudge appears on, and how many melee bodies get rendered as
+    // one. It is a SUBSTITUTION, not an addition -- see StartNextWave.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge", meta=(ClampMin="1")) int32 DrudgeFromWave = 3;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge", meta=(ClampMin="1")) int32 DrudgeWaveDivisor = 4;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge", meta=(ClampMin="0")) int32 MaximumDrudgesPerWave = 2;   // O2 PLACEHOLDER
+    // Clear ground a Drudge needs around it to be flankable. Its own body is
+    // 120 cm across and the answer to it is getting behind it, so it is spawned
+    // where a full circle of this radius is free of hard cover.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Drudge", meta=(ClampMin="0")) float DrudgeFlankClearanceCm = 900.0f;   // O2 PLACEHOLDER
+
 public:
     // The one frame every spawn function works in. Ground is a point on the
     // REAL floor directly under the spawn; Forward/Right are the spawn facing.
@@ -364,10 +423,15 @@ private:
     void BuildCaptureTour();
 
     bool bPlaytestTargetsSpawned = false;
-    // Every piece of hard cover the field built, in world space. Populated
-    // during SpawnExpandedField, so it survives an F1 reset (which rebuilds the
-    // enemies but not the geometry).
-    TArray<FVector> CoverAnchors;
+    // Every piece of hard cover the field built, in world space, WITH ITS CLASS
+    // AND HEIGHT. Populated during SpawnExpandedField, so it survives an F1
+    // reset (which rebuilds the enemies but not the geometry).
+    //
+    // It was a bare TArray<FVector>, which recorded position and nothing else --
+    // so the placement code could not tell a 500 cm pillar from a 110 cm block,
+    // and the difference between those two is the difference between breaking
+    // line of sight and standing behind a footstool.
+    FBreakerCoverRegistry CoverRegistry;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
     UPROPERTY() TObjectPtr<class ABreakerBossEnemy> ActiveBoss;
@@ -388,7 +452,21 @@ private:
     void SpawnExpandedField();
     void SpawnBreach();
     void SpawnJumpGapRun();
-    void SpawnCombatPocket(float Fwd, float Rgt, struct FRandomStream& Stream);
+    // bRimRuins false leaves out the broken-wall arc. The elite arena uses it:
+    // the arc sits at 1800-2200 cm from centre and the Field Marshal's gallery
+    // offsets are +/-1900 and its alcoves +/-1700, so in the ARENA the arc is
+    // geometry the boss gives orders into. SpawnBossTest has warned about
+    // exactly this since it was written; this is the fix rather than the warning.
+    void SpawnCombatPocket(float Fwd, float Rgt, struct FRandomStream& Stream, bool bRimRuins = true);
+    // THE COVER FIELD. Builds UBreakerCoverLayoutLibrary's answer in the world
+    // and registers every piece. Called from SpawnExpandedField.
+    void SpawnCoverField();
+    FBreakerCoverFieldParams MakeCoverFieldParams() const;
+    // A Drudge wants a clear circle to be flanked in. Returns a point near
+    // Around whose DrudgeFlankClearanceCm neighbourhood carries no hard cover,
+    // or Around itself when the field has none to avoid.
+    FVector FindFlankableGround(const FVector& Around, float SearchRadius) const;
+    class ABreakerAlteredEnemy* SpawnDrudge(const FVector& Around, float PatrolPhase, int32 AreaLevel);
     void SpawnPlaytestTargets();
     void SpawnMovementCourse();
     void SpawnCombatEncounter();
@@ -402,16 +480,19 @@ private:
     // ITSELF, filtered to candidates whose line from the threat is blocked, so
     // whether the archetype exists at all is decided by where it is spawned.
     //
-    // The field already builds hard cover — pocket cover blocks on a
-    // CoverPitchMax ring, pocket pillars, the sniper lane's hard-cover piece.
-    // Nothing recorded WHERE, so the spawners could not aim at it. This records
-    // every piece as it is built, which also makes the derived cover pitch
-    // (Level-Design G23, max 1700 cm) checkable at runtime instead of by
-    // reading the spawner.
-    void RegisterCoverAnchor(const FVector& WorldLocation);
+    // The field used to build its hard cover as a side effect of other
+    // spawners — pocket blocks, pocket pillars, one piece on the sniper lane —
+    // and record only WHERE, not WHAT. So the placement code could not tell a
+    // 500 cm pillar from a 110 cm block, and there was no cover at all outside
+    // four discs in 250 m of field. SpawnCoverField now builds the whole thing
+    // from UBreakerCoverLayoutLibrary and records every piece with its class and
+    // height, which is what lets the Skirmisher ask for a LINE BREAK rather than
+    // for the nearest lump of geometry.
+    void RegisterCoverAnchor(const FVector& WorldLocation, EBreakerCoverClass Class, float HeightCm);
     // Nearest recorded cover to Around, within MaxDistance. False means "there
-    // is no cover here", which is a real answer and is why the Skirmisher
-    // spawners fall back to a plain position rather than skipping the spawn.
+    // is no cover here", which is a real answer. Kept as the class-agnostic
+    // query for callers that only need a position; SpawnSkirmisherNearCover uses
+    // the registry's class-filtered form directly.
     bool FindCoverAnchorNear(const FVector& Around, float MaxDistance, FVector& OutAnchor) const;
     // Spawns a Skirmisher AT a cover anchor near Around, standing off from the
     // threat side so its first act is to duck rather than to walk into view.
