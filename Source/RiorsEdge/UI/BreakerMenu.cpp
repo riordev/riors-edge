@@ -1,5 +1,9 @@
 #include "UI/BreakerMenu.h"
 
+#include "Save/BreakerCharacterRoster.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Layout/SScrollBox.h"
+
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Characters/BreakerCharacter.h"
@@ -765,6 +769,8 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Loadout: ContentHost->SetContent(BuildLoadoutScreen()); break;
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
         case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
+        case EBreakerMenuScreen::CharacterSelect: ContentHost->SetContent(BuildCharacterSelectScreen()); break;
+        case EBreakerMenuScreen::CharacterCreate: ContentHost->SetContent(BuildCharacterCreateScreen()); break;
         case EBreakerMenuScreen::SkillTrees: ContentHost->SetContent(BuildSkillTreesScreen()); break;
         case EBreakerMenuScreen::Forge: ContentHost->SetContent(BuildForgeScreen()); break;
         case EBreakerMenuScreen::Abilities: ContentHost->SetContent(BuildAbilitiesScreen()); break;
@@ -951,47 +957,97 @@ TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicke
     ];
 }
 
+FReply SBreakerMenu::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
+{
+    // The title gate, and ONLY the title gate. Every other screen's keyboard
+    // handling stays where it already is; intercepting keys globally here
+    // would silently steal them from the name field on the create screen.
+    if (CurrentScreen == EBreakerMenuScreen::Main && !bTitleRevealed)
+    {
+        // Enter is what the owner asked for, but any key dismisses an attract
+        // plate — a player who presses Space and sees nothing happen concludes
+        // the game is frozen, not that they pressed the wrong key. Escape is
+        // excluded because it means "back" everywhere else in this front end
+        // and must not come to mean "forward" on one screen.
+        if (KeyEvent.GetKey() != EKeys::Escape)
+        {
+            bTitleRevealed = true;
+            Rebuild(EBreakerMenuScreen::Main);
+            return FReply::Handled();
+        }
+    }
+    return SCompoundWidget::OnKeyDown(Geometry, KeyEvent);
+}
+
+void SBreakerMenu::EnsureRosterLoaded()
+{
+    if (Roster.IsValid()) return;
+    Roster.Reset(UBreakerCharacterRoster::LoadOrCreate());
+    if (!Roster.IsValid()) return;
+    // A player who has been playing this project before the roster existed has
+    // a character in the old single slot. Adopting it here — at the first
+    // moment anything asks for the roster — means their progress is simply
+    // present on the select screen rather than apparently deleted.
+    Roster->AdoptLegacySaveIfPresent();
+    if (!SelectedCharacterId.IsValid())
+    {
+        SelectedCharacterId = Roster->LastPlayedCharacterId.IsValid()
+            ? Roster->LastPlayedCharacterId
+            : (Roster->Characters.Num() > 0 ? Roster->Characters[0].CharacterId : FGuid());
+    }
+}
+
 TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
 {
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)
+
+    // ---- The attract plate --------------------------------------------
+    if (!bTitleRevealed)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        [
+            MenuText(FText::FromString(TEXT("MOVEMENT-DRIVEN ARPG LOOTER SHOOTER")), 11, SoftText)
+        ];
+        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("PRESS ENTER")), BreakerUI::TypeH2, Cyan, true)
+        ];
+        // A visible fallback for the case the keyboard path is somehow not
+        // reaching us. The owner asked for a key, and a key is what this
+        // listens for — but a title screen with no clickable way forward is
+        // unrecoverable if focus is wrong, and that is a bad thing to be
+        // certain about without having looked.
+        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            MakeButton(FText::FromString(TEXT("CONTINUE")), FOnClicked::CreateLambda([this]()
+            {
+                bTitleRevealed = true;
+                Rebuild(EBreakerMenuScreen::Main);
+                return FReply::Handled();
+            }), true)
+        ];
+        return BuildFrame(FText::FromString(TEXT("RIOR'S EDGE")),
+            FText::FromString(TEXT("")), Body, 720.0f);
+    }
+
+    // ---- PLAY / SETTINGS / QUIT ----------------------------------------
+    // Exactly the three the owner asked for. LOADOUT, INVENTORY and BREAKER
+    // CLASS used to sit here and have MOVED to the pause menu, where they
+    // belong: they act on a character, and at the title screen there is not
+    // one yet — every one of them silently operated on whatever pawn the gym
+    // happened to have spawned.
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
-        MenuText(FText::FromString(TEXT("MOVEMENT-DRIVEN COMBAT PROTOTYPE")), 11, SoftText)
+        MenuText(FText::FromString(TEXT("MOVEMENT-DRIVEN ARPG LOOTER SHOOTER")), 11, SoftText)
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
     [
-        MakeButton(FText::FromString(TEXT("ENTER PLAYTEST GYM")), FOnClicked::CreateLambda([this]()
+        MakeButton(FText::FromString(TEXT("PLAY")), FOnClicked::CreateLambda([this]()
         {
-            if (Character.IsValid()) Character->ResumeFromMenu();
+            Rebuild(EBreakerMenuScreen::CharacterSelect);
             return FReply::Handled();
         }), true)
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("LOADOUT")), FOnClicked::CreateLambda([this]()
-        {
-            Rebuild(EBreakerMenuScreen::Loadout);
-            return FReply::Handled();
-        }))
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("INVENTORY")), FOnClicked::CreateLambda([this]()
-        {
-            Rebuild(EBreakerMenuScreen::Inventory);
-            return FReply::Handled();
-        }))
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("BREAKER CLASS")), FOnClicked::CreateLambda([this]()
-        {
-            Rebuild(EBreakerMenuScreen::ClassSelect);
-            return FReply::Handled();
-        }))
-    ];
-    // Skill trees are reached through the INVENTORY tab strip; no separate
-    // top-level entry point.
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
     [
         MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
@@ -1002,7 +1058,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
     ];
     Body->AddSlot().AutoHeight()
     [
-        MakeButton(FText::FromString(TEXT("QUIT TO DESKTOP")), FOnClicked::CreateLambda([this]()
+        MakeButton(FText::FromString(TEXT("QUIT GAME")), FOnClicked::CreateLambda([this]()
         {
             if (Character.IsValid()) Character->QuitFromMenu();
             return FReply::Handled();
@@ -2245,6 +2301,486 @@ void SBreakerMenu::SetEquipSlotOutline(EBreakerEquipSlot Slot, bool bDoomed)
             Outline->SetBorderBackgroundColor(FSlateColor(bDoomed ? Harm : Background));
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// CHARACTER SELECT / CREATE
+// ---------------------------------------------------------------------------
+// Class choice is permanent per character (a locked decision) and the project
+// shipped with exactly ONE save slot, so a player who picked Swift could never
+// see Caster without a dev override — the permanence rule and the single slot
+// together made the class screen a trap rather than a choice. These two
+// screens are the other half of UBreakerCharacterRoster: permanence stays,
+// and it stops being a cage because there are five slots and a delete.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // The five classes, their resource, their branches and a one-line premise.
+    // Shared by the create carousel and BuildClassSelectScreen so the two can
+    // never describe the same class differently.
+    struct FBreakerClassBlurb
+    {
+        EBreakerClassId ClassId;
+        const TCHAR* Name;
+        const TCHAR* Resource;
+        const TCHAR* Branches;
+        const TCHAR* Pitch;
+    };
+
+    const FBreakerClassBlurb GBreakerClassBlurbs[] =
+    {
+        { EBreakerClassId::Swift,    TEXT("SWIFT"),    TEXT("MOMENTUM"), TEXT("Frenzy / Kinetic / Marksman"),
+          TEXT("Speed is the build. Movement generates power, and standing still spends it.") },
+        { EBreakerClassId::Caster,   TEXT("CASTER"),   TEXT("MANA"),     TEXT("Spellblade / Void Whisperer / Multispell"),
+          TEXT("Mana is the cooldown. Statuses, reactions and ability-driven combat.") },
+        { EBreakerClassId::Gunsmith, TEXT("GUNSMITH"), TEXT("SCRAP"),    TEXT("Armory / Field Tech / Tinkerer"),
+          TEXT("Deployables and weapon mastery. The gun is the character.") },
+        { EBreakerClassId::Tank,     TEXT("TANK"),     TEXT("GRIT"),     TEXT("Leech / Bastion / Demolitionist"),
+          TEXT("Mitigation becomes fuel. Hold the line and be paid for it.") },
+        { EBreakerClassId::Support,  TEXT("SUPPORT"),  TEXT("CHARGE"),   TEXT("Medic / Conductor / Warden"),
+          TEXT("Amplify, sustain, control — and solo viable, never a second seat.") },
+    };
+
+    const FBreakerClassBlurb* FindClassBlurb(EBreakerClassId ClassId)
+    {
+        for (const FBreakerClassBlurb& Blurb : GBreakerClassBlurbs)
+        {
+            if (Blurb.ClassId == ClassId) return &Blurb;
+        }
+        return nullptr;
+    }
+}
+
+TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented) const
+{
+    // A stand-in for the character model, drawn from the same primitives the
+    // rest of this front end is built from. Owner's ruling: unimplemented
+    // classes show a GREYED SILHOUETTE rather than being hidden, so the shape
+    // of what the game intends to be is legible from the first screen while
+    // O39 still refuses to let anyone lock into one.
+    //
+    // The silhouette is deliberately the SAME figure for every class. It is
+    // honest about being a placeholder, and five subtly different boxes would
+    // imply a distinction the models will actually have to earn later.
+    const FLinearColor Body = bImplemented ? SoftText : Disabled;
+    const FLinearColor Plate = bImplemented ? PanelRaised : Panel;
+
+    TSharedRef<SVerticalBox> Figure = SNew(SVerticalBox);
+    // Head.
+    Figure->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+    [
+        SNew(SBox).WidthOverride(22.0f).HeightOverride(22.0f)[SolidBlock(Body)]
+    ];
+    // Torso.
+    Figure->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+    [
+        SNew(SBox).WidthOverride(42.0f).HeightOverride(52.0f)[SolidBlock(Body)]
+    ];
+    // Legs, as two blocks with a gap, so the figure reads as a person at a
+    // glance rather than as an icon.
+    Figure->AddSlot().AutoHeight().HAlign(HAlign_Center)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)
+        [
+            SNew(SBox).WidthOverride(16.0f).HeightOverride(38.0f)[SolidBlock(Body)]
+        ]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(16.0f).HeightOverride(38.0f)[SolidBlock(Body)]
+        ]
+    ];
+
+    TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
+    Inner->AddSlot().FillHeight(1.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)[Figure];
+    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        // "PLACEHOLDER MODEL" measured wider than the 150px plate and drew as
+        // "PLACEHOLDER MC" — the same measure-versus-clip defect the owner
+        // reported on the skill board, reintroduced by authoring a caption
+        // longer than the box that holds it. Shortened rather than widened:
+        // the plate width is what makes five tiles fit a column.
+        MenuText(FText::FromString(bImplemented ? TEXT("PLACEHOLDER") : TEXT("NOT BUILT")),
+            BreakerUI::TypeCaption, bImplemented ? Muted : Disabled, true)
+    ];
+
+    return SNew(SBox).WidthOverride(150.0f).HeightOverride(190.0f)
+    [
+        MakePlate(Inner, Plate, bImplemented ? Cyan : BorderEmphasis,
+            FMargin(BreakerUI::Space8, BreakerUI::Space8), false, BreakerUI::BorderRest)
+    ];
+}
+
+TSharedRef<SWidget> SBreakerMenu::MakeClassTile(EBreakerClassId ClassId, bool bSelected)
+{
+    const FBreakerClassBlurb* Blurb = FindClassBlurb(ClassId);
+    if (!Blurb) return SNullWidget::NullWidget;
+    const bool bImplemented = ClassHasImplementedKit(ClassId);
+
+    TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
+    Text->AddSlot().AutoHeight()
+    [
+        MenuText(FText::FromString(Blurb->Name), BreakerUI::TypeH2,
+            bImplemented ? (bSelected ? Cyan : Primary) : Disabled, true)
+    ];
+    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(FString::Printf(TEXT("RESOURCE: %s"), Blurb->Resource)),
+            BreakerUI::TypeCaption, bImplemented ? SoftText : Disabled, true)
+    ];
+    Text->AddSlot().AutoHeight()
+    [
+        MenuText(FText::FromString(Blurb->Branches), BreakerUI::TypeCaption,
+            bImplemented ? Muted : Disabled, true)
+    ];
+    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        SNew(STextBlock)
+            .Text(FText::FromString(Blurb->Pitch))
+            .ColorAndOpacity(bImplemented ? SoftText : Disabled)
+            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+            .AutoWrapText(true)
+    ];
+    if (!bImplemented)
+    {
+        // O39, said out loud rather than left as a dead button. A disabled
+        // tile with no reason reads as a bug; a disabled tile that says why
+        // reads as a roadmap.
+        Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("NO KIT YET — CANNOT BE CHOSEN")), BreakerUI::TypeCaption, Amber, true)
+        ];
+    }
+
+    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)[MakeClassSilhouette(ClassId, bImplemented)];
+    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
+
+    const EBreakerClassId Captured = ClassId;
+    return BorderWrap(
+        SNew(SButton)
+        .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
+        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
+        .HAlign(HAlign_Fill).VAlign(VAlign_Center)
+        .OnClicked(FOnClicked::CreateLambda([this, Captured, bImplemented]()
+        {
+            if (!bImplemented)
+            {
+                // Refused, and it SAYS so. A click that does nothing is the
+                // failure mode this project keeps rediscovering.
+                CharacterScreenStatus = FText::FromString(
+                    TEXT("That class has no kit yet. Class choice is permanent, so it cannot be chosen."));
+            }
+            else
+            {
+                PendingCreateClass = Captured;
+                CharacterScreenStatus = FText::GetEmpty();
+            }
+            Rebuild(EBreakerMenuScreen::CharacterCreate);
+            return FReply::Handled();
+        }))
+        [
+            Row
+        ],
+        bSelected ? Cyan : (bImplemented ? BorderEmphasis : BreakerUI::BorderRest),
+        bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
+}
+
+TSharedRef<SWidget> SBreakerMenu::MakeCharacterRow(const FBreakerCharacterSummary& Summary, bool bSelected)
+{
+    const FBreakerClassBlurb* Blurb = FindClassBlurb(Summary.ClassId);
+
+    TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
+    Text->AddSlot().AutoHeight()
+    [
+        MenuText(FText::FromString(Summary.CharacterName.ToUpper()), BreakerUI::TypeH2,
+            bSelected ? Cyan : Primary, true)
+    ];
+    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(FString::Printf(TEXT("LEVEL %d  ·  %s"),
+            Summary.CharacterLevel, Blurb ? Blurb->Name : TEXT("UNKNOWN"))),
+            BreakerUI::TypeCaption, SoftText, true)
+    ];
+
+    const FGuid Captured = Summary.CharacterId;
+    const bool bArmedForDelete = (PendingDeleteCharacterId == Summary.CharacterId);
+
+    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)[MakeClassSilhouette(Summary.ClassId, true)];
+    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+    [
+        SNew(SBox).WidthOverride(190.0f)
+        [
+            // TWO-STEP DELETE. The same arm/confirm shape the inventory's bulk
+            // discard and O37's COMMIT control use. This is the most
+            // destructive button in the game — it removes hours of progress and
+            // there is no undo — so it does not get a bare single click, and
+            // the armed label states the consequence rather than saying
+            // "confirm".
+            MakeButton(FText::FromString(bArmedForDelete
+                    ? TEXT("DELETE FOREVER?")
+                    : TEXT("DELETE")),
+                FOnClicked::CreateLambda([this, Captured, bArmedForDelete]()
+                {
+                    EnsureRosterLoaded();
+                    if (!Roster.IsValid()) return FReply::Handled();
+                    if (!bArmedForDelete)
+                    {
+                        PendingDeleteCharacterId = Captured;
+                        CharacterScreenStatus = FText::FromString(
+                            TEXT("Click DELETE FOREVER to destroy this character. There is no undo."));
+                    }
+                    else
+                    {
+                        FBreakerCharacterSummary Doomed;
+                        const bool bFound = Roster->FindCharacter(Captured, Doomed);
+                        Roster->DeleteCharacter(Captured);
+                        PendingDeleteCharacterId = FGuid();
+                        if (SelectedCharacterId == Captured)
+                        {
+                            SelectedCharacterId = Roster->Characters.Num() > 0
+                                ? Roster->Characters[0].CharacterId : FGuid();
+                        }
+                        CharacterScreenStatus = FText::FromString(bFound
+                            ? FString::Printf(TEXT("%s has been deleted."), *Doomed.CharacterName.ToUpper())
+                            : TEXT("Character deleted."));
+                    }
+                    Rebuild(EBreakerMenuScreen::CharacterSelect);
+                    return FReply::Handled();
+                }))
+        ]
+    ];
+
+    return BorderWrap(
+        SNew(SButton)
+        .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
+        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
+        .HAlign(HAlign_Fill).VAlign(VAlign_Center)
+        .OnClicked(FOnClicked::CreateLambda([this, Captured]()
+        {
+            SelectedCharacterId = Captured;
+            // Selecting a different row disarms a pending delete. Otherwise an
+            // arm could survive a change of subject and the next click would
+            // destroy a character the player had stopped looking at.
+            PendingDeleteCharacterId = FGuid();
+            Rebuild(EBreakerMenuScreen::CharacterSelect);
+            return FReply::Handled();
+        }))
+        [
+            Row
+        ],
+        bSelected ? Cyan : BorderEmphasis,
+        bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildCharacterSelectScreen()
+{
+    EnsureRosterLoaded();
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    if (!Roster.IsValid())
+    {
+        // LoadOrCreate returns null only when it refuses a roster written by a
+        // newer build. Saying so beats an empty list that reads as data loss.
+        Body->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(
+                TEXT("The character roster could not be read — it may have been written by a newer build. ")
+                TEXT("No file has been modified.")), BreakerUI::TypeCaption, Harm, true)
+        ];
+        return BuildFrame(FText::FromString(TEXT("CHARACTERS")), FText::FromString(TEXT("")), Body, 860.0f);
+    }
+
+    if (Roster->Characters.Num() == 0)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        [
+            MenuText(FText::FromString(TEXT("No characters yet. Create one to begin.")),
+                BreakerUI::TypeCaption, SoftText, true)
+        ];
+    }
+    for (const FBreakerCharacterSummary& Summary : Roster->Characters)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MakeCharacterRow(Summary, Summary.CharacterId == SelectedCharacterId)
+        ];
+    }
+
+    if (!CharacterScreenStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        [
+            MenuText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, true)
+        ];
+    }
+
+    const bool bFull = Roster->IsFull();
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(FString::Printf(TEXT("%d / %d CHARACTERS"),
+            Roster->Characters.Num(), UBreakerCharacterRoster::MaxCharacters)),
+            BreakerUI::TypeCaption, bFull ? Amber : Muted, true)
+    ];
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(bFull ? TEXT("ROSTER FULL — DELETE ONE TO CREATE") : TEXT("CREATE CHARACTER")),
+            FOnClicked::CreateLambda([this, bFull]()
+            {
+                if (bFull)
+                {
+                    CharacterScreenStatus = FText::FromString(
+                        TEXT("You already have five characters. Delete one first."));
+                    Rebuild(EBreakerMenuScreen::CharacterSelect);
+                    return FReply::Handled();
+                }
+                PendingCreateClass = EBreakerClassId::None;
+                PendingCreateName = FText::GetEmpty();
+                CharacterScreenStatus = FText::GetEmpty();
+                Rebuild(EBreakerMenuScreen::CharacterCreate);
+                return FReply::Handled();
+            }))
+    ];
+
+    const bool bCanPlay = SelectedCharacterId.IsValid();
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(bCanPlay ? TEXT("PLAY") : TEXT("SELECT A CHARACTER")),
+            FOnClicked::CreateLambda([this]()
+            {
+                if (!SelectedCharacterId.IsValid() || !Roster.IsValid()) return FReply::Handled();
+                Roster->LastPlayedCharacterId = SelectedCharacterId;
+                Roster->SaveRoster();
+                // GAP, recorded rather than faked: loading the selected
+                // character's save into the live pawn is the character-load
+                // path, and it does not exist yet — ABreakerCharacter still
+                // loads the single legacy slot at BeginPlay. Entering the world
+                // here would silently play the WRONG character, which is worse
+                // than not entering. Wired in the same pass as the hub.
+                CharacterScreenStatus = FText::FromString(
+                    TEXT("Character selected. Entering the world is wired with the hub."));
+                Rebuild(EBreakerMenuScreen::CharacterSelect);
+                return FReply::Handled();
+            }), bCanPlay)
+    ];
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack))
+    ];
+
+    return BuildFrame(FText::FromString(TEXT("CHARACTERS")),
+        FText::FromString(TEXT("Class choice is permanent per character.")), Body, 860.0f);
+}
+
+TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
+{
+    EnsureRosterLoaded();
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+    [
+        MenuText(FText::FromString(
+            TEXT("Choose a class. This is PERMANENT for this character — the Forge can respec nodes, never the class.")),
+            BreakerUI::TypeCaption, SoftText, true)
+    ];
+
+    // The five tiles are taller than the frame's plate, and a Canvas/VBox will
+    // happily draw past the panel edge rather than clipping — TANK and SUPPORT
+    // ran off the bottom of the screen. A plain SScrollBox, deliberately NOT
+    // an SWrapBox with UseAllottedSize: that combination inside a scroll box is
+    // banned in this project because it caused a bug the owner personally hit.
+    TSharedRef<SVerticalBox> ClassList = SNew(SVerticalBox);
+    for (const FBreakerClassBlurb& Blurb : GBreakerClassBlurbs)
+    {
+        ClassList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, BreakerUI::Space8, BreakerUI::Space8)
+        [
+            MakeClassTile(Blurb.ClassId, Blurb.ClassId == PendingCreateClass)
+        ];
+    }
+    Body->AddSlot().FillHeight(1.0f)
+    [
+        SNew(SScrollBox)
+        + SScrollBox::Slot()[ClassList]
+    ];
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
+    [
+        MenuText(FText::FromString(TEXT("NAME")), BreakerUI::TypeCaption, Muted, true)
+    ];
+    Body->AddSlot().AutoHeight()
+    [
+        SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+        [
+            SNew(SEditableTextBox)
+            .Text(PendingCreateName)
+            .HintText(FText::FromString(TEXT("Name this Breaker")))
+            .OnTextChanged(FOnTextChanged::CreateLambda([this](const FText& NewText)
+            {
+                // Stored WITHOUT rebuilding: rebuilding on every keystroke
+                // would destroy the text box mid-word and take focus with it.
+                PendingCreateName = NewText;
+            }))
+        ]
+    ];
+
+    if (!CharacterScreenStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        [
+            MenuText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, true)
+        ];
+    }
+
+    const bool bReady = PendingCreateClass != EBreakerClassId::None;
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(bReady ? TEXT("CREATE") : TEXT("CHOOSE A CLASS")),
+            FOnClicked::CreateLambda([this]()
+            {
+                EnsureRosterLoaded();
+                if (!Roster.IsValid() || PendingCreateClass == EBreakerClassId::None)
+                {
+                    CharacterScreenStatus = FText::FromString(TEXT("Choose a class first."));
+                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                    return FReply::Handled();
+                }
+                FText Failure;
+                const FGuid Created = Roster->CreateCharacter(
+                    PendingCreateName.ToString(), PendingCreateClass, Failure);
+                if (!Created.IsValid())
+                {
+                    // The roster's own reason, surfaced verbatim rather than
+                    // replaced with a generic one — it already distinguishes a
+                    // full roster from a bad name from a kitless class.
+                    CharacterScreenStatus = Failure;
+                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                    return FReply::Handled();
+                }
+                SelectedCharacterId = Created;
+                PendingCreateClass = EBreakerClassId::None;
+                PendingCreateName = FText::GetEmpty();
+                CharacterScreenStatus = FText::GetEmpty();
+                Rebuild(EBreakerMenuScreen::CharacterSelect);
+                return FReply::Handled();
+            }), bReady)
+    ];
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateLambda([this]()
+        {
+            CharacterScreenStatus = FText::GetEmpty();
+            Rebuild(EBreakerMenuScreen::CharacterSelect);
+            return FReply::Handled();
+        }))
+    ];
+
+    return BuildFrame(FText::FromString(TEXT("CREATE CHARACTER")),
+        FText::FromString(TEXT("Unbuilt classes are shown greyed and cannot be chosen.")), Body, 860.0f);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()

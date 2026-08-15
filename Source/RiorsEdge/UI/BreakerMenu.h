@@ -4,6 +4,10 @@
 #include "Widgets/SCompoundWidget.h"
 
 #include "Items/BreakerItemTypes.h"
+#include "Progression/BreakerProgressionTypes.h"
+#include "UObject/StrongObjectPtr.h"
+// Complete type: the roster is held by value in a TStrongObjectPtr below.
+#include "Save/BreakerCharacterRoster.h"
 
 class ABreakerCharacter;
 class SBorder;
@@ -25,7 +29,14 @@ enum class EBreakerMenuScreen : uint8
     // not sub-modes of one screen — same reason SkillTrees is its own value
     // rather than a tab flag on Inventory.
     Forge,
-    Abilities
+    Abilities,
+    // The front door. Main is the title root (PLAY / SETTINGS / QUIT) and is
+    // gated behind a press-any-key reveal; these two are what PLAY leads to.
+    // Peers rather than modes of Main, for the same reason SkillTrees is its
+    // own value: each has its own header, its own back target and its own
+    // rebuild triggers.
+    CharacterSelect,
+    CharacterCreate
 };
 
 class RIORSEDGE_API SBreakerMenu : public SCompoundWidget
@@ -61,6 +72,19 @@ private:
     TSharedRef<SWidget> BuildLoadoutScreen();
     TSharedRef<SWidget> BuildInventoryScreen();
     TSharedRef<SWidget> BuildClassSelectScreen();
+    TSharedRef<SWidget> BuildCharacterSelectScreen();
+    TSharedRef<SWidget> BuildCharacterCreateScreen();
+    // One row of the roster, and one class tile of the create carousel. Split
+    // out because both are loops whose bodies would otherwise bury the screen
+    // they belong to.
+    TSharedRef<SWidget> MakeCharacterRow(const struct FBreakerCharacterSummary& Summary, bool bSelected);
+    TSharedRef<SWidget> MakeClassTile(EBreakerClassId ClassId, bool bSelected);
+    // The greyed silhouette a class tile draws instead of a model. Owner's
+    // call: unimplemented classes are shown as silhouettes rather than hidden,
+    // so the roster of what the game intends to be is legible from the start
+    // while O39 still refuses to let anyone lock into one.
+    TSharedRef<SWidget> MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented) const;
+    void EnsureRosterLoaded();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
     // Reach: Items/BreakerForgeLibrary.h's three crafting verbs plus salvage,
@@ -97,7 +121,33 @@ private:
     TSharedRef<SWidget> MakeGearCard(const FText& Slot, const FText& Name, const FText& Details, const FLinearColor& Accent) const;
     FReply GoBack();
 
+    // The title gate. The owner asked for the game to open on the main menu
+    // "until you hit enter" — so the root screen opens as an attract plate and
+    // the PLAY / SETTINGS / QUIT column only appears once a key lands. Slate
+    // keyboard focus is already set on this widget by ABreakerCharacter's
+    // FInputModeUIOnly (BreakerCharacter.cpp:1009), so OnKeyDown genuinely
+    // reaches us rather than being swallowed by the game viewport.
+    virtual bool SupportsKeyboardFocus() const override { return true; }
+    virtual FReply OnKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+
     TWeakObjectPtr<ABreakerCharacter> Character;
+    // False until the title is dismissed. Deliberately NOT persisted: the
+    // attract plate is the front door of a session, not a one-time tutorial.
+    bool bTitleRevealed = false;
+    // The roster is a UObject held by a Slate widget, so it needs an explicit
+    // strong reference — a raw pointer here would be collected out from under
+    // the character-select screen between rebuilds.
+    TStrongObjectPtr<UBreakerCharacterRoster> Roster;
+    FGuid SelectedCharacterId;
+    // Two-step delete, the same arm/confirm shape the inventory's destructive
+    // cleanup and O37's COMMIT control already use. Deleting a character is
+    // the most destructive button in the game and it is not getting a bare
+    // single click.
+    FGuid PendingDeleteCharacterId;
+    // Create-screen state.
+    EBreakerClassId PendingCreateClass = EBreakerClassId::None;
+    FText PendingCreateName;
+    FText CharacterScreenStatus;
     TSharedPtr<SBox> ContentHost;
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
     // -1 shows every slot; otherwise an EBreakerEquipSlot index.

@@ -1025,6 +1025,12 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     else if (Wanted == TEXT("SETTINGS")) Screen = EBreakerMenuScreen::Settings;
     else if (Wanted == TEXT("CLASS") || Wanted == TEXT("CLASSSELECT")) Screen = EBreakerMenuScreen::ClassSelect;
     else if (Wanted == TEXT("PAUSE")) Screen = EBreakerMenuScreen::Pause;
+    // The front door. Added with the screens themselves rather than after the
+    // fact: every screen in this project that shipped unphotographable also
+    // shipped broken, and character create is the one screen a new player
+    // cannot avoid.
+    else if (Wanted == TEXT("CHARACTERSELECT") || Wanted == TEXT("CHARACTERS")) Screen = EBreakerMenuScreen::CharacterSelect;
+    else if (Wanted == TEXT("CHARACTERCREATE") || Wanted == TEXT("CREATE")) Screen = EBreakerMenuScreen::CharacterCreate;
 
     MenuWidget->ShowScreenForCapture(Screen);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] menu screen '%s'"), *Wanted);

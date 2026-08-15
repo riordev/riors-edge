@@ -1,5 +1,8 @@
 #include "Game/BreakerGameMode.h"
 
+#include "Game/BreakerHubBuilder.h"
+#include "Interaction/BreakerTravelPoint.h"
+
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
@@ -70,6 +73,20 @@ void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
     Super::EndPlay(Reason);
 }
 
+void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
+{
+    if (!RequestingPawn) return;
+    if (DestinationId != ABreakerTravelPoint::GymDestinationId) return;
+
+    // A TELEPORT, not a rebuild. The gym field is already fully built at
+    // player start, so travel must not re-run any of the Spawn* functions —
+    // doing so would duplicate the encounter, the targets and the course, and
+    // would reset wave mode under a player who is mid-run. The gym is the
+    // playtest instrument (F1-F4, the wave sampler, the TTK report) and this
+    // pass is explicitly not allowed to disturb it.
+    RequestingPawn->TeleportTo(Frame.Ground, RequestingPawn->GetActorRotation());
+}
+
 void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
@@ -88,6 +105,20 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     SpawnJumpGapRun();
     SpawnCombatEncounter();
     SpawnWorldDressing();
+    // THE HUB, and its travel point back to this gym. Placed BEHIND the safe
+    // ring, on the opposite side from the encounter, so it cannot overlap the
+    // field SpawnExpandedField just built or the arena the combat spawns use.
+    //
+    // Reachability (O40c): a hub nobody can walk to is the same defect as an
+    // ability nobody can equip. This call, and the delegate bind under it, are
+    // the whole in-game path — the travel point deliberately does not move
+    // anyone itself (it has no idea where the gym is), so the game mode owns
+    // the teleport because the game mode is what knows Frame.Ground.
+    if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
+            GetWorld(), FTransform(Frame.Forward.Rotation(), Frame.At(-6000.0f, 0.0f, 0.0f))))
+    {
+        HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+    }
     LogGymSummary();
     BuildCaptureTour();
     ScheduleScreenshots();

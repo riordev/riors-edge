@@ -344,6 +344,9 @@ private:
     FFieldFrame Frame;
     bool bFieldFrameSet = false;
     void BuildFieldFrame(const APawn* Pawn);
+    // Bound to the hub travel point. Teleports only — see the implementation
+    // for why travel must never re-run the gym build.
+    void HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn);
     float ResolveGroundZ(const APawn* Pawn) const;
 
     // Vantage cameras for -BreakerCaptureTour. A screenshot of the spawn view
