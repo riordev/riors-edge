@@ -668,7 +668,21 @@ void SBreakerMenu::HandleEscape()
         if (Character.IsValid()) Character->ResumeFromMenu();
         return;
     }
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities)
+    // CharacterCreate backs out to CharacterSelect rather than to the root:
+    // it is a step INSIDE character selection, and dropping the player all the
+    // way to the title from a half-filled create form loses their work with no
+    // warning.
+    if (CurrentScreen == EBreakerMenuScreen::CharacterCreate)
+    {
+        CharacterScreenStatus = FText::GetEmpty();
+        Rebuild(EBreakerMenuScreen::CharacterSelect);
+        return;
+    }
+    // Every screen that is a leaf off the root backs out to the root. The two
+    // character screens were MISSING from this list when they were added, so
+    // Escape on them did nothing at all — a dead end on the one screen a new
+    // player cannot avoid.
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::CharacterSelect)
     {
         Rebuild(RootScreen);
     }
@@ -733,10 +747,16 @@ void SBreakerMenu::Rebuild(EBreakerMenuScreen NewScreen)
         UE_LOG(LogTemp, Log, TEXT("[MenuRebuild] caller:\n%hs"), StackTrace);
     }
 
-    // Deferred: swapping the content synchronously destroys the button whose
-    // OnClicked is still on the callstack — a Slate re-entrancy footgun and
-    // the prime suspect for the screen flip-flop. Coalesce all requests made
-    // this frame and apply once on the next Slate tick.
+    // WHICH SCREEN WE ARE ON UPDATES NOW; only the WIDGET SWAP is deferred.
+    // These were both deferred, and that is the reported "snaps to other menus
+    // or flickers to them" bug: between the click and the next Slate tick,
+    // CurrentScreen still named the screen we had just left, so every reader
+    // branched on stale state. HandleEscape is the worst of them — pressing
+    // Escape in that window took the branch for the PREVIOUS screen and sent
+    // the player somewhere neither screen would have gone. Separating the two
+    // costs nothing (an enum assignment cannot destroy a widget) and removes
+    // the whole class of bug rather than one instance of it.
+    CurrentScreen = NewScreen;
     PendingScreen = NewScreen;
     if (!bRebuildScheduled)
     {
@@ -957,11 +977,17 @@ TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicke
     ];
 }
 
-FReply SBreakerMenu::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
+FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
-    // The title gate, and ONLY the title gate. Every other screen's keyboard
-    // handling stays where it already is; intercepting keys globally here
-    // would silently steal them from the name field on the create screen.
+    // PREVIEW, not OnKeyDown. Preview runs on ancestors BEFORE descendants, so
+    // the gate fires even when Slate has parked keyboard focus on a child —
+    // and it had: the CONTINUE button is focusable, so Enter was being routed
+    // to the button's own activation path and consumed before ever reaching
+    // this widget. That is why the owner reported "enter doesnt move the
+    // screen forward" while the mouse fallback worked.
+    //
+    // Still the title gate and ONLY the title gate: intercepting keys globally
+    // here would silently steal them from the name field on the create screen.
     if (CurrentScreen == EBreakerMenuScreen::Main && !bTitleRevealed)
     {
         // Enter is what the owner asked for, but any key dismisses an attract
@@ -2352,7 +2378,7 @@ namespace
     }
 }
 
-TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented) const
+TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented, float Scale, bool bShowCaption) const
 {
     // A stand-in for the character model, drawn from the same primitives the
     // rest of this front end is built from. Owner's ruling: unimplemented
@@ -2370,12 +2396,12 @@ TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, b
     // Head.
     Figure->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
     [
-        SNew(SBox).WidthOverride(22.0f).HeightOverride(22.0f)[SolidBlock(Body)]
+        SNew(SBox).WidthOverride(22.0f * Scale).HeightOverride(22.0f * Scale)[SolidBlock(Body)]
     ];
     // Torso.
     Figure->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
     [
-        SNew(SBox).WidthOverride(42.0f).HeightOverride(52.0f)[SolidBlock(Body)]
+        SNew(SBox).WidthOverride(42.0f * Scale).HeightOverride(52.0f * Scale)[SolidBlock(Body)]
     ];
     // Legs, as two blocks with a gap, so the figure reads as a person at a
     // glance rather than as an icon.
@@ -2384,28 +2410,33 @@ TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, b
         SNew(SHorizontalBox)
         + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, 6.0f, 0.0f)
         [
-            SNew(SBox).WidthOverride(16.0f).HeightOverride(38.0f)[SolidBlock(Body)]
+            SNew(SBox).WidthOverride(16.0f * Scale).HeightOverride(38.0f * Scale)[SolidBlock(Body)]
         ]
         + SHorizontalBox::Slot().AutoWidth()
         [
-            SNew(SBox).WidthOverride(16.0f).HeightOverride(38.0f)[SolidBlock(Body)]
+            SNew(SBox).WidthOverride(16.0f * Scale).HeightOverride(38.0f * Scale)[SolidBlock(Body)]
         ]
     ];
 
     TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
     Inner->AddSlot().FillHeight(1.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)[Figure];
-    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        // "PLACEHOLDER MODEL" measured wider than the 150px plate and drew as
-        // "PLACEHOLDER MC" — the same measure-versus-clip defect the owner
-        // reported on the skill board, reintroduced by authoring a caption
-        // longer than the box that holds it. Shortened rather than widened:
-        // the plate width is what makes five tiles fit a column.
-        MenuText(FText::FromString(bImplemented ? TEXT("PLACEHOLDER") : TEXT("NOT BUILT")),
-            BreakerUI::TypeCaption, bImplemented ? Muted : Disabled, true)
-    ];
+    // The caption is OPTIONAL, and off at banner scale. The plate scales with
+    // Scale but the font does not, so at 0.42 the caption is wider than the
+    // plate that clips it and drew as "PLACE" / "NOT B" — the same
+    // measure-versus-clip defect the owner reported on the skill board, and a
+    // second instance of it caused by scaling a box without scaling what is
+    // inside. The banner names the class beneath it anyway, so the caption was
+    // redundant there as well as broken.
+    if (bShowCaption)
+    {
+        Inner->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(bImplemented ? TEXT("PLACEHOLDER") : TEXT("NOT BUILT")),
+                BreakerUI::TypeCaption, bImplemented ? Muted : Disabled, true)
+        ];
+    }
 
-    return SNew(SBox).WidthOverride(150.0f).HeightOverride(190.0f)
+    return SNew(SBox).WidthOverride(150.0f * Scale).HeightOverride(190.0f * Scale)
     [
         MakePlate(Inner, Plate, bImplemented ? Cyan : BorderEmphasis,
             FMargin(BreakerUI::Space8, BreakerUI::Space8), false, BreakerUI::BorderRest)
@@ -2487,6 +2518,69 @@ TSharedRef<SWidget> SBreakerMenu::MakeClassTile(EBreakerClassId ClassId, bool bS
         bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
 }
 
+TSharedRef<SWidget> SBreakerMenu::MakeClassBanner(EBreakerClassId ClassId, bool bSelected)
+{
+    const FBreakerClassBlurb* Blurb = FindClassBlurb(ClassId);
+    if (!Blurb) return SNullWidget::NullWidget;
+    const bool bImplemented = ClassHasImplementedKit(ClassId);
+
+    // A tall narrow crest, the shape a class banner wants, carrying identity
+    // only — the name and the resource. Everything else about the class reads
+    // on the detail panel to the right, so scanning the column is a scan of
+    // FIVE THINGS rather than five paragraphs.
+    // NO THUMBNAIL. A scaled-down figure plus two text lines overran the
+    // banner box and spilled its name through the border below it — and the
+    // figure it showed was the same one already drawn large on the right, at a
+    // size where it read as a grey smudge. The banner carries IDENTITY, the
+    // right-hand panel carries the character; duplicating the figure bought
+    // nothing and cost the layout. Removing it also removes the caption-
+    // clipping problem at its root rather than suppressing the caption.
+    TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
+    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center)
+    [
+        MenuText(FText::FromString(Blurb->Name), BreakerUI::TypeBody,
+            bImplemented ? (bSelected ? Cyan : Primary) : Disabled, true)
+    ];
+    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(Blurb->Resource), BreakerUI::TypeCaption,
+            bImplemented ? Muted : Disabled, true)
+    ];
+
+    const EBreakerClassId Captured = ClassId;
+    // 72: name plus resource plus the button's own padding, measured against
+    // what actually fits. Five of these plus spacing sit inside the column
+    // beside the character with room left, so nothing scrolls and nothing
+    // overruns the name field beneath. Sized to the CONTENT rather than
+    // picked — the two previous values were picked, and both were wrong.
+    return SNew(SBox).HeightOverride(72.0f)
+    [
+        BorderWrap(
+            SNew(SButton)
+            .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
+            .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space8))
+            .HAlign(HAlign_Fill).VAlign(VAlign_Center)
+            .OnClicked(FOnClicked::CreateLambda([this, Captured, bImplemented]()
+            {
+                // An unbuilt class still SELECTS — it just cannot be created.
+                // Letting the player read what Tank is meant to be is the whole
+                // reason O39 shows them greyed rather than hiding them; a
+                // banner that refuses even to be inspected teaches nothing.
+                PendingCreateClass = Captured;
+                CharacterScreenStatus = bImplemented
+                    ? FText::GetEmpty()
+                    : FText::FromString(TEXT("This class has no kit yet and cannot be created."));
+                Rebuild(EBreakerMenuScreen::CharacterCreate);
+                return FReply::Handled();
+            }))
+            [
+                Inner
+            ],
+            bSelected ? Cyan : (bImplemented ? BorderEmphasis : BreakerUI::BorderRest),
+            bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+    ];
+}
+
 TSharedRef<SWidget> SBreakerMenu::MakeCharacterRow(const FBreakerCharacterSummary& Summary, bool bSelected)
 {
     const FBreakerClassBlurb* Blurb = FindClassBlurb(Summary.ClassId);
@@ -2512,7 +2606,13 @@ TSharedRef<SWidget> SBreakerMenu::MakeCharacterRow(const FBreakerCharacterSummar
     Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
     Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
     [
-        SNew(SBox).WidthOverride(190.0f)
+        // 260, not 190. "DELETE FOREVER?" measured wider than the box and was
+        // cut off (owner: "the delete forever doesnt actually stretch or fit
+        // in the box"). Sized to the LONGEST label the button can ever carry
+        // rather than to the shortest, because the box is fixed and the label
+        // changes underneath it — sizing to "DELETE" is what created the
+        // defect. Same root cause as the skill board's clipped captions.
+        SNew(SBox).WidthOverride(260.0f)
         [
             // TWO-STEP DELETE. The same arm/confirm shape the inventory's bulk
             // discard and O37's COMMIT control use. This is the most
@@ -2681,32 +2781,101 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
 {
     EnsureRosterLoaded();
 
+    // Two columns, mirrored from the genre convention the owner referenced:
+    // the CLASS COLUMN on the LEFT and the CHARACTER on the RIGHT. The shape
+    // matters — the thing you are choosing between wants to be a short
+    // scannable list, and the thing you are choosing wants to be shown large.
+    // The previous stacked version made the player scroll past five paragraphs
+    // to compare two classes, and drew the figure five times at thumbnail size.
+    const FBreakerClassBlurb* Selected = FindClassBlurb(PendingCreateClass);
+    const bool bSelectedImplemented = Selected && ClassHasImplementedKit(Selected->ClassId);
+
+    // ---- LEFT: the five banners ----------------------------------------
+    TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+    for (const FBreakerClassBlurb& Blurb : GBreakerClassBlurbs)
+    {
+        Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MakeClassBanner(Blurb.ClassId, Blurb.ClassId == PendingCreateClass)
+        ];
+    }
+
+    // ---- RIGHT: the character, then what it is --------------------------
+    TSharedRef<SVerticalBox> Detail = SNew(SVerticalBox);
+    Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+    [
+        // Nothing selected yet still draws a figure, greyed. An empty right
+        // half would read as a broken screen on the one screen a new player
+        // cannot avoid.
+        MakeClassSilhouette(Selected ? Selected->ClassId : EBreakerClassId::None,
+            Selected != nullptr && bSelectedImplemented, 1.55f)
+    ];
+    Detail->AddSlot().AutoHeight().HAlign(HAlign_Center)
+    [
+        MenuText(FText::FromString(Selected ? Selected->Name : TEXT("SELECT A CLASS")),
+            BreakerUI::TypeH1, Selected ? Primary : Muted, true)
+    ];
+    if (Selected)
+    {
+        // The keyword line: the branches, which ARE this class's three
+        // identities, in the same slot the reference gives its three-word
+        // character summary.
+        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(FString(Selected->Branches).ToUpper().Replace(TEXT("/"), TEXT("."))),
+                BreakerUI::TypeCaption, Cyan, true)
+        ];
+        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        [
+            SNew(SBox).MaxDesiredWidth(420.0f)
+            [
+                SNew(STextBlock)
+                    .Text(FText::FromString(Selected->Pitch))
+                    .Justification(ETextJustify::Center)
+                    .ColorAndOpacity(SoftText)
+                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
+                    .AutoWrapText(true)
+            ]
+        ];
+        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(FString::Printf(TEXT("CLASS RESOURCE - %s"), Selected->Resource)),
+                BreakerUI::TypeCaption, Muted, true)
+        ];
+        if (!bSelectedImplemented)
+        {
+            Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(TEXT("NO KIT YET - CANNOT BE CREATED")), BreakerUI::TypeCaption, Amber, true)
+            ];
+        }
+    }
+
+    TSharedRef<SHorizontalBox> Columns = SNew(SHorizontalBox);
+    Columns->AddSlot().AutoWidth()
+    [
+        // Scrolled as well as sized: the fix above makes five banners fit, and
+        // this is what stops a sixth class silently reintroducing the overrun.
+        SNew(SBox).WidthOverride(200.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot()[Column]
+        ]
+    ];
+    Columns->AddSlot().FillWidth(1.0f).VAlign(VAlign_Top).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        Detail
+    ];
+
+    // ---- Below both columns: name, create, back -------------------------
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
         MenuText(FText::FromString(
-            TEXT("Choose a class. This is PERMANENT for this character — the Forge can respec nodes, never the class.")),
+            TEXT("Class choice is PERMANENT for this character - the Forge can respec nodes, never the class.")),
             BreakerUI::TypeCaption, SoftText, true)
     ];
-
-    // The five tiles are taller than the frame's plate, and a Canvas/VBox will
-    // happily draw past the panel edge rather than clipping — TANK and SUPPORT
-    // ran off the bottom of the screen. A plain SScrollBox, deliberately NOT
-    // an SWrapBox with UseAllottedSize: that combination inside a scroll box is
-    // banned in this project because it caused a bug the owner personally hit.
-    TSharedRef<SVerticalBox> ClassList = SNew(SVerticalBox);
-    for (const FBreakerClassBlurb& Blurb : GBreakerClassBlurbs)
-    {
-        ClassList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, BreakerUI::Space8, BreakerUI::Space8)
-        [
-            MakeClassTile(Blurb.ClassId, Blurb.ClassId == PendingCreateClass)
-        ];
-    }
-    Body->AddSlot().FillHeight(1.0f)
-    [
-        SNew(SScrollBox)
-        + SScrollBox::Slot()[ClassList]
-    ];
+    Body->AddSlot().FillHeight(1.0f)[Columns];
 
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
     [
@@ -2736,7 +2905,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         ];
     }
 
-    const bool bReady = PendingCreateClass != EBreakerClassId::None;
+    const bool bReady = PendingCreateClass != EBreakerClassId::None && bSelectedImplemented;
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
         MakeButton(FText::FromString(bReady ? TEXT("CREATE") : TEXT("CHOOSE A CLASS")),
@@ -2755,7 +2924,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                 if (!Created.IsValid())
                 {
                     // The roster's own reason, surfaced verbatim rather than
-                    // replaced with a generic one — it already distinguishes a
+                    // replaced with a generic one - it already distinguishes a
                     // full roster from a bad name from a kitless class.
                     CharacterScreenStatus = Failure;
                     Rebuild(EBreakerMenuScreen::CharacterCreate);
@@ -2780,7 +2949,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
     ];
 
     return BuildFrame(FText::FromString(TEXT("CREATE CHARACTER")),
-        FText::FromString(TEXT("Unbuilt classes are shown greyed and cannot be chosen.")), Body, 860.0f);
+        FText::FromString(TEXT("Unbuilt classes are shown greyed and cannot be created.")), Body, 900.0f);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()

@@ -83,7 +83,11 @@ private:
     // call: unimplemented classes are shown as silhouettes rather than hidden,
     // so the roster of what the game intends to be is legible from the start
     // while O39 still refuses to let anyone lock into one.
-    TSharedRef<SWidget> MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented) const;
+    TSharedRef<SWidget> MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented, float Scale = 1.0f, bool bShowCaption = true) const;
+    // The narrow selector on the LEFT of the create screen. Named a banner
+    // rather than a tile because it carries identity, not detail — the detail
+    // panel on the right is what reads.
+    TSharedRef<SWidget> MakeClassBanner(EBreakerClassId ClassId, bool bSelected);
     void EnsureRosterLoaded();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
@@ -128,7 +132,7 @@ private:
     // FInputModeUIOnly (BreakerCharacter.cpp:1009), so OnKeyDown genuinely
     // reaches us rather than being swallowed by the game viewport.
     virtual bool SupportsKeyboardFocus() const override { return true; }
-    virtual FReply OnKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    virtual FReply OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
 
     TWeakObjectPtr<ABreakerCharacter> Character;
     // False until the title is dismissed. Deliberately NOT persisted: the
