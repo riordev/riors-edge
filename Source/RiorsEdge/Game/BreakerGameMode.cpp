@@ -2,6 +2,8 @@
 
 #include "Game/BreakerHubBuilder.h"
 #include "Game/BreakerGameInstance.h"
+#include "Game/BreakerWorldBasics.h"
+#include "GameFramework/PlayerStart.h"
 #include "Interaction/BreakerTravelPoint.h"
 
 #include "Characters/BreakerCharacter.h"
@@ -121,10 +123,38 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
         *DestinationId.ToString());
 }
 
+AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+    if (AActor* Authored = Super::ChoosePlayerStart_Implementation(Player))
+    {
+        return Authored;
+    }
+    // Z 112: the pawn capsule's half-height is 88, so feet land at 24 — the
+    // same "capsule assumption" plane ResolveGroundZ falls back to in a map
+    // with no floor, which is exactly the map this branch exists for. The
+    // apron / plaza / boot floor all get built at that plane in the same
+    // frame, so the pawn stands on ground it arrived with.
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+    APlayerStart* Fallback = World->SpawnActor<APlayerStart>(
+        APlayerStart::StaticClass(), FTransform(FRotator::ZeroRotator, FVector(0.0f, 0.0f, 112.0f)));
+    if (Fallback)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] no authored PlayerStart; runtime fallback spawned at origin."));
+    }
+    return Fallback;
+}
+
 void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
     if (bPlaytestTargetsSpawned || !NewPlayer || !NewPlayer->GetPawn() || !GetWorld()) return;
+
+    // Light to see by, for every map role. Runs before the front-end early
+    // return on purpose: the title screen floats over a real (if minimal)
+    // world now, not over a black void. A map with an authored directional
+    // light (Lvl_FirstPerson) suppresses this entirely.
+    UBreakerWorldBasics::EnsureWorldLighting(GetWorld());
 
     // WHAT THIS MAP IS FOR. Until tonight there was one map, so this function
     // unconditionally built the entire gym — which is exactly why the owner
@@ -138,7 +168,20 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // early return here is the one place that guarantees no field exists.
     if (UBreakerGameInstance::IsFrontEndMap(this))
     {
+        // "Nothing" still needs a floor: the map is an empty shell and the
+        // pawn under the title menu was falling through it. Top surface at
+        // the pawn's feet, same plane the fallback PlayerStart assumed.
+        if (const APawn* Pawn = NewPlayer->GetPawn())
+        {
+            UBreakerWorldBasics::EnsureBootFloor(GetWorld(),
+                Pawn->GetActorLocation() - FVector(0.0f, 0.0f, 88.0f));
+        }
         bPlaytestTargetsSpawned = true;
+        // The capture harness works on the front end too. Without this a
+        // -BreakerScreenshots run of the shipped boot map never schedules its
+        // exit and hangs forever — which is also why no automated run ever
+        // photographed the title screen the game actually boots into.
+        ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] front end — no field built."));
         return;
     }
@@ -158,6 +201,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
         }
         bPlaytestTargetsSpawned = true;
+        // Same reason as the front end: a screenshot run of the Anchor must
+        // schedule its exit, or the harness can never photograph the hub.
+        ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] anchor — hub built, no gym."));
         return;
     }

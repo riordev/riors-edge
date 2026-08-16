@@ -411,6 +411,18 @@ struct RIORSEDGE_API FBreakerProgressionState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 TotalExperience = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentClassPoints = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentCorePoints = 0;
+    // How many level-entitled points have already been paid into the pools
+    // above (XP-And-Pacing §4: 1 Class Point per level to 30, 1 Core Point
+    // per level to 50). Cumulative like TotalExperience and for the same
+    // reason: the entitlement is min(Level, cap) and the component pays only
+    // the positive difference, so a curve retune that moves levels can never
+    // double-pay, and a retune that LOWERS a level claws nothing back. The
+    // slice lump seeds these to its own values — it is an advance, not a
+    // bonus (see UBreakerProgressionLibrary::SliceClassPointGrant). Defaulted
+    // so an existing save loads as "nothing paid yet"; LoadProgressionState
+    // repairs pre-entitlement saves that already received the lump.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelClassPointsGranted = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelCorePointsGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> ClassNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> CoreNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerAbilityLoadout AbilityLoadout;

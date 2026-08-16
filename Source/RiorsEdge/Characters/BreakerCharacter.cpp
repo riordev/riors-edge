@@ -247,9 +247,21 @@ void ABreakerCharacter::BeginPlay()
             }
         }
     }
+    // THE TITLE MENU BELONGS TO SESSIONS THAT HAVE NOT ENTERED THE WORLD YET.
+    // OpenLevel destroys the pawn, so BeginPlay re-runs on every map arrival —
+    // unguarded, this re-opened the title screen (paused) on ARRIVING in the
+    // Anchor and again in the gym. The session id is the tell: a mid-session
+    // arrival adopted a character two hundred lines up and needs no menu, while
+    // the front end always shows it and a PIE drop-in on the template map (no
+    // character chosen yet) still gets its character select.
     if (IsLocallyControlled())
     {
-        GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::ShowInitialMenu);
+        const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+        if (ShouldShowInitialMenu(UBreakerGameInstance::IsFrontEndMap(this),
+                Session && Session->ActiveCharacterId.IsValid()))
+        {
+            GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::ShowInitialMenu);
+        }
     }
 }
 

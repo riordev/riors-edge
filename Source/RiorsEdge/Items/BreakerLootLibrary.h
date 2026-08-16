@@ -31,6 +31,12 @@ public:
     UFUNCTION(BlueprintPure, Category="Items|Loot")
     static FBreakerItemInstance RollItem(FName DefinitionId, EBreakerEquipSlot Slot, EBreakerItemRarity Rarity, int32 ItemLevel, int32 RandomSeed);
 
+    // Which equip slot a kill's drop lands in — THE production slot draw, and
+    // the tests must draw it from here too (a test that picks slots its own
+    // way is how the bug this fixes stayed invisible; see the .cpp).
+    UFUNCTION(BlueprintPure, Category="Items|Loot")
+    static EBreakerEquipSlot RollDropSlot(int32 RandomSeed);
+
     UFUNCTION(BlueprintPure, Category="Items|Loot")
     static int32 CountAffixesOfCategory(const FBreakerItemInstance& Item, EBreakerAffixCategory Category);
 

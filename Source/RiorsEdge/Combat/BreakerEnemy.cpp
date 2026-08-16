@@ -630,7 +630,13 @@ void ABreakerEnemy::HandleDeath()
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SetBodyVisible(false);
-    if (HasAuthority() && bDropsLoot) GrantLoot();
+    // Unconditional like XP, and for the same reason: GrantLoot pays the
+    // crafting currency before its item roll, and gating the whole call on
+    // bDropsLoot made the wallet inherit loot's wave-gating — in wave mode 5
+    // of every 6 waves paid no currency at all, which defeated the "currency
+    // is the steady income" comment inside. The ITEM half of GrantLoot still
+    // honours bDropsLoot internally.
+    if (HasAuthority()) GrantLoot();
     if (HasAuthority()) GrantAmmo();
     if (HasAuthority()) GrantExperience();
 
@@ -774,6 +780,11 @@ void ABreakerEnemy::GrantLoot()
     Equipment->CreditForgeCurrency(UBreakerDropTableLibrary::RollCurrencyDrop(
         Seed, EnemyLevel, MonsterRank, CurrencyDropTable));
 
+    // ITEMS, from here down, are what bDropsLoot actually gates: "this spawn
+    // is not a loot source" is a statement about items (arena furniture,
+    // standard waves), not about the wallet above or the XP alongside.
+    if (!bDropsLoot) return;
+
     // THE DROP PIPELINE (Items/BreakerDropTable.h). This used to be a bare
     // RollRarity call, which meant every death produced an item and the flat
     // rarity table was the whole system — the owner's playtest report from both
@@ -798,7 +809,10 @@ void ABreakerEnemy::GrantLoot()
         Rarity = EBreakerItemRarity::Exceptional;
     }
 
-    const EBreakerEquipSlot Slot = static_cast<EBreakerEquipSlot>(FRandomStream(Seed).RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
+    // The slot draw lives in the loot library now, salted — drawing it here
+    // from FRandomStream(Seed) collided with RollItem's own first draw and
+    // pinned every weapon drop to Machinegun or Sidearm (see RollDropSlot).
+    const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
     const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("GymDrop"), Slot, Rarity, EnemyLevel, Seed);
 
     // Drops land on the ground now instead of teleporting into the backpack:

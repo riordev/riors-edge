@@ -178,6 +178,21 @@ public:
 
     // XP-And-Pacing §9: 10 Class Points and 12 Core Points at slice cap 10.
     // O2 PLACEHOLDER — the shipping values come from the curve Data Asset.
+    //
+    // SEMANTICS CHANGED with the per-level economy below: the slice grant is
+    // now an ADVANCE on the level entitlement, not a bonus beside it. A fresh
+    // character's granted-counters are seeded to these values, so levels 1-10
+    // pay nothing extra (they were pre-paid here) and level 11 pays the 11th
+    // Class Point. At the doc's own milestones the totals agree exactly:
+    // 10 Class at slice cap 10, 30 Class at 30, 50 Core at 50 (the Core
+    // advance's extra 2 stands in for §7's first world-content grants).
     static constexpr int32 SliceClassPointGrant = 10;
     static constexpr int32 SliceCorePointGrant = 12;
+
+    // XP-And-Pacing §4: one Class Point per level, exhausted at 30; one Core
+    // Point per level, exhausted at 50. Transcribed from the doc (the doc's
+    // values, not invented here); O2 PLACEHOLDER only in the sense that §8.9
+    // wants them read from a Data Asset eventually.
+    static constexpr int32 ClassPointCapLevel = 30;
+    static constexpr int32 CorePointCapLevel = 50;
 };

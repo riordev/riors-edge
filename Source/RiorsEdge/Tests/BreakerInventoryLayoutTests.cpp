@@ -45,7 +45,7 @@
 
 namespace
 {
-    FBreakerItemInstance MakeItem(EBreakerEquipSlot Slot, EBreakerItemRarity Rarity, int32 ItemLevel)
+    FBreakerItemInstance BreakerInventoryMakeItem(EBreakerEquipSlot Slot, EBreakerItemRarity Rarity, int32 ItemLevel)
     {
         FBreakerItemInstance Item;
         Item.ItemId = FGuid::NewGuid();
@@ -55,7 +55,7 @@ namespace
         return Item;
     }
 
-    FBreakerAffixComparison MakeComparison(float Value, float ComparedValue, EBreakerAffixDelta Delta)
+    FBreakerAffixComparison BreakerInventoryMakeComparison(float Value, float ComparedValue, EBreakerAffixDelta Delta)
     {
         FBreakerAffixComparison Comparison;
         Comparison.Value = Value;
@@ -146,19 +146,19 @@ bool FBreakerInventoryLayoutDeltaTest::RunTest(const FString& Parameters)
     // The magnitude is UNSIGNED: the glyph beside it already carries the sign,
     // and "- -40.0" reads as a typo rather than as a loss.
     TestEqual(TEXT("an improvement prints its size"),
-        FormatDelta(MakeComparison(22.0f, 18.0f, EBreakerAffixDelta::Better)), TEXT("4.0"));
+        FormatDelta(BreakerInventoryMakeComparison(22.0f, 18.0f, EBreakerAffixDelta::Better)), TEXT("4.0"));
     TestEqual(TEXT("a downgrade prints its size unsigned"),
-        FormatDelta(MakeComparison(140.0f, 180.0f, EBreakerAffixDelta::Worse)), TEXT("40.0"));
+        FormatDelta(BreakerInventoryMakeComparison(140.0f, 180.0f, EBreakerAffixDelta::Worse)), TEXT("40.0"));
     // Parity prints the glyph alone. A "0.0" beside an equals sign is two ways
     // of saying nothing changed, and the second one costs a column.
     TestEqual(TEXT("parity prints nothing"),
-        FormatDelta(MakeComparison(9.0f, 9.0f, EBreakerAffixDelta::Parity)), FString());
+        FormatDelta(BreakerInventoryMakeComparison(9.0f, 9.0f, EBreakerAffixDelta::Parity)), FString());
 
     // The classification itself is the equipment component's, never this
     // screen's: a comparison whose numbers disagree with its verdict still
     // renders the verdict it was handed. This is deliberate — one opinion.
     TestEqual(TEXT("the screen renders the verdict it is given, not its own"),
-        FString(DeltaGlyph(MakeComparison(1.0f, 999.0f, EBreakerAffixDelta::Better).Delta)), Better);
+        FString(DeltaGlyph(BreakerInventoryMakeComparison(1.0f, 999.0f, EBreakerAffixDelta::Better).Delta)), Better);
 
     return true;
 }
@@ -232,7 +232,7 @@ bool FBreakerInventoryLayoutLimitTellTest::RunTest(const FString& Parameters)
     {
         FBreakerEquipPreview Preview;
         Preview.bSlotOccupied = true;
-        Preview.SlotDisplaced = MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Uncommon, 58);
+        Preview.SlotDisplaced = BreakerInventoryMakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Uncommon, 58);
         TestFalse(TEXT("an ordinary swap is not a limit tell"), ShouldShowLimitTell(Preview));
         TestEqual(TEXT("an ordinary swap names the replacement"), MakeFooterLead(Preview), TEXT("EQUIP · REPLACES"));
     }
@@ -245,7 +245,7 @@ bool FBreakerInventoryLayoutLimitTellTest::RunTest(const FString& Parameters)
         Preview.bExceedsRarityLimit = true;
         Preview.RarityCount = 3;
         Preview.RarityLimit = 3;
-        Preview.LimitDisplaced = MakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Aberrant, 61);
+        Preview.LimitDisplaced = BreakerInventoryMakeItem(EBreakerEquipSlot::Necklace, EBreakerItemRarity::Aberrant, 61);
         TestTrue(TEXT("a spent cap tells"), ShouldShowLimitTell(Preview));
         TestEqual(TEXT("the cap is quoted verbatim"), MakeFooterLead(Preview), TEXT("LIMIT FULL 3/3"));
     }
@@ -256,7 +256,7 @@ bool FBreakerInventoryLayoutLimitTellTest::RunTest(const FString& Parameters)
         Preview.bExceedsRarityLimit = true;
         Preview.RarityCount = 1;
         Preview.RarityLimit = 1;
-        Preview.LimitDisplaced = MakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Anomalous, 66);
+        Preview.LimitDisplaced = BreakerInventoryMakeItem(EBreakerEquipSlot::Boots, EBreakerItemRarity::Anomalous, 66);
         TestEqual(TEXT("the anomalous cap"), MakeFooterLead(Preview), TEXT("LIMIT FULL 1/1"));
     }
 

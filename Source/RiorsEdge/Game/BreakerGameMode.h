@@ -19,6 +19,14 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+    // The three shipped maps have no authored PlayerStart (they are runtime-
+    // built worlds), and the engine's answer to "no start spot" is a log
+    // error and no pawn — no pawn means no field frame means no world, since
+    // every builder derives its frame from the possessed pawn. The fallback
+    // spawns a transient start at the runtime-build origin instead. An
+    // authored PlayerStart in any map (Lvl_FirstPerson's, or a future lit
+    // map's) wins untouched.
+    virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
     UFUNCTION(BlueprintCallable, Category="Playtest") void ResetPlaytestTargets();
 
     // Enemies never target players inside the zone and will not enter it.

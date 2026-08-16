@@ -49,6 +49,25 @@ FBreakerItemInstance UBreakerLootLibrary::RollItem(FName DefinitionId, EBreakerE
     return RollItemInternal(DefinitionId, Slot, Rarity, ItemLevel, RandomSeed, /*bAllowLegendary=*/true);
 }
 
+EBreakerEquipSlot UBreakerLootLibrary::RollDropSlot(int32 RandomSeed)
+{
+    // THE SALT IS THE FIX. GrantLoot used to draw the slot from
+    // FRandomStream(Seed) — and RollItemInternal opens FRandomStream(Seed)
+    // on the SAME seed, so the slot draw and the item's first draw were the
+    // same number. For a weapon slot the first draw is the archetype, over
+    // the same 0..7 range: archetype index == slot index, always. Primary(6)
+    // was every Machinegun, Secondary(7) every Sidearm, and the other six
+    // archetypes never dropped from any kill at any level. For armour the
+    // first draw is the affix count, so the slot fully determined it.
+    //
+    // Salting the slot draw decorrelates both symptoms at once. NOTE: this
+    // changes every historical drop seed's outcome — unavoidable, since the
+    // old outcomes were the bug. The salt composes with the seed rather than
+    // replacing BreakerDropTable.cpp's salts, which must not change.
+    FRandomStream Random(HashCombine(static_cast<uint32>(RandomSeed), 0x510Cu));
+    return static_cast<EBreakerEquipSlot>(Random.RandRange(0, static_cast<int32>(EBreakerEquipSlot::Count) - 1));
+}
+
 FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, EBreakerEquipSlot Slot, EBreakerItemRarity Rarity,
     int32 ItemLevel, int32 RandomSeed, bool bAllowLegendary)
 {

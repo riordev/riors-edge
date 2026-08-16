@@ -382,6 +382,19 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
     // Re-seed here so loading never leaves the tree screen unspendable; the
     // freshness test means a save with any real progress is left untouched.
     ApplySliceDefaultsIfFresh();
+    // LEGACY REPAIR for saves from before the per-level entitlement existed:
+    // they received the slice lump (or are receiving it just above) but carry
+    // granted-counters of zero, and paying min(Level, cap) on top of the lump
+    // would double-pay levels 1-10. A non-fresh state with zero counters can
+    // only be such a save — the lump seeds the counters on every path that
+    // grants it — so seed them here the same way before settling up.
+    if (State.LevelClassPointsGranted == 0 && State.LevelCorePointsGranted == 0)
+    {
+        State.LevelClassPointsGranted = UBreakerProgressionLibrary::SliceClassPointGrant;
+        State.LevelCorePointsGranted = UBreakerProgressionLibrary::SliceCorePointGrant;
+    }
+    RefreshLevelFromXp();
+    GrantLevelPointEntitlement();
     OnProgressionChanged.Broadcast();
 }
 
@@ -436,6 +449,13 @@ int32 UBreakerProgressionComponent::AwardExperience(int32 Amount)
     const int32 Gained = State.CharacterLevel - Before;
     if (Gained > 0)
     {
+        // THE POINT PAYS BEFORE THE EVENT FIRES. The level-up used to grant
+        // nothing — a HUD flash over an unchanged pool — which made the whole
+        // XP loop decorative (the tree economy was the one-time slice lump).
+        // Paying first means anything listening to OnLevelGained (the HUD's
+        // flash, a future "point available" tell) observes the pool it will
+        // tell the player about.
+        GrantLevelPointEntitlement();
         // A level-up that changes numbers and says nothing is the failure mode
         // this project keeps rediscovering, so the event is raised here rather
         // than left for a caller to remember.
@@ -443,6 +463,32 @@ int32 UBreakerProgressionComponent::AwardExperience(int32 Amount)
         OnProgressionChanged.Broadcast();
     }
     return Gained;
+}
+
+void UBreakerProgressionComponent::GrantLevelPointEntitlement()
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    // The entitlement is a FUNCTION OF LEVEL, not an event: min(Level, cap)
+    // points per currency, minus what has already been paid. Event-shaped
+    // grants ("+1 on each level-up") cannot survive the rederived-level rule —
+    // a curve retune that jumps a character three levels would need to
+    // remember how many events it owes, which is exactly this counter.
+    const int32 ClassEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::ClassPointCapLevel);
+    const int32 CoreEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::CorePointCapLevel);
+    const int32 ClassOwed = ClassEntitled - State.LevelClassPointsGranted;
+    const int32 CoreOwed = CoreEntitled - State.LevelCorePointsGranted;
+    if (ClassOwed <= 0 && CoreOwed <= 0) return;
+    if (ClassOwed > 0)
+    {
+        State.UnspentClassPoints += ClassOwed;
+        State.LevelClassPointsGranted = ClassEntitled;
+    }
+    if (CoreOwed > 0)
+    {
+        State.UnspentCorePoints += CoreOwed;
+        State.LevelCorePointsGranted = CoreEntitled;
+    }
+    OnProgressionChanged.Broadcast();
 }
 
 int32 UBreakerProgressionComponent::AwardKillExperience(EBreakerMonsterRank Rank, int32 AreaLevel)
@@ -489,6 +535,15 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     // O2 PLACEHOLDER: 10 Class / 12 Core is the XP-And-Pacing §9 slice budget
     // at cap 10; the shipping numbers come from the curve Data Asset.
     GrantPlaytestPoints(UBreakerProgressionLibrary::SliceClassPointGrant, UBreakerProgressionLibrary::SliceCorePointGrant);
+    // THE LUMP IS AN ADVANCE on the per-level entitlement, not a bonus beside
+    // it. Seeding the granted-counters to the lump's own values means levels
+    // 1-10 pay nothing extra (pre-paid above) and level 11 pays the 11th
+    // Class Point — which is also the level a branch keystone first becomes
+    // affordable through play (investment gate 8 + cost 3). Without this
+    // seed, per-level grants would stack on the lump and a level-10 character
+    // would hold 20 Class Points against a documented budget of 10.
+    State.LevelClassPointsGranted = FMath::Max(State.LevelClassPointsGranted, UBreakerProgressionLibrary::SliceClassPointGrant);
+    State.LevelCorePointsGranted = FMath::Max(State.LevelCorePointsGranted, UBreakerProgressionLibrary::SliceCorePointGrant);
 }
 
 int32 UBreakerProgressionComponent::GetTreeInvestment(const UBreakerProgressionTree* Tree) const

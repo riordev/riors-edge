@@ -153,11 +153,20 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         ++TargetIndex;
     }
 
+    // "Rewrites Unmake: DURING IT, Cleave has no animation lock" — the node
+    // text and Class-Kits §2.2 both scope the rewrite to Unmake's window. The
+    // keystone tag alone is published permanently by node purchase, so gating
+    // on the tag alone shipped a permanent uncapped Cleave-spam buff as an
+    // ultimate rewrite: buying Edgework removed the lock forever. Both halves
+    // are required — the tag says the rewrite is owned, the window says it is
+    // currently rewriting.
+    UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character);
     const bool bHasEdgework = ActorInfo && ActorInfo->AbilitySystemComponent.IsValid()
         && ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
-    const float Lock = AnimationLockFor(bHasEdgework, AnimationLockSeconds);
+    const bool bDuringUnmake = State && State->IsWindowActive(UBreakerCasterAbility::UnmakeWindowKey());
+    const float Lock = AnimationLockFor(bHasEdgework && bDuringUnmake, AnimationLockSeconds);
 
-    if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
+    if (State)
     {
         // Published for the HUD and for cosmetics; the ability's own lock is
         // the GAS activation, not this window.

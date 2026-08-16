@@ -151,6 +151,15 @@ public:
     // CharacterLevel; called after an award and after a save load, so a
     // retuned curve takes effect on existing characters.
     void RefreshLevelFromXp();
+    // XP-And-Pacing §4, the missing half of the XP loop: pays the difference
+    // between what the current level entitles the character to
+    // (1 Class Point/level to 30, 1 Core Point/level to 50) and what has
+    // already been paid, into the unspent pools. Monotonic — never claws
+    // back after a downward curve retune. Called after every real level gain
+    // and once on load, so a save from before the entitlement existed is
+    // brought current the first time it opens.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|XP")
+    void GrantLevelPointEntitlement();
     // Seeds the slice budget whenever the point economy is empty (no ranks in
     // either currency and nothing unspent), and locks Swift only if no class
     // is chosen — so both a new gym pawn and an existing save written before

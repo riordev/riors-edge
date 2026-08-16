@@ -274,6 +274,18 @@ private:
     void ActivateAbilityTwo();
     void ActivateUltimate();
     void ShowInitialMenu();
+public:
+    // THE D1 GUARD, extracted pure so the shipped decision is testable
+    // without a world (RiorsEdge.Game.BootFlow). The title menu belongs to
+    // sessions that have not entered the world yet: the front end always
+    // shows it; any other map shows it only when the session carries no
+    // active character (a PIE drop-in on the template map). A mid-session
+    // map arrival — the pawn OpenLevel just rebuilt — shows nothing.
+    static bool ShouldShowInitialMenu(bool bIsFrontEndMap, bool bSessionHasActiveCharacter)
+    {
+        return bIsFrontEndMap || !bSessionHasActiveCharacter;
+    }
+private:
     void OpenMenu(bool bInitialMenu);
     // Dev capture only (-BreakerCaptureMenu=<name>): opens the front end on a
     // named screen so a screenshot run can photograph it.

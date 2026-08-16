@@ -80,13 +80,20 @@ bool FBreakerWeaponDropArchetypeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A seed reproduces the archetype"), static_cast<int32>(A.WeaponArchetype), static_cast<int32>(B.WeaponArchetype));
     TestEqual(TEXT("A seed reproduces the affix count"), A.Affixes.Num(), B.Affixes.Num());
 
-    // Both weapon slots roll weapons, and across a run every archetype appears.
-    // This is the owner's actual ask: primaries and secondaries drop as
-    // DIFFERENT weapon classes.
+    // Every archetype appears — WITH THE SLOT DRAWN THE WAY PRODUCTION DRAWS
+    // IT. The previous version of this test picked the slot as (Seed % 2),
+    // which is exactly why it stayed green for the entire life of a bug that
+    // made six archetypes undroppable: GrantLoot drew the slot from the same
+    // unsalted seed as RollItem's first draw, so archetype always equalled
+    // slot index in the shipped game while the test rolled its own slots and
+    // saw all eight. Shipped-configuration testing (O40c) means the slot
+    // comes from UBreakerLootLibrary::RollDropSlot here or the assertion is
+    // about a game that does not exist.
     bool bSeen[static_cast<int32>(EBreakerWeaponArchetype::Count)] = {};
     for (int32 Seed = 1; Seed <= 600; ++Seed)
     {
-        const EBreakerEquipSlot Slot = (Seed % 2) ? EBreakerEquipSlot::Primary : EBreakerEquipSlot::Secondary;
+        const EBreakerEquipSlot Slot = UBreakerLootLibrary::RollDropSlot(Seed);
+        if (!FBreakerItemInstance::IsWeaponSlot(Slot)) continue;
         const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(TEXT("Drop"), Slot, EBreakerItemRarity::Standard, 20, Seed);
         TestTrue(TEXT("A weapon-slot drop is a weapon"), Item.IsWeapon());
         bSeen[static_cast<int32>(Item.WeaponArchetype)] = true;
