@@ -1,5 +1,7 @@
 # Story Source — the owner's Master Sheet (imported 2026-08-14)
 
+> STATUS 2026-08-16: HISTORICAL — a verbatim import of the owner's Google Doc; re-import rather than edit, and never cite it as authority (the O-ledger in Decisions.md rules).
+
 **Source:** the owner's Google Doc, imported verbatim below. Re-import it
 rather than editing it here; local edits will be lost and, worse, will make
 this copy disagree with the document the owner is actually writing in.

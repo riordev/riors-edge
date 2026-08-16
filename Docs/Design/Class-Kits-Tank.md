@@ -1,5 +1,7 @@
 # Class Kit — TANK / Grit (full treatment)
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — nothing here reaches a player (this doc's own header audit stands); the owner authorized building all five classes as O2-placeholder implementations in chat on 2026-08-16, pending ratification — see Docs/Owner-Rulings-Pending-Ratification.md.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

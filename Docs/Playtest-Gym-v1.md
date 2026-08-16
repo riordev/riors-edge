@@ -1,5 +1,7 @@
 # Playtest Gym v1
 
+> STATUS 2026-08-16: PARTIALLY BUILT — describes the gym on the First Person template map; the gym is now its own level (Lvl_Gym) built by the cover registry, with Lvl_FirstPerson the PIE template only (HANDOFF §8 T1), so trust Level-Design.md's AS BUILT and the code over this file.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

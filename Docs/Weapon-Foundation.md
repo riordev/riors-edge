@@ -1,5 +1,7 @@
 # Weapon foundation
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the weapon pipeline exists, but the doc predates equipment arming the held gun (SyncArchetypesToEquipment) and the 2026-08-16 slot-draw fix that made all eight archetypes droppable.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

@@ -1,5 +1,7 @@
 # Ability Implementation Spec — engineering design for every class ability
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the Swift/Caster/Parry sections describe shipped code, but the doc predates the S4 vocabulary, the Caster branch trees and points-per-level; the Gunsmith/Tank/Support one-pagers (§5–§8) remain unbuilt with their 21 ability rows deliberately null (HANDOFF §8 T6).
+
 **Scope:** mixed — judge per section; slice covers currently-built verbs and abilities (Swift, Caster, Parry), post-slice covers unbuilt class kits and future ability systems (the Gunsmith / Tank / Support one-pagers, §5–§8) (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-14).
 

@@ -1,5 +1,7 @@
 # Hook and Condition Vocabulary — where a node attaches, and what it may ask
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the enums, mask and aggregation lanes shipped (S4), but the consumers mostly did not: 5 of 24 conditions are authored anywhere and the 21 new stat targets have zero uses outside tests and UI labels (HANDOFF §5 R2/R7/R9) — the signed O40(c) exception this doc records at :704-711.
+
 **Scope:** slice (see `Vertical-Slice.md`). The vocabulary is authored whole;
 §6 stages which parts of it are wired, and in what order.
 **Last reconciled against: O40**

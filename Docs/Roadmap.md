@@ -1,5 +1,7 @@
 # Production roadmap — RETIRED
 
+> STATUS 2026-08-16: HISTORICAL — retired by ruling O28; do not plan from this document.
+
 **HISTORICAL — RETIRED BY O28.** This document's five milestones are no
 longer the operative plan. `Docs/Design/Decisions.md` is the only ruling
 ledger; `CONTEXT.md`'s next-actions list is the operative plan (playtest →

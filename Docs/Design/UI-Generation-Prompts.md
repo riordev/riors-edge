@@ -1,5 +1,7 @@
 # UI Generation Prompts
 
+> STATUS 2026-08-16: HISTORICAL — self-declared below: these prompts produced the mocks and are not a spec; the FIELDPLATE specs and the owner's canvases are the authority.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

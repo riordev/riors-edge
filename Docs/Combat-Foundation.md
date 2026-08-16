@@ -1,5 +1,7 @@
 # Combat foundation
 
+> STATUS 2026-08-16: PARTIALLY BUILT — an implementation note subordinate to Damage-Pipeline.md; it predates the 2026-08-15/16 combat pass (Severed Drudge, Warden turn cap, damage numbers from every source) and the D15–D19 hit-feedback findings (HANDOFF §6).
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

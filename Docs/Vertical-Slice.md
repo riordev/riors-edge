@@ -1,5 +1,7 @@
 # Vertical slice
 
+> STATUS 2026-08-16: LAW — the scope contract every doc's Scope line cites; its content list predates the current milestone (front door → Anchor → gym) but the slice/post-slice boundary it defines still governs.
+
 **Last reconciled against: O32**
 
 ## Scope

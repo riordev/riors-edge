@@ -1,5 +1,7 @@
 # Character and progression architecture
 
+> STATUS 2026-08-16: PARTIALLY BUILT — its own "As built" section predates the XP loop, points-per-level, the character roster and the S4 widening; trust HANDOFF.md and Source/RiorsEdge/Progression/ for what exists.
+
 **Scope:** mixed — judge per section; the "As built" status, progression currencies, and locked decisions describe the current slice, while most of the five-class / six-constellation architecture above them is post-slice design intent, explicitly flagged in this document's own opening note as mostly not yet built (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

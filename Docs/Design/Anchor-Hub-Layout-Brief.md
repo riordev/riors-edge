@@ -1,5 +1,7 @@
 # The Anchor — hub layout brief
 
+> STATUS 2026-08-16: PARTIALLY BUILT — measured from the live runtime hub and current as of 2026-08-15, but the authored Anchor map it commissions does not exist and A7 (authored map vs runtime hub) is unruled; note arrivals now land at a gate-side ArrivalTransform, not the hub centre (commit 6ab1ac1).
+
 **Scope:** an asset/level brief for building THE ANCHOR as an authored space.
 **Last reconciled against:** O40.
 

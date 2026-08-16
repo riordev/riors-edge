@@ -2,6 +2,26 @@
 
 **Last reconciled against: O40**
 
+## 2026-08-15/16 — Session 7 (the front door in anger: flicker, the obelisk, hit reads)
+
+First sessions run through the real boot path. Three findings, and the middle
+one is the session's lesson: a spatial bug reported as an input bug.
+
+| Finding (owner's words) | Root cause | Response |
+|---|---|---|
+| Menu flickers / snaps to other screens when switching | `CurrentScreen` and the widget swap were BOTH deferred to the next Slate tick, so between the click and the tick every reader branched on the screen just left (`HandleEscape` worst) — and the rebuild transient could land on the wrong screen entirely, character create included | Screen state now updates synchronously in `Rebuild`; only the widget swap defers (`UI/BreakerMenu.cpp:923-933`). `[MenuRebuild]` transition logging left in for repro sessions |
+| "i cant move when i spawn / mouse sensitivity is super high" | **One bug wearing two symptoms.** The hub is built AROUND the arriving pawn, so the plaza's central obelisk spawned exactly inside the player's capsule — wedged in place, camera clipping through the cube's faces on every small mouse move, which reads as broken sensitivity | Arrivals (and the PLAY teleport, which had the same latent bug via `HubOrigin+120`) land at a gate-side `ArrivalTransform` facing the plaza (commit 6ab1ac1). The Anchor also holsters the gun now: fire and the three ability slots are refused while holstered, `StopFire` deliberately un-gated |
+| Hits from spells/effects don't feel like they register | Partly presentation, partly five real defects root-caused in the same pass: damage numbers draw at the target's pivot, not the impact (D15); the killing blow under-reports by clamping to remaining health (D16); DoT ticks are exempt from facing armour (D17); the Warden's shield primitive stops nothing (D18); the Drudge's weak point floats detached from the body (D19) | The presentation half landed earlier in the wave: damage numbers are fed by every player damage source (`UI/BreakerPlaytestHUD.cpp:1859`). D15–D19 are recorded with file:line at `Docs/HANDOFF.md` §6 and remain OPEN — none is fixed as of this entry |
+
+Also landed off the same reports, same sessions: D1 (the title screen re-opening
+on every map arrival) fixed with a map guard and pinned by
+`RiorsEdge.Game.BootFlow.ShippedConfiguration`; the three empty maps got their
+runtime PlayerStart/lighting/boot-floor baseline (`Game/BreakerWorldBasics.cpp`)
+and `Lvl_FrontEnd` had its first verified standalone boot; points-per-level and
+the loot slot-draw salt shipped (see `Docs/Owner-Rulings-Pending-Ratification.md`);
+and save data was moved aside to `Saved/SaveGames_wiped_2026-08-16` — moved, not
+deleted — per the owner's fresh-boot request.
+
 ## 2026-08-14 — Session 4 (class identity, the Forge economy, the skill matrix)
 
 Seven findings. Two of them turned out to be one bug, and three of the UI

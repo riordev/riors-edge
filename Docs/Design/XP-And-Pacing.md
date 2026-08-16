@@ -1,5 +1,7 @@
 # XP and Pacing
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the XP loop and §4's per-level points are now built (2026-08-16) as code defaults rather than the Data Asset this document requires; read the AS BUILT section at the end before using any number or acceptance criterion here.
+
 Domain: the experience curve to the level 50 hard stop, intended solo hours,
 act breakpoints, XP sources, catch-up mechanics, the ~15 world-content Core
 Points, the vertical slice's compressed level-10 curve, and the enemy-level /
@@ -1133,3 +1135,36 @@ Recorded here only because this document's numbers assume them:
     so the third field reads zero for the entire campaign and for a good part of
     the endgame. It needs to become a best or average equipped tier, or an
     item-level average. A `UI-UX-Spec.md` decision, not a curve one.
+
+---
+
+## AS BUILT (2026-08-16)
+
+- **§4's per-level points are BUILT** (2026-08-16): 1 Class Point per level to
+  level 30, 1 Core Point per level to 50, with the slice lump reinterpreted as
+  an ADVANCE on the entitlement — level 11 pays the 11th point, so the first
+  keystone (8 invested + 3 cost) becomes affordable through play at level 11
+  without moving either O2-frozen number.
+  `Progression/BreakerProgressionComponent.cpp:468 GrantLevelPointEntitlement`
+  (an entitlement as a function of level with granted-counters, so it survives
+  curve retunes); pinned by `Tests/BreakerBootFlowTests.cpp`
+  (`RiorsEdge.Progression.LevelPointEntitlement`).
+- **The curve is code defaults, NOT the Data Asset this document requires**
+  (§8.9 hybrid model, §9/§10 acceptance criteria):
+  `Progression/BreakerExperience.h` — per-level cost 240 × L^1.45, kill XP
+  12 × rank multiplier {1, 4, 7, 40} × (1 + 0.08 × (AL − 1)), all flagged
+  O2 PLACEHOLDER. The "read from a Data Asset, no hardcoded 10/30/50"
+  criteria are NOT met.
+- **Audit flag — XP pays from EnemyLevel, not AreaLevel.**
+  `Combat/BreakerEnemy.cpp:760-762` passes `EnemyLevel` (the DROP item level:
+  `GetDropItemLevel(AreaLevel)` + elite bonus, clamped to 120) into
+  `AwardKillExperience`, while the comment beside the call says "Area level,
+  not character level". At gym levels the two coincide; above area ~50 the
+  drop ladder diverges upward, so kill XP silently tracks it. Nobody has
+  ruled which is intended.
+- Levels are re-derived from stored cumulative XP
+  (`RefreshLevelFromXp`, the only writer of `CharacterLevel`), so a curve
+  retune moves existing characters instead of stranding them — §1's product
+  intent, honoured.
+- OQ1 (first-level pacing) is now a measurable question: ~20 trash kills to
+  level 2 at gym defaults, per HANDOFF §4.

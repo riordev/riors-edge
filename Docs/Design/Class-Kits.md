@@ -1,5 +1,7 @@
 # Class Kits — Resource Loops, Abilities, and Branch Trees
 
+> STATUS 2026-08-16: PARTIALLY BUILT — Swift and Caster are structurally complete in code, but most authored nodes are tag-only with no consumer (HANDOFF §5 R2), nine Caster nodes invalidated by the Mana inversion were never re-sited (:393-405), and the doc predates the S4 widening and points-per-level.
+
 **Scope:** slice (see `Vertical-Slice.md`). Swift and Caster are authored
 end-to-end as the slice's class story (O39); Gunsmith, Tank, and Support
 appear here only as one-page treatments and remain designed-only and

@@ -1,5 +1,7 @@
 # Core Constellations — six universal trees authored, FIVE shipping, SEVEN CLUSTERS LIVE
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the shipped Core tree is 30 nodes in seven clusters with five constellations shipping per O38, but only 7 of the 30 Core nodes carry a live stat effect (HANDOFF §5 R2) and the doc predates points-per-level.
+
 **Scope:** mixed — §10's 15-node subset is the vertical slice; the rest of
 this document (the full live 30-node/seven-cluster tree beyond the slice's
 10-point cap, and the O30 redesign direction) is post-slice (see

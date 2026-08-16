@@ -1,5 +1,7 @@
 # Item Foundation
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the core item pipeline exists as described, but the doc predates crafting-currency drops, the inventory rebuild, and the 2026-08-16 drop-slot salt fix (UBreakerLootLibrary::RollDropSlot) that made all eight weapon archetypes droppable and re-rolled historical drop seeds.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

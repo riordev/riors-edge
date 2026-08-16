@@ -1,5 +1,7 @@
 # The power curve
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the curve is implemented as O2-placeholder code defaults; both OPENs near the end are closed by O36 and the EnemyLevel re-clamp recorded at :485-495 was fixed on 2026-08-14, so read the AS BUILT section at the end before acting on anything past §7.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 
@@ -585,3 +587,26 @@ Ranked by how much each blocks the others. None is decided here.
 5. **`EBreakerBuildCondition` is movement-only.** O30's taxonomy (ailment,
    crit, stacking) needs it widened before those axes can be authored honestly.
    Cheap to widen; it has blocked content twice.
+
+---
+
+## AS BUILT (2026-08-16)
+
+- **Both OPENs above are CLOSED.** The "item level 101-120 has no source" OPEN
+  (~:497-506) and the deliberately-red `PowerBand` OPEN (~:511-513) were
+  resolved by O36 into pinned fixtures. There are no deliberate reds in the
+  suite any more; any `Result={Fail}` is a regression, full stop.
+- **The EnemyLevel re-clamp recorded above (~:485-495) is FIXED** — commit
+  09aa66c, 2026-08-14. `ABreakerEnemy::ApplyChassis` now clamps to
+  `[1, UBreakerAffixLibrary::MaxItemLevel]` (= 120) at
+  `Combat/BreakerEnemy.cpp:179-181`, with the old defect recorded in the
+  comment directly above the clamp. Drops above ilvl 50 DO ship; the 74x
+  endgame gap is no longer blocked at the actor. (`Docs/HANDOFF.md` §6 D9
+  still describes the pre-fix state — this section is the correction, and the
+  discrepancy is reported rather than edited there.)
+- The curve constants remain O2 PLACEHOLDER code defaults; nothing here has
+  moved to a Data Asset.
+- Related but separate: kill XP is paid from `EnemyLevel` (the drop item
+  level), not `AreaLevel` — `Combat/BreakerEnemy.cpp:760-762`, contra the
+  comment beside it. Recorded in `XP-And-Pacing.md`'s AS BUILT; above area
+  ~50 the two ladders diverge.

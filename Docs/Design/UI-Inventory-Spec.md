@@ -1,5 +1,7 @@
 # FIELDPLATE — Loadout / inventory screen spec
 
+> STATUS 2026-08-16: SUPERSEDED — see Docs/Design/UI-Reference/Inventory.dc.html (the owner's designer reference) and the 2026-08-15 inventory rebuild in UI/BreakerMenu.cpp ~:2795-3800; even this doc's own "Superseded" notes are out of date — the AS BUILT section at the end is the current chain.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 
@@ -248,3 +250,26 @@ Still not landed:
   not an allotted-size reflow — the viewport is read once per rebuild.)*
 - Gear score in the meta line is the sum of equipped item levels — `O2
   PLACEHOLDER`, no shipping formula is authored.
+
+---
+
+## AS BUILT (2026-08-16)
+
+This spec is SUPERSEDED, and its own "Superseded (2026-08-13)" notes are
+themselves out of date. The chain today:
+
+- **Authority:** the owner's designer reference, preserved in-repo at
+  `Docs/Design/UI-Reference/Inventory.dc.html` (2026-08-15).
+- **Implementation:** the 2026-08-15 inventory rebuild in
+  `UI/BreakerMenu.cpp` (~:2795-3800) — arithmetic column solve,
+  readability-driven card count, measured filter chips
+  (`MeasureChipWidth`/`PackChipRows`), hover limit-tell, bulk-discard modal —
+  covered by `Tests/BreakerInventoryLayoutTests.cpp`.
+- The rebuild's point was killing the layout-jitter class: nothing sizes
+  itself from its own allotted size (the banned patterns are HANDOFF §2 R4).
+- Known residuals live in `Docs/HANDOFF.md` §6, not here: D3 (the discard
+  modal's unprobed shrink-wrapped plate), D7 (equipment-column wrap ~36 px
+  too generous), §7 A15 (three-across needs a full-bleed frame ruling).
+
+Read this file for FIELDPLATE vocabulary and history only; do not implement
+from it.

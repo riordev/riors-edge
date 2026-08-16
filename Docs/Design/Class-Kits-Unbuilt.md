@@ -1,5 +1,7 @@
 # Class Kits — THE THREE UNBUILT CLASSES, CONSOLIDATED
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the resource components and 21 ability rows it catalogues exist in code but are attached to nothing (HANDOFF §5 R3); where this consolidation and a full treatment disagree, the treatment wins.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

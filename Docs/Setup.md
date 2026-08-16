@@ -1,5 +1,7 @@
 # Setup
 
+> STATUS 2026-08-16: LAW — operative machine-setup instructions; for build/suite/run specifics use HANDOFF.md §3 (R5–R7 govern the cycle).
+
 **Last reconciled against: O32**
 
 Use Unreal Engine 5.8 on both computers. Install Git and Git LFS, then run `git lfs install` once per machine. Do not sync the project with iCloud, OneDrive, Dropbox, or a network drive.

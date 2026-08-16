@@ -1,5 +1,7 @@
 # UI / UX Specification — Rior's Edge (Project Breaker)
 
+> STATUS 2026-08-16: PARTIALLY BUILT — design pass 1, predating the settings screen, character select/create, the three-map front end and the inventory rebuild; its :928 question is answered by O15+O37 but this doc was never swept, and FIELDPLATE (UI-Style-Guide-Fieldplate.md) is the visual authority, not this file.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

@@ -1,5 +1,7 @@
 # Architecture
 
+> STATUS 2026-08-16: LAW — the C++/Blueprint/Data-Asset ownership rule still governs; the "initial module" description below it is historical.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

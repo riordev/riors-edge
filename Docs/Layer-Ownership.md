@@ -1,5 +1,7 @@
 # Layer ownership
 
+> STATUS 2026-08-16: LAW — the three-layer authoring rule remains operative; apply it before adding any node, affix, or class mechanic.
+
 **Scope:** slice — this rule governs systems already live in code (checked against the current build throughout; see the "FOR THE OWNER" section below) and is written to extend unchanged into post-slice endgame gear rather than needing a separate treatment (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

@@ -1,5 +1,7 @@
 # Encounter Design — Vertical Slice
 
+> STATUS 2026-08-16: PARTIALLY BUILT — substantially implemented and its AS BUILT section (2026-08-14) is the authority on what exists, but that section predates the Severed Drudge, the cover registry, the three-map split, and the wave loot-gating and Warden findings (HANDOFF §5 R13, §6 D5, D18).
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-14).
 

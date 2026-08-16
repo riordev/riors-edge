@@ -1,5 +1,7 @@
 # Level Design — the spatial grammar
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the spatial grammar is built into the runtime gym, but this doc predates the three-map split (Lvl_FrontEnd/Lvl_Anchor/Lvl_Gym); Lvl_FirstPerson is now the PIE template only, so read the AS BUILT section at the end before acting on §5 or §8.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (`Docs/Design/Decisions.md` O1, O2, O24, O25, O26 read for content; O27–O32 read for conflicts, none found — this document authors space, not power).
 
@@ -479,3 +481,25 @@ a defect class the harness will keep passing.
 serviced at the end of the frame, after the view-target change in the same
 tick, so shot *N* renders vantage *N* and there is currently no spawn-eye frame
 in a tour run. Run without `-BreakerCaptureTour` for the spawn view.
+
+---
+
+## AS BUILT (2026-08-16)
+
+- **The game's maps are now three**: `Lvl_FrontEnd` (GameDefaultMap, the
+  title screen) → `Lvl_Anchor` (the hub) → `Lvl_Gym` (this document's field),
+  dispatched by map role in `Game/BreakerGameMode.cpp:124-236`, with travel as
+  `OpenLevel` through `Interaction/BreakerTravelPoint.cpp`.
+- **`Lvl_FirstPerson` is the PIE template only** (`EditorStartupMap`). §5/§8's
+  treatment of it as the game's field, and the editor-delete list, are
+  historical — do not act on them (HANDOFF §8 T1: do not change
+  `EditorStartupMap` casually; PIE's working loop depends on it).
+- The three maps ship as empty shells on purpose for now: PlayerStart,
+  sun/sky lighting and the front end's boot floor arrive at runtime
+  (`Game/BreakerWorldBasics.cpp` — `EnsureWorldLighting` / `EnsureBootFloor`),
+  and the rig yields automatically to any authored directional light or
+  start, so A6 (runtime vs authored lighting) remains the owner's call.
+- The gym field itself is built by the cover registry
+  (`Game/BreakerCoverRegistry.cpp`, nine deterministic passes,
+  `IsLayoutLegal`); the four station collisions are recorded at HANDOFF
+  §6 D30 / §7 A9 and are unruled O2 value questions.

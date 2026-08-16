@@ -1,5 +1,7 @@
 # FIELDPLATE — Combat HUD spec
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the HUD is implemented against it with recorded deltas (damage-number abbreviation, a minimap authored with no canvas ruling behind it); trust UI/BreakerPlaytestHUD.cpp for current behaviour.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

@@ -1,5 +1,7 @@
 # FIELDPLATE — Skill matrix spec
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the skill matrix is built against it with recorded deltas (viewport/zoom model, measured markers, boards opening 1:1), and its :159 open question is answered by O37 but this doc was never swept to say so.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

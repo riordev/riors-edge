@@ -1,5 +1,7 @@
 # FIELDPLATE — Rior's Edge UI specification v1.0
 
+> STATUS 2026-08-16: LAW — the owner-authored visual authority for every screen and the HUD; the implementation token header is Source/RiorsEdge/UI/BreakerUIStyle.h, and the banned Slate patterns it feeds are HANDOFF §2 R4.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

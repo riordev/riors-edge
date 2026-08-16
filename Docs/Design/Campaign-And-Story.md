@@ -1,5 +1,7 @@
 # Campaign and Story — the spine, the missions, and the handoff
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — no campaign content exists in code; the owner's 2026-08-15/16 chat premise (a looter shooter with ARPG elements, movement a core pillar, multi-area story per this document) awaits ratification — see Docs/Owner-Rulings-Pending-Ratification.md.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

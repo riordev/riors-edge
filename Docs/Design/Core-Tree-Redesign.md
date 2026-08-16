@@ -1,5 +1,7 @@
 # Core Tree Redesign — scouting the build axes (O30)
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — an O30 scouting document; the redesign has not begun and is blocked on the defence/mobility axis question (:770), which only the owner can answer.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

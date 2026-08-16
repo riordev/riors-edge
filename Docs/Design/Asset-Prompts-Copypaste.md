@@ -1,5 +1,7 @@
 # Asset prompts — copy/paste
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — a convenience extract of Player-Weapon-Gear-Asset-Brief.md's prompts; the assets they commission are not in the game yet, and the full brief holds the reasoning and citations.
+
 Extracted from `Player-Weapon-Gear-Asset-Brief.md`. The full brief has
 the reasoning, the citations and the failure-mode section; this file is
 just the prompts, in order, so they can be pasted one after another.

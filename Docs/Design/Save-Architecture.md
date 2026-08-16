@@ -1,5 +1,7 @@
 # Save / State Architecture
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the AS BUILT section at the end is the authority on what exists, but it predates the GUID-keyed 5-slot character roster, pre-roster save adoption (Save/BreakerCharacterRoster.cpp), and the 2026-08-16 save wipe (data moved to Saved/SaveGames_wiped_2026-08-16, not deleted).
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

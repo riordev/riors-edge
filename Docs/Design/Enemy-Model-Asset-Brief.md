@@ -1,5 +1,7 @@
 # Enemy Model Asset Brief — commissioning prompts for AI asset generation
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — commissioning prompts; the enemy meshes do not exist and the in-game bodies are still primitive blockouts (it also predates the Severed Drudge, Combat/BreakerAlteredEnemy.cpp).
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-14).
 

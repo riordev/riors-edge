@@ -1,5 +1,7 @@
 # The Anchor Hub — the settlement, the loop through it, and the boundary it stands on
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — the settlement designed here does not exist; today's Anchor is the runtime blockout hub (Game/BreakerHubBuilder.cpp) on Lvl_Anchor, which this document predates, and whether an authored map replaces or dresses that hub (A7) is an open owner question.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

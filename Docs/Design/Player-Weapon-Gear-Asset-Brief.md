@@ -1,5 +1,7 @@
 # Player, Weapon and Gear Asset Brief — commissioning prompts for the player-facing set
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — commissioning prompts, current as of 2026-08-15; none of the commissioned assets are in the game yet.
+
 **Scope:** slice (see `Docs/Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-15).
 

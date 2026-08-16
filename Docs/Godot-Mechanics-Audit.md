@@ -1,5 +1,7 @@
 # Godot mechanics audit
 
+> STATUS 2026-08-16: HISTORICAL — audits the pre-Unreal Godot prototype; O40(a) closes its Dash section and none of it describes current, live design.
+
 **Historical.** This document audits the pre-Unreal Godot prototype
 (`riors-arena`); it predates the current Unreal build. O40(a) closes its Dash
 section specifically — the current Unreal single-dash-on-cooldown model is

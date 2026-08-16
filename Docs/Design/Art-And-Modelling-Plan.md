@@ -1,5 +1,7 @@
 # Art and Modelling Plan — Rior's Edge (Project Breaker)
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — a commissioning plan with almost no assets landed (the anchor_hub mesh set is the exception); the concrete, current prompts live in Enemy-Model-Asset-Brief.md, Player-Weapon-Gear-Asset-Brief.md and Asset-Prompts-Copypaste.md.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

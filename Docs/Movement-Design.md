@@ -1,5 +1,7 @@
 # Movement design
 
+> STATUS 2026-08-16: PARTIALLY BUILT — movement is built and has been playtest-tuned past this doc's numbers (gravity, wall-ride entry, third jump per O25/O40a); the owner's 2026-08-15/16 premise ruling (movement is a core pillar, not the genre) awaits ratification — see Docs/Owner-Rulings-Pending-Ratification.md.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

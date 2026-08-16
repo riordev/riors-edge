@@ -1,5 +1,7 @@
 # FIELDPLATE — Ability icon system
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — an art commission brief transcribed from the owner's canvas; the icons themselves do not exist.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

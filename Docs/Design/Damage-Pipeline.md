@@ -1,5 +1,7 @@
 # Damage Pipeline — canonical resolution spec
 
+> STATUS 2026-08-16: PARTIALLY BUILT — the resolution order is largely implemented, but sign-off is blocked on Replication-Position.md (O22), and the live hit-feedback defects D15–D19 (HANDOFF §6) all sit in this pipeline's domain.
+
 **Scope:** slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

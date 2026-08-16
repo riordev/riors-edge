@@ -1,5 +1,7 @@
 # The elements — Rift, Entropy, Void
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — ratified-as-deferred by O38 (ships when the resistance model does, post-slice); its implementation claims were verified true on 2026-08-14 and nothing here reaches a player.
+
 **Scope:** post-slice (see `Vertical-Slice.md`).
 **Last reconciled against: O40**
 

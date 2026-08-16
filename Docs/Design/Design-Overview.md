@@ -1,5 +1,7 @@
 # Design Overview — the map, the locks, the collisions, and what to build next
 
+> STATUS 2026-08-16: PARTIALLY BUILT — a map, not law (O28), and the map is stale: it predates the XP system, the character roster, the three-map split, the settings screen, the S4 vocabulary and points-per-level, so read the AS BUILT section at the end before trusting any Q/S status above it.
+
 Status: synthesis pass 1. This document does not author new systems. It reads the master sheet and the seven design documents written against it, and produces four things the individual documents cannot produce for themselves:
 
 1. a map of the design space, including the domains nobody owns;
@@ -664,3 +666,36 @@ Original text follows. Ranked by how much downstream work each blocks. Every ite
 **S3. What is the replication topology?** **OPEN.** The Anchor is non-instanced and shared, parties go to five, Conquest matchmakes nine. `Save-Architecture.md` §7 covers storage authority only. Nothing covers the network. A **DRAFT** recommendation now exists at `Docs/Design/Replication-Position.md` (proposed 2026-08-14); it does **not** close O22 and is not law until the owner signs off.
 
 **S4. Who enumerates the rule-rewrite hooks?** **OPEN.** `Class-Kits.md` §7 correctly identifies that rule-rewriting nodes need code-side hooks and asks for them to be enumerated before authoring. Across the class and core trees there are roughly forty distinct hook types. That enumeration is the real engineering specification for the progression system, and it is the largest unwritten technical document in the project.
+
+---
+
+## AS BUILT (2026-08-16)
+
+A status-correcting pass only; this records where the map above has been
+overtaken by code. Cross-checked against `Docs/HANDOFF.md` (2026-08-16).
+
+- **S4 IS WRITTEN.** The §"S4" line (~:666) calls the hook enumeration "the
+  largest unwritten technical document in the project". It exists:
+  `Hook-And-Condition-Vocabulary.md` (716 lines), and its enums shipped —
+  though most consumers have not (HANDOFF §5 R2/R7/R9).
+- **XP EXISTS.** Q24's premise ("there is no XP system at all") is dead:
+  `Source/RiorsEdge/Progression/BreakerExperience.{h,cpp}` is the curve,
+  awarded on every kill at `Combat/BreakerEnemy.cpp:743-763`.
+- **Points-per-level is IMPLEMENTED** (2026-08-16):
+  `Progression/BreakerProgressionComponent.cpp:468`
+  `GrantLevelPointEntitlement` — 1 Class Point/level to 30, 1 Core Point/level
+  to 50, the slice lump reinterpreted as an advance on the entitlement.
+  Pinned by `Tests/BreakerBootFlowTests.cpp`
+  (`RiorsEdge.Progression.LevelPointEntitlement`).
+- **The Core tree ships FIVE constellations, not six** (the ~:63 table row) —
+  O38; the live tree is 30 nodes in seven clusters
+  (`Core-Constellations.md` header).
+- **The game has a front door and three maps** — `Lvl_FrontEnd` (boot) →
+  character select → `Lvl_Anchor` (hub) → `Lvl_Gym` — with runtime
+  lighting/PlayerStart/boot-floor fallback (`Game/BreakerWorldBasics.cpp`).
+  No section above mentions any of them.
+- The document also predates: the GUID character roster
+  (`Save/BreakerCharacterRoster.cpp`), the settings screen, the cover
+  registry (`Game/BreakerCoverRegistry.cpp`), and the inventory rebuild.
+  Treat every Q/S status above as a snapshot; `Decisions.md` and
+  `Docs/HANDOFF.md` are the currency.

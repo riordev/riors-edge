@@ -1,5 +1,7 @@
 # Replication Position
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — a DRAFT proposal, not law until the owner signs off (O22); its "this week" sign-off deadline (Decisions.md:71, dated 08-12) has silently expired, and Damage-Pipeline sign-off waits on it.
+
 > **DRAFT — proposed 2026-08-14; O22 keeps this owner-authored; not law until
 > the owner signs off.** This page does not rule anything. It exists so O22
 > has a concrete recommendation to react to instead of a blank page. Until

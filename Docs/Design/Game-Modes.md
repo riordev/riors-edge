@@ -1,5 +1,7 @@
 # Game Modes — Content Type Design
 
+> STATUS 2026-08-16: UNBUILT TREATMENT — only the gym's arena/wave mode exists in code; Local Rifts, Frontiers, Dungeons, Raids and Conquest are design-only.
+
 **Scope:** mixed — slice: arena + wave-mode content only; post-slice: dungeons, raids, Conquest, and Anomaly/Frontier tiered content (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-14).
 
