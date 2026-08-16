@@ -215,6 +215,21 @@ namespace BreakerUI
     inline constexpr float HudMinimapBlipSize = 5.0f;
     inline constexpr float HudMinimapPlayerSize = 9.0f;
 
+    // --- Quest tracker (directly below the minimap) -------------------------
+    // Same width as the minimap so the two read as one top-right column, gap
+    // on the 8px grid. Row height fits an 11px caption line with breathing
+    // room; the title row takes its own measured height.
+    inline constexpr float HudQuestTrackerWidth = 320.0f;    // O2 PLACEHOLDER
+    inline constexpr float HudQuestTrackerGap = 8.0f;        // O2 PLACEHOLDER
+    inline constexpr float HudQuestTrackerPad = 12.0f;       // O2 PLACEHOLDER
+    inline constexpr float HudQuestTrackerRowHeight = 16.0f; // O2 PLACEHOLDER
+    inline constexpr float HudQuestTitlePixels = 13.0f;      // O2 PLACEHOLDER
+    inline constexpr float HudQuestLinePixels = 11.0f;       // O2 PLACEHOLDER
+    // Reserved right-hand column for an objective's "4/8" counter, measured
+    // against the widest realistic counter so the objective text has a stable
+    // fit limit rather than a per-frame one.
+    inline constexpr float HudQuestCounterColumn = 44.0f;    // O2 PLACEHOLDER
+
     // Damage number sizes, section 4 of the HUD spec.
     // The spec's 40/64/80 were authored for a 1920x1080 mock viewed at desk
     // distance. In the game they cover the target you are shooting at, which

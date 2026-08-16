@@ -284,7 +284,7 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
         FBreakerStatusApplicationSpec Spec;
         Spec.BaseDamagePerTick = 10.0f;
         Spec.Snapshot.SourcePower = SnapshotSourcePower;
-        FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Spec, EBreakerDamageFamily::TrueDamage, 1, nullptr);
+        FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Spec, EBreakerDamageFamily::TrueDamage, 1, nullptr, FVector::ZeroVector, false);
         return UBreakerDamageLibrary::ResolveDamage(Tick, Defense).RawDamage;
     };
 

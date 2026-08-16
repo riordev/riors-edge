@@ -98,7 +98,9 @@ namespace
         float ValueAtT12,
         float ValueAtT1,
         float RollWeight = 100.0f,
-        EBreakerBuildCondition Condition = EBreakerBuildCondition::Always)
+        EBreakerBuildCondition Condition = EBreakerBuildCondition::Always,
+        EBreakerItemRarity MinimumRarity = EBreakerItemRarity::Standard,
+        FName PairedAffixId = NAME_None)
     {
         FBreakerAffixDefinition Affix;
         Affix.AffixId = AffixId;
@@ -111,6 +113,8 @@ namespace
         Affix.ValueAtT1 = ValueAtT1;
         Affix.RollWeight = RollWeight;
         Affix.Condition = Condition;
+        Affix.MinimumRarity = MinimumRarity;
+        Affix.PairedAffixId = PairedAffixId;
         return Affix;
     }
 
@@ -290,11 +294,220 @@ namespace
             {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 57.0f, 55.0f));
         return Pool;
     }
+
+    // -----------------------------------------------------------------------
+    // THE ABERRANT POOL — O11's "1-2 unique modifier affixes", landed.
+    // -----------------------------------------------------------------------
+    // Owner (2026-08-16): "make some cool weapons (their special affixes for
+    // abberants and very special affixes on anomalous)". The design rules that
+    // shaped every entry:
+    //
+    //  - EXISTING CHANNELS ONLY. Every line is an ordinary Flat or Increased
+    //    roll on a stat target the aggregation already consumes, gated (or not)
+    //    by a SELF-EVALUABLE build condition. No new attribute, no new bucket,
+    //    no More — the locked aggregation law is untouched, and nothing here
+    //    needs a consumer that does not already run.
+    //  - BUILD-BENDERS, not bigger numbers. Each entry is either a magnitude
+    //    roughly DOUBLE the ordinary pool's ceiling paid for with a condition
+    //    or a companion downside, or a condition-FLIPPED payoff (Grounded,
+    //    Stationary, low health, empty resource) that pays the player the
+    //    ordinary pool ignores. In a game whose pillar is momentum, "pays for
+    //    standing your ground" is a real build decision, not filler.
+    //  - PERCEPTIBLE. Every magnitude is an O2 PLACEHOLDER, and per the O2
+    //    rule a placeholder must be felt in play — these are sized to be the
+    //    headline of the item they roll on.
+    //
+    // Exclusive to Aberrant BY POOL MEMBERSHIP: the generic loop and the Forge
+    // never iterate this array, and Anomalous draws from its own pool below.
+    TArray<FBreakerAffixDefinition> BreakerBuildAberrantAffixPool()
+    {
+        TArray<FBreakerAffixDefinition> Pool;
+
+        // RIFTBURN. The DoT build's flagship: more than double the ordinary
+        // ceiling, billed as a constant cut to direct hit damage — the gun
+        // becomes the applicator, the rift does the killing.
+        // O2 PLACEHOLDER: 12% -> 130% Increased DoT; bill is -12% Increased
+        // Weapon Damage, constant (Downside.Riftburn).
+        Pool.Add(MakeAffix(TEXT("Aberrant.Riftburn"), TEXT("Riftburn"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::DamageOverTime, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 12.0f, 130.0f, 100.0f,
+            EBreakerBuildCondition::Always, EBreakerItemRarity::Aberrant, TEXT("Downside.Riftburn")));
+
+        // TERMINAL VELOCITY. The airborne conditional at roughly double its
+        // ordinary band — the over-commit line for the Freefall family.
+        // O2 PLACEHOLDER: 12% -> 110% Increased damage while Airborne.
+        Pool.Add(MakeAffix(TEXT("Aberrant.TerminalVelocity"), TEXT("Terminal Velocity"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirborneDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 12.0f, 110.0f, 100.0f,
+            EBreakerBuildCondition::Airborne, EBreakerItemRarity::Aberrant));
+
+        // BALLAST. The condition-FLIPPED one: unconditional-sized damage that
+        // pays only while GROUNDED, in a game that rewards never being. The
+        // tension is the movement pillar itself.
+        // O2 PLACEHOLDER: 8% -> 80% Increased damage while Grounded.
+        Pool.Add(MakeAffix(TEXT("Aberrant.Ballast"), TEXT("Ballast"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Gloves}, 8.0f, 80.0f, 100.0f,
+            EBreakerBuildCondition::Grounded, EBreakerItemRarity::Aberrant));
+
+        // OVERWOUND RECEIVER. Double the Fire Rate band, billed as a constant
+        // flat cut to Critical Chance — the spray gun that cannot aim.
+        // O2 PLACEHOLDER: 5% -> 48% Increased fire rate; bill is -3 flat crit
+        // chance, constant (Downside.Overwound).
+        Pool.Add(MakeAffix(TEXT("Aberrant.Overwound"), TEXT("Overwound Receiver"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::FireRate, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 5.0f, 48.0f, 100.0f,
+            EBreakerBuildCondition::Always, EBreakerItemRarity::Aberrant, TEXT("Downside.Overwound")));
+
+        // REDLINE CHORUS. The Momentum spike, doubled. Swift-only by
+        // construction exactly as Offense.RedlineDamage already is; a rarity
+        // whose identity is build-benders is allowed a class-shaped line.
+        // O2 PLACEHOLDER: 10% -> 100% Increased damage at Redline.
+        Pool.Add(MakeAffix(TEXT("Aberrant.RedlineChorus"), TEXT("Redline Chorus"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RedlineDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Primary}, 10.0f, 100.0f, 100.0f,
+            EBreakerBuildCondition::Redline, EBreakerItemRarity::Aberrant));
+
+        // FAILSAFE OVERRIDE. Pays only below the low-vital line (35%). The
+        // biggest Increased band on the rarity because it is live precisely
+        // when the player is 4-5 seconds from death (O18's TTD prices it).
+        // O2 PLACEHOLDER: 15% -> 120% Increased damage while health is low.
+        Pool.Add(MakeAffix(TEXT("Aberrant.Failsafe"), TEXT("Failsafe Override"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Necklace}, 15.0f, 120.0f, 90.0f,
+            EBreakerBuildCondition::HealthLow, EBreakerItemRarity::Aberrant));
+
+        // DEADSTILL PROTOCOL. The other movement flip: crit damage for the
+        // Breaker who plants and holds still — the marksman fantasy the
+        // Stationary condition exists for.
+        // O2 PLACEHOLDER: +15 -> +95 flat Critical Damage while Stationary.
+        Pool.Add(MakeAffix(TEXT("Aberrant.Deadstill"), TEXT("Deadstill Protocol"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::CriticalDamage, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Primary}, 15.0f, 95.0f, 100.0f,
+            EBreakerBuildCondition::Stationary, EBreakerItemRarity::Aberrant));
+
+        // BREAKER'S TITHE. The clean one: no condition, no bill, just sustain
+        // at 2.4x the ordinary ceiling, so the pool is not ALL knives.
+        // O2 PLACEHOLDER: 20 -> 220 health per kill.
+        Pool.Add(MakeAffix(TEXT("Aberrant.Tithe"), TEXT("Breaker's Tithe"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::LifeOnKill, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary, EBreakerEquipSlot::Boots}, 20.0f, 220.0f, 90.0f,
+            EBreakerBuildCondition::Always, EBreakerItemRarity::Aberrant));
+
+        return Pool;
+    }
+
+    // -----------------------------------------------------------------------
+    // THE ANOMALOUS POOL — the "very special" signature lines.
+    // -----------------------------------------------------------------------
+    // One per drop, sitting BESIDE the rule rewrite rather than replacing it:
+    // an Anomalous is now a rule plus a signature line plus its ordinary rolls.
+    // Stronger than the Aberrant pool tier for tier, and a separate pool so
+    // neither rarity is a subset of the other.
+    TArray<FBreakerAffixDefinition> BreakerBuildAnomalousAffixPool()
+    {
+        TArray<FBreakerAffixDefinition> Pool;
+
+        // EVENT HORIZON. The apex airborne line — more than triple the
+        // ordinary conditional's ceiling. The item the Deadfall wearer dreams
+        // about and the Unbound wearer retires on.
+        // O2 PLACEHOLDER: 25% -> 170% Increased damage while Airborne.
+        Pool.Add(MakeAffix(TEXT("Anomaly.EventHorizon"), TEXT("Event Horizon"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AirborneDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 25.0f, 170.0f, 100.0f,
+            EBreakerBuildCondition::Airborne, EBreakerItemRarity::Anomalous));
+
+        // PHASE SHEAR. The dash window as a rotation: three seconds of triple
+        // the ordinary dash conditional, every dash.
+        // O2 PLACEHOLDER: 20% -> 150% Increased damage after dashing.
+        Pool.Add(MakeAffix(TEXT("Anomaly.PhaseShear"), TEXT("Phase Shear"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RecentlyDashedDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Secondary}, 20.0f, 150.0f, 100.0f,
+            EBreakerBuildCondition::RecentlyDashed, EBreakerItemRarity::Anomalous));
+
+        // ENTROPY DEBT. Pays only while the class resource is at or below
+        // ZERO — dead weight on a full tank, monstrous on a Caster running
+        // Overcast into negative Mana. The most condition-flipped line in the
+        // game, and it costs nothing to author because ResourceDepleted is
+        // already self-evaluable.
+        // O2 PLACEHOLDER: 30% -> 200% Increased damage while resource is empty.
+        Pool.Add(MakeAffix(TEXT("Anomaly.EntropyDebt"), TEXT("Entropy Debt"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist}, 30.0f, 200.0f, 80.0f,
+            EBreakerBuildCondition::ResourceDepleted, EBreakerItemRarity::Anomalous));
+
+        // SINGULARITY FEED. The resource engine: every kill pays roughly
+        // triple the ordinary on-kill line, which is a whole cast for a Caster
+        // and a Redline extension for a Swift.
+        // O2 PLACEHOLDER: 8 -> 70 class resource per kill.
+        Pool.Add(MakeAffix(TEXT("Anomaly.SingularityFeed"), TEXT("Singularity Feed"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::ResourceOnKill, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Boots}, 8.0f, 70.0f, 100.0f,
+            EBreakerBuildCondition::Always, EBreakerItemRarity::Anomalous));
+
+        // RIFTPLATE. The survivability signature: over five times the ordinary
+        // armour ceiling, billed as a constant cut to Movement Speed — plating
+        // cut from the far side of a rift does not care what you wanted.
+        // O2 PLACEHOLDER: 30 -> 400 flat Armour; bill is -10% Increased
+        // Movement Speed, constant (Downside.Riftplate).
+        Pool.Add(MakeAffix(TEXT("Anomaly.Riftplate"), TEXT("Riftplate"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::Armour, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 30.0f, 400.0f, 100.0f,
+            EBreakerBuildCondition::Always, EBreakerItemRarity::Anomalous, TEXT("Downside.Riftplate")));
+
+        return Pool;
+    }
+
+    // -----------------------------------------------------------------------
+    // THE BILLS — companion downsides, never drawn on their own.
+    // -----------------------------------------------------------------------
+    // Constant negative rolls in ORDINARY buckets, following the precedent
+    // Deadfall's Air Control bill set: a downside is an ordinary negative line
+    // in the same additive lane everything else bids in, never a sub-1.0 More.
+    // Authored with equal anchors so the bill does not scale with tier — the
+    // deal is "this much, always", which is the only version a player can
+    // price. (ValueForTier's degenerate-band branch makes an equal-anchor
+    // definition constant across the normal tiers; the roll pipeline adds
+    // these at the carrier's tier, which item level caps at T1, so the spike
+    // tiers never touch them on a drop.)
+    //
+    // AllSlots on every entry: a bill must be legal wherever its carrier is,
+    // and a carrier's slot list can be retuned without the bill silently
+    // becoming an illegal line.
+    TArray<FBreakerAffixDefinition> BreakerBuildSpecialDownsidePool()
+    {
+        const std::initializer_list<EBreakerEquipSlot> AllSlots =
+        {
+            EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves,
+            EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Waist,
+            EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary
+        };
+
+        TArray<FBreakerAffixDefinition> Pool;
+        // Riftburn's bill: direct hits pay for the burn.
+        // O2 PLACEHOLDER: -12% Increased Weapon Damage, constant.
+        Pool.Add(MakeAffix(TEXT("Downside.Riftburn"), TEXT("Unstable Combustion"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent,
+            AllSlots, -12.0f, -12.0f, 1.0f, EBreakerBuildCondition::Always, EBreakerItemRarity::Aberrant));
+        // Overwound's bill: the spray gun cannot aim.
+        // O2 PLACEHOLDER: -3 flat Critical Chance, constant.
+        Pool.Add(MakeAffix(TEXT("Downside.Overwound"), TEXT("Thrown Pattern"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::CriticalChance, EBreakerStatBucket::Flat,
+            AllSlots, -3.0f, -3.0f, 1.0f, EBreakerBuildCondition::Always, EBreakerItemRarity::Aberrant));
+        // Riftplate's bill: mass is mass.
+        // O2 PLACEHOLDER: -10% Increased Movement Speed, constant.
+        Pool.Add(MakeAffix(TEXT("Downside.Riftplate"), TEXT("Dead Mass"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::MoveSpeed, EBreakerStatBucket::IncreasedPercent,
+            AllSlots, -10.0f, -10.0f, 1.0f, EBreakerBuildCondition::Always, EBreakerItemRarity::Anomalous));
+        return Pool;
+    }
 }
 
 const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetSliceAffixPool()
 {
     static const TArray<FBreakerAffixDefinition> Pool = BuildSliceAffixPool();
+    return Pool;
+}
+
+const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetAberrantAffixPool()
+{
+    static const TArray<FBreakerAffixDefinition> Pool = BreakerBuildAberrantAffixPool();
+    return Pool;
+}
+
+const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetAnomalousAffixPool()
+{
+    static const TArray<FBreakerAffixDefinition> Pool = BreakerBuildAnomalousAffixPool();
+    return Pool;
+}
+
+const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetSpecialDownsidePool()
+{
+    static const TArray<FBreakerAffixDefinition> Pool = BreakerBuildSpecialDownsidePool();
     return Pool;
 }
 
@@ -325,7 +538,18 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
 
 const FBreakerAffixDefinition* UBreakerAffixLibrary::FindAffix(const TArray<FBreakerAffixDefinition>& Pool, FName AffixId)
 {
-    return Pool.FindByPredicate([AffixId](const FBreakerAffixDefinition& Affix) { return Affix.AffixId == AffixId; });
+    auto ById = [AffixId](const FBreakerAffixDefinition& Affix) { return Affix.AffixId == AffixId; };
+    if (const FBreakerAffixDefinition* Found = Pool.FindByPredicate(ById)) return Found;
+    // The special-pool fallback. Aggregation, comparison rows, tooltips and the
+    // Forge all resolve rolled ids through this function with the SLICE pool as
+    // the argument; a special line on an Aberrant/Anomalous item must resolve
+    // there or it would aggregate to nothing — a line that lies. Falling back
+    // here (instead of merging the pools) is what keeps the special entries out
+    // of every generic candidate walk, so they can never be OFFERED below their
+    // rarity while still always being READ.
+    if (const FBreakerAffixDefinition* Found = GetAberrantAffixPool().FindByPredicate(ById)) return Found;
+    if (const FBreakerAffixDefinition* Found = GetAnomalousAffixPool().FindByPredicate(ById)) return Found;
+    return GetSpecialDownsidePool().FindByPredicate(ById);
 }
 
 // ---------------------------------------------------------------------------

@@ -79,7 +79,18 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     // SOMEONE in a way the Vestiges do not, and in graybox that is silhouette.
     ShieldVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldVisual"));
     ShieldVisual->SetupAttachment(BodyCollision);
-    ShieldVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    // The shield the player SEES is the shield the game SIMULATES. This was
+    // NoCollision, so the rectangular slab occupying X 47..57, Y +-47,
+    // Z -47..87 stopped nothing — a round aimed square at it sailed through
+    // to whatever was behind, which read as broken hit recognition. It now
+    // blocks the player weapon trace channel exactly the way BodyHitBox does
+    // (ignore everything, block ECC_GameTraceChannel2, query only): a shot
+    // into the shield face registers as a frontal hit on the Warden and pays
+    // the frontal armour, which is the archetype's whole lesson. QueryOnly so
+    // it never pushes physics; movement and enemy projectiles are untouched.
+    ShieldVisual->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    ShieldVisual->SetCollisionResponseToAllChannels(ECR_Ignore);
+    ShieldVisual->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
     ShieldVisual->SetRelativeLocation(FVector(52.0f, 0.0f, 20.0f));
     ShieldVisual->SetRelativeScale3D(FVector(0.10f, 0.95f, 1.35f));
     if (CubeMesh.Succeeded()) ShieldVisual->SetStaticMesh(CubeMesh.Object);
@@ -130,7 +141,16 @@ float ABreakerWardenEnemy::GetSlamDamage() const
 void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
 {
     Super::SetBodyVisible(bVisible);
-    if (ShieldVisual) ShieldVisual->SetVisibility(bVisible, true);
+    if (ShieldVisual)
+    {
+        ShieldVisual->SetVisibility(bVisible, true);
+        // Collision tracks visibility: every path that hides the body (death,
+        // Wakeful downed, a Phase modifier's untargetable window) also stops
+        // the shield blocking, and every path that shows it re-arms it. An
+        // invisible slab that still ate bullets would be the same lie this
+        // component just stopped telling, mirrored.
+        ShieldVisual->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+    }
     // The ring is driven by the slam and must never be left on by a death or a
     // respawn, so it goes away regardless of which way bVisible points.
     if (SlamRingVisual) SlamRingVisual->SetVisibility(false, true);

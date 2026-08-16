@@ -232,6 +232,22 @@ EBreakerForgeResult UBreakerForgeLibrary::Attune(FBreakerItemInstance& Item, FBr
             Locked.Add(AffixId);
         }
     }
+    // A special line is locked for the same reason a legendary signature is:
+    // it IS the rarity's identity, and the candidate walk below iterates the
+    // slice pool, so an attune could only ever reroll a special line INTO an
+    // ordinary one — a strictly destructive outcome the player cannot see
+    // coming. The bill rides its carrier: attuning away the downside while
+    // keeping the payoff would make Attune a downside-remover, which is a
+    // different (unruled) verb.
+    for (const FBreakerRolledAffix& Existing : Item.Affixes)
+    {
+        const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, Existing.AffixId);
+        if (Definition && Definition->IsSpecial())
+        {
+            Locked.Add(Existing.AffixId);
+            if (!Definition->PairedAffixId.IsNone()) Locked.Add(Definition->PairedAffixId);
+        }
+    }
 
     // Tiers are preserved position by position, so attuning is a question about
     // WHICH lines and never about how good they are. Two verbs that both moved

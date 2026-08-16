@@ -175,6 +175,11 @@ void ABreakerProjectileBase::ResolveImpact(AActor* HitActor, const FVector& Loca
         // Source position feeds the target's frontal defensive checks.
         Applied.SourceLocation = Location;
         Applied.bHasSourceLocation = true;
+        // The projectile resolved at a real point in the world; that point is
+        // also where the hit LANDED, so the HUD number draws there rather than
+        // at the target's pivot.
+        Applied.ImpactLocation = Location;
+        Applied.bHasImpactLocation = true;
         // Fall back to the spawn instigator so a projectile armed without one
         // still credits its shooter — kill credit, Mana generation and every
         // on-hit affix hang off this.

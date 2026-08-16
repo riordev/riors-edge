@@ -52,7 +52,17 @@ enum class EBreakerMenuScreen : uint8
     // APPENDED at the end of the enum on purpose. The values are logged by
     // Rebuild and mapped from a capture string in Characters/, so inserting in
     // the middle would renumber every screen above it for no gain.
-    Travel
+    Travel,
+    // The breakpoint sandbox, and it is DEV TOOLING, said in its own name.
+    // Owner: "a way for me as a player/dev to test different breakpoints and
+    // strength throughout the progression of the game". It is a peer screen
+    // rather than a mode of Settings because everything on it acts on the
+    // CHARACTER and the WORLD (level, area level, class, gear), not on the
+    // player's preferences — and because it is plumbing to existing dev calls
+    // (AwardExperience, DevForceClass, GrantPlaytestPoints, seeded RollItem),
+    // never a place where new game rules live. Appended last, same rule as
+    // Travel above.
+    DevSandbox
 };
 
 // ---------------------------------------------------------------------------
@@ -402,6 +412,11 @@ private:
     TSharedRef<SWidget> BuildDialogueScreen();
     // The Anchor's navigation screen: one card per available destination.
     TSharedRef<SWidget> BuildTravelScreen();
+    // The breakpoint sandbox (see the enum note on DevSandbox). Reached from
+    // the pause menu behind an explicit DEV label; also the reachable home of
+    // the DEV MODE class-swap checkbox that used to live only on the
+    // unreachable class-select screen.
+    TSharedRef<SWidget> BuildDevSandboxScreen();
     // Reach: Items/BreakerForgeLibrary.h's three crafting verbs plus salvage,
     // wired to a wallet readout. See the FORGE tab note on EBreakerMenuScreen.
     TSharedRef<SWidget> BuildForgeScreen();
@@ -593,6 +608,23 @@ private:
     FName SkillExpandedConstellation = NAME_None;
     EBreakerMenuScreen PendingScreen = EBreakerMenuScreen::Main;
     bool bRebuildScheduled = false;
+    // ---- Breakpoint sandbox state ----------------------------------------
+    // The level the slider is parked on. 0 means "not moved yet", which reads
+    // as the character's current level — so opening the screen and pressing
+    // SET LEVEL is a no-op rather than a surprise jump to 1.
+    int32 DevTargetLevel = 0;
+    // The seed field's text, stored WITHOUT rebuilding on each keystroke for
+    // the same reason the create screen's name field does it: a rebuild would
+    // destroy the text box mid-word and take focus with it. Empty means "roll
+    // me a fresh seed".
+    FString DevSeedString;
+    // Rarity and slot the next GRANT uses. Slot -1 means "draw the slot from
+    // the seed through RollDropSlot", i.e. exactly what a real kill does.
+    EBreakerItemRarity DevGrantRarity = EBreakerItemRarity::Exceptional;
+    int32 DevGrantSlot = -1;
+    // Result line echoed under the sandbox controls; cleared on leaving the
+    // screen, same rule as TravelStatus.
+    FText DevSandboxStatus;
     // Forge tab: which held item (equipped or backpack, found by id in either
     // container on every rebuild) the three verbs and salvage act on, and the
     // result line echoed under them. Invalid/consumed ids just resolve to "no

@@ -689,8 +689,30 @@ void ABreakerCharacter::StopAim()
     OnAimInput(false);
 }
 
+namespace
+{
+    // HOLSTERED CARRY (the Anchor). The rig drops out of the eyeline and
+    // pitches down — the social-space read the owner asked for ("gun should
+    // be lowered in the anchor") — expressed as offsets from each archetype's
+    // OWN hip pose rather than as an authored pose per archetype, for the
+    // same anti-rot reason the ADS pose is derived. Prefixed for the unity
+    // build like every other file-scope name in Combat/ and Characters/.
+    constexpr float BreakerHolsterDropCm = 24.0f;       // O2 PLACEHOLDER
+    constexpr float BreakerHolsterPullBackCm = 10.0f;   // O2 PLACEHOLDER
+    constexpr float BreakerHolsterPitchDegrees = -35.0f; // O2 PLACEHOLDER
+    constexpr float BreakerHolsterYawDegrees = 10.0f;   // O2 PLACEHOLDER
+}
+
 FVector ABreakerCharacter::GetWeaponRestLocation() const
 {
+    // Holstered wins over everything, including a stale ADS flag: an Anchor
+    // pawn is holstered for its whole life and its rig must never present a
+    // ready pose. Location-only here; the matching pitch-down lives in
+    // UpdateViewmodelKick, which owns the rig's rotation.
+    if (bWeaponsHolstered)
+    {
+        return ActiveLayout.HipOffsetCm + FVector(-BreakerHolsterPullBackCm, 0.0f, -BreakerHolsterDropCm);
+    }
     // ADS is DERIVED, not authored: the rig comes forward and drops by exactly
     // this weapon's sight height, which puts its own sight on the crosshair.
     // Authoring the aimed pose per archetype was the alternative and it rots —
@@ -711,7 +733,17 @@ void ABreakerCharacter::UpdateViewmodelKick()
     if (!PrototypeWeaponVisual) return;
     const FVector Rest = GetWeaponRestLocation();
     const FVector Offset = Weapon ? Weapon->GetViewmodelLocationOffset() : FVector::ZeroVector;
-    const FRotator Rotation = Weapon ? Weapon->GetViewmodelRotationOffset() : FRotator::ZeroRotator;
+    FRotator Rotation = Weapon ? Weapon->GetViewmodelRotationOffset() : FRotator::ZeroRotator;
+    // Holstered: the muzzle pitches down and eases slightly across the body,
+    // finishing what the dropped rest location starts — lowered and out of
+    // the eyeline for the whole life of an Anchor pawn. Composed onto the
+    // spring's rotation rather than replacing it, though holstered pawns
+    // cannot fire so the spring is at rest anyway.
+    if (bWeaponsHolstered)
+    {
+        Rotation.Pitch += BreakerHolsterPitchDegrees;
+        Rotation.Yaw += BreakerHolsterYawDegrees;
+    }
     PrototypeWeaponVisual->SetRelativeLocation(Rest + Offset);
     PrototypeWeaponVisual->SetRelativeRotation(Rotation);
 
@@ -1143,6 +1175,7 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     // cannot avoid.
     else if (Wanted == TEXT("CHARACTERSELECT") || Wanted == TEXT("CHARACTERS")) Screen = EBreakerMenuScreen::CharacterSelect;
     else if (Wanted == TEXT("CHARACTERCREATE") || Wanted == TEXT("CREATE")) Screen = EBreakerMenuScreen::CharacterCreate;
+    else if (Wanted == TEXT("DEVSANDBOX") || Wanted == TEXT("SANDBOX")) Screen = EBreakerMenuScreen::DevSandbox;
 
     MenuWidget->ShowScreenForCapture(Screen);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] menu screen '%s'"), *Wanted);

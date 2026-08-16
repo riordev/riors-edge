@@ -21,6 +21,15 @@ struct RIORSEDGE_API FBreakerActiveStatus
     // Who applied this status. Weak: a DoT outliving its applier keeps
     // ticking, it just stops crediting anyone.
     UPROPERTY(BlueprintReadOnly) TWeakObjectPtr<AActor> Instigator = nullptr;
+    // WHERE the applier stood when the status landed, snapshotted at
+    // application exactly like the offensive stats in Spec.Snapshot. Every
+    // tick's damage request carries this as its source location so the
+    // facing-armour step judges the tick from the angle the wound was
+    // inflicted at — without it MakeSnapshotDotTick set no source location,
+    // the combat component skipped the facing multiplier entirely, and a
+    // Bleed applied to a Warden's exposed back ate the frontal mitigation.
+    UPROPERTY(BlueprintReadOnly) FVector SourceLocationSnapshot = FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly) bool bHasSourceLocationSnapshot = false;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerStatusEvent, const FBreakerActiveStatus&, Status);

@@ -44,7 +44,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat|Status")
     // Instigator is the actor that applied the status; it is carried weakly on
     // the tick request so attacker-side hit events fire for DoT damage too.
-    static FBreakerDamageRequest MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator);
+    // SourceLocation/bHasSourceLocation are the APPLICATION-TIME source
+    // position (snapshotted by the status component when the status landed),
+    // so every tick answers the facing-armour check the same way the applying
+    // hit did — a Bleed put into a Warden's exposed back keeps reading as a
+    // rear hit instead of silently re-acquiring the frontal mitigation.
+    static FBreakerDamageRequest MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator,
+        const FVector& SourceLocation, bool bHasSourceLocation);
 
     // The healing half of the contract, pure and world-free for exactly the
     // reason ResolveDamage is: the arithmetic of "how much of this heal lands,

@@ -174,6 +174,10 @@ void ABreakerRocketProjectile::Explode(const FVector& Location)
         AreaDamage.bWeakPointHit = false;
         AreaDamage.SourceLocation = Location;
         AreaDamage.bHasSourceLocation = true;
+        // The rocket landed HERE; every number the blast produces draws at the
+        // explosion point rather than at each victim's pivot.
+        AreaDamage.ImpactLocation = Location;
+        AreaDamage.bHasImpactLocation = true;
         AreaDamage.RandomSeed = HashCombine(Damage.RandomSeed, GetTypeHash(Candidate));
         // The firing request normally already carries the shooter; fall back to
         // the spawn instigator so a rocket fired without one still credits.

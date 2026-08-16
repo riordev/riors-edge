@@ -41,6 +41,15 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // and hazards without a position keep working.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FVector SourceLocation = FVector::ZeroVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceLocation = false;
+    // Where the hit LANDED — the trace or projectile impact point, distinct
+    // from SourceLocation (where it came FROM; a rifle's SourceLocation is the
+    // shooter, its ImpactLocation is the wound). Presentation only: the hit
+    // context's WorldLocation prefers this so a damage number draws where the
+    // shot landed instead of at the victim's pivot. Optional — paths without a
+    // real impact (DoT ticks, hazards, tests) leave it unset and the dispatch
+    // falls back to the victim's own location.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FVector ImpactLocation = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasImpactLocation = false;
     // Who dealt this damage. Weak so a request outliving its dealer (a rocket
     // in flight, a DoT ticking after the shooter died) never keeps the actor
     // alive and never dereferences a stale pointer. Optional: hazards and
@@ -77,6 +86,14 @@ struct RIORSEDGE_API FBreakerDamageResult
     UPROPERTY(BlueprintReadOnly) float MitigatedDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ShieldDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float HealthDamage = 0.0f;
+    // The part of the hit that exceeded the target's remaining health.
+    // HealthDamage stays clamped — it is what was actually APPLIED and every
+    // vitals write depends on that — but a killing blow's true size is
+    // HealthDamage + OverkillDamage, and the HUD displays that sum so a
+    // 900-damage rocket on a 30 HP target reads as 900, not 30. The owner uses
+    // damage numbers for TTK/balance reading; a number clamped to the corpse's
+    // last sliver of health under-reports every killing blow.
+    UPROPERTY(BlueprintReadOnly) float OverkillDamage = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RemainingShield = 0.0f;
     UPROPERTY(BlueprintReadOnly) float RemainingHealth = 0.0f;
     UPROPERTY(BlueprintReadOnly) bool bCritical = false;

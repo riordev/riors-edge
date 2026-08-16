@@ -173,6 +173,32 @@ public:
     // Docs/Item-Foundation.md.
     static const TArray<FBreakerAffixDefinition>& GetSliceAffixPool();
 
+    // ---- The high-rarity identity pools (O11's reserved seat) --------------
+    // Aberrant's "1-2 unique modifier affixes", finally landed: build-bender
+    // lines built ONLY from channels the aggregation already consumes (the
+    // existing stat targets and the self-evaluable build conditions), at
+    // magnitudes roughly double the ordinary pool's ceiling, several of them
+    // condition-FLIPPED (Grounded, Stationary, Health-low, Resource-depleted)
+    // so they pay the player the ordinary pool ignores. They are drawn by a
+    // dedicated step in UBreakerLootLibrary::RollItemInternal, never by the
+    // generic affix loop — which is why they live in their own array instead of
+    // the slice pool. Exclusive to Aberrant: Anomalous has its own, stronger
+    // pool below, so each high rarity keeps its own identity rather than the
+    // higher one being "the lower one plus more".
+    static const TArray<FBreakerAffixDefinition>& GetAberrantAffixPool();
+
+    // Anomalous' signature lines: rarer, stronger, exactly one per drop, and
+    // they sit BESIDE the rule rewrite (the rule roll is untouched — every
+    // Anomalous still carries a rule, and the legendary chance is drawn before
+    // this line exists in the stream).
+    static const TArray<FBreakerAffixDefinition>& GetAnomalousAffixPool();
+
+    // The companion downsides some special affixes carry (PairedAffixId).
+    // Never drawable: no roll loop iterates this array. Constant negative
+    // values in ordinary buckets — see the field's comment on
+    // FBreakerAffixDefinition.
+    static const TArray<FBreakerAffixDefinition>& GetSpecialDownsidePool();
+
     // ---- Per-archetype affix leans ----------------------------------------
     // Owner's instruction, verbatim: "make sure certain guns have certain
     // leans towards affixes -- like smg fire rate, lmg damage, sidearm slide
@@ -199,5 +225,13 @@ public:
     // structurally incapable of raising damage; the UI can use it to group.
     static bool IsOffensiveTarget(EBreakerStatTarget Target);
 
+    // Resolves an affix id against the given pool FIRST, then falls back to the
+    // special pools (Aberrant, Anomalous, downsides). The fallback is what lets
+    // every existing definition lookup — aggregation, the comparison rows, the
+    // Forge's temper/reforge, the tooltip — resolve a special line without any
+    // of those call sites changing, while the special definitions stay OUT of
+    // the slice pool so no generic candidate walk can offer them below their
+    // rarity. A special line that aggregated to nothing would be a line that
+    // lies, which is this project's named cardinal failure.
     static const FBreakerAffixDefinition* FindAffix(const TArray<FBreakerAffixDefinition>& Pool, FName AffixId);
 };

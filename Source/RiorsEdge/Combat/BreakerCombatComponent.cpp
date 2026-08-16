@@ -116,7 +116,15 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.bFromDoT = Request.bIsDamageOverTime;
     Context.bWeakPoint = Result.bWeakPoint;
     Context.DamageFamily = Request.DamageFamily;
-    Context.WorldLocation = GetOwner() ? GetOwner()->GetActorLocation() : Request.SourceLocation;
+    // The IMPACT point when the request carries one (weapons trace real hits,
+    // projectiles resolve at a real location), so the HUD's floating number
+    // draws where the shot landed. The victim's pivot is only the FALLBACK for
+    // paths with no impact of their own (DoT ticks, hazards) — before this,
+    // every number drew at the pivot and the owner read it as bad hit
+    // recognition on spells and effects.
+    Context.WorldLocation = Request.bHasImpactLocation
+        ? Request.ImpactLocation
+        : (GetOwner() ? GetOwner()->GetActorLocation() : Request.SourceLocation);
 
     // Victim side first, and unconditionally: a hit with no instigator at all
     // (an environmental hazard, a test) is still a hit the victim took, and the

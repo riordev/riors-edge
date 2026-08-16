@@ -96,15 +96,29 @@ FBreakerDamageResult UBreakerDamageLibrary::ResolveDamage(const FBreakerDamageRe
     }
 
     Result.HealthDamage = FMath::Min(Result.RemainingHealth, RemainingDamage);
+    // What the clamp discarded. Applied damage stays clamped — the vitals write
+    // depends on it — but the DISPLAY of a killing blow must not be, so the
+    // overkill travels alongside rather than replacing it.
+    Result.OverkillDamage = FMath::Max(0.0f, RemainingDamage - Result.HealthDamage);
     Result.RemainingHealth -= Result.HealthDamage;
     Result.bKilled = Result.HealthDamage > 0.0f && Result.RemainingHealth <= 0.0f;
     return Result;
 }
 
-FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator)
+FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerStatusApplicationSpec& StatusSpec, EBreakerDamageFamily DamageFamily, int32 TickIndex, AActor* Instigator,
+    const FVector& SourceLocation, bool bHasSourceLocation)
 {
     FBreakerDamageRequest Request;
     Request.SetInstigator(Instigator);
+    // Application-time source position, snapshotted like every other offensive
+    // stat on the DoT contract. Without it a tick carries no source location,
+    // BreakerCombatComponent skips the facing-armour step, and a Bleed applied
+    // to a Warden's exposed BACK quietly eats the full frontal mitigation on
+    // every tick — the facing rule said the flank mattered and the DoT said it
+    // did not. Snapshotted rather than re-read per tick, matching the DoT
+    // snapshot rule: the arc is judged where the wound was inflicted.
+    Request.SourceLocation = SourceLocation;
+    Request.bHasSourceLocation = bHasSourceLocation;
     Request.BaseDamage = StatusSpec.BaseDamagePerTick * FMath::Max(1, StatusSpec.InitialStacks);
     Request.DamageFamily = DamageFamily;
     Request.DamageTypeTag = StatusSpec.StatusTag;

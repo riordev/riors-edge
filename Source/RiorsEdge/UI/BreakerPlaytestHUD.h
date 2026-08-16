@@ -111,6 +111,17 @@ private:
     // which DrawEnemyHealthBars has already filled from the one enemy
     // iteration the HUD was making anyway, and allocates nothing per frame.
     void DrawMinimap(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
+    // Compact quest panel directly below the minimap, on EVERY map: the active
+    // quest's name and, by state, either a directive line (Offered / ready to
+    // turn in) or its objectives with live counters. Reads the pawn's
+    // UBreakerQuestJournal through the pure quest-library helpers, so it can
+    // never disagree with the dialogue system about a quest's state.
+    void DrawQuestTracker(const ABreakerCharacter* Character, float X, float Y, float Width);
+    // Top-left playtest chrome: key legend, the F3 diagnostics plate, world
+    // diagnostic labels, and the report-copied toast. Factored out because the
+    // Anchor's trimmed HUD keeps exactly this block and nothing else of the
+    // combat chrome.
+    void DrawPlaytestInstrumentation(const ABreakerCharacter* Character, const FVector2D& Center);
     // Rounds in flight are no longer drawn here at all. The HUD records the
     // shot and hands it to a world-space pooled renderer, spawned lazily on
     // the first shot and never replicated; see BreakerTracerRenderer.h.

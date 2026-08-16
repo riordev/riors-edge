@@ -1316,6 +1316,10 @@ bool UBreakerWeaponComponent::FireOnce()
             Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
             Damage.SourceLocation = GetOwner()->GetActorLocation();
             Damage.bHasSourceLocation = true;
+            // The traced impact point, so the damage number draws where this
+            // pellet actually landed instead of at the enemy's pivot.
+            Damage.ImpactLocation = Hit.ImpactPoint;
+            Damage.bHasImpactLocation = true;
             Damage.SetInstigator(GetOwner());
             // Outgoing modifiers compose on the shooter's own component before
             // the request leaves the weapon.

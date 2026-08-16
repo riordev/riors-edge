@@ -21,7 +21,12 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Interaction/BreakerNPC.h"
+#include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+// Quest tracker: definitions and the pure state helpers (read-only — the HUD
+// derives, never writes). The journal type itself comes through
+// BreakerQuestContent.h's own include.
+#include "Save/BreakerQuestContent.h"
 #include "EngineUtils.h"
 #include "AbilitySystemComponent.h"
 #include "Items/BreakerItemTypes.h"
@@ -229,10 +234,43 @@ void ABreakerPlaytestHUD::DrawHUD()
     // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
 
+    // --- ANCHOR TRIM (owner ask, tonight) ---------------------------------
+    // The Anchor is a social space: weapons are holstered for the pawn's whole
+    // life and there is nothing to shoot, so the combat chrome is not merely
+    // idle there — it is a lie about what the place is for. Drawn instead:
+    // the minimap, the quest tracker beneath it, the XP rail with its level
+    // readout (and the level-up banner, which is the same readout's earned
+    // moment), the NPC talk prompt (the Anchor's one verb), and the playtest
+    // instrumentation with its working F3 diagnostics toggle. Everything else
+    // — health/shield, class resource, ammo, crosshair, wave banner, damage
+    // numbers, enemy bars, every combat readout — is deliberately absent.
+    if (UBreakerGameInstance::IsAnchorMap(this))
+    {
+        // No enemy pass runs here, so the blip array is cleared by hand: the
+        // minimap consumes whatever the last combat frame left in it.
+        EnemyBlips.Reset();
+        const float TrackerX = Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudQuestTrackerWidth);
+        DrawMinimap(Character,
+            Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudMinimapWidth),
+            S(BreakerUI::HudSafeMargin),
+            S(BreakerUI::HudMinimapWidth), S(BreakerUI::HudMinimapHeight));
+        DrawQuestTracker(Character, TrackerX,
+            S(BreakerUI::HudSafeMargin) + S(BreakerUI::HudMinimapHeight) + S(BreakerUI::HudQuestTrackerGap),
+            S(BreakerUI::HudQuestTrackerWidth));
+        DrawExperienceRail(Character);
+        DrawLevelUpBanner(Center);
+        if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
+        {
+            DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
+                Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+        }
+        DrawPlaytestInstrumentation(Character, Center);
+        return;
+    }
+
     TickCapturePreview(Character);
 
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();
-    const UBreakerPlaytestComponent* Playtest = Character->GetPlaytest();
     const bool bRecentShot = Weapon && Weapon->GetSecondsSinceLastShot() < 0.14f;
     const FBreakerShotResult* Shot = Weapon ? &Weapon->GetLastShot() : nullptr;
 
@@ -333,6 +371,14 @@ void ABreakerPlaytestHUD::DrawHUD()
         Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudMinimapWidth),
         S(BreakerUI::HudSafeMargin),
         S(BreakerUI::HudMinimapWidth), S(BreakerUI::HudMinimapHeight));
+    // The quest tracker rides directly under the minimap on EVERY map, not
+    // only the Anchor: a contract accepted in camp is worked in the field,
+    // and objectives that vanish the moment the player travels are objectives
+    // the player has to memorise.
+    DrawQuestTracker(Character,
+        Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudQuestTrackerWidth),
+        S(BreakerUI::HudSafeMargin) + S(BreakerUI::HudMinimapHeight) + S(BreakerUI::HudQuestTrackerGap),
+        S(BreakerUI::HudQuestTrackerWidth));
 
     // --- Centre: feedback only, nothing persistent ------------------------
     DrawSkimBurst(Center);
@@ -383,7 +429,20 @@ void ABreakerPlaytestHUD::DrawHUD()
         DrawSpecTextCentered(TEXT("ELITE DOWN"), Center.X, Center.Y - S(118.0f), BreakerUI::Gold, 20.0f, Fade);
     }
 
-    // --- Top-left: playtest instrumentation ------------------------------
+    DrawPlaytestInstrumentation(Character, Center);
+}
+
+// --------------------------------------------------------------------------
+// Top-left playtest instrumentation, shared by the combat HUD and the
+// Anchor's trimmed HUD — which is WHY it is a function: the Anchor keeps
+// exactly this block (key legend, F3 diagnostics, report toast) and nothing
+// else of the chrome, and duplicating it there would fork it.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* Character, const FVector2D& Center)
+{
+    if (!Character) return;
+    const UBreakerPlaytestComponent* Playtest = Character->GetPlaytest();
+
     // Not in the design canvas and never shipping. It still has to obey the
     // system: muted text on its own plate, because unbacked grey text over a
     // bright sky is unreadable — which is exactly how the first pass shipped.
@@ -1006,6 +1065,121 @@ void ABreakerPlaytestHUD::DrawMinimap(const ABreakerCharacter* Character, float 
     // one cell buys.
     DrawSpecText(FString::Printf(TEXT("GRID %.0fM"), BreakerUI::HudMinimapGridCm / 100.0f),
         InnerX + S(BreakerUI::Space8), InnerY + InnerH - S(16.0f), BreakerUI::TextMuted, 11.0f);
+}
+
+// --------------------------------------------------------------------------
+// Quest tracker — a compact panel directly below the minimap, on all maps.
+//
+// DERIVED, never stored: quest state is a pure function of the journal's flag
+// set (Save/BreakerQuestContent.h), so this panel asks ComputeQuestState and
+// the counters and can never disagree with the dialogue system about where a
+// quest stands. Gold rail: a contract is the reward family's system, the same
+// accent its payout already carries.
+//
+// State-aware by design:
+//   Offered       -> "SPEAK TO THE <GIVER>"  (the player has not accepted yet)
+//   Active        -> objectives with live counters ("Thin the spill... 4/5")
+//   ReadyToTurnIn -> "RETURN TO THE <GIVER>"
+// NotOffered and Complete draw nothing — an empty tracker is the truthful
+// state, not a placeholder's.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawQuestTracker(const ABreakerCharacter* Character, float X, float Y, float Width)
+{
+    const UBreakerQuestJournal* Journal = Character ? Character->GetQuestJournal() : nullptr;
+    if (!Journal) return;
+
+    // The first quest that is live in any form is the tracked one. The slice
+    // ships one quest; when the campaign ships more, "first live" is still the
+    // right minimal policy for a panel this size, and a picker can replace it.
+    const FBreakerQuestDefinition* Tracked = nullptr;
+    EBreakerQuestState TrackedState = EBreakerQuestState::NotOffered;
+    for (const FBreakerQuestDefinition& Quest : UBreakerQuestLibrary::GetFallbackQuests())
+    {
+        const EBreakerQuestState State = UBreakerQuestLibrary::ComputeQuestState(Quest, Journal->GetState());
+        if (State == EBreakerQuestState::Offered || State == EBreakerQuestState::Active
+            || State == EBreakerQuestState::ReadyToTurnIn)
+        {
+            Tracked = &Quest;
+            TrackedState = State;
+            break;
+        }
+    }
+    if (!Tracked) return;
+
+    // Content rows resolved BEFORE the plate, so the plate is sized from its
+    // content rather than the content being trusted to fit the plate — the
+    // wave banner's lesson, applied from the start instead of after an audit.
+    struct FTrackerRow
+    {
+        FString Text;
+        FString Counter;    // right-aligned, empty for directive rows
+        FLinearColor Color = BreakerUI::TextSecondary;
+    };
+    TArray<FTrackerRow> Rows;
+    if (TrackedState == EBreakerQuestState::Offered)
+    {
+        Rows.Add({ FString::Printf(TEXT("SPEAK TO THE %s"), *Tracked->Giver.ToUpper()), FString(), BreakerUI::Cyan });
+    }
+    else if (TrackedState == EBreakerQuestState::ReadyToTurnIn)
+    {
+        Rows.Add({ FString::Printf(TEXT("RETURN TO THE %s"), *Tracked->Giver.ToUpper()), FString(), BreakerUI::Gold });
+    }
+    else
+    {
+        for (const FBreakerQuestObjective& Objective : Tracked->Objectives)
+        {
+            FTrackerRow& Row = Rows.AddDefaulted_GetRef();
+            Row.Text = Objective.Text.ToUpper();
+            const bool bComplete = Journal->HasFlag(Objective.CompletionFlag);
+            if (Objective.RequiredCount > 0)
+            {
+                // A completed counted objective reads full whatever the raw
+                // counter says: the FLAG is the truth, the counter is how it
+                // got there.
+                const int32 Count = bComplete ? Objective.RequiredCount
+                    : FMath::Clamp(Journal->GetCounter(Objective.ProgressCounter), 0, Objective.RequiredCount);
+                Row.Counter = FString::Printf(TEXT("%d/%d"), Count, Objective.RequiredCount);
+            }
+            else if (bComplete)
+            {
+                Row.Counter = TEXT("DONE");
+            }
+            // A finished objective recedes rather than disappearing, so the
+            // list keeps saying what the contract was.
+            Row.Color = bComplete ? BreakerUI::TextMuted : BreakerUI::TextSecondary;
+        }
+    }
+
+    const float Pad = S(BreakerUI::HudQuestTrackerPad);
+    const float RowH = S(BreakerUI::HudQuestTrackerRowHeight);
+    const FVector2D TitleSize = MeasureSpecText(Tracked->Title, BreakerUI::HudQuestTitlePixels);
+    const float PlateH = Pad + TitleSize.Y + S(BreakerUI::Space4) + Rows.Num() * RowH + Pad;
+
+    DrawPlate(X, Y, Width, PlateH, BreakerUI::Gold);
+
+    const float InnerX = X + S(BreakerUI::RailThickness) + Pad;
+    const float InnerRight = X + Width - Pad;
+    DrawSpecText(Tracked->Title, InnerX, Y + Pad, BreakerUI::TextPrimary,
+        FitSpecPixels(Tracked->Title, BreakerUI::HudQuestTitlePixels, InnerRight - InnerX, 11.0f));
+
+    float RowY = Y + Pad + TitleSize.Y + S(BreakerUI::Space4);
+    for (const FTrackerRow& Row : Rows)
+    {
+        // The counter column is reserved from the token, not measured per
+        // frame, so the objective text has a stable fit limit; the text is
+        // then FITTED into what is left rather than trusted to be short.
+        const float CounterColumn = Row.Counter.IsEmpty() ? 0.0f : S(BreakerUI::HudQuestCounterColumn);
+        const float TextLimit = (InnerRight - InnerX) - CounterColumn - (CounterColumn > 0.0f ? S(BreakerUI::Space8) : 0.0f);
+        DrawSpecText(Row.Text, InnerX, RowY, Row.Color,
+            FitSpecPixels(Row.Text, BreakerUI::HudQuestLinePixels, TextLimit, 9.0f));
+        if (!Row.Counter.IsEmpty())
+        {
+            DrawSpecTextRight(Row.Counter, InnerRight, RowY,
+                Row.Counter == TEXT("DONE") || Row.Color == BreakerUI::TextMuted ? BreakerUI::TextMuted : BreakerUI::Gold,
+                BreakerUI::HudQuestLinePixels);
+        }
+        RowY += RowH;
+    }
 }
 
 
@@ -1858,8 +2032,14 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 
 void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
 {
+    // OVERKILL-INCLUSIVE, display only. Applied damage is clamped to what the
+    // target could still lose — correct for the vitals write, and a lie as a
+    // number: a 900-damage rocket on a 30 HP enemy printed 30, and the owner
+    // reads these numbers for TTK/balance, so a killing blow under-reporting
+    // by 30x poisons exactly the read they exist for. The clamped value still
+    // drives everything mechanical; only what is PRINTED adds the overkill.
     const float Applied = Hit.Result.ShieldDamage + Hit.Result.HealthDamage;
-    const float Shown = Applied > 0.0f ? Applied : Hit.Result.MitigatedDamage;
+    const float Shown = Applied > 0.0f ? Applied + Hit.Result.OverkillDamage : Hit.Result.MitigatedDamage;
     if (Shown <= 0.0f) return;
 
     const UWorld* World = GetWorld();

@@ -79,4 +79,13 @@ public:
     // Cube and Sphere meshes are both 100 cm across before scale, so a
     // component's half-extent on an axis is 50 * (that axis' scale).
     UFUNCTION(BlueprintPure, Category="Enemy|Altered") bool AreCosmeticExtentsWithinCapsule() const;
+
+    // True when the weak point SPHERE visibly touches at least one cosmetic
+    // primitive (its surface reaches the primitive's axis-aligned box). The
+    // inverse defect is the one this archetype shipped with: a weak point
+    // floating ~4.3 cm clear of the nearest cosmetic corner, a tell hanging
+    // in the air behind the ridge it claims to be part of. Conservative the
+    // same way AreCosmeticExtentsWithinCapsule is — pre-rotation and
+    // axis-aligned — and pinned by the geometry test alongside it.
+    UFUNCTION(BlueprintPure, Category="Enemy|Altered") bool DoesWeakPointTouchCosmetics() const;
 };

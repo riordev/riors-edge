@@ -53,6 +53,42 @@ bool FBreakerStatusStackingTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerStatusSourceLocationSnapshotTest,
+    "RiorsEdge.Combat.Status.SourceLocationSnapshot",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerStatusSourceLocationSnapshotTest::RunTest(const FString& Parameters)
+{
+    // The facing-armour half of the application snapshot: a status applied by
+    // a positioned actor records WHERE the applier stood, so every tick's
+    // damage request can answer the facing check the way the applying hit did
+    // (the Warden's rear-arc rule — without this a Bleed in its exposed back
+    // paid the frontal mitigation on every tick).
+    AActor* Target = NewObject<AActor>();
+    UBreakerStatusComponent* Status = NewObject<UBreakerStatusComponent>(Target);
+
+    AActor* Applier = NewObject<AActor>();
+    FBreakerStatusApplicationSpec Spec = MakeBleedSpec();
+    Status->ApplyStatus(Spec, EBreakerDamageFamily::Physical, Applier);
+    if (!TestEqual(TEXT("The bleed applied"), Status->GetActiveStatuses().Num(), 1)) return false;
+    TestTrue(TEXT("An applier with a position is snapshotted"),
+        Status->GetActiveStatuses()[0].bHasSourceLocationSnapshot);
+    TestTrue(TEXT("The snapshot is the applier's application-time location"),
+        Status->GetActiveStatuses()[0].SourceLocationSnapshot.Equals(Applier->GetActorLocation(), 0.001f));
+
+    // An applierless status (a hazard, a test) stays honest: no position, so
+    // the tick it builds will skip the facing step instead of judging every
+    // tick from the world origin.
+    AActor* Bystander = NewObject<AActor>();
+    UBreakerStatusComponent* Unattributed = NewObject<UBreakerStatusComponent>(Bystander);
+    Unattributed->ApplyStatus(MakeBleedSpec(), EBreakerDamageFamily::Physical, nullptr);
+    if (!TestEqual(TEXT("The applierless bleed applied"), Unattributed->GetActiveStatuses().Num(), 1)) return false;
+    TestFalse(TEXT("No applier means no snapshotted position"),
+        Unattributed->GetActiveStatuses()[0].bHasSourceLocationSnapshot);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWeaponBleedDefinitionTest,
     "RiorsEdge.Weapons.BleedApplication",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

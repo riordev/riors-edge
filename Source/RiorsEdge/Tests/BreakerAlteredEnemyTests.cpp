@@ -125,8 +125,8 @@ bool FBreakerAlteredEnemyGeometryTest::RunTest(const FString& Parameters)
     // comment calls out by name as the one that must not drift from its own
     // visual tell — WeakPointVisual is a child of WeakPoint and was never
     // repositioned independently, so there is exactly one number to pin.
-    TestEqual(TEXT("The weak point sits 129 cm above the ground, on the centreline"),
-        Altered->GetWeakPointWorldHeightCm(), 129.0f);
+    TestEqual(TEXT("The weak point sits 123 cm above the ground, on the centreline"),
+        Altered->GetWeakPointWorldHeightCm(), 123.0f);
     // Radius is left at the base value (20 cm) — only the placement changed.
     TestEqual(TEXT("The weak point radius is unchanged from the base class"),
         Altered->GetWeakPointRadiusCm(), 20.0f);
@@ -143,6 +143,16 @@ bool FBreakerAlteredEnemyGeometryTest::RunTest(const FString& Parameters)
     // through walls.
     TestTrue(TEXT("Every cosmetic primitive's extent stays inside the capsule"),
         Altered->AreCosmeticExtentsWithinCapsule());
+
+    // THE FLOATING-TELL DEFECT, closed and pinned. The first authored
+    // placement (-30, 0, 54) left the weak point sphere ~4.3 cm clear of the
+    // nearest cosmetic corner — a tell hanging in the air behind the ridge it
+    // claims to be part of. The sphere must visibly reach the body cosmetics
+    // (it now overlaps BodyVisual's rear-top edge by ~3.9 cm; see the
+    // constructor's arithmetic), while the capsule-ceiling assertion above
+    // keeps it from drifting outside the silhouette in compensation.
+    TestTrue(TEXT("The weak point sphere visibly touches the body cosmetics"),
+        Altered->DoesWeakPointTouchCosmetics());
     return true;
 }
 

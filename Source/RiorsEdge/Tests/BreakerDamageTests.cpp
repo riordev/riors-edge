@@ -57,7 +57,7 @@ bool FBreakerSnapshotDotTest::RunTest(const FString& Parameters)
     Status.Snapshot.CriticalMultiplier = 2.0f;
     Status.Snapshot.bRolledCritical = true;
 
-    FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 3, nullptr);
+    FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 3, nullptr, FVector::ZeroVector, false);
     Tick.bBypassShield = true;
     FBreakerDefenseState Defense;
     Defense.Health = 100.0f;
@@ -110,11 +110,95 @@ bool FBreakerDotInstigatorTest::RunTest(const FString& Parameters)
     Status.BaseDamagePerTick = 10.0f;
 
     AActor* Applier = NewObject<AActor>(GetTransientPackage());
-    const FBreakerDamageRequest Credited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, Applier);
+    const FBreakerDamageRequest Credited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, Applier, FVector::ZeroVector, false);
     TestTrue(TEXT("Tick carries its applier"), Credited.Instigator.Get() == Applier);
 
-    const FBreakerDamageRequest Uncredited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, nullptr);
+    const FBreakerDamageRequest Uncredited = UBreakerDamageLibrary::MakeSnapshotDotTick(Status, EBreakerDamageFamily::Physical, 1, nullptr, FVector::ZeroVector, false);
     TestFalse(TEXT("An applierless tick credits nobody"), Uncredited.Instigator.IsValid());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDotSourceLocationTest,
+    "RiorsEdge.Combat.Damage.DotTickCarriesSourceLocation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDotSourceLocationTest::RunTest(const FString& Parameters)
+{
+    // The facing-armour half of the DoT snapshot rule: a tick built with the
+    // application-time source position must carry it, or ReceiveDamage skips
+    // the facing multiplier and a Bleed applied to a Warden's exposed BACK
+    // quietly re-acquires the frontal mitigation on every tick.
+    FBreakerStatusApplicationSpec Status;
+    Status.BaseDamagePerTick = 10.0f;
+
+    const FVector ApplicationPoint(-500.0f, 120.0f, 30.0f);
+    const FBreakerDamageRequest Located = UBreakerDamageLibrary::MakeSnapshotDotTick(
+        Status, EBreakerDamageFamily::Physical, 1, nullptr, ApplicationPoint, true);
+    TestTrue(TEXT("The tick says it has a source location"), Located.bHasSourceLocation);
+    TestTrue(TEXT("The tick carries the application-time position"),
+        Located.SourceLocation.Equals(ApplicationPoint, 0.001f));
+
+    // A status applied by nothing positioned (a hazard, a test) stays honest:
+    // no location, so the facing step stays skipped rather than judging every
+    // tick from the world origin.
+    const FBreakerDamageRequest Unlocated = UBreakerDamageLibrary::MakeSnapshotDotTick(
+        Status, EBreakerDamageFamily::Physical, 1, nullptr, FVector::ZeroVector, false);
+    TestFalse(TEXT("A positionless application sets no source location"), Unlocated.bHasSourceLocation);
+
+    // End to end through the resolver: the facing multiplier a tick's carried
+    // location produces must be the same one a direct hit from that angle
+    // gets — rear multiplier 0 against a target facing +X, source behind it.
+    const float RearMultiplier = UBreakerDamageLibrary::GetFacingArmorMultiplier(
+        FVector::ForwardVector, FVector::ZeroVector, ApplicationPoint, 0.0f, 0.15f);
+    TestEqual(TEXT("The carried position lands in the rear arc"), RearMultiplier, 0.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOverkillReportTest,
+    "RiorsEdge.Combat.Damage.OverkillReported",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOverkillReportTest::RunTest(const FString& Parameters)
+{
+    // The owner reads damage numbers for TTK/balance, so a killing blow must
+    // REPORT its full size while still APPLYING only what the target had. The
+    // 900-damage-rocket-on-30-HP case, verbatim.
+    FBreakerDamageRequest Request;
+    Request.BaseDamage = 900.0f;
+    Request.DamageFamily = EBreakerDamageFamily::TrueDamage;
+    Request.bCanCritical = false;
+    FBreakerDefenseState Defense;
+    Defense.Health = 30.0f;
+
+    const FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
+    TestEqual(TEXT("Applied health damage stays clamped to remaining health"), Result.HealthDamage, 30.0f);
+    TestEqual(TEXT("Health still clamps at zero"), Result.RemainingHealth, 0.0f);
+    TestTrue(TEXT("The blow kills"), Result.bKilled);
+    TestEqual(TEXT("The clamp's discard is reported as overkill"), Result.OverkillDamage, 870.0f);
+    TestEqual(TEXT("Applied plus overkill reconstructs the true blow"),
+        Result.HealthDamage + Result.OverkillDamage, 900.0f);
+
+    // A survivable hit reports zero overkill — the field only ever carries
+    // what the clamp discarded, never a duplicate of applied damage.
+    FBreakerDefenseState Healthy;
+    Healthy.Health = 5000.0f;
+    Healthy.Shield = 100.0f;
+    const FBreakerDamageResult Survived = UBreakerDamageLibrary::ResolveDamage(Request, Healthy);
+    TestEqual(TEXT("A survivable hit has no overkill"), Survived.OverkillDamage, 0.0f);
+
+    // Shield overflow composes: 900 into 100 shield (not bypassed) + 30 health
+    // still reports the remainder past death as overkill.
+    FBreakerDamageRequest Shielded = Request;
+    Shielded.bBypassShield = false;
+    FBreakerDefenseState Fragile;
+    Fragile.Health = 30.0f;
+    Fragile.Shield = 100.0f;
+    const FBreakerDamageResult Broken = UBreakerDamageLibrary::ResolveDamage(Shielded, Fragile);
+    TestEqual(TEXT("Shield takes its share first"), Broken.ShieldDamage, 100.0f);
+    TestEqual(TEXT("Health takes what it had"), Broken.HealthDamage, 30.0f);
+    TestEqual(TEXT("The rest is overkill"), Broken.OverkillDamage, 770.0f);
     return true;
 }
 

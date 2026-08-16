@@ -24,8 +24,15 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
         {
             Active.Stacks = FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), GetEffectiveStackCap());
             Active.RemainingDuration = FMath::Max(Active.RemainingDuration, Spec.Duration);
-            // Refresh credit to whoever most recently reapplied it.
-            if (Instigator) Active.Instigator = Instigator;
+            // Refresh credit to whoever most recently reapplied it — and the
+            // facing snapshot with it, because credit and angle belong to the
+            // same application.
+            if (Instigator)
+            {
+                Active.Instigator = Instigator;
+                Active.SourceLocationSnapshot = Instigator->GetActorLocation();
+                Active.bHasSourceLocationSnapshot = true;
+            }
             OnStatusApplied.Broadcast(Active);
             return;
         }
@@ -38,6 +45,15 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     Status.RemainingDuration = Spec.Duration;
     Status.TimeUntilNextTick = Spec.TickInterval;
     Status.Instigator = Instigator;
+    // Application-time facing snapshot. Taken from the applier's position NOW,
+    // not per tick: the DoT contract snapshots at application, and a tick that
+    // re-read the applier's live position would let a shooter flank AFTER the
+    // wound to retroactively strip armour off every remaining tick.
+    if (Instigator)
+    {
+        Status.SourceLocationSnapshot = Instigator->GetActorLocation();
+        Status.bHasSourceLocationSnapshot = true;
+    }
     ActiveStatuses.Add(Status);
     OnStatusApplied.Broadcast(Status);
 }
@@ -65,7 +81,8 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
 
             FBreakerStatusApplicationSpec TickSpec = Status.Spec;
             TickSpec.InitialStacks = Status.Stacks;
-            FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get());
+            FBreakerDamageRequest Tick = UBreakerDamageLibrary::MakeSnapshotDotTick(TickSpec, Status.DamageFamily, Status.TicksDelivered, Status.Instigator.Get(),
+                Status.SourceLocationSnapshot, Status.bHasSourceLocationSnapshot);
             // Physical DoTs — Bleed, Poison — ignore shields and take half
             // armour mitigation via the damage library's global status rule.
             Tick.bBypassShield = Status.DamageFamily == EBreakerDamageFamily::Physical;

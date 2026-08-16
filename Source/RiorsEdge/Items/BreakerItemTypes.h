@@ -237,8 +237,29 @@ struct RIORSEDGE_API FBreakerAffixDefinition
     // so every pre-existing affix keeps behaving exactly as authored.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerBuildCondition Condition = EBreakerBuildCondition::Always;
 
+    // ---- The high-rarity identity pass (O11's reserved seat) --------------
+    // The rarity FLOOR for this line. Standard means "the ordinary pool", which
+    // is every affix that existed before this field did — the default keeps all
+    // of them exactly as authored. Aberrant/Anomalous mark the SPECIAL pools:
+    // those definitions live in UBreakerAffixLibrary::GetAberrantAffixPool /
+    // GetAnomalousAffixPool rather than in the slice pool, so the generic affix
+    // loop and the Forge's Attune candidate walk (which both iterate the slice
+    // pool) structurally cannot offer them below their rarity. The field is the
+    // stated intent; the pool separation is the enforcement.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerItemRarity MinimumRarity = EBreakerItemRarity::Standard;
+
+    // The BILL. When a special affix names a companion here, rolling it also
+    // adds the companion line — a constant NEGATIVE roll in an ordinary bucket
+    // (never a sub-1.0 More; the locked aggregation rule has no downside
+    // exemption, exactly as Deadfall's Air Control bill established). The
+    // companion definitions live in UBreakerAffixLibrary::GetSpecialDownsidePool
+    // and are never drawable on their own — a downside is part of the deal that
+    // carried it, not loot.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName PairedAffixId = NAME_None;
+
     bool AllowsSlot(EBreakerEquipSlot Slot) const { return AllowedSlots.Contains(Slot); }
     bool IsConditional() const { return Condition != EBreakerBuildCondition::Always; }
+    bool IsSpecial() const { return MinimumRarity >= EBreakerItemRarity::Aberrant; }
 };
 
 USTRUCT(BlueprintType)

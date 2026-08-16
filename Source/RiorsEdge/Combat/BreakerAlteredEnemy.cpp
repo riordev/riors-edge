@@ -199,28 +199,40 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // for damage — repositioned, not recreated. Its radius (20) is left at
     // the base value; only the placement changes.
     //
-    // Relative location (-30, 0, 54): X is negative (rearward — this is the
+    // Relative location (-24, 0, 48): X is negative (rearward — this is the
     // BACK of the frame, "dorsal"), Y is 0 (kept on the centreline exactly
     // like the base class's own weak point, so it reads as a single ridge
     // along the spine rather than something off to one side), Z is raised
     // toward the top of the shorter frame.
+    //
+    // SEATED ON THE BODY, not floating near it. The first authored placement
+    // (-30, 0, 54) left the sphere's surface ~4.3 cm clear of BodyVisual's
+    // nearest corner — a weak point visibly hanging in the air behind the
+    // ridge it claims to be part of, which reads as a bug the moment the
+    // player circles it. At (-24, 0, 48) the closest point of BodyVisual's
+    // box (X -17..49, Z -21.5..33.5 — see its comment above) is (-17, 0,
+    // 33.5), which is sqrt(7^2 + 14.5^2) = 16.1 cm from the sphere's centre:
+    // 3.9 cm INSIDE the 20 cm radius, so the sphere visibly overlaps the
+    // torso's rear-top edge and reads as a ridge growing out of the back.
+    // DoesWeakPointTouchCosmetics() below asserts exactly this and the
+    // geometry test pins it.
     //
     // WORLD HEIGHT ARITHMETIC (this is the number that matters — a visual
     // tell that does not coincide with the collision sphere is a recorded
     // defect elsewhere in this codebase, and it does not get a second one
     // here): capsule origin sits CapsuleHalfHeightCm (75 cm) above the ground
     // after the ground-snap in the base Tick, and WeakPoint's relative Z here
-    // is 54, so the sphere's CENTRE is 75 + 54 = 129 cm above the ground, on
+    // is 48, so the sphere's CENTRE is 75 + 48 = 123 cm above the ground, on
     // the centreline. WeakPointVisual is a child of WeakPoint and was never
     // touched, so the visible tell sits at exactly that point — there is only
     // one number to keep in sync, and it lives here.
     //
-    // Sphere bounds against the capsule: X: -50..-10, Z: 34..74 — the top of
-    // the sphere (74) is 1 cm inside the capsule ceiling (75), which is
+    // Sphere bounds against the capsule: X: -44..-4, Z: 28..68 — the top of
+    // the sphere (68) is 7 cm inside the capsule ceiling (75), which is
     // MORE conservative than the base class's own weak point (78 relative +
     // 20 radius = 98, against a 90 half-height — it already pokes 8 cm past
     // its own capsule top and ships that way).
-    WeakPoint->SetRelativeLocation(FVector(-30.0f, 0.0f, 54.0f));
+    WeakPoint->SetRelativeLocation(FVector(-24.0f, 0.0f, 48.0f));
 
     // The tell is recoloured hazard-amber so it reads as the exposed spot
     // against the olive-slate body, the same "distinct hot colour on the
@@ -294,4 +306,34 @@ bool ABreakerAlteredEnemy::AreCosmeticExtentsWithinCapsule() const
         if (HorizontalExtent > Radius || Top > HalfHeight || Bottom < -HalfHeight) return false;
     }
     return true;
+}
+
+bool ABreakerAlteredEnemy::DoesWeakPointTouchCosmetics() const
+{
+    if (!WeakPoint) return false;
+    const FVector Center = WeakPoint->GetRelativeLocation();
+    const float Radius = WeakPoint->GetUnscaledSphereRadius();
+
+    // Same cosmetic list AreCosmeticExtentsWithinCapsule walks, same
+    // pre-rotation axis-aligned reading of each primitive as a box of
+    // half-extent 50 * scale (basic-shape meshes are 100 cm across before
+    // scale). The sphere "touches" a primitive when the distance from its
+    // centre to the closest point of that box is at or under the radius —
+    // i.e. the visible sphere reaches the visible mass instead of floating
+    // beside it.
+    const UStaticMeshComponent* Parts[] = {
+        BodyVisual, HeadVisual, LeftArmVisual, RightArmVisual, LeftLegVisual, RightLegVisual
+    };
+    for (const UStaticMeshComponent* Part : Parts)
+    {
+        if (!Part) continue;
+        const FVector Location = Part->GetRelativeLocation();
+        const FVector HalfExtent = Part->GetRelativeScale3D() * 50.0f;
+        const FVector Closest(
+            FMath::Clamp(Center.X, Location.X - HalfExtent.X, Location.X + HalfExtent.X),
+            FMath::Clamp(Center.Y, Location.Y - HalfExtent.Y, Location.Y + HalfExtent.Y),
+            FMath::Clamp(Center.Z, Location.Z - HalfExtent.Z, Location.Z + HalfExtent.Z));
+        if (FVector::DistSquared(Center, Closest) <= FMath::Square(Radius)) return true;
+    }
+    return false;
 }
