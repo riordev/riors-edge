@@ -8092,6 +8092,52 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
             PackChipRows(SlotChips, SlotChipWidths, ChipRowWidth, BreakerUI::Space8)
         ];
     }
+    {
+        // Item level the grant rolls at — the sandbox's own control, not the
+        // gym's. O48 froze the rarity gates and named dev spawning THE way to
+        // test chase items, and the second half of the affix ladder (T6 at
+        // ilvl 50 down to T1 at 120) sits past any reachable area level, so
+        // without this stepper it is untestable. 0 (untouched) preserves the
+        // old behaviour: the gym's area level, character level outside a gym.
+        // Stepped, not slid, same reasoning as the area-level row above.
+        const int32 FallbackItemLevel = GameMode ? GameMode->GymAreaLevel
+            : (Progression ? Progression->GetCharacterLevel() : 1);
+        const int32 ShownItemLevel = FMath::Clamp(
+            DevGrantItemLevel > 0 ? DevGrantItemLevel : FallbackItemLevel,
+            1, UBreakerAffixLibrary::MaxItemLevel);
+        TSharedRef<SHorizontalBox> ItemLevelRow = SNew(SHorizontalBox);
+        ItemLevelRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+        [
+            MenuValueColumn(FText::FromString(FString::Printf(TEXT("%d"), ShownItemLevel)),
+                SettingsValueWidth, BreakerUI::TypeH2, Cyan)
+        ];
+        const int32 ItemLevelSteps[] = { -10, -1, +1, +10 };
+        for (const int32 Step : ItemLevelSteps)
+        {
+            ItemLevelRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                MakeChip(FString::Printf(TEXT("%+d"), Step), false, Primary,
+                    FOnClicked::CreateLambda([this, Step, ShownItemLevel]()
+                    {
+                        // Step from the SHOWN value, so the first click on an
+                        // untouched stepper moves off the fallback rather than
+                        // off zero.
+                        DevGrantItemLevel = FMath::Clamp(ShownItemLevel + Step, 1, UBreakerAffixLibrary::MaxItemLevel);
+                        DevSandboxStatus = FText::FromString(FString::Printf(
+                            TEXT("GRANT ITEM LEVEL %d — AFFIX TIERS FOLLOW ITEM LEVEL: T6 AT 50, T1 AT 120."),
+                            DevGrantItemLevel));
+                        Rebuild(EBreakerMenuScreen::DevSandbox);
+                        return FReply::Handled();
+                    }))
+            ];
+        }
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[ItemLevelRow];
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(FText::FromString(TEXT("ITEM LEVEL OF THE NEXT GRANT (1-120). UNTOUCHED = GYM AREA LEVEL, CHARACTER LEVEL OUTSIDE A GYM.")),
+                BreakerUI::TypeCaption, Muted)
+        ];
+    }
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
     [
         SNew(SBox).WidthOverride(240.0f)
@@ -8117,13 +8163,18 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
                 const EBreakerEquipSlot Slot = DevGrantSlot >= 0
                     ? static_cast<EBreakerEquipSlot>(DevGrantSlot)
                     : UBreakerLootLibrary::RollDropSlot(Seed);
-                // Item level is the AREA's, exactly as a kill pays it; outside
-                // a gym world it falls back to the character's level so the
-                // button still works in the Anchor.
+                // Item level: the stepper's value if the tester moved it (O48
+                // — the sandbox is the route to ilvl-120 chase items no area
+                // can pay out); untouched, the AREA's exactly as a kill pays
+                // it, character level outside a gym so the button still works
+                // in the Anchor.
                 ABreakerGameMode* Mode = (Character.IsValid() && Character->GetWorld())
                     ? Character->GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
                 UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
-                const int32 ItemLevel = Mode ? Mode->GymAreaLevel : (Prog ? Prog->GetCharacterLevel() : 1);
+                const int32 ItemLevel = FMath::Clamp(
+                    DevGrantItemLevel > 0 ? DevGrantItemLevel
+                        : (Mode ? Mode->GymAreaLevel : (Prog ? Prog->GetCharacterLevel() : 1)),
+                    1, UBreakerAffixLibrary::MaxItemLevel);
                 const FBreakerItemInstance Item = UBreakerLootLibrary::RollItem(
                     TEXT("DevSandbox"), Slot, DevGrantRarity, ItemLevel, Seed);
                 Equip->AddToBackpack(Item);

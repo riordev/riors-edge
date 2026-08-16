@@ -1106,8 +1106,13 @@ void ABreakerGameMode::SpawnAnchorCamp()
         AttachPropLight(Crate, FVector(0, 0, 90.0f), FLinearColor(1.0f, 0.68f, 0.28f), 700.0f, 600.0f);  // light 6/6
     }
 
-    ABreakerNPC::SpawnForgeKeeper(World, Frame.At(CampFwd - 320.0f, -450.0f, 100.0f), Frame.Forward.Rotation());
-    ABreakerNPC::SpawnQuartermaster(World, Frame.At(CampFwd - 320.0f, 480.0f, 100.0f), Frame.Forward.Rotation());
+    // Kess and the Quartermaster no longer spawn here (owner ruling
+    // 2026-08-16, A10 -> O48: the Anchor hub is their ONLY home —
+    // BreakerHubBuilder.cpp spawns them, this camp does not). The camp keeps
+    // its physical props (forge, crate, supply trigger) as set dressing.
+    // Consequence, deliberate: quest offer and turn-in now require travelling
+    // to the Anchor — including from a PIE drop-in on the template map, where
+    // there is no vendor at all until you take the travel point to the hub.
 
     // Arena boundary ring, at CombatPocketRadius rather than the old 1400.
     // 1400 was under the 1976 cm a dash-speed orbit needs, so the markers were

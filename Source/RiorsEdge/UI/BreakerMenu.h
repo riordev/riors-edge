@@ -622,6 +622,12 @@ private:
     // the seed through RollDropSlot", i.e. exactly what a real kill does.
     EBreakerItemRarity DevGrantRarity = EBreakerItemRarity::Exceptional;
     int32 DevGrantSlot = -1;
+    // Item level the next GRANT rolls at (O48: the sandbox is THE testing
+    // route for chase items now that the rarity gates are frozen, and affix
+    // tiers run past any reachable area level — T1 opens at ilvl 120). 0 means
+    // "not moved yet", which reads as the old behaviour: the gym's area level,
+    // or the character's level outside a gym world.
+    int32 DevGrantItemLevel = 0;
     // Result line echoed under the sandbox controls; cleared on leaving the
     // screen, same rule as TravelStatus.
     FText DevSandboxStatus;

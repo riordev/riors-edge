@@ -220,7 +220,7 @@ public:
     //
     // Still free: no resource cost, no cooldown, no point spend (O25 makes it
     // innate to the class, not a purchase).
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1", ClampMax="50")) int32 SwiftThirdJumpUnlockLevel = 1; // WAS 20 — unreachable, nothing writes CharacterLevel
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Jump", meta=(ClampMin="1", ClampMax="50")) int32 SwiftThirdJumpUnlockLevel = 1; // RULED, not residue: O47 (2026-08-16) — level 1 permanently, base class identity. (History: shipped at 20 when nothing wrote CharacterLevel.)
     // O2 PLACEHOLDER. The third jump must not read as "the second jump again".
     // It blends horizontal velocity toward the current input direction while
     // PRESERVING its magnitude, so it is a course correction, not a speed

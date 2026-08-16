@@ -125,56 +125,6 @@ Implementation notes tied to this ruling:
   -> the per-domain docs. `Master-Sheet-Import.txt` retains its content for
   history and loses its standing.
 
-## Owner choices currently pending (presented, not ruled)
-
-- **TTK re-anchor** — RULED by O27. It is no longer a single retune: trash
-  health becomes a curve in area level, and the target is stated for a
-  baseline build in on-level content. Do not pick a new constant.
-- **Movement's multiplicative gear x tree composition** — the last instance
-  of the bug class fixed everywhere else. Conforming to the one-additive-
-  bucket rule changes movement FEEL (+20/+20 becomes x1.40, not x1.44),
-  which is why it is a ruling and not a fix. Related: the composed MoveSpeed
-  attribute has no gameplay consumer at all.
-- **Subclass commitment** — RULED by O37 (commitment unlocks the branch's
-  keystone tier; ordinary nodes stay freely mixed, so the O15 collision
-  dissolves).
-- **Swift's third jump (O25)** — mechanism BUILT and reachable (2026-08-14);
-  the unlock THRESHOLD stays open and is gated by O40(b): no CharacterLevel
-  gate until an XP loop exists.
-- **The DoT bucket question [O34]** — do Increased Damage and Increased DoT
-  share one additive bucket for DoT ticks, or keep multiplying? Currently
-  they multiply (a deliberate deviation recorded in the canon). Owner call.
-- **Replication position [O22]** — still owner-authored. A DRAFT page now
-  exists at `Docs/Design/Replication-Position.md` with a recommended
-  position; it is not law until signed off.
-- **Endgame band verification [O36]** — the 12–20x seed rails are accepted
-  arithmetic, not a feeling; first endgame-area playtest should judge them.
-- **Movement affix uplift [O29]** — the pool-wide 2.2x tier uplift made the
-  gear-only movement band large; retune is a frozen O2 value question.
-
-
-- **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
-  collides with the Frontier content type (GAP [O8]). HELD per owner.
-- **Sealed / Bare modifier scope** vs Support and Leech generation
-  (Game-Modes Class C audit).
-- **REDESIGN bucket [O20]** — K10 SLIPSTREAM refund clause; stamina-built
-  Bulwark nodes (B4 cooldown shape, B7 Riposte, B9 Guard Doctrine).
-  Redesign, not recost; owner-led.
-- **Dodge resource refund** — survives as base kit, tree rewrite, or dies
-  (Item-Foundation GAP [O1]).
-- **Rift-archetype first-clear point budget** — 8 (Game-Modes) vs 2 (XP §7)
-  within the 15-point canon list.
-- **XP band-to-Rank collapse** — two bands each under Champion and Boss.
-- **Networking/replication position** — owner writing it this week, due
-  before 0c closes (O22).
-
-Implementation notes tied to these rulings:
-- O1: `Stamina`/`MaxStamina` removed from the attribute set and combat
-  component in the same commit as this file.
-- O2: wave mode + time-to-kill instrumentation in the gym (same commit).
-- O5: `EBreakerDamageFamily::Elemental` stays as the pipeline family; the
-  Rift/Time/Void split arrives with the resistance model.
-
 ## 2026-08-14 — O29, O30, O31 (endgame gear depth, the archetype axes, content shape)
 
 | # | Decision |
@@ -256,4 +206,73 @@ Implementation notes tied to these rulings:
 - O39: `ApplySliceDefaultsIfFresh`'s auto-lock to Swift should be retired to a
   dev convenience once the class screen's real path works, so the screen is
   actually exercised.
+
+## 2026-08-16 — O41..O48 (premise, maps, economies, five classes, high-rarity identity, Swift)
+
+Provenance: ruled by the owner by direct chat directive during the 2026-08-16
+overnight session ("rulings in chat are a go", plus itemized answers to O25 /
+D33 / A6 / A7 / A10 / A12). Entries drafted by the session agent under that
+delegation, in the O33–O40 precedent; any entry is supersedable as usual. The
+full chat-ruling texts live in `Docs/Owner-Rulings-Pending-Ratification.md`.
+
+| # | Decision |
+|---|----------|
+| O41 | **THE PREMISE, RESTATED.** Rior's Edge is a looter shooter with ARPG progression and MMO social structure, unfolding a multi-area story per `Docs/Design/Campaign-And-Story.md`'s treatment. Movement is a core pillar, not the thesis — "movement-driven" is retired from all copy and design language. |
+| O42 | **THE THREE-MAP WORLD IS RATIFIED, AND ITS LIGHTING IS INTERIM.** The Lvl_FrontEnd / Lvl_Anchor / Lvl_Gym split, travel as OpenLevel, and gym-as-fallback map identity are ratified as built. A6: runtime-built lighting/PlayerStart/boot-floor (`Game/BreakerWorldBasics`) is the interim answer; the owner will author real maps later, driven by the story doc, and an authored light or start in any map retires the runtime rig for that map automatically. A7: the authored Anchor map will eventually replace the runtime hub builder; until then the runtime hub is the Anchor. |
+| O43 | **POINTS PER LEVEL, AS BUILT.** XP-And-Pacing §4 is law and implemented: 1 Class Point per level through 30, 1 Core Point per level through 50, with the slice lump (10/12) reinterpreted as an advance on the entitlement. Supersedes the A2 keystone-budget contradiction: a keystone is first affordable through play at level 11 and neither frozen constant moved. |
+| O44 | **THE LOOT ECONOMY FLOWS.** The drop slot draw is salted (all eight weapon archetypes drop; historical drop seeds re-rolled, accepted as the cost of the fix), and crafting currency pays on every kill — `bDropsLoot` gates items only. |
+| O45 | **ALL FIVE CLASSES ARE BUILT.** Gunsmith, Tank and Support ship as playable O2-placeholder kits (resources wired, 21 abilities, minimal deployable system). O39's honesty rule still governs and now admits all five; every substituted-for-missing primitive is recorded in code at its site. |
+| O46 | **THE O11 SEAT IS FILLED.** Aberrant carries 1–2 unique modifier affixes from its own pool (eight authored) and Anomalous carries one signature affix (five authored), beside its rule; all O2 PLACEHOLDER, deterministic, locked against Forge Attune like legendary signatures. |
+| O47 | **SWIFT IS THE PROJECTILE-MANIPULATION CLASS.** Owner directive, verbatim: "swifts identity should be based around multishot, pierce, chain, ricochet, movement, manipulation of projectiles with your momentum type of deal." Built: four shot channels (default zero), momentum-state coupling (Running/Redline/airborne/sliding modulate the shot), pierce feeds Momentum back. Amends O25: **Swift's third jump unlocks at level 1, permanently** — it is base class identity, not a level gate. |
+| O48 | **CHASE ITEMS STAY CHASED.** A12 is frozen long-term: `GymAreaLevel` 10 and the Aberrant/Anomalous item-level gates (25/40) stand — high rarities are chase items by design. The sanctioned testing route is the Breakpoint Sandbox dev screen (spawn seeded items at any rarity/slot/level). A10: the gym's duplicate Kess/Quartermaster are removed; the hub is their only home. D33 is answered by this file's pending section now living at the bottom, where line 14 always said it was. |
+
+## Owner choices currently pending (presented, not ruled)
+
+- **TTK re-anchor** — RULED by O27. It is no longer a single retune: trash
+  health becomes a curve in area level, and the target is stated for a
+  baseline build in on-level content. Do not pick a new constant.
+- **Movement's multiplicative gear x tree composition** — the last instance
+  of the bug class fixed everywhere else. Conforming to the one-additive-
+  bucket rule changes movement FEEL (+20/+20 becomes x1.40, not x1.44),
+  which is why it is a ruling and not a fix. Related: the composed MoveSpeed
+  attribute has no gameplay consumer at all.
+- **Subclass commitment** — RULED by O37 (commitment unlocks the branch's
+  keystone tier; ordinary nodes stay freely mixed, so the O15 collision
+  dissolves).
+- **Swift's third jump (O25)** — mechanism BUILT and reachable (2026-08-14);
+  the unlock THRESHOLD stays open and is gated by O40(b): no CharacterLevel
+  gate until an XP loop exists. [Threshold RULED by O47: level 1, permanent.]
+- **The DoT bucket question [O34]** — do Increased Damage and Increased DoT
+  share one additive bucket for DoT ticks, or keep multiplying? Currently
+  they multiply (a deliberate deviation recorded in the canon). Owner call.
+- **Replication position [O22]** — still owner-authored. A DRAFT page now
+  exists at `Docs/Design/Replication-Position.md` with a recommended
+  position; it is not law until signed off.
+- **Endgame band verification [O36]** — the 12–20x seed rails are accepted
+  arithmetic, not a feeling; first endgame-area playtest should judge them.
+- **Movement affix uplift [O29]** — the pool-wide 2.2x tier uplift made the
+  gear-only movement band large; retune is a frozen O2 value question.
+
+
+- **"Frontier pack" name collision** — Game-Modes §4.3's top pack tier now
+  collides with the Frontier content type (GAP [O8]). HELD per owner.
+- **Sealed / Bare modifier scope** vs Support and Leech generation
+  (Game-Modes Class C audit).
+- **REDESIGN bucket [O20]** — K10 SLIPSTREAM refund clause; stamina-built
+  Bulwark nodes (B4 cooldown shape, B7 Riposte, B9 Guard Doctrine).
+  Redesign, not recost; owner-led.
+- **Dodge resource refund** — survives as base kit, tree rewrite, or dies
+  (Item-Foundation GAP [O1]).
+- **Rift-archetype first-clear point budget** — 8 (Game-Modes) vs 2 (XP §7)
+  within the 15-point canon list.
+- **XP band-to-Rank collapse** — two bands each under Champion and Boss.
+- **Networking/replication position** — owner writing it this week, due
+  before 0c closes (O22).
+
+Implementation notes tied to these rulings:
+- O1: `Stamina`/`MaxStamina` removed from the attribute set and combat
+  component in the same commit as this file.
+- O2: wave mode + time-to-kill instrumentation in the gym (same commit).
+- O5: `EBreakerDamageFamily::Elemental` stays as the pipeline family; the
+  Rift/Time/Void split arrives with the resistance model.
 
