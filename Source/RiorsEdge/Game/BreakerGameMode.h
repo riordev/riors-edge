@@ -420,6 +420,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Breaker|Hub") void TeleportPawnToHub(APawn* Pawn);
 private:
     FVector HubOrigin = FVector::ZeroVector;
+    // Where arriving players actually stand — the gate-side spot from
+    // UBreakerHubBuilder::ArrivalTransform, NOT HubOrigin: the origin is the
+    // plaza centre, and the plaza centre is inside the landmark obelisk.
+    FTransform HubArrival = FTransform::Identity;
     bool bHubBuilt = false;
     float ResolveGroundZ(const APawn* Pawn) const;
 

@@ -192,6 +192,8 @@ void ABreakerCharacter::BeginPlay()
     // which character was being played, so this one asks the session first —
     // otherwise every load after the first would read the legacy single slot.
     AdoptSessionCharacter();
+    // Holstered for the whole life of an Anchor pawn (see IsWeaponsHolstered).
+    bWeaponsHolstered = UBreakerGameInstance::IsAnchorMap(this);
     AbilitySystem->InitAbilityActorInfo(this, this);
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
@@ -482,16 +484,19 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void ABreakerCharacter::ActivateAbilityOne()
 {
+    if (bWeaponsHolstered) return;   // holstered in the Anchor, same as fire
     if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityOne);
 }
 
 void ABreakerCharacter::ActivateAbilityTwo()
 {
+    if (bWeaponsHolstered) return;
     if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::ClassAbilityTwo);
 }
 
 void ABreakerCharacter::ActivateUltimate()
 {
+    if (bWeaponsHolstered) return;
     if (Abilities) Abilities->TryActivateSlot(EBreakerAbilitySlot::Ultimate);
 }
 
@@ -664,7 +669,11 @@ void ABreakerCharacter::StopSlide()
     }
 }
 
-void ABreakerCharacter::StartFire() { if (Weapon) Weapon->StartFire(); OnFireInput(true); }
+// HOLSTERED IN THE ANCHOR: the hub is a social space and the trigger does
+// nothing there (owner: "gun should be lowered in the anchor and unable to
+// shoot"). StopFire stays un-gated on purpose — a held trigger crossing a
+// travel load must always be releasable.
+void ABreakerCharacter::StartFire() { if (bWeaponsHolstered) return; if (Weapon) Weapon->StartFire(); OnFireInput(true); }
 void ABreakerCharacter::StopFire() { if (Weapon) Weapon->StopFire(); OnFireInput(false); }
 void ABreakerCharacter::StartAim()
 {

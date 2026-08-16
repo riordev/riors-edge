@@ -285,7 +285,12 @@ public:
     {
         return bIsFrontEndMap || !bSessionHasActiveCharacter;
     }
+    // True in the Anchor (a social space): fire and abilities are refused and
+    // the viewmodel presents lowered. Set once in BeginPlay from the map role
+    // — a pawn never outlives a map, so it cannot go stale.
+    bool IsWeaponsHolstered() const { return bWeaponsHolstered; }
 private:
+    bool bWeaponsHolstered = false;
     void OpenMenu(bool bInitialMenu);
     // Dev capture only (-BreakerCaptureMenu=<name>): opens the front end on a
     // named screen so a screenshot run can photograph it.

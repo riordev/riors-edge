@@ -206,6 +206,17 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
     ABreakerNPC::SpawnQuartermaster(World, Frame.At(VendorForward - 80.0f, VendorLateral, 100.0f), Frame.Right.Rotation());
 }
 
+FTransform UBreakerHubBuilder::ArrivalTransform(const FTransform& HubOrigin)
+{
+    using namespace BreakerHubLayout;
+    const FBreakerHubFrame Frame(HubOrigin);
+    // 320 cm plaza-side of the gate posts, +100 up so the capsule drops onto
+    // the plaza surface rather than spawning intersecting it. Facing hub
+    // forward: the obelisk and both vendors are in view on arrival, which is
+    // the "you have arrived somewhere" frame the gate walk-through implies.
+    return FTransform(Frame.Forward.Rotation(), Frame.At(TravelPointForward + 320.0f, 0.0f, 100.0f));
+}
+
 ABreakerTravelPoint* UBreakerHubBuilder::BuildTravelPoint(UWorld* World, const FBreakerHubFrame& Frame)
 {
     using namespace BreakerHubLayout;

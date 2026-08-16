@@ -36,6 +36,16 @@ public:
     UFUNCTION(BlueprintCallable, Category="Hub")
     static ABreakerTravelPoint* BuildHub(UWorld* World, const FTransform& HubOrigin);
 
+    // Where an arriving player STANDS, for the same HubOrigin BuildHub was
+    // given: just inside the travel gate, facing the plaza. This exists
+    // because the hub is built AROUND the arriving pawn's spawn point, and
+    // the plaza's central landmark (a colliding obelisk) is spawned exactly
+    // there — the owner's "i cant move when i spawn" was the player wedged
+    // inside the monument, reading their own camera clipping through its
+    // faces as broken mouse sensitivity.
+    UFUNCTION(BlueprintPure, Category="Hub")
+    static FTransform ArrivalTransform(const FTransform& HubOrigin);
+
 private:
     // Split out for testability of the shape even though it spawns actors
     // (a world is still required — see BreakerHubTests.cpp for what is and

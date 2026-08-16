@@ -90,9 +90,14 @@ void ABreakerGameMode::TeleportPawnToHub(APawn* Pawn)
             TEXT("The pawn was left where it was."));
         return;
     }
-    // Lifted clear of the ground so the capsule does not spawn intersecting the
-    // hub floor and get pushed somewhere unpredictable.
-    Pawn->TeleportTo(HubOrigin + FVector(0.0f, 0.0f, 120.0f), Pawn->GetActorRotation());
+    // The gate-side arrival spot, never HubOrigin: the origin is the plaza
+    // centre, and the centre holds the colliding landmark obelisk — the old
+    // +120 teleport put the player INSIDE it.
+    Pawn->TeleportTo(HubArrival.GetLocation(), HubArrival.Rotator());
+    if (AController* Controller = Pawn->GetController())
+    {
+        Controller->SetControlRotation(HubArrival.Rotator());
+    }
 }
 
 void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn)
@@ -194,12 +199,18 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     {
         HubOrigin = Frame.Ground;
         bHubBuilt = true;
-        if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(
-                GetWorld(), FTransform(Frame.Forward.Rotation(), HubOrigin)))
+        const FTransform HubFrame(Frame.Forward.Rotation(), HubOrigin);
+        if (ABreakerTravelPoint* HubTravel = UBreakerHubBuilder::BuildHub(GetWorld(), HubFrame))
         {
             HubTravel->ExcludedDestinationId = ABreakerTravelPoint::HubDestinationId;
             HubTravel->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
         }
+        // THE HUB IS BUILT AROUND THE ARRIVING PAWN, which means the pawn is
+        // standing at plaza centre — inside the landmark obelisk BuildHub just
+        // spawned there. Move them to the gate-side arrival spot immediately,
+        // in the same frame, before physics gets an opinion.
+        HubArrival = UBreakerHubBuilder::ArrivalTransform(HubFrame);
+        TeleportPawnToHub(NewPlayer->GetPawn());
         bPlaytestTargetsSpawned = true;
         // Same reason as the front end: a screenshot run of the Anchor must
         // schedule its exit, or the harness can never photograph the hub.
