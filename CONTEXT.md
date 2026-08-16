@@ -2,6 +2,19 @@
 
 **Last reconciled against: O40**
 
+> **START WITH `Docs/HANDOFF.md`.** It was written on 2026-08-16 from six parallel
+> domain audits of the live tree — progression, front end, world, combat, classes
+> and the design corpus — specifically for a session with no memory of this work.
+> It carries the authority chain, the standing rules, the exact build and test
+> commands, the **dead-content register** (authored content that compiles and
+> reaches no player — the single most important section), the known defects
+> including the ones nobody has reported, and the open owner decisions.
+>
+> This file remains the operative PLAN (O28). The handoff is the operative
+> BRIEFING. Where the two disagree about a measured fact, the handoff is newer
+> and was checked against the code; where they disagree about intent, this file
+> and the O-ledger win.
+
 This is the durable handoff document for anyone working on the project. Read it before making changes, then update it whenever architecture, milestone status, paths, or workflow constraints materially change.
 
 ## Product vision
@@ -135,7 +148,7 @@ level 120, the drop pipeline, the skill-board viewport and the HUD feedback
 pass. `main` is the truth. If you are picking up work, start from the list
 below rather than from a branch.
 
-**THE SUITE IS FULLY GREEN — 252 tests, 0 failures — and green is
+**THE SUITE IS FULLY GREEN — 312 tests, 0 failures — and green is
 meaningful.** O36 ruled the band question the former deliberate reds were
 holding open: the band is authored at TWO points now — at-cap 8–10x
 (measures 8.08x) and endgame seed rails 12–20x at ilvl 120 (measures
@@ -753,7 +766,7 @@ The Desktop copy is a backup and must not be edited. The canonical working copy 
 
 The `RiorsEdgeEditor` Development target compiles and links successfully on Apple Silicon and Win64 with Unreal Engine 5.8.
 
-**The suite is 244 tests, all passing, and GREEN IS MEANINGFUL AGAIN.** The
+**The suite is 312 tests, all passing, and GREEN IS MEANINGFUL AGAIN.** The
 former deliberate reds were ruled by O36 and split into pinned fixtures
 (`PowerBand.AtCap` 8.0–10.0, `PowerBand.Endgame` 12.0–20.0 seed rails,
 `RuleBandImpact` at the re-anchored 1.5x PROLIFIC ceiling), so any
@@ -858,7 +871,7 @@ The user's future affix system is intentionally different from the Godot attachm
 ## Session workflow facts (read before working)
 
 - Build: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>\riors_edge.uproject" -WaitMutex`. Fails while the editor is open (Live Coding lock).
-- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; **all 252 pass; there are no deliberate failures any more** (O36 resolved the two, see Verification status). NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
+- Tests: headless `UnrealEditor-Cmd.exe` with `-ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi`; **all 312 pass; there are no deliberate failures any more** (O36 resolved the two, see Verification status). NOTE: when the owner has the MAIN tree editor open, an agent building in a separate worktree hits a false-positive Live Coding lock (the guard keys off the shared UnrealEditor.exe, not the project DLL); `-NoHotReloadFromIDE` is the correct override in that case only.
 - Authority chain for design questions: `Docs/Design/Decisions.md` (append-only O-ledger) supersedes everything; then Design-Overview.md; then the per-domain docs; then `Docs/Design/Master-Sheet-Import.txt`. O2 freezes value authoring — placeholders must be flagged `O2 PLACEHOLDER`.
 - `Docs/Playtest-Feedback-Log.md` records every owner playtest and the responses; append per session.
 - The owner works in short playtest loops: expect to build/fix while the editor is closed, relaunch it for them, and push to origin/main after a clean run. **"Clean" means ZERO failures.** The two former deliberate reds were resolved by O36 into pinned fixtures, so any `Result={Fail}` is now a regression without exception. (Do not pin a commit hash here; it goes stale within a session. `git log` is the source of truth.)
