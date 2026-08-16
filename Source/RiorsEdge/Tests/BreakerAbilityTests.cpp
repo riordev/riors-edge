@@ -324,9 +324,19 @@ bool FBreakerAbilityResolutionTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The Caster default is Cleave"), CasterOne->AbilityId, FName(TEXT("Caster.Cleave")));
         TestEqual(TEXT("Cleave is a Caster ability"), CasterOne->ClassId, EBreakerClassId::Caster);
     }
-    // A class that genuinely has no kit still grants nothing rather than
-    // borrowing another class's.
-    TestNull(TEXT("Tank has no fallback kit yet"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Tank, EBreakerAbilitySlot::ClassAbilityOne, NAME_None));
+    // ALL FIVE classes resolve now (owner authorization 2026-08-16: "feel
+    // free to do all 5 classes"). This line used to assert a Tank slot
+    // resolved to null — that was the alarm for the unbuilt state, and it
+    // fired by design when the kits landed. A classless character is what
+    // still resolves to nothing.
+    const UBreakerAbilityDefinition* TankOne = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Tank, EBreakerAbilitySlot::ClassAbilityOne, NAME_None);
+    TestNotNull(TEXT("An empty Tank slot one resolves (kit implemented 2026-08-16)"), TankOne);
+    if (TankOne)
+    {
+        TestEqual(TEXT("The Tank default is Rend"), TankOne->AbilityId, FName(TEXT("Tank.Rend")));
+        TestTrue(TEXT("And it executes"), TankOne->IsImplemented());
+    }
+    TestNull(TEXT("No class resolves nothing"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::None, EBreakerAbilitySlot::ClassAbilityOne, NAME_None));
     // An explicitly equipped ability that does not fit the slot is refused.
     TestNull(TEXT("Overdrive cannot be equipped into a class slot"), UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne, TEXT("Swift.Overdrive")));
     // Rule changed after the owner hit dead abilities from a stale loadout:

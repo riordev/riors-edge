@@ -6,8 +6,11 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Characters/BreakerCharacter.h"
+#include "Classes/BreakerChargeComponent.h"
+#include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Classes/BreakerScrapComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "UI/BreakerUIStyle.h"
@@ -755,6 +758,18 @@ BreakerHUD::FResourceRow ABreakerPlaytestHUD::ResolveResourceRow(const ABreakerC
         const UBreakerAttributeSet* Attributes = Character->GetAttributes();
         const float MaxMana = Attributes ? Attributes->GetMaxClassResource() : 0.0f;
         return BreakerHUD::ResolveManaRow(Mana->GetMana(), MaxMana, Mana->GetOvercastFloor());
+    }
+    if (const UBreakerScrapComponent* Scrap = Character->GetScrap(); Scrap && Scrap->IsActiveForOwner())
+    {
+        return BreakerHUD::ResolveScrapRow(Scrap->GetScrapFraction(), Scrap->GetScrapState());
+    }
+    if (const UBreakerGritComponent* Grit = Character->GetGrit(); Grit && Grit->IsActiveForOwner())
+    {
+        return BreakerHUD::ResolveGritRow(Grit->GetGritFraction(), Grit->GetGritBand());
+    }
+    if (const UBreakerChargeComponent* Charge = Character->GetCharge(); Charge && Charge->IsActiveForOwner())
+    {
+        return BreakerHUD::ResolveChargeRow(Charge->GetChargeFraction(), Charge->GetChargeBand());
     }
     return BreakerHUD::ResolveEmptyResourceRow();
 }

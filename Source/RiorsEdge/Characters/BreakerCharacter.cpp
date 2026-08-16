@@ -28,6 +28,9 @@
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Classes/BreakerScrapComponent.h"
+#include "Classes/BreakerGritComponent.h"
+#include "Classes/BreakerChargeComponent.h"
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
@@ -75,6 +78,11 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     Equipment = CreateDefaultSubobject<UBreakerEquipmentComponent>(TEXT("Equipment"));
     Momentum = CreateDefaultSubobject<UBreakerMomentumComponent>(TEXT("Momentum"));
     Mana = CreateDefaultSubobject<UBreakerManaComponent>(TEXT("Mana"));
+    // The other three loops, the same attach pattern: every pawn carries all
+    // five and each gates itself on the permanent class internally.
+    Scrap = CreateDefaultSubobject<UBreakerScrapComponent>(TEXT("Scrap"));
+    Grit = CreateDefaultSubobject<UBreakerGritComponent>(TEXT("Grit"));
+    Charge = CreateDefaultSubobject<UBreakerChargeComponent>(TEXT("Charge"));
     Abilities = CreateDefaultSubobject<UBreakerAbilityComponent>(TEXT("Abilities"));
     Quests = CreateDefaultSubobject<UBreakerQuestJournal>(TEXT("QuestJournal"));
 
@@ -160,6 +168,17 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     ApplyWeaponPresentation();
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
+    // Coarse poll for the Grit/Charge discrete state inputs (in-combat,
+    // enemy-within-5m). Cheap: early-outs unless one of those loops is live.
+    if (HasAuthority())
+    {
+        ClassResourcePollElapsed += DeltaSeconds;
+        if (ClassResourcePollElapsed >= ClassResourcePollInterval)
+        {
+            ClassResourcePollElapsed = 0.0f;
+            UpdateClassResourceStates();
+        }
+    }
     // Fall-out-of-map recovery: the template level has no kill volume, so
     // enforce our own floor relative to the spawn point.
     if (HasAuthority() && GetActorLocation().Z < FallKillZ)
@@ -197,6 +216,31 @@ void ABreakerCharacter::BeginPlay()
     AbilitySystem->InitAbilityActorInfo(this, this);
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
+    // --- Class-resource wiring (T7 step 2) -----------------------------
+    // Every resource loop's Notify* entry point gets its one real caller
+    // here. Server-side facts only, so the bindings are authority-gated.
+    if (HasAuthority())
+    {
+        if (Combat)
+        {
+            // Scrap: kills at the killing instance's coefficient (§1.1).
+            Combat->OnKillDealt.AddDynamic(this, &ThisClass::HandleClassResourceKill);
+            // Grit: post-mitigation damage taken (health/shield split), the
+            // passive block proc, and the self-inflicted flag off Instigator.
+            Combat->OnDamageTaken.AddDynamic(this, &ThisClass::HandleClassResourceDamageTaken);
+            // Charge: healing/shielding done, effective/overheal split.
+            Combat->OnHealingDealt.AddDynamic(this, &ThisClass::HandleClassResourceHealingDealt);
+            // The in-combat derivation needs "recently dealt a hit" too.
+            Combat->OnHitDealt.AddDynamic(this, &ThisClass::HandleClassResourceHitDealt);
+        }
+        if (Weapon)
+        {
+            // Scrap: completed reloads and full-magazine dumps, each carrying
+            // its own anti-farm clause as the parameter.
+            Weapon->OnReloadCompleted.AddDynamic(this, &ThisClass::HandleClassResourceReloadCompleted);
+            Weapon->OnMagazineEmptied.AddDynamic(this, &ThisClass::HandleClassResourceMagazineEmptied);
+        }
+    }
     PlaytestSpawnTransform = GetActorTransform();
     FallKillZ = PlaytestSpawnTransform.GetLocation().Z - 4000.0f;
     // A weapon ITEM decides which gun its slot holds. Bound before the save
@@ -962,7 +1006,157 @@ void ABreakerCharacter::PoseArm(UStaticMeshComponent* Forearm, UStaticMeshCompon
 
 void ABreakerCharacter::HandlePlayerDeath()
 {
+    // Death zeroes Grit BEFORE the playtest reset restores vitals: no banking
+    // through a death and no free Hold on respawn (Class-Kits-Tank §1.4).
+    if (Grit) Grit->NotifyDeath();
     ResetPlaytest();
+}
+
+// ---------------------------------------------------------------------------
+// Class-resource event fan-out (T7 step 2). Every handler forwards one real
+// event to every loop that could read it; the loops' own class gates make the
+// forwarding a no-op for non-owners, so there is not a single class branch
+// here to go stale on a class swap.
+// ---------------------------------------------------------------------------
+
+void ABreakerCharacter::HandleClassResourceKill(const FBreakerHitContext& Hit)
+{
+    LastHitDealtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    if (Scrap)
+    {
+        // §1.1: a kill credits at the KILLING INSTANCE'S proc coefficient.
+        // RECORDED GAP: FBreakerHitContext does not carry the coefficient, so
+        // every kill credits at 1.0. The rule's anti-farm target — Tick
+        // Frequency becoming a Scrap engine — cannot fire through THIS event
+        // (a kill happens once per enemy regardless of tick rate), so 1.0 is
+        // an over-credit only in the DoT-landed-the-kill case, and it is
+        // visible here rather than hidden.
+        Scrap->NotifyKill(1.0f);
+    }
+    // Grit's melee-kill source is fed by Rend itself (the Tank's only melee
+    // verb) — this generic kill event cannot tell melee from a bullet.
+}
+
+void ABreakerCharacter::HandleClassResourceHitDealt(const FBreakerHitContext& Hit)
+{
+    // Timestamp only: "recently dealt a hit" is half the in-combat derivation.
+    LastHitDealtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+}
+
+void ABreakerCharacter::HandleClassResourceDamageTaken(const FBreakerHitContext& Hit)
+{
+    if (!Grit) return;
+    // POST-MITIGATION, health and shield as separate quantities — the split
+    // the Grit component demands so shield absorption pays half. Instigator on
+    // the hit context is what makes the self-damage flag honest: a Breach
+    // Charge self-hit arrives with Instigator == this and pays at the 25%
+    // self-damage rate under its own sub-cap, so rocket-jumping cannot become
+    // the cheapest Grit engine (§1.3 rule 3).
+    //
+    // RECORDED GAP: the context carries no proc coefficient, so a DoT tick on
+    // the Tank pays at 1.0 rather than at its coefficient. No enemy applies a
+    // DoT to the player today, which is why this is a recorded gap and not a
+    // live exploit; the day one does, the coefficient must travel with the
+    // context.
+    Grit->NotifyDamageTaken(Hit.Result.HealthDamage, Hit.Result.ShieldDamage,
+        /*bSelfInflicted=*/Hit.Instigator == this, /*ProcCoefficient=*/1.0f);
+    // The passive block layer: an RNG proc, never an input (O1). The roll
+    // already happened inside the damage resolve; this only reports it.
+    if (Hit.Result.bBlocked)
+    {
+        Grit->NotifyBlockProc();
+    }
+}
+
+void ABreakerCharacter::HandleClassResourceHealingDealt(const FBreakerHealContext& Heal)
+{
+    if (!Charge || !Heal.Target) return;
+    // The effective/overheal split arrives pre-separated on the heal result —
+    // the exact contract the Charge component's signature demands, so overheal
+    // credits nothing by construction. Percentage-of-TARGET max health.
+    float TargetMaxHealth = 0.0f;
+    if (const ABreakerCharacter* TargetBreaker = Cast<ABreakerCharacter>(Heal.Target))
+    {
+        if (const UBreakerAttributeSet* TargetAttributes = TargetBreaker->GetAttributes())
+        {
+            TargetMaxHealth = TargetAttributes->GetMaxHealth();
+        }
+    }
+    else if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(Heal.Target))
+    {
+        if (const UAbilitySystemComponent* TargetASC = AbilityOwner->GetAbilitySystemComponent())
+        {
+            if (const UBreakerAttributeSet* TargetAttributes = TargetASC->GetSet<UBreakerAttributeSet>())
+            {
+                TargetMaxHealth = TargetAttributes->GetMaxHealth();
+            }
+        }
+    }
+    const bool bSelfTargeted = Heal.Target == this;
+    // RECORDED GAP: heal contexts carry no proc coefficient (no heal-over-time
+    // source exists to need one); 1.0 until one does.
+    if (Heal.Result.HealthHealed > 0.0f || Heal.Result.Overheal > 0.0f)
+    {
+        Charge->NotifyHealingDone(Heal.Result.HealthHealed, Heal.Result.Overheal, TargetMaxHealth, bSelfTargeted, 1.0f);
+    }
+    // The shield-side twin: shield actually granted (the overheal-to-shield
+    // routing) credits through the shielding source; over-cap shield was
+    // already trimmed by the healing resolve and so never reaches the rule.
+    if (Heal.Result.ShieldGranted > 0.0f)
+    {
+        Charge->NotifyShieldingDone(Heal.Result.ShieldGranted, 0.0f, TargetMaxHealth, bSelfTargeted);
+    }
+}
+
+void ABreakerCharacter::HandleClassResourceReloadCompleted(bool bAnyRoundFired)
+{
+    if (Scrap) Scrap->NotifyReloadCompleted(bAnyRoundFired);
+}
+
+void ABreakerCharacter::HandleClassResourceMagazineEmptied(bool bStartedFull)
+{
+    if (Scrap) Scrap->NotifyMagazineEmptied(bStartedFull);
+}
+
+void ABreakerCharacter::UpdateClassResourceStates()
+{
+    // Only the two loops with discrete state inputs pay for the derivation,
+    // and only when one of them is actually live for this class.
+    const bool bGritLive = Grit && Grit->IsActiveForOwner();
+    const bool bChargeLive = Charge && Charge->IsActiveForOwner();
+    if (!bGritLive && !bChargeLive) return;
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    // "In combat": took or dealt damage inside the window. The dumbest true
+    // derivation (O2 PLACEHOLDER) — the project has no shared combat-state
+    // concept for it to read instead.
+    const double Now = World->GetTimeSeconds();
+    const bool bInCombat = (Combat && Combat->GetSecondsSinceDamage() < CombatStateWindowSeconds)
+        || (Now - LastHitDealtTime < CombatStateWindowSeconds);
+    if (bGritLive) Grit->SetInCombat(bInCombat);
+    if (bChargeLive) Charge->SetInCombat(bInCombat);
+
+    // Grit's proximity source: an enemy within 5 m (Class-Kits-Tank §1.1).
+    // A BOOL by construction — the component has no count overload to pay
+    // per-enemy, so this scan stops at the first live one.
+    if (bGritLive)
+    {
+        bool bEnemyNear = false;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            const ABreakerEnemy* Enemy = *It;
+            if (!Enemy) continue;
+            const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+            if (!EnemyCombat || EnemyCombat->IsDead()) continue;
+            if (FVector::DistSquared(GetActorLocation(), Enemy->GetActorLocation()) <= GritProximityRadiusCm * GritProximityRadiusCm)
+            {
+                bEnemyNear = true;
+                break;
+            }
+        }
+        Grit->SetEnemyInProximity(bEnemyNear);
+    }
 }
 
 void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)

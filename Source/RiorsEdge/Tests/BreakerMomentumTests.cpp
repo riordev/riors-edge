@@ -57,10 +57,10 @@ bool FBreakerMomentumInertTest::RunTest(const FString& Parameters)
 
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     TestFalse(TEXT("An unselected class is not Swift"), Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift);
-    // O39: locking a class with no implemented kit is refused at the component,
-    // so the un-built-class premise uses the dev swap instead.
-    TestFalse(TEXT("Locking an unimplemented class is refused (O39)"), Progression->ChoosePermanentClassById(EBreakerClassId::Tank));
-    Progression->DevForceClass(EBreakerClassId::Tank);
+    // Tank has an implemented kit now (owner authorization 2026-08-16), so
+    // the O39 gate ADMITS it; None remains the class no gate may pass.
+    TestFalse(TEXT("Locking no class at all is refused"), Progression->ChoosePermanentClassById(EBreakerClassId::None));
+    TestTrue(TEXT("Locking Tank is allowed now that its kit executes (2026-08-16)"), Progression->ChoosePermanentClassById(EBreakerClassId::Tank));
     TestFalse(TEXT("A Tank never runs the Momentum loop"), Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift);
     Progression->DevForceClass(EBreakerClassId::Swift);
     TestTrue(TEXT("Swift runs the Momentum loop"), Progression->GetProgressionState().PermanentClass == EBreakerClassId::Swift);

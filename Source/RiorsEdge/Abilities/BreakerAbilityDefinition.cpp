@@ -11,6 +11,9 @@
 #include "Abilities/BreakerAbility_Unmake.h"
 #include "Abilities/BreakerAbility_Overdrive.h"
 #include "Abilities/BreakerAbility_Skim.h"
+#include "Abilities/BreakerGunsmithAbilities.h"
+#include "Abilities/BreakerSupportAbilities.h"
+#include "Abilities/BreakerTankAbilities.h"
 
 bool UBreakerAbilityDefinition::CanOccupySlot(EBreakerAbilitySlot Slot) const
 {
@@ -383,42 +386,26 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Registry.Add(Unmake);
 
     // ==================================================================
-    // GUNSMITH, TANK AND SUPPORT — DATA ONLY. NOTHING BELOW EXECUTES.
+    // GUNSMITH, TANK AND SUPPORT — IMPLEMENTED (owner authorization
+    // 2026-08-16: "feel free to do all 5 classes").
     // ==================================================================
-    // READ THIS BEFORE ASSUMING ANY OF THE FOLLOWING WORKS.
+    // These twenty-one rows were registered as DATA ONLY with null
+    // `AbilityClass`, and this block used to forbid nearest-fit pointing and
+    // wait for "the day the abilities run". That day is this pass: every row
+    // now names its real `UGameplayAbility` subclass
+    // (Abilities/BreakerGunsmithAbilities.h / BreakerTankAbilities.h /
+    // BreakerSupportAbilities.h), the minimal deployable system behind five of
+    // them exists (Combat/BreakerDeployable.h — O30's hole, opened), the class
+    // definitions are registered (Progression/BreakerProgressionLibrary.cpp)
+    // AFTER the abilities execute — never before, which is the T7 ordering
+    // that recreated the every-ability-reads-locked bug — and
+    // `DefaultAbilityIdForSlot` below carries the three classes' starters.
     //
-    // **Every definition below leaves `AbilityClass` null**, which is not an
-    // oversight and is not a TODO that slipped: no `UGameplayAbility` subclass
-    // exists for any of these twenty-one rows, and `IsImplemented()` returning
-    // false is the honest answer. `UBreakerAbilityComponent` records such a slot
-    // as UNIMPLEMENTED rather than granting nothing silently, which is exactly
-    // the behaviour wanted here — the alternative, pointing these at some
-    // nearest-fit existing ability, would make a Turret cast Skim.
-    //
-    // **These rows do not make the three classes selectable, and must not.**
-    // O39 (slice class honesty) keeps a class off the class screen until it has
-    // an implemented kit, and `GetFallbackClassDefinition` still returns
-    // `nullptr` for all three, so nothing reads as unlocked and no character can
-    // lock into a class that grants nothing. `DefaultAbilityIdForSlot` is
-    // likewise NOT extended below — `RiorsEdge.Abilities.*` asserts today that
-    // a Tank slot resolves to null, and that assertion is correct until the
-    // abilities execute. Registering the class definitions and the default
-    // loadout rows is a single, later, deliberate step, and it should happen on
-    // the day the abilities run and not before.
-    //
-    // So what are these FOR? Three things a null registry cannot do: the picker
-    // and the HUD can enumerate a real catalogue through `GetClassAbilities`;
-    // the costs, cooldowns and slot affinities are pinned by a test instead of
-    // living only in prose; and the keystone variant rows exist so the ultimate
-    // rewrites are structure rather than a promise. Costs and cooldowns are
-    // QUOTED from the three class-kit documents — see the per-row citations —
-    // and every one of those documents is under a blanket O2 PLACEHOLDER
-    // banner, so nothing here is authored balance either.
-    //
-    // O30: DEPLOYABLES AND MINIONS DO NOT EXIST IN ANY FORM. Four of the six
-    // Gunsmith abilities and one Tank ability are deployables. Their rows below
-    // are DATA describing a system the ledger says is unbuilt; no actor, no
-    // density cap, no lifetime, no targeting is created by anything here.
+    // Costs and cooldowns remain QUOTED from the three class-kit documents
+    // (per-row citations kept), all under the blanket O2 PLACEHOLDER banner:
+    // the classes are PLAYABLE, not balanced. Behavioural gaps that could not
+    // be built honestly (threat, stagger, status immunity, reload tempo, the
+    // party layer) are recorded at each ability's own site, never faked.
 
     // ------------------------------------------------------------------
     // GUNSMITH — Scrap. Costs and cooldowns quoted from
@@ -442,6 +429,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     SidearmRig->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
     SidearmRig->AbilityTag = Ability_Class_Gunsmith_SidearmRig;
     SidearmRig->CooldownTag = Cooldown_Class_Gunsmith_SidearmRig;
+    SidearmRig->AbilityClass = UBreakerAbility_SidearmRig::StaticClass();
     SidearmRig->ResourceCost = 0.0f;
     SidearmRig->CooldownSeconds = 10.0f;
     // WindowDuration stays 0 DELIBERATELY. Sidearm Rig's window is counted in
@@ -460,6 +448,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Overhaul->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Overhaul->AbilityTag = Ability_Class_Gunsmith_Overhaul;
     Overhaul->CooldownTag = Cooldown_Class_Gunsmith_Overhaul;
+    Overhaul->AbilityClass = UBreakerAbility_Overhaul::StaticClass();
     Overhaul->ResourceCost = 0.0f;
     Overhaul->CooldownSeconds = 18.0f;
     Overhaul->WindowDuration = 10.0f;
@@ -473,6 +462,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Turret->Description = FText::FromString(TEXT("An emplacement that fires on the nearest target it can see. Consistent, never optimal."));
     Turret->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Turret->AbilityTag = Ability_Class_Gunsmith_Turret;
+    Turret->AbilityClass = UBreakerAbility_Turret::StaticClass();
     Turret->ResourceCost = 40.0f;
     Turret->CooldownSeconds = 0.0f;
     Turret->WindowDuration = 30.0f;   // the emplacement's lifetime, for the HUD
@@ -486,6 +476,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     AmmoCrate->Description = FText::FromString(TEXT("A crate of reserve ammunition. You are a valid interactor with your own, at full value."));
     AmmoCrate->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     AmmoCrate->AbilityTag = Ability_Class_Gunsmith_AmmoCrate;
+    AmmoCrate->AbilityClass = UBreakerAbility_AmmoCrate::StaticClass();
     AmmoCrate->ResourceCost = 30.0f;
     AmmoCrate->CooldownSeconds = 0.0f;
     AmmoCrate->WindowDuration = 45.0f;
@@ -499,6 +490,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     MineCluster->Description = FText::FromString(TEXT("Three proximity charges that arm on a delay. The cluster is one placement, not three."));
     MineCluster->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     MineCluster->AbilityTag = Ability_Class_Gunsmith_MineCluster;
+    MineCluster->AbilityClass = UBreakerAbility_MineCluster::StaticClass();
     MineCluster->ResourceCost = 35.0f;
     MineCluster->CooldownSeconds = 0.0f;
     MineCluster->WindowDuration = 60.0f;
@@ -512,6 +504,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Disruptor->Description = FText::FromString(TEXT("A field that slows enemies inside it and strips a flat amount of their armour."));
     Disruptor->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Disruptor->AbilityTag = Ability_Class_Gunsmith_Disruptor;
+    Disruptor->AbilityClass = UBreakerAbility_Disruptor::StaticClass();
     Disruptor->ResourceCost = 45.0f;
     Disruptor->CooldownSeconds = 0.0f;
     Disruptor->WindowDuration = 20.0f;
@@ -525,6 +518,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     FieldAssembly->Description = FText::FromString(TEXT("Deploys every unlocked deployable type at once and raises the density cap for the window."));
     FieldAssembly->SlotAffinity = EBreakerAbilitySlot::Ultimate;
     FieldAssembly->AbilityTag = Ability_Class_Gunsmith_FieldAssembly;
+    FieldAssembly->AbilityClass = UBreakerAbility_FieldAssembly::StaticClass();
     FieldAssembly->ResourceCost = 100.0f;
     FieldAssembly->CooldownSeconds = 0.0f;
     FieldAssembly->WindowDuration = 20.0f;
@@ -592,6 +586,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Rend->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
     Rend->AbilityTag = Ability_Class_Tank_Rend;
     Rend->CooldownTag = Cooldown_Class_Tank_Rend;
+    Rend->AbilityClass = UBreakerAbility_Rend::StaticClass();
     Rend->ResourceCost = 25.0f;
     Rend->CooldownSeconds = 6.0f;
     Registry.Add(Rend);
@@ -605,6 +600,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Bloodline->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Bloodline->AbilityTag = Ability_Class_Tank_Bloodline;
     Bloodline->CooldownTag = Cooldown_Class_Tank_Bloodline;
+    Bloodline->AbilityClass = UBreakerAbility_Bloodline::StaticClass();
     Bloodline->ResourceCost = 40.0f;
     Bloodline->CooldownSeconds = 12.0f;
     Bloodline->WindowDuration = 8.0f;
@@ -619,6 +615,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     AnchorPoint->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     AnchorPoint->AbilityTag = Ability_Class_Tank_AnchorPoint;
     AnchorPoint->CooldownTag = Cooldown_Class_Tank_AnchorPoint;
+    AnchorPoint->AbilityClass = UBreakerAbility_AnchorPoint::StaticClass();
     AnchorPoint->ResourceCost = 30.0f;
     AnchorPoint->CooldownSeconds = 10.0f;
     AnchorPoint->WindowDuration = 12.0f;
@@ -633,6 +630,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Provoke->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Provoke->AbilityTag = Ability_Class_Tank_Provoke;
     Provoke->CooldownTag = Cooldown_Class_Tank_Provoke;
+    Provoke->AbilityClass = UBreakerAbility_Provoke::StaticClass();
     Provoke->ResourceCost = 35.0f;
     Provoke->CooldownSeconds = 12.0f;
     Provoke->WindowDuration = 4.0f;
@@ -647,6 +645,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     BreachCharge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     BreachCharge->AbilityTag = Ability_Class_Tank_BreachCharge;
     BreachCharge->CooldownTag = Cooldown_Class_Tank_BreachCharge;
+    BreachCharge->AbilityClass = UBreakerAbility_BreachCharge::StaticClass();
     BreachCharge->ResourceCost = 30.0f;
     BreachCharge->CooldownSeconds = 8.0f;
     Registry.Add(BreachCharge);
@@ -660,6 +659,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     GroundZero->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     GroundZero->AbilityTag = Ability_Class_Tank_GroundZero;
     GroundZero->CooldownTag = Cooldown_Class_Tank_GroundZero;
+    GroundZero->AbilityClass = UBreakerAbility_GroundZero::StaticClass();
     GroundZero->ResourceCost = 45.0f;
     GroundZero->CooldownSeconds = 10.0f;
     Registry.Add(GroundZero);
@@ -672,6 +672,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Hold->Description = FText::FromString(TEXT("Caps the damage any single hit can do to you, and triples Grit generation for the duration."));
     Hold->SlotAffinity = EBreakerAbilitySlot::Ultimate;
     Hold->AbilityTag = Ability_Class_Tank_Hold;
+    Hold->AbilityClass = UBreakerAbility_Hold::StaticClass();
     Hold->ResourceCost = 100.0f;
     Hold->CooldownSeconds = 0.0f;
     Hold->WindowDuration = 10.0f;
@@ -739,6 +740,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Patch->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
     Patch->AbilityTag = Ability_Class_Support_Patch;
     Patch->CooldownTag = Cooldown_Class_Support_Patch;
+    Patch->AbilityClass = UBreakerAbility_Patch::StaticClass();
     Patch->ResourceCost = 25.0f;
     Patch->CooldownSeconds = 6.0f;
     Registry.Add(Patch);
@@ -752,6 +754,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Purge->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Purge->AbilityTag = Ability_Class_Support_Purge;
     Purge->CooldownTag = Cooldown_Class_Support_Purge;
+    Purge->AbilityClass = UBreakerAbility_Purge::StaticClass();
     Purge->ResourceCost = 30.0f;
     Purge->CooldownSeconds = 10.0f;
     Purge->WindowDuration = 3.0f;   // the immunity window, which is the whole value
@@ -766,6 +769,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Cadence->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Cadence->AbilityTag = Ability_Class_Support_Cadence;
     Cadence->CooldownTag = Cooldown_Class_Support_Cadence;
+    Cadence->AbilityClass = UBreakerAbility_Cadence::StaticClass();
     Cadence->ResourceCost = 30.0f;
     Cadence->CooldownSeconds = 8.0f;
     Cadence->WindowDuration = 8.0f;
@@ -780,6 +784,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Metronome->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Metronome->AbilityTag = Ability_Class_Support_Metronome;
     Metronome->CooldownTag = Cooldown_Class_Support_Metronome;
+    Metronome->AbilityClass = UBreakerAbility_Metronome::StaticClass();
     Metronome->ResourceCost = 35.0f;
     Metronome->CooldownSeconds = 9.0f;
     Metronome->WindowDuration = 8.0f;
@@ -794,6 +799,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Mark->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Mark->AbilityTag = Ability_Class_Support_Mark;
     Mark->CooldownTag = Cooldown_Class_Support_Mark;
+    Mark->AbilityClass = UBreakerAbility_Mark::StaticClass();
     Mark->ResourceCost = 20.0f;
     Mark->CooldownSeconds = 5.0f;
     Mark->WindowDuration = 10.0f;
@@ -808,6 +814,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Suppress->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
     Suppress->AbilityTag = Ability_Class_Support_Suppress;
     Suppress->CooldownTag = Cooldown_Class_Support_Suppress;
+    Suppress->AbilityClass = UBreakerAbility_Suppress::StaticClass();
     Suppress->ResourceCost = 40.0f;
     Suppress->CooldownSeconds = 10.0f;
     Suppress->WindowDuration = 6.0f;
@@ -821,6 +828,7 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Conduit->Description = FText::FromString(TEXT("For the duration your abilities cost nothing and reach every valid target near you — always including yourself."));
     Conduit->SlotAffinity = EBreakerAbilitySlot::Ultimate;
     Conduit->AbilityTag = Ability_Class_Support_Conduit;
+    Conduit->AbilityClass = UBreakerAbility_Conduit::StaticClass();
     Conduit->ResourceCost = 100.0f;
     Conduit->CooldownSeconds = 0.0f;
     Conduit->WindowDuration = 12.0f;
@@ -978,6 +986,36 @@ FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId
         case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Caster.Cleave");
         case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Caster.Rot");
         case EBreakerAbilitySlot::Ultimate:        return TEXT("Caster.Unmake");
+        default: return NAME_None;
+        }
+    // The three formerly-unbuilt classes (implemented 2026-08-16, owner
+    // authorization). Each default pair is the kit's two STARTERS, sitting on
+    // opposite sides of the class tension exactly as the treatments name them:
+    // Gunsmith holds a gun buff and a turret (Class-Kits-Gunsmith §3), Tank
+    // holds sustain and position (Class-Kits-Tank §2), Support holds a heal
+    // and a mark (Class-Kits-Support §3).
+    case EBreakerClassId::Gunsmith:
+        switch (Slot)
+        {
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Gunsmith.SidearmRig");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Gunsmith.Turret");
+        case EBreakerAbilitySlot::Ultimate:        return TEXT("Gunsmith.FieldAssembly");
+        default: return NAME_None;
+        }
+    case EBreakerClassId::Tank:
+        switch (Slot)
+        {
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Tank.Rend");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Tank.AnchorPoint");
+        case EBreakerAbilitySlot::Ultimate:        return TEXT("Tank.Hold");
+        default: return NAME_None;
+        }
+    case EBreakerClassId::Support:
+        switch (Slot)
+        {
+        case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Support.Patch");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Support.Mark");
+        case EBreakerAbilitySlot::Ultimate:        return TEXT("Support.Conduit");
         default: return NAME_None;
         }
     default:

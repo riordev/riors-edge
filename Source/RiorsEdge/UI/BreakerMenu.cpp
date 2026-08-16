@@ -4461,6 +4461,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
     GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevClassSwap, GGameUserSettingsIni);
 
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    // D13: a refused class lock renders its reason here instead of the screen
+    // rebuilding as if nothing happened.
+    if (!CharacterScreenStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, true)
+        ];
+    }
     if (CurrentClass != EBreakerClassId::None)
     {
         const FClassEntry* Locked = nullptr;
@@ -4510,7 +4519,21 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
                 {
                     UBreakerProgressionComponent* Progression = Character->GetProgression();
                     if (bCapturedDevSwap) Progression->DevForceClass(CapturedClass);
-                    if (bCapturedDevSwap || Progression->ChoosePermanentClassById(CapturedClass)) Character->SaveGameState();
+                    // D13 FIX: the return is CHECKED and a refusal is
+                    // SURFACED. Before this the screen ignored the result and
+                    // rebuilt silently, so a refused lock (O39, or any future
+                    // refusal reason) was indistinguishable from a successful
+                    // one — the exact silent-rebuild the fix names.
+                    if (bCapturedDevSwap || Progression->ChoosePermanentClassById(CapturedClass))
+                    {
+                        CharacterScreenStatus = FText::GetEmpty();
+                        Character->SaveGameState();
+                    }
+                    else
+                    {
+                        CharacterScreenStatus = FText::FromString(
+                            TEXT("That class was refused: it has no implemented kit yet, or a class is already locked."));
+                    }
                 }
                 Rebuild(EBreakerMenuScreen::ClassSelect);
                 return FReply::Handled();

@@ -21,6 +21,9 @@ class UBreakerPlaytestComponent;
 class UBreakerEquipmentComponent;
 class UBreakerMomentumComponent;
 class UBreakerManaComponent;
+class UBreakerScrapComponent;
+class UBreakerGritComponent;
+class UBreakerChargeComponent;
 class UBreakerAbilityComponent;
 class UBreakerQuestJournal;
 class ABreakerNPC;
@@ -51,6 +54,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") UBreakerProgressionComponent* GetProgression() const { return Progression; }
     UFUNCTION(BlueprintPure, Category="Momentum") UBreakerMomentumComponent* GetMomentum() const { return Momentum; }
     UFUNCTION(BlueprintPure, Category="Mana") UBreakerManaComponent* GetMana() const { return Mana; }
+    UFUNCTION(BlueprintPure, Category="Scrap") UBreakerScrapComponent* GetScrap() const { return Scrap; }
+    UFUNCTION(BlueprintPure, Category="Grit") UBreakerGritComponent* GetGrit() const { return Grit; }
+    UFUNCTION(BlueprintPure, Category="Charge") UBreakerChargeComponent* GetCharge() const { return Charge; }
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAbilityComponent* GetAbilities() const { return Abilities; }
     UFUNCTION(BlueprintCallable, Category="Save") void SaveGameState();
     UFUNCTION(BlueprintCallable, Category="Save") void LoadGameState();
@@ -113,6 +119,13 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Equipment") TObjectPtr<UBreakerEquipmentComponent> Equipment;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Momentum") TObjectPtr<UBreakerMomentumComponent> Momentum;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mana") TObjectPtr<UBreakerManaComponent> Mana;
+    // The three remaining class-resource loops (owner authorization
+    // 2026-08-16). Attached unconditionally like Momentum and Mana: each loop
+    // gates itself internally on the owner's permanent class, so a Swift
+    // carries an inert Scrap component exactly as it carries an inert Mana one.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Scrap") TObjectPtr<UBreakerScrapComponent> Scrap;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Grit") TObjectPtr<UBreakerGritComponent> Grit;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Charge") TObjectPtr<UBreakerChargeComponent> Charge;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities") TObjectPtr<UBreakerAbilityComponent> Abilities;
     // THE RIG ROOT. Historically this was the weapon body itself, a single grey
     // cube; it is now an EMPTY transform that every proxy part and both arms
@@ -297,6 +310,20 @@ private:
     void OpenMenuScreenForCapture(const FString& ScreenName);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void HandlePlayerDeath();
+    // --- Class-resource event wiring (the T7 step-2 call sites) ------------
+    // Each handler fans one real combat/weapon event out to whichever resource
+    // loop is live for this character's class; the loops themselves stay
+    // inert for non-owners, so the fan-out needs no class branches here.
+    UFUNCTION() void HandleClassResourceKill(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleClassResourceHitDealt(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleClassResourceDamageTaken(const FBreakerHitContext& Hit);
+    UFUNCTION() void HandleClassResourceHealingDealt(const FBreakerHealContext& Heal);
+    UFUNCTION() void HandleClassResourceReloadCompleted(bool bAnyRoundFired);
+    UFUNCTION() void HandleClassResourceMagazineEmptied(bool bStartedFull);
+    // Derives the discrete combat/proximity state the Grit and Charge loops
+    // read (in-combat, enemy-within-5m), on a coarse poll rather than a
+    // per-frame scan. Runs only while one of those loops is live.
+    void UpdateClassResourceStates();
     // The campaign's only non-dialogue flag source today: a kill advances the
     // counted objectives of whichever quest is active. Bound to the combat
     // component's attacker-side OnKillDealt.
@@ -345,4 +372,15 @@ private:
     int32 ViewmodelCycleIndex = 0;
     bool bViewmodelBuilt = false;
     EBreakerWeaponArchetype PresentedArchetype = EBreakerWeaponArchetype::Count;
+
+    // --- Class-resource state derivation ---------------------------------
+    // "In combat" for the Grit/Charge loops: damage taken OR dealt within the
+    // window. O2 PLACEHOLDER — the project has no shared combat-state concept
+    // yet, and this derivation is deliberately the dumbest thing that is true.
+    float CombatStateWindowSeconds = 6.0f;   // O2 PLACEHOLDER
+    // Class-Kits-Tank §1.1: an enemy within 5 m is the proximity source.
+    float GritProximityRadiusCm = 500.0f;    // O2 PLACEHOLDER (§1.1: 5 m)
+    float ClassResourcePollInterval = 0.25f; // O2 PLACEHOLDER
+    float ClassResourcePollElapsed = 0.0f;
+    double LastHitDealtTime = -1000.0;
 };

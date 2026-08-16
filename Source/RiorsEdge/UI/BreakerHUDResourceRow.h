@@ -1,7 +1,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Classes/BreakerChargeComponent.h"
+#include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Classes/BreakerScrapComponent.h"
 #include "UI/BreakerUIStyle.h"
 
 // ---------------------------------------------------------------------------
@@ -131,6 +134,104 @@ namespace BreakerHUD
             Row.StateWord = TEXT("BANKED");
             Row.StateColor = BreakerUI::Cyan;
             Row.Fraction = MaxMana > 0.0f ? FMath::Min(Mana / MaxMana, 1.0f) : 0.0f;
+        }
+        return Row;
+    }
+
+    // Gunsmith — Scrap. A ledger: accumulates, never decays, never idles. The
+    // three bands reuse Momentum's texture ladder (continuous / blocks / wide
+    // blocks) so the "how full is my working capital" read is peripheral, and
+    // Surplus — the band the class is built to SPEND OUT OF — owns the loud
+    // frame exactly as Redline does.
+    inline FResourceRow ResolveScrapRow(float ScrapFraction, EBreakerScrapState State)
+    {
+        FResourceRow Row;
+        Row.bActive = true;
+        Row.Label = TEXT("SCRAP");
+        Row.Fraction = FMath::Clamp(ScrapFraction, 0.0f, 1.0f);
+        switch (State)
+        {
+        case EBreakerScrapState::Surplus:
+            Row.StateWord = TEXT("SURPLUS");
+            Row.StateColor = BreakerUI::Orange;
+            Row.Track = EResourceTrack::WideBlocks;
+            Row.BorderColor = BreakerUI::Orange;
+            Row.BorderPixels = 2.0f;
+            break;
+        case EBreakerScrapState::Stocked:
+            Row.StateWord = TEXT("STOCKED");
+            Row.StateColor = BreakerUI::Gold;
+            Row.Track = EResourceTrack::Blocks;
+            break;
+        default:
+            Row.StateWord = TEXT("DRY");
+            Row.StateColor = BreakerUI::Cyan;
+            Row.Track = EResourceTrack::Continuous;
+            break;
+        }
+        return Row;
+    }
+
+    // Tank — Grit. A banked state with a lapse timer; IRONCLAD is the band the
+    // class holds under pressure and owns the frame.
+    inline FResourceRow ResolveGritRow(float GritFraction, EBreakerGritBand Band)
+    {
+        FResourceRow Row;
+        Row.bActive = true;
+        Row.Label = TEXT("GRIT");
+        Row.Fraction = FMath::Clamp(GritFraction, 0.0f, 1.0f);
+        switch (Band)
+        {
+        case EBreakerGritBand::Ironclad:
+            Row.StateWord = TEXT("IRONCLAD");
+            Row.StateColor = BreakerUI::Orange;
+            Row.Track = EResourceTrack::WideBlocks;
+            Row.BorderColor = BreakerUI::Orange;
+            Row.BorderPixels = 2.0f;
+            break;
+        case EBreakerGritBand::Braced:
+            Row.StateWord = TEXT("BRACED");
+            Row.StateColor = BreakerUI::Gold;
+            Row.Track = EResourceTrack::Blocks;
+            break;
+        default:
+            Row.StateWord = TEXT("WINDED");
+            Row.StateColor = BreakerUI::Cyan;
+            Row.Track = EResourceTrack::Continuous;
+            break;
+        }
+        return Row;
+    }
+
+    // Support — Charge. A bank the class REACHES the top of, spends, and
+    // climbs back; RESONANT deliberately starts at three quarters rather than
+    // two thirds (the pinned band asymmetry), which the fill length shows
+    // without this row needing to know it.
+    inline FResourceRow ResolveChargeRow(float ChargeFraction, EBreakerChargeBand Band)
+    {
+        FResourceRow Row;
+        Row.bActive = true;
+        Row.Label = TEXT("CHARGE");
+        Row.Fraction = FMath::Clamp(ChargeFraction, 0.0f, 1.0f);
+        switch (Band)
+        {
+        case EBreakerChargeBand::Resonant:
+            Row.StateWord = TEXT("RESONANT");
+            Row.StateColor = BreakerUI::Orange;
+            Row.Track = EResourceTrack::WideBlocks;
+            Row.BorderColor = BreakerUI::Orange;
+            Row.BorderPixels = 2.0f;
+            break;
+        case EBreakerChargeBand::Attuned:
+            Row.StateWord = TEXT("ATTUNED");
+            Row.StateColor = BreakerUI::Gold;
+            Row.Track = EResourceTrack::Blocks;
+            break;
+        default:
+            Row.StateWord = TEXT("COLD");
+            Row.StateColor = BreakerUI::Cyan;
+            Row.Track = EResourceTrack::Continuous;
+            break;
         }
         return Row;
     }

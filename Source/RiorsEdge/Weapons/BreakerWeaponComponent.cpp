@@ -1134,7 +1134,7 @@ void UBreakerWeaponComponent::StartReload()
         return;
     }
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
-    if (!Definition || bReloading || bSwapping || MagazineAmmo >= Definition->MagazineSize || ReserveAmmo <= 0) return;
+    if (!Definition || bReloading || bSwapping || MagazineAmmo >= GetEffectiveMagazineSize() || ReserveAmmo <= 0) return;
     StopFire();
     bReloading = true;
     OnReloadChanged.Broadcast(true);
@@ -1191,8 +1191,21 @@ bool UBreakerWeaponComponent::FireOnce()
     }
 
     LastShotTime = GetWorld()->GetTimeSeconds();
+    // Scrap's magazine-dump clause: the cycle counts as "started full" only
+    // when this round left a genuinely full magazine (Class-Kits-Gunsmith
+    // §1.1 — topping off at 1/30 and firing one round does not re-arm it).
+    if (MagazineAmmo >= GetEffectiveMagazineSize())
+    {
+        bFireCycleStartedFull = true;
+    }
     --MagazineAmmo;
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+    if (MagazineAmmo <= 0)
+    {
+        // On the LAST ROUND LEAVING the magazine — never on the reload.
+        OnMagazineEmptied.Broadcast(bFireCycleStartedFull);
+        bFireCycleStartedFull = false;
+    }
 
     FVector ViewLocation;
     FRotator ViewRotation;
@@ -1468,13 +1481,83 @@ void UBreakerWeaponComponent::FinishReload()
 {
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition) return;
-    const int32 Needed = FMath::Max(0, Definition->MagazineSize - MagazineAmmo);
+    // Fills to the EFFECTIVE capacity, so a reload completing inside an
+    // Overhaul window fills to the overridden size and one completing after
+    // the pop fills to base (Class-Kits-Gunsmith §3 G2's stated requirement).
+    const int32 Needed = FMath::Max(0, GetEffectiveMagazineSize() - MagazineAmmo);
     const int32 Loaded = FMath::Min(Needed, ReserveAmmo);
     MagazineAmmo += Loaded;
     ReserveAmmo -= Loaded;
     bReloading = false;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+    // Scrap's reload clause as a parameter: rounds only ever leave a magazine
+    // by being FIRED, so "the reload loaded anything" is exactly "a round left
+    // the magazine since it was last full" — a top-off of an untouched
+    // magazine cannot start (StartReload's full-magazine gate), and a reload
+    // that loads zero because reserve ran dry mid-cycle still credits nothing.
+    OnReloadCompleted.Broadcast(Loaded > 0);
+}
+
+int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 DeltaRounds, int32 ReservePerRound)
+{
+    if (Key.IsNone() || DeltaRounds <= 0) return 0;
+    // Re-pushing the same key SETTLES the old entry first rather than
+    // stacking: a re-cast refreshes, and stacking two conversions under one
+    // key would strand the first one's economy.
+    PopMagazineCapacityOverride(Key);
+
+    FMagazineCapacityOverrideEntry Entry;
+    Entry.ReservePerRound = FMath::Max(0, ReservePerRound);
+    if (Entry.ReservePerRound > 0)
+    {
+        // The conversion form (G2): draw what reserve can actually pay for.
+        const int32 Affordable = ReserveAmmo / Entry.ReservePerRound;
+        Entry.DeltaRounds = FMath::Clamp(Affordable, 0, DeltaRounds);
+        if (Entry.DeltaRounds <= 0) return 0;
+        ReserveAmmo -= Entry.DeltaRounds * Entry.ReservePerRound;
+        MagazineAmmo += Entry.DeltaRounds;
+        OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+    }
+    else
+    {
+        Entry.DeltaRounds = DeltaRounds;
+    }
+    MagazineCapacityOverrides.Add(Key, Entry);
+    return Entry.DeltaRounds;
+}
+
+void UBreakerWeaponComponent::PopMagazineCapacityOverride(FName Key)
+{
+    const FMagazineCapacityOverrideEntry* Entry = MagazineCapacityOverrides.Find(Key);
+    if (!Entry) return;
+    const FMagazineCapacityOverrideEntry Removed = *Entry;
+    MagazineCapacityOverrides.Remove(Key);
+
+    if (Removed.ReservePerRound > 0)
+    {
+        // Settle the unspent remainder back (G2): whatever converted rounds
+        // are still sitting above the restored capacity return to reserve at
+        // the ratio they were bought at. Fired rounds refund nothing.
+        const int32 Unspent = FMath::Clamp(MagazineAmmo - GetEffectiveMagazineSize(), 0, Removed.DeltaRounds);
+        if (Unspent > 0)
+        {
+            MagazineAmmo -= Unspent;
+            ReserveAmmo += Unspent * Removed.ReservePerRound;
+            OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+        }
+    }
+}
+
+int32 UBreakerWeaponComponent::GetEffectiveMagazineSize() const
+{
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    int32 Size = Definition ? Definition->MagazineSize : 0;
+    for (const TPair<FName, FMagazineCapacityOverrideEntry>& Override : MagazineCapacityOverrides)
+    {
+        Size += Override.Value.DeltaRounds;
+    }
+    return FMath::Max(1, Size);
 }
 
 FVector UBreakerWeaponComponent::GetVisualMuzzleLocation() const

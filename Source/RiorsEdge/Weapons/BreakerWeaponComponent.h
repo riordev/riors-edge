@@ -99,6 +99,20 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerShotEvent, const FBreakerSho
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerAmmoEvent, int32, MagazineAmmo, int32, ReserveAmmo);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerReloadEvent, bool, bReloading);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerSwapEvent, bool, bSwapping, int32, SlotNumber);
+// The two magazine-economy events Scrap generation needs (Class-Kits-Gunsmith
+// §1.1; the kit doc ranks OnMagazineEmptied as its top missing hook). Both
+// carry their anti-farm clause as the parameter, so a listener CANNOT credit
+// the un-earned case by omission:
+//  * ReloadCompleted's bAnyRoundFired is false for a top-off of a magazine
+//    nothing has left (rounds only ever leave by firing, so "the reload loaded
+//    anything" and "a round was fired since the magazine was last full" are
+//    the same fact);
+//  * MagazineEmptied fires on the LAST ROUND LEAVING the magazine — never on
+//    the reload — and bStartedFull is true only when the magazine was full at
+//    the start of this fire cycle, so topping off at 1/30 and firing one round
+//    does not re-arm the dump bonus.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerReloadCompletedEvent, bool, bAnyRoundFired);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerMagazineEmptiedEvent, bool, bStartedFull);
 
 UCLASS(ClassGroup=Weapons, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerWeaponComponent : public UActorComponent
@@ -330,6 +344,37 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerAmmoEvent OnAmmoChanged;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerReloadEvent OnReloadChanged;
     UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerSwapEvent OnSwapChanged;
+    // Server-side magazine-economy events (see the delegate comments above).
+    // UBreakerScrapComponent's NotifyReloadCompleted / NotifyMagazineEmptied
+    // are the intended listeners; ABreakerCharacter wires them.
+    UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerReloadCompletedEvent OnReloadCompleted;
+    UPROPERTY(BlueprintAssignable, Category="Weapon") FBreakerMagazineEmptiedEvent OnMagazineEmptied;
+
+    // ---- Magazine capacity override (Class-Kits-Gunsmith §3 G2) -----------
+    // The hook Overhaul's own doc names as MISSING ("PushMagazineCapacityOverride
+    // ... with reserve debited on push and settled on pop", spec §6 G2). Keyed
+    // and additive: while any entries are live the effective magazine size is
+    // base plus their sum, a reload completing during the window fills to the
+    // overridden capacity, and a reload completing after pop fills to base.
+    // ReservePerRound > 0 is the CONVERSION form the spec describes: the push
+    // immediately draws up to DeltaRounds into the magazine, debiting
+    // ReservePerRound reserve per round drawn (G2's seed is 3:1), and raises
+    // capacity by exactly what was drawn. ReservePerRound == 0 raises capacity
+    // only and moves no rounds. Returns the rounds actually drawn.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Magazine")
+    int32 PushMagazineCapacityOverride(FName Key, int32 DeltaRounds, int32 ReservePerRound = 0);
+    // The pop settles the UNSPENT remainder back: converted rounds still in
+    // the magazine above the restored capacity are removed and refunded to
+    // reserve at the same ratio they were bought at. Spent rounds refund
+    // nothing — the bet is that you fire them (G2: "if the fight ends before
+    // the window does you gave up reserve for nothing" applies only to the
+    // rounds you FIRED; the unspent conversion settles back).
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Magazine")
+    void PopMagazineCapacityOverride(FName Key);
+    // The active definition's MagazineSize plus every live override delta,
+    // floored at 1.
+    UFUNCTION(BlueprintPure, Category="Weapon|Magazine")
+    int32 GetEffectiveMagazineSize() const;
 
 protected:
     UFUNCTION(Server, Reliable) void ServerStartFire();
@@ -373,6 +418,20 @@ private:
     double LastSwapInTime = -1000.0;
     FBreakerShotResult LastShot;
     double LastCosmeticShotTime = -1000.0;
+    // True while the current fire cycle began from a genuinely full magazine —
+    // the MagazineEmptied event's anti-farm clause (see the delegate comment).
+    bool bFireCycleStartedFull = false;
+    // Keyed additive deltas over the definition's MagazineSize. No expiry: an
+    // ability window owns its pop, exactly like the incoming-modifier chain.
+    struct FMagazineCapacityOverrideEntry
+    {
+        // Capacity delta this entry contributes (== the rounds drawn, for a
+        // conversion push).
+        int32 DeltaRounds = 0;
+        // Reserve paid per drawn round, so the pop can settle at the same rate.
+        int32 ReservePerRound = 0;
+    };
+    TMap<FName, FMagazineCapacityOverrideEntry> MagazineCapacityOverrides;
 
     // Weapon feel state. RecoilPitch/YawAccumulated is the settle BUDGET: the
     // degrees this component added to the control rotation and has not yet

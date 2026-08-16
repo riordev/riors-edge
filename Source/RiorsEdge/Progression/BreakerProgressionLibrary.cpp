@@ -1391,9 +1391,91 @@ TArray<UBreakerProgressionTree*> UBreakerProgressionLibrary::GetTreesForClass(EB
 
 UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId ClassId)
 {
-    // O39 SLICE CLASS HONESTY / audit item 4: Swift and Caster are the two
-    // classes with implemented kits, so both get a row; Gunsmith, Tank and
-    // Support stay nullptr rather than a definition that grants nothing.
+    // O39 SLICE CLASS HONESTY: a class gets a row here only once its kit
+    // EXECUTES. All five now do — Gunsmith, Tank and Support landed 2026-08-16
+    // (owner authorization: "feel free to do all 5 classes"), and their rows
+    // below were registered AFTER their ability classes, never before: a class
+    // definition registered ahead of executing abilities is the exact ordering
+    // that made every Caster ability read as locked (T7 step order).
+    //
+    // Each catalogue below mirrors the ability fallback registry's ids EXACTLY
+    // (Abilities/BreakerAbilityDefinition.cpp), all seven per class, starters
+    // first — IsAbilityUnlocked answers from this list, and gating any id
+    // behind an unpurchased node would repeat the "grants nothing reachable"
+    // failure the Caster row's own comment documents. BranchTrees carries the
+    // shared Core tree only: the three classes' branch layers are deliberately
+    // unauthored this pass (kits playable is the scope; the keystone
+    // reachability suite's honest-emptiness arm depends on exactly this).
+    if (ClassId == EBreakerClassId::Gunsmith)
+    {
+        static UBreakerClassDefinition* Gunsmith = nullptr;
+        if (Gunsmith) return Gunsmith;
+
+        Gunsmith = NewObject<UBreakerClassDefinition>(GetTransientPackage(), UBreakerClassDefinition::StaticClass(), NAME_None, RF_Standalone);
+        Gunsmith->AddToRoot();
+        Gunsmith->ClassAssetId = TEXT("Gunsmith");
+        Gunsmith->ClassId = EBreakerClassId::Gunsmith;
+        Gunsmith->DisplayName = LOCTEXT("GunsmithName", "Gunsmith");
+        Gunsmith->Description = LOCTEXT("GunsmithDescription",
+            "Scrap: a ledger of work already done -- no idle income, no decay. Deployables spend it; the gun in your hands costs nothing.");
+        // Starters first (Sidearm Rig / Turret, Class-Kits-Gunsmith §3), so a
+        // loadout seeded from [0]/[1] matches DefaultAbilityIdForSlot.
+        Gunsmith->StartingClassAbilityIds = {
+            TEXT("Gunsmith.SidearmRig"), TEXT("Gunsmith.Turret"),
+            TEXT("Gunsmith.Overhaul"), TEXT("Gunsmith.AmmoCrate"),
+            TEXT("Gunsmith.MineCluster"), TEXT("Gunsmith.Disruptor"),
+            TEXT("Gunsmith.FieldAssembly")};
+        Gunsmith->BaseUltimateId = TEXT("Gunsmith.FieldAssembly");
+        Gunsmith->BranchTrees.Add(GetCoreSliceTree());
+        return Gunsmith;
+    }
+
+    if (ClassId == EBreakerClassId::Tank)
+    {
+        static UBreakerClassDefinition* Tank = nullptr;
+        if (Tank) return Tank;
+
+        Tank = NewObject<UBreakerClassDefinition>(GetTransientPackage(), UBreakerClassDefinition::StaticClass(), NAME_None, RF_Standalone);
+        Tank->AddToRoot();
+        Tank->ClassAssetId = TEXT("Tank");
+        Tank->ClassId = EBreakerClassId::Tank;
+        Tank->DisplayName = LOCTEXT("TankName", "Tank");
+        Tank->Description = LOCTEXT("TankDescription",
+            "Grit: banked by taking hits and holding ground, bleeding on a lapse timer. Stronger for being hit, never wanting to be hit more than necessary.");
+        // Starters first (Rend / Anchor Point, Class-Kits-Tank §2).
+        Tank->StartingClassAbilityIds = {
+            TEXT("Tank.Rend"), TEXT("Tank.AnchorPoint"),
+            TEXT("Tank.Bloodline"), TEXT("Tank.Provoke"),
+            TEXT("Tank.BreachCharge"), TEXT("Tank.GroundZero"),
+            TEXT("Tank.Hold")};
+        Tank->BaseUltimateId = TEXT("Tank.Hold");
+        Tank->BranchTrees.Add(GetCoreSliceTree());
+        return Tank;
+    }
+
+    if (ClassId == EBreakerClassId::Support)
+    {
+        static UBreakerClassDefinition* Support = nullptr;
+        if (Support) return Support;
+
+        Support = NewObject<UBreakerClassDefinition>(GetTransientPackage(), UBreakerClassDefinition::StaticClass(), NAME_None, RF_Standalone);
+        Support->AddToRoot();
+        Support->ClassAssetId = TEXT("Support");
+        Support->ClassId = EBreakerClassId::Support;
+        Support->DisplayName = LOCTEXT("SupportName", "Support");
+        Support->Description = LOCTEXT("SupportDescription",
+            "Charge: banked by healing, shielding, buff uptime and marked-target damage. Solo pays exactly what a party pays, source for source.");
+        // Starters first (Patch / Mark, Class-Kits-Support §3).
+        Support->StartingClassAbilityIds = {
+            TEXT("Support.Patch"), TEXT("Support.Mark"),
+            TEXT("Support.Purge"), TEXT("Support.Cadence"),
+            TEXT("Support.Metronome"), TEXT("Support.Suppress"),
+            TEXT("Support.Conduit")};
+        Support->BaseUltimateId = TEXT("Support.Conduit");
+        Support->BranchTrees.Add(GetCoreSliceTree());
+        return Support;
+    }
+
     if (ClassId == EBreakerClassId::Caster)
     {
         static UBreakerClassDefinition* Caster = nullptr;
@@ -1443,7 +1525,7 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         return Caster;
     }
 
-    // Only Swift and Caster are authored for the slice (Class-Kits §1.7, O39).
+    // Anything else (None, a future entry) has no kit and gets no row.
     if (ClassId != EBreakerClassId::Swift) return nullptr;
 
     static UBreakerClassDefinition* Swift = nullptr;

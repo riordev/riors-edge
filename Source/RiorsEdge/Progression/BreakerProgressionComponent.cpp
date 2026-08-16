@@ -122,15 +122,32 @@ bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId Clas
     // (null definition, no trees, no abilities, no resource) — refuse it here,
     // not only in the UI, so console/Blueprint/save paths get the same rule.
     // DevForceClass remains the dev-mode way to inhabit an unbuilt class.
-    if (!ClassDefinition && !UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId))
+    //
+    // D12 FIX: the gate is PER-CLASS-ID. The old form read
+    // `!ClassDefinition && !GetFallbackClassDefinition(ClassId)`, so any
+    // assigned Blueprint-default ClassDefinition — describing whatever class
+    // it happened to describe — made the gate pass for EVERY ClassId. A held
+    // definition only vouches for the class it actually describes.
+    const bool bHeldDefinitionMatches = ClassDefinition && ClassDefinition->ClassId == ClassId;
+    if (!bHeldDefinitionMatches && !UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId))
     {
         UE_LOG(LogTemp, Warning, TEXT("ChoosePermanentClassById refused %d: no implemented kit (O39)"), static_cast<int32>(ClassId));
         return false;
     }
     State.PermanentClass = ClassId;
-    if (!ClassDefinition)
+    if (!bHeldDefinitionMatches)
     {
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
+    }
+    // D11 FIX: seed the loadout exactly as ChoosePermanentClass does. Without
+    // this a fresh character's loadout stayed all-None — the HUD fired the
+    // DEFAULT table's abilities while the picker showed nothing selected, two
+    // different answers to "what am I holding".
+    if (ClassDefinition)
+    {
+        if (ClassDefinition->StartingClassAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StartingClassAbilityIds[0];
+        if (ClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StartingClassAbilityIds[1];
+        State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
     RecalculateStats();
     // Locking a class is a progression change like any other. Without this the
@@ -372,6 +389,20 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
     if (!ClassDefinition && State.PermanentClass != EBreakerClassId::None)
     {
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(State.PermanentClass);
+    }
+    // D11, the roster path: a character created from the create screen is
+    // written with a class and an all-None loadout (the roster writes the save
+    // directly, no Choose* runs). Seed the starters here so a fresh character
+    // shows its selection instead of firing the default table with an empty
+    // picker. A save with ANY equipped id is left exactly as it was.
+    if (ClassDefinition && State.PermanentClass != EBreakerClassId::None
+        && State.AbilityLoadout.ClassAbilityOne.IsNone()
+        && State.AbilityLoadout.ClassAbilityTwo.IsNone()
+        && State.AbilityLoadout.Ultimate.IsNone())
+    {
+        if (ClassDefinition->StartingClassAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StartingClassAbilityIds[0];
+        if (ClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StartingClassAbilityIds[1];
+        State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
     // Ranks were just bulk-replaced from outside; the running spent-points
     // totals have to be rebuilt from what actually loaded rather than

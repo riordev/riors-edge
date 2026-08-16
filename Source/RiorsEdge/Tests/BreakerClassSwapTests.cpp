@@ -151,18 +151,22 @@ bool FBreakerClassSwapKitlessIsEmptyNotStaleTest::RunTest(const FString& Paramet
     FClassRig Rig;
     if (!Rig.Progression) { AddError(TEXT("Progression component failed to construct")); return false; }
 
-    // O39: Gunsmith, Tank and Support have no implemented kit, so
-    // GetFallbackClassDefinition returns nullptr for them. DevForceClass is the
-    // sanctioned dev path into an unbuilt class, and the REQUIREMENT is that it
-    // shows nothing rather than showing the previous class's kit. An empty
-    // board is honest; a board full of Swift is a lie.
+    // UPDATED 2026-08-16: Gunsmith has an implemented kit now, so a dev swap
+    // into it fetches Gunsmith's OWN definition. The original requirement is
+    // unchanged and still asserted — the previous class's kit must not leak
+    // through a swap — and the class now shows its own kit rather than an
+    // empty board.
     Rig.Progression->DevForceClass(EBreakerClassId::Swift);
     Rig.Progression->DevForceClass(EBreakerClassId::Gunsmith);
 
-    TestFalse(TEXT("A kitless class is not offered Swift's branch trees"),
+    TestFalse(TEXT("A swapped class is not offered Swift's branch trees"),
         AnyTreeRequiresClass(Rig.Progression->GetAvailableTrees(), EBreakerClassId::Swift));
-    TestFalse(TEXT("A kitless class is not offered Swift's ultimate"),
+    TestFalse(TEXT("A swapped class is not offered Swift's ultimate"),
         Rig.Progression->IsAbilityUnlocked(TEXT("Swift.Overdrive")));
+    TestTrue(TEXT("A swapped Gunsmith is offered its own starter"),
+        Rig.Progression->IsAbilityUnlocked(TEXT("Gunsmith.SidearmRig")));
+    TestTrue(TEXT("A swapped Gunsmith is offered its own ultimate"),
+        Rig.Progression->IsAbilityUnlocked(TEXT("Gunsmith.FieldAssembly")));
 
     return true;
 }

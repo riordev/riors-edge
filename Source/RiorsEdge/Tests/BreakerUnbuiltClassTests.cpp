@@ -17,17 +17,20 @@
 // class gate refusing a non-owner, and the shape of the ability rows now in the
 // fallback registry.
 //
+// UPDATE 2026-08-16 (owner authorization: "feel free to do all 5 classes"):
+// the three kits now EXECUTE — every row carries a real AbilityClass, the
+// class definitions are registered, and the assertions in this file that
+// deliberately pinned the unbuilt state have been flipped to pin the built
+// one. Tests/BreakerBuiltClassKitTests.cpp owns the new built-state coverage;
+// this file keeps the loop arithmetic and the class gate.
+//
 // WHAT THESE TESTS DO NOT COVER, stated plainly rather than left to be
 // discovered:
 //
-//  * **No ability executes.** Every one of the twenty-one registered
-//    definitions has a null `AbilityClass`, so there is nothing to activate and
-//    no test here activates anything. The rows are data and are tested as data.
 //  * **No branch tree, no node, no keystone is reachable.** None of the three
-//    classes has a fallback class definition or a branch tree, so the keystone
-//    variant rows below are asserted to EXIST and are asserted to be
-//    UNREACHABLE — the reachability suite owns the second half of that and
-//    takes its honest-emptiness arm today.
+//    classes has an authored branch tree (kits-playable was the scope), so the
+//    keystone variant rows are asserted to EXIST and the reachability suite
+//    still takes its honest-emptiness arm.
 //  * **No deployable, minion, ally, party, mark, buff, aura, threat or stagger
 //    behaviour is covered, because none exists** (O30 for the first group; the
 //    party layer for the second). The Scrap loop's two deployable-facing
@@ -392,16 +395,23 @@ bool FBreakerUnbuiltClassGateTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An unselected character is not a Gunsmith"),
         Progression->GetProgressionState().PermanentClass == EBreakerClassId::Gunsmith);
 
-    // O39 is still enforced at the progression layer: these three classes have
-    // no class definition, so locking into one is REFUSED outright and only the
-    // dev path can force it. Asserted here because this pass registered ability
-    // data for all three and that must not have loosened the lock.
-    TestFalse(TEXT("Locking into Gunsmith is still refused (O39)"), Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith));
-    TestFalse(TEXT("Locking into Tank is still refused (O39)"), Progression->ChoosePermanentClassById(EBreakerClassId::Tank));
-    TestFalse(TEXT("Locking into Support is still refused (O39)"), Progression->ChoosePermanentClassById(EBreakerClassId::Support));
+    // O39's gate now ADMITS all three (kits implemented 2026-08-16): the lock
+    // succeeds once and — class choice being permanent — refuses everything
+    // after, which is the same one-way rule Swift and Caster live under.
+    TestTrue(TEXT("Locking into Gunsmith is allowed (kit implemented 2026-08-16)"), Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith));
+    TestFalse(TEXT("A second lock is refused: class choice is permanent"), Progression->ChoosePermanentClassById(EBreakerClassId::Tank));
+    TestFalse(TEXT("A third lock is refused too"), Progression->ChoosePermanentClassById(EBreakerClassId::Support));
+    TestTrue(TEXT("The lock actually landed"),
+        Progression->GetProgressionState().PermanentClass == EBreakerClassId::Gunsmith);
+    // D11: the lock seeds the starter loadout, so a fresh character's picker
+    // shows what the HUD fires instead of an empty selection.
+    TestEqual(TEXT("The lock seeded slot one with the first starter"),
+        Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, FName(TEXT("Gunsmith.SidearmRig")));
+    TestEqual(TEXT("The lock seeded the ultimate"),
+        Progression->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Gunsmith.FieldAssembly")));
 
     Progression->DevForceClass(EBreakerClassId::Gunsmith);
-    TestTrue(TEXT("The dev path can still force a Gunsmith for testing"),
+    TestTrue(TEXT("The dev path still lands on a Gunsmith for testing"),
         Progression->GetProgressionState().PermanentClass == EBreakerClassId::Gunsmith);
     TestFalse(TEXT("A Gunsmith is not a Tank"),
         Progression->GetProgressionState().PermanentClass == EBreakerClassId::Tank);
@@ -468,11 +478,12 @@ bool FBreakerUnbuiltClassAbilityDataTest::RunTest(const FString& Parameters)
         TestTrue(*FString::Printf(TEXT("%s belongs to its class"), Row.Id), Definition->ClassId == Row.ClassId);
         TestEqual(*FString::Printf(TEXT("%s costs what its kit document says"), Row.Id), Definition->GetResourceCost(), Row.Cost);
         TestEqual(*FString::Printf(TEXT("%s has the cooldown its kit document says"), Row.Id), Definition->GetCooldownSeconds(), Row.Cooldown);
-        // THE POINT OF THIS WHOLE TEST. Not one of these executes, and a row
-        // that quietly acquires an AbilityClass without the O39 conversation
-        // having happened should turn this red rather than ship a class the
-        // class screen has not been told about.
-        TestFalse(*FString::Printf(TEXT("%s is registered as data and does NOT execute"), Row.Id), Definition->IsImplemented());
+        // FLIPPED 2026-08-16: the O39 conversation happened (owner: "feel free
+        // to do all 5 classes") and every row now executes. The old TestFalse
+        // was the alarm for a row acquiring an AbilityClass without that
+        // conversation; it fired exactly as designed, and the assertion now
+        // pins the built state so a row LOSING its class is equally loud.
+        TestTrue(*FString::Printf(TEXT("%s executes (implemented 2026-08-16)"), Row.Id), Definition->IsImplemented());
     }
 
     // The class's ergonomic, asserted rather than described: Gunsmith runs on
@@ -582,15 +593,15 @@ bool FBreakerUnbuiltClassHonestyTest::RunTest(const FString& Parameters)
     // and this is the assertion that keeps the two apart.
     TestTrue(TEXT("Swift has an implemented kit"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Swift));
     TestTrue(TEXT("Caster has an implemented kit"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Caster));
-    TestFalse(TEXT("Gunsmith has ability data and no implemented kit"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Gunsmith));
-    TestFalse(TEXT("Tank has ability data and no implemented kit"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Tank));
-    TestFalse(TEXT("Support has ability data and no implemented kit"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Support));
+    // FLIPPED 2026-08-16: "the abilities landed (good, and the class screen
+    // needs telling)" — the case the old comment predicted. The class screen
+    // derives from this very predicate, so it was told automatically (O39's
+    // gate is ClassHasImplementedKit, not a list).
+    TestTrue(TEXT("Gunsmith has an implemented kit (2026-08-16)"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Gunsmith));
+    TestTrue(TEXT("Tank has an implemented kit (2026-08-16)"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Tank));
+    TestTrue(TEXT("Support has an implemented kit (2026-08-16)"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::Support));
     TestFalse(TEXT("No class is not a class"), UBreakerAbilityDefinition::ClassHasImplementedKit(EBreakerClassId::None));
 
-    // The catalogue is deliberately NOT empty for the three — that is the whole
-    // point of the pass — so the two queries must give different answers. If
-    // this ever stops being true, either the abilities landed (good, and the
-    // class screen needs telling) or the registry rows were deleted (bad).
     TestTrue(TEXT("Gunsmith has a catalogue to enumerate"),
         UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Gunsmith, EBreakerAbilitySlot::ClassAbilityOne).Num() > 0);
     TestTrue(TEXT("Tank has a catalogue to enumerate"),
@@ -598,12 +609,11 @@ bool FBreakerUnbuiltClassHonestyTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Support has a catalogue to enumerate"),
         UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Support, EBreakerAbilitySlot::ClassAbilityOne).Num() > 0);
 
-    // The progression layer's independent gate on the same decision is
-    // untouched: still no class definition, so still nothing unlocked and still
-    // no lock possible.
-    TestNull(TEXT("Gunsmith still has no class definition (O39)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Gunsmith));
-    TestNull(TEXT("Tank still has no class definition (O39)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Tank));
-    TestNull(TEXT("Support still has no class definition (O39)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Support));
+    // The progression layer's independent gate on the same decision agrees
+    // (T7 step 4: the definitions were registered AFTER the abilities ran).
+    TestNotNull(TEXT("Gunsmith has a class definition (2026-08-16)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Gunsmith));
+    TestNotNull(TEXT("Tank has a class definition (2026-08-16)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Tank));
+    TestNotNull(TEXT("Support has a class definition (2026-08-16)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Support));
 
     // A class ability may not be equipped by a class that does not grant it,
     // whatever route the id took to get into the request.

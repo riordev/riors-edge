@@ -181,9 +181,24 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
     // public EquipAbility, IsAbilityUnlocked's only externally visible effect.
     TestNotNull(TEXT("Caster has a fallback class definition"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Caster));
 
+    // D11 (2026-08-16): ChoosePermanentClassById now SEEDS the starter loadout
+    // exactly as ChoosePermanentClass always did, so Cleave/Rot/Unmake arrive
+    // already equipped and the duplicate rule (an id may sit in only one slot)
+    // refuses re-equipping them elsewhere. The equip loop therefore covers the
+    // four NON-seeded ids, and the two starters plus the ultimate are asserted
+    // as seeded — which is the stronger form of what this test always meant:
+    // every one of the seven is reachable on a fresh Caster.
+    {
+        UBreakerProgressionComponent* Seeded = NewObject<UBreakerProgressionComponent>();
+        TestTrue(TEXT("Choosing Caster succeeds"), Seeded->ChoosePermanentClassById(EBreakerClassId::Caster));
+        TestEqual(TEXT("Cleave is seeded into slot one (D11)"), Seeded->GetProgressionState().AbilityLoadout.ClassAbilityOne, FName(TEXT("Caster.Cleave")));
+        TestEqual(TEXT("Rot is seeded into slot two (D11)"), Seeded->GetProgressionState().AbilityLoadout.ClassAbilityTwo, FName(TEXT("Caster.Rot")));
+        TestEqual(TEXT("Unmake is seeded as the ultimate (D11)"), Seeded->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Caster.Unmake")));
+    }
+
     const TArray<FName> ClassAbilities = {
-        TEXT("Caster.Cleave"), TEXT("Caster.Rot"), TEXT("Caster.Closequarter"),
-        TEXT("Caster.Siphon"), TEXT("Caster.Fracture"), TEXT("Caster.Resonance")};
+        TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
+        TEXT("Caster.Fracture"), TEXT("Caster.Resonance")};
     for (const FName AbilityId : ClassAbilities)
     {
         // A fresh component per id: EquipAbility refuses a duplicate id
@@ -198,18 +213,13 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The equipped id is recorded"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, AbilityId);
     }
 
-    // The ultimate resolves through its own slot rule.
-    UBreakerProgressionComponent* UltimateProgression = NewObject<UBreakerProgressionComponent>();
-    UltimateProgression->ChoosePermanentClassById(EBreakerClassId::Caster);
-    FText UltimateFailure;
-    TestTrue(TEXT("Caster.Unmake unlocks and equips as the ultimate"),
-        UltimateProgression->EquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Caster.Unmake"), UltimateFailure));
-    TestEqual(TEXT("The ultimate slot records it"), UltimateProgression->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Caster.Unmake")));
-
     // Swift stays exactly as it was -- this pass adds a row, it does not
     // touch the existing one.
     TestNotNull(TEXT("Swift still has a fallback class definition"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift));
-    TestNull(TEXT("Gunsmith still grants nothing (O39 slice class honesty)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Gunsmith));
+    // FLIPPED 2026-08-16 (owner authorization: "feel free to do all 5
+    // classes"): Gunsmith's kit executes now, so O39's gate admits it and the
+    // old "still grants nothing" assertion fired exactly as intended.
+    TestNotNull(TEXT("Gunsmith has a fallback class definition (kit implemented 2026-08-16)"), UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Gunsmith));
     return true;
 }
 
