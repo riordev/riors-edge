@@ -485,15 +485,16 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
 //     movement conditions through a fixture; the five new self conditions have
 //     no equivalent yet and should get one in whichever lane owns a character
 //     fixture.
-//  2. SupplyTargetState's reads. Needs two actors, a status component with
-//     applied statuses, and an ABreakerEnemy with a rank. This is the highest
-//     value uncovered thing in the file, because it is the half with no caller:
-//     a bug here would be invisible until a target-conditional node shipped.
-//  3. That the aggregator honours composition. AggregateStats still calls
-//     IsActive(Effect.Condition) and ignores AlsoRequires entirely, so a
-//     two-condition effect currently pays on its primary alone. That is a
-//     coordinator change (roadmap item 1), and the test that proves it belongs
-//     beside the aggregator, in BreakerBranchContentTests.cpp's mould.
+//  2. SupplyTargetState's status and rank reads. PARTLY ANSWERED since Stage 6:
+//     the half now HAS a production caller (UBreakerCombatComponent::
+//     ReceiveDamage) and BreakerTargetRiderTests.cpp drives the two-actor path
+//     end to end through TargetAtCloseRange and the "asked, answer no" case.
+//     Still uncovered live: a status-component read with real applied statuses
+//     and an ABreakerEnemy rank, which need world time.
+//  3. That the aggregator honours composition — ANSWERED: AggregateStats now
+//     calls SatisfiesAll(Effect.Condition, Effect.AlsoRequires) (Stage 1), and
+//     since Stage 6 it routes target-requiring effects to the rider table
+//     instead of warning about them.
 //  4. That the warn-once path actually fires. The TSet is function-local and
 //     process-wide by design, so a test asserting "this warned" would pass or
 //     fail depending on which test ran first. Verified by inspection instead,

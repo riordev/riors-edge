@@ -122,6 +122,134 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Fracture);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Resonance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cascade);
+
+    // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). Authored 2026-08-16 under
+    // the owner's "do all 5 classes" ruling — the branch layer the kits-playable
+    // pass deliberately left out.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_FieldStripping);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_WorkingStock);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_Chambered);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_DeepPockets);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_LastRound);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_ColdBarrel);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_BenchWork);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_RigDiscipline);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_Reciprocal);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_Overpressure);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_NoReserve);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_AR_Machinist);
+
+    // Gunsmith / FIELD TECH (Class-Kits-Gunsmith §4.2).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Salvage);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Overwatch);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_SecondShift);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Tithe);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Requisition);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Foreman);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Emplacement);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Logistics);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Redundancy);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Automation);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Deadman);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_FT_Foundry);
+
+    // Gunsmith / TINKERER (Class-Kits-Gunsmith §4.3).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_CheapWork);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_QuickSet);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Tripwire);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Rearm);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_AttritionField);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Overlap);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Ordnance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Interdiction);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Patience);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_DeadGround);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_CommandDetonation);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TK_Minefield);
+
+    // Tank / LEECH (Class-Kits-Tank §3).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Clot);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_SlowBleed);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_OpenWound);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_FeedTheWound);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Bloodlet);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Transfusion);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_RendMastery);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_SecondHeart);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_NothingWasted);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Reciprocity);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Exsanguinate);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_L_Vein);
+
+    // Tank / BASTION (Class-Kits-Tank §4).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_LineOfSight);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Footing);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Loud);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_HeldGround);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_AnsweringFire);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Bulk);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Emplacement);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Interposition);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Conversion);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_StandingOrder);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_ImmovableObject);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_B_Wall);
+
+    // Tank / DEMOLITIONIST (Class-Kits-Tank §5).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_ShapedCharge);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Bootstraps);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_BracedForImpact);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Fragmentation);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Concussion);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Overpressure);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Demolition);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_TerminalDescent);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_BlastRadius);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_KineticRecovery);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_ChainReaction);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_D_Detonation);
+
+    // Support / MEDIC (Class-Kits-Support §4.1).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_FieldDressing);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_TriagePriority);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_CleanHands);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_SteadyHands);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_SecondOpinion);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_Attending);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_FieldKit);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_SustainedCare);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_Overflow);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_BloodDebt);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_NoTriage);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MD_Triage);
+
+    // Support / CONDUCTOR (Class-Kits-Support §4.2).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_DownbeatDiscipline);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Section);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Sustain);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Rehearsal);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Tempo);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Attunement);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Conducting);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Counterpoint);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_StandingOvation);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_SympatheticResonance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_DetachedBaton);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_CO_Downbeat);
+
+    // Support / WARDEN (Class-Kits-Support §4.3).
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Painted);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_LongWatch);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_FieldOfView);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Handoff);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Pressure);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Tell);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Suppression);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_DeepMark);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_ExecutionersLedger);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_BlackoutProtocol);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_HuntersEconomy);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_WA_Blackout);
 }
 
 // Zero-setup fallback skill-tree content, the same convention the weapon
@@ -160,6 +288,31 @@ public:
     static UBreakerProgressionTree* GetCasterVoidWhispererTree();
     // Caster MULTISPELL branch, tiers 1-3 (Class-Kits §2.5).
     static UBreakerProgressionTree* GetCasterMultispellTree();
+
+    // Gunsmith / Tank / Support branches, authored 2026-08-16 (owner
+    // authorization: "feel free to do all 5 classes" + "keep building").
+    // Tiers 1-4 plus the keystone compressed onto tier 3, the Swift shape —
+    // see the block comment above GetGunsmithArmoryTree for the compression
+    // citation these nine trees share.
+    //
+    // Gunsmith ARMORY branch (Class-Kits-Gunsmith §4.1).
+    static UBreakerProgressionTree* GetGunsmithArmoryTree();
+    // Gunsmith FIELD TECH branch (Class-Kits-Gunsmith §4.2).
+    static UBreakerProgressionTree* GetGunsmithFieldTechTree();
+    // Gunsmith TINKERER branch (Class-Kits-Gunsmith §4.3).
+    static UBreakerProgressionTree* GetGunsmithTinkererTree();
+    // Tank LEECH branch (Class-Kits-Tank §3).
+    static UBreakerProgressionTree* GetTankLeechTree();
+    // Tank BASTION branch (Class-Kits-Tank §4).
+    static UBreakerProgressionTree* GetTankBastionTree();
+    // Tank DEMOLITIONIST branch (Class-Kits-Tank §5).
+    static UBreakerProgressionTree* GetTankDemolitionistTree();
+    // Support MEDIC branch (Class-Kits-Support §4.1).
+    static UBreakerProgressionTree* GetSupportMedicTree();
+    // Support CONDUCTOR branch (Class-Kits-Support §4.2).
+    static UBreakerProgressionTree* GetSupportConductorTree();
+    // Support WARDEN branch (Class-Kits-Support §4.3).
+    static UBreakerProgressionTree* GetSupportWardenTree();
 
     // Core tree plus every class tree. The UI enumerates from here.
     UFUNCTION(BlueprintPure, Category="Progression|Content")

@@ -759,7 +759,18 @@ void ABreakerEnemy::GrantExperience()
 
     // Area level, not character level — see UBreakerExperienceLibrary::
     // XpForKill for why the reward tracks the content rather than the player.
-    Progression->AwardKillExperience(MonsterRank, EnemyLevel);
+    //
+    // And AreaLevel, not EnemyLevel (audit finding #4): this call passed
+    // EnemyLevel — the DROP item level, GetDropItemLevel(AreaLevel) plus the
+    // elite bonus, clamped to 120 against the area ladder's 100 — while the
+    // comment above claimed area level. Rank already pays the elite premium
+    // through EliteXpMultiplier, so paying it again through the level scalar
+    // double-charged it: an elite at area level 10 paid 102 XP off EnemyLevel
+    // 15 where the area's own level pays 83, and past area level 100 the two
+    // clamps let XP keep climbing 20 levels the area ladder does not have.
+    // EnemyLevel stays what it is: the LOOT number GrantLoot hands the drop
+    // pipeline, one comment down.
+    Progression->AwardKillExperience(MonsterRank, AreaLevel);
 }
 
 void ABreakerEnemy::GrantLoot()

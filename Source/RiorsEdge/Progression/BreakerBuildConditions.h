@@ -102,10 +102,20 @@ enum class EBreakerBuildCondition : uint8
     // opposite things to Caster and to Swift — a single bit cannot honestly
     // carry both readings. Budgeted out; see the vocabulary document §2.4.
     ResourceLow,
-    // Resource fraction at or below zero. Distinct from ResourceLow because
-    // Caster's Overcast drives Mana NEGATIVE and two nodes
+    // Resource fraction at or below zero — for a loop whose RESTING state is
+    // full/positive, which today means Mana alone. Distinct from ResourceLow
+    // because Caster's Overcast drives Mana NEGATIVE and two nodes
     // (Caster.Spellblade.Debt, Caster.Spellblade.Bloodprice) are authored
     // against the debt state specifically, not against "nearly out".
+    //
+    // The resting-state gate is the condition's MEANING, not a special case
+    // (build-math finding #3): "depleted" is DRAINED PAST EMPTY, and the
+    // bank-style loops (Grit, Scrap, Charge) plus Momentum all idle at zero —
+    // without the gate this bit was simply ON for an idle Tank, Gunsmith and
+    // Support and near-always-on for a standing Swift, which made
+    // Anomaly.EntropyDebt a free unconditional line for three classes while
+    // the Caster it was written for had to earn it. Each loop answers
+    // IsRestingStateFull() for itself; only Caster can proc this today.
     ResourceDepleted,
 
     // ---- SELF: recent-event windows (13-16) ------------------------------
@@ -130,11 +140,13 @@ enum class EBreakerBuildCondition : uint8
     // character's own.
     //
     // NONE of these are populated by EvaluateForActor and they never will be:
-    // EvaluateForActor takes one actor and target state is a two-actor fact. It
-    // has exactly one honest call site, UBreakerCombatComponent::ReceiveDamage,
-    // where the target is GetOwner() and the attacker is Request.Instigator.
-    // Until that site calls SupplyTargetState, a requirement naming one of these
-    // is unsatisfiable, and SatisfiesAll warns once rather than quietly
+    // EvaluateForActor takes one actor and target state is a two-actor fact.
+    // SupplyTargetState has exactly one honest production call site, and since
+    // Stage 6 it is LIVE: UBreakerCombatComponent::ReceiveDamage supplies the
+    // target half (target = GetOwner(), attacker = Request.Instigator) and
+    // resolves the progression component's target-conditional rider table
+    // there. A requirement naming one of these outside that path is still
+    // unsatisfiable, and SatisfiesAll warns once rather than quietly
     // returning false. See the vocabulary document §3.
     //
     // O38 holds: Elements are post-slice, so there is no TargetBurning /
@@ -274,13 +286,13 @@ struct RIORSEDGE_API FBreakerBuildConditionState
     // the warn-once path rather than left to be discovered.
     static FBreakerBuildConditionState EvaluateForActor(const AActor* Actor);
 
-    // The second half of the pair, and the call site that does not exist yet.
-    // Fills the Target* conditions from the actor being hit, marks target state
-    // as supplied so SatisfiesAll stops warning, and takes the attacker only to
-    // measure TargetAtCloseRange. Its one intended caller is
-    // UBreakerCombatComponent::ReceiveDamage, where the target is GetOwner() and
-    // the attacker is Request.Instigator — see the vocabulary document §3.2 and
-    // the coordinator roadmap.
+    // The second half of the pair, LIVE since Stage 6. Fills the Target*
+    // conditions from the actor being hit, marks target state as supplied so
+    // SatisfiesAll stops warning, and takes the attacker only to measure
+    // TargetAtCloseRange. Its one production caller is the site the design
+    // named: UBreakerCombatComponent::ReceiveDamage (via
+    // ApplyTargetConditionRiders), where the target is GetOwner() and the
+    // attacker is Request.Instigator — see the vocabulary document §3.2.
     void SupplyTargetState(const AActor* Target, const AActor* Attacker);
 
     // True once SupplyTargetState has run. Distinct from "some target condition

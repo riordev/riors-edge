@@ -65,6 +65,17 @@ public:
     UFUNCTION(BlueprintPure, Category="Mana") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Mana") float GetMana() const;
     UFUNCTION(BlueprintPure, Category="Mana") float GetManaFraction() const;
+    // Whether this loop's RESTING state is a full/positive bank. The one
+    // eligibility question EBreakerBuildCondition::ResourceDepleted asks
+    // (build-math finding #3): "depleted" means DRAINED PAST EMPTY, which is
+    // only a meaningful state for a loop that idles full. Mana starts full,
+    // regenerates toward full, and only casting (Overcast, to negative)
+    // empties it — so an empty or negative bank is an EARNED state here, and
+    // this is the one loop that answers true. The bank-style loops (Grit,
+    // Scrap, Charge) and Momentum idle at zero, where "fraction <= 0" is the
+    // resting state, not a drained one — they answer false, which is what
+    // stops Anomaly.EntropyDebt reading as always-on for an idle non-Caster.
+    UFUNCTION(BlueprintPure, Category="Mana") bool IsRestingStateFull() const { return true; }
     UFUNCTION(BlueprintPure, Category="Mana") bool IsOvercast() const;
     // The fraction of extra damage the owner should take while Overcast, e.g.
     // 0.15 for +15%. Zero when not Overcast. Combat consumes this later; this

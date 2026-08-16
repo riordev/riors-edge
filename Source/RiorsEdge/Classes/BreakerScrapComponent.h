@@ -67,6 +67,11 @@ public:
     UFUNCTION(BlueprintPure, Category="Scrap") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Scrap") float GetScrap() const;
     UFUNCTION(BlueprintPure, Category="Scrap") float GetScrapFraction() const;
+    // ResourceDepleted eligibility (build-math finding #3): Scrap is a bank —
+    // it starts and idles at zero — so an empty ledger is the RESTING state,
+    // not a drained one. False stops a ResourceDepleted line reading as
+    // always-on for an idle Gunsmith. Mana is the one loop that answers true.
+    UFUNCTION(BlueprintPure, Category="Scrap") bool IsRestingStateFull() const { return false; }
 
     // Spending. Deployable abilities cost Scrap and carry NO cooldown (Scrap is
     // the cooldown); personal abilities carry a cooldown and cost NO Scrap

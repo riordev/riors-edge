@@ -23,6 +23,25 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTag DamageTypeTag;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer SourceTags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceDamageMultiplier = 1.0f;
+    // ---- STAGE 6: the source split (Hook-And-Condition-Vocabulary §3.3) ----
+    // SourceDamageMultiplier arrives ALREADY COMPOSED as
+    // (1 + Increased/100) x MoreProduct, which is fine until the TARGET side
+    // wants to add a target-conditional Increased line: folding a rider into
+    // the composed value would make it a second More in everything but name,
+    // outside the O3 budget and against the one-additive-bucket law. So the
+    // request may carry the two halves separately. SourceDamageMultiplier
+    // STAYS, as the composed convenience value every existing call site and
+    // test keeps reading; the split is additive information.
+    //
+    // bHasSourceSplit is the presence flag: only a submission site that
+    // actually snapshotted the split sets it, and ReceiveDamage recomposes
+    // ONLY when it is set AND a rider fired — otherwise the request resolves
+    // bit-identically to a request that never heard of the split. Today the
+    // weapon paths (hitscan and rocket) fill it; ability submissions and DoT
+    // tick requests stay composed-only and get riders in a later pass.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceIncreasedPercent = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalChance = 0.0f;
     // Struct default only — live requests are filled from the attribute set
     // (or its named fallback constants). O2 PLACEHOLDER

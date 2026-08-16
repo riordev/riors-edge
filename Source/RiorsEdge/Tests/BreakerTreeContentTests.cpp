@@ -14,13 +14,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
 {
     const TArray<UBreakerProgressionTree*>& Trees = UBreakerProgressionLibrary::GetAllFallbackTrees();
-    // Core, plus THREE Swift branches (Class-Kits §1.3-1.5), plus THREE Caster
-    // branches (§2.3-2.5). Caster shipped with no branch trees at all until
-    // now — it played through abilities and the Core tree only — so this count
-    // moving from 4 to 7 is the whole point of that pass rather than drift.
-    // Counted rather than sampled deliberately: a tree silently failing to
-    // register is exactly the class of gap this file exists to catch.
-    TestEqual(TEXT("Core tree plus three Swift and three Caster branches exist"), Trees.Num(), 7);
+    // Core, plus THREE branches for EVERY class: Swift (Class-Kits §1.3-1.5),
+    // Caster (§2.3-2.5), and — authored 2026-08-16 under the owner's "do all
+    // 5 classes" ruling — Gunsmith (Class-Kits-Gunsmith §4), Tank
+    // (Class-Kits-Tank §3-5) and Support (Class-Kits-Support §4). The count
+    // moved 4 -> 7 when Caster's branch layer landed and 7 -> 16 when the
+    // last three classes' did; each move was the point of its pass, not
+    // drift. Counted rather than sampled deliberately: a tree silently
+    // failing to register is exactly the class of gap this file exists to
+    // catch.
+    TestEqual(TEXT("Core tree plus three branches for each of the five classes exist"), Trees.Num(), 16);
 
     TSet<FName> SeenNodeIds;
     for (const UBreakerProgressionTree* Tree : Trees)

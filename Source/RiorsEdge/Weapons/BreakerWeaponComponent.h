@@ -272,6 +272,22 @@ public:
     // active definition's Damage, scaled to the equipped item level. For a
     // multi-pellet weapon this is still PER PELLET, exactly as Damage was.
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetScaledBaseDamage() const;
+    // The whole trigger pull: GetScaledBaseDamage() times the active
+    // definition's PelletsPerShot. THIS is the number a melee/blast
+    // weapon-coefficient means by "weapon damage" — the per-pellet base reads
+    // a shotgun at 10 while a sniper reads 72, so "1.5x weapon damage" on a
+    // shotgun Tank swung feather-soft, a 7.2x thematic inversion (audit F1,
+    // Build-Profiles-2026-08-16). Weapon ROUNDS keep the per-pellet accessor;
+    // nothing in the fire path changes.
+    //
+    // What a 1.0-coefficient swing reads per archetype at item level 1:
+    //   Rifle 24, SMG 13, Sniper 72, Shotgun 80 (10 x 8 pellets), Rocket 90,
+    //   Burst Rifle 29, Machinegun 11, Sidearm 21.
+    // The shotgun becomes the heavy swing, which is the theme. The burst
+    // rifle is deliberately PER ROUND (29): a trigger pull puts ONE round in
+    // the air — the burst is a cadence fact, not a payload fact — so pellet
+    // count is the only per-pull payload multiplier there is.
+    UFUNCTION(BlueprintPure, Category="Weapon|Damage") float GetScaledFullBlastDamage() const;
 
     // ---- Weapon feel -------------------------------------------------------
     // Recoil moves the AIM, never the bullet relative to the aim: the trace

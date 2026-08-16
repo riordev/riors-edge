@@ -216,6 +216,17 @@ public:
 
 private:
     void PruneExpiredOutgoingModifiers();
+    // STAGE 6 (Hook-And-Condition-Vocabulary §3.2-§3.3): target-conditional
+    // damage, resolved on the TARGET side because ReceiveDamage is the one
+    // call site that knows both actors and is reached by every damage event.
+    // Reads the instigator's published rider table and cached SELF conditions,
+    // supplies the target half from GetOwner(), and — only when a rider fired
+    // AND the request carries the source split — recomposes
+    //   Effective = (1 + (SourceIncreasedPercent + RiderPercent)/100) x SourceMoreProduct
+    // so the rider joins the SAME additive Increased bucket as every other
+    // Increased line instead of becoming a second More. Any other request
+    // resolves bit-identically to before this existed (test-pinned).
+    void ApplyTargetConditionRiders(FBreakerDamageRequest& Request) const;
     void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
 
     UPROPERTY() TArray<FBreakerOutgoingModifier> OutgoingModifiers;

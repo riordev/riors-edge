@@ -158,4 +158,67 @@ bool FBreakerAbilityScalingRidesGearDepthTest::RunTest(const FString& Parameters
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// AUDIT F1: MELEE COEFFICIENTS KEY OFF THE FULL BLAST, NOT THE PELLET
+// ---------------------------------------------------------------------------
+// The per-pellet base read a shotgun at 10 (x8 pellets) against a sniper's 72,
+// so "1.5x weapon damage" made the shotgun melee the weakest swing in the game
+// — a 7.2x thematic inversion. GetScaledFullBlastDamage is per-pellet base
+// times pellet count, so the shotgun (80 at ilvl 1) is the heavy swing and
+// every single-projectile weapon is bit-identical to before.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityScalingFullBlastSwingTest,
+    "RiorsEdge.Combat.AbilityScaling.MeleeSwingsTheFullBlast",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityScalingFullBlastSwingTest::RunTest(const FString& Parameters)
+{
+    AActor* Owner = NewObject<AActor>(GetTransientPackage());
+    UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>(Owner);
+    const UBreakerAbility_Cleave* Cleave = GetDefault<UBreakerAbility_Cleave>();
+
+    // All three at the same (unequipped => item level 1) anchor, so the ONLY
+    // variable between them is the archetype's per-pull payload.
+    auto SwingFor = [&](EBreakerWeaponArchetype Archetype) -> float
+    {
+        Weapon->EquipArchetype(Archetype);
+        return Cleave->ComputeSwingBaseDamage(Owner);
+    };
+    const float SmgSwing = SwingFor(EBreakerWeaponArchetype::SMG);
+    const float RifleSwing = SwingFor(EBreakerWeaponArchetype::Rifle);
+    const float ShotgunSwing = SwingFor(EBreakerWeaponArchetype::Shotgun);
+
+    // The accessor is exactly per-pellet base times pellet count. With the
+    // shotgun equipped at the anchor that is the authored 10 x 8 = 80, the
+    // heaviest hitscan pull in the archetype table — the theme, restored.
+    const UBreakerWeaponDefinition* ShotgunDefinition = Weapon->GetActiveDefinition();
+    if (!ShotgunDefinition)
+    {
+        AddError(TEXT("The weapon component resolves no active shotgun definition"));
+        return false;
+    }
+    TestEqual(TEXT("Full blast is per-pellet base times pellet count"),
+        Weapon->GetScaledFullBlastDamage(),
+        Weapon->GetScaledBaseDamage() * ShotgunDefinition->PelletsPerShot);
+    TestEqual(TEXT("The shotgun swing reads the whole 80-damage blast"),
+        ShotgunSwing,
+        UBreakerAbility_Cleave::SwingDamage(
+            ShotgunDefinition->Damage * ShotgunDefinition->PelletsPerShot,
+            Cleave->WeaponDamageCoefficient, Cleave->UnarmedDamage));
+
+    // The ordering the archetypes' per-pull payloads author: 80 > 24 > 13.
+    TestTrue(*FString::Printf(TEXT("Shotgun swing (%.1f) beats rifle swing (%.1f)"), ShotgunSwing, RifleSwing),
+        ShotgunSwing > RifleSwing);
+    TestTrue(*FString::Printf(TEXT("Rifle swing (%.1f) beats SMG swing (%.1f)"), RifleSwing, SmgSwing),
+        RifleSwing > SmgSwing);
+
+    // Bare hands never see the accessor: no weapon component means the
+    // unarmed fallback, unchanged to the bit.
+    AActor* Bare = NewObject<AActor>(GetTransientPackage());
+    TestEqual(TEXT("A bare-hands cast is the unarmed fallback, untouched"),
+        Cleave->ComputeSwingBaseDamage(Bare),
+        UBreakerAbility_Cleave::SwingDamage(0.0f, Cleave->WeaponDamageCoefficient, Cleave->UnarmedDamage));
+    return true;
+}
+
 #endif

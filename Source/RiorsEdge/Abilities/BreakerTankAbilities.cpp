@@ -26,6 +26,12 @@ namespace BreakerTankAbilityLocal
     // The shared "weapon-scaled with an unarmed floor" base the melee/blast
     // verbs use — the Cleave precedent (O35: reads the SCALED weapon base, so
     // ability damage rides gear depth; item level 1 is the authored number).
+    // FULL BLAST, not per pellet (audit F1, the Cleave fix verbatim): the
+    // per-pellet base made a shotgun Tank — the class/weapon pairing the
+    // theme is built on — swing 10 while a sniper Tank swung 72. Rend,
+    // Breach Charge and Ground Zero all mean the whole trigger pull by
+    // "weapon damage", so all three read the full-blast accessor through
+    // this one seam.
     float BreakerTankAbilityBaseDamage(const ABreakerCharacter* Character, float WeaponCoefficient, float UnarmedDamage)
     {
         float WeaponDamage = 0.0f;
@@ -33,7 +39,7 @@ namespace BreakerTankAbilityLocal
         {
             if (Weapon->GetActiveDefinition())
             {
-                WeaponDamage = Weapon->GetScaledBaseDamage();
+                WeaponDamage = Weapon->GetScaledFullBlastDamage();
             }
         }
         const float ScaledUnarmed = UnarmedDamage * UBreakerGameplayAbility::AbilityDamageScalarFor(Character);

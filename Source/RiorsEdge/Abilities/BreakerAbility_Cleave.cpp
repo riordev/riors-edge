@@ -87,15 +87,20 @@ float UBreakerAbility_Cleave::ComputeSwingBaseDamage(const AActor* OwnerActor) c
     // O35: the weapon-coefficient path reads the SCALED weapon base — the
     // number every weapon round already uses — instead of the raw archetype
     // constant, which stood still while weapon rounds grew (1 + w)^(ilvl - 1)
-    // and turned "1.5x weapon damage" into a rounding error by ilvl 50. At
-    // item level 1 GetScaledBaseDamage IS the authored Definition->Damage, so
-    // nothing moves at the anchor.
+    // and turned "1.5x weapon damage" into a rounding error by ilvl 50.
+    //
+    // FULL BLAST, not per pellet (audit F1): the per-pellet base read a
+    // shotgun at 10 against a sniper's 72, so a shotgun Caster's swing was
+    // the weakest in the game — a 7.2x thematic inversion. "Weapon damage"
+    // for a swing means the whole trigger pull; see the accessor for the
+    // per-archetype table. Single-projectile weapons are bit-identical, so
+    // nothing moves at the anchor for any pre-existing test.
     float WeaponDamage = 0.0f;
     if (const UBreakerWeaponComponent* Weapon = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
     {
         if (Weapon->GetActiveDefinition())
         {
-            WeaponDamage = Weapon->GetScaledBaseDamage();
+            WeaponDamage = Weapon->GetScaledFullBlastDamage();
         }
     }
     // The unarmed fallback is flat ability damage and rides the same scalar

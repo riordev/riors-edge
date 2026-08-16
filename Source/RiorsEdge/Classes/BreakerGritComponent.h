@@ -71,6 +71,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Grit") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Grit") float GetGrit() const;
     UFUNCTION(BlueprintPure, Category="Grit") float GetGritFraction() const;
+    // ResourceDepleted eligibility (build-math finding #3): Grit is a bank —
+    // it starts and idles at zero and is earned by taking hits — so an empty
+    // bank is the RESTING state, not a drained one. Answering false is what
+    // stops a ResourceDepleted line (Anomaly.EntropyDebt) being always-on for
+    // an idle Tank. Mana is the one loop that answers true; see its
+    // declaration.
+    UFUNCTION(BlueprintPure, Category="Grit") bool IsRestingStateFull() const { return false; }
     // True while the lapse window is open — i.e. damage taken or an enemy within
     // the proximity radius inside the last LapseSeconds. Decay is suspended for
     // exactly as long as this is true.

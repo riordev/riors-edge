@@ -723,6 +723,37 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             const float Value = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
 
             const bool bConditional = Effect.Condition != EBreakerBuildCondition::Always;
+            // STAGE 6: an effect that needs the TARGET's state is a RIDER —
+            // published by BuildTargetConditionRiders and composed in
+            // UBreakerCombatComponent::ReceiveDamage, the one site that knows
+            // both actors. When this state carries no target half (the live
+            // per-actor state never does), skip it WITHOUT asking
+            // SatisfiesAll: the effect is no longer dead, it is resolved at
+            // the other end of the pipeline, and the warn-once path must not
+            // call a working lane a wiring bug. A state that DOES carry
+            // target info — All()'s tooltip hypothetical, a test fixture —
+            // still composes it right here, which is what keeps the
+            // "potential" display an upper bound rather than a blind spot.
+            //
+            // The MorePercent case is skipped under ANY state: target-side
+            // lines are Increased-bucket only (vocabulary §3.3 — a
+            // target-conditional More would re-run the strongest-three
+            // selection per event per target), and letting All() compose one
+            // would make the tooltip promise a More the pipeline refuses to
+            // pay. The loud drop lives in BuildTargetConditionRiders.
+            if (Effect.RequiresTargetState())
+            {
+                if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent) continue;
+                if (!Conditions.HasTargetState())
+                {
+                    if (bConditional && Effect.StatTarget == EBreakerNodeStatTarget::Damage
+                        && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
+                    {
+                        PotentialConditionalPercent += Value;
+                    }
+                    continue;
+                }
+            }
             // COMPOSITION (owner ruling, 2026-08-15: "conditions do compose
             // yes"). An effect may now require several conditions at once, and
             // SatisfiesAll is also where an unsatisfiable requirement becomes
@@ -896,6 +927,63 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     return Stats;
 }
 
+TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetConditionRiders(
+    const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks)
+{
+    // STAGE 6 (Hook-And-Condition-Vocabulary §3.2). The rows the target side
+    // resolves: same node walk as AggregateStats, filtered to the effects
+    // whose requirement names a Target* condition anywhere in it. The full
+    // requirement travels with the row — a rider may mix self and target
+    // conditions ("while airborne and against a bleeding enemy"), and
+    // ReceiveDamage evaluates it against the attacker's cached SELF state
+    // plus the freshly supplied target state.
+    TArray<FBreakerTargetConditionRider> Riders;
+    for (const FBreakerNodeRank& Rank : Ranks)
+    {
+        if (Rank.Rank <= 0) continue;
+        const UBreakerProgressionNode* const* Found = Nodes.FindByPredicate(
+            [&Rank](const UBreakerProgressionNode* Node) { return Node && Node->NodeId == Rank.NodeId; });
+        if (!Found) continue;
+        const UBreakerProgressionNode* Node = *Found;
+
+        const int32 EffectiveRank = FMath::Min(Rank.Rank, Node->MaxRank);
+        for (const FBreakerNodeEffect& Effect : Node->Effects)
+        {
+            if (!Effect.RequiresTargetState()) continue;
+
+            // Target-side lines are Increased-bucket only, and Damage is the
+            // one stat target with a rider consumer today. Everything else is
+            // dropped LOUDLY, once per node — the dead-lane rule (§2.7):
+            //  * MorePercent is unsupported BY RULE (§3.3): it would need the
+            //    strongest-three More selection re-run per event per target,
+            //    which is expensive and unexplainable to a player. Same
+            //    warn-and-drop the aggregator gives every other unpaid More.
+            //  * Flat and non-Damage targets simply have no lane yet; they
+            //    are dropped with the same loudness until one exists.
+            if (Effect.StatBucket != EBreakerNodeStatBucket::IncreasedPercent
+                || Effect.StatTarget != EBreakerNodeStatTarget::Damage)
+            {
+                static TSet<FName> WarnedOnceTargetRiderNodeIds;
+                if (!WarnedOnceTargetRiderNodeIds.Contains(Node->NodeId))
+                {
+                    WarnedOnceTargetRiderNodeIds.Add(Node->NodeId);
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[BreakerProgression] node '%s' authors a target-conditional effect in bucket %d on stat target %d, but target-side lines are Increased-bucket Damage only (Hook-And-Condition-Vocabulary §3.3) — this effect is dropped."),
+                        *Node->NodeId.ToString(), static_cast<int32>(Effect.StatBucket), static_cast<int32>(Effect.StatTarget));
+                }
+                continue;
+            }
+
+            FBreakerTargetConditionRider& Rider = Riders.AddDefaulted_GetRef();
+            Rider.Condition = Effect.Condition;
+            Rider.AlsoRequires = Effect.AlsoRequires;
+            Rider.StatTarget = Effect.StatTarget;
+            Rider.Percent = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
+        }
+    }
+    return Riders;
+}
+
 float UBreakerProgressionComponent::GetSpentPoints() const
 {
     // Points actually committed to nodes, in both wallets. GetRefundValue is
@@ -920,6 +1008,10 @@ void UBreakerProgressionComponent::RecalculateStats()
     Ranks.Append(State.CoreNodeRanks);
 
     CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution, ActiveConditions);
+    // Stage 6: the rider table rides the same recalculation, so purchases,
+    // respecs, loads and condition transitions all republish the current rows
+    // and nothing new needs invalidating.
+    CachedTargetRiders = BuildTargetConditionRiders(Nodes, Ranks);
 
     // Every committed point pays a small Increased Damage baseline, into the
     // SAME additive bucket as gear and node damage. Under O27 this is a FLOOR,

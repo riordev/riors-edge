@@ -81,7 +81,13 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         Defense.BlockChance = FMath::Clamp(Defense.BlockChance + Progression->GetBlockChanceBonus(), 0.0f, 1.0f);
     }
 
-    Result = UBreakerDamageLibrary::ResolveDamage(Request, Defense);
+    // Stage 6 (H3): target-conditional riders resolve HERE, the one site that
+    // knows both actors. A local copy so the caller's request is untouched;
+    // ApplyTargetConditionRiders leaves it bit-identical unless a rider
+    // actually fired against this target with the source split present.
+    FBreakerDamageRequest ResolvedRequest = Request;
+    ApplyTargetConditionRiders(ResolvedRequest);
+    Result = UBreakerDamageLibrary::ResolveDamage(ResolvedRequest, Defense);
     if (Result.bDodged)
     {
         AddClassResource(DodgeResourceRefund);
@@ -103,6 +109,57 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     }
     DispatchHitDealt(Request, Result);
     return Result;
+}
+
+void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& Request) const
+{
+    // STAGE 6, the mechanism of Hook-And-Condition-Vocabulary §3.2 step by
+    // step. Every early return below is a request resolving exactly as it did
+    // before target riders existed — that bit-identity is test-pinned.
+    //
+    // The split gate first: without the source's Increased/More halves the
+    // recomposition would have to guess how much of the composed multiplier is
+    // additive bucket, and a guess here is a second More by accident. Ability
+    // submissions and DoT ticks are composed-only today and take this exit.
+    if (!Request.bHasSourceSplit) return;
+
+    // A request outliving its dealer (a rocket in flight after the shooter
+    // died) has nobody whose rider table could answer.
+    const AActor* Attacker = Request.Instigator.Get();
+    if (!Attacker) return;
+    const UBreakerProgressionComponent* Progression = Attacker->FindComponentByClass<UBreakerProgressionComponent>();
+    if (!Progression) return;
+    const TArray<FBreakerTargetConditionRider>& Riders = Progression->GetTargetConditionRiders();
+    if (Riders.IsEmpty()) return;
+
+    // The event's condition state: the attacker's cached SELF half (the same
+    // standing state its own aggregation uses, so a mixed "airborne AND
+    // target bleeding" rider reads one truth) plus the target half supplied
+    // from this component's owner — the call site the vocabulary document
+    // named as SupplyTargetState's one honest home.
+    FBreakerBuildConditionState Conditions = Progression->GetActiveConditions();
+    Conditions.SupplyTargetState(GetOwner(), Attacker);
+
+    float RiderPercent = 0.0f;
+    for (const FBreakerTargetConditionRider& Rider : Riders)
+    {
+        // The builder only publishes Damage/IncreasedPercent rows today; the
+        // filter stays here too so a future row for a partition lane cannot
+        // silently pay into the general bucket.
+        if (Rider.StatTarget != EBreakerNodeStatTarget::Damage) continue;
+        if (Conditions.SatisfiesAll(Rider.Condition, Rider.AlsoRequires))
+        {
+            RiderPercent += Rider.Percent;
+        }
+    }
+    if (FMath::IsNearlyZero(RiderPercent)) return;
+
+    // The recomposition (§3.3): the rider joins the source's ADDITIVE
+    // Increased bucket and the More product is reapplied on top, unchanged.
+    // Floored at zero on both factors so a hostile authored negative can
+    // never invert damage.
+    const float IncreasedFactor = FMath::Max(0.0f, 1.0f + (Request.SourceIncreasedPercent + RiderPercent) / 100.0f);
+    Request.SourceDamageMultiplier = IncreasedFactor * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 
 void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result)
@@ -359,9 +416,17 @@ void UBreakerCombatComponent::ApplyOutgoingModifiers(FBreakerDamageRequest& Requ
     float Flat = 0.0f;
     for (const FBreakerOutgoingModifier& Modifier : OutgoingModifiers) Flat += Modifier.FlatBonus;
 
-    // Flat first, then the More product — resolution order step 1.
+    // Flat first, then the More product — resolution order step 1. The chain's
+    // product is a More, so it lands in BOTH the composed convenience value
+    // and the split's More half: a request carrying the Stage 6 source split
+    // must keep (1 + Increased/100) x MoreProduct == SourceDamageMultiplier
+    // through this pass, or the target-side recomposition would silently
+    // shed (or double) the window. Harmless when the split is absent — the
+    // default SourceMoreProduct is 1.0 and bHasSourceSplit stays false.
+    const float ChainMoreProduct = GetComposedMoreMultiplier();
     Request.BaseDamage = FMath::Max(0.0f, Request.BaseDamage + Flat);
-    Request.SourceDamageMultiplier *= GetComposedMoreMultiplier();
+    Request.SourceDamageMultiplier *= ChainMoreProduct;
+    Request.SourceMoreProduct *= ChainMoreProduct;
 }
 
 // Both writes go through UBreakerAttributeSet::ApplyClassResource rather than

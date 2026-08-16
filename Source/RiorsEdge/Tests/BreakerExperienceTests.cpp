@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Combat/BreakerEnemy.h"
 #include "Progression/BreakerExperience.h"
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,63 @@ bool FBreakerExperienceKillValueTest::RunTest(const FString& Parameters)
     // area level 1 as the fastest route to anything.
     TestTrue(TEXT("A higher area level pays more for the same rank"),
         XP::XpForKill(EBreakerMonsterRank::Trash, 50, Curve) > XP::XpForKill(EBreakerMonsterRank::Trash, 1, Curve));
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT #4: XP IS PAID FROM THE AREA LEVEL, NOT THE DROP ITEM LEVEL
+// ---------------------------------------------------------------------------
+// ABreakerEnemy::GrantExperience passed EnemyLevel — the DROP item level,
+// GetDropItemLevel(AreaLevel) plus the elite bonus, clamped to 120 against the
+// area ladder's 100 — into AwardKillExperience, under a comment claiming area
+// level. Rank already pays the elite premium via EliteXpMultiplier, so the
+// elite level bonus double-charged it (elite at area 10: 102 XP off level 15
+// against 83 off the area's own 10), and past area 100 the two clamps diverge
+// by up to 20 levels. GrantExperience itself needs a world and a player pawn,
+// so this pins the SEAM on a real actor: the two fields genuinely diverge for
+// an elite, and the number the call site now passes (GetAreaLevel) prices the
+// kill differently from the number it used to pass (GetEnemyLevel).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerExperiencePaysTheAreaLevelTest,
+    "RiorsEdge.Progression.Experience.PaysTheAreaLevel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerExperiencePaysTheAreaLevelTest::RunTest(const FString& Parameters)
+{
+    const FBreakerExperienceCurve Curve;
+    using XP = UBreakerExperienceLibrary;
+
+    ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>();
+    if (!Enemy)
+    {
+        AddError(TEXT("Could not construct an enemy to read its levels from."));
+        return false;
+    }
+    Enemy->SetMonsterRank(EBreakerMonsterRank::Elite);
+    Enemy->SetAreaLevel(10);
+
+    // The divergence is real on the actor: an elite's drop level sits ABOVE
+    // its area level, so the two are not interchangeable XP inputs.
+    TestEqual(TEXT("An elite in area 10 fights at area level 10"), Enemy->GetAreaLevel(), 10);
+    TestTrue(TEXT("An elite's drop item level sits above its area level"),
+        Enemy->GetEnemyLevel() > Enemy->GetAreaLevel());
+
+    // The kill now pays the area's own level. The old input priced the same
+    // kill strictly higher — the elite premium charged twice, once by rank
+    // and once by the level scalar.
+    const int32 PaidNow = XP::XpForKill(Enemy->GetMonsterRank(), Enemy->GetAreaLevel(), Curve);
+    const int32 PaidBefore = XP::XpForKill(Enemy->GetMonsterRank(), Enemy->GetEnemyLevel(), Curve);
+    TestTrue(*FString::Printf(TEXT("The drop-level input over-paid the elite (%d XP off the area's %d)"),
+        PaidBefore, PaidNow), PaidBefore > PaidNow);
+
+    // The endgame divergence: the area ladder clamps at 100 while the drop
+    // ladder runs to 120, so past area 100 an EnemyLevel-priced XP curve kept
+    // climbing content that does not exist. The area-priced one cannot.
+    Enemy->SetAreaLevel(100);
+    TestEqual(TEXT("The area ladder tops out at 100"), Enemy->GetAreaLevel(), 100);
+    TestTrue(TEXT("An endgame elite's drop level exceeds the area ladder's cap"),
+        Enemy->GetEnemyLevel() > Enemy->GetAreaLevel());
 
     return true;
 }

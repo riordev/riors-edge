@@ -47,6 +47,13 @@ public:
     UFUNCTION(BlueprintPure, Category="Momentum") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentum() const;
     UFUNCTION(BlueprintPure, Category="Momentum") float GetMomentumFraction() const;
+    // ResourceDepleted eligibility (build-math finding #3): "depleted" means
+    // DRAINED past empty, which only a loop that RESTS full can be. Momentum
+    // is earned by moving and decays to zero at rest — an empty bar is the
+    // idle state, not a drained one — so this loop answers false and a
+    // ResourceDepleted line can never read as always-on for a standing Swift.
+    // Mana is the one loop that answers true; see its declaration.
+    UFUNCTION(BlueprintPure, Category="Momentum") bool IsRestingStateFull() const { return false; }
 
     // Direct credit, mirroring UBreakerManaComponent::GrantMana(Amount,
     // bIgnoreGlobalCap=true): it bypasses the metered per-second generation

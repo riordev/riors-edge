@@ -32,27 +32,34 @@ namespace
     // dummy, a test rig — and the resource conditions are then simply absent
     // rather than reading as "empty", which would make every ResourceLow line
     // in the game pay out on a target dummy.
-    bool TryGetResourceFraction(const AActor* Actor, float& OutFraction)
+    //
+    // bOutRestsFull carries the loop's own IsRestingStateFull() answer —
+    // whether the loop idles at a full/positive bank (Mana) or at zero (the
+    // banks and Momentum). ResourceDepleted's eligibility question, and asked
+    // of the component rather than answered here, so a future loop
+    // self-describes instead of growing a case in this file (build-math
+    // finding #3).
+    bool TryGetResourceFraction(const AActor* Actor, float& OutFraction, bool& bOutRestsFull)
     {
         if (const UBreakerMomentumComponent* Momentum = Actor->FindComponentByClass<UBreakerMomentumComponent>())
         {
-            if (Momentum->IsActiveForOwner()) { OutFraction = Momentum->GetMomentumFraction(); return true; }
+            if (Momentum->IsActiveForOwner()) { OutFraction = Momentum->GetMomentumFraction(); bOutRestsFull = Momentum->IsRestingStateFull(); return true; }
         }
         if (const UBreakerManaComponent* Mana = Actor->FindComponentByClass<UBreakerManaComponent>())
         {
-            if (Mana->IsActiveForOwner()) { OutFraction = Mana->GetManaFraction(); return true; }
+            if (Mana->IsActiveForOwner()) { OutFraction = Mana->GetManaFraction(); bOutRestsFull = Mana->IsRestingStateFull(); return true; }
         }
         if (const UBreakerChargeComponent* Charge = Actor->FindComponentByClass<UBreakerChargeComponent>())
         {
-            if (Charge->IsActiveForOwner()) { OutFraction = Charge->GetChargeFraction(); return true; }
+            if (Charge->IsActiveForOwner()) { OutFraction = Charge->GetChargeFraction(); bOutRestsFull = Charge->IsRestingStateFull(); return true; }
         }
         if (const UBreakerGritComponent* Grit = Actor->FindComponentByClass<UBreakerGritComponent>())
         {
-            if (Grit->IsActiveForOwner()) { OutFraction = Grit->GetGritFraction(); return true; }
+            if (Grit->IsActiveForOwner()) { OutFraction = Grit->GetGritFraction(); bOutRestsFull = Grit->IsRestingStateFull(); return true; }
         }
         if (const UBreakerScrapComponent* Scrap = Actor->FindComponentByClass<UBreakerScrapComponent>())
         {
-            if (Scrap->IsActiveForOwner()) { OutFraction = Scrap->GetScrapFraction(); return true; }
+            if (Scrap->IsActiveForOwner()) { OutFraction = Scrap->GetScrapFraction(); bOutRestsFull = Scrap->IsRestingStateFull(); return true; }
         }
         return false;
     }
@@ -176,7 +183,7 @@ bool FBreakerBuildConditionState::SatisfiesOne(EBreakerBuildCondition Condition)
                 TEXT("[BreakerConditions] an effect requires condition '%s', which cannot be evaluated here and therefore never pays out. %s"),
                 DescribeCondition(Condition),
                 bNeedsTargetState
-                    ? TEXT("It is a TARGET condition and this state was built without target information -- the call site must call FBreakerBuildConditionState::SupplyTargetState (UBreakerCombatComponent::ReceiveDamage is the intended one).")
+                    ? TEXT("It is a TARGET condition and this state was built without target information. The production path DOES supply it -- UBreakerCombatComponent::ReceiveDamage calls SupplyTargetState and resolves target riders there (Stage 6) -- so this warning means a target requirement reached a state built OUTSIDE the damage pipeline: either a call site that should route through the rider table, or an effect on a layer with no target-side consumer.")
                     : TEXT("Nothing records the state it reads yet -- see FBreakerBuildConditionState::IsSelfEvaluable for what is missing."));
         }
     }
@@ -251,13 +258,25 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
     }
 
     float ResourceFraction = 0.0f;
-    if (TryGetResourceFraction(Actor, ResourceFraction))
+    bool bResourceRestsFull = false;
+    if (TryGetResourceFraction(Actor, ResourceFraction, bResourceRestsFull))
     {
         State.Set(EBreakerBuildCondition::ResourceLow, ResourceFraction <= LowVitalFraction);
         // Caster's Overcast drives Mana below zero, which is the state
         // Spellblade's Debt and Bloodprice are written against. <= rather than
         // < so an exactly-empty bar counts as depleted.
-        State.Set(EBreakerBuildCondition::ResourceDepleted, ResourceFraction <= 0.0f);
+        //
+        // Gated on the loop resting full (build-math finding #3): "depleted"
+        // means DRAINED past empty, and a loop that IDLES at zero — Grit,
+        // Scrap and Charge bank from empty, Momentum decays to empty at rest —
+        // is not drained by standing still. Without the gate,
+        // Anomaly.EntropyDebt's "while resource is empty" line was always-on
+        // for an idle Tank/Gunsmith/Support and near-always-on for a standing
+        // Swift, while the Caster it was written against had to EARN it
+        // through Overcast. Today only Mana rests full, so only a Caster can
+        // proc this condition; the loop's own IsRestingStateFull() is the
+        // authority, so a future full-resting loop joins with no edit here.
+        State.Set(EBreakerBuildCondition::ResourceDepleted, bResourceRestsFull && ResourceFraction <= 0.0f);
     }
 
     // The Recently* family is deliberately not set here. It is not an oversight
@@ -267,7 +286,10 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
 }
 
 // ---------------------------------------------------------------------------
-// TARGET evaluation — the half with no caller yet
+// TARGET evaluation — LIVE since Stage 6. The one production caller is
+// UBreakerCombatComponent::ApplyTargetConditionRiders (inside ReceiveDamage),
+// exactly the site the vocabulary document named: the target is GetOwner()
+// and the attacker is Request.Instigator.
 // ---------------------------------------------------------------------------
 void FBreakerBuildConditionState::SupplyTargetState(const AActor* Target, const AActor* Attacker)
 {

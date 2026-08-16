@@ -27,10 +27,13 @@
 // WHAT THESE TESTS DO NOT COVER, stated plainly rather than left to be
 // discovered:
 //
-//  * **No branch tree, no node, no keystone is reachable.** None of the three
-//    classes has an authored branch tree (kits-playable was the scope), so the
-//    keystone variant rows are asserted to EXIST and the reachability suite
-//    still takes its honest-emptiness arm.
+//  * **Branch trees are covered ELSEWHERE.** When this file was written none
+//    of the three classes had an authored branch tree and the reachability
+//    suite took its honest-emptiness arm; the branch layers landed later the
+//    same day (2026-08-16, same authorization) and that arm no longer
+//    applies. Tests/BreakerBuiltClassTreeTests.cpp owns the branch-tree
+//    coverage; the keystone variant rows this file asserts to EXIST are now
+//    also asserted REACHABLE there and in BreakerKeystoneReachabilityTests.
 //  * **No deployable, minion, ally, party, mark, buff, aura, threat or stagger
 //    behaviour is covered, because none exists** (O30 for the first group; the
 //    party layer for the second). The Scrap loop's two deployable-facing

@@ -74,6 +74,11 @@ public:
     UFUNCTION(BlueprintPure, Category="Charge") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Charge") float GetCharge() const;
     UFUNCTION(BlueprintPure, Category="Charge") float GetChargeFraction() const;
+    // ResourceDepleted eligibility (build-math finding #3): Charge is a bank —
+    // it starts and idles at zero — so an empty bar is the RESTING state, not
+    // a drained one. False stops a ResourceDepleted line reading as always-on
+    // for an idle Support. Mana is the one loop that answers true.
+    UFUNCTION(BlueprintPure, Category="Charge") bool IsRestingStateFull() const { return false; }
 
     // Support abilities cost Charge AND carry a cooldown, per the shared rule
     // for event-driven, spiky generation. Charge is NEVER spent to zero

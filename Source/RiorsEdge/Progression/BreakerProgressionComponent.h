@@ -18,6 +18,32 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerProgressionChanged);
 // reached 4 is worse than no tell.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerLevelGained, int32, NewLevel, int32, LevelsGained);
 
+// ---------------------------------------------------------------------------
+// STAGE 6 — one target-conditional Increased line, published for the target
+// side to resolve (Hook-And-Condition-Vocabulary §3.2).
+// ---------------------------------------------------------------------------
+// A node effect whose requirement names a Target* condition cannot be composed
+// at the source: the outgoing pass has no target (H2's structural hole), a
+// projectile has no target at fire time, and the one call site that knows both
+// actors is UBreakerCombatComponent::ReceiveDamage (H3). So the progression
+// component publishes these effects as ROWS — the full requirement, the stat
+// target and the rank-scaled percent — alongside its ordinary attribute
+// contribution, and ReceiveDamage adds the percent of every satisfied row into
+// the SAME additive Increased bucket via the request's source split
+// (FBreakerDamageRequest::SourceIncreasedPercent). Never a multiplier:
+// target-side lines are Increased-bucket only, by the doc's own rule.
+struct RIORSEDGE_API FBreakerTargetConditionRider
+{
+    EBreakerBuildCondition Condition = EBreakerBuildCondition::Always;
+    TArray<EBreakerBuildCondition> AlsoRequires;
+    // Recorded so a future partition consumer (AbilityDamage etc.) can route
+    // rows without a table migration; ReceiveDamage consumes Damage rows only
+    // today and the builder is loud about anything else.
+    EBreakerNodeStatTarget StatTarget = EBreakerNodeStatTarget::Damage;
+    // Whole percent, already multiplied by the owned rank.
+    float Percent = 0.0f;
+};
+
 UCLASS(ClassGroup=Progression, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerProgressionComponent : public UActorComponent
 {
@@ -185,6 +211,25 @@ public:
     // The movement/momentum conditions this component last folded in.
     const FBreakerBuildConditionState& GetActiveConditions() const { return ActiveConditions; }
 
+    // ---- STAGE 6: the target-conditional rider table ---------------------
+    // Pure over the same node/rank inputs AggregateStats takes, for the same
+    // reason: testable with no actor. Emits one row per owned rank of every
+    // effect whose requirement needs target state, IncreasedPercent bucket and
+    // Damage stat target only — a target-conditional MorePercent is
+    // warn-and-dropped exactly like the other unpaid Mores (it would need the
+    // strongest-three More selection re-run per event per target, which is
+    // both expensive and unexplainable), and any other bucket or stat target
+    // is warn-and-dropped until a lane exists to pay it.
+    static TArray<FBreakerTargetConditionRider> BuildTargetConditionRiders(
+        const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks);
+
+    // The rows this build currently publishes, re-derived in RecalculateStats
+    // with everything else — purchases, respecs, loads and condition
+    // transitions all re-state the current truth, so nothing new needs
+    // invalidating. Read by UBreakerCombatComponent::ReceiveDamage off
+    // Request.Instigator.
+    const TArray<FBreakerTargetConditionRider>& GetTargetConditionRiders() const { return CachedTargetRiders; }
+
     // Binds the attribute set this component contributes to. BeginPlay calls
     // it with the set found on the owner's ability system; tests call it with
     // a standalone set. Capturing the bases is the attribute set's job.
@@ -205,6 +250,8 @@ private:
     // true base; this component only ever submits a contribution, which is why
     // skill nodes and gear now stack instead of overwriting each other.
     FBreakerAttributeContribution CachedContribution;
+    // Stage 6: the published target-conditional rows. See GetTargetConditionRiders.
+    TArray<FBreakerTargetConditionRider> CachedTargetRiders;
     FBreakerBuildConditionState ActiveConditions;
     // The node tags currently pushed onto the owner's ability system, so the
     // next submission can remove exactly what the last one added. Without this
