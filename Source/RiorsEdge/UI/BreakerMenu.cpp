@@ -4719,6 +4719,13 @@ namespace
         case EBreakerNodeStatTarget::ClassResourceDecay:return TEXT("RESOURCE DECAY");
         case EBreakerNodeStatTarget::FireRate:       return TEXT("FIRE RATE");
         case EBreakerNodeStatTarget::DashCooldown:   return TEXT("DASH COOLDOWN");
+        // ---- Swift projectile channels (2026-08-16), named in the same pass
+        // that made their lanes live — the four targets nodes can now author
+        // and a player can now feel.
+        case EBreakerNodeStatTarget::ProjectileCount:return TEXT("PROJECTILES");
+        case EBreakerNodeStatTarget::Pierce:         return TEXT("PIERCE");
+        case EBreakerNodeStatTarget::ChainCount:     return TEXT("CHAIN");
+        case EBreakerNodeStatTarget::RicochetCount:  return TEXT("RICOCHET");
         default:                                     return TEXT("STAT");
         }
     }
@@ -4759,6 +4766,11 @@ namespace
         case EBreakerNodeStatTarget::ClassResourceDecay:return TEXT("RES DECAY");
         case EBreakerNodeStatTarget::FireRate:       return TEXT("FIRE RATE");
         case EBreakerNodeStatTarget::DashCooldown:   return TEXT("DASH CD");
+        // Swift projectile channels, kept to marker width like the rest.
+        case EBreakerNodeStatTarget::ProjectileCount:return TEXT("MULTI");
+        case EBreakerNodeStatTarget::Pierce:         return TEXT("PIERCE");
+        case EBreakerNodeStatTarget::ChainCount:     return TEXT("CHAIN");
+        case EBreakerNodeStatTarget::RicochetCount:  return TEXT("RICO");
         default:                                     return TEXT("STAT");
         }
     }

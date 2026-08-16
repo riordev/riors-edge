@@ -189,6 +189,27 @@ enum class EBreakerNodeStatTarget : uint8
     // weak point) stays a tag because bypassing a roll is not a percentage.
     StatusChance,
 
+    // ---- Swift projectile identity (owner ruling 2026-08-16) --------------
+    // "swifts identity should be based around multishot, pierce, chain,
+    // ricochet, movement, manipulation of projectiles with your momentum".
+    // Chain and ricochet join ProjectileCount and Pierce above as MECHANIC
+    // COUNTS — Flat-bucket whole numbers, deliberately not Mores (O3/O34: new
+    // Swift payoffs are Increased-bucket or mechanic-count, never a fourth
+    // More source). Appended at the end because this enum is serialized by
+    // ordinal into Data Assets; the vocabulary tests pin the original block.
+
+    // Arcs the shot takes to a further enemy after its final target: on hit,
+    // the shot jumps to the nearest legal enemy within the weapon's chain
+    // radius for a reduced-damage hit. A count, so it stacks additively with
+    // the momentum-state grant that is Swift's native source of it.
+    ChainCount,
+    // Bounces the shot may take off geometry: a shot that hits the world seeks
+    // the nearest enemy in line of sight of the impact instead of dying there.
+    // Swift.Marksman.Angle is the authoring node (Class-Kits §1.5 M4 rewrites
+    // the geometric reflection into a seek; with no Ricochet Chance affix in
+    // the item layer yet, the node also has to be the count's source).
+    RicochetCount,
+
     Count UMETA(Hidden)
 };
 
@@ -238,6 +259,23 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::ClassResourceRegen:
     case EBreakerNodeStatTarget::FireRate:
     case EBreakerNodeStatTarget::Armor:
+    // ---- Wired 2026-08-16, the Swift projectile pass ---------------------
+    // Owner ruling of the same date: Swift's identity is multishot / pierce /
+    // chain / ricochet, manipulated by Momentum. These four are Flat
+    // mechanic-count lanes in AggregateStats, landing on FBreakerNodeStats
+    // (BonusProjectileCount / BonusPierceCount / BonusChainCount /
+    // BonusRicochetCount) and read by UBreakerWeaponComponent::GetShotChannels
+    // on the fire path. They deliberately do NOT route through the aggregated
+    // attribute set: no EBreakerAggregatedAttribute entry exists for any of
+    // them and no gear affix bids on them yet, so the tree is the only bidder
+    // and the weapon reads the progression component directly — the same
+    // honest single-bidder shape Armor had before gear arrived, recorded here
+    // so the day a Multishot/Pierce affix lands, these move onto the shared
+    // additive bucket instead of multiplying beside it.
+    case EBreakerNodeStatTarget::ProjectileCount:
+    case EBreakerNodeStatTarget::Pierce:
+    case EBreakerNodeStatTarget::ChainCount:
+    case EBreakerNodeStatTarget::RicochetCount:
         return true;
     default:
         // Every O30 widening entry. They become true one at a time as the
@@ -363,6 +401,17 @@ struct RIORSEDGE_API FBreakerNodeStats
     // Whole percent, display only — the live half is already in DamageMultiplier.
     UPROPERTY(BlueprintReadOnly) float ActiveConditionalDamagePercent = 0.0f;
     UPROPERTY(BlueprintReadOnly) float PotentialConditionalDamagePercent = 0.0f;
+    // ---- Swift projectile channels (owner ruling 2026-08-16) --------------
+    // Flat mechanic counts, summed from the ProjectileCount / Pierce /
+    // ChainCount / RicochetCount lanes. Floats because a node may author a
+    // fractional projectile (the weapon accumulates the fraction across shots
+    // and fires the whole pellet when it crosses 1 — a perceptible every-other-
+    // shot rhythm rather than a rounding loss); pierce/chain/ricochet floor at
+    // consumption. Consumed by UBreakerWeaponComponent::GetShotChannels.
+    UPROPERTY(BlueprintReadOnly) float BonusProjectileCount = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BonusPierceCount = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BonusChainCount = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BonusRicochetCount = 0.0f;
     // Rule-rewrite and verb-grant nodes cannot be expressed as stats; they
     // publish a tag here and the owning system reads it.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer GrantedTags;

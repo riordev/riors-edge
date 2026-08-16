@@ -766,9 +766,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Ledger.GetTag());
     Tree->Nodes.Add(Node);
 
+    // LIVE 2026-08-16 (owner ruling: Swift = multishot/pierce/chain/ricochet).
+    // The weapon layer now has a real ricochet: a shot that hits geometry
+    // bounces toward the nearest enemy in line of sight. Class-Kits §1.5 M4
+    // authors Angle as a rewrite of the Ricochet Chance AFFIX's geometric
+    // reflection — but no such affix exists in the item layer yet, so with
+    // nothing to rewrite, this node is also the count's source: +1 bounce per
+    // rank (AUTHORED, O2 PLACEHOLDER, the §1.3.1 stat-half pattern). The two
+    // seek radii ARE transcribed doc values — 12 m at R1, 20 m at R2 — read
+    // per-rank by UBreakerWeaponComponent::ResolvePelletImpacts.
     Node = MakeNode(TEXT("Swift.Marksman.Angle"), TEXT("Angle"),
-        TEXT("Ricochets seek the nearest target instead of reflecting geometrically."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Shots that hit the world bounce toward the nearest enemy in sight. A second rank bounces again, and seeks further."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.LongLens"));
+    AddEffect(Node, EBreakerNodeStatTarget::RicochetCount, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER (authored count; radii are §1.5 M4's 12 m / 20 m)
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Angle.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -778,24 +788,43 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarkEconomy.GetTag());
     Tree->Nodes.Add(Node);
 
+    // LIVE 2026-08-16: pierce exists on the weapon path, and BOTH halves of
+    // §1.5 M6 now pay. The rule half — "+4 Momentum per target pierced (R2:
+    // +7), capped at 3" — is consumed by UBreakerWeaponComponent::FireOnce
+    // reading this node's rank (values transcribed there). The Pierce line
+    // below is the AUTHORED half that gives the discipline something to
+    // discipline: +1 penetration per rank, the enum's own naming of this node
+    // ("Pierce... Named by Swift.Marksman.PierceDiscipline") made real. The
+    // pre-existing crit/damage stat half is kept unchanged — removing an
+    // authored value would be a retune under the O2 freeze.
     Node = MakeNode(TEXT("Swift.Marksman.PierceDiscipline"), TEXT("Pierce Discipline"),
-        TEXT("Each target pierced by a shot generates Momentum, up to three. Shots also land harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Shots punch through one more enemy per rank, and every target pierced pays Momentum, up to three."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
+    AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER (authored count)
     AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
+    // LIVE 2026-08-16: the "STILL INERT awaiting a Weapons/ consumer" note
+    // below is settled — the pierce-ignores-armour rule is now CONSUMED by
+    // UBreakerWeaponComponent::ResolvePelletImpacts, which reads this tag and
+    // grants full armour penetration to the second and subsequent targets of
+    // a pierced shot (§1.5 M7's rule half, verbatim). The Pierce line is
+    // AUTHORED (O2 PLACEHOLDER): the S5 Sightline ABILITY this node was meant
+    // to grant still does not exist, and an armour rule riding zero
+    // penetrations would be a purchase the player cannot feel — two whole
+    // penetrations is the nearest honest stand-in until the ability lands,
+    // and it comes out again the day the grant goes in.
     Node = MakeNode(TEXT("Swift.Marksman.Sightline"), TEXT("Sightline"),
-        TEXT("Grants Sightline. Its pierce ignores Armour after the first target."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Shots pierce two more enemies, and pierced targets after the first take full damage through Armour."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
+    AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER (authored count until the S5 ability grant exists)
     // PHANTOM GRANT FIXED (audit item 3): "Sightline" is not an ability id in
     // the fallback registry (it collides in NAME ONLY with the unrelated
     // Core.Precision.Sightline node) and there is no implemented ability it
-    // could resolve to — it is a pierce-ignores-armour RULE, and
-    // Node_Sightline is listed among the "STILL INERT" tags in
-    // Abilities/BreakerAbilityStateComponent.h awaiting a Weapons/ consumer.
-    // The grant is removed rather than invented; the tag is the real hook.
+    // could resolve to. The grant stays absent rather than invented; the tag
+    // is the real hook, and it now has its consumer.
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Sightline.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -846,8 +875,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // is a weapon-layer curve, so "do not apply it" has no node-stat form —
     // and expressing it as Increased Damage would be the affix-layer
     // duplication §6.4 forbids, not to mention unconditional where the design
-    // is bounded by the Pierce cap. WAITING ON: the projectile path checking
-    // this tag before applying pierce falloff on a killing hit.
+    // is bounded by the Pierce cap.
+    // LIVE 2026-08-16: the WAITING ON is answered — pierce falloff exists
+    // (UBreakerWeaponComponent::PierceDamageFalloff) and
+    // FBreakerWeaponMath::NextPierceMultiplier skips the falloff step after a
+    // killing hit exactly when this tag is owned. Still a tag with no stat
+    // line, correctly: the node changes a rule, not a number.
     Node = MakeNode(TEXT("Swift.Marksman.Overpenetration"), TEXT("Overpenetration"),
         TEXT("A shot that kills carries on at full damage instead of falling off, up to the pierce cap."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));

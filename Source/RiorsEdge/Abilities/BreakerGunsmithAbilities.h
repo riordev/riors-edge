@@ -29,8 +29,11 @@ class UBreakerWeaponComponent;
 //    ALL outgoing damage while live, not only weapon rounds. The window's
 //    shot-counted lifetime keeps that leak small; a per-shot modifier hook
 //    (spec §4.5 FBreakerPendingShotModifier) does not exist to be reused.
-//  * +1 Pierce is NOT implemented: no pierce mechanic exists anywhere on the
-//    weapon path yet, so there is no ceiling to stack into. Recorded absent.
+//  * +1 Pierce IS implemented (2026-08-16, the authorized cross-territory
+//    edit of the Swift projectile pass): the weapon path now has a real
+//    pierce mechanic (UBreakerWeaponComponent's shot channels), so the rig's
+//    recorded-absent half is honored — the window pushes a keyed +1 Pierce
+//    channel bonus on activation and pops it with the rest of the teardown.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_SidearmRig : public UBreakerGameplayAbility
 {
@@ -48,6 +51,8 @@ public:
     // O2 PLACEHOLDER: §G1 authors "bonus flat damage" with no magnitude. Flat
     // bucket, before the additive Increased bucket, so it cannot double-dip.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) float FlatBonusDamage = 8.0f;   // O2 PLACEHOLDER
+    // §G1's other half, verbatim: "+1 Pierce". Doc-seeded, not a placeholder.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SidearmRig", meta=(ClampMin="0")) int32 PierceBonus = 1;   // Class-Kits-Gunsmith §3 G1
 
 private:
     UFUNCTION() void HandleMagazineEmptied(bool bStartedFull);

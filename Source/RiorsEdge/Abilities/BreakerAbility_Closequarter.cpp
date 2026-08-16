@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
@@ -10,6 +11,8 @@
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 
 UBreakerAbility_Closequarter::UBreakerAbility_Closequarter()
 {
@@ -45,6 +48,28 @@ bool UBreakerAbility_Closequarter::ShouldRefund(float TargetHealthFraction, floa
     return TargetHealthFraction >= 0.0f && TargetHealthFraction <= Threshold;
 }
 
+bool UBreakerAbility_Closequarter::ShouldBlinkUntargeted(bool bTargetFound, bool bHasBlinkNode)
+{
+    return !bTargetFound && bHasBlinkNode;
+}
+
+FVector UBreakerAbility_Closequarter::UntargetedBlinkDestination(const FVector& CasterLocation, const FVector& AimDirection, float RangeCm)
+{
+    const FVector Direction = AimDirection.GetSafeNormal();
+    if (Direction.IsNearlyZero())
+    {
+        return CasterLocation;
+    }
+    return CasterLocation + Direction * FMath::Max(0.0f, RangeCm);
+}
+
+float UBreakerAbility_Closequarter::EffectiveRangeCm(bool bEdgeworkDuringUnmake, float AuthoredRangeCm, float UnrestrictedRangeCm)
+{
+    // Max, not replacement: an unrestricted range authored below the base
+    // range must never SHORTEN the blink.
+    return bEdgeworkDuringUnmake ? FMath::Max(AuthoredRangeCm, UnrestrictedRangeCm) : AuthoredRangeCm;
+}
+
 void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -62,13 +87,27 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
     }
 
+    // Edgework's Closequarter half (Class-Kits §2.2): "during Unmake,
+    // Closequarter has no range limit within line of sight." Two-part gate,
+    // the exact idiom Cleave's animation-lock half uses: the keystone tag says
+    // the rewrite is owned, the live Unmake window says it is currently
+    // rewriting. The tag alone is permanent from node purchase and gating on
+    // it alone already shipped one bug (D10). The trace IS the line-of-sight
+    // clause — a wall still stops it at any range.
+    const bool bHasEdgework = ActorInfo && ActorInfo->AbilitySystemComponent.IsValid()
+        && ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
+    const UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>();
+    const bool bDuringUnmake = State && State->IsWindowActive(UnmakeWindowKey());
+    const float TraceRangeCm = EffectiveRangeCm(bHasEdgework && bDuringUnmake, MaximumRangeCm, UnrestrictedRangeCm);
+
     // Target acquisition happens BEFORE the commit: unlike Skim, a
     // Closequarter with nothing under the crosshair has no effect at all, and
     // charging 35 Mana for a cast that provably cannot move the player is a
-    // dead key, not a risk the design asked for.
+    // dead key, not a risk the design asked for. (SB7 below is the one
+    // exception, and it moves the player every time.)
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerClosequarter), false, Character);
-    const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * MaximumRangeCm;
+    const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * TraceRangeCm;
     AActor* Target = nullptr;
     if (World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_GameTraceChannel2, Params) && Hit.GetActor())
     {
@@ -80,7 +119,38 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         }
     }
 
-    if (!Target || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    if (!Target)
+    {
+        // SB7 "Blink": "Closequarter may be cast with no target to blink 12 m
+        // in the aim direction." Same verb, same machinery: the destination is
+        // where the targeted blink would have gone, the teleport is the same
+        // swept move, the arrival carries no velocity. Without the node the
+        // empty-crosshair cast stays a refused, uncharged dead key.
+        const UBreakerProgressionComponent* Progression = Character->FindComponentByClass<UBreakerProgressionComponent>();
+        const bool bHasBlinkNode = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_Blink.GetTag());
+        if (!ShouldBlinkUntargeted(false, bHasBlinkNode) || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+        {
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+            return;
+        }
+
+        // The node text says 12 m — which is C2's own MaximumRangeCm, so the
+        // distance is transcribed, not authored here. Deliberately NOT the
+        // Edgework trace range: "no range limit within line of sight" needs a
+        // target to sight; the free-aimed blink stays 12 m.
+        const FVector BlinkDestination = UntargetedBlinkDestination(Character->GetActorLocation(), ViewRotation.Vector(), MaximumRangeCm);
+        FHitResult UntargetedHit;
+        Character->SetActorLocation(BlinkDestination, /*bSweep*/ true, &UntargetedHit, ETeleportType::TeleportPhysics);
+        if (UPawnMovementComponent* Movement = Character->GetMovementComponent())
+        {
+            Movement->Velocity = FVector::ZeroVector;
+        }
+        // No target, no refund: the refund gate reads target health.
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
+
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;

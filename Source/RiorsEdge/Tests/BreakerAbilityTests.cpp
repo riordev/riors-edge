@@ -726,6 +726,86 @@ bool FBreakerClosequarterRulesTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A full-health target does not refund"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 0.4f));
     // SB10 No Distance moves the threshold to 100% — a data change, not a branch.
     TestTrue(TEXT("A 100% threshold refunds on anything"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 1.0f));
+
+    // SB7 Blink: an untargeted cast is legal only with the node, and never
+    // preempts a found target.
+    TestTrue(TEXT("No target plus the Blink node blinks untargeted"), UBreakerAbility_Closequarter::ShouldBlinkUntargeted(false, true));
+    TestFalse(TEXT("No target without the node stays a refused cast"), UBreakerAbility_Closequarter::ShouldBlinkUntargeted(false, false));
+    TestFalse(TEXT("A found target always takes the targeted path"), UBreakerAbility_Closequarter::ShouldBlinkUntargeted(true, true));
+    TestFalse(TEXT("Base Closequarter is unchanged with a target and no node"), UBreakerAbility_Closequarter::ShouldBlinkUntargeted(true, false));
+
+    // The untargeted destination is the full 12 m along the aim, no standoff —
+    // there is no target to stand off from.
+    const FVector Aim(0.0, 1.0, 0.0);
+    TestTrue(TEXT("The untargeted blink covers the full range"),
+        UBreakerAbility_Closequarter::UntargetedBlinkDestination(Caster, Aim, 1200.0f).Equals(FVector(0.0, 1200.0, 0.0), 0.01));
+    TestTrue(TEXT("An unnormalized aim direction does not scale the blink"),
+        UBreakerAbility_Closequarter::UntargetedBlinkDestination(Caster, Aim * 50.0, 1200.0f).Equals(FVector(0.0, 1200.0, 0.0), 0.01));
+    TestTrue(TEXT("A degenerate aim direction goes nowhere"),
+        UBreakerAbility_Closequarter::UntargetedBlinkDestination(Caster, FVector::ZeroVector, 1200.0f).Equals(Caster, 0.01));
+    TestTrue(TEXT("A negative range goes nowhere rather than backwards"),
+        UBreakerAbility_Closequarter::UntargetedBlinkDestination(Caster, Aim, -100.0f).Equals(Caster, 0.01));
+
+    // Edgework's Closequarter half: the range limit lifts only under the
+    // two-part gate (keystone AND live Unmake window), mirroring Cleave's
+    // AnimationLockFor. The callers compose the two flags with &&; every
+    // partial combination is the base range.
+    TestEqual(TEXT("Base Closequarter keeps its authored range"),
+        UBreakerAbility_Closequarter::EffectiveRangeCm(false, 1200.0f, 100000.0f), 1200.0f);
+    TestEqual(TEXT("Edgework during Unmake lifts the range limit"),
+        UBreakerAbility_Closequarter::EffectiveRangeCm(true, 1200.0f, 100000.0f), 100000.0f);
+    TestEqual(TEXT("An unrestricted range can never shorten the blink"),
+        UBreakerAbility_Closequarter::EffectiveRangeCm(true, 1200.0f, 500.0f), 1200.0f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCascadeRulesTest,
+    "RiorsEdge.Abilities.CascadeRules",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCascadeRulesTest::RunTest(const FString& Parameters)
+{
+    // Class-Kits §2.2, the Multispell keystone: "during Unmake, every status
+    // application also applies the next status in Fracture's cycle at proc
+    // coefficient 0." Four legs, all required.
+    TestTrue(TEXT("Held keystone, live window, own application echoes"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, true, true, 1.0f));
+    TestFalse(TEXT("Without the keystone nothing echoes"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(false, true, true, 1.0f));
+    TestFalse(TEXT("The tag alone outside the window echoes nothing — D10's lesson"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, false, true, 1.0f));
+    TestFalse(TEXT("Another actor's application is not the Caster's reaction"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, true, false, 1.0f));
+    // The termination clause: an echo carries proc coefficient 0, and a
+    // 0-coefficient application must never echo again (Master 7.10.1).
+    TestFalse(TEXT("A proc-coefficient-0 application cannot echo"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, true, true, 0.0f));
+    TestTrue(TEXT("A partial coefficient still echoes"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, true, true, 0.5f));
+
+    // The echo spec is the cycle entry riding the item-level scalar, with its
+    // coefficient forced to 0 — so the echo of an echo is structurally dead.
+    FBreakerStatusApplicationSpec CycleSpec;
+    CycleSpec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
+    CycleSpec.BaseDamagePerTick = 4.0f;
+    CycleSpec.Duration = 3.0f;
+    CycleSpec.TickInterval = 0.5f;
+    CycleSpec.ProcCoefficient = 1.0f;
+    const FBreakerStatusApplicationSpec Echo = UBreakerAbility_Unmake::MakeCascadeEchoSpec(CycleSpec, 2.0f);
+    TestEqual(TEXT("The echo carries proc coefficient 0"), Echo.ProcCoefficient, 0.0f);
+    TestEqual(TEXT("The echo's per-tick damage rides the item-level scalar"), Echo.BaseDamagePerTick, 8.0f);
+    TestEqual(TEXT("The echo keeps the cycle entry's status"), Echo.StatusTag, CycleSpec.StatusTag);
+    TestEqual(TEXT("The echo keeps the cycle entry's duration"), Echo.Duration, 3.0f);
+    TestEqual(TEXT("The echo keeps the cycle entry's tick interval"), Echo.TickInterval, 0.5f);
+    TestFalse(TEXT("An echo built from an echo cannot pass the gate"),
+        UBreakerAbility_Unmake::ShouldCascadeEcho(true, true, true, Echo.ProcCoefficient));
+    // At item level 1 the scalar is exactly 1.0 and the authored numbers pass
+    // through bit-identical; a negative scalar is treated as none, not a heal.
+    TestEqual(TEXT("The anchor scalar is a pass-through"),
+        UBreakerAbility_Unmake::MakeCascadeEchoSpec(CycleSpec, 1.0f).BaseDamagePerTick, 4.0f);
+    TestEqual(TEXT("A negative scalar clamps to zero damage"),
+        UBreakerAbility_Unmake::MakeCascadeEchoSpec(CycleSpec, -1.0f).BaseDamagePerTick, 0.0f);
     return true;
 }
 

@@ -48,6 +48,10 @@ void UBreakerAbility_SidearmRig::ActivateAbility(const FGameplayAbilitySpecHandl
         // comes from the shot events below.
         State->StartWindow(WindowKey(), 120.0f);
     }
+    // §G1's "+1 Pierce", live as of the Swift projectile pass (2026-08-16,
+    // the one authorized cross-territory edit): a keyed channel bonus with no
+    // expiry — the shot events below own the pop, like everything else here.
+    Weapon->PushShotChannelBonus(OutgoingModifierKey(), 0.0f, PierceBonus, 0, 0);
 
     BoundWeapon = Weapon;
     Weapon->OnMagazineEmptied.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleMagazineEmptied);
@@ -94,6 +98,7 @@ void UBreakerAbility_SidearmRig::EndAbility(const FGameplayAbilitySpecHandle Han
         }
         if (UBreakerWeaponComponent* Weapon = BoundWeapon.Get())
         {
+            Weapon->PopShotChannelBonus(OutgoingModifierKey());
             Weapon->OnMagazineEmptied.RemoveDynamic(this, &UBreakerAbility_SidearmRig::HandleMagazineEmptied);
             Weapon->OnReloadChanged.RemoveDynamic(this, &UBreakerAbility_SidearmRig::HandleReloadChanged);
         }

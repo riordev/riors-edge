@@ -9,6 +9,68 @@
 
 class UBreakerAttributeSet;
 class UBreakerWeaponDefinition;
+class UBreakerProgressionComponent;
+class UBreakerMomentumComponent;
+enum class EBreakerMomentumState : uint8;
+
+// ---------------------------------------------------------------------------
+// The composed projectile channels one trigger pull fires with (owner ruling
+// 2026-08-16: Swift's identity is multishot / pierce / chain / ricochet,
+// manipulated by Momentum). All four default to zero, so a character with no
+// nodes, no ability window and no Momentum fires exactly the shot the
+// archetype table authored — nothing changes for non-Swift builds until a
+// lane, a keyed push or a momentum state grants a count.
+// ---------------------------------------------------------------------------
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerShotChannels
+{
+    GENERATED_BODY()
+
+    // Extra pellets per trigger pull, on top of the definition's
+    // PelletsPerShot. Fractional: the weapon banks the fraction across pulls
+    // and fires the whole pellet when it crosses 1 (a visible rhythm, not a
+    // rounding loss). Extra pellets draw their spread from salted sub-streams
+    // so the primary sequence never moves.
+    UPROPERTY(BlueprintReadOnly) float AdditionalProjectiles = 0.0f;
+    // Enemies a shot may continue THROUGH beyond its first, paying the
+    // weapon's per-pierce falloff each penetration.
+    UPROPERTY(BlueprintReadOnly) int32 PierceCount = 0;
+    // Arcs the shot takes to a further enemy after its final target, each at
+    // the weapon's chain damage fraction of the hit before it.
+    UPROPERTY(BlueprintReadOnly) int32 ChainCount = 0;
+    // Bounces off geometry toward the nearest enemy in line of sight.
+    UPROPERTY(BlueprintReadOnly) int32 RicochetCount = 0;
+
+    bool IsIdentity() const
+    {
+        return AdditionalProjectiles <= 0.0f && PierceCount <= 0 && ChainCount <= 0 && RicochetCount <= 0;
+    }
+
+    FBreakerShotChannels& operator+=(const FBreakerShotChannels& Other)
+    {
+        AdditionalProjectiles += Other.AdditionalProjectiles;
+        PierceCount += Other.PierceCount;
+        ChainCount += Other.ChainCount;
+        RicochetCount += Other.RicochetCount;
+        return *this;
+    }
+};
+
+// One secondary leg of a shot: a pierce continuation, a chain arc, or a
+// ricochet bounce. ADDITIVE beside FBreakerPelletImpact for the same reason
+// that struct exists — presentation needs a segment (start AND end) to draw an
+// arc, and the per-pellet record's one-entry-per-pellet contract must not be
+// disturbed by legs that are not pellets.
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerSecondaryImpact
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly) FVector Start = FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly) FVector End = FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly) bool bHit = false;
+    UPROPERTY(BlueprintReadOnly) TObjectPtr<AActor> HitActor = nullptr;
+};
 
 
 // ---------------------------------------------------------------------------
@@ -83,6 +145,14 @@ struct RIORSEDGE_API FBreakerShotResult
         for (const FBreakerPelletImpact& Pellet : Pellets) { if (Pellet.bHit) ++Landed; }
         return Landed;
     }
+    // ---- Secondary legs, ADDITIVE ------------------------------------------
+    // Pierce continuations, chain arcs and ricochet bounces, in resolution
+    // order. Empty for every shot fired by a build with the channels at zero,
+    // so nothing that predates the channels ever sees one. Each leg carries
+    // its own start, because an arc's tracer cannot be reconstructed from the
+    // pellet's muzzle.
+    UPROPERTY(BlueprintReadOnly) TArray<FBreakerSecondaryImpact> SecondaryImpacts;
+
     // Recoil pattern position of this shot: 0 is the first shot of a burst.
     // Replicated with the cosmetic event so every machine kicks identically.
     UPROPERTY(BlueprintReadOnly) int32 BurstShotIndex = 0;
@@ -311,6 +381,53 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PopRangeTreatmentOverride(FName Key);
     UFUNCTION(BlueprintPure, Category="Weapon|Damage") bool IsRangeTreatmentOverridden() const;
 
+    // ---- Projectile channels (owner ruling 2026-08-16) --------------------
+    // Swift's redesign: "multishot, pierce, chain, ricochet, movement,
+    // manipulation of projectiles with your momentum". The channels compose
+    // from three sources, in this order:
+    //   1. the progression tree's Flat lanes (FBreakerNodeStats — the
+    //      ProjectileCount / Pierce / ChainCount / RicochetCount stat targets),
+    //   2. keyed pushes from ability windows (Sidearm Rig's +1 Pierce is the
+    //      first caller), same lazy-expiry shape as PushRangeTreatmentOverride,
+    //   3. the owner's Momentum STATE, Swift-gated by the momentum component's
+    //      own IsActiveForOwner — see MomentumChannelBonus for the table.
+    // Hitscan only: the rocket puts a real actor in the world and is untouched.
+    UFUNCTION(BlueprintPure, Category="Weapon|Channels") FBreakerShotChannels GetShotChannels() const;
+    // Keyed additive channel bonus. Re-pushing a key replaces rather than
+    // stacks; Duration <= 0 means no expiry, popped explicitly.
+    UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PushShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration = -1.0f);
+    UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PopShotChannelBonus(FName Key);
+
+    // The momentum coupling table, the identity mechanic: Momentum STATE
+    // manipulates projectiles. Pure and static so the suite pins the table
+    // with no world. Every magnitude below is O2 PLACEHOLDER, chosen to be
+    // PERCEPTIBLE (a pierce the player cannot see is dead content):
+    //   Running:  +1 Pierce            — moving fast makes rounds punch through.
+    //   Redline:  +1 Pierce, +1 Chain  — held speed makes them arc onward too.
+    //   Airborne: +1 whole projectile  — leaving the ground doubles the shot.
+    //   Sliding:  +0.5 projectile      — a second pellet every other shot.
+    // Airborne/sliding multishot requires at least Running: the coupling is
+    // Momentum manipulating projectiles, not posture doing it for free.
+    static FBreakerShotChannels MomentumChannelBonus(EBreakerMomentumState State, bool bAirborne, bool bSliding);
+
+    // ---- Channel tunables, all O2 PLACEHOLDER -----------------------------
+    // Damage multiplier applied per target PENETRATED: the second enemy in a
+    // line takes 70% of the first, the third 49%. Overpenetration (Marksman
+    // M10, by tag) skips the step after a killing hit.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float PierceDamageFalloff = 0.70f;   // O2 PLACEHOLDER
+    // Chain arcs reach this far from the struck enemy...
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0")) float ChainRadiusCm = 1200.0f;   // O2 PLACEHOLDER
+    // ...and each arc deals this fraction of the hit before it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float ChainDamageMultiplier = 0.50f;   // O2 PLACEHOLDER
+    // Ricochet seeks the nearest enemy in line of sight within this radius of
+    // the geometry impact. Base value matches nothing in the kit doc — the
+    // doc's 12 m / 20 m figures belong to Swift.Marksman.Angle's two ranks
+    // (Class-Kits §1.5 M4, transcribed at the read site), which OVERRIDE this
+    // when owned.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0")) float RicochetSeekRadiusCm = 800.0f;   // O2 PLACEHOLDER
+    // A bounced round arrives at this fraction of the pellet's current damage.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Channels", meta=(ClampMin="0", ClampMax="1")) float RicochetDamageMultiplier = 0.65f;   // O2 PLACEHOLDER
+
     // Master switch, so the owner can A/B the whole layer in the editor.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bRecoilEnabled = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Feel") bool bViewmodelKickEnabled = true;
@@ -459,6 +576,43 @@ private:
     mutable TMap<FName, FRangeTreatmentOverrideEntry> RangeTreatmentOverrides;
     void PruneRangeTreatmentOverrides() const;
 
+    // ---- Projectile channel state -----------------------------------------
+    // The banked sub-pellet fraction from AdditionalProjectiles. Server-side
+    // fire-path state, like ShotSequence; resets with the rest of nothing —
+    // deliberately, so a +0.5 build's every-other-shot rhythm survives reloads
+    // and swaps rather than restarting on each.
+    float MultishotAccumulator = 0.0f;
+    struct FShotChannelBonusEntry
+    {
+        FBreakerShotChannels Channels;
+        // Negative = no expiry; popped explicitly.
+        double ExpiryTime = -1.0;
+    };
+    // Mutable for the same lazy-expiry-in-const-read reason as
+    // RangeTreatmentOverrides above.
+    mutable TMap<FName, FShotChannelBonusEntry> ShotChannelBonuses;
+    void PruneShotChannelBonuses() const;
+    // One pellet's full resolution: the pierce loop, the ricochet bounce and
+    // the chain arcs. Writes impacts and damage into Shot/Pellet and returns
+    // how many enemies the pellet pierced BEYOND its first hit, so FireOnce
+    // can pay Pierce Discipline's Momentum once per trigger pull. Lives beside
+    // FireOnce rather than inside it so the base pellet bookkeeping above it
+    // stays readable. PelletSeed is the seed the pellet's spread was drawn
+    // with; every secondary draw is salted off it.
+    int32 ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
+        const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
+        const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
+        FBreakerShotResult& Shot, struct FBreakerPelletImpact& Pellet);
+    // Nearest legal enemy (combat component, alive, unstruck, line of sight)
+    // to Origin within RadiusCm. The world query half of chain/ricochet.
+    AActor* FindNearestChainTarget(const FVector& Origin, float RadiusCm, const TArray<const AActor*>& ExcludedActors) const;
+    // Builds and submits one weapon damage request; shared by the base hit,
+    // pierce continuations, chain arcs and ricochet legs so a stat can never
+    // apply to some of them and not others.
+    FBreakerDamageResult SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, class UBreakerCombatComponent* TargetCombat,
+        const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
+        float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed);
+
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;
     // Owner ground speed over MoveSpreadReferenceSpeed, clamped to [0,1].
@@ -488,7 +642,10 @@ private:
     void FireProjectile(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FRotator& ViewRotation, float Spread, int32 BurstIndex, int32 RecoilSeed, float ShotAimAlpha);
     // LevelScalar is resolved once per trigger pull and passed down, so every
     // pellet and the bleed it may apply share one item-level reading.
-    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar);
+    // SeedBasis is the hit's own draw seed (the base pellet's ShotSequence
+    // value, or a secondary leg's salted seed), so a pierced or chained hit's
+    // bleed roll neither collides with the primary sequence nor repeats it.
+    void ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis);
     void FinishReload();
     void FinishSwap();
     bool CanFire() const;

@@ -799,6 +799,20 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.AirControlMultiplier = Increased(EBreakerNodeStatTarget::AirControl);
     Stats.DamageOverTimeMultiplier = Increased(EBreakerNodeStatTarget::DamageOverTime);
     Stats.DamageMultiplier = Increased(EBreakerNodeStatTarget::Damage);
+    // ---- Swift projectile channels (owner ruling 2026-08-16) --------------
+    // Flat lanes only, on purpose: "+50% projectiles" is meaningless on a
+    // single-shot weapon (the enum comment on ProjectileCount says so), and
+    // pierce/chain/ricochet are whole mechanics, not percentages — an
+    // IncreasedPercent authored against any of these four is dropped by the
+    // bucket dispatch above exactly as it always was. These do not join the
+    // attribute contribution below: no EBreakerAggregatedAttribute exists for
+    // them and gear does not bid, so UBreakerWeaponComponent::GetShotChannels
+    // reads this struct directly (see the lane-register comment in
+    // BreakerProgressionTypes.h for the single-bidder reasoning).
+    Stats.BonusProjectileCount = Flat(EBreakerNodeStatTarget::ProjectileCount);
+    Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);
+    Stats.BonusChainCount = Flat(EBreakerNodeStatTarget::ChainCount);
+    Stats.BonusRicochetCount = Flat(EBreakerNodeStatTarget::RicochetCount);
 
     if (OutContribution)
     {

@@ -42,6 +42,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKe
 //                        2.0s internal cooldown. PARTIAL: guaranteed dodge is
 //                        the nearest primitive Combat/ already owns; real
 //                        invulnerability needs a damage-immunity flag there.
+//   Node_SB_Blink        Abilities/BreakerAbility_Closequarter.cpp — with the
+//                        node owned, Closequarter cast with no target blinks
+//                        the full 12 m along the aim direction (SB7).
 //
 // STILL INERT (tag granted, nothing reads it)
 //   Core:   Node_Fixate (needs the More bucket), Node_TunnelVision,

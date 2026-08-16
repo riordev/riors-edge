@@ -71,4 +71,50 @@ public:
 
     /** ArchetypeBase * ItemLevelDamageScalar(...). Negative bases clamp to 0. */
     static float WeaponBaseDamage(float ArchetypeBase, int32 ItemLevel, float GrowthPerLevel);
+
+    // ---- Swift projectile channels (owner ruling 2026-08-16) --------------
+    // Pure halves of the multishot / pierce / chain / ricochet mechanics, kept
+    // dependency-free here so the suite (which is world-free by construction)
+    // can exercise the decision math while UBreakerWeaponComponent keeps only
+    // the trace loop itself.
+
+    /**
+     * Multishot consumption, once per trigger pull. Returns the number of
+     * WHOLE extra pellets this shot fires; the fractional part of
+     * AdditionalProjectiles banks in Accumulator across pulls, so a +0.5 line
+     * is a visible every-other-shot second pellet rather than a rounding loss.
+     * Zero (or negative) input drains nothing and leaves the accumulator
+     * untouched, so a non-Swift weapon is bit-identical to before the channel
+     * existed.
+     */
+    static int32 ConsumeMultishot(float AdditionalProjectiles, float& Accumulator);
+
+    /**
+     * The pierce damage ladder: the multiplier the NEXT pierced target pays,
+     * given what the shot has already paid. Each penetration multiplies by
+     * FalloffPerTarget, except that Swift.Marksman.Overpenetration
+     * (Class-Kits §1.5 M10) skips the step after a KILLING hit — the shot
+     * carries on at its full remaining damage.
+     */
+    static float NextPierceMultiplier(float CurrentMultiplier, float FalloffPerTarget, bool bPreviousHitKilled, bool bOverpenetration);
+
+    /**
+     * Nearest-target selection for chain arcs and ricochet seeks. Candidates
+     * are world positions the caller has already filtered for legality (alive,
+     * not already struck, line of sight); returns the index of the nearest one
+     * within MaxRadiusCm of Origin, or INDEX_NONE. Deterministic: distance
+     * ties break toward the lower index, so the same world state always picks
+     * the same target.
+     */
+    static int32 SelectNearestTarget(const FVector& Origin, const TArray<FVector>& Candidates, float MaxRadiusCm);
+
+    /**
+     * Seed for a draw that must not perturb the primary shot sequence.
+     * Multishot's extra pellets and the secondary hits' crit rolls draw from
+     * these salted sub-streams, so a build with the channels at zero produces
+     * bit-identical recoil and spread sequences to a build from before the
+     * channels existed — and the same owner, shot and index always reproduce
+     * the same draw on the server.
+     */
+    static int32 SecondaryShotSeed(uint32 OwnerHash, int32 ShotSequence, uint32 Salt, int32 Index);
 };

@@ -1,6 +1,6 @@
 # HANDOFF — Rior's Edge
 
-**Written 2026-08-16 from six domain audits (progression, frontend, world, combat, classes, docs/rulings). Last reconciled against: O40.**
+**Written 2026-08-16 from six domain audits (progression, frontend, world, combat, classes, docs/rulings). Last reconciled against: O40. Updated 2026-08-16 evening against commits `1f6a2ba`..`130dca7` — resolved items are annotated in place, dated and per-commit; the §1 and §4 addenda carry the evening's summary.**
 This document exists to make a fresh agent effective in ten minutes. It does not flatter the work.
 
 ---
@@ -12,6 +12,14 @@ This document exists to make a fresh agent effective in ten minutes. It does not
 3. What actually runs today, end to end, is the **gym loop in Play In Editor**: spawn, talk to camp NPCs (F), fight (F4 waves / standing encounter), loot (F), equip (I), spend points, use Swift or Caster abilities, F1/F2/F3 playtest keys.
 4. What has **almost certainly never been run end to end** is the three-map flow itself — PIE still boots `Lvl_FirstPerson`, and the three new maps are empty shells with no PlayerStart and no lighting (§6 D1, D2).
 5. A very large amount landed in the last 24 hours across parallel lanes. Most of it compiles, much of it is tested, and a substantial fraction of it is **unreachable by a player** — that is what §5 is for, and it is the section to read first.
+
+**AS OF 2026-08-16 EVENING (commits `1f6a2ba`..`130dca7`)** — the five lines above are the morning; a reachability-and-content pass landed tonight and lines 3–5 are now materially out of date:
+- The three-map flow **has now been run end to end, standalone** — first verified `-game` boot of `Lvl_FrontEnd`, title screen photographed by the capture harness (`1f6a2ba`). Runtime world basics (fallback PlayerStart, sun/sky rig, front-end boot floor) exist; the `.umap` files are still empty as assets (§5 R6).
+- The title-screen-on-every-arrival defect (D1) is fixed; hub arrival is at the gate, not inside the obelisk (`6ab1ac1`); the Anchor holsters weapons, trims the HUD, and carries a quest tracker (`6ab1ac1`, `8f527b9`).
+- Levels pay points, all eight archetypes drop, currency is ungated, keystones are affordable through play (`1f6a2ba`); 13 special affixes give Aberrant/Anomalous their identity (`8f527b9`).
+- **All five classes are playable** (`130dca7`) — the §8 T7 chain has been executed, a minimal deployable system exists, and every missing primitive is recorded honestly at its site.
+- The menu-flash root cause was found and fixed; a DEV Breakpoint Sandbox lives on the pause menu (`8f527b9`). 46 docs got status stamps and `Docs/Owner-Rulings-Pending-Ratification.md` exists (`9caf41d`). Save data was wiped **by backup, not deletion** — `Saved/SaveGames_wiped_2026-08-16` (`6ab1ac1`).
+Details per section: §4 addendum for what landed, §5/§6 for what each resolves, §7 for what now awaits ratification.
 
 ---
 
@@ -80,21 +88,21 @@ Results **do not reach stdout**. Grep the log file:
 Saved/Logs/riors_edge.log      →  grep for  Result={Fail}
 ```
 
-**Baseline suite count: 314 passing, 0 failing** (measured at commit 1f6a2ba: the 312 measured at 70b8ea4 plus `RiorsEdge.Game.BootFlow.ShippedConfiguration` and `RiorsEdge.Progression.LevelPointEntitlement`). *(An earlier draft of this document carried 252 with an uncertainty note, taken from a stale line in `CONTEXT.md`. Re-run the suite on your first build and treat what you measure as the baseline; a count BELOW 314 means tests went missing, which is itself the regression.)*
+**Baseline suite count: 327 passing, 0 failing** (as of commit `130dca7`, the most recent commit stating a count: 314 at `1f6a2ba`, +8 at `8f527b9` = 322, +5 more at `130dca7` = 327, including the new `BreakerBuiltClassKitTests`). *(An earlier draft of this document carried 252 with an uncertainty note, taken from a stale line in `CONTEXT.md`. Re-run the suite on your first build and treat what you measure as the baseline; a count BELOW 327 means tests went missing, which is itself the regression.)*
 
 **Standalone game:**
 ```
 UnrealEditor-Cmd.exe "<repo>\riors_edge.uproject" -game -windowed -ResX=1920 -ResY=1080
 ```
-This boots `GameDefaultMap` = `/Game/Breaker/Maps/Lvl_FrontEnd`, which has **no PlayerStart** (§6 D2). Expect it to be broken until that is fixed.
+This boots `GameDefaultMap` = `/Game/Breaker/Maps/Lvl_FrontEnd`, which has **no PlayerStart** (§6 D2). ~~Expect it to be broken until that is fixed.~~ **[RESOLVED 2026-08-16 `1f6a2ba`]** `Game/BreakerWorldBasics` now supplies a fallback PlayerStart, lighting rig and front-end boot floor at runtime (suppressed by any authored equivalent); this launch has been run and photographed. The maps are still empty as assets — see §5 R6.
 
-**Capture harness** — eight switches, all verified against their parse sites. Frames land in `Saved/Screenshots/breaker_NN.png`; the process exits ~2.5 s after the last. Capture runs on a **CORE ticker, not a world timer**, because opening a menu pauses the world.
+**Capture harness** — eight switches, all verified against their parse sites. *(2026-08-16 `1f6a2ba`: `ScheduleScreenshots` now runs on **all three map roles** — front end and Anchor schedule their own exit, so the title screen and the hub are photographable, not just the gym.)* Frames land in `Saved/Screenshots/breaker_NN.png`; the process exits ~2.5 s after the last. Capture runs on a **CORE ticker, not a world timer**, because opening a menu pauses the world.
 
 | Switch | Form | Effect |
 |---|---|---|
 | `-BreakerAutoPlay` | flag | Skips the title menu into the gym. **Required for `-BreakerCaptureMenu`**, which is parsed inside its branch. |
 | `-BreakerScreenshots=N` | int 1–60 | N frames then exit. First at 6.0 s, then every 2.0 s. |
-| `-BreakerCaptureMenu=<SCREEN>` | string | `INVENTORY`, `SKILLTREES`/`SKILLS`, `LOADOUT`, `SETTINGS`, `CLASS`/`CLASSSELECT`, `PAUSE`, `CHARACTERSELECT`, `CHARACTERCREATE`. Anything else **silently** falls back to the main screen. |
+| `-BreakerCaptureMenu=<SCREEN>` | string | `INVENTORY`, `SKILLTREES`/`SKILLS`, `LOADOUT`, `SETTINGS`, `CLASS`/`CLASSSELECT`, `PAUSE`, `CHARACTERSELECT`, `CHARACTERCREATE`, and (added 2026-08-16 `8f527b9`) `DEVSANDBOX`/`SANDBOX` for the Breakpoint Sandbox (`BreakerCharacter.cpp:1372`). Anything else **silently** falls back to the main screen. |
 | `-BreakerCaptureBoard=<BOARD>` | string, NOT a bare flag | `CORE`, `COMPARE`, `BRANCH<n>`. Also the undocumented back-door to FORGE/ABILITIES: `-BreakerCaptureMenu=INVENTORY -BreakerCaptureBoard=FORGE` (`BreakerMenu.cpp:886-887`). |
 | `-BreakerCaptureTour` | flag | Eight authored field vantages instead of the player's eyes. |
 | `-BreakerCaptureHUD` | flag | Fabricates the HUD **events** a headless run cannot reach. |
@@ -137,6 +145,22 @@ UnrealEditor-Cmd.exe "<repo>\riors_edge.uproject" -game -BreakerAutoPlay ^
 
 **Cover field registry** (`Game/BreakerCoverRegistry.{h,cpp}`) — 9 deterministic passes, world-free and testable, with `IsLayoutLegal` naming the broken rule. *Point:* arena cover stops being ad-hoc and becomes measurable.
 
+**AS OF 2026-08-16 EVENING** — everything above is the morning's ledger. Tonight landed on top of it, in commit order:
+
+**`1f6a2ba` — the boot path is real.** D1 fixed with a tested pure-static guard (`ShouldShowInitialMenu`); `Game/BreakerWorldBasics` gives the three empty maps a runtime fallback PlayerStart, sun/sky/atmosphere rig and front-end boot floor, all suppressed by any authored equivalent (A6 stays the owner's call); first verified standalone boot of `Lvl_FrontEnd`, photographed; `RiorsEdge.Game.BootFlow.ShippedConfiguration` pins the boot map, the three packages, the D1 matrix and both travel directions. The loot slot draw is salted (`UBreakerLootLibrary::RollDropSlot`) — six archetypes drop for the first time, historical seeds re-roll. Points per level per `XP-And-Pacing.md` §4, with the slice lump reinterpreted as an **advance on the entitlement** (level 11 pays the 11th point) — keystones affordable at 11 without moving either O2-frozen number; pinned by `RiorsEdge.Progression.LevelPointEntitlement`. Currency ungated from `bDropsLoot`. D10 fixed.
+
+**`6ab1ac1` — arrival is at the gate.** The owner's "can't move on spawn / sensitivity super high" was the hub's landmark obelisk spawning inside the arriving pawn's capsule; arrivals and the PLAY teleport now land at a gate-side `ArrivalTransform`. The Anchor refuses fire and the three ability slots while holstered (`StopFire` stays un-gated). Save data moved aside to `Saved/SaveGames_wiped_2026-08-16` per the owner's fresh-boot request — moved, not deleted.
+
+**`9caf41d` — docs say what they are.** Status stamps (LAW / PARTIALLY BUILT / UNBUILT TREATMENT / SUPERSEDED / HISTORICAL) on 46 docs, AS BUILT sections on the five worst offenders (§6 D34), `Docs/Owner-Rulings-Pending-Ratification.md` as the transcription list for the next `Decisions.md` sweep, a Session 7 playtest-log entry. Also surfaced: this document's D9 entry was stale — the defect was already fixed 08-14.
+
+**`8f527b9` — hits land where they hit; the high rarities get their identity.** The menu click-flash root cause (see D3's update). The **Breakpoint Sandbox**, a DEV screen on the pause menu: set level (pays the real entitlement), set gym area level, force class (the relocated DEV class-swap), grant seeded gear at any rarity/slot via the production rolls, composed-stats readout; `-BreakerCaptureMenu=DEVSANDBOX` photographs it. Hit feedback: D15/D16/D17/D18/D19 all fixed. Anchor HUD trimmed to minimap + XP + quest tracker + talk prompt; a state-aware quest tracker on every map. **Thirteen special affixes** (owner-authorized, the O11 seat): eight Aberrant — Riftburn, Terminal Velocity, Ballast, Overwound Receiver, Redline Chorus, Failsafe Override, Deadstill Protocol, Breaker's Tithe — and five Anomalous signatures — Event Horizon, Phase Shear, Entropy Debt, Singularity Feed, Riftplate. All O2 PLACEHOLDER, all paying through existing aggregation channels; special pools live outside the slice pool; draws append after the rule/legendary draws so old seeds' rules are unchanged.
+
+**`130dca7` — all five classes are playable** (owner-authorized: "feel free to do all 5 classes"). Scrap/Grit/Charge attached beside Momentum and Mana with **every generation entry point wired to a real caller** (assists stay honestly caller-less until a party layer exists); all 21 ability rows carry real `UGameplayAbility` classes; five are deployables on a new minimal system (`Combat/BreakerDeployable`); fallback class definitions + `DefaultAbilityIdForSlot` rows; HUD resolves SCRAP/GRIT/CHARGE; O39's derived gate opened by itself. Built in the exact §8 T7 order. D11/D12/D13 fixed on the selection path. Every substitution for a missing primitive (threat, stagger, status immunity, life-on-hit, per-hit cap hook, tempo, lethal save, accuracy) is recorded in code at its site. **No branch trees authored** — keystone honest-emptiness stays valid, and §5 R2/R7/R8/R9 stay true.
+
+**WORKING TREE AT THE TIME OF THIS UPDATE — two more lanes in flight, UNCOMMITTED.** If you find these committed above `130dca7`, read those commit messages instead of this note; if the tree still holds them modified, do not assume they build or pass. What is actually in the diff right now:
+- *Abilities lane* (`BreakerAbility_Closequarter.{h,cpp}`, `BreakerAbility_Unmake.{h,cpp}`, `BreakerAbilityTests.cpp`): SB7 Blink's untargeted-cast branch, Edgework's Closequarter no-range-limit half gated on keystone tag **plus** live Unmake window (the D10 idiom), and a large Unmake pass — i.e. §5 R15's Blink/Edgework/Cascade bullets are being worked.
+- *Weapons/Progression lane* (`BreakerWeaponMath.{h,cpp}`, `BreakerWeaponComponent.h`, `BreakerProgressionComponent.cpp`, `BreakerProgressionTypes.h`): a Swift projectile-identity pass citing an owner ruling of 2026-08-16 ("multishot, pierce, chain, ricochet…") — new `ChainCount`/`RicochetCount` stat targets appended, and Flat mechanic-count lanes wired for `ProjectileCount`/`Pierce`/`ChainCount`/`RicochetCount`, which would strike four entries from §5 R9's no-lane list when it lands.
+
 ---
 
 ## 5. THE DEAD CONTENT REGISTER
@@ -146,6 +170,7 @@ UnrealEditor-Cmd.exe "<repo>\riors_edge.uproject" -game -BreakerAutoPlay ^
 ### R1 — Levelling grants nothing. *(blocks the entire tree economy)*
 `Progression/BreakerProgressionComponent.cpp:436-444` — `AwardExperience` → `RefreshLevelFromXp` → `OnLevelGained.Broadcast`. **No point award exists anywhere on the level-up path.** The only writers of `UnspentClassPoints`/`UnspentCorePoints` are `RespecAtForge:295-296` (refund), `GrantPlaytestPoints:465` (dev), and the one-time `ApplySliceDefaultsIfFresh:491`. `XP-And-Pacing.md` §4 specifies 1 Class Point/level to 30 and 1 Core Point/level to 50; none of it is implemented.
 **The XP loop that O40(b) was waiting for produces a level number, a HUD flash, and nothing spendable.**
+**[RESOLVED 2026-08-16 `1f6a2ba`]** Points per level exist: 1 Class Point/level to 30, 1 Core Point/level to 50, with the slice lump reinterpreted as an **advance on the entitlement** (level 11 pays the 11th point). Neither O2-frozen number moved. Pinned by `RiorsEdge.Progression.LevelPointEntitlement`. Awaits owner ratification (§7 A1).
 
 ### R2 — 53 of 97 authored tree nodes have no stat effect; 49 of those are fully silent. *(blocks the point of the tree)*
 `Progression/BreakerProgressionLibrary.cpp`. The count is **unchanged by the S4 widening** — `BreakerProgressionTypes.h:61-62` cites "53 of 97" as the *justification* for adding 21 enum entries, and 53 of 97 is still the shipped number. Grep of the library returns only the original ten stat targets. **Zero uses of the 21 new entries anywhere outside tests and UI label switches.**
@@ -157,6 +182,7 @@ Named cases the docs promised and did not deliver: `Caster.Multispell.Reservoir:
 `Classes/BreakerScrapComponent`, `BreakerGritComponent`, `BreakerChargeComponent` are **never `CreateDefaultSubobject`'d and never spawned**. `Characters/BreakerCharacter.cpp:76-77` creates only `Momentum` and `Mana`. No Blueprint references them. Their only non-test consumers are three `FindComponentByClass` calls in `Progression/BreakerBuildConditions.cpp:45-56` that always return null. **Even `DevForceClass(Gunsmith)` produces a pawn with no Scrap component at all.**
 Worse: every generation entry point on all three is uncalled. `NotifyKill`, `NotifyReloadCompleted`, `NotifyMagazineEmptied`, `NotifyDeployableDestroyed`, `NotifyDeployableDamageDealt` (`BreakerScrapComponent.h:82-95`); `NotifyDamageTaken`, `NotifyBlockProc`, `NotifyMeleeKill`, `NotifyDeath` (`BreakerGritComponent.h:94-112`); `NotifyHealingDone`, `NotifyShieldingDone`, `NotifyMarkedTargetDamage`, `NotifyStatusCleansed`, `NotifyAssist` (`BreakerChargeComponent.h:93-103`). **Zero callers anywhere.** Even if attached, all three would sit at zero forever.
 The 21 ability rows (`Abilities/BreakerAbilityDefinition.cpp:437-878`) all have `AbilityClass == nullptr`. That part is deliberate (§8).
+**[RESOLVED 2026-08-16 `130dca7`]** All three resource components attach beside Momentum and Mana, every generation entry point has a real caller (assists excepted, honestly, until a party layer exists), and all 21 rows carry real `UGameplayAbility` classes — five on the new `Combat/BreakerDeployable` system. All five classes are selectable and playable. See §8 T6/T7, both updated.
 
 ### R4 — Six of eight weapon archetypes can never drop. *(blocks the looter half of the looter shooter)*
 `Combat/BreakerEnemy.cpp:801` draws the slot with `FRandomStream(Seed).RandRange(0, 7)`. `Items/BreakerLootLibrary.cpp:55` opens `RollItemInternal` with `FRandomStream Random(RandomSeed)` — **the same seed** — and its first draw for a weapon slot is also `RandRange(0, 7)` (`:78-79`). Identical seed, identical first draw ⇒ **archetype index == slot index, always.**
@@ -164,16 +190,19 @@ Slot `Primary` (6) → **Machinegun**. Slot `Secondary` (7) → **Sidearm**. Rif
 The suite does not catch it: `Tests/BreakerWeaponDropTests.cpp:89` picks the slot with `Seed % 2` rather than from the stream, so the collision is invisible to the test that asserts every archetype drops.
 Same root cause, second symptom: for **armour** the first stream draw is the affix count, so the slot fully determines it — Helmet/BodyArmour/Gloves/Boots always roll the low count, Necklace/Waist always the high one, in every rarity band.
 Measured rate today: ~134 items/hour, of which ~33.5 are weapons, **split ~16.8 Machinegun + ~16.8 Sidearm and 0.0/hour for each of the other six.** After the fix it would be ~4.2/hour per archetype.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** The slot draw is salted and lives in `UBreakerLootLibrary::RollDropSlot`; all eight archetypes drop. The drop test now draws slots the way production does. Historical drop seeds re-roll — unavoidable, the old outcomes were the bug.
 
 ### R5 — All six branch keystones are unreachable at the shipped point budget. *(blocks the payoff of every branch)*
 `CornerstoneInvestmentGate = 8` (`Progression/BreakerProgressionTree.h:25`), applied at `BreakerProgressionComponent.cpp:213` as `Max(RequiredTreeInvestment, 8)`. A keystone costs 3. So: 8 invested in one branch **plus** 3 for itself = **11 class points**. `SliceClassPointGrant = 10` (`BreakerProgressionLibrary.h:181`).
 Bloodrhythm, Overpressure, Culling, Edgework, LongDark, Cascade are each **one point short of purchasable in a real session**. `Tests/BreakerProgressionAuditTests.cpp:372` grants 30 points, so the suite is green while the content is unreachable — exactly the failure shape `BreakerKeystoneReachabilityTests.cpp` was written to catch, one layer up. The only in-game route is the debug re-grant at `UI/BreakerMenu.cpp:6753`.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** Resolved by R1's entitlement, not by moving either frozen number: level 11 pays the 11th class point, so keystones become affordable **through play** at level 11.
 
 ### R6 — The three maps are literally empty: no PlayerStart, no light, no sky. *(blocks the shipped boot path)*
 Binary inspection of all three `.umap` files yields only `WorldSettings`, `Default__Brush`/`BrushComponent0`, `NavigationSystemModuleConfig`, `WorldThumbnailInfo`. `Content/Python/breaker_make_levels.py:38` uses `LevelEditorSubsystem.new_level()`, which produces an empty level, not a template.
 - **No lighting exists anywhere in the project.** Grep for `ADirectionalLight|ASkyLight|ASkyAtmosphere|AExponentialHeightFog|DirectionalLightComponent` across `Source/` returns **zero hits**. The only lights are prop-attached `UPointLightComponent`s. `Lvl_Anchor` and `Lvl_Gym` render with no directional or sky light at all — the plaza, the 250 m gym field and every cover piece lit only by a handful of ~700–1200 intensity point lights at 600–1400 cm attenuation. Everything outside those bubbles is black.
 - **No PlayerStart in any of the three maps.** PIE papers over this (the editor injects `PlayerStartPIE` at the viewport camera). A packaged or `-game` launch of `Lvl_FrontEnd` — the shipped boot map — has no start spot, and since the whole field frame is derived from the pawn (`BreakerGameMode.cpp:331-342`), no pawn means no frame means no world.
 The gym looks correct today **only because PIE boots `Lvl_FirstPerson`**, which carries the template's lighting and start (§8 T1).
+**[RESOLVED 2026-08-16 `1f6a2ba` — at runtime, with a nuance]** `Game/BreakerWorldBasics` now supplies a fallback PlayerStart, a sun/sky/atmosphere rig, and a boot floor for the front end, each **suppressed automatically by any authored light or start** — so A6 stays the owner's call and `Lvl_FirstPerson` is untouched. The standalone boot has been executed and photographed. **The `.umap` files themselves are still empty shells as assets** — nothing about the maps changed on disk; what changed is that empty no longer means black and pawnless.
 
 ### R7 — All seven TARGET-side build conditions are unreachable by construction.
 `Progression/BreakerBuildConditions.cpp:272-315` — `SupplyTargetState` has **no production caller**; only `Tests/BreakerConditionVocabularyTests.cpp:328`. Its documented intended call site, `UBreakerCombatComponent::ReceiveDamage`, does not call it. Any effect naming `TargetAiling`/`TargetBleeding`/`TargetPoisoned`/`TargetMultiStatus`/`TargetLowHealth`/`TargetElite`/`TargetAtCloseRange` returns false forever (warns once).
@@ -191,7 +220,7 @@ No lane at all (any node authored against them is silently unpaid): `AbilityDama
 Lane exists, nothing writes it: `AbilityCost`, `MaxClassResource`, `ClassResourceRegen`, `FireRate`, `Armor` — five lines of aggregator plumbing carrying zero.
 
 ### R10 — Keybind rebinding is entirely cosmetic.
-`UI/BreakerMenu.cpp:1942-2011` and `Settings/BreakerGameSettings.cpp` write, clamp, conflict-check, persist and reload `KeybindOverrides` correctly. **Nothing in the running game reads it.** Grep for `KeybindOverrides` outside `Settings/`, `Tests/` and `UI/BreakerMenu.cpp` returns zero hits. `ABreakerCharacter` adds the untouched default mapping context at `Characters/BreakerCharacter.cpp:246` and never consults the model. Wiring it means rewriting the `UInputMappingContext` at runtime. Disclosed on screen at `BreakerMenu.cpp:2011` — deliberate, but under O40(c) arguably already a violation.
+`UI/BreakerMenu.cpp:1942-2011` and `Settings/BreakerGameSettings.cpp` write, clamp, conflict-check, persist and reload `KeybindOverrides` correctly. **Nothing in the running game reads it.** Grep for `KeybindOverrides` outside `Settings/`, `Tests/` and `UI/BreakerMenu.cpp` returns zero hits. `ABreakerCharacter` adds the untouched default mapping context at `Characters/BreakerCharacter.cpp:246` and never consults the model. Wiring it means rewriting the `UInputMappingContext` at runtime. Disclosed on screen at `BreakerMenu.cpp:2011` — deliberate, but under O40(c) arguably already a violation. *(Re-verified 2026-08-16 evening: still true — `KeybindOverrides` still has no consumer outside `Settings/`, `Tests/` and the menu.)*
 
 ### R11 — Audio volumes and scoped sensitivity: saved, clamped, routed nowhere.
 All three audio volumes: `Settings/BreakerGameSettings.cpp:430-435` logs Verbose and returns. `FAudioDevice::SetTransientMasterVolume` lives in a module this target does not link, and there are no SoundClass/SoundMix assets. **The project has no audio at all** — no owner, no palette, no document (`Design-Overview.md:662` S2).
@@ -199,12 +228,15 @@ All three audio volumes: `Settings/BreakerGameSettings.cpp:430-435` logs Verbose
 
 ### R12 — `BuildClassSelectScreen` — 122 lines no player can reach.
 `UI/BreakerMenu.cpp:4404-4525`. `BuildMainScreen`'s comment at `:1350` says BREAKER CLASS "MOVED to the pause menu". **It did not** — `BuildPauseScreen:1390` offers RESUME / LOADOUT / INVENTORY / SETTINGS / RETURN TO TITLE / QUIT and no class entry. The only `Rebuild(ClassSelect)` calls are `:4474` and `:4517`, both *inside the screen itself*, plus the capture switch. `HandleEscape:858` still lists `ClassSelect` in its back-out set, which is what makes the deadness invisible. **The DEV MODE class-swap checkbox at `:4511` lives only here**, so it is currently reachable only from a capture run. Class choice happens at `BuildCharacterCreateScreen:4229` now.
+**[RESOLVED 2026-08-16 `8f527b9` — the part that mattered]** The DEV class-swap now has a reachable home: the **Breakpoint Sandbox**, a "DEV — BREAKPOINT SANDBOX" button on the pause menu (`BuildDevSandboxScreen`, `BreakerMenu.cpp:7767`; its force-class control notes it "used to live only on BuildClassSelectScreen, which nothing links to", `:7993`). `BuildClassSelectScreen` itself (`:4445`) still exists and still has no player path — but it now renders the D13 refusal reason instead of silently rebuilding, and deleting-vs-re-homing the screen is only cleanup now (§7 A14).
 
 ### R13 — In wave mode, 5 of every 6 waves pay nothing at all.
 `Game/BreakerWaveBudget.cpp:53` — `bDropsLoot = Kind != Standard`. With `RestWaveInterval=6`/`BossWaveInterval=12`, only waves 6, 12, 18, 24… drop. `Combat/BreakerEnemy.cpp:633` gates the **whole** of `GrantLoot()` on it, **including the currency credit at `:774`**. The comment at `:768-773` claims currency is "the steady income… so the Forge economy does not inherit loot's sparsity" — it is defeated. The wallet does not move on a standard wave.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** Currency is ungated from `bDropsLoot`: the wallet moves on every kill again; items alone stay wave-gated.
 
 ### R14 — Aberrant, Anomalous, legendaries and item rules are unreachable in the shipped gym.
 `GymAreaLevel = 10` (`Game/BreakerGameMode.h:255`) vs `AberrantMinimumItemLevel = 25` / `AnomalousMinimumItemLevel = 40` (`Items/BreakerDropTable.h:154,157`). The standing encounter rolls ilvl 10, so both weights are zeroed (`BreakerDropTable.cpp:59-68`). Wave mode is `10 + wave*2`, so Aberrant needs wave ≥ 8 and Anomalous wave ≥ 15 — **and the boss wave is 12 (ilvl 34), so the Field Marshal can never drop an Anomalous or a legendary.** Everything downstream of `Rarity == Anomalous` (`BreakerLootLibrary.cpp:198-211` — legendary chance, `RollRule`, the three legendaries, O37's 1-legendary cap) is dead in play. `HoursPerAberrant`/`HoursPerAnomalous` both honestly return `TNumericLimits<float>::Max()`.
+*(Still open as of 2026-08-16 evening — the area-level-vs-gates question is the owner's call, §7 A12. Two things changed at the edges: the Breakpoint Sandbox (`8f527b9`) can set the gym area level and grant seeded gear at any rarity through the production rolls — a dev route, not a play route — and the 13 new special affixes (§4 addendum) now live behind these same unreachable rarities, so the register's blast radius grew.)*
 
 ### R15 — Smaller inert items, cited for completeness.
 - `PendingDestinationId` is written (`BreakerGameMode.cpp:104`) and **read by nothing**. Arrival dispatch uses the map name. Its declaration comment (`BreakerGameInstance.h:40`) describes behaviour that does not exist.
@@ -226,15 +258,19 @@ All three audio volumes: `Settings/BreakerGameSettings.cpp:430-435` logs Verbose
 **D1 — Arriving in ANY map re-opens the title screen, paused.** `Characters/BreakerCharacter.cpp:250-252` schedules `ShowInitialMenu` on next tick in `BeginPlay` for any locally-controlled pawn, with **no map guard**. `ShowInitialMenu` (`:1057-1079`) calls `OpenMenu(true)` → `ShowMainMenu()` + `SetPause(true)`. `OpenLevel` destroys the pawn, so the new one re-runs `BeginPlay`:
 PLAY on the front end → travel to `Lvl_Anchor` → **title screen again**, paused, standing in the hub. Hub gate → `Lvl_Gym` → **title screen again**.
 Recoverable (PLAY → character select → `EnterWorldAsCharacter` a second time takes the non-front-end branch at `:329-340`), not a hard lock — but every level transition dumps you on the title. This is the same class of defect the map split was built to remove, re-introduced by the split. The `-BreakerAutoPlay` early-out at `:1066` is why no automated run has caught it.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** Guarded by a pure static, `ShouldShowInitialMenu`, so the decision itself is tested: front end always shows it, a PIE drop-in with no character shows it, a mid-session arrival never does. The matrix is pinned by `RiorsEdge.Game.BootFlow.ShippedConfiguration`.
 
 **D2 — the three maps are empty shells** (no PlayerStart, no lighting). See §5 R6. The owner has reported darkness and load-in problems; this is the root.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** At runtime, via `Game/BreakerWorldBasics` — see R6's annotation for the asset-vs-runtime nuance. Darkness and pawnlessness are gone; the `.umap` files are still empty on disk.
 
 **D3 — menu jitter.** VERIFIED FIXED at every `BuildZonedFrame` call site — all four pass `bFillHeight=true` (`BreakerMenu.cpp:3641` inventory, `:6919` skill matrix, `:7285` forge, `:7474` abilities), and `BuildFrame:1046` uses `HeightOverride(MeasureWideScreen().PanelHeight)`.
 **One shrink-wrapped centred plate remains:** `BuildDiscardModal`, `BreakerMenu.cpp:3751-3759` — `SOverlay` centred slot around `SBox.WidthOverride(560)` with **no height override**. Its height varies only across rebuilds, so it cannot oscillate per-frame, but it is structurally the exact shape the fix targeted, and it is **not wrapped in `SBreakerPlateProbe`**, so it is invisible to the instrumentation.
+**[RESOLVED 2026-08-16 `8f527b9` — and the analysis above was chasing the wrong layer]** The owner's residual "flash" was not a plate-sizing issue at all. The real, general per-frame cause: `Rebuild` defers the widget swap to an active timer, and **Slate runs active timers inside Paint — after prepass** — so every freshly built screen painted one frame at 0×0, desired size never measured. `ApplyScreen` now prepasses the new tree immediately. Every screen transition flashed this way; the owner saw it as "flashes the create character screen" only because create was the screen under the mouse.
 
 **D4 — text cut off / clipped.** See D6.
 
 **D5 — "hard to hit the Warden's weak spot."** Answered by the armour-facing rule, not by the head sphere. The flank **is** winnable and easier than the header claims: `GetFacingArmorMultiplier` (`Combat/BreakerDamageLibrary.cpp:25`) is **binary** with `RearArcCosine = 0.15`, so the rear multiplier applies past **81.4°** off forward — 0.84–1.16 s of circle-strafe, well inside the 2.2 s sweep cooldown. But the reward is **1.90x**, not the 3x §2.3 promises (`FrontalArmor 90 → 47.4%` mitigation, `RearArmorFraction 0.0f`). And the turn-rate cap does nothing for weak-point reachability: the Warden inherits the base weak point at `(0,0,78)` r20 — the head, on the centreline, above a `BodyHitBox` that tops out at Z 62, exposed from **every** bearing including dead ahead.
+**[PARTIALLY RESOLVED 2026-08-16 `8f527b9`]** The shield slab now actually blocks (D18 fixed), which changes the frontal fight: shooting "through the shield" into the body no longer works, so flanking earns its keep. The 1.90x-vs-3x reward gap and the weak-point geometry above are unchanged.
 
 ### Nobody has reported these
 
@@ -255,32 +291,43 @@ The same file already owns the fix — `MeasureChipWidth:349` + `PackChipRows:37
 **D8 — `SetActorLabel` called unguarded in five places; non-editor builds will not compile.** `Game/BreakerGameMode.cpp:438, 684, 1086`; `Game/BreakerHubBuilder.cpp:107, 228`. `AActor::SetActorLabel` is inside `#if WITH_EDITOR`, and `Source/RiorsEdge.Target.cs` is `TargetType.Game`. Unhit because only the editor target is ever built.
 
 **D9 — no drop in the shipping game carries an item level above 50.** `ABreakerEnemy::ApplyChassis` re-clamps `EnemyLevel` to `[1,50]` **after** calling `GetDropItemLevel`, so the 74x endgame gap is still live in play — while `EndgameComposition` passes because it tests the library function and never touches the actor. Recorded only at `Docs/Design/Power-Curve.md:485-495`, buried at line 485 of a 587-line doc.
+**[STALE ENTRY — surfaced 2026-08-16 `9caf41d`]** This was already fixed on 08-14; the audit line this register inherited was stale. Do not re-fix it.
 
 **D10 — Edgework permanently removes Cleave's animation lock.** Class-Kits and the node text (`BreakerProgressionLibrary.cpp:1183`) both say "Rewrites Unmake: **during it**, Cleave has no animation lock." `Abilities/BreakerAbility_Cleave.cpp:156-158` checks only `HasMatchingGameplayTag(Keystone_Caster_Edgework)` — a tag published permanently by node purchase. Buying Edgework removes the 0.45 s lock **forever**, not for Unmake's 6 s. A permanent uncapped Cleave-spam buff shipped as an ultimate rewrite.
+**[RESOLVED 2026-08-16 `1f6a2ba`]** The lock is now removed only **during** Unmake's window, per the node text.
 
 **D11 — `ChoosePermanentClassById` does not seed `AbilityLoadout`; `ChoosePermanentClass` does.** `BreakerProgressionComponent.cpp:130-145` vs `:147-170`. The class screen calls the *ById* form (`BreakerMenu.cpp:4472`). A freshly-locked character has three `NAME_None` slots; `ResolveDefinition` rescues gameplay via `DefaultAbilityIdForSlot`, but `GetEquippedAbilityId` returns None, so **the ABILITIES tab shows no ability selected while the HUD is firing Cleave/Rot/Unmake.**
+**[RESOLVED 2026-08-16 `130dca7`]** `ChoosePermanentClassById` now seeds the starter loadout, and `LoadProgressionState` repairs all-None loadouts from old saves.
 
 **D12 — the O39 gate in `ChoosePermanentClassById` is short-circuitable.** `BreakerProgressionComponent.cpp:125` reads `if (!ClassDefinition && !GetFallbackClassDefinition(ClassId))`. `ClassDefinition` is `EditDefaultsOnly` (`.h:187`), so any Blueprint assigning a default class-definition asset makes the gate pass **unconditionally, for any ClassId including Gunsmith**. The roster gate (`Save/BreakerCharacterRoster.cpp:111`) has no such hole.
+**[RESOLVED 2026-08-16 `130dca7`]** The gate is now per-ClassId — a held Blueprint default vouches only for the class it describes. (With all five classes now implemented, the gate's remaining job is guarding whatever comes sixth.)
 
 **D13 — two independent answers to "is this class real", and the UI ignores the return value.** The class screen asks `ClassHasImplementedKit`; progression and the roster ask `GetFallbackClassDefinition`. They agree today. The moment one Gunsmith ability lands, the screen offers Gunsmith while `ChoosePermanentClassById` still refuses — and `BreakerMenu.cpp:4470-4473` **does not check the return**, so the button appears enabled, does nothing, and rebuilds the screen.
+**[RESOLVED 2026-08-16 `130dca7`]** The class screen now checks the refusal and renders the reason (`CharacterScreenStatus`, `BreakerMenu.cpp:4464-4472`) instead of silently rebuilding. The predicted divergence also never happened — all five classes landed at once.
 
 **D14 — unequipping a weapon leaves the old gun in hand.** `Weapons/BreakerWeaponComponent.cpp:951-957` `continue`s on an empty slot by design. Clicking an equipped Primary in the inventory (`BreakerMenu.cpp:2916 UnequipSlot`) removes the affixes and item level but the player keeps firing the shotgun.
 
 **D15 — damage numbers always draw at the target's pivot.** `Combat/BreakerCombatComponent.cpp:119` sets `Context.WorldLocation = GetOwner()->GetActorLocation()`. A weak-point hit on the Drudge's ridge at 129 cm draws its number at the capsule centre (75 cm), 54 cm below the thing you shot. The HUD's fallback and merge comment both assume per-impact locations that never arrive.
+**[RESOLVED 2026-08-16 `8f527b9`]** The damage request carries `ImpactLocation`; pellets, rockets and spell projectiles fill it. Numbers draw at the impact point.
 
 **D16 — the killing blow under-reports.** `BreakerDamageLibrary.cpp:98` clamps `HealthDamage` to remaining health and the HUD shows the sum. A 900-damage rocket into a 30 HP Skitter prints `30`. Overkill is invisible, which makes the numbers useless for exactly the TTK measurement O2 wants.
+**[RESOLVED 2026-08-16 `8f527b9`]** Killing blows print the full hit including overkill.
 
 **D17 — DoT ticks are exempt from facing armour.** `BreakerDamageLibrary.cpp:104 MakeSnapshotDotTick` never sets `bHasSourceLocation`, so `BreakerCombatComponent.cpp:56` skips the facing multiplier. A Bleed on a Warden's back always eats the full 47% frontal mitigation.
+**[RESOLVED 2026-08-16 `8f527b9`]** DoT ticks snapshot their application-time source location, so facing armour applies to them.
 
 **D18 — the Warden's shield primitive stops nothing.** `Combat/BreakerWardenEnemy.cpp:82` sets `NoCollision`. It occupies X 47..57, Y ±47, Z −47..87 in front of the body; the player sees a shield and shoots straight through it into `BodyHitBox`.
+**[RESOLVED 2026-08-16 `8f527b9`]** The shield slab blocks (`BodyHitBox` profile, toggled with visibility).
 
 **D19 — the Drudge's weak point is a detached floating orb.** `Combat/BreakerAlteredEnemy.cpp:223` places it at relative `(-30,0,54)` r20; nearest cosmetic corner is 24.3 cm away against a 20 cm radius — a **~4.3 cm gap**. The constructor only ever checks "inside the capsule", never "touching the body".
+**[RESOLVED 2026-08-16 `8f527b9`]** The weak point sits ON the body, with a pinned touch-check.
 
 **D20 — `DrudgeFromWave = 3` is a dead gate.** `BreakerGameMode.cpp:2132-2134` computes `Clamp(CurrentWave / 4, 0, 2)`. Wave 3 → 0. First Drudge is wave 4.
 
 **D21 — the gym's return gate spawns buried and unrotated.** `BreakerGameMode.cpp:194-195` spawns at `Up = 0` with identity rotation and no `FActorSpawnParameters`; capsule half-height is 100 and the visual is offset −12, so the marker is ~half submerged and faces arbitrarily. The hub's own point does it correctly (`BreakerHubBuilder.cpp:222-225`).
 
 **D22 — the "hub not built" warning fires on every normal gym arrival.** `TeleportPawnToHub` (`BreakerGameMode.cpp:78-94`) warns and returns when `!bHubBuilt`, which is only set in the anchor branch. Because of D1, `EnterWorldAsCharacter` calls it in the gym too. **Read this as noise, not failure** — the pawn stays put and that is correct.
+**[RESOLVED 2026-08-16 — by the D1 fix, verified against current code]** A normal gym arrival no longer shows the menu, so `EnterWorldAsCharacter` no longer runs there and the warning is gone from the normal path. The warning itself survives, deliberately loud, for the one path that can still hit it: a PIE drop-in in a gym-role map entering through character select (`BreakerCharacter.cpp:397` → `BreakerGameMode.cpp:80-101`). In that case it is still noise, not failure.
 
 **D23 — `EvaluateForActor` runs every tick on the server** (`BreakerBuildConditions.cpp:29-42`) doing up to 9 `FindComponentByClass` linear scans per frame per pawn. The constructor comment at `:23-26` — "the tick itself is a byte comparison" — is false; only the *recalculation* is skipped.
 
@@ -328,6 +375,7 @@ The same file already owns the fix — `MeasureChipWidth:349` + `PackChipRows:37
 4. `Docs/Design/XP-And-Pacing.md` — 1,135 lines of curve design with the system shipped and no `AS BUILT` section; OQ1 still asks a now-measurable question.
 5. `UI-Inventory-Spec.md` (its "Superseded 2026-08-14" note is itself superseded), `Playtest-Gym-v1.md`, `Class-Kits.md`, `Anchor-Hub.md`, `Save-Architecture.md`, `UI-UX-Spec.md`, `Core-Tree-Redesign.md`, `Ability-Implementation-Spec.md`, `Damage-Pipeline.md`.
 Only two docs have an `AS BUILT` section (`Encounter-Design.md:683`, `Save-Architecture.md:594`). That is the pattern that keeps a design doc from lying. `Docs/Playtest-Feedback-Log.md` owes an entry for the 08-15 inventory/jitter session.
+**[LARGELY RESOLVED 2026-08-16 `9caf41d`]** Status stamps (LAW / PARTIALLY BUILT / UNBUILT TREATMENT / SUPERSEDED / HISTORICAL) on 46 docs, `AS BUILT` sections on the five worst offenders above, and a Session 7 playtest-log entry. Every doc now says what it is before it says anything else; the stamps do not rewrite stale *content*, so read them as the trust boundary, not as a full sweep. `Decisions.md` untouched per R1 — D33 stands.
 
 ---
 
@@ -338,8 +386,10 @@ Ordered by what they block. **An agent cannot rule on any of these.** Report and
 ### Tier A — blocking work right now
 
 **A1. Points per level.** `XP-And-Pacing.md` §4 specifies 1 Class Point/level to 30, 1 Core Point/level to 50. Nothing is implemented. *Blocks:* the entire tree economy — XP is decorative and the tree is a one-time 10/12 grant (§5 R1). **Highest-leverage unblock in the project.**
+**[RESOLVED-BY-IMPLEMENTATION 2026-08-16 `1f6a2ba` — pending owner ratification]** Built exactly to the §4 spec, with the slice lump reinterpreted as an advance on the entitlement. On the transcription list in `Docs/Owner-Rulings-Pending-Ratification.md`.
 
 **A2. The keystone budget contradiction.** `CornerstoneInvestmentGate` 8 + cost 3 = 11 > `SliceClassPointGrant` 10. Gate to 7, grant to 11+, or superseded by A1. *Blocks:* all six branch keystones, the three Overdrive variants, Edgework's Cleave rewrite, LongDark and Cascade (§5 R5). Both numbers are O2-frozen.
+**[RESOLVED-BY-IMPLEMENTATION 2026-08-16 `1f6a2ba` — pending owner ratification]** Superseded by A1, the third option: neither frozen number moved; level 11 pays the 11th point and keystones are affordable through play.
 
 **A3. Does an `AbilityDamage` More count inside O34's single 2.197 ceiling?** `BreakerAttributeAggregation.h:223` — `IsMoreCappedAttribute` returns true for `DamageMultiplier` and nothing else. HCV Ruling 3 (trees scale abilities) invites an ability-damage More that would sit **outside** the budget. *Blocks:* HCV Stage 4, explicitly. *If it stays open:* O34's "ONE More ceiling" quietly stops being true, and the two audit tests do not catch it.
 
@@ -348,10 +398,11 @@ Ordered by what they block. **An agent cannot rule on any of these.** Report and
 **A5. The tier/gate ladder.** Class-Kits §0.2's five-tier shape was compressed to three in the slice. Re-tier keystones, or accept the shape. Re-tiering moves authored gates (O2) and breaks a pinned assertion. Note the recorded direction is backwards (D32).
 
 **A6. Lighting: asset-authored or runtime-built?** No light exists in the project. This determines whether the three maps can stay empty shells at all (§5 R6).
+**[PROVISIONALLY ANSWERED 2026-08-16 `1f6a2ba` — runtime, reversibly]** `BreakerWorldBasics` builds the rig at runtime and suppresses itself the moment any authored light or start exists, so the owner's ruling is preserved either way: ratify runtime, or author lights and the fallback steps aside on its own.
 
 **A7. Does the authored Anchor map replace or dress the runtime hub builder?** `Anchor-Hub-Layout-Brief.md:129-133`. 24 anchor_hub `.uasset` meshes are committed with no ruling about whether they supersede the blockout. *If it stays open:* both run, and every distance in the layout brief becomes a lie.
 
-**A8. The three-map split has no O-ruling.** `Decisions.md` runs O1..O40 and contains **nothing** about maps, the front end, the hub, or travel. The split, the `GameDefaultMap` change, gym-as-fallback and travel-as-`OpenLevel` are all agent decisions taken under a chat brief. Under O28 these want ratification or overturning.
+**A8. The three-map split has no O-ruling.** `Decisions.md` runs O1..O40 and contains **nothing** about maps, the front end, the hub, or travel. The split, the `GameDefaultMap` change, gym-as-fallback and travel-as-`OpenLevel` are all agent decisions taken under a chat brief. Under O28 these want ratification or overturning. *(Still open as of 2026-08-16 evening — but the ratification path now has a vehicle: `Docs/Owner-Rulings-Pending-Ratification.md` (`9caf41d`) is the transcription list for the next `Decisions.md` sweep, and tonight added more to it: points-per-level, the five-class authorization, the O11 special-affix seat.)*
 
 **A9. The four station collisions (D30).** Move the arena past 16400, shorten the jump lane, or accept the overlap; move pockets 2 and 3 off `FieldHalfExtent × 0.55` (6050 against lanes at ±6820), or move the lanes. All are O2 value changes.
 
@@ -364,6 +415,7 @@ Ordered by what they block. **An agent cannot rule on any of these.** Report and
 **A13. Do keybinds get wired?** (§5 R10) Wire it, or ratify the on-screen disclosure as the shipped state. Under O40(c) a saved-and-inert rebind screen is arguably already a violation.
 
 **A14. `BuildClassSelectScreen` — delete or re-home?** (§5 R12) If it dies, the DEV MODE class-swap toggle needs a new home.
+**[RESOLVED 2026-08-16 `8f527b9`]** The Breakpoint Sandbox is the new home — force-class lives there, on the pause menu, reachable in play. The dead screen itself can now be deleted without losing anything; that is cleanup, not a ruling.
 
 **A15. Three-across inventory needs a full-bleed frame.** `MeasureWideScreen` spends 80 px on margins and caps at 1760, allowing 745 px where the three-card grid needs 879. **Changing the frame policy alters the skill matrix, Forge and abilities tabs too**, which is why it is the owner's call. The solver picks three up automatically the day the room exists.
 
@@ -396,9 +448,9 @@ Beyond that, roughly forty owner-level questions exist **only inside their own d
 
 **D1. Should the S4 vocabulary have shipped ahead of its consumers at all?** `Hook-And-Condition-Vocabulary.md` §8.5 records this as a deliberate O40(c) exception justified by loudness. Twenty-four hours later the exception has produced 21 unused stat targets, 18 unused conditions, 5 empty aggregator lanes and 53 unchanged nodes. Worth explicit re-ratification before another vocabulary pass.
 **D2. `PowerBand` relabelling.** `All()` now includes target conditions, so the fixture measures against a hypothetical most-convenient enemy. The number will not move until a target-conditional line is authored — **relabel before that, not after**, or O36's pinned rails silently stop measuring what their names claim.
-**D3. Is the archetype-per-drop distribution meant to be uniform?** `BreakerLootLibrary.cpp:71-75` says uniform is deliberate and a weighted table would be "a rarity system for gun CLASSES, which nobody has ruled on". Untested in practice, since only two archetypes have ever dropped (§5 R4).
+**D3. Is the archetype-per-drop distribution meant to be uniform?** `BreakerLootLibrary.cpp:71-75` says uniform is deliberate and a weighted table would be "a rarity system for gun CLASSES, which nobody has ruled on". ~~Untested in practice, since only two archetypes have ever dropped (§5 R4).~~ *(2026-08-16 `1f6a2ba`: R4 is fixed, so the uniform distribution is now actually exercised in play for the first time. The question itself stays open.)*
 **D4. Should the Drudge be a real solver archetype or stay a re-skin?** The exact fields a real row would need are written out at `BreakerGameMode.cpp:2121-2123`. Reported, not made.
-**D5. Do the three unbuilt-class resource components get attached now (dev-inspectable, HUD-less), or stay detached?** Currently unreachable even in dev mode, which is not what O39's text implies.
+**D5. Do the three unbuilt-class resource components get attached now (dev-inspectable, HUD-less), or stay detached?** Currently unreachable even in dev mode, which is not what O39's text implies. **[OVERTAKEN 2026-08-16 `130dca7`]** Attached, wired, and on the HUD as part of the full five-class build (§5 R3) — the question no longer exists in this form.
 **D6. When does `bAutoLockSwiftIfFresh` go false** so the class screen's real path is exercised? O39's own named retirement candidate (`Decisions.md:256`).
 **D7. Two screens are both titled LOADOUT**, both on the pause menu. Which keeps the name, and does `BuildLoadoutScreen` survive now that `SyncArchetypesToEquipment` overrides its only verb?
 
@@ -409,6 +461,7 @@ Beyond that, roughly forty owner-level questions exist **only inside their own d
 ### T1 — The editor does not boot the front end.
 `Config/DefaultEngine.ini` still has `EditorStartupMap=/Game/FirstPerson/Lvl_FirstPerson`. `GameDefaultMap` is `Lvl_FrontEnd`, which governs standalone/packaged launch only. **Pressing Play in the editor loads `Lvl_FirstPerson`, which is none of the three maps, so `IsGymMap` returns true and the full gym builds.** That is why "the loop works in PIE today" — it works in the *old* map, with the template's PlayerStart and lighting.
 **Do not "fix" `EditorStartupMap` without first putting a PlayerStart and lighting in the three maps, or you break PIE and lose the only working loop.**
+*(2026-08-16 evening: `EditorStartupMap` is still `Lvl_FirstPerson` — verified in `Config/DefaultEngine.ini:8` — so PIE still boots the old map and this trap still stands. The stakes changed, though: `BreakerWorldBasics` (`1f6a2ba`) now supplies a runtime PlayerStart and lighting in the three maps, so changing the startup map is no longer guaranteed breakage — but it remains an untested change to the only loop everyone playtests in. Treat it as a deliberate decision, not a tidy-up.)*
 
 ### T2 — The gym fallback is load-bearing, not laziness.
 `Game/BreakerGameInstance.cpp:33-43` defines `IsGymMap` as "not front end AND not anchor". The capture harness, `-BreakerAutoPlay` and any PIE drop-in all run in unnamed maps and all expect a gym. Tightening it to a name comparison silently kills all three.
@@ -426,19 +479,25 @@ Related: map names are string-matched against `.umap` short names (`BreakerGameI
 The whole tier-4 Swift trio and every Caster non-keystone node are **rule rewrites**. `BreakerProgressionLibrary.cpp:537-588` is the authoritative rationale, and each node carries a `WAITING ON:` comment naming its real consumer. Inventing Increased Damage lines for them is an O2 violation and, for affix-rule rewrites, an explicit Class-Kits §6.4 violation.
 Likewise, **reserved More slots are intentionally empty**: `Core.Elements.ReactionChain` (`:519-526`), `Caster.Spellblade.Edgework` (`:1171-1188`), `Caster.Multispell.Cascade` (`:1341-1358`). Authoring them unconditional makes them *stronger* than designed.
 
-### T6 — The 21 null ability rows are not a TODO.
-`Abilities/BreakerAbilityDefinition.cpp:385-421` is an explicit instruction block: do not point them at nearest-fit abilities, do not extend `DefaultAbilityIdForSlot`, do not register class definitions. `Tests/BreakerAbilityTests.cpp` asserts a Tank slot resolves to null; `BreakerProgressionAuditTests.cpp:212` asserts Gunsmith grants nothing. "Fixing" any of it turns the suite red **on purpose**.
-Within those rows, three more deliberate-looking-wrong things: `WindowDuration = 0` on `Gunsmith.SidearmRig` (`:447-451`) is correct — its window is counted in shots. The Gunsmith cost/cooldown split (`:427-433`) is the class's ergonomic. `AbilityCostMultiplier = 1.0` on Field Assembly and Hold (`:532-539`, `:679-685`) states what the window does to *other* abilities' price; 0.0 would make every subsequent cast free.
+### T6 — The 21 ability rows are REAL now (2026-08-16 `130dca7`) — the traps moved, they did not go away.
+The rows were null-`AbilityClass` data with an instruction block forbidding nearest-fit pointing; owner authorization ("feel free to do all 5 classes") ended that state, and the block at `Abilities/BreakerAbilityDefinition.cpp:388-408` now records the transition itself. Every row names its real `UGameplayAbility` subclass; the tests that pinned the unbuilt state were updated citing the authorization. The new reality has its own traps:
+- **Playable is not balanced.** Costs and cooldowns are QUOTED from the three class-kit documents with per-row citations, all under the blanket O2 PLACEHOLDER banner. Do not retune them.
+- **Behavioural gaps are recorded, never faked.** Every substitution for a missing primitive (threat, stagger, status immunity, life-on-hit, per-hit cap hook, tempo, lethal save, accuracy) is written at the ability's own site. Read the site comment before "completing" one — the honest absence is the design.
+- **The Gunsmith cost/cooldown split is the class's ergonomic** (`:410-421`): Armory abilities cost nothing and carry a cooldown; deployables cost Scrap and carry none. Tidying a cooldown onto a deployable deletes the class.
+- `WindowDuration = 0` on `Gunsmith.SidearmRig` (`:435-439`) is still correct — its window is counted in **shots**, not seconds. `AbilityCostMultiplier = 1.0` on the window abilities still states what the window does to *other* abilities' price; 0.0 would make every subsequent cast free.
+- **No branch trees were authored** for the three new classes, so their keystone tags still rest on the honest-emptiness arm (T13) — authoring a tree without siting the keystone on a `bCornerstone` node turns the suite red, and that is the alarm working.
 
-### T7 — The exact chain that must happen before an unbuilt class becomes selectable.
-1. Attach the resource component in `BreakerCharacter.cpp:76-77` (currently step zero and undocumented).
-2. Wire its `Notify*` entry points from combat/weapon/status/healing. Grit needs `Instigator` on the damage request; Charge needs healing with separated overheal reporting. Prerequisites, not polish.
-3. Write the `UGameplayAbility` subclasses and assign `AbilityClass`. Four Gunsmith and one Tank ability are deployables, blocked on O30 — **no deployable system exists in any form**. `Tank.Hold`'s per-hit damage cap needs a damage-pipeline hook that does not exist.
-4. Add a `GetFallbackClassDefinition` row (`BreakerProgressionLibrary.cpp:1392`) mirroring the registry ids exactly.
-5. Add the class to `DefaultAbilityIdForSlot` (`BreakerAbilityDefinition.cpp:958`) or its three keys stay dead.
-6. Add the resource to the HUD (`BreakerPlaytestHUD.cpp:688-693` reads only Momentum and Mana).
-7. O39 then opens **automatically**, because `ClassHasImplementedKit` is derived, not a list.
-**Steps 4 and 3 must not be inverted.** A class definition registered before its abilities execute recreates the exact bug that made every Caster ability read as locked.
+### T7 — The exact chain that must happen before an unbuilt class becomes selectable. **[EXECUTED 2026-08-16 `130dca7` for all three classes, in exactly this order]**
+The steps below now describe what was done — keep them as the template for any sixth class:
+1. Attach the resource component in `BreakerCharacter.cpp:76-77` — *done: Scrap/Grit/Charge attach beside Momentum and Mana.*
+2. Wire its `Notify*` entry points from combat/weapon/status/healing — *done for every generation entry point except assists, which stay honestly caller-less until a party layer exists.*
+3. Write the `UGameplayAbility` subclasses and assign `AbilityClass` — *done: all 21; the five deployables run on the new minimal `Combat/BreakerDeployable` system (O30's hole, opened); the primitives that could not be built honestly are recorded at each site (T6).*
+4. Add a `GetFallbackClassDefinition` row (`BreakerProgressionLibrary.cpp:1392`) mirroring the registry ids exactly — *done, and a new id-by-id mirror test pins it.*
+5. Add the class to `DefaultAbilityIdForSlot` (`BreakerAbilityDefinition.cpp:958`) — *done.*
+6. Add the resource to the HUD — *done: the HUD resolves SCRAP/GRIT/CHARGE rows.*
+7. O39 then opens **automatically**, because `ClassHasImplementedKit` is derived, not a list — *and it did.*
+**Steps 4 and 3 must not be inverted.** A class definition registered before its abilities execute recreates the exact bug that made every Caster ability read as locked — the executed pass kept this ordering deliberately.
+*Tests that changed with the execution:* the pins on the unbuilt state (`BreakerAbilityTests.cpp`'s null-Tank-slot assert, `BreakerProgressionAuditTests.cpp:212`'s Gunsmith-grants-nothing) were updated citing the authorization, and `Tests/BreakerBuiltClassKitTests` now pins resource generation from the wired events, all 21 implementations, and the definition↔registry id mirror. Suite 327 at `130dca7`.
 
 ### T8 — Caster deliberately authors no cooldowns anywhere.
 `Classes/BreakerCasterAbility.cpp:9-16` nulls `CooldownGameplayEffectClass`. **Mana is the cooldown.** An empty `CooldownTag` means cost-gated, which the HUD must distinguish from "cooldown of zero" (spec D3). Do not fill in the missing tags.
@@ -509,17 +568,14 @@ Within those rows, three more deliberate-looking-wrong things: `WindowDuration =
 
 ## 9. WHAT I WOULD DO NEXT, IN PRIORITY ORDER
 
-The ordering principle: **first make the shipped configuration reachable at all, then make the content already authored pay, then add.** Every item below is either a bug fix or an owner question — none of it authors new design.
+The ordering principle: **first make the shipped configuration reachable at all, then make the content already authored pay, then add.** *(List rewritten 2026-08-16 evening — the morning list's items 1–6 and 10-in-part all landed; see the §4 addendum. The list below is what is actually next.)*
 
-1. **Fix D1 — the title screen on every level arrival.** Map-guard `ShowInitialMenu` in `Characters/BreakerCharacter.cpp:250-252` so it only fires on the front end. *Why first:* it is the only defect that makes the milestone the owner just shipped unusable on its own terms. Everything else in this list is invisible until someone can walk boot → front end → Anchor → gym without landing on the title twice.
-2. **Give the three maps a PlayerStart, then take A6 to the owner for lighting** (§5 R6, §7 A6). *Why second:* without a PlayerStart the shipped boot map produces no pawn, no field frame and no world outside PIE — so the three-map flow has never been executed and cannot be tested. Do **not** touch `EditorStartupMap` until both land (T1). Lighting is the owner's call because runtime-vs-authored decides whether the maps stay empty shells.
-3. **Write the O40(c) shipped-configuration test that should have caught #1 and #2**: boot → front end → PLAY → Anchor → gym → Anchor, in the `JumpGrantMatrix` mold. *Why third:* the same failure shape (a green test proving a rule against a configuration the game cannot produce) has now shipped three times — `JumpGrant`, `PowerBand`, and the keystone budget. Fixing the bug without the test guarantees a fourth.
-4. **Fix the loot seed collision** — `Combat/BreakerEnemy.cpp:801`, salt the slot draw (`FRandomStream(HashCombine(Seed, <new salt>))`). *Why fourth:* one line moves the game from **two** droppable weapon archetypes to **eight**, unlocking authored content that already exists in full (leans, recoil profiles, prototypes, viewmodels). Highest reachability-per-line-changed in the codebase. Fix `Tests/BreakerWeaponDropTests.cpp:89` to draw the slot from the stream in the same commit, or the test still cannot see the bug. Tell the owner it changes every historical drop seed.
-5. **Take A1 (points per level) to the owner and build it the moment it is ruled.** *Why fifth:* it is the single highest-leverage unblock (§7 A1) but it is a value question an agent may not answer under O2. Until it lands, the XP loop shipped yesterday is decorative and the entire 97-node tree is a one-time 10/12 grant. Pair it with A2 in the same conversation — A1 may supersede A2 entirely.
-6. **Ungate currency from `bDropsLoot`** (§5 R13, `Combat/BreakerEnemy.cpp:633` / `:774`) the way XP is already ungated. *Why sixth:* it restores the Forge economy on 5 of every 6 waves, it is a small mechanical change, and it makes the Forge screens — which are fully built — actually reachable through play.
-7. **Fix the misleading comments in D32.** *Why seventh:* they are cheap and each one is a trap that will cost a future agent a wasted session — one of them (`BreakerProgressionLibrary.cpp:578-587`) actively directs an agent to "fix" a non-existent inversion while the real one goes unrecorded. Do not touch `Decisions.md` (R1); report its issues instead.
-8. **Fix D6/D7 — the five overflowing fixed boxes and the equipment-column wrap.** *Why eighth:* it is the owner's most-repeated report class, the file already owns the fix (`MeasureChipWidth`/`PackChipRows`), and it is verifiable with the capture harness in one run. Photograph before and after.
-9. **Fix D8** (`SetActorLabel` unguarded in five places) *before* anyone attempts a package. Trivial now, a wall later.
-10. **Then take the reachability questions to the owner in one batch** — A7 (Anchor map vs hub builder), A9 (station collisions), A10 (vendor duplication), A12 (gym area level vs rarity gates), A13 (keybinds), A14 (dead class screen), A15 (inventory frame). *Why last:* each unblocks a slice of §5, none can be answered by an agent, and batching them costs the owner one conversation instead of seven.
+1. **Take the ratification batch to the owner in one conversation.** `Docs/Owner-Rulings-Pending-Ratification.md` now exists as the vehicle (`9caf41d`); tonight's implementations-pending-ratification (A1/A2 points-per-level, the five-class authorization, the O11 special-affix seat, A6's runtime lighting, A8's three-map split) plus the still-open Tier A calls that block §5 — A7 (Anchor map vs hub builder), A9 (station collisions), A10 (vendor duplication), A12 (gym area level vs rarity gates), A13 (keybinds), A15 (inventory frame). *Why first:* the project is now carrying more owner-authorized-but-unratified law than at any point in its history, and every §5 item still open is blocked on one of these, not on code.
+2. **Make the purchased tree pay — the surviving core of §5.** R2 (53 of 97 nodes still silent; zero nodes re-authored against the S4 entries — `130dca7` confirmed no branch trees were authored), R8 (86 unconsumed tags), R9 (16 targets without lanes, 5 lanes carrying nothing). Work the vocabulary doc's staged plan (`Hook-And-Condition-Vocabulary.md` §8, Stage 4 pilot: ability cost) rather than freelancing — and note Stage 6 (target-side, §5 R7's `SupplyTargetState` wiring into `ReceiveDamage`) **"needs a ruling read before it starts"** per the doc itself, so it belongs in the batch above before it belongs in code.
+3. **Wire keybinds, or ratify the disclosure** (§5 R10, §7 A13). *Why third:* it is the last "saved, clamped, routed nowhere" settings group with a real consumer waiting, the settings model has been correct since it shipped, and O40(c) makes the current state arguably a standing violation. Which way it goes is the owner's call in the batch; the work starts the day the ruling lands.
+4. **Branch trees + keystones for the three new classes.** The classes are playable with starters and no trees — the first genuinely *new* authoring the ordering principle permits, since the consumer (the kit) now exists. Respect T13's honest-emptiness alarm: siting each keystone on a `bCornerstone` node is what turns the suite green again, and that alarm firing is the process working. Costs and magnitudes remain O2 PLACEHOLDER territory.
+5. **Resolve A7 — authored Anchor map vs runtime hub builder** — before more hub content lands on either side. The 24 anchor_hub `.uasset` meshes and the runtime blockout are still both live; every day extends the layout brief's drift.
+6. **Audio ownership (S2).** Still the highest-value unowned domain in the project: nine telegraphs, one closing ritual, the dodge/block feedback model, and now an Anchor social space, all silent. Nothing changed tonight; it will not change until someone owns it.
+7. **The small standing defects that survived the pass:** D6/D7 (overflowing boxes, wrap width — the owner's most-repeated report class; photograph before and after), D8 (`SetActorLabel` unguarded, trivial now and a wall at package time), D14 (unequip leaves the gun in hand), D20/D21 (Drudge wave gate, buried return gate), the D32 comment sweep.
 
-**What I would deliberately NOT do next:** author any new stat targets, conditions, nodes, abilities or classes. The project's demonstrated failure mode is shipping authored content ahead of its consumer — 53 inert nodes, 86 unconsumed tags, 21 unused stat targets, 18 unused conditions, 5 empty aggregator lanes, ~1,700 lines of detached resource components and ~2,700 lines of unreachable class design. **Nothing new should be authored until §5 is materially shorter.**
+**What I would deliberately NOT do next:** author stat targets, conditions, or node content ahead of consumers — the S4 widening's 21 unused targets and 18 unused conditions are still sitting exactly where §5 R2/R7/R9 describe, and §7 Tier D1 already asks whether that exception should ever be repeated. The five-class pass is the counter-example worth copying: authorization first, consumer and content in the same commit, honest absence recorded where a primitive is missing. **Nothing new should be authored until §5 is materially shorter — and tonight §5 got materially shorter, so hold the line.**

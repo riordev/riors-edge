@@ -5,14 +5,18 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerBuildConditions.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "UObject/UObjectIterator.h"
 #include "Weapons/BreakerRocketProjectile.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Weapons/BreakerWeaponFeel.h"
@@ -23,6 +27,26 @@ namespace
     // Salts the shared shot seed so the bleed roll never correlates with the
     // spread or critical rolls drawn from the same shot sequence.
     constexpr uint32 BreakerBleedSalt = 0x51ED0000u;
+
+    // Sub-stream salts for the projectile channels (owner ruling 2026-08-16).
+    // Every draw the channels add — an extra pellet's spread, a pierce or
+    // chain hit's crit roll — comes from one of these salted streams rather
+    // than from ++ShotSequence, so a build with the channels at ZERO produces
+    // bit-identical recoil, spread and crit sequences to a build from before
+    // the channels existed. That is the whole determinism contract.
+    constexpr uint32 BreakerMultishotSalt = 0x3B0057A0u;
+    constexpr uint32 BreakerPierceSalt = 0x91E4CE00u;
+    constexpr uint32 BreakerChainSalt = 0xC4A15000u;
+    constexpr uint32 BreakerRicochetSalt = 0x51C0C4E7u;
+
+    // Marksman node ids and tags this fire path consumes, spelled once. These
+    // are the serialized names from Progression/BreakerProgressionLibrary.cpp;
+    // RequestGameplayTag(..., false) so a rig without the tag table loaded
+    // reads "not owned" rather than asserting.
+    const FName BreakerPierceDisciplineNodeId(TEXT("Swift.Marksman.PierceDiscipline"));
+    const FName BreakerAngleNodeId(TEXT("Swift.Marksman.Angle"));
+    FGameplayTag BreakerSightlineTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Sightline"), false); }
+    FGameplayTag BreakerOverpenetrationTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Overpenetration"), false); }
 
     // Recoil belongs in the archetype table beside cadence, spread, falloff and
     // damage, so the five weapons kick like five weapons. Every number here is
@@ -1243,7 +1267,6 @@ bool UBreakerWeaponComponent::FireOnce()
     Shot.bAimedShot = bAiming;
     Shot.AimAlpha = ShotAimAlpha;
     Shot.TraceStart = ViewLocation;
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
 
     // Lead's mark, resolved once per shot rather than once per pellet: the mark
     // cannot change between the pellets of a single trigger pull. A mark with
@@ -1258,101 +1281,70 @@ bool UBreakerWeaponComponent::FireOnce()
     const float LevelScalar = GetItemLevelDamageScalar();
     const float ScaledBaseDamage = FMath::Max(0.0f, Definition->Damage) * LevelScalar;
 
-    const int32 PelletCount = FMath::Max(1, Definition->PelletsPerShot);
+    // ---- Projectile channels (owner ruling 2026-08-16) --------------------
+    // Composed once per trigger pull, so every pellet of this shot fires with
+    // one reading of the tree, the ability windows and the Momentum state.
+    const FBreakerShotChannels Channels = GetShotChannels();
+    // MULTISHOT: whole extra pellets fire now; the fraction banks across
+    // pulls. Zero channels drain nothing and the accumulator stays untouched.
+    const int32 ExtraPellets = FBreakerWeaponMath::ConsumeMultishot(Channels.AdditionalProjectiles, MultishotAccumulator);
+
+    const UBreakerAttributeSet* SourceAttributes = nullptr;
+    if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
+    {
+        if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
+    }
+
+    const int32 BasePelletCount = FMath::Max(1, Definition->PelletsPerShot);
+    const int32 PelletCount = BasePelletCount + ExtraPellets;
     // One record per pellet, hits and misses alike. Reserved once: a spread is
     // a fixed size and this is on the fire path.
     Shot.Pellets.Reserve(PelletCount);
+    int32 PiercedThisPull = 0;
     for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
-        const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, ++ShotSequence);
+        // DETERMINISM CONTRACT. Base pellets advance ShotSequence exactly as
+        // they always have; extra multishot pellets draw from a salted
+        // sub-stream keyed off the pull's final base sequence value and never
+        // touch the counter. A build with the channels at zero therefore
+        // produces a bit-identical spread/recoil/crit sequence to a build from
+        // before the channels existed.
+        const bool bExtraPellet = PelletIndex >= BasePelletCount;
+        const int32 PelletSeed = bExtraPellet
+            ? FBreakerWeaponMath::SecondaryShotSeed(GetTypeHash(GetOwner()), ShotSequence, BreakerMultishotSalt, PelletIndex - BasePelletCount)
+            : ++ShotSequence;
+        const FVector Direction = FBreakerWeaponMath::ApplyConeSpread(ViewRotation.Vector(), Spread, PelletSeed);
         const FVector PelletEnd = ViewLocation + Direction * Definition->MaximumRange;
         if (PelletIndex == 0) Shot.TraceEnd = PelletEnd;
 
-        // Added BEFORE the trace so that every code path below — miss,
+        // Added BEFORE the resolution so that every code path below — miss,
         // continue, geometry with no combat component — still leaves exactly
         // one entry per pellet. A spread with a hole in it would silently drop
         // a tracer, which is the failure this whole change exists to remove.
         FBreakerPelletImpact& Pellet = Shot.Pellets.AddDefaulted_GetRef();
         Pellet.End = PelletEnd;
 
-        FHitResult Hit;
-        if (!GetWorld()->LineTraceSingleByChannel(Hit, ViewLocation, PelletEnd, ECC_GameTraceChannel2, Params)) continue;
+        // PIERCE / CHAIN / RICOCHET live inside the pellet's resolution; with
+        // the channels at zero it performs exactly one trace and one damage
+        // submission, the legacy path to the bit.
+        PiercedThisPull += ResolvePelletImpacts(Definition, ViewLocation, Direction, Channels, ScaledBaseDamage,
+            SourceAttributes, MarkedTarget, LeadMinimumRangeCm, LevelScalar, PelletSeed, Shot, Pellet);
+    }
 
-        Pellet.bHit = true;
-        Pellet.End = Hit.ImpactPoint;
-        Pellet.HitActor = Hit.GetActor();
-
-        Shot.bHit = true;
-        Shot.HitActor = Hit.GetActor();
-        Shot.ImpactPoint = Hit.ImpactPoint;
-        Shot.TraceEnd = Hit.ImpactPoint;
-        // The geometric hit, the forgiveness halo around it, or Lead's mark.
-        const bool bPelletWeakPoint = ResolveWeakPointHit(Hit, ViewLocation, Direction)
-            // Lead (Class-Kits §1.2 S6): shots that hit the mark from beyond
-            // the range gate are weak-point hits regardless of impact
-            // location. The gate is the ability's own rule, called here rather
-            // than reimplemented.
-            || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
-                MarkedTarget != nullptr && Hit.GetActor() == MarkedTarget, Hit.Distance, LeadMinimumRangeCm);
-        Shot.bWeakPoint |= bPelletWeakPoint;
-        Pellet.bWeakPoint = bPelletWeakPoint;
-
-        if (UBreakerCombatComponent* TargetCombat = Hit.GetActor() ? Hit.GetActor()->FindComponentByClass<UBreakerCombatComponent>() : nullptr)
+    // Pierce Discipline (Class-Kits §1.5 M6, transcribed): each target pierced
+    // by a single shot generates +4 Momentum (R2: +7), capped at 3 targets "to
+    // bound Multishot/Pierce interaction" — the cap is per trigger pull for
+    // exactly that reason. Swift-gated twice over: the node is Swift-locked
+    // and the momentum component is inert for every other class.
+    if (PiercedThisPull > 0 && GetOwner())
+    {
+        UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>();
+        const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+        const int32 DisciplineRank = Progression ? Progression->GetNodeRank(BreakerPierceDisciplineNodeId, EBreakerPointCurrency::ClassPoints) : 0;
+        if (Momentum && Momentum->IsActiveForOwner() && DisciplineRank > 0)
         {
-            const UBreakerAttributeSet* SourceAttributes = nullptr;
-            if (const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner()))
-            {
-                if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent()) SourceAttributes = ASC->GetSet<UBreakerAttributeSet>();
-            }
-            FBreakerDamageRequest Damage;
-            // The multiplicand: archetype base carried up the item-level curve,
-            // then falloff. Per pellet, exactly as before.
-            // While a range-treatment override is active (Standing Wave's
-            // Overdrive rewrite), the falloff computation itself is
-            // short-circuited to 1.0 — every other term here (spread, the
-            // trace, weak-point resolution) is untouched.
-            const float FalloffMultiplier = IsRangeTreatmentOverridden()
-                ? 1.0f
-                : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, Hit.Distance);
-            Damage.BaseDamage = ScaledBaseDamage * FalloffMultiplier;
-            Damage.DamageFamily = EBreakerDamageFamily::Physical;
-            Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
-            Damage.ArmorPenetration = Definition->ArmorPenetration;
-            Damage.bWeakPointHit = bPelletWeakPoint;
-            Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
-            Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-            // ONE number. Gear's Weapon Damage affix and every skill node that
-            // raises damage are already summed into the DamageMultiplier
-            // attribute's single additive Increased bucket; multiplying gear in
-            // separately here is what used to break the locked rule.
-            Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
-            Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
-            Damage.SourceLocation = GetOwner()->GetActorLocation();
-            Damage.bHasSourceLocation = true;
-            // The traced impact point, so the damage number draws where this
-            // pellet actually landed instead of at the enemy's pivot.
-            Damage.ImpactLocation = Hit.ImpactPoint;
-            Damage.bHasImpactLocation = true;
-            Damage.SetInstigator(GetOwner());
-            // Outgoing modifiers compose on the shooter's own component before
-            // the request leaves the weapon.
-            if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
-            {
-                OwnerCombat->ApplyOutgoingModifiers(Damage);
-            }
-            const FBreakerDamageResult PelletDamage = TargetCombat->ReceiveDamage(Damage);
-            Shot.DamageResult.RawDamage += PelletDamage.RawDamage;
-            Shot.DamageResult.MitigatedDamage += PelletDamage.MitigatedDamage;
-            Shot.DamageResult.ShieldDamage += PelletDamage.ShieldDamage;
-            Shot.DamageResult.HealthDamage += PelletDamage.HealthDamage;
-            Shot.DamageResult.RemainingShield = PelletDamage.RemainingShield;
-            Shot.DamageResult.RemainingHealth = PelletDamage.RemainingHealth;
-            Shot.DamageResult.bCritical |= PelletDamage.bCritical;
-            Shot.DamageResult.bWeakPoint |= PelletDamage.bWeakPoint;
-            Shot.DamageResult.bShieldBroken |= PelletDamage.bShieldBroken;
-            Shot.DamageResult.bKilled |= PelletDamage.bKilled;
-
-            ApplyBleedOnHit(Definition, Hit.GetActor(), SourceAttributes, LevelScalar);
+            const float PerTarget = DisciplineRank >= 2 ? 7.0f : 4.0f;   // Class-Kits §1.5 M6 R1/R2
+            Momentum->GrantMomentum(static_cast<float>(FMath::Min(PiercedThisPull, 3)) * PerTarget);   // §1.5 M6 cap: 3
         }
     }
     MulticastShotCosmetics(Shot);
@@ -1390,15 +1382,405 @@ bool UBreakerWeaponComponent::ResolveWeakPointHit(const FHitResult& Hit, const F
     return false;
 }
 
-void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar)
+// ---------------------------------------------------------------------------
+// Projectile channels (owner ruling 2026-08-16): the composition, the momentum
+// coupling table, and the pellet resolution loop.
+// ---------------------------------------------------------------------------
+
+FBreakerShotChannels UBreakerWeaponComponent::GetShotChannels() const
+{
+    FBreakerShotChannels Channels;
+    const AActor* Owner = GetOwner();
+    if (!Owner) return Channels;
+
+    // 1. The tree's Flat lanes. Read live, like GetFireRateMultiplier: a
+    // respec mid-fight changes the next shot, not the next equip. Pierce,
+    // chain and ricochet floor to whole mechanics here (the enum comment on
+    // ProjectileCount: the lane must round down rather than silently firing
+    // 1.5 bullets); the projectile fraction stays fractional because the
+    // accumulator makes it perceptible instead of lost.
+    if (const UBreakerProgressionComponent* Progression = Owner->FindComponentByClass<UBreakerProgressionComponent>())
+    {
+        const FBreakerNodeStats& Stats = Progression->GetNodeStats();
+        Channels.AdditionalProjectiles += FMath::Max(0.0f, Stats.BonusProjectileCount);
+        Channels.PierceCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusPierceCount));
+        Channels.ChainCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusChainCount));
+        Channels.RicochetCount += FMath::Max(0, FMath::FloorToInt32(Stats.BonusRicochetCount));
+    }
+
+    // 2. Keyed ability-window pushes (Sidearm Rig's +1 Pierce is the first).
+    PruneShotChannelBonuses();
+    for (const TPair<FName, FShotChannelBonusEntry>& Bonus : ShotChannelBonuses)
+    {
+        Channels += Bonus.Value.Channels;
+    }
+
+    // 3. Momentum manipulates projectiles — the Swift identity mechanic. The
+    // gate is the momentum component's own IsActiveForOwner, which is already
+    // Swift-locked, so a Caster (no momentum component, or an inert one left
+    // by a dev class swap) fires exactly the shot it always did.
+    if (const UBreakerMomentumComponent* Momentum = Owner->FindComponentByClass<UBreakerMomentumComponent>())
+    {
+        if (Momentum->IsActiveForOwner())
+        {
+            const FBreakerBuildConditionState Conditions = FBreakerBuildConditionState::EvaluateForActor(Owner);
+            Channels += MomentumChannelBonus(Momentum->GetMomentumState(),
+                Conditions.IsActive(EBreakerBuildCondition::Airborne),
+                Conditions.IsActive(EBreakerBuildCondition::Sliding));
+        }
+    }
+
+    // Floors, so a future negative-authored line can suppress but never
+    // invert a mechanic into nonsense.
+    Channels.AdditionalProjectiles = FMath::Max(0.0f, Channels.AdditionalProjectiles);
+    Channels.PierceCount = FMath::Max(0, Channels.PierceCount);
+    Channels.ChainCount = FMath::Max(0, Channels.ChainCount);
+    Channels.RicochetCount = FMath::Max(0, Channels.RicochetCount);
+    return Channels;
+}
+
+FBreakerShotChannels UBreakerWeaponComponent::MomentumChannelBonus(EBreakerMomentumState State, bool bAirborne, bool bSliding)
+{
+    // The coupling table (see the declaration comment for the design intent).
+    // Every number is an O2 PLACEHOLDER chosen to be PERCEPTIBLE: a whole
+    // pierce, a whole chain, a whole airborne pellet — states the HUD already
+    // shows as bands, answered by shots that visibly behave differently.
+    FBreakerShotChannels Bonus;
+    if (State >= EBreakerMomentumState::Running)
+    {
+        Bonus.PierceCount += 1;   // O2 PLACEHOLDER — Running: rounds punch through
+        // Momentum in the bar is what arms the posture bonuses: the coupling
+        // is Momentum manipulating projectiles, not airtime doing it for free.
+        if (bAirborne) Bonus.AdditionalProjectiles += 1.0f;   // O2 PLACEHOLDER — airborne: the shot doubles
+        else if (bSliding) Bonus.AdditionalProjectiles += 0.5f;   // O2 PLACEHOLDER — sliding: a second pellet every other shot
+    }
+    if (State == EBreakerMomentumState::Redline)
+    {
+        Bonus.ChainCount += 1;   // O2 PLACEHOLDER — Redline: hits arc onward
+    }
+    return Bonus;
+}
+
+void UBreakerWeaponComponent::PushShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration)
+{
+    if (Key.IsNone()) return;
+    FShotChannelBonusEntry Entry;
+    Entry.Channels.AdditionalProjectiles = AdditionalProjectiles;
+    Entry.Channels.PierceCount = PierceBonus;
+    Entry.Channels.ChainCount = ChainBonus;
+    Entry.Channels.RicochetCount = RicochetBonus;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    // Re-pushing the same key replaces rather than stacks, matching
+    // PushRangeTreatmentOverride and PushSpeedMultiplier.
+    ShotChannelBonuses.Add(Key, Entry);
+}
+
+void UBreakerWeaponComponent::PopShotChannelBonus(FName Key)
+{
+    ShotChannelBonuses.Remove(Key);
+}
+
+void UBreakerWeaponComponent::PruneShotChannelBonuses() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || ShotChannelBonuses.Num() == 0) return;
+    const double Now = World->GetTimeSeconds();
+    for (auto It = ShotChannelBonuses.CreateIterator(); It; ++It)
+    {
+        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, float RadiusCm, const TArray<const AActor*>& ExcludedActors) const
+{
+    // The enemy query behind chain arcs and ricochet seeks: nearest living
+    // combat-component owner within the radius that this shot has not already
+    // struck, with line of sight from the origin. Combat components are the
+    // one honest register of "things weapon fire can damage" — enemies and
+    // target dummies both carry one, and nothing else does.
+    UWorld* World = GetWorld();
+    if (!World || RadiusCm <= 0.0f) return nullptr;
+
+    struct FCandidate { AActor* Actor = nullptr; double DistanceSquared = 0.0; };
+    TArray<FCandidate> Candidates;
+    const double RadiusSquared = FMath::Square(static_cast<double>(RadiusCm));
+    for (TObjectIterator<UBreakerCombatComponent> It; It; ++It)
+    {
+        UBreakerCombatComponent* Combat = *It;
+        AActor* Actor = Combat ? Combat->GetOwner() : nullptr;
+        if (!Actor || Actor->GetWorld() != World || Actor == GetOwner()) continue;
+        if (Combat->IsDead() || ExcludedActors.Contains(Actor)) continue;
+        const double DistanceSquared = FVector::DistSquared(Origin, Actor->GetActorLocation());
+        if (DistanceSquared > RadiusSquared) continue;
+        Candidates.Add({ Actor, DistanceSquared });
+    }
+    Candidates.Sort([](const FCandidate& A, const FCandidate& B) { return A.DistanceSquared < B.DistanceSquared; });
+
+    // Nearest first, but only through open air: an arc that passed through a
+    // wall would read as a bug, not a mechanic.
+    FCollisionQueryParams LineOfSight(SCENE_QUERY_STAT(BreakerChainSeek), true, GetOwner());
+    for (const AActor* Excluded : ExcludedActors) LineOfSight.AddIgnoredActor(Excluded);
+    for (const FCandidate& Candidate : Candidates)
+    {
+        FHitResult Hit;
+        const bool bBlocked = World->LineTraceSingleByChannel(Hit, Origin, Candidate.Actor->GetActorLocation(), ECC_GameTraceChannel2, LineOfSight);
+        if (!bBlocked || Hit.GetActor() == Candidate.Actor) return Candidate.Actor;
+    }
+    return nullptr;
+}
+
+FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, UBreakerCombatComponent* TargetCombat,
+    const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
+    float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed)
+{
+    FBreakerDamageRequest Damage;
+    // The multiplicand: archetype base carried up the item-level curve, then
+    // falloff. While a range-treatment override is active (Standing Wave's
+    // Overdrive rewrite), the falloff computation itself is short-circuited
+    // to 1.0 — every other term here is untouched.
+    const float FalloffMultiplier = IsRangeTreatmentOverridden()
+        ? 1.0f
+        : FBreakerWeaponMath::DamageMultiplierAtDistance(Definition, DistanceFromMuzzle);
+    Damage.BaseDamage = BaseDamage * FalloffMultiplier;
+    Damage.DamageFamily = EBreakerDamageFamily::Physical;
+    Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
+    Damage.ArmorPenetration = ArmorPenetrationOverride;
+    Damage.bWeakPointHit = bWeakPoint;
+    Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
+    // ONE number. Gear's Weapon Damage affix and every skill node that raises
+    // damage are already summed into the DamageMultiplier attribute's single
+    // additive Increased bucket; multiplying gear in separately here is what
+    // used to break the locked rule.
+    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    Damage.RandomSeed = DamageSeed;
+    Damage.SourceLocation = GetOwner()->GetActorLocation();
+    Damage.bHasSourceLocation = true;
+    // The traced impact point, so the damage number draws where this hit
+    // actually landed instead of at the enemy's pivot.
+    Damage.ImpactLocation = ImpactPoint;
+    Damage.bHasImpactLocation = true;
+    Damage.SetInstigator(GetOwner());
+    // Outgoing modifiers compose on the shooter's own component before the
+    // request leaves the weapon — for every leg, so an ability window can
+    // never apply to the entry wound and miss the exit.
+    if (UBreakerCombatComponent* OwnerCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        OwnerCombat->ApplyOutgoingModifiers(Damage);
+    }
+    return TargetCombat->ReceiveDamage(Damage);
+}
+
+int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefinition* Definition, const FVector& ViewLocation, const FVector& Direction,
+    const FBreakerShotChannels& Channels, float ScaledBaseDamage, const UBreakerAttributeSet* SourceAttributes,
+    const AActor* MarkedTarget, float LeadMinimumRangeCm, float LevelScalar, int32 PelletSeed,
+    FBreakerShotResult& Shot, FBreakerPelletImpact& Pellet)
+{
+    const uint32 OwnerHash = GetTypeHash(GetOwner());
+    const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    // Sightline (Class-Kits §1.5 M7 rule half): "its pierce also ignores
+    // Armour on the second and subsequent targets" — consumed here, off the
+    // node tag the tree already publishes.
+    const bool bSightline = Progression && Progression->HasNodeTag(BreakerSightlineTag());
+    // Overpenetration (§1.5 M10): a killing hit skips the pierce falloff step.
+    const bool bOverpenetration = Progression && Progression->HasNodeTag(BreakerOverpenetrationTag());
+    // Angle (§1.5 M4, transcribed): ricochet seeks within 12 m at rank 1 and
+    // 20 m at rank 2, overriding the authored base radius when larger.
+    float SeekRadiusCm = RicochetSeekRadiusCm;
+    if (const int32 AngleRank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::ClassPoints) : 0)
+    {
+        SeekRadiusCm = FMath::Max(SeekRadiusCm, AngleRank >= 2 ? 2000.0f : 1200.0f);   // Class-Kits §1.5 M4 R2/R1
+    }
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWeaponTrace), true, GetOwner());
+    TArray<const AActor*> StruckActors;
+    FVector SegmentStart = ViewLocation;
+    FVector SegmentDirection = Direction;
+    float TravelledCm = 0.0f;
+    float CurrentMultiplier = 1.0f;
+    int32 EnemiesStruck = 0;
+    int32 RicochetsRemaining = Channels.RicochetCount;
+    int32 SecondarySeedIndex = 0;
+    FVector LastEnemyImpact = FVector::ZeroVector;
+    float LastEnemyDistanceCm = 0.0f;
+
+    while (TravelledCm < Definition->MaximumRange - 1.0f)
+    {
+        const float RemainingRange = Definition->MaximumRange - TravelledCm;
+        const FVector SegmentEnd = SegmentStart + SegmentDirection * RemainingRange;
+        const bool bIsFirstLeg = EnemiesStruck == 0 && TravelledCm == 0.0f;
+
+        FHitResult Hit;
+        if (!GetWorld()->LineTraceSingleByChannel(Hit, SegmentStart, SegmentEnd, ECC_GameTraceChannel2, Params))
+        {
+            // Flew off. The first leg leaves the pellet record exactly as the
+            // caller seeded it (full-range end, no hit) — the legacy miss.
+            if (!bIsFirstLeg)
+            {
+                FBreakerSecondaryImpact& Leg = Shot.SecondaryImpacts.AddDefaulted_GetRef();
+                Leg.Start = SegmentStart;
+                Leg.End = SegmentEnd;
+            }
+            break;
+        }
+
+        AActor* HitActor = Hit.GetActor();
+        if (bIsFirstLeg)
+        {
+            // The pre-pierce contract, byte for byte: the pellet record and the
+            // shot's single-impact accessors describe the FIRST thing the
+            // pellet touched.
+            Pellet.bHit = true;
+            Pellet.End = Hit.ImpactPoint;
+            Pellet.HitActor = HitActor;
+            Shot.bHit = true;
+            Shot.HitActor = HitActor;
+            Shot.ImpactPoint = Hit.ImpactPoint;
+            Shot.TraceEnd = Hit.ImpactPoint;
+        }
+        else
+        {
+            FBreakerSecondaryImpact& Leg = Shot.SecondaryImpacts.AddDefaulted_GetRef();
+            Leg.Start = SegmentStart;
+            Leg.End = Hit.ImpactPoint;
+            Leg.bHit = true;
+            Leg.HitActor = HitActor;
+        }
+
+        UBreakerCombatComponent* TargetCombat = HitActor ? HitActor->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+        if (!TargetCombat)
+        {
+            // RICOCHET: the shot hit the world. Spend a bounce seeking the
+            // nearest enemy in line of sight of the impact; a bounce that
+            // finds nobody dies on the wall, honestly.
+            if (RicochetsRemaining > 0)
+            {
+                if (AActor* Sought = FindNearestChainTarget(Hit.ImpactPoint, SeekRadiusCm, StruckActors))
+                {
+                    --RicochetsRemaining;
+                    CurrentMultiplier *= FMath::Clamp(RicochetDamageMultiplier, 0.0f, 1.0f);
+                    TravelledCm += Hit.Distance;
+                    SegmentStart = Hit.ImpactPoint;
+                    SegmentDirection = (Sought->GetActorLocation() - Hit.ImpactPoint).GetSafeNormal();
+                    if (SegmentDirection.IsNearlyZero()) break;
+                    continue;
+                }
+            }
+            break;
+        }
+
+        // The geometric hit, the forgiveness halo around it, or Lead's mark.
+        // Distance for Lead's range gate is from the MUZZLE — a mark's payoff
+        // must not be reachable by bouncing a round off a nearby wall.
+        const float DistanceFromMuzzleCm = TravelledCm + Hit.Distance;
+        const bool bWeakPoint = ResolveWeakPointHit(Hit, SegmentStart, SegmentDirection)
+            || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
+                MarkedTarget != nullptr && HitActor == MarkedTarget, DistanceFromMuzzleCm, LeadMinimumRangeCm);
+        if (bIsFirstLeg)
+        {
+            Shot.bWeakPoint |= bWeakPoint;
+            Pellet.bWeakPoint = bWeakPoint;
+        }
+
+        // The first hit rolls with the legacy seed material so an unchannelled
+        // build's crit sequence does not move; every later leg draws from the
+        // pierce sub-stream.
+        const int32 DamageSeed = EnemiesStruck == 0
+            ? static_cast<int32>(HashCombine(OwnerHash, static_cast<uint32>(PelletSeed)))
+            : FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerPierceSalt, SecondarySeedIndex++);
+        const float ArmorPenetration = (EnemiesStruck > 0 && bSightline) ? 1.0f : Definition->ArmorPenetration;
+        const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
+            ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed);
+        Shot.DamageResult.RawDamage += HitDamage.RawDamage;
+        Shot.DamageResult.MitigatedDamage += HitDamage.MitigatedDamage;
+        Shot.DamageResult.ShieldDamage += HitDamage.ShieldDamage;
+        Shot.DamageResult.HealthDamage += HitDamage.HealthDamage;
+        Shot.DamageResult.RemainingShield = HitDamage.RemainingShield;
+        Shot.DamageResult.RemainingHealth = HitDamage.RemainingHealth;
+        Shot.DamageResult.bCritical |= HitDamage.bCritical;
+        Shot.DamageResult.bWeakPoint |= HitDamage.bWeakPoint;
+        Shot.DamageResult.bShieldBroken |= HitDamage.bShieldBroken;
+        Shot.DamageResult.bKilled |= HitDamage.bKilled;
+        // The first hit's bleed seeds from the raw pellet sequence value —
+        // exactly the material the pre-channel code used, so an unchannelled
+        // build's bleed rolls do not move either.
+        ApplyBleedOnHit(Definition, HitActor, SourceAttributes, LevelScalar, EnemiesStruck == 0 ? PelletSeed : DamageSeed);
+
+        StruckActors.Add(HitActor);
+        ++EnemiesStruck;
+        LastEnemyImpact = Hit.ImpactPoint;
+        LastEnemyDistanceCm = DistanceFromMuzzleCm;
+
+        // PIERCE: the budget is enemies CONTINUED THROUGH, so the first hit is
+        // free and PierceCount 0 stops here — the legacy single-hit shot.
+        if (EnemiesStruck > Channels.PierceCount) break;
+        CurrentMultiplier = FBreakerWeaponMath::NextPierceMultiplier(CurrentMultiplier, PierceDamageFalloff, HitDamage.bKilled, bOverpenetration);
+        Params.AddIgnoredActor(HitActor);
+        TravelledCm += Hit.Distance;
+        SegmentStart = Hit.ImpactPoint;
+    }
+
+    // CHAIN: on hit, from wherever the shot's last victim stood. On HIT rather
+    // than on kill, deliberately: Class-Kits already owns the on-kill
+    // continuation (§1.5 M10 Overpenetration lets a killing shot carry on),
+    // so chain-on-kill would duplicate a rule the branch already sells —
+    // chain-on-hit is the distinct mechanic the owner's ruling adds, and it
+    // is the one a player can rely on feeling every shot at Redline.
+    if (EnemiesStruck > 0 && Channels.ChainCount > 0)
+    {
+        FVector ArcOrigin = LastEnemyImpact;
+        float ArcMultiplier = ScaledBaseDamage > 0.0f ? CurrentMultiplier : 0.0f;
+        for (int32 Arc = 0; Arc < Channels.ChainCount; ++Arc)
+        {
+            AActor* Target = FindNearestChainTarget(ArcOrigin, ChainRadiusCm, StruckActors);
+            UBreakerCombatComponent* TargetCombat = Target ? Target->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+            if (!TargetCombat) break;
+            ArcMultiplier *= FMath::Clamp(ChainDamageMultiplier, 0.0f, 1.0f);
+
+            const FVector ArcImpact = Target->GetActorLocation();
+            FBreakerSecondaryImpact& Leg = Shot.SecondaryImpacts.AddDefaulted_GetRef();
+            Leg.Start = ArcOrigin;
+            Leg.End = ArcImpact;
+            Leg.bHit = true;
+            Leg.HitActor = Target;
+
+            // The arc inherits its parent hit's range falloff rather than
+            // re-measuring: the reduced-damage fraction is the arc's whole
+            // price, and paying falloff twice would make chain quietly
+            // worthless at exactly the ranges Marksman fights at.
+            const int32 ArcSeed = FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerChainSalt, Arc);
+            const FBreakerDamageResult ArcDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
+                ScaledBaseDamage * ArcMultiplier, LastEnemyDistanceCm, false, Definition->ArmorPenetration, ArcImpact, ArcSeed);
+            Shot.DamageResult.RawDamage += ArcDamage.RawDamage;
+            Shot.DamageResult.MitigatedDamage += ArcDamage.MitigatedDamage;
+            Shot.DamageResult.ShieldDamage += ArcDamage.ShieldDamage;
+            Shot.DamageResult.HealthDamage += ArcDamage.HealthDamage;
+            Shot.DamageResult.bCritical |= ArcDamage.bCritical;
+            Shot.DamageResult.bShieldBroken |= ArcDamage.bShieldBroken;
+            Shot.DamageResult.bKilled |= ArcDamage.bKilled;
+            ApplyBleedOnHit(Definition, Target, SourceAttributes, LevelScalar, ArcSeed);
+
+            StruckActors.Add(Target);
+            ArcOrigin = ArcImpact;
+        }
+    }
+
+    return FMath::Max(0, EnemiesStruck - 1);
+}
+
+void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* Definition, AActor* Target, const UBreakerAttributeSet* SourceAttributes, float LevelScalar, int32 SeedBasis)
 {
     if (!Definition || !Target || Definition->BleedChance <= 0.0f || Definition->BleedDamagePerTick <= 0.0f || Definition->BleedDuration <= 0.0f) return;
     UBreakerStatusComponent* Status = Target->FindComponentByClass<UBreakerStatusComponent>();
     if (!Status) return;
 
-    // Same seed material as the pellet damage, salted so bleed and critical
+    // Same seed material as the hit's damage, salted so bleed and critical
     // rolls stay independent while remaining reproducible on the server.
-    FRandomStream Stream(static_cast<int32>(HashCombine(HashCombine(GetTypeHash(GetOwner()), ShotSequence), BreakerBleedSalt)));
+    FRandomStream Stream(static_cast<int32>(HashCombine(HashCombine(GetTypeHash(GetOwner()), static_cast<uint32>(SeedBasis)), BreakerBleedSalt)));
     if (Stream.FRand() > Definition->BleedChance) return;
 
     FBreakerStatusApplicationSpec Spec;

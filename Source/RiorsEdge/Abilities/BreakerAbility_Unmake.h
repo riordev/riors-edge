@@ -2,7 +2,27 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/BreakerCasterAbility.h"
+#include "Combat/BreakerStatusComponent.h"
 #include "BreakerAbility_Unmake.generated.h"
+
+class ABreakerCharacter;
+
+// One Cascade ear per status-bearing actor. The status layer's application
+// event is FBreakerActiveStatus only — it does not say WHO it fired on — so
+// each binding needs an object that remembers its target. This is that object:
+// a weak target, a weak caster, and one handler. Created by Unmake when the
+// Cascade window opens, unbound and discarded when it closes.
+UCLASS()
+class RIORSEDGE_API UBreakerCascadeEchoListener : public UObject
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY() TWeakObjectPtr<AActor> Target;
+    UPROPERTY() TWeakObjectPtr<ABreakerCharacter> Caster;
+
+    UFUNCTION() void HandleStatusApplied(const FBreakerActiveStatus& Status);
+};
 
 // UNMAKE — the Caster ultimate (Class-Kits §2.2, Ability-Implementation-Spec
 // §5.7): 80 Mana, no cooldown. "For 6 seconds, all Caster abilities cost 0
@@ -11,18 +31,21 @@
 //
 // Keystone rewrites (spec D1, resolved from the owner's tag container):
 //   Edgework  — Cleave loses its animation lock and Closequarter loses its
-//               range limit within line of sight. IMPLEMENTED FOR CLEAVE ONLY:
-//               UBreakerAbility_Cleave reads the keystone tag directly. The
-//               Closequarter half needs a line-of-sight range override and is
-//               NOT built.
+//               range limit within line of sight. BUILT, both halves: each
+//               ability reads the keystone tag AND the live Unmake window
+//               (the two-part gate; the tag alone is permanent from node
+//               purchase and shipped exactly that bug once, D10).
 //   Long Dark — 12s duration, abilities cost 50% instead of 0%. Fully
 //               parametric: both numbers are variant-row fields, no branch.
-//   Cascade   — every status application also applies the next status in
-//               Fracture's cycle at proc coefficient 0. NOT BUILT: Fracture
-//               (C5) and the status-cycle component do not exist.
-//
-// Both unbuilt halves are registered as variant rows so the selector is real
-// and the gap is visible, rather than a keystone that silently does nothing.
+//   Cascade   — every status application by this Caster during the window
+//               also applies the next status in Fracture's cycle to the same
+//               target, at proc coefficient 0. BUILT below: the window binds a
+//               listener to every status-bearing actor's application event and
+//               echoes through the caster's own status cycle. Proc coefficient
+//               0 on the echo is the load-bearing termination (Master 7.10.1):
+//               the listener ignores applications carrying 0, so an echo can
+//               never echo. KNOWN LIMIT: actors spawned after the window opens
+//               are not bound and do not echo until the next Unmake.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Unmake : public UBreakerCasterAbility
 {
@@ -49,6 +72,26 @@ public:
     UFUNCTION(BlueprintPure, Category="Unmake")
     static float ResolveDuration(float VariantDuration, float DefinitionDuration);
 
+    // Pure rule, Cascade: does this application echo? All four legs or
+    // nothing — the keystone must be owned, the window must be live, the
+    // application must be the caster's own, and the application must itself
+    // carry a positive proc coefficient (the echo's own 0 is what stops
+    // echo-of-echo recursion, Master 7.10.1).
+    UFUNCTION(BlueprintPure, Category="Unmake")
+    static bool ShouldCascadeEcho(bool bCascadeHeld, bool bWindowActive, bool bInstigatedByCaster, float AppliedProcCoefficient);
+
+    // Pure rule, Cascade: the echoed application is the cycle entry's own spec
+    // riding the item-level scalar (Fracture's rule, O35), with its proc
+    // coefficient forced to 0. Everything else is untouched — the echo is the
+    // next cycle status, not a new status.
+    UFUNCTION(BlueprintPure, Category="Unmake")
+    static FBreakerStatusApplicationSpec MakeCascadeEchoSpec(FBreakerStatusApplicationSpec CycleSpec, float DamageScalar);
+
 private:
+    void BeginCascadeListening(UWorld* World, ABreakerCharacter* Character);
+    void EndCascadeListening();
+
+    UPROPERTY() TArray<TObjectPtr<UBreakerCascadeEchoListener>> CascadeListeners;
+
     FTimerHandle WindowTimer;
 };

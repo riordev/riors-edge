@@ -393,11 +393,21 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
         if (BreakerStatTargetHasAggregationLane(static_cast<EBreakerNodeStatTarget>(Index))) ++Wired;
     }
 
-    // 15: the ten that predate the widening pass, plus the five wired on
+    // 19: the ten that predate the widening pass, plus the five wired on
     // 2026-08-15 — AbilityCost, MaxClassResource, ClassResourceRegen, FireRate
     // and Armor. Each of those five already had an aggregated attribute and
     // gear already bid into it; only the node-side line was missing, so each
     // cost exactly one line in AggregateStats.
+    //
+    // Plus the four wired on 2026-08-16 under THE OWNER'S SWIFT RULING of the
+    // same date ("swifts identity should be based around multishot, pierce,
+    // chain, ricochet ... manipulation of projectiles with your momentum"):
+    // ProjectileCount, Pierce, and the two appended in that pass, ChainCount
+    // and RicochetCount. These four are Flat mechanic-count lanes landing on
+    // FBreakerNodeStats and read by UBreakerWeaponComponent::GetShotChannels;
+    // they do not route through the aggregated attribute set because no
+    // aggregated attribute exists for them and gear does not bid yet — see
+    // the register comment in BreakerProgressionTypes.h.
     //
     // DashCooldown was on the roadmap as a sixth and is NOT wired, because the
     // roadmap was wrong about it: EBreakerAggregatedAttribute has no dash entry
@@ -407,7 +417,7 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // multiply instead of sharing a bucket.
     //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 15);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 19);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet
