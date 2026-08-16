@@ -11,6 +11,8 @@ static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttribu
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Classes/BreakerGritComponent.h"
+#include "Classes/BreakerMomentumComponent.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -813,6 +815,24 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.BonusPierceCount = Flat(EBreakerNodeStatTarget::Pierce);
     Stats.BonusChainCount = Flat(EBreakerNodeStatTarget::ChainCount);
     Stats.BonusRicochetCount = Flat(EBreakerNodeStatTarget::RicochetCount);
+    // ---- Loop valve and ability geometry (2026-08-16) ---------------------
+    // Four more single-bidder lanes: no aggregated attribute exists for any of
+    // them and gear does not bid, so consumers read this struct directly (the
+    // projectile-channel precedent above). All four are one additive Increased
+    // bucket composed to a 1.0-based multiplier.
+    //
+    // ClassResourceDecay's sign convention, stated where the composition
+    // happens: POSITIVE authored percent = FASTER decay. The consuming nodes
+    // author decay as a downside (No Safety +100 "drains twice as fast", No
+    // Ground +50 while Grounded) and a suspension as a negative line (Reserve
+    // -100 while Aiming), so the floor at 0 is a real state — "does not decay"
+    // — not a defensive fiction. Delivered by PushLoopValveOverrides below.
+    Stats.ClassResourceDecayMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::ClassResourceDecay));
+    Stats.AbilityAreaMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::AbilityArea));
+    Stats.AbilityDurationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::AbilityDuration));
+    // The divisor convention (DashCooldownReduction's): 1.20 == 20% shorter.
+    // Floored just above zero so no authored row can divide a cooldown by zero.
+    Stats.AbilityCooldownReduction = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::AbilityCooldown));
 
     if (OutContribution)
     {
@@ -916,6 +936,47 @@ void UBreakerProgressionComponent::RecalculateStats()
     }
 
     ApplyStatsToAttributes();
+    PushLoopValveOverrides();
+}
+
+void UBreakerProgressionComponent::PushLoopValveOverrides()
+{
+    // The progression -> resource-component bridge for the ClassResourceDecay
+    // lane. Decay is a per-loop rule computed inside each class component, not
+    // a shared attribute, and PushLoopOverride is the seam those components
+    // already expose for "rewrite the loop, keyed and replaceable" — so the
+    // tree's composed decay change rides that valve rather than growing a
+    // second delivery path (the enum comment on ClassResourceDecay:
+    // "plumbing to an existing valve, not a new system").
+    //
+    // Re-pushing the same key replaces, so a condition transition (Reserve's
+    // Aiming line going live, No Ground's Grounded half toggling) or a respec
+    // simply re-states the current truth; a neutral multiplier pops the entry
+    // entirely so an idle build leaves the override map empty rather than
+    // full of 1.0s. No expiry: the override stands until the aggregate moves.
+    //
+    // Momentum and Grit are the two loops with a decay rule. Mana regenerates
+    // and Scrap banks (neither decays), and Charge's out-of-combat settle has
+    // no authored bidder yet — recorded on the lane register rather than
+    // multiplied in speculatively. Both components are pushed when present;
+    // each is inert for an owner of the wrong class anyway, so the extra map
+    // entry on a mixed-component test rig is harmless.
+    AActor* Owner = GetOwner();
+    if (!Owner || !Owner->HasAuthority()) return;
+    static const FName BreakerLoopValveKey(TEXT("Progression.ClassResourceDecay"));
+    const float DecayMultiplier = CachedStats.ClassResourceDecayMultiplier;
+    const bool bNeutral = FMath::IsNearlyEqual(DecayMultiplier, 1.0f);
+
+    if (UBreakerMomentumComponent* Momentum = Owner->FindComponentByClass<UBreakerMomentumComponent>())
+    {
+        if (bNeutral) Momentum->PopLoopOverride(BreakerLoopValveKey);
+        else Momentum->PushLoopOverride(BreakerLoopValveKey, false, 1.0f, 0.0f, DecayMultiplier);
+    }
+    if (UBreakerGritComponent* Grit = Owner->FindComponentByClass<UBreakerGritComponent>())
+    {
+        if (bNeutral) Grit->PopLoopOverride(BreakerLoopValveKey);
+        else Grit->PushLoopOverride(BreakerLoopValveKey, false, 1.0f, 0.0f, DecayMultiplier);
+    }
 }
 
 void UBreakerProgressionComponent::ApplyStatsToAttributes()

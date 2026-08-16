@@ -42,6 +42,38 @@ namespace BreakerQuestFlags
     // it reaches its threshold (Campaign-And-Story.md 6.4).
     RIORSEDGE_API extern const FName FirstContractKillCounter;
     RIORSEDGE_API extern const FName FirstContractEliteCounter;
+
+    // ACT I CHAIN, quests 2-4. Gating is dialogue-side: each quest's offer
+    // choice requires the PREVIOUS quest's TurnedIn flag, so the chain order
+    // lives in exactly one place per link and the quest definitions stay a
+    // flat registry (Campaign-And-Story.md 6.4: flags are the state, quests
+    // are a lens).
+    //
+    // Q2 — Kess's salvage. The Forge needs feedstock; the reward is the first
+    // thing the Forge ever does FOR the player, which is how the relationship
+    // thread opens (roster: Kess has the highest interaction count in the game).
+    RIORSEDGE_API extern const FName KessSalvageOffered;
+    RIORSEDGE_API extern const FName KessSalvageAccepted;
+    RIORSEDGE_API extern const FName KessSalvageFeedstock;
+    RIORSEDGE_API extern const FName KessSalvageTurnedIn;
+    RIORSEDGE_API extern const FName KessSalvageKillCounter;
+
+    // Q3 — the spill is not random. The Quartermaster's first unease, filed
+    // as weather because her sheet has no box for what she actually thinks.
+    RIORSEDGE_API extern const FName PatternOffered;
+    RIORSEDGE_API extern const FName PatternAccepted;
+    RIORSEDGE_API extern const FName PatternMarkedDown;
+    RIORSEDGE_API extern const FName PatternTurnedIn;
+    RIORSEDGE_API extern const FName PatternEliteCounter;
+
+    // Q4 — the Act I capstone: a rift out past the far ground that "didn't
+    // close clean" (Command's words, never hers). Seeds the Breach-to-come
+    // without naming anything the Act II turn depends on.
+    RIORSEDGE_API extern const FName DeeperOffered;
+    RIORSEDGE_API extern const FName DeeperAccepted;
+    RIORSEDGE_API extern const FName DeeperSweepDone;
+    RIORSEDGE_API extern const FName DeeperTurnedIn;
+    RIORSEDGE_API extern const FName DeeperEliteCounter;
 }
 
 // Derived, never stored. A quest's state is a pure function of the flag set,

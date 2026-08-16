@@ -16,6 +16,24 @@ namespace BreakerQuestFlags
 
     const FName FirstContractKillCounter(TEXT("Quest.FirstContract.Kills"));
     const FName FirstContractEliteCounter(TEXT("Quest.FirstContract.EliteKills"));
+
+    const FName KessSalvageOffered(TEXT("Quest.KessSalvage.Offered"));
+    const FName KessSalvageAccepted(TEXT("Quest.KessSalvage.Accepted"));
+    const FName KessSalvageFeedstock(TEXT("Quest.KessSalvage.FeedstockTaken"));
+    const FName KessSalvageTurnedIn(TEXT("Quest.KessSalvage.TurnedIn"));
+    const FName KessSalvageKillCounter(TEXT("Quest.KessSalvage.Kills"));
+
+    const FName PatternOffered(TEXT("Quest.Pattern.Offered"));
+    const FName PatternAccepted(TEXT("Quest.Pattern.Accepted"));
+    const FName PatternMarkedDown(TEXT("Quest.Pattern.MarkedDown"));
+    const FName PatternTurnedIn(TEXT("Quest.Pattern.TurnedIn"));
+    const FName PatternEliteCounter(TEXT("Quest.Pattern.EliteKills"));
+
+    const FName DeeperOffered(TEXT("Quest.Deeper.Offered"));
+    const FName DeeperAccepted(TEXT("Quest.Deeper.Accepted"));
+    const FName DeeperSweepDone(TEXT("Quest.Deeper.SweepDone"));
+    const FName DeeperTurnedIn(TEXT("Quest.Deeper.TurnedIn"));
+    const FName DeeperEliteCounter(TEXT("Quest.Deeper.EliteKills"));
 }
 
 const TArray<FName>& UBreakerQuestLibrary::GetRegisteredFlags()
@@ -30,6 +48,18 @@ const TArray<FName>& UBreakerQuestLibrary::GetRegisteredFlags()
         BreakerQuestFlags::FirstContractSpillThinned,
         BreakerQuestFlags::FirstContractEliteDown,
         BreakerQuestFlags::FirstContractTurnedIn,
+        BreakerQuestFlags::KessSalvageOffered,
+        BreakerQuestFlags::KessSalvageAccepted,
+        BreakerQuestFlags::KessSalvageFeedstock,
+        BreakerQuestFlags::KessSalvageTurnedIn,
+        BreakerQuestFlags::PatternOffered,
+        BreakerQuestFlags::PatternAccepted,
+        BreakerQuestFlags::PatternMarkedDown,
+        BreakerQuestFlags::PatternTurnedIn,
+        BreakerQuestFlags::DeeperOffered,
+        BreakerQuestFlags::DeeperAccepted,
+        BreakerQuestFlags::DeeperSweepDone,
+        BreakerQuestFlags::DeeperTurnedIn,
     };
     return Registered;
 }
@@ -77,7 +107,105 @@ const TArray<FBreakerQuestDefinition>& UBreakerQuestLibrary::GetFallbackQuests()
         Contract.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;  // O2 PLACEHOLDER
         Contract.Reward.ItemLevel = 1;                                    // O2 PLACEHOLDER
 
-        return TArray<FBreakerQuestDefinition>{ Contract };
+        // ---- Q2: FEED THE FORGE (Kess, after the first contract closes) ----
+        // Kess's first ask. The chain gate lives on her offer choice
+        // (requires FirstContractTurnedIn), not here — a definition stays a
+        // flat description of the work, and the dialogue decides who may hear
+        // about it. Registry order is chain order: the HUD tracker follows the
+        // first live quest, so the list must read in the order players play it.
+        FBreakerQuestDefinition Salvage;
+        Salvage.QuestId = TEXT("Quest.KessSalvage");
+        Salvage.Title = TEXT("FEED THE FORGE");
+        // "FORGE KEEPER", not the display name "KESS — FORGE KEEPER": the
+        // tracker prints "RETURN TO THE <GIVER>" and the em-dash form does not
+        // survive that sentence.
+        Salvage.Giver = TEXT("FORGE KEEPER");
+        Salvage.OfferedFlag = BreakerQuestFlags::KessSalvageOffered;
+        Salvage.AcceptedFlag = BreakerQuestFlags::KessSalvageAccepted;
+        Salvage.TurnedInFlag = BreakerQuestFlags::KessSalvageTurnedIn;
+        {
+            FBreakerQuestObjective Feedstock;
+            Feedstock.ObjectiveId = TEXT("Feedstock");
+            Feedstock.Text = TEXT("Take feedstock from the spill");
+            Feedstock.CompletionFlag = BreakerQuestFlags::KessSalvageFeedstock;
+            Feedstock.ProgressCounter = BreakerQuestFlags::KessSalvageKillCounter;
+            // O2 PLACEHOLDER, checked against content like the first
+            // contract's 5: the named encounter fields three melee, two
+            // LATTICE and one elite, and every rank feeds an uncounted-rank
+            // objective — so 6 is exactly one full pass of the spill.
+            Feedstock.RequiredCount = 6;
+            Salvage.Objectives.Add(Feedstock);
+        }
+        Salvage.Reward.ItemCount = 1;                                     // O2 PLACEHOLDER
+        Salvage.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;   // O2 PLACEHOLDER
+        Salvage.Reward.ItemLevel = 1;                                     // O2 PLACEHOLDER
+
+        // ---- Q3: THE PATTERN (Quartermaster, after Kess's salvage) ---------
+        FBreakerQuestDefinition Pattern;
+        Pattern.QuestId = TEXT("Quest.Pattern");
+        Pattern.Title = TEXT("THE PATTERN");
+        Pattern.Giver = TEXT("QUARTERMASTER");
+        Pattern.OfferedFlag = BreakerQuestFlags::PatternOffered;
+        Pattern.AcceptedFlag = BreakerQuestFlags::PatternAccepted;
+        Pattern.TurnedInFlag = BreakerQuestFlags::PatternTurnedIn;
+        {
+            FBreakerQuestObjective Marked;
+            Marked.ObjectiveId = TEXT("Marked");
+            Marked.Text = TEXT("Put the marked ones down");
+            Marked.CompletionFlag = BreakerQuestFlags::PatternMarkedDown;
+            Marked.ProgressCounter = BreakerQuestFlags::PatternEliteCounter;
+            // O2 PLACEHOLDER. One elite stands per regroup of the named
+            // ground, so 3 is three returns to the same spill — which IS the
+            // fiction ("same ground, every time"), not a grind bolted onto it.
+            // Wave play pays it too: the director promotes an elite from wave
+            // 4 on.
+            Marked.RequiredCount = 3;
+            Marked.bRequiresEliteKill = true;
+            Pattern.Objectives.Add(Marked);
+        }
+        Pattern.Reward.ItemCount = 1;                                     // O2 PLACEHOLDER
+        Pattern.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;   // O2 PLACEHOLDER
+        Pattern.Reward.ItemLevel = 1;                                     // O2 PLACEHOLDER
+
+        // ---- Q4: DEEPER (Quartermaster, the Act I capstone) ----------------
+        // The brief asked for a boss clear. The kill tracker's only
+        // discrimination is elite-or-above (HandleQuestKill collapses rank to
+        // one bool), so a boss-only objective cannot be honestly counted
+        // today — the honest fallback is a high elite-or-above count, and the
+        // Field Marshal PAYS INTO it when killed, since anything above elite
+        // counts for an elite objective. When rank reaches the notify API,
+        // this objective can tighten without a save migration: the flag names
+        // stay.
+        FBreakerQuestDefinition Deeper;
+        Deeper.QuestId = TEXT("Quest.Deeper");
+        Deeper.Title = TEXT("DEEPER");
+        Deeper.Giver = TEXT("QUARTERMASTER");
+        Deeper.OfferedFlag = BreakerQuestFlags::DeeperOffered;
+        Deeper.AcceptedFlag = BreakerQuestFlags::DeeperAccepted;
+        Deeper.TurnedInFlag = BreakerQuestFlags::DeeperTurnedIn;
+        {
+            FBreakerQuestObjective Sweep;
+            Sweep.ObjectiveId = TEXT("Sweep");
+            Sweep.Text = TEXT("Sweep the source of the spill");
+            Sweep.CompletionFlag = BreakerQuestFlags::DeeperSweepDone;
+            Sweep.ProgressCounter = BreakerQuestFlags::DeeperEliteCounter;
+            // O2 PLACEHOLDER. Five elite-or-above: the field elite, wave
+            // promotions, and the Field Marshal all feed it, so the capstone
+            // is heavier than Q3 without demanding any one source.
+            Sweep.RequiredCount = 5;
+            Sweep.bRequiresEliteKill = true;
+            Deeper.Objectives.Add(Sweep);
+        }
+        // The capstone pays best-in-chain by COUNT, not rarity: Aberrant and
+        // Anomalous are the endgame chase (the teaching order puts Aberrant
+        // limits at A2-10), so an Act I camp contract has no business printing
+        // either. Two Exceptionals is heavier than every prior link without
+        // spending a rarity the campaign has not introduced.
+        Deeper.Reward.ItemCount = 2;                                      // O2 PLACEHOLDER
+        Deeper.Reward.MinimumRarity = EBreakerItemRarity::Exceptional;    // O2 PLACEHOLDER
+        Deeper.Reward.ItemLevel = 1;                                      // O2 PLACEHOLDER
+
+        return TArray<FBreakerQuestDefinition>{ Contract, Salvage, Pattern, Deeper };
     }();
     return Quests;
 }

@@ -10,8 +10,10 @@
 // FORGE WALLET PERSISTENCE (CONTEXT.md next-action 3: "the crafting wallet is
 // not in UBreakerSaveGame"). FBreakerForgeWallet was replicated on
 // UBreakerEquipmentComponent but SaveGameState/LoadGameState never touched
-// it, so every Slag/Flux/Sigil balance a player had earned was gone the
-// moment the process restarted.
+// it, so every balance a player had earned was gone the moment the process
+// restarted. Since the one-currency consolidation (owner ruling 2026-08-16)
+// the wallet holds a single Riftglass balance; the v3 -> v4 migration folds
+// the old Slag/Flux/Sigil array into it, covered below.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerForgeWalletRoundTripTest,
@@ -23,9 +25,7 @@ bool FBreakerForgeWalletRoundTripTest::RunTest(const FString& Parameters)
     UBreakerSaveGame* Written = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
     if (!Written) { AddError(TEXT("Could not create a save object")); return false; }
 
-    Written->ForgeWallet.Add(EBreakerForgeCurrency::Slag, 42);
-    Written->ForgeWallet.Add(EBreakerForgeCurrency::Flux, 7);
-    Written->ForgeWallet.Add(EBreakerForgeCurrency::Sigil, 1);
+    Written->ForgeWallet.Add(144);
     Written->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
 
     // Memory rather than a slot, exactly like the quest round trip
@@ -37,9 +37,7 @@ bool FBreakerForgeWalletRoundTripTest::RunTest(const FString& Parameters)
     UBreakerSaveGame* Read = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
     if (!Read) { AddError(TEXT("Save did not deserialize")); return false; }
 
-    TestEqual(TEXT("Slag survives serialization"), Read->ForgeWallet.Get(EBreakerForgeCurrency::Slag), 42);
-    TestEqual(TEXT("Flux survives serialization"), Read->ForgeWallet.Get(EBreakerForgeCurrency::Flux), 7);
-    TestEqual(TEXT("Sigil survives serialization"), Read->ForgeWallet.Get(EBreakerForgeCurrency::Sigil), 1);
+    TestEqual(TEXT("The Riftglass balance survives serialization"), Read->ForgeWallet.Get(), 144);
 
     // And into the equipment component, the way ABreakerCharacter::LoadGameState
     // restores it.
@@ -47,37 +45,41 @@ bool FBreakerForgeWalletRoundTripTest::RunTest(const FString& Parameters)
     UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
     Equipment->RestoreForgeWallet(Read->ForgeWallet);
     TestEqual(TEXT("The restored wallet reaches the equipment component"),
-        Equipment->GetForgeWallet().Get(EBreakerForgeCurrency::Slag), 42);
-    TestEqual(TEXT("Every currency reaches the equipment component"),
-        Equipment->GetForgeWallet().Get(EBreakerForgeCurrency::Flux), 7);
+        Equipment->GetForgeWallet().Get(), 144);
     return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSaveWalletMigrationTest,
-    "RiorsEdge.Save.WalletMigrationV2ToV3",
+    "RiorsEdge.Save.WalletMigrationToRiftglass",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerSaveWalletMigrationTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("The current version is 3, the wallet's version"), UBreakerSaveGame::CurrentSaveVersion, 3);
+    TestEqual(TEXT("The current version is 4, the one-currency version"), UBreakerSaveGame::CurrentSaveVersion, 4);
 
-    // A faithful v2 payload: version 2, real quest state, and no ForgeWallet
-    // property at all — it deserializes to the struct's own
-    // default-constructed zero wallet, exactly like QuestCounters did across
-    // the v1 -> v2 step.
+    // A faithful v3 payload: version 3, real quest state, and a wallet whose
+    // balance lives in the legacy Slag/Flux/Sigil array — exactly what a
+    // pre-consolidation build serialized.
     UBreakerSaveGame* Old = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
     if (!Old) { AddError(TEXT("Could not create a save object")); return false; }
-    Old->SaveVersion = 2;
+    Old->SaveVersion = 3;
     Old->QuestFlags = { TEXT("Quest.FirstContract.Accepted"), TEXT("Quest.FirstContract.Offered") };
     Old->QuestCounters.Add(TEXT("Quest.FirstContract.Kills"), 3);
+    Old->ForgeWallet.Amounts = { 42, 7, 1 };  // Slag, Flux, Sigil
 
     FString Note;
-    TestTrue(TEXT("A v2 save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, Note));
+    TestTrue(TEXT("A v3 save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, Note));
     TestEqual(TEXT("It is now current"), Old->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
-    // A migration step ran (v2 -> v3), so it reports itself exactly like the
+    // A migration step ran (v3 -> v4), so it reports itself exactly like the
     // v1 -> v2 step's own test expects.
     TestFalse(TEXT("The migration reports itself"), Note.IsEmpty());
+
+    // THE CONVERSION, total value preserved at the stated 1/6/60 rates
+    // (FBreakerForgeWallet::CollapseLegacyDenominations): 42 Slag + 7 Flux +
+    // 1 Sigil = 42 + 42 + 60 = 144 Riftglass, and the legacy array is gone.
+    TestEqual(TEXT("The three denominations fold into one Riftglass balance"), Old->ForgeWallet.Get(), 144);
+    TestTrue(TEXT("The legacy array is emptied"), Old->ForgeWallet.Amounts.IsEmpty());
 
     // Everything else survives untouched — the "preserves everything else"
     // half of the requirement.
@@ -86,18 +88,22 @@ bool FBreakerSaveWalletMigrationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Offered survives"), Old->QuestFlags.Contains(FName(TEXT("Quest.FirstContract.Offered"))));
     TestEqual(TEXT("Counter survives"), Old->QuestCounters.FindRef(TEXT("Quest.FirstContract.Kills")), 3);
 
-    // The wallet a v2 file never had comes up empty, not invented.
-    TestEqual(TEXT("A migrated v2 file has an empty Slag balance"), Old->ForgeWallet.Get(EBreakerForgeCurrency::Slag), 0);
-    TestEqual(TEXT("Flux is empty too"), Old->ForgeWallet.Get(EBreakerForgeCurrency::Flux), 0);
-    TestEqual(TEXT("Sigil is empty too"), Old->ForgeWallet.Get(EBreakerForgeCurrency::Sigil), 0);
-
     // Idempotent, same discipline as RiorsEdge.Save.Migration's own v1 -> v2
-    // assertion: migrating an already-current save changes nothing.
-    const int32 SlagAfterFirst = Old->ForgeWallet.Get(EBreakerForgeCurrency::Slag);
+    // assertion: migrating an already-current save changes nothing — above
+    // all it must not fold twice and double a balance.
     FString SecondNote;
     TestTrue(TEXT("A current save loads"), UBreakerSaveGame::MigrateToCurrent(*Old, SecondNote));
     TestTrue(TEXT("A current save reports no migration"), SecondNote.IsEmpty());
-    TestEqual(TEXT("A current save's wallet is unchanged"), Old->ForgeWallet.Get(EBreakerForgeCurrency::Slag), SlagAfterFirst);
+    TestEqual(TEXT("A current save's wallet is unchanged"), Old->ForgeWallet.Get(), 144);
+
+    // A v2 payload (no wallet property at all) still arrives empty rather
+    // than invented, across BOTH remaining steps.
+    UBreakerSaveGame* Ancient = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Ancient) { AddError(TEXT("Could not create a save object")); return false; }
+    Ancient->SaveVersion = 2;
+    FString AncientNote;
+    TestTrue(TEXT("A v2 save loads"), UBreakerSaveGame::MigrateToCurrent(*Ancient, AncientNote));
+    TestEqual(TEXT("A migrated v2 file has an empty Riftglass balance"), Ancient->ForgeWallet.Get(), 0);
 
     // Refuse-to-load still holds at the new ceiling (Save-Architecture 5.2):
     // never repair a file from a newer build, above all not one carrying
@@ -105,11 +111,11 @@ bool FBreakerSaveWalletMigrationTest::RunTest(const FString& Parameters)
     UBreakerSaveGame* Future = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
     if (!Future) { AddError(TEXT("Could not create a save object")); return false; }
     Future->SaveVersion = UBreakerSaveGame::CurrentSaveVersion + 1;
-    Future->ForgeWallet.Add(EBreakerForgeCurrency::Sigil, 9);
+    Future->ForgeWallet.Add(9);
     FString FutureNote;
-    TestFalse(TEXT("A save from a build newer than v3 is still refused"), UBreakerSaveGame::MigrateToCurrent(*Future, FutureNote));
+    TestFalse(TEXT("A save from a build newer than v4 is still refused"), UBreakerSaveGame::MigrateToCurrent(*Future, FutureNote));
     TestFalse(TEXT("The refusal is explained"), FutureNote.IsEmpty());
-    TestEqual(TEXT("A refused file is not repaired"), Future->ForgeWallet.Get(EBreakerForgeCurrency::Sigil), 9);
+    TestEqual(TEXT("A refused file is not repaired"), Future->ForgeWallet.Get(), 9);
     TestEqual(TEXT("A refused file keeps its own out-of-range version"),
         Future->SaveVersion, UBreakerSaveGame::CurrentSaveVersion + 1);
     return true;

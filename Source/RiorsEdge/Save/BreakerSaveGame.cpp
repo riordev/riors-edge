@@ -80,6 +80,15 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // wallet, which is exactly correct for a save written before
             // wallet persistence existed. Nothing to transform.
             break;
+        case 3:
+            // The one-currency consolidation (owner ruling 2026-08-16): a v3
+            // file's wallet holds Slag/Flux/Sigil in the legacy Amounts array.
+            // Fold them into Riftglass at the conversion stated in
+            // CollapseLegacyDenominations (1/6/60 — total value preserved). A
+            // v2-or-older file arrives here with an empty legacy array and
+            // this is a no-op, exactly as it should be.
+            Save.ForgeWallet.CollapseLegacyDenominations();
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its

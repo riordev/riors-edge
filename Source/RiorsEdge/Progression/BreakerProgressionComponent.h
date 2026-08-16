@@ -235,6 +235,11 @@ private:
     void RecomputeSpentPointsFromState();
     void RecalculateStats();
     void ApplyStatsToAttributes();
+    // The ClassResourceDecay bridge: delivers the composed decay multiplier to
+    // the owner's class resource component as a keyed loop override (the
+    // PushLoopOverride seam). Called from RecalculateStats so purchases,
+    // respecs, loads AND condition transitions all re-state the current truth.
+    void PushLoopValveOverrides();
     // Mirrors CachedStats.GrantedTags onto the owner's ability system as loose
     // tags. Rule-rewrite nodes published tags that only this component could
     // see, so a keystone whose whole job is to rewrite an ability — Overdrive

@@ -143,7 +143,7 @@ float UBreakerGritComponent::DrawFromBudget(float Requested, float& InOutBudgetR
     return Drawn;
 }
 
-void UBreakerGritComponent::PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration)
+void UBreakerGritComponent::PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration, float DecayRateMultiplier)
 {
     if (Key.IsNone()) return;
     FLoopOverrideEntry Entry;
@@ -157,6 +157,14 @@ void UBreakerGritComponent::PushLoopOverride(FName Key, bool bSuspendDecay, floa
     // Zero is legal and must survive: see the same guard on the Momentum loop,
     // where promoting 0 to 1.0 shipped a keystone as its own opposite.
     Entry.GenerationMultiplier = GenerationMultiplier >= 0.0f ? GenerationMultiplier : 1.0f;
+    // Decay lane, same rule: zero is a legal suspension, negative is loud.
+    if (DecayRateMultiplier < 0.0f)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("PushLoopOverride('%s'): negative decay-rate multiplier %.3f is meaningless; falling back to 1.0."),
+            *Key.ToString(), DecayRateMultiplier);
+    }
+    Entry.DecayRateMultiplier = DecayRateMultiplier >= 0.0f ? DecayRateMultiplier : 1.0f;
     const UWorld* World = GetWorld();
     Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
     LoopOverrides.Add(Key, Entry);
@@ -198,6 +206,20 @@ float UBreakerGritComponent::GetGenerationMultiplier() const
         Active.Add(Pair.Value.GenerationMultiplier);
     }
     return ComposeGenerationMultipliers(Active);
+}
+
+float UBreakerGritComponent::GetDecayRateMultiplier() const
+{
+    PruneLoopOverrides();
+    // Multiplicative like the generation stack, except zero must SURVIVE the
+    // fold — "decay stops" is a real request, and ComposeGenerationMultipliers
+    // skips non-positive entries by design.
+    float Composed = 1.0f;
+    for (const TPair<FName, FLoopOverrideEntry>& Pair : LoopOverrides)
+    {
+        Composed *= FMath::Max(0.0f, Pair.Value.DecayRateMultiplier);
+    }
+    return Composed;
 }
 
 int32 UBreakerGritComponent::GetActiveLoopOverrideCount() const
@@ -442,7 +464,8 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     // Decay only outside the lapse window. Inside it Grit BANKS — the Tank may
     // build through an approach and spend at the point of contact, which is the
     // whole reason the shape is a lapse timer rather than Momentum's state test.
-    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended(), DecayPerSecond);
+    // The loop valve's decay lane scales the rate at the one place it is paid.
+    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended(), DecayPerSecond) * GetDecayRateMultiplier();
     if (Decay > 0.0f) ApplyGritDelta(-Decay * DeltaTime);
     RefreshBand();
 }

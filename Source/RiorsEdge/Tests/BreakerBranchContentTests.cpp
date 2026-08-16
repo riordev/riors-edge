@@ -122,11 +122,27 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
         const UBreakerProgressionNode* Rewrite = Frenzy->FindNode(RewriteId);
         if (!TestNotNull(*(RewriteId.ToString() + TEXT(" is authored")), Rewrite)) continue;
         TestEqual(*(RewriteId.ToString() + TEXT(" sits at tier 4")), Rewrite->Tier, 4);
-        // O30: every one of these is an ability / Momentum-loop / affix-rule
-        // rewrite, and EBreakerBuildCondition is movement-only, so each ships
-        // as a rule tag awaiting a named consumer and authors no stat effect.
-        // If that changes, this fails and somebody has to explain the number.
-        TestEqual(*(RewriteId.ToString() + TEXT(" is a rule tag, not a stat line")), Rewrite->Effects.Num(), 0);
+        // Re-pinned 2026-08-16 (the loop valve): No Safety's two halves are
+        // now real authored lines — ClassResourceDecay +100 and AbilityCost
+        // +40, both Class-Kits §1.3 F11 transcriptions — while Second Wind and
+        // Redline Trigger stay pure rule tags (their consumers, Cadence Break
+        // and the Damage Ramp affix, still do not read them). The boundary
+        // that still holds for all three: loop-economy lines only, never a
+        // damage or combat stat.
+        for (const FBreakerNodeEffect& Effect : Rewrite->Effects)
+        {
+            TestTrue(*(RewriteId.ToString() + TEXT(" authors only loop-economy lines")),
+                Effect.StatTarget == EBreakerNodeStatTarget::ClassResourceDecay
+                || Effect.StatTarget == EBreakerNodeStatTarget::AbilityCost);
+        }
+        if (RewriteId == FName(TEXT("Swift.Frenzy.NoSafety")))
+        {
+            TestEqual(*(RewriteId.ToString() + TEXT(" authors both F11 halves")), Rewrite->Effects.Num(), 2);
+        }
+        else
+        {
+            TestEqual(*(RewriteId.ToString() + TEXT(" is a rule tag, not a stat line")), Rewrite->Effects.Num(), 0);
+        }
         TestTrue(*(RewriteId.ToString() + TEXT(" publishes its rule tag")), Rewrite->GrantedTags.Num() > 0);
         // Every prerequisite resolves inside this tree, so a rewrite can never
         // be stranded behind a node in a branch the player did not buy (O15
@@ -196,11 +212,12 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     // THE TIER-4 PINS ABOVE ARE ABOUT SHAPE; THESE TWO ARE ABOUT POWER.
     //
     // Both damage equalities immediately above are UNCHANGED by F9-F11, and
-    // that is the assertion, not an accident of the diff. Nine new nodes across
-    // Swift moved the branch's damage output by exactly zero, because every one
-    // of them is a rule rewrite waiting on a consumer. If a later pass gives a
-    // tier-4 node a stat line, those two equalities fail first and loudest —
-    // which is the correct place for that conversation to happen.
+    // that is the assertion, not an accident of the diff. The tier-4 nodes
+    // moved the branch's DAMAGE output by exactly zero — No Safety's 2026-08-16
+    // lines are loop-economy (decay and ability cost), which touch neither
+    // DamageMultiplier nor the conditional-damage display. If a later pass
+    // gives a tier-4 node a damage line, those two equalities fail first and
+    // loudest — which is the correct place for that conversation to happen.
     //
     // The three rewrites publish their rules, so a consumer that learns to read
     // them finds them there.

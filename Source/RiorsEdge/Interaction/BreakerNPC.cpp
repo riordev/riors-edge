@@ -186,6 +186,10 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
             // this is the smallest possible proof that a flag changes what an
             // NPC says.
             MakeChoice(TEXT("The Quartermaster's contract is closed."), TEXT("Contract"), NAME_None, { FirstContractTurnedIn }),
+            // The chain's second link: Kess only asks once the first contract
+            // proved the player comes back. Blocks on her own acceptance.
+            MakeChoice(TEXT("What would heat the Forge?"), TEXT("Salvage"), KessSalvageOffered, { FirstContractTurnedIn }, { KessSalvageAccepted }),
+            MakeChoice(TEXT("Still gathering your feedstock."), TEXT("SalvageProgress"), NAME_None, { KessSalvageAccepted }, { KessSalvageTurnedIn }),
             MakeChoice(TEXT("You're an Effigy, aren't you?"), TEXT("Effigy"), NAME_None, {}, { AskedKessAboutRior }),
             MakeChoice(TEXT("[Leave] Another time.")),
         }),
@@ -212,6 +216,34 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
         {
             MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
             MakeChoice(TEXT("The Quartermaster's contract is closed."), TEXT("Contract"), NAME_None, { FirstContractTurnedIn }),
+            MakeChoice(TEXT("What would heat the Forge?"), TEXT("Salvage"), KessSalvageOffered, { FirstContractTurnedIn }, { KessSalvageAccepted }),
+            MakeChoice(TEXT("Still gathering your feedstock."), TEXT("SalvageProgress"), NAME_None, { KessSalvageAccepted }, { KessSalvageTurnedIn }),
+            MakeChoice(TEXT("[Leave] Another time.")),
+        }),
+
+        // ---- Q2: FEED THE FORGE --------------------------------------------
+        MakeNode(TEXT("Salvage"), TEXT("(Kess turns a cold crucible with one hand.) Feedstock. Vestige residue burns, and the spill carries more of it than the ground can rot. Six of them. Bring me what's left when they drop — I'll know the weight when you walk in."),
+        {
+            MakeChoice(TEXT("You'll have it."), NAME_None, KessSalvageAccepted),
+            MakeChoice(TEXT("[Leave] Not today.")),
+        }),
+        MakeNode(TEXT("SalvageProgress"), TEXT("Not the weight yet. Six carcasses' worth. The Forge has waited years — it can wait an afternoon."),
+        {
+            MakeChoice(TEXT("[Leave] Working on it.")),
+        }),
+        // Entry target: the turn-in. She said she'd know the weight; she does.
+        MakeNode(TEXT("SalvageTurnIn"), TEXT("(Kess does not weigh anything. Kess already knows.) That's the weight. The Forge takes it. ...It's warmer in here now. Remember that, next time you find something worth heating."),
+        {
+            MakeChoice(TEXT("The Forge eats first."), NAME_None, KessSalvageTurnedIn),
+            MakeChoice(TEXT("[Leave] Later.")),
+        }),
+        // Entry target after the salvage closes: her opening line stops being
+        // "the Forge is cold", because it stopped being true and she is the
+        // one character who would never say a false thing about the Forge.
+        MakeNode(TEXT("Warm"), TEXT("(The Forge is lit. Low, but lit.) You did that. Now find me something worth it."),
+        {
+            MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
+            MakeChoice(TEXT("You're an Effigy, aren't you?"), TEXT("Effigy"), NAME_None, {}, { AskedKessAboutRior }),
             MakeChoice(TEXT("[Leave] Another time.")),
         }),
     };
@@ -220,7 +252,13 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
 TArray<FBreakerDialogueEntry> ABreakerNPC::MakeForgeKeeperEntries()
 {
     using namespace BreakerQuestFlags;
-    return { MakeEntry(TEXT("Returned"), { AskedKessAboutRior }) };
+    return
+    {
+        // Most progressed first, same rule as the Quartermaster's.
+        MakeEntry(TEXT("SalvageTurnIn"), { KessSalvageAccepted, KessSalvageFeedstock }, { KessSalvageTurnedIn }),
+        MakeEntry(TEXT("Warm"), { KessSalvageTurnedIn }),
+        MakeEntry(TEXT("Returned"), { AskedKessAboutRior }),
+    };
 }
 
 TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
@@ -236,6 +274,13 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
             // state from one never mentioned, and the quest object reads both.
             MakeChoice(TEXT("Anything need doing around here?"), TEXT("Job"), FirstContractOffered, {}, { FirstContractAccepted }),
             MakeChoice(TEXT("Still working on that spill."), TEXT("Progress"), NAME_None, { FirstContractAccepted }, { FirstContractTurnedIn }),
+            // The chain gates, each one line: an offer requires the PREVIOUS
+            // quest's turn-in and blocks on its own acceptance, so the chain
+            // order is authored exactly once per link.
+            MakeChoice(TEXT("Got another contract?"), TEXT("Pattern"), PatternOffered, { KessSalvageTurnedIn }, { PatternAccepted }),
+            MakeChoice(TEXT("Still counting your marked."), TEXT("PatternProgress"), NAME_None, { PatternAccepted }, { PatternTurnedIn }),
+            MakeChoice(TEXT("What's this about a bad rift?"), TEXT("Deeper"), DeeperOffered, { PatternTurnedIn }, { DeeperAccepted }),
+            MakeChoice(TEXT("Still sweeping the source."), TEXT("DeeperProgress"), NAME_None, { DeeperAccepted }, { DeeperTurnedIn }),
             MakeChoice(TEXT("[Leave] Just passing through.")),
         }),
         MakeNode(TEXT("Vendor"), TEXT("Storefront's not built yet, Breaker. The rift schedule says soon. Everything comes through the rift schedule eventually."),
@@ -260,6 +305,57 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
         }),
         MakeNode(TEXT("Done"), TEXT("Contract's closed and you've been paid. There'll be more — the spill always comes back. Ammo's still on the shelf."),
         {
+            // Every closed-contract node routes back to Start, because the
+            // entry overrides OPEN on these nodes: without the route, a player
+            // who lands here could never reach the next offer.
+            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
+            MakeChoice(TEXT("[Leave] I'll be around.")),
+        }),
+
+        // ---- Q3: THE PATTERN ------------------------------------------------
+        MakeNode(TEXT("Pattern"), TEXT("Second contract. The spill keeps regrouping — same ground, same hours — and the marked ones are up front now, every time. Three of them, down. I want to see if the next count sheet reads different."),
+        {
+            MakeChoice(TEXT("Consider it done."), NAME_None, PatternAccepted),
+            MakeChoice(TEXT("[Leave] Not yet.")),
+        }),
+        MakeNode(TEXT("PatternProgress"), TEXT("Count's short. The marked don't fall easy — that's why the contract says three and not thirty. Come back when the sheet's full."),
+        {
+            MakeChoice(TEXT("[Leave] Working on it.")),
+        }),
+        // Her first unease. In HER register: no theory, no rift talk — a count
+        // sheet that will not add up, filed under the only box it fits.
+        MakeNode(TEXT("PatternTurnIn"), TEXT("Count's right. Three marked, three down. ...Off the record: spills drift. This one doesn't. Same ground, every time, like something's taking a measurement. The sheet doesn't have a box for that, so it's going down as weather."),
+        {
+            MakeChoice(TEXT("That's the job."), NAME_None, PatternTurnedIn),
+            MakeChoice(TEXT("[Leave] Later.")),
+        }),
+        MakeNode(TEXT("PatternDone"), TEXT("Contract's closed, paid in full. Sheet still says weather. Weather doesn't hold formation."),
+        {
+            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
+            MakeChoice(TEXT("[Leave] I'll be around.")),
+        }),
+
+        // ---- Q4: DEEPER -----------------------------------------------------
+        // Seeds Act II in the only register that doesn't overreach: a rift
+        // that "didn't close clean" — Command's words, which she repeats and
+        // declines to interpret. Nothing is named.
+        MakeNode(TEXT("Deeper"), TEXT("Last one on my sheet, and I don't love writing it. Command flagged a rift out past the far ground — didn't close clean, their words. Everything it lets through comes up marked. Sweep it: five of the marked, and whatever's biggest goes down first."),
+        {
+            MakeChoice(TEXT("Consider it done."), NAME_None, DeeperAccepted),
+            MakeChoice(TEXT("[Leave] Not yet.")),
+        }),
+        MakeNode(TEXT("DeeperProgress"), TEXT("Sweep's not done. Five of the marked, and the count's honest or it's nothing. Same as always — I count what comes back."),
+        {
+            MakeChoice(TEXT("[Leave] Working on it.")),
+        }),
+        MakeNode(TEXT("DeeperTurnIn"), TEXT("Five down, and you walked back in to say so. Good count. ...That rift's still out there. Didn't close clean — Command's words, not mine. It's gone up the chain, and what goes up the chain comes back down with a name and a Breaker attached. Sleep while you can."),
+        {
+            MakeChoice(TEXT("That's the job."), NAME_None, DeeperTurnedIn),
+            MakeChoice(TEXT("[Leave] Later.")),
+        }),
+        MakeNode(TEXT("DeeperDone"), TEXT("Sheet's clear. First time since you signed in. Restock while it lasts — when that name comes back down the chain, it'll be yours."),
+        {
+            MakeChoice(TEXT("Anything else need doing?"), TEXT("Start")),
             MakeChoice(TEXT("[Leave] I'll be around.")),
         }),
     };
@@ -270,8 +366,15 @@ TArray<FBreakerDialogueEntry> ABreakerNPC::MakeQuartermasterEntries()
     using namespace BreakerQuestFlags;
     return
     {
-        // Most progressed first.
-        MakeEntry(TEXT("Done"), { FirstContractTurnedIn }),
+        // Most progressed first. The closed-contract greetings additionally
+        // block on the NEXT quest being in play, so a mid-chain player gets
+        // the ordinary Start (where the live progress line is) rather than a
+        // stale closure line.
+        MakeEntry(TEXT("DeeperDone"), { DeeperTurnedIn }),
+        MakeEntry(TEXT("DeeperTurnIn"), { DeeperAccepted, DeeperSweepDone }, { DeeperTurnedIn }),
+        MakeEntry(TEXT("PatternDone"), { PatternTurnedIn }, { DeeperOffered }),
+        MakeEntry(TEXT("PatternTurnIn"), { PatternAccepted, PatternMarkedDown }, { PatternTurnedIn }),
+        MakeEntry(TEXT("Done"), { FirstContractTurnedIn }, { PatternOffered }),
         MakeEntry(TEXT("ReadyTurnIn"), { FirstContractSpillThinned, FirstContractEliteDown }, { FirstContractTurnedIn }),
     };
 }

@@ -5,6 +5,7 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
+#include "Progression/BreakerProgressionComponent.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 UBreakerAbilityCostEffect::UBreakerAbilityCostEffect()
@@ -56,7 +57,49 @@ float UBreakerGameplayAbility::GetResourceCost() const
 float UBreakerGameplayAbility::GetCooldownSeconds() const
 {
     const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
-    return Definition ? Definition->CooldownSeconds : 0.0f;
+    if (!Definition) return 0.0f;
+    const FGameplayAbilityActorInfo* Info = GetCurrentActorInfo();
+    const AActor* Avatar = Info ? Info->AvatarActor.Get() : nullptr;
+    return ScaledCooldownSeconds(Definition->CooldownSeconds, AbilityCooldownReductionFor(Avatar));
+}
+
+float UBreakerGameplayAbility::ScaledCooldownSeconds(float AuthoredSeconds, float ReductionDivisor)
+{
+    // A non-positive authored cooldown means "no cooldown at all" (Caster's
+    // whole class, T8) and stays exactly that — dividing it would be inventing
+    // a mechanic the definition deliberately does not author.
+    if (AuthoredSeconds <= 0.0f) return AuthoredSeconds;
+    return AuthoredSeconds / FMath::Max(0.01f, ReductionDivisor);
+}
+
+float UBreakerGameplayAbility::AbilityAreaMultiplierFor(const AActor* OwnerActor)
+{
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression ? Progression->GetNodeStats().AbilityAreaMultiplier : 1.0f;
+}
+
+float UBreakerGameplayAbility::AbilityDurationMultiplierFor(const AActor* OwnerActor)
+{
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression ? Progression->GetNodeStats().AbilityDurationMultiplier : 1.0f;
+}
+
+float UBreakerGameplayAbility::AbilityCooldownReductionFor(const AActor* OwnerActor)
+{
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression ? FMath::Max(0.01f, Progression->GetNodeStats().AbilityCooldownReduction) : 1.0f;
+}
+
+float UBreakerGameplayAbility::GetAbilityAreaMultiplier() const
+{
+    const FGameplayAbilityActorInfo* Info = GetCurrentActorInfo();
+    return AbilityAreaMultiplierFor(Info ? Info->AvatarActor.Get() : nullptr);
+}
+
+float UBreakerGameplayAbility::GetAbilityDurationMultiplier() const
+{
+    const FGameplayAbilityActorInfo* Info = GetCurrentActorInfo();
+    return AbilityDurationMultiplierFor(Info ? Info->AvatarActor.Get() : nullptr);
 }
 
 float UBreakerGameplayAbility::AbilityDamageScalarFor(const AActor* OwnerActor)
@@ -159,7 +202,12 @@ void UBreakerGameplayAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Han
     {
         return;
     }
-    Spec.Data->SetSetByCallerMagnitude(BreakerAbilityTags::Data_AbilityCooldown.GetTag(), Definition->CooldownSeconds);
+    // GetCooldownSeconds, not the raw definition number: the AbilityCooldown
+    // lane's composed reduction divides the authored seconds here, the way
+    // DashCooldownReduction's divisor convention works. The guard above still
+    // reads the RAW authored value, so "authors no cooldown" (every Caster
+    // ability, T8) never becomes a cooldown of any length under any divisor.
+    Spec.Data->SetSetByCallerMagnitude(BreakerAbilityTags::Data_AbilityCooldown.GetTag(), GetCooldownSeconds());
     Spec.Data->DynamicGrantedTags.AddTag(Definition->CooldownTag);
     ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
 }

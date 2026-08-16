@@ -19,12 +19,13 @@
 //
 // WHAT THIS DELIBERATELY IS NOT. Not an economy. There is no vendor, no
 // material drop table, no orb inventory, no bench progression and no
-// item-derived materials (O12 rules the currencies SCALAR and tiered, 3-4 of
-// them, and that is what this implements). The slice does not want a crafting
-// game; it wants the top of its own tier curve to be reachable and it wants a
-// reason not to vendor every drop.
+// item-derived materials. OWNER RULING (2026-08-16 chat, superseding O12's
+// "3-4 tiered currencies"): exactly ONE scalar crafting currency, Riftglass,
+// defined below. The slice does not want a crafting game; it wants the top of
+// its own tier curve to be reachable and it wants a reason not to vendor
+// every drop.
 //
-// THE LOOP: salvage a backpack item -> scalar currency -> temper one affix one
+// THE LOOP: kill or salvage -> Riftglass -> temper one affix one
 // tier better, reforge an item's values, or attune which affixes it carries.
 // Three verbs, all deterministic, all pure functions over an item and a wallet.
 //
@@ -33,24 +34,39 @@
 // the same flag for the same reason, so "the Forge is a place you go" is one
 // rule rather than two.
 
-UENUM(BlueprintType)
-enum class EBreakerForgeCurrency : uint8
+// ---------------------------------------------------------------------------
+// THE ONE CURRENCY: RIFTGLASS (owner ruling, 2026-08-16 chat, closing the
+// Save-Architecture O12 gap: the Forge economy has exactly one crafting
+// currency).
+// ---------------------------------------------------------------------------
+// The fiction: when a rift is suppressed, the breach edge vitrifies — whatever
+// was half-through gets fused into a glassy, faintly humming slag. Breakers
+// chip it out of every closed rift and every thing that came through one, and
+// the Forge remelts it to rework salvage into gear. It is the material a kill
+// leaves behind and the stock a craft consumes, which is why the SAME number
+// can honestly be both the drop credit and the cost line. Not coinage: nobody
+// mints it, nobody trades it — you pry it out of the world and burn it at the
+// Forge.
+//
+// This replaces the three-denomination Slag/Flux/Sigil wallet. The old
+// "currency steps with tier" gate (T0/T-1 were Sigil-only) is expressed in
+// PRICE instead: the spike tiers cost boss-scale amounts and their price does
+// not scale down with item level, so they stay a chase without needing a
+// second ledger. Old saves are folded into Riftglass by
+// UBreakerSaveGame::MigrateToCurrent (v3 -> v4) at a stated conversion.
+namespace BreakerForge
 {
-    // O12: scalar and tiered. Three, not four, because a fourth tier with
-    // nothing to spend it on is the first step toward the economy this is
-    // explicitly not building.
-    Slag,   // Common. Salvaged from anything; buys value rerolls and low tiers.
-    Flux,   // Uncommon. From Exceptional and above; buys the T3..T1 tempers.
-    Sigil,  // Rare. From Aberrant and above; the ONLY thing that buys T0/T-1.
-    Count UMETA(Hidden)
-};
+    // The display name, single point of truth for every cost line, chip and
+    // salvage preview. All-caps to match the menu's existing label voice.
+    inline const TCHAR* CurrencyDisplayName = TEXT("RIFTGLASS");
+}
 
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerForgeCost
 {
     GENERATED_BODY()
 
-    UPROPERTY(BlueprintReadOnly) EBreakerForgeCurrency Currency = EBreakerForgeCurrency::Slag;
+    // Riftglass. There is exactly one currency, so a cost is just an amount.
     UPROPERTY(BlueprintReadOnly) int32 Amount = 0;
 
     bool IsFree() const { return Amount <= 0; }
@@ -64,21 +80,33 @@ struct RIORSEDGE_API FBreakerForgeWallet
 {
     GENERATED_BODY()
 
-    static constexpr int32 CurrencyCount = static_cast<int32>(EBreakerForgeCurrency::Count);
+    // How many denominations the PRE-consolidation wallet had (Slag, Flux,
+    // Sigil at indices 0/1/2). Only the save migration cares.
+    static constexpr int32 LegacyDenominationCount = 3;
 
-    // Fixed-size and index-aligned to the enum, so a save written before a
-    // currency existed cannot silently map one currency onto another.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> Amounts;
+    // The one balance: Riftglass.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 Riftglass = 0;
 
-    FBreakerForgeWallet() { Amounts.Init(0, CurrencyCount); }
+    // LEGACY STORAGE, save versions 3 and earlier: the Slag/Flux/Sigil array,
+    // index-aligned to the deleted EBreakerForgeCurrency enum. The property
+    // keeps its old name so an old file still deserializes into it;
+    // CollapseLegacyDenominations then folds it into Riftglass and empties it.
+    // Nothing at runtime reads or writes this.
+    UPROPERTY() TArray<int32> Amounts;
 
-    int32 Get(EBreakerForgeCurrency Currency) const;
-    void Add(EBreakerForgeCurrency Currency, int32 Amount);
+    int32 Get() const { return Riftglass; }
+    void Add(int32 Amount);
     bool CanAfford(const FBreakerForgeCost& Cost) const;
     // Returns false and spends NOTHING when the wallet is short. A partial
     // spend is the failure mode that turns one refused craft into a lost
     // currency bug report.
     bool Spend(const FBreakerForgeCost& Cost);
+
+    // Folds a pre-v4 Slag/Flux/Sigil balance into Riftglass and clears the
+    // legacy array. Total value preserved at the stated conversion (see the
+    // implementation); idempotent, so migrating twice cannot double a balance.
+    // Returns true if anything changed.
+    bool CollapseLegacyDenominations();
 };
 
 UENUM(BlueprintType)
@@ -107,9 +135,9 @@ public:
     static FBreakerForgeWallet SalvageValue(const FBreakerItemInstance& Item);
 
     // ---- Costs, published so the UI states the price before the click -----
-    // Tempering an affix from Tier to Tier-1. The currency STEPS with the
-    // target tier, which is what makes T0/T-1 a Sigil sink rather than a
-    // grind: no amount of Slag reaches them.
+    // Tempering an affix from Tier to Tier-1. The price climbs steeply with
+    // the target tier, and the spike tiers (T0/T-1) are priced flat at boss
+    // scale — see the ladder table at the cost site in the .cpp.
     UFUNCTION(BlueprintPure, Category="Items|Forge")
     static FBreakerForgeCost TemperCost(const FBreakerItemInstance& Item, int32 AffixIndex);
     UFUNCTION(BlueprintPure, Category="Items|Forge")
@@ -118,9 +146,9 @@ public:
     static FBreakerForgeCost AttuneCost(const FBreakerItemInstance& Item);
 
     // The best tier this item may be tempered to. Rarity-capped, exactly as the
-    // drop path is: a Standard item stops at T3 no matter how much Sigil the
-    // player has, because otherwise crafting would erase rarity's meaning at
-    // the same moment this pass gave it one.
+    // drop path is: a Standard item stops at its cap no matter how much
+    // Riftglass the player has, because otherwise crafting would erase rarity's
+    // meaning at the same moment this pass gave it one.
     UFUNCTION(BlueprintPure, Category="Items|Forge")
     static int32 TemperCeilingForItem(const FBreakerItemInstance& Item);
 

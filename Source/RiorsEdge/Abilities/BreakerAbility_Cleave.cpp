@@ -10,6 +10,8 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -50,6 +52,34 @@ float UBreakerAbility_Cleave::SwingDamage(float WeaponDamage, float Coefficient,
 float UBreakerAbility_Cleave::AnimationLockFor(bool bHasEdgework, float AuthoredLockSeconds)
 {
     return bHasEdgework ? 0.0f : FMath::Max(0.0f, AuthoredLockSeconds);
+}
+
+float UBreakerAbility_Cleave::EffectiveArcFor(bool bHasEdge, float AuthoredArcDegrees, float AreaMultiplier)
+{
+    // Class-Kits §2.3 SB8: "Cleave's arc widens to 180 degrees". The rule half
+    // replaces the base; the AbilityArea lane then scales whichever base
+    // applies, clamped to a real arc so no stack of area nodes sweeps a
+    // circle and a half.
+    const float BaseArc = bHasEdge ? 180.0f : FMath::Max(0.0f, AuthoredArcDegrees);
+    return FMath::Clamp(BaseArc * FMath::Max(0.0f, AreaMultiplier), 0.0f, 360.0f);
+}
+
+float UBreakerAbility_Cleave::ComputeEffectiveArcDegrees(const AActor* OwnerActor) const
+{
+    // Edge is read off the progression component's aggregated node tags — the
+    // same register the loop valve and every rule-rewrite consumer reads — so
+    // a respec that drops the node narrows the swing on the next cast.
+    const UBreakerProgressionComponent* Progression = OwnerActor ? OwnerActor->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const bool bHasEdge = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SB_Edge.GetTag());
+    return EffectiveArcFor(bHasEdge, ArcDegrees, AbilityAreaMultiplierFor(OwnerActor));
+}
+
+float UBreakerAbility_Cleave::ComputeEffectiveRangeCm(const AActor* OwnerActor) const
+{
+    // Range rides the same AbilityArea multiplier as the arc — the lane is a
+    // geometry scale ("radius / arc / range", the enum's own naming), not an
+    // area-in-square-metres promise.
+    return FMath::Max(0.0f, RangeCm) * FMath::Max(0.0f, AbilityAreaMultiplierFor(OwnerActor));
 }
 
 float UBreakerAbility_Cleave::ComputeSwingBaseDamage(const AActor* OwnerActor) const
@@ -104,8 +134,14 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     // Sweep from the pawn, not from the camera: 3 m is a body reach.
     Params.Origin = Character->GetActorLocation();
     Params.Forward = Forward;
-    Params.RangeCm = RangeCm;
-    Params.ArcDegrees = ArcDegrees;
+    // The geometry seam: SB8 Edge's 180-degree rule and the AbilityArea
+    // lane's multiplier, composed once in the accessors above. With no Edge
+    // and no area ranks these are exactly the authored UPROPERTYs.
+    // Edge's other half — "its Bleed applies to every target hit" — is the
+    // base behaviour of the loop below already (every swept target takes the
+    // 100%-chance Bleed), so the node's live payoff is the geometry.
+    Params.RangeCm = ComputeEffectiveRangeCm(Character);
+    Params.ArcDegrees = ComputeEffectiveArcDegrees(Character);
 
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
 

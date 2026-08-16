@@ -6,7 +6,10 @@
 #include "Input/BreakerInputConfig.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "InputModifiers.h"
+#include "InputTriggers.h"
 #include "Misc/ConfigCacheIni.h"
+#include "UObject/Package.h"
 
 // ---------------------------------------------------------------------------
 // UBreakerGameSettingsLibrary — pure clamps and keybind resolution.
@@ -255,6 +258,105 @@ TMap<FName, TArray<FKey>> UBreakerGameSettingsLibrary::ProjectDefaultKeybinds()
     return KeysByAction;
 }
 
+TArray<FEnhancedActionKeyMapping> UBreakerGameSettingsLibrary::BuildOverriddenMappings(
+    const TArray<TPair<FName, const UInputAction*>>& ActionsByName,
+    const TArray<FEnhancedActionKeyMapping>& DefaultMappings,
+    const TMap<FName, FKey>& Overrides)
+{
+    // Pointer -> name, same single-walk shape ResolveDefaultKeysByAction uses.
+    TMap<const UInputAction*, FName> NameByAction;
+    for (const TPair<FName, const UInputAction*>& Pair : ActionsByName)
+    {
+        if (Pair.Value)
+        {
+            NameByAction.Add(Pair.Value, Pair.Key);
+        }
+    }
+
+    // The key each action's row on the settings screen SHOWS: its first valid
+    // key in mapping order. That is the key an override replaces — and only
+    // that key, so WASD's A/S/D and any gamepad alternate keep their defaults
+    // when the displayed key moves.
+    TMap<FName, FKey> FirstDefaultKey;
+    for (const FEnhancedActionKeyMapping& Mapping : DefaultMappings)
+    {
+        const FName* Name = NameByAction.Find(Mapping.Action.Get());
+        if (Name && Mapping.Key.IsValid() && !FirstDefaultKey.Contains(*Name))
+        {
+            FirstDefaultKey.Add(*Name, Mapping.Key);
+        }
+    }
+
+    TArray<FEnhancedActionKeyMapping> Result = DefaultMappings;
+    for (FEnhancedActionKeyMapping& Mapping : Result)
+    {
+        const FName* Name = NameByAction.Find(Mapping.Action.Get());
+        if (!Name)
+        {
+            continue;
+        }
+        const FKey* Override = Overrides.Find(*Name);
+        const FKey* Shown = FirstDefaultKey.Find(*Name);
+        // A 2D-axis action can carry its shown key on more than one row (the
+        // same key under different modifier stacks), so EVERY row holding the
+        // shown key moves — replacing only the first row would leave the old
+        // key half-bound, pressing both the old and the new key at once.
+        if (Override && Override->IsValid() && Shown && Mapping.Key == *Shown)
+        {
+            Mapping.Key = *Override;
+        }
+    }
+    return Result;
+}
+
+UInputMappingContext* UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(
+    const UBreakerInputConfig* Config, const TMap<FName, FKey>& Overrides, UObject* Outer)
+{
+    // Nothing to override means "use the default asset itself" — signalled as
+    // nullptr so the caller registers the authored context and no clone
+    // exists to drift from it.
+    if (!Config || !Config->DefaultMappingContext || Overrides.Num() == 0)
+    {
+        return nullptr;
+    }
+
+    TArray<TPair<FName, const UInputAction*>> ActionsByName;
+    ListConfigActions(Config, ActionsByName);
+    const TArray<FEnhancedActionKeyMapping> Rewritten =
+        BuildOverriddenMappings(ActionsByName, Config->DefaultMappingContext->GetMappings(), Overrides);
+
+    UInputMappingContext* Context = NewObject<UInputMappingContext>(
+        Outer ? Outer : GetTransientPackage(), NAME_None, RF_Transient);
+    for (const FEnhancedActionKeyMapping& Source : Rewritten)
+    {
+        // MapKey appends the row; the struct copy then carries over the whole
+        // mapping (modifier/trigger stacks, mappable settings) on top of the
+        // action+key MapKey set — including Source's key, which is already
+        // the overridden one.
+        FEnhancedActionKeyMapping& Row = Context->MapKey(Source.Action.Get(), Source.Key);
+        Row = Source;
+        // Modifiers and triggers are INSTANCED objects. The copied pointers
+        // still aim at the asset's instances; stateful ones (smoothing,
+        // holds) must not be shared between the asset and this clone, so
+        // each gets its own copy outered to the clone.
+        for (TObjectPtr<UInputModifier>& Modifier : Row.Modifiers)
+        {
+            if (Modifier)
+            {
+                Modifier = DuplicateObject<UInputModifier>(Modifier, Context);
+            }
+        }
+        for (TObjectPtr<UInputTrigger>& Trigger : Row.Triggers)
+        {
+            if (Trigger)
+            {
+                Trigger = DuplicateObject<UInputTrigger>(Trigger, Context);
+            }
+        }
+    }
+    return Context;
+}
+
 // ---------------------------------------------------------------------------
 // UBreakerGameSettings — model + persistence.
 // ---------------------------------------------------------------------------
@@ -432,5 +534,36 @@ void UBreakerGameSettings::ApplyToEngine() const
         UE_LOG(LogTemp, Verbose,
             TEXT("BreakerGameSettings: master volume %.2f is stored but not routed — no audio pipeline exists yet."),
             MasterVolume);
+    }
+}
+
+FOnBreakerKeybindOverridesChanged& UBreakerGameSettings::OnKeybindOverridesChanged()
+{
+    static FOnBreakerKeybindOverridesChanged Delegate;
+    return Delegate;
+}
+
+void UBreakerGameSettings::SetKeybindOverride(FName Action, FKey Key)
+{
+    KeybindOverrides.Add(Action, Key);
+    OnKeybindOverridesChanged().Broadcast(KeybindOverrides);
+}
+
+void UBreakerGameSettings::ClearKeybindOverride(FName Action)
+{
+    // Only a REMOVAL is a change worth rebuilding a live mapping context
+    // over — clearing an action that was never overridden is a no-op.
+    if (KeybindOverrides.Remove(Action) > 0)
+    {
+        OnKeybindOverridesChanged().Broadcast(KeybindOverrides);
+    }
+}
+
+void UBreakerGameSettings::ResetKeybindsToDefault()
+{
+    if (KeybindOverrides.Num() > 0)
+    {
+        KeybindOverrides.Empty();
+        OnKeybindOverridesChanged().Broadcast(KeybindOverrides);
     }
 }

@@ -31,6 +31,18 @@ FVector UBreakerAbility_Rot::AimPoint(const FVector& ViewLocation, const FVector
     return ViewLocation + (Unit.IsNearlyZero() ? FVector::ForwardVector : Unit) * FMath::Max(0.0f, MaximumRangeCm);
 }
 
+float UBreakerAbility_Rot::ComputeEffectiveRadiusCm(const AActor* OwnerActor) const
+{
+    return FMath::Max(0.0f, RadiusCm) * FMath::Max(0.0f, AbilityAreaMultiplierFor(OwnerActor));
+}
+
+float UBreakerAbility_Rot::ComputeEffectiveDurationSeconds(const AActor* OwnerActor) const
+{
+    // The AbilityDuration lane. Lingering's "zones linger" line lands here —
+    // and on the refresh path below, so a refreshed puddle lingers too.
+    return FMath::Max(0.0f, DurationSeconds) * FMath::Max(0.0f, AbilityDurationMultiplierFor(OwnerActor));
+}
+
 void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
     ABreakerCharacter* Character = GetBreakerCharacter();
@@ -56,13 +68,18 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     const FGameplayTag ZoneTag = BreakerAbilityTags::Zone_Caster_Rot.GetTag();
 
+    // The geometry seam, read once for the whole cast so the anti-stack
+    // search, the spawned volume and the refresh all share one reading.
+    const float EffectiveRadiusCm = ComputeEffectiveRadiusCm(Character);
+    const float EffectiveDuration = ComputeEffectiveDurationSeconds(Character);
+
     // VW4's anti-stack rule lives at the SPAWNER, once, exactly as the spec
     // requires — never per ability. A recast on top of a live Rot refreshes it;
     // two Rots do not stack their armour strip, and the zone actor's key makes
     // sure even genuinely separate puddles cannot double-strip.
-    if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, RadiusCm, 0.5f))
+    if (ABreakerZoneActor* Existing = ABreakerZoneActor::FindRefreshableZone(World, ZoneTag, Character, Center, EffectiveRadiusCm, 0.5f))
     {
-        Existing->RefreshDuration(DurationSeconds);
+        Existing->RefreshDuration(EffectiveDuration);
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
@@ -75,9 +92,9 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     FBreakerZoneSpec Spec;
     Spec.ZoneTag = ZoneTag;
-    Spec.RadiusCm = RadiusCm;
+    Spec.RadiusCm = EffectiveRadiusCm;
     Spec.HalfHeightCm = HalfHeightCm;
-    Spec.Duration = DurationSeconds;
+    Spec.Duration = EffectiveDuration;
     Spec.TickInterval = TickIntervalSeconds;
     Spec.FlatArmorReduction = FlatArmorReduction;
     // Not teal (O19): saturated teal is a property of rift objects and

@@ -77,7 +77,7 @@ bool UBreakerMomentumComponent::IsLoopOverrideExpired(double ExpiryTime, double 
     return ExpiryTime >= 0.0 && ExpiryTime <= Now;
 }
 
-void UBreakerMomentumComponent::PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration)
+void UBreakerMomentumComponent::PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration, float DecayRateMultiplier)
 {
     if (Key.IsNone()) return;
     FLoopOverrideEntry Entry;
@@ -96,6 +96,16 @@ void UBreakerMomentumComponent::PushLoopOverride(FName Key, bool bSuspendDecay, 
             *Key.ToString(), GenerationMultiplier);
     }
     Entry.GenerationMultiplier = GenerationMultiplier >= 0.0f ? GenerationMultiplier : 1.0f;
+    // Same rule for the decay lane: zero is a legal, meaningful suspension
+    // (Reserve's while-ADS line composes to exactly 0), only negative is
+    // nonsense, and it is loud rather than silently promoted.
+    if (DecayRateMultiplier < 0.0f)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("PushLoopOverride('%s'): negative decay-rate multiplier %.3f is meaningless; falling back to 1.0."),
+            *Key.ToString(), DecayRateMultiplier);
+    }
+    Entry.DecayRateMultiplier = DecayRateMultiplier >= 0.0f ? DecayRateMultiplier : 1.0f;
     const UWorld* World = GetWorld();
     Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
     // Re-pushing the same key replaces rather than stacks: a re-cast refreshes.
@@ -138,6 +148,27 @@ float UBreakerMomentumComponent::GetGenerationMultiplier() const
         Active.Add(Pair.Value.GenerationMultiplier);
     }
     return ComposeGenerationMultipliers(Active);
+}
+
+float UBreakerMomentumComponent::GetDecayRateMultiplier() const
+{
+    PruneLoopOverrides();
+    TArray<float> Active;
+    Active.Reserve(LoopOverrides.Num());
+    for (const TPair<FName, FLoopOverrideEntry>& Pair : LoopOverrides)
+    {
+        Active.Add(Pair.Value.DecayRateMultiplier);
+    }
+    // Composes multiplicatively like the generation stack — with the one
+    // divergence that zero must SURVIVE the fold, because "decay stops" is a
+    // real request (the ComposeGenerationMultipliers helper skips non-positive
+    // entries and would quietly turn a suspension into full decay).
+    float Composed = 1.0f;
+    for (const float Multiplier : Active)
+    {
+        Composed *= FMath::Max(0.0f, Multiplier);
+    }
+    return Composed;
 }
 
 int32 UBreakerMomentumComponent::GetActiveLoopOverrideCount() const
@@ -416,7 +447,11 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     SettledElapsed += DeltaTime;
     if (SettledElapsed >= DecayGraceSeconds)
     {
-        ApplyMomentumDelta(-DecayRateForSpeed(Speed, SettledSpeed, GroundThresholdSpeed, SettledDecayRate, SlowDecayRate) * DeltaTime);
+        // The loop valve's decay lane: the tree's composed ClassResourceDecay
+        // multiplier (and any ability-pushed override) scales the rate here,
+        // at the one place decay is actually paid.
+        ApplyMomentumDelta(-DecayRateForSpeed(Speed, SettledSpeed, GroundThresholdSpeed, SettledDecayRate, SlowDecayRate)
+            * GetDecayRateMultiplier() * DeltaTime);
     }
     RefreshState();
 }

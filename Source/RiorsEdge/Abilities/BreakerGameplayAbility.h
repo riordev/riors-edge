@@ -49,6 +49,10 @@ public:
     // CheckCost and ApplyCost both read through this, so there is exactly one
     // answer to "what does this cost right now".
     UFUNCTION(BlueprintPure, Category="Abilities") virtual float GetResourceCost() const;
+    // The LIVE cooldown: the definition's authored seconds divided by the
+    // owner's composed AbilityCooldown reduction. ApplyCooldown and the HUD
+    // both read through this, so the timer started and the timer displayed
+    // are one number.
     UFUNCTION(BlueprintPure, Category="Abilities") float GetCooldownSeconds() const;
     UFUNCTION(BlueprintPure, Category="Abilities") ABreakerCharacter* GetBreakerCharacter() const;
     UFUNCTION(BlueprintPure, Category="Abilities") UBreakerAttributeSet* GetBreakerAttributes() const;
@@ -69,6 +73,36 @@ public:
     // whole ABILITIES axis (O30) decays x74 against the curve by ilvl 50.
     // Static and null-safe so application sites and tests share one seam.
     static float AbilityDamageScalarFor(const AActor* OwnerActor);
+
+    // ---- Ability geometry seam (2026-08-16) -------------------------------
+    // The base-class accessors EBreakerNodeStatTarget's AbilityArea /
+    // AbilityDuration / AbilityCooldown comments ask for: radius, arc, range
+    // and duration are differently-named UPROPERTYs per subclass
+    // (Cleave::RangeCm / ArcDegrees, Rot::RadiusCm / DurationSeconds), so the
+    // composed tree multiplier is read HERE, once, and each geometry-owning
+    // subclass applies it to its own numbers through its Effective* accessors.
+    // All three read the owner's progression component's aggregated node
+    // stats; null-safe (no owner, no progression, no ranks) is exactly 1.0,
+    // so every authored number is bit-identical for a build that owns none.
+    // Static and actor-parameterised like AbilityDamageScalarFor, for the
+    // same reason: application sites and tests share one seam.
+    static float AbilityAreaMultiplierFor(const AActor* OwnerActor);
+    static float AbilityDurationMultiplierFor(const AActor* OwnerActor);
+    // The cooldown DIVISOR (DashCooldownReduction's convention: 1.20 == 20%
+    // shorter). Never at or below zero — the aggregator floors it.
+    static float AbilityCooldownReductionFor(const AActor* OwnerActor);
+
+    // Instance forms, reading the current avatar. Virtual so a future variant
+    // ability can re-site WHICH multiplier its geometry answers to; every
+    // subclass today uses the owner's composed values unchanged.
+    UFUNCTION(BlueprintPure, Category="Abilities") virtual float GetAbilityAreaMultiplier() const;
+    UFUNCTION(BlueprintPure, Category="Abilities") virtual float GetAbilityDurationMultiplier() const;
+
+    // Pure rule: authored cooldown seconds under a reduction divisor. A
+    // non-positive authored cooldown stays non-positive — Caster abilities
+    // author none at all (Mana IS the cooldown, T8), and no divisor may
+    // invent one for them.
+    static float ScaledCooldownSeconds(float AuthoredSeconds, float ReductionDivisor);
 
     // Pure rule, exposed for tests: an ability is affordable when the owner's
     // class resource is at or above its cost. Free abilities are always

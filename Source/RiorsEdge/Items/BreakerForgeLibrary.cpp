@@ -3,31 +3,43 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerItemRules.h"
 
-int32 FBreakerForgeWallet::Get(EBreakerForgeCurrency Currency) const
+void FBreakerForgeWallet::Add(int32 Amount)
 {
-    const int32 Index = static_cast<int32>(Currency);
-    return Amounts.IsValidIndex(Index) ? Amounts[Index] : 0;
-}
-
-void FBreakerForgeWallet::Add(EBreakerForgeCurrency Currency, int32 Amount)
-{
-    // A wallet deserialized from a save written before a currency existed is
-    // short, not corrupt: grow it rather than dropping the grant on the floor.
-    if (Amounts.Num() < CurrencyCount) Amounts.SetNumZeroed(CurrencyCount);
-    const int32 Index = static_cast<int32>(Currency);
-    if (!Amounts.IsValidIndex(Index)) return;
-    Amounts[Index] = FMath::Max(0, Amounts[Index] + Amount);
+    // Clamped at zero: a bug in a spend path must not be able to leave the
+    // wallet in an unrepresentable state.
+    Riftglass = FMath::Max(0, Riftglass + Amount);
 }
 
 bool FBreakerForgeWallet::CanAfford(const FBreakerForgeCost& Cost) const
 {
-    return Cost.IsFree() || Get(Cost.Currency) >= Cost.Amount;
+    return Cost.IsFree() || Riftglass >= Cost.Amount;
 }
 
 bool FBreakerForgeWallet::Spend(const FBreakerForgeCost& Cost)
 {
     if (!CanAfford(Cost)) return false;
-    if (!Cost.IsFree()) Add(Cost.Currency, -Cost.Amount);
+    if (!Cost.IsFree()) Add(-Cost.Amount);
+    return true;
+}
+
+bool FBreakerForgeWallet::CollapseLegacyDenominations()
+{
+    if (Amounts.IsEmpty()) return false;
+
+    // O2 PLACEHOLDER conversion, stated once: 1 Slag = 1 Riftglass, 1 Flux =
+    // 6, 1 Sigil = 60. The rates come from the old temper ladder itself — the
+    // cheapest Flux temper (16 Flux) had to outprice the priciest Slag one
+    // (48 Slag), and the cheapest Sigil temper (12 Sigil) the priciest Flux
+    // one (40 Flux) — so every craft a saved balance could afford before the
+    // consolidation, it can still afford after, at the same rung of the new
+    // ladder. Total value preserved; nothing rounds because the rates are
+    // integers.
+    constexpr int32 LegacyRates[LegacyDenominationCount] = { 1, 6, 60 };  // Slag, Flux, Sigil
+    for (int32 Index = 0; Index < Amounts.Num() && Index < LegacyDenominationCount; ++Index)
+    {
+        Add(FMath::Max(0, Amounts[Index]) * LegacyRates[Index]);
+    }
+    Amounts.Empty();
     return true;
 }
 
@@ -36,31 +48,34 @@ namespace
     // Distinctively prefixed: this project has twice shipped a unity-build
     // collision between identically named helpers in two anonymous namespaces.
 
-    // O2 PLACEHOLDER. What one item of each rarity is worth as material.
-    // Aberrant and Anomalous are the only sources of Sigil, which is what makes
-    // "should I wear this or melt it" a decision at exactly the rarities where
-    // the player owns several and can equip at most three (O11).
+    // O2 PLACEHOLDER (touched by the one-currency consolidation: the old
+    // Slag/Flux/Sigil rows are re-expressed in Riftglass at the migration's
+    // stated 1/6/60 conversion, so a melt pays what it always paid). What one
+    // item of each rarity is worth as material, split into a level-scaled base
+    // (the old Slag part) and a FLAT rarity bonus (the old Flux+Sigil part),
+    // which is what keeps "should I wear this or melt it" a decision at
+    // exactly the rarities where the player owns several and can equip at most
+    // three (O11).
     struct FBreakerForgeSalvageRow
     {
-        int32 Slag;
-        int32 Flux;
-        int32 Sigil;
+        int32 ScaledBase;   // multiplied by BreakerForgeLevelScalar
+        int32 FlatBonus;    // rarity-pure, never level-scaled
     };
 
     FBreakerForgeSalvageRow BreakerForgeSalvageRowFor(EBreakerItemRarity Rarity)
     {
         switch (Rarity)
         {
-        case EBreakerItemRarity::Standard:    return {2, 0, 0};
-        case EBreakerItemRarity::Uncommon:    return {4, 1, 0};
-        case EBreakerItemRarity::Exceptional: return {8, 3, 0};
-        case EBreakerItemRarity::Aberrant:    return {14, 7, 1};
-        case EBreakerItemRarity::Anomalous:   return {20, 12, 3};
-        default:                              return {1, 0, 0};
+        case EBreakerItemRarity::Standard:    return {2, 0};
+        case EBreakerItemRarity::Uncommon:    return {4, 6};      // was 1 Flux
+        case EBreakerItemRarity::Exceptional: return {8, 18};     // was 3 Flux
+        case EBreakerItemRarity::Aberrant:    return {14, 102};   // was 7 Flux + 1 Sigil
+        case EBreakerItemRarity::Anomalous:   return {20, 252};   // was 12 Flux + 3 Sigil
+        default:                              return {1, 0};
         }
     }
 
-    // Item level scales the Slag yield only. Flux and Sigil stay rarity-pure so
+    // Item level scales the base yield only. The rarity bonus stays flat so
     // that farming a low level cannot substitute for finding the rarity, which
     // is the shortest route from "minimal crafting" to "crafting replaces
     // looting".
@@ -73,36 +88,60 @@ namespace
         return 1.0f + (FMath::Clamp(ItemLevel, 1, UBreakerAffixLibrary::MaxItemLevel) - 1) * 0.06f;  // O2 PLACEHOLDER, x3.94 at 50, x8.14 at 120
     }
 
-    // O2 PLACEHOLDER. Tempering INTO this tier costs this, in the currency the
-    // tier demands. Costs rise steeply toward the spike because T0 and T-1 are
-    // meant to be the end of a chase, not the end of an afternoon.
+    // O2 PLACEHOLDER (touched by the one-currency consolidation: the old
+    // Slag/Flux/Sigil bands are re-expressed in Riftglass at the migration's
+    // stated 1/6/60 conversion, so every rung costs the same real effort it
+    // did — only the denomination merged). Tempering INTO this tier costs
+    // this. Costs rise steeply toward the spike because T0 and T-1 are meant
+    // to be the end of a chase, not the end of an afternoon.
+    //
+    // THE LADDER, so the whole economy reads in one place. Kill credits are
+    // FBreakerCurrencyDropParams' per-rank ranges (BreakerDropTable.h); costs
+    // are below and in ReforgeCost/AttuneCost. Both sides scale by the same
+    // 0.06/level scalar (spike tiers excepted), so the ratios hold at any
+    // item level. At ilvl 1, average kill pay: Trash ~0.5, Elite ~3,
+    // Modifier-bearer ~11, Boss ~55 Riftglass.
+    //
+    //   Verb / rung          Cost (ilvl 1)   ...in kills' worth (ilvl 1)
+    //   Temper into T12            6         ~2 Elites of warm-up
+    //   Temper into T5            48         ~1 Boss, or ~16 Elites
+    //   Temper into T4            96         ~2 Bosses
+    //   Temper into T1           240         ~4-5 Bosses
+    //   Reforge (3 lines)         18         ~6 Elites — the cheap verb
+    //   Attune (3 lines)          78         ~1.5 Bosses — the expensive verb
+    //   Temper into T0          2400 flat    ~11 Bosses at endgame (ilvl 50)
+    //   Temper into T-1         6000 flat    ~28 Bosses at endgame (ilvl 50)
+    //
+    // T0/T-1 are priced FLAT — no level scalar — which is what replaced the
+    // old "Sigil-only" gate: at low item level they cost a week, at endgame
+    // boss income they cost a chase, and no amount of trash farming makes
+    // them an afternoon. The flat price sits ABOVE the T1 rung even at the
+    // O29 ilvl-120 ceiling (T1 there is 240 * 8.14 ~ 1954 < 2400), so the
+    // ladder can never invert and offer the spike for less than the rung
+    // below it.
     FBreakerForgeCost BreakerForgeTemperCostForTargetTier(int32 TargetTier, int32 ItemLevel)
     {
         FBreakerForgeCost Cost;
         const float LevelScalar = BreakerForgeLevelScalar(ItemLevel);
-        // The currency bands are re-sited onto the 12-tier ladder (O29). They
-        // used to split an 8-tier ladder at T4 -- the top 3 normal tiers cost
-        // Flux, the rest Slag. The same split of 11 steps puts the boundary at
-        // T4 again by coincidence of arithmetic (3 of 11 rounds to 3), so
-        // T12..T5 are the Slag band and T4..T1 the Flux band; only the linear
-        // coefficients move, so that the cheapest step in each band still costs
-        // what it did.
+        // The band boundaries are unchanged from the pre-consolidation ladder
+        // (re-sited onto the 12-tier ladder by O29): T12..T5 is the shallow
+        // ramp, T4..T1 the steep one, T0/T-1 the flat-priced spike.
         if (TargetTier >= 5)
         {
-            Cost.Currency = EBreakerForgeCurrency::Slag;
             Cost.Amount = FMath::RoundToInt((13 - TargetTier) * 6.0f * LevelScalar);
         }
         else if (TargetTier >= 1)
         {
-            Cost.Currency = EBreakerForgeCurrency::Flux;
-            Cost.Amount = FMath::RoundToInt((6 - TargetTier) * 8.0f * LevelScalar);
+            // (6-T)*8 in old Flux, at 6 Riftglass per Flux.
+            Cost.Amount = FMath::RoundToInt((6 - TargetTier) * 48.0f * LevelScalar);
         }
         else
         {
-            // T0 and T-1. The ONLY Sigil sink in the game, which is what makes
-            // Sigil worth the Aberrant it came from.
-            Cost.Currency = EBreakerForgeCurrency::Sigil;
-            Cost.Amount = TargetTier == 0 ? 12 : 30;
+            // The spike. Sized so the effort at endgame boss income matches
+            // what the old boss-only Sigil economy demanded (~10 and ~28
+            // bosses), and so it clears the scaled T1 rung at every legal
+            // item level — see the ladder-inversion note above.
+            Cost.Amount = TargetTier == 0 ? 2400 : 6000;
         }
         return Cost;
     }
@@ -113,9 +152,7 @@ FBreakerForgeWallet UBreakerForgeLibrary::SalvageValue(const FBreakerItemInstanc
     FBreakerForgeWallet Wallet;
     if (!Item.IsValid()) return Wallet;
     const FBreakerForgeSalvageRow Row = BreakerForgeSalvageRowFor(Item.Rarity);
-    Wallet.Add(EBreakerForgeCurrency::Slag, FMath::Max(1, FMath::RoundToInt(Row.Slag * BreakerForgeLevelScalar(Item.ItemLevel))));
-    Wallet.Add(EBreakerForgeCurrency::Flux, Row.Flux);
-    Wallet.Add(EBreakerForgeCurrency::Sigil, Row.Sigil);
+    Wallet.Add(FMath::Max(1, FMath::RoundToInt(Row.ScaledBase * BreakerForgeLevelScalar(Item.ItemLevel))) + Row.FlatBonus);
     return Wallet;
 }
 
@@ -145,9 +182,9 @@ FBreakerForgeCost UBreakerForgeLibrary::TemperCost(const FBreakerItemInstance& I
 FBreakerForgeCost UBreakerForgeLibrary::ReforgeCost(const FBreakerItemInstance& Item)
 {
     FBreakerForgeCost Cost;
-    Cost.Currency = EBreakerForgeCurrency::Slag;
     // Scales on how much item there is to reroll, so rerolling a six-affix
-    // Anomalous is not the same price as rerolling a one-line Standard.
+    // Anomalous is not the same price as rerolling a one-line Standard. See
+    // the ladder table above BreakerForgeTemperCostForTargetTier.
     Cost.Amount = FMath::RoundToInt((6 + 4 * Item.Affixes.Num()) * BreakerForgeLevelScalar(Item.ItemLevel));  // O2 PLACEHOLDER
     return Cost;
 }
@@ -155,10 +192,11 @@ FBreakerForgeCost UBreakerForgeLibrary::ReforgeCost(const FBreakerItemInstance& 
 FBreakerForgeCost UBreakerForgeLibrary::AttuneCost(const FBreakerItemInstance& Item)
 {
     FBreakerForgeCost Cost;
-    Cost.Currency = EBreakerForgeCurrency::Flux;
     // The expensive verb: it is the one that converts an item with the tiers
     // you wanted and the lines you did not into the item you were farming for.
-    Cost.Amount = FMath::RoundToInt((4 + 3 * Item.Affixes.Num()) * BreakerForgeLevelScalar(Item.ItemLevel));  // O2 PLACEHOLDER
+    // Old (4+3N) Flux at the migration's 6 Riftglass per Flux; see the ladder
+    // table above BreakerForgeTemperCostForTargetTier.
+    Cost.Amount = FMath::RoundToInt((24 + 18 * Item.Affixes.Num()) * BreakerForgeLevelScalar(Item.ItemLevel));  // O2 PLACEHOLDER (consolidation-touched)
     return Cost;
 }
 

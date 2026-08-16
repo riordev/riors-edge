@@ -236,129 +236,81 @@ struct RIORSEDGE_API FBreakerLootRateProjection
 // CURRENCY DROPS — owner playtest, verbatim: "resources for crafting should
 // drop from mobs at a reasonable rate."
 //
-// Read Items/BreakerForgeLibrary.h first: EBreakerForgeCurrency (Slag/Flux/
-// Sigil, in that rarity order), FBreakerForgeWallet, and SalvageValue.
+// Read Items/BreakerForgeLibrary.h first: Riftglass (the ONE crafting
+// currency — owner ruling 2026-08-16), FBreakerForgeWallet, and SalvageValue.
 // SalvageValue was the ONLY currency source in the game before this — the
 // wallet only filled by destroying loot the player already owned. This is
 // the second source, and it is a kill paying directly rather than an item
 // paying indirectly.
 //
-// Same THREE-STEP shape as the item pipeline above, because the owner's
-// complaint about items ("every single enemy dropped ... it shouldn't even
-// be fundamentally possible") is exactly the failure mode a flat per-kill
-// currency grant would repeat for currency instead of items:
+// The consolidation folded the old Slag/Flux/Sigil streams (and their
+// rank/item-level gates) into ONE ranged, rank-scaled Riftglass grant per
+// kill. Scarcity no longer lives in a gated denomination; it lives in the
+// PRICE of the top tempers (flat boss-scale amounts — see the ladder table
+// in BreakerForgeLibrary.cpp) and in the rank ranges below, whose per-rank
+// totals were seeded from the old three streams at the migration's 1/6/60
+// conversion so an hour of play pays roughly what it paid before.
 //
-//     1. AMOUNT   — Slag pays on every kill, ranged and scaled by rank, so a
-//                    kill feed is not a metronome.
-//     2. GATE     — Flux and Sigil are gated behind BOTH a minimum monster
-//                    rank and a minimum item level, mirroring
-//                    IsRarityUnlocked exactly: a gated-out currency is zero,
-//                    not redistributed, not rerolled.
-//     3. ROLL     — the (gated) ranged amount, seeded off the kill seed so
-//                    the currency grant is deterministic like every other
-//                    roll in this file.
+//     1. AMOUNT   — a [Min,Max] range per rank, so a kill feed is not a
+//                    metronome. THE RANK ORDER is the design (pinned by
+//                    RiorsEdge.Items.ForgeDrops.CurrencyRankScaling).
+//     2. ROLL     — the ranged amount, seeded off the kill seed so the
+//                    currency grant is deterministic like every other roll
+//                    in this file.
 //
-// O2: every number below is EditAnywhere and a PLACEHOLDER, seeded from
-// SalvageValue's own numbers and ProjectLootRate's 134 items/hour so the
-// figure is derived rather than invented — see BreakerDropTable.cpp and the
-// coordinator's report for the derivation and the resulting per-hour totals.
+// O2: every number below is EditAnywhere and a PLACEHOLDER (touched by the
+// one-currency consolidation).
 
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerCurrencyDropParams
 {
     GENERATED_BODY()
 
-    // --- Slag: pays on every kill, the literal "resources ... at a
-    // reasonable rate". A [Min,Max] range per rank rather than a flat
-    // number, so watching the wallet does not feel like a metronome. THE
-    // RANK ORDER is the design (pinned by
-    // RiorsEdge.Items.ForgeDrops.CurrencyRankScaling); the numbers are O2.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 TrashSlagMin = 0;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 TrashSlagMax = 1;   // O2 PLACEHOLDER
+    // Riftglass pays on every kill, the literal "resources ... at a
+    // reasonable rate". Boss folds in what the old gated Flux/Sigil streams
+    // paid, which is why its band sits an order above the modifier-bearer's.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 TrashRiftglassMin = 0;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 TrashRiftglassMax = 1;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 EliteSlagMin = 2;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 EliteSlagMax = 4;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 EliteRiftglassMin = 2;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 EliteRiftglassMax = 4;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 ModifierBearingSlagMin = 5;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 ModifierBearingSlagMax = 9;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 ModifierBearingRiftglassMin = 8;   // O2 PLACEHOLDER (consolidation-touched: old 5-9 Slag + gated Flux)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 ModifierBearingRiftglassMax = 14;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 BossSlagMin = 20;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Slag", meta=(ClampMin="0"))
-    int32 BossSlagMax = 30;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 BossRiftglassMin = 40;   // O2 PLACEHOLDER (consolidation-touched: old 20-30 Slag + gated Flux/Sigil)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
+    int32 BossRiftglassMax = 70;   // O2 PLACEHOLDER
 
-    // How steeply item level scales the Slag amount. The SAME 0.06-per-level
+    // How steeply item level scales the amount. The SAME 0.06-per-level
     // coefficient UBreakerForgeLibrary's file-private salvage scalar uses
     // (BreakerForgeLevelScalar is not exported, so this is the currency
     // pipeline's own copy of that formula), kept identical on purpose: a
-    // Slag grant from a kill and a Slag grant from salvage inflate at the
-    // same rate as item level climbs, so neither route becomes the cheap one
-    // at endgame item levels.
+    // grant from a kill and a grant from salvage inflate at the same rate as
+    // item level climbs, so neither route becomes the cheap one at endgame
+    // item levels — and so do the level-scaled Forge costs, which is what
+    // keeps the kills-per-craft ladder constant across levels.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency", meta=(ClampMin="0"))
-    float SlagLevelScalarPerLevel = 0.06f;   // O2 PLACEHOLDER
-
-    // --- Flux: the Uncommon-tier salvage currency, from Exceptional-and-
-    // above items. For kills it is gated exactly the way item rarities are
-    // (IsRarityUnlocked): a minimum monster rank AND a minimum item level.
-    // At the defaults only ModifierBearing and Boss ever pay it — Trash and
-    // Elite cannot, at any item level, mirroring
-    // RiorsEdge.Items.Drops.TrashCannotRollAberrant for currency. NOT scaled
-    // by item level, matching SalvageValue's "Flux and Sigil stay
-    // rarity-pure" rule, so farming a low level cannot substitute for
-    // fighting the rank that actually pays it.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux")
-    EBreakerMonsterRank FluxMinimumRank = EBreakerMonsterRank::ModifierBearing;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux", meta=(ClampMin="1"))
-    int32 FluxMinimumItemLevel = 8;   // O2 PLACEHOLDER (mirrors ExceptionalMinimumItemLevel)
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux", meta=(ClampMin="0"))
-    int32 ModifierBearingFluxMin = 1;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux", meta=(ClampMin="0"))
-    int32 ModifierBearingFluxMax = 2;   // O2 PLACEHOLDER
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux", meta=(ClampMin="0"))
-    int32 BossFluxMin = 4;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Flux", meta=(ClampMin="0"))
-    int32 BossFluxMax = 6;   // O2 PLACEHOLDER
-
-    // --- Sigil: the Rare tier, "the ONLY thing that buys T0/T-1"
-    // (BreakerForgeLibrary.h). Gated behind Boss and a high item level, the
-    // same shape as Anomalous's item-level gate: Trash, Elite and
-    // ModifierBearing cannot pay it at any item level whatsoever at the O2
-    // defaults. If SigilMinimumRank is ever retuned below Boss, the unlocked
-    // rank uses this same [BossSigilMin, BossSigilMax] range — there is
-    // deliberately no second authored band, because Sigil is meant to have
-    // exactly one source rank until the owner says otherwise.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Sigil")
-    EBreakerMonsterRank SigilMinimumRank = EBreakerMonsterRank::Boss;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Sigil", meta=(ClampMin="1"))
-    int32 SigilMinimumItemLevel = 25;   // O2 PLACEHOLDER (mirrors AberrantMinimumItemLevel)
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Sigil", meta=(ClampMin="0"))
-    int32 BossSigilMin = 1;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Drops|Currency|Sigil", meta=(ClampMin="0"))
-    int32 BossSigilMax = 2;   // O2 PLACEHOLDER
+    float RiftglassLevelScalarPerLevel = 0.06f;   // O2 PLACEHOLDER
 };
 
 // What an hour of kills is worth in currency. The direct analogue of
 // FBreakerLootRateProjection, and deliberately a separate struct rather than
-// three more fields bolted onto it: loot and currency are two different
-// pipelines that happen to share a kill-rate input, not one pipeline with
-// two outputs.
+// a field bolted onto it: loot and currency are two different pipelines that
+// happen to share a kill-rate input, not one pipeline with two outputs.
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerCurrencyRateProjection
 {
     GENERATED_BODY()
 
-    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float SlagPerHour = 0.0f;
-    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float FluxPerHour = 0.0f;
-    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float SigilPerHour = 0.0f;
+    UPROPERTY(BlueprintReadOnly, Category="Drops|Projection") float RiftglassPerHour = 0.0f;
 };
 
 UCLASS()
@@ -422,7 +374,7 @@ public:
     // THE ONE ENTRY POINT a kill should call for currency, exactly as
     // RollDrop is the one entry point for items. Deterministic from
     // RandomSeed: the same kill seed always produces the same wallet credit.
-    // Unlike RollDrop this never "misses" — Slag always pays something at
+    // Unlike RollDrop this never "misses" — Riftglass always pays at
     // rank-appropriate odds — because the owner's finding was that NOTHING
     // paid crafting currency from a kill, not that kills should sometimes
     // pay zero the way item drops deliberately do.

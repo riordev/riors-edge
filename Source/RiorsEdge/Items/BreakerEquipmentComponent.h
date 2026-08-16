@@ -145,13 +145,11 @@ public:
     // affordability checks — so this is a plain assignment plus the usual
     // change broadcast.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void RestoreForgeWallet(const FBreakerForgeWallet& NewWallet);
-    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount);
-    // Credits every currency held in Yield additively in one call — the
-    // entry point for a wallet-shaped grant that spans more than one
-    // currency (e.g. UBreakerDropTableLibrary::RollCurrencyDrop off a kill),
-    // so a caller outside this file never has to loop
-    // FBreakerForgeWallet::CurrencyCount itself the way SalvageFromBackpack
-    // does internally. GrantForgeCurrency remains the single-currency form.
+    // Grants a flat Riftglass amount (dev/test/reward paths).
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void GrantForgeCurrency(int32 Amount);
+    // Credits a wallet-shaped yield additively in one call — the entry point
+    // for a rolled grant (e.g. UBreakerDropTableLibrary::RollCurrencyDrop off
+    // a kill). GrantForgeCurrency remains the flat-amount form.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Forge") void CreditForgeCurrency(const FBreakerForgeWallet& Yield);
     // Destroys a backpack item and pays its salvage value into the wallet. This
     // is the ONLY currency source, which is what gives the discard pile a

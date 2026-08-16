@@ -16,13 +16,10 @@ namespace
     constexpr int32 BreakerDropChanceSalt = 0x00D20D19;
     constexpr int32 BreakerDropRaritySalt = 0x00A17E51;
 
-    // Currency's own salts. Three, one per currency stream, for the same
-    // reason the item pipeline splits chance from rarity: three grants
-    // drawn from the same stream would correlate, and a kill that rolled a
-    // generous Slag amount would also tend to roll a generous Flux amount.
-    constexpr int32 BreakerCurrencySlagSalt = 0x5A1C0001;
-    constexpr int32 BreakerCurrencyFluxSalt = 0x5A1C0002;
-    constexpr int32 BreakerCurrencySigilSalt = 0x5A1C0003;
+    // Currency's own salt, distinct from the item salts for the same reason
+    // chance and rarity are salted apart. Kept at the old Slag stream's value
+    // so the consolidation re-rolls nothing it did not have to.
+    constexpr int32 BreakerCurrencyRiftglassSalt = 0x5A1C0001;
 
     // The rarity weights BEFORE gating, with the Drop Chance affix's quality
     // effect applied. This is the original RollRarity table, moved verbatim
@@ -72,14 +69,14 @@ namespace
     // about which rank pays what — the same discipline BreakerDropBuildWeights
     // and BreakerDropApplyGates keep for items.
 
-    void BreakerCurrencySlagRangeForRank(EBreakerMonsterRank Rank, const FBreakerCurrencyDropParams& Params, int32& OutMin, int32& OutMax)
+    void BreakerCurrencyRangeForRank(EBreakerMonsterRank Rank, const FBreakerCurrencyDropParams& Params, int32& OutMin, int32& OutMax)
     {
         switch (Rank)
         {
-        case EBreakerMonsterRank::Trash:           OutMin = Params.TrashSlagMin; OutMax = Params.TrashSlagMax; return;
-        case EBreakerMonsterRank::Elite:           OutMin = Params.EliteSlagMin; OutMax = Params.EliteSlagMax; return;
-        case EBreakerMonsterRank::ModifierBearing: OutMin = Params.ModifierBearingSlagMin; OutMax = Params.ModifierBearingSlagMax; return;
-        case EBreakerMonsterRank::Boss:            OutMin = Params.BossSlagMin; OutMax = Params.BossSlagMax; return;
+        case EBreakerMonsterRank::Trash:           OutMin = Params.TrashRiftglassMin; OutMax = Params.TrashRiftglassMax; return;
+        case EBreakerMonsterRank::Elite:           OutMin = Params.EliteRiftglassMin; OutMax = Params.EliteRiftglassMax; return;
+        case EBreakerMonsterRank::ModifierBearing: OutMin = Params.ModifierBearingRiftglassMin; OutMax = Params.ModifierBearingRiftglassMax; return;
+        case EBreakerMonsterRank::Boss:            OutMin = Params.BossRiftglassMin; OutMax = Params.BossRiftglassMax; return;
         }
         OutMin = 0; OutMax = 0;
     }
@@ -89,7 +86,7 @@ namespace
         // Same shape as UBreakerForgeLibrary's file-private salvage scalar
         // (BreakerForgeLevelScalar): 1.0 at ilvl 1, growing linearly with the
         // O29 item-level ceiling rather than the old character cap.
-        return 1.0f + (FMath::Clamp(ItemLevel, 1, UBreakerAffixLibrary::MaxItemLevel) - 1) * Params.SlagLevelScalarPerLevel;
+        return 1.0f + (FMath::Clamp(ItemLevel, 1, UBreakerAffixLibrary::MaxItemLevel) - 1) * Params.RiftglassLevelScalarPerLevel;
     }
 
     // One bound of a currency range, scaled by item level. Shared by the roll
@@ -98,30 +95,6 @@ namespace
     int32 BreakerCurrencyScaleBound(int32 Bound, float LevelScalar)
     {
         return FMath::RoundToInt(static_cast<float>(Bound) * LevelScalar);
-    }
-
-    bool BreakerCurrencyFluxUnlockedForRank(EBreakerMonsterRank Rank, int32 ItemLevel, const FBreakerCurrencyDropParams& Params)
-    {
-        return UBreakerDropTableLibrary::GetRankLootOrder(Rank) >= UBreakerDropTableLibrary::GetRankLootOrder(Params.FluxMinimumRank)
-            && ItemLevel >= Params.FluxMinimumItemLevel;
-    }
-
-    void BreakerCurrencyFluxRangeForRank(EBreakerMonsterRank Rank, const FBreakerCurrencyDropParams& Params, int32& OutMin, int32& OutMax)
-    {
-        // Only Boss authors its own band; every other rank that
-        // BreakerCurrencyFluxUnlockedForRank lets through (ModifierBearing at
-        // the O2 defaults, or Elite/Trash if FluxMinimumRank is retuned down)
-        // uses the ModifierBearing band, because Flux is meant to have one
-        // "elite-plus" band and one "boss" band, not four authored ranges.
-        if (Rank == EBreakerMonsterRank::Boss) { OutMin = Params.BossFluxMin; OutMax = Params.BossFluxMax; return; }
-        OutMin = Params.ModifierBearingFluxMin;
-        OutMax = Params.ModifierBearingFluxMax;
-    }
-
-    bool BreakerCurrencySigilUnlockedForRank(EBreakerMonsterRank Rank, int32 ItemLevel, const FBreakerCurrencyDropParams& Params)
-    {
-        return UBreakerDropTableLibrary::GetRankLootOrder(Rank) >= UBreakerDropTableLibrary::GetRankLootOrder(Params.SigilMinimumRank)
-            && ItemLevel >= Params.SigilMinimumItemLevel;
     }
 }
 
@@ -293,53 +266,28 @@ FBreakerForgeWallet UBreakerDropTableLibrary::RollCurrencyDrop(int32 RandomSeed,
     FBreakerForgeWallet Wallet;
     const float LevelScalar = BreakerCurrencyLevelScalar(ItemLevel, Params);
 
-    // Step 1/3: Slag. Ranged and rank-scaled, paying on every kill — the
+    // One ranged, rank-scaled Riftglass grant, paying on every kill — the
     // owner's finding was that NOTHING paid currency from a kill, not that
     // kills should sometimes pay zero the way an item drop deliberately does.
-    int32 SlagMin = 0, SlagMax = 0;
-    BreakerCurrencySlagRangeForRank(Rank, Params, SlagMin, SlagMax);
-    if (SlagMax > 0)
+    int32 RangeMin = 0, RangeMax = 0;
+    BreakerCurrencyRangeForRank(Rank, Params, RangeMin, RangeMax);
+    if (RangeMax > 0)
     {
         // THE SCALAR IS APPLIED TO THE RANGE, NOT TO THE SAMPLE, and the
         // difference is not cosmetic. Scaling the sample —
         // Round(RandRange(0,1) * 1.54) at ilvl 10 — can only ever produce 0 or
-        // 2, so a trash kill paid an even number of Slag and never an odd one,
-        // and the mean landed 30% above the analytic projection. Scaling the
+        // 2, so a trash kill paid an even amount and never an odd one, and the
+        // mean landed 30% above the analytic projection. Scaling the
         // ENDPOINTS first draws uniformly across the whole scaled band (0,1,2),
         // which both restores the intended distribution and makes the mean
         // exactly the projection's (Min+Max)/2 — which is what lets
         // RiorsEdge.Items.ForgeDrops.CurrencyPerHour hold the two in agreement
         // at all. Caught by that test, not by inspection.
-        const int32 ScaledMin = BreakerCurrencyScaleBound(SlagMin, LevelScalar);
-        const int32 ScaledMax = BreakerCurrencyScaleBound(SlagMax, LevelScalar);
-        const FRandomStream SlagStream(HashCombine(RandomSeed, BreakerCurrencySlagSalt));
-        const int32 SlagAmount = SlagStream.RandRange(ScaledMin, ScaledMax);
-        if (SlagAmount > 0) Wallet.Add(EBreakerForgeCurrency::Slag, SlagAmount);
-    }
-
-    // Step 2/3: Flux, gated exactly like IsRarityUnlocked — a rank AND an
-    // item level, both required, or the grant is zero rather than rerolled.
-    if (BreakerCurrencyFluxUnlockedForRank(Rank, ItemLevel, Params))
-    {
-        int32 FluxMin = 0, FluxMax = 0;
-        BreakerCurrencyFluxRangeForRank(Rank, Params, FluxMin, FluxMax);
-        if (FluxMax > 0)
-        {
-            const FRandomStream FluxStream(HashCombine(RandomSeed, BreakerCurrencyFluxSalt));
-            const int32 FluxAmount = FluxStream.RandRange(FluxMin, FluxMax);
-            if (FluxAmount > 0) Wallet.Add(EBreakerForgeCurrency::Flux, FluxAmount);
-        }
-    }
-
-    // Step 3/3: Sigil, gated the same way and, at the O2 defaults, reachable
-    // from exactly one rank (Boss) — mirroring
-    // RiorsEdge.Items.Drops.TrashCannotRollAberrant's "not at any item level
-    // whatsoever" for the rarest currency instead of the rarest item.
-    if (BreakerCurrencySigilUnlockedForRank(Rank, ItemLevel, Params) && Params.BossSigilMax > 0)
-    {
-        const FRandomStream SigilStream(HashCombine(RandomSeed, BreakerCurrencySigilSalt));
-        const int32 SigilAmount = SigilStream.RandRange(Params.BossSigilMin, Params.BossSigilMax);
-        if (SigilAmount > 0) Wallet.Add(EBreakerForgeCurrency::Sigil, SigilAmount);
+        const int32 ScaledMin = BreakerCurrencyScaleBound(RangeMin, LevelScalar);
+        const int32 ScaledMax = BreakerCurrencyScaleBound(RangeMax, LevelScalar);
+        const FRandomStream Stream(HashCombine(RandomSeed, BreakerCurrencyRiftglassSalt));
+        const int32 Amount = Stream.RandRange(ScaledMin, ScaledMax);
+        if (Amount > 0) Wallet.Add(Amount);
     }
 
     return Wallet;
@@ -360,26 +308,14 @@ FBreakerCurrencyRateProjection UBreakerDropTableLibrary::ProjectCurrencyRate(con
 
     for (int32 Index = 0; Index < 4; ++Index)
     {
-        int32 SlagMin = 0, SlagMax = 0;
-        BreakerCurrencySlagRangeForRank(Ranks[Index], Params, SlagMin, SlagMax);
+        int32 RangeMin = 0, RangeMax = 0;
+        BreakerCurrencyRangeForRank(Ranks[Index], Params, RangeMin, RangeMax);
         // Scales the BOUNDS and then averages, in exactly the order the roll
         // does it, so the projection is the roll's true mean rather than a
         // continuous approximation of it. See the roll's comment for the defect
         // this shape exists to prevent.
-        Projection.SlagPerHour += KillsPerHour[Index]
-            * (BreakerCurrencyScaleBound(SlagMin, LevelScalar) + BreakerCurrencyScaleBound(SlagMax, LevelScalar)) * 0.5f;
-
-        if (BreakerCurrencyFluxUnlockedForRank(Ranks[Index], ItemLevel, Params))
-        {
-            int32 FluxMin = 0, FluxMax = 0;
-            BreakerCurrencyFluxRangeForRank(Ranks[Index], Params, FluxMin, FluxMax);
-            Projection.FluxPerHour += KillsPerHour[Index] * (FluxMin + FluxMax) * 0.5f;
-        }
-
-        if (BreakerCurrencySigilUnlockedForRank(Ranks[Index], ItemLevel, Params))
-        {
-            Projection.SigilPerHour += KillsPerHour[Index] * (Params.BossSigilMin + Params.BossSigilMax) * 0.5f;
-        }
+        Projection.RiftglassPerHour += KillsPerHour[Index]
+            * (BreakerCurrencyScaleBound(RangeMin, LevelScalar) + BreakerCurrencyScaleBound(RangeMax, LevelScalar)) * 0.5f;
     }
 
     return Projection;

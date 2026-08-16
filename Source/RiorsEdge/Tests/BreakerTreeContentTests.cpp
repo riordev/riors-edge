@@ -126,11 +126,21 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
                 TestTrue(*(Context + TEXT(" tier-4 rewrite authors no More multiplier")),
                     Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
             }
-            // O30 keeps EBreakerBuildCondition movement-only, so every one of
-            // these nine rewrites ships as a rule tag with no stat effect. If a
-            // later pass gives one of them a real stat line this fails, which
-            // is the point: that is a content decision, not a refactor.
-            TestEqual(*(Context + TEXT(" tier-4 rewrite is a rule tag, not a stat line")), Node->Effects.Num(), 0);
+            // The old pin here was "tier-4 rewrites author NO stat effect",
+            // and it failed exactly as intended when the loop valve landed
+            // (2026-08-16): the tier-4 trio's decay downsides ARE stat lines
+            // now — ClassResourceDecay through the valve, AbilityCost for No
+            // Safety's discount half, both Class-Kits-transcribed. The re-set
+            // pin is the boundary that still holds: a tier-4 rewrite may
+            // author ONLY loop-economy lines (decay / cost), never a damage
+            // or combat stat — that would be a different node with a
+            // different fantasy, and a content decision, not a refactor.
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                TestTrue(*(Context + TEXT(" tier-4 rewrite authors only loop-economy lines (ClassResourceDecay/AbilityCost)")),
+                    Effect.StatTarget == EBreakerNodeStatTarget::ClassResourceDecay
+                    || Effect.StatTarget == EBreakerNodeStatTarget::AbilityCost);
+            }
             TestTrue(*(Context + TEXT(" tier-4 rewrite carries its rule as a tag")), Node->GrantedTags.Num() > 0);
             // A rewrite with no prerequisite is a rewrite of nothing. The
             // generic loop above already proves prerequisites resolve inside

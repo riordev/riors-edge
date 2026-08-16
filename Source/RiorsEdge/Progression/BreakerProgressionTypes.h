@@ -94,21 +94,28 @@ enum class EBreakerNodeStatTarget : uint8
     // Swift.Marksman.Ledger and the whole Caster cost side.
     AbilityCost,
     // Cooldown reduction on abilities, stored as the divisor exactly as
-    // DashCooldownReduction is. NO attribute and NO hook exists:
-    // UBreakerGameplayAbility::ApplyCooldown reads Definition->CooldownSeconds
-    // raw. Named by Swift.Kinetic.Redirect.
+    // DashCooldownReduction is. WIRED 2026-08-16: UBreakerGameplayAbility::
+    // ApplyCooldown now reads through GetCooldownSeconds, which divides the
+    // authored seconds by the composed reduction; a definition that authors
+    // no cooldown (every Caster ability, T8) stays cooldown-free under any
+    // divisor. Named by Swift.Kinetic.Redirect, which now authors it.
     AbilityCooldown,
     // Radius / arc / range of abilities. Named by Caster.Spellblade.Edge
     // ("Cleave's arc widens"), Swift.Marksman.CalledShot (Lead's range gate)
     // and Rot's zone. The expensive one: radius has no shared representation
     // at all — it is a differently-named UPROPERTY on each ability subclass
-    // (Cleave::RangeCm, Cleave::ArcDegrees, Rot::RadiusCm), so this entry needs
-    // a base-class accessor before it can land anywhere.
+    // (Cleave::RangeCm, Cleave::ArcDegrees, Rot::RadiusCm), so this entry
+    // needed a base-class accessor before it could land anywhere. WIRED
+    // 2026-08-16: UBreakerGameplayAbility::AbilityAreaMultiplierFor is that
+    // accessor, applied by Cleave's and Rot's Effective* geometry methods.
+    // CalledShot's range-gate rewrite stays a tag — a gate is not a scale.
     AbilityArea,
     // Duration of ability windows and zones. Named by
     // Caster.VoidWhisperer.LongDark and Caster.VoidWhisperer.Lingering. Same
-    // shape problem as AbilityArea: WindowDuration is on the definition, zone
-    // duration is on the subclass.
+    // shape problem as AbilityArea; the same 2026-08-16 accessor seam
+    // (AbilityDurationMultiplierFor) answers it, consumed by Rot's zone
+    // duration today. Window durations on definitions adopt it as their
+    // abilities are touched; LongDark stays waiting on the owner's A4 ruling.
     AbilityDuration,
     // The delivery-method partition's other half. WeaponDamage is O30's GUNS
     // axis; MeleeDamage is what Caster.Spellblade.Edgework's reserved More is
@@ -153,6 +160,11 @@ enum class EBreakerNodeStatTarget : uint8
     // — PushLoopOverride — so this entry is plumbing to an existing valve, not
     // a new system. Named by Swift.Kinetic.NoGround, Swift.Marksman.Reserve and
     // Swift.Frenzy.NoSafety, the three tier-4 nodes with real downsides.
+    // WIRED 2026-08-16: exactly that plumbing. The aggregate lands on
+    // FBreakerNodeStats::ClassResourceDecayMultiplier and
+    // UBreakerProgressionComponent::PushLoopValveOverrides delivers it as a
+    // keyed loop override; all three naming nodes now author it. Sign
+    // convention and per-loop consumer status are on the lane register below.
     ClassResourceDecay,
 
     // ---- Weapon handling (O30's GUNS axis) -------------------------------
@@ -276,6 +288,39 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::Pierce:
     case EBreakerNodeStatTarget::ChainCount:
     case EBreakerNodeStatTarget::RicochetCount:
+    // ---- Wired 2026-08-16, the loop valve and ability geometry -----------
+    // Four more single-bidder lanes landing on FBreakerNodeStats (no
+    // aggregated attribute exists for any of them and gear does not bid), the
+    // same honest shape as the projectile channels above.
+    //
+    // ClassResourceDecay: an Increased bucket where POSITIVE means FASTER
+    // decay — the sign convention comes from the three consuming nodes, which
+    // author decay as a DOWNSIDE (F11 "decay is doubled" = +100, K11
+    // "grounded decay increases by 50%" = +50 while Grounded) and a
+    // suspension as a negative line (M9 "does not decay while ADS" = -100
+    // while Aiming). The composed multiplier is floored at 0 and delivered by
+    // UBreakerProgressionComponent::PushLoopValveOverrides as a keyed
+    // PushLoopOverride on the owner's class resource component — the seam the
+    // enum comment above names. Momentum and Grit consume it (the two loops
+    // with a decay rule); Mana and Scrap have no decay at all, and Charge's
+    // out-of-combat settle stays unconsumed until a Gunsmith decay node
+    // exists to need it — recorded here rather than silently multiplied in.
+    //
+    // AbilityArea / AbilityDuration: composed to 1.0-based multipliers read
+    // through the UBreakerGameplayAbility accessor seam
+    // (AbilityAreaMultiplierFor / AbilityDurationMultiplierFor) and applied
+    // by the subclasses that own geometry — Cleave's arc and range, Rot's
+    // radius and zone duration.
+    //
+    // AbilityCooldown: stored as the DIVISOR exactly as DashCooldownReduction
+    // is (x1.20 == a 20% shorter cooldown); UBreakerGameplayAbility::
+    // ApplyCooldown divides the authored seconds by it. Caster abilities
+    // author no cooldown at all (Mana IS the cooldown, T8), so the lane is
+    // structurally inert for them rather than specially cased.
+    case EBreakerNodeStatTarget::ClassResourceDecay:
+    case EBreakerNodeStatTarget::AbilityArea:
+    case EBreakerNodeStatTarget::AbilityDuration:
+    case EBreakerNodeStatTarget::AbilityCooldown:
         return true;
     default:
         // Every O30 widening entry. They become true one at a time as the
@@ -412,6 +457,22 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float BonusPierceCount = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusChainCount = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusRicochetCount = 0.0f;
+    // ---- Loop valve and ability geometry (2026-08-16) ---------------------
+    // Class-resource decay rate scale, 1.0-based, floored at 0. POSITIVE
+    // authored percent means FASTER decay (the consuming nodes author decay
+    // as a downside; see the lane-register comment). Delivered to the class
+    // resource component as a keyed loop override by
+    // UBreakerProgressionComponent::PushLoopValveOverrides.
+    UPROPERTY(BlueprintReadOnly) float ClassResourceDecayMultiplier = 1.0f;
+    // Ability geometry scales, 1.0-based, floored at 0. Read through the
+    // UBreakerGameplayAbility accessor seam by the subclasses that own
+    // radius/arc/range (AbilityArea) and window/zone duration (AbilityDuration).
+    UPROPERTY(BlueprintReadOnly) float AbilityAreaMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AbilityDurationMultiplier = 1.0f;
+    // Cooldown reduction as the DIVISOR (DashCooldownReduction's convention:
+    // 1.20 == 20% shorter). Floored just above zero so a malformed authored
+    // row can never divide by zero or lengthen a cooldown to infinity.
+    UPROPERTY(BlueprintReadOnly) float AbilityCooldownReduction = 1.0f;
     // Rule-rewrite and verb-grant nodes cannot be expressed as stats; they
     // publish a tag here and the owning system reads it.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer GrantedTags;

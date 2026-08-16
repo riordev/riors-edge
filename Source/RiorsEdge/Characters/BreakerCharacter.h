@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Weapons/BreakerWeaponComponent.h"
@@ -11,6 +12,7 @@
 class UAbilitySystemComponent;
 class UBreakerAttributeSet;
 class UBreakerInputConfig;
+class UInputMappingContext;
 class UCameraComponent;
 class UBreakerCharacterMovementComponent;
 class UBreakerProgressionComponent;
@@ -180,6 +182,19 @@ protected:
     float GloveSizeCm = 9.5f;      // O2 PLACEHOLDER
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Playtest") TObjectPtr<UBreakerPlaytestComponent> Playtest;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UBreakerInputConfig> InputConfig;
+    // The mapping context this pawn actually registered: InputConfig's
+    // authored default, or a transient clone of it with the player's keybind
+    // overrides applied (R10 — the settings screen's rebinds are live, not
+    // cosmetic). UPROPERTY so GC keeps the clone alive while registered;
+    // outered to the pawn so it dies with it.
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> ActiveMappingContext;
+    // Registers the right mapping context for Overrides: removes whatever
+    // this pawn registered before, then adds either a rebuilt clone or the
+    // untouched default. Called from BeginPlay with the overrides loaded off
+    // the profile ini, and again — via UBreakerGameSettings::
+    // OnKeybindOverridesChanged — every time the settings screen rebinds,
+    // clears or resets a key mid-session.
+    void ApplyKeybindOverrides(const TMap<FName, FKey>& Overrides);
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleReach = 90.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleMinimumHeight = 35.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleMaximumHeight = 150.0f;

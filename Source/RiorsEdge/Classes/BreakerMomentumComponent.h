@@ -65,10 +65,20 @@ public:
     // "Momentum does not decay and all generation is doubled" actually means.
     // Lazily expired, mirroring the movement component's PushSpeedMultiplier:
     // no timers, no teardown path to get wrong if the pusher dies first.
-    UFUNCTION(BlueprintCallable, Category="Momentum|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration);
+    // DecayRateMultiplier is the loop valve's decay lane (2026-08-16): the
+    // tree's ClassResourceDecay aggregate arrives through it, pushed keyed by
+    // UBreakerProgressionComponent::PushLoopValveOverrides. 1.0 is neutral,
+    // 2.0 doubles every decay rate, 0.0 is a legal full suspension (Reserve's
+    // while-ADS line composes to exactly that) — only a NEGATIVE value is
+    // meaningless, and it is loud like the generation guard. Defaulted so
+    // every pre-existing caller (Overdrive, Standing Wave) is unchanged.
+    UFUNCTION(BlueprintCallable, Category="Momentum|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration, float DecayRateMultiplier = 1.0f);
     UFUNCTION(BlueprintCallable, Category="Momentum|Loop") void PopLoopOverride(FName Key);
     UFUNCTION(BlueprintPure, Category="Momentum|Loop") bool IsDecaySuspended() const;
     UFUNCTION(BlueprintPure, Category="Momentum|Loop") float GetGenerationMultiplier() const;
+    // Product of every active override's decay-rate multiplier, composed like
+    // the generation stack. Multiplies the rate DecayRateForSpeed returns.
+    UFUNCTION(BlueprintPure, Category="Momentum|Loop") float GetDecayRateMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Momentum|Loop") int32 GetActiveLoopOverrideCount() const;
 
     // Pure loop rules, exposed for tests and for the eventual DA_MomentumPolicy
@@ -151,6 +161,8 @@ private:
     {
         bool bSuspendDecay = false;
         float GenerationMultiplier = 1.0f;
+        // Scales the decay rate; 0 is a legal suspension, see PushLoopOverride.
+        float DecayRateMultiplier = 1.0f;
         // Negative = no expiry; popped explicitly.
         double ExpiryTime = -1.0;
     };

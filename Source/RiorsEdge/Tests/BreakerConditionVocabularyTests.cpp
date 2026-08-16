@@ -416,8 +416,18 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // means moving that read onto the aggregator first, or the two layers
     // multiply instead of sharing a bucket.
     //
+    // Plus the four wired on 2026-08-16 in the loop-valve / ability-geometry
+    // pass: ClassResourceDecay (composed to a decay-rate multiplier and
+    // delivered to the Momentum/Grit components through their PushLoopOverride
+    // seam by UBreakerProgressionComponent::PushLoopValveOverrides), and
+    // AbilityArea / AbilityDuration / AbilityCooldown (composed onto
+    // FBreakerNodeStats and read through the UBreakerGameplayAbility accessor
+    // seam — Cleave's arc/range, Rot's radius/duration, and ApplyCooldown's
+    // divisor). All four are single-bidder lanes like the projectile
+    // channels: no aggregated attribute exists and gear does not bid.
+    //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 19);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 23);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet

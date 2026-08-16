@@ -33,6 +33,17 @@ public:
     UFUNCTION(BlueprintPure, Category="Rot")
     static FVector AimPoint(const FVector& ViewLocation, const FVector& ViewDirection, float MaximumRangeCm, bool bTraceHit, const FVector& HitLocation);
 
+    // The geometry the activation actually spawns: the ability-geometry seam
+    // (base-class AbilityArea / AbilityDuration accessors) applied to this
+    // subclass's own differently-named UPROPERTYs — the shape the
+    // EBreakerNodeStatTarget comments ask for. Actor-parameterised so a test
+    // can pin them on a rigged owner with no world. With no owned ranks both
+    // are exactly the authored Class-Kits numbers (4 m, 6 s).
+    UFUNCTION(BlueprintPure, Category="Rot")
+    float ComputeEffectiveRadiusCm(const AActor* OwnerActor) const;
+    UFUNCTION(BlueprintPure, Category="Rot")
+    float ComputeEffectiveDurationSeconds(const AActor* OwnerActor) const;
+
     // Class-Kits §2.2 C3: 4 m radius, 6 s.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float RadiusCm = 400.0f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rot", meta=(ClampMin="0")) float DurationSeconds = 6.0f;

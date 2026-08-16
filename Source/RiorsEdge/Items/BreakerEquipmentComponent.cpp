@@ -477,29 +477,22 @@ void UBreakerEquipmentComponent::RestoreForgeWallet(const FBreakerForgeWallet& N
     OnEquipmentChanged.Broadcast();
 }
 
-void UBreakerEquipmentComponent::GrantForgeCurrency(EBreakerForgeCurrency Currency, int32 Amount)
+void UBreakerEquipmentComponent::GrantForgeCurrency(int32 Amount)
 {
     if (!HasAttributeAuthority()) return;
-    ForgeWallet.Add(Currency, Amount);
+    ForgeWallet.Add(Amount);
     OnEquipmentChanged.Broadcast();
 }
 
 void UBreakerEquipmentComponent::CreditForgeCurrency(const FBreakerForgeWallet& Yield)
 {
     if (!HasAttributeAuthority()) return;
-    bool bChanged = false;
-    for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
-    {
-        const EBreakerForgeCurrency Id = static_cast<EBreakerForgeCurrency>(Currency);
-        const int32 Amount = Yield.Get(Id);
-        // Zero-amount entries are common (a Trash kill's wallet has Flux and
-        // Sigil at zero) and skipped rather than added, so
-        // FBreakerForgeWallet::Add's own clamp is never exercised on a no-op.
-        if (Amount == 0) continue;
-        ForgeWallet.Add(Id, Amount);
-        bChanged = true;
-    }
-    if (bChanged) OnEquipmentChanged.Broadcast();
+    const int32 Amount = Yield.Get();
+    // A zero-Riftglass kill (a Trash roll can land on 0) is common and skipped
+    // rather than added, so no change broadcast fires on a no-op.
+    if (Amount == 0) return;
+    ForgeWallet.Add(Amount);
+    OnEquipmentChanged.Broadcast();
 }
 
 bool UBreakerEquipmentComponent::SalvageFromBackpack(const FGuid& ItemId)
@@ -510,10 +503,7 @@ bool UBreakerEquipmentComponent::SalvageFromBackpack(const FGuid& ItemId)
 
     const FBreakerForgeWallet Yield = UBreakerForgeLibrary::SalvageValue(Backpack[Index]);
     Backpack.RemoveAt(Index);
-    for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
-    {
-        ForgeWallet.Add(static_cast<EBreakerForgeCurrency>(Currency), Yield.Get(static_cast<EBreakerForgeCurrency>(Currency)));
-    }
+    ForgeWallet.Add(Yield.Get());
     OnEquipmentChanged.Broadcast();
     return true;
 }
@@ -529,11 +519,7 @@ int32 UBreakerEquipmentComponent::SalvageBackpackBelowRarity(EBreakerItemRarity 
     for (int32 Index = Backpack.Num() - 1; Index >= 0; --Index)
     {
         if (!IsBelowRarity(Backpack[Index], MinimumKept)) continue;
-        const FBreakerForgeWallet Yield = UBreakerForgeLibrary::SalvageValue(Backpack[Index]);
-        for (int32 Currency = 0; Currency < FBreakerForgeWallet::CurrencyCount; ++Currency)
-        {
-            ForgeWallet.Add(static_cast<EBreakerForgeCurrency>(Currency), Yield.Get(static_cast<EBreakerForgeCurrency>(Currency)));
-        }
+        ForgeWallet.Add(UBreakerForgeLibrary::SalvageValue(Backpack[Index]).Get());
         Backpack.RemoveAt(Index);
         ++Salvaged;
     }
@@ -581,7 +567,7 @@ EBreakerForgeResult UBreakerEquipmentComponent::ReforgeItem(const FGuid& ItemId,
     // Seeded from the item's own GUID plus the wallet state, so a reforge is
     // deterministic for a given (item, wallet) and cannot be save-scummed by
     // repeating the call — the wallet moved, so the next roll differs.
-    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get(EBreakerForgeCurrency::Slag) * 7919);
+    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get() * 7919);
     const EBreakerForgeResult Result = UBreakerForgeLibrary::Reforge(*Item, ForgeWallet, bIsAtForge, Seed);
     if (Result == EBreakerForgeResult::Success) OnHeldItemMutated(bEquipped);
     return Result;
@@ -593,7 +579,7 @@ EBreakerForgeResult UBreakerEquipmentComponent::AttuneItem(const FGuid& ItemId, 
     bool bEquipped = false;
     FBreakerItemInstance* Item = FindHeldItem(ItemId, bEquipped);
     if (!Item) return EBreakerForgeResult::InvalidItem;
-    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get(EBreakerForgeCurrency::Flux) * 104729);
+    const int32 Seed = GetTypeHash(Item->ItemId) ^ (ForgeWallet.Get() * 104729);
     const EBreakerForgeResult Result = UBreakerForgeLibrary::Attune(*Item, ForgeWallet, bIsAtForge, Seed);
     if (Result == EBreakerForgeResult::Success) OnHeldItemMutated(bEquipped);
     return Result;

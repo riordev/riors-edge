@@ -118,10 +118,19 @@ public:
     // raised cap — and the Tank kit explicitly needs the KEYED form because
     // Hold, a Bastion node suspending decay near an Anchor Point, and a Leech
     // node can all be live at once and must each revert independently.
-    UFUNCTION(BlueprintCallable, Category="Grit|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration);
+    // DecayRateMultiplier is the loop valve's decay lane (2026-08-16), the
+    // Momentum extension verbatim: the tree's ClassResourceDecay aggregate
+    // arrives keyed through UBreakerProgressionComponent::PushLoopValveOverrides.
+    // 1.0 neutral, 0.0 a legal suspension, negative loud. Defaulted so every
+    // pre-existing caller (Hold) is unchanged. No Tank node authors the lane
+    // yet; the seam exists so the day one does, it pays without a Classes/ edit.
+    UFUNCTION(BlueprintCallable, Category="Grit|Loop") void PushLoopOverride(FName Key, bool bSuspendDecay, float GenerationMultiplier, float Duration, float DecayRateMultiplier = 1.0f);
     UFUNCTION(BlueprintCallable, Category="Grit|Loop") void PopLoopOverride(FName Key);
     UFUNCTION(BlueprintPure, Category="Grit|Loop") bool IsDecaySuspended() const;
     UFUNCTION(BlueprintPure, Category="Grit|Loop") float GetGenerationMultiplier() const;
+    // Product of every active override's decay-rate multiplier; scales the
+    // rate DecayRate returns at the one place decay is paid.
+    UFUNCTION(BlueprintPure, Category="Grit|Loop") float GetDecayRateMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Grit|Loop") int32 GetActiveLoopOverrideCount() const;
 
     // Pure loop rules, exposed for tests and for the eventual DA_GritPolicy asset.
@@ -204,6 +213,8 @@ private:
     {
         bool bSuspendDecay = false;
         float GenerationMultiplier = 1.0f;
+        // Scales the decay rate; 0 is a legal suspension, see PushLoopOverride.
+        float DecayRateMultiplier = 1.0f;
         double ExpiryTime = -1.0;
     };
     mutable TMap<FName, FLoopOverrideEntry> LoopOverrides;

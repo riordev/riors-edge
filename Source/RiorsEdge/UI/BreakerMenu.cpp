@@ -2039,17 +2039,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsKeybindSection()
             ]
         ]
     ];
-    // The honest line. The override map is written, clamped, persisted and
-    // read back correctly — and nothing in the running game consumes it yet:
-    // as of this pass UBreakerGameSettings has no callers outside the settings
-    // screen and its own tests. Applying an override live means rewriting the
-    // mapping context's entries and asking Enhanced Input to rebuild, which is
-    // a change to ABreakerCharacter's input setup
-    // (Characters/BreakerCharacter.cpp:239-240, 388-418) and not this screen's
-    // to make. Saying so beats a screen that appears to rebind and does not.
+    // The honest line, second edition. The disclosure that used to end this
+    // sentence ("live input still uses the default keys") became FALSE when
+    // ABreakerCharacter grew ApplyKeybindOverrides — overrides now rebuild a
+    // transient mapping context at spawn and live on change — so it is gone.
+    // The how-to stays.
     Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
     [
-        MenuText(FText::FromString(TEXT("CLICK A KEY, THEN PRESS THE ONE YOU WANT INSTEAD.  ESC CANCELS.\nREBINDS SAVE TO YOUR PROFILE. LIVE INPUT STILL USES THE DEFAULT KEYS UNTIL THE INPUT PASS READS THEM.")),
+        MenuText(FText::FromString(TEXT("CLICK A KEY, THEN PRESS THE ONE YOU WANT INSTEAD.  ESC CANCELS.\nREBINDS SAVE TO YOUR PROFILE AND APPLY IMMEDIATELY.")),
             BreakerUI::TypeCaption, Muted)
     ];
     return Section;
@@ -7005,20 +7002,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
 
 namespace
 {
-    FString ForgeCurrencyName(EBreakerForgeCurrency Currency)
-    {
-        switch (Currency)
-        {
-            case EBreakerForgeCurrency::Slag:  return TEXT("SLAG");
-            case EBreakerForgeCurrency::Flux:  return TEXT("FLUX");
-            case EBreakerForgeCurrency::Sigil: return TEXT("SIGIL");
-            default:                           return TEXT("?");
-        }
-    }
-
     FString DescribeForgeCost(const FBreakerForgeCost& Cost)
     {
-        return Cost.IsFree() ? FString(TEXT("FREE")) : FString::Printf(TEXT("%d %s"), Cost.Amount, *ForgeCurrencyName(Cost.Currency));
+        // The ONE currency's name comes from BreakerForge::CurrencyDisplayName
+        // (Items/BreakerForgeLibrary.h) so a cost line, the wallet chip and
+        // the salvage preview can never disagree about what it is called.
+        return Cost.IsFree() ? FString(TEXT("FREE")) : FString::Printf(TEXT("%d %s"), Cost.Amount, BreakerForge::CurrencyDisplayName);
     }
 
     // EBreakerForgeResult (Items/BreakerForgeLibrary.h) carries no FText, unlike
@@ -7079,20 +7068,22 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
     }
 
     // ---- Header: tab strip, wallet, BACK -----------------------------------
-    auto MakeCurrencyChip = [](EBreakerForgeCurrency Currency, int32 Amount) -> TSharedRef<SWidget>
+    // The ONE wallet chip: the currency's name over its amount. Imperative
+    // rebuild like everything else on this screen — the amount is re-read on
+    // the next rebuild, never a per-frame attribute. AutoWidth, so the chip
+    // always fits its widest content (the RIFTGLASS caption).
+    auto MakeCurrencyChip = [](int32 Amount) -> TSharedRef<SWidget>
     {
         return MakePlate(
             SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(ForgeCurrencyName(Currency)), BreakerUI::TypeCaption, Muted, true)]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(BreakerForge::CurrencyDisplayName), BreakerUI::TypeCaption, Muted, true)]
             + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Amount))), BreakerUI::TypeH2, Primary, true)],
             PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space4));
     };
     TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Forge)];
     HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Slag, Wallet.Get(EBreakerForgeCurrency::Slag))];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Flux, Wallet.Get(EBreakerForgeCurrency::Flux))];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)[MakeCurrencyChip(EBreakerForgeCurrency::Sigil, Wallet.Get(EBreakerForgeCurrency::Sigil))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)[MakeCurrencyChip(Wallet.Get())];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
     [
         SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
@@ -7203,7 +7194,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             const FBreakerRolledAffix& Affix = SelectedItem.Affixes[AffixIndex];
             const int32 TargetTier = Affix.Tier - 1;
             const int32 Ceiling = UBreakerForgeLibrary::TemperCeilingForItem(SelectedItem);
-            // TemperCost returns a deceptive {Slag, 0} — indistinguishable from
+            // TemperCost returns a deceptive zero — indistinguishable from
             // free — both for a bad index AND for a line already at its tier
             // ceiling, so the ceiling has to be checked independently rather
             // than trusted from Cost.IsFree() alone.
@@ -7311,8 +7302,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             const FBreakerForgeWallet SalvagePreview = UBreakerForgeLibrary::SalvageValue(SelectedItem);
             ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("SALVAGE — DESTROYS THE ITEM · PAYS %d SLAG · %d FLUX · %d SIGIL"),
-                    SalvagePreview.Get(EBreakerForgeCurrency::Slag), SalvagePreview.Get(EBreakerForgeCurrency::Flux), SalvagePreview.Get(EBreakerForgeCurrency::Sigil))),
+                MenuText(FText::FromString(FString::Printf(TEXT("SALVAGE — DESTROYS THE ITEM · PAYS %d %s"),
+                    SalvagePreview.Get(), BreakerForge::CurrencyDisplayName)),
                     BreakerUI::TypeCaption, Harm, true)
             ];
             ForgePanel->AddSlot().AutoHeight()

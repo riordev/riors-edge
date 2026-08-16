@@ -49,6 +49,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Cleave")
     static float AnimationLockFor(bool bHasEdgework, float AuthoredLockSeconds);
 
+    // Pure rule: the swing's live arc. SB8 Edge is a RULE change first — the
+    // arc widens to 180 degrees (Class-Kits §2.3 SB8, transcribed; "full
+    // sweep" in the node text) — and the AbilityArea lane's multiplier then
+    // scales whichever base applies. Clamped to a real arc.
+    UFUNCTION(BlueprintPure, Category="Cleave")
+    static float EffectiveArcFor(bool bHasEdge, float AuthoredArcDegrees, float AreaMultiplier);
+
+    // The geometry the activation actually sweeps: the ability-geometry seam
+    // (base-class AbilityArea accessors) applied to this subclass's own
+    // differently-named UPROPERTYs, which is exactly the shape the
+    // EBreakerNodeStatTarget::AbilityArea comment asks for. Actor-
+    // parameterised so a test can pin them on a rigged owner with no world.
+    UFUNCTION(BlueprintPure, Category="Cleave")
+    float ComputeEffectiveArcDegrees(const AActor* OwnerActor) const;
+    UFUNCTION(BlueprintPure, Category="Cleave")
+    float ComputeEffectiveRangeCm(const AActor* OwnerActor) const;
+
     static FName SwingWindowKey();
 
     // Class-Kits §2.2 C1: 3 m.

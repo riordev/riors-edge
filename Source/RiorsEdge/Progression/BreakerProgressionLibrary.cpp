@@ -609,9 +609,18 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Carry.GetTag());
     Tree->Nodes.Add(Node);
 
+    // LIVE 2026-08-16 (partially): the AbilityCooldown lane exists, so the
+    // node's cooldown half pays — cooldowns started while airborne run 20%
+    // shorter per rank (O2 PLACEHOLDER; the divisor convention, evaluated at
+    // cast, and Skim is the ability a Swift casts airborne). The designed
+    // once-per-airtime EVENT ("sharp direction changes refund") is a rule the
+    // lane cannot say; the tag stays for that consumer, and the text below
+    // describes what the purchase actually does today rather than what it
+    // will do then.
     Node = MakeNode(TEXT("Swift.Kinetic.Redirect"), TEXT("Redirect"),
-        TEXT("Sharp airborne direction changes reduce Skim's cooldown once per airtime."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Skim comes back faster while you stay off the ground — abilities cast airborne start a shorter cooldown."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityCooldown, EBreakerNodeStatBucket::IncreasedPercent, 20.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Redirect.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -704,14 +713,23 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 
     // K11. Pure Momentum-loop rewrite with a real downside, the Kinetic twin
     // of Frenzy's No Safety: airborne decay is removed outright and grounded
-    // decay is increased. Decay lives on UBreakerMomentumComponent and is not
-    // a node stat target in either direction, so neither half is authorable as
-    // an effect and authoring only the upside would ship a strictly-better
-    // node than designed. WAITING ON: the Momentum component reading this tag
-    // when it computes its decay rate.
+    // decay is increased.
+    // LIVE 2026-08-16: the WAITING ON is answered by the loop valve — the
+    // ClassResourceDecay lane composes these lines and
+    // UBreakerProgressionComponent::PushLoopValveOverrides delivers the
+    // multiplier through the Momentum component's PushLoopOverride seam.
+    // Class-Kits §1.4 K11's number is transcribed: "grounded decay increases
+    // by 50%" (+50 while Grounded). The airborne half is authored as -100
+    // while Airborne — the base loop already never decays airborne, so the
+    // line is belt-and-braces that survives a future loop retune rather than
+    // a new behaviour. K11's OTHER clause, "or within 0.5s of leaving the
+    // ground", stays waiting: no coyote-time condition exists and the decay
+    // grace timer is not it.
     Node = MakeNode(TEXT("Swift.Kinetic.NoGround"), TEXT("No Ground"),
         TEXT("Momentum stops decaying the moment your feet leave the floor, and decays faster while they are on it."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 50.0f, EBreakerBuildCondition::Grounded); // Class-Kits §1.4 K11: grounded decay +50%
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Airborne); // Class-Kits §1.4 K11: no airborne decay
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoGround.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -857,16 +875,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // was most damaged by the tier being dropped. Reserve is the node the
     // branch description points at.
 
-    // M9. The stationary-Swift unlock. Momentum decay is a
-    // UBreakerMomentumComponent rule and ADS is a weapon state; neither is a
-    // node stat target, and the deliberate half-measure — the bar HOLDS while
-    // ADS but still does not GENERATE — is a distinction only the loop itself
-    // can draw. Authoring it as, say, Increased Damage while stationary would
-    // be a different node with a different fantasy. WAITING ON: the Momentum
-    // component reading this tag when it decides whether to decay.
+    // M9. The stationary-Swift unlock, and the deliberate half-measure — the
+    // bar HOLDS while ADS but still does not GENERATE — held exactly.
+    // LIVE 2026-08-16: the WAITING ON is answered by the loop valve. Class-
+    // Kits §1.5 M9, "Momentum does not decay while ADS", is authored as a
+    // -100% ClassResourceDecay line conditioned on Aiming (the O30 posture
+    // predicate added by name for this node), composed to a decay multiplier
+    // of exactly 0 while ADS and delivered through the Momentum component's
+    // PushLoopOverride seam. Generation while ADS is untouched — the lane
+    // scales DECAY only, so "holds a bar, does not fill one" is structural.
     Node = MakeNode(TEXT("Swift.Marksman.Reserve"), TEXT("Reserve"),
         TEXT("Momentum stops decaying while you are aiming down sights. It still does not build there — this holds a bar, it does not fill one."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Aiming); // Class-Kits §1.5 M9: no decay while ADS
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Reserve.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1055,17 +1076,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     Tree->Nodes.Add(Node);
 
     // F11. §1.3 calls this "the node that makes Frenzy read as a CLASS choice
-    // rather than a bonus", and both of its halves live on the Momentum loop:
-    // doubled decay and a 40% ability discount. Neither decay rate nor ability
-    // resource cost is a node stat target — Caster's whole branch set ran into
-    // the same wall from the cost side (there is no analogue of gear's
-    // Resource Cost Reduction on this enum) — and shipping only the discount
-    // would turn a node with a real downside into a pure upgrade, which is the
-    // exact inversion O2 exists to stop an agent making. WAITING ON: the
-    // Momentum component reading this tag for BOTH halves at once.
+    // rather than a bonus", and both of its halves are now authorable.
+    // LIVE 2026-08-16: both halves at once, exactly as the old WAITING ON
+    // demanded — shipping either alone would invert the design (a pure
+    // upgrade, or a pure tax). Class-Kits §1.3 F11 transcribed: "Momentum
+    // decay is doubled" (+100% ClassResourceDecay, unconditional, through the
+    // loop valve) "and abilities cost 40% less Momentum" (+40 on the
+    // AbilityCost lane, which is authored as an Increased percentage OF THE
+    // REDUCTION — the enum's own convention — and joins gear's Resource
+    // Efficiency bucket additively).
     Node = MakeNode(TEXT("Swift.Frenzy.NoSafety"), TEXT("No Safety"),
         TEXT("Abilities cost far less Momentum, and the bar drains twice as fast. A real downside, taken on purpose."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.ShortLeash"));
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 100.0f); // Class-Kits §1.3 F11: decay doubled
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityCost, EBreakerNodeStatBucket::IncreasedPercent, 40.0f); // Class-Kits §1.3 F11: abilities cost 40% less
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoSafety.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1195,6 +1219,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Blink.GetTag());
     Tree->Nodes.Add(Node);
 
+    // LIVE 2026-08-16: the tag found its consumer. UBreakerAbility_Cleave::
+    // ComputeEffectiveArcDegrees reads Node_SB_Edge off the progression
+    // component and widens the swing to Class-Kits §2.3 SB8's 180 degrees
+    // (the geometry then rides the AbilityArea lane's multiplier, clamped to
+    // 360). Correctly still a tag with NO stat effect — SB8 is explicit that
+    // this is a rule change with no damage percentage, and the Bleed-to-every-
+    // target half is Cleave's base behaviour already (every swept target takes
+    // the 100%-chance Bleed).
     Node = MakeNode(TEXT("Caster.Spellblade.Edge"), TEXT("Edge"),
         TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit. Rule change; no damage percentage (Class-Kits SB8 is explicit)."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
@@ -1247,9 +1279,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Tree->Nodes.Add(Node);
 
     // --- Tier 2 (VW4-VW6) ----------------------------------------------------
+    // LIVE 2026-08-16: Lingering was a purchase that paid nothing — VW4's
+    // anti-stack rule was implemented unconditionally at the zone spawner
+    // (UBreakerAbility_Rot's FindRefreshableZone call, "the anti-stack rule
+    // lives at the SPAWNER, once"), so owning the node changed no behaviour
+    // at all. The AbilityDuration lane gives the fantasy a perceptible half:
+    // zones linger longer per rank (O2 PLACEHOLDER, consumed by Rot's
+    // ComputeEffectiveDurationSeconds on both the spawn and refresh paths).
+    // VW4 R2's "radius grows by 1 m, once" stays waiting — a one-shot flat
+    // growth on refresh is a zone rule, not a lane.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Lingering"), TEXT("Lingering"),
-        TEXT("A second overlapping zone refreshes duration instead of stacking. Explicit anti-stack rule."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
+        TEXT("Zones linger longer, and a second overlapping zone refreshes duration instead of stacking. Explicit anti-stack rule."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.StandingWater"));
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
     Tree->Nodes.Add(Node);
 

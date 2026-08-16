@@ -2,6 +2,10 @@
 
 #include "Misc/AutomationTest.h"
 #include "Settings/BreakerGameSettings.h"
+#include "Input/BreakerInputConfig.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "UObject/Package.h"
 
 // ---------------------------------------------------------------------------
 // SETTINGS MODEL — clamps, keybind override layering/conflict detection, and
@@ -207,6 +211,187 @@ bool FBreakerGameSettingsAccessorRoundTripTest::RunTest(const FString& Parameter
     TestEqual(TEXT("FieldOfView round-trips"), Settings->FieldOfView, 100.0f);
     TestTrue(TEXT("bInvertVerticalLook round-trips"), Settings->bInvertVerticalLook);
 
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// R10 — overrides applied to the LIVE mapping list. BuildOverriddenMappings
+// is the pure decision the character's runtime context is rebuilt from: the
+// override moves exactly the rows carrying the action's displayed (first
+// default) key, and every other row keeps its default byte-for-byte.
+// ---------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerKeybindOverrideMappingTest,
+    "RiorsEdge.Settings.KeybindOverrideMapping",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerKeybindOverrideMappingTest::RunTest(const FString& Parameters)
+{
+    UInputAction* JumpAction = NewObject<UInputAction>(GetTransientPackage());
+    UInputAction* MoveAction = NewObject<UInputAction>(GetTransientPackage());
+    UInputAction* FireAction = NewObject<UInputAction>(GetTransientPackage());
+    UInputAction* ReloadAction = NewObject<UInputAction>(GetTransientPackage());
+
+    TArray<TPair<FName, const UInputAction*>> Actions;
+    Actions.Add(TPair<FName, const UInputAction*>(TEXT("Jump"), JumpAction));
+    Actions.Add(TPair<FName, const UInputAction*>(TEXT("Move"), MoveAction));
+    Actions.Add(TPair<FName, const UInputAction*>(TEXT("Fire"), FireAction));
+    Actions.Add(TPair<FName, const UInputAction*>(TEXT("Reload"), ReloadAction));
+
+    // The shape a real context has: Move's displayed key (W) appears on TWO
+    // rows (different modifier stacks), Jump carries a keyboard key plus a
+    // gamepad alternate, Reload has no rows at all.
+    TArray<FEnhancedActionKeyMapping> Defaults;
+    Defaults.Add(FEnhancedActionKeyMapping(MoveAction, EKeys::W));
+    Defaults.Add(FEnhancedActionKeyMapping(MoveAction, EKeys::W));
+    Defaults.Add(FEnhancedActionKeyMapping(MoveAction, EKeys::S));
+    Defaults.Add(FEnhancedActionKeyMapping(MoveAction, EKeys::A));
+    Defaults.Add(FEnhancedActionKeyMapping(MoveAction, EKeys::D));
+    Defaults.Add(FEnhancedActionKeyMapping(JumpAction, EKeys::SpaceBar));
+    Defaults.Add(FEnhancedActionKeyMapping(JumpAction, EKeys::Gamepad_FaceButton_Bottom));
+    Defaults.Add(FEnhancedActionKeyMapping(FireAction, EKeys::LeftMouseButton));
+
+    // One override: Jump onto F.
+    TMap<FName, FKey> Overrides;
+    Overrides.Add(TEXT("Jump"), EKeys::F);
+    TArray<FEnhancedActionKeyMapping> Result =
+        UBreakerGameSettingsLibrary::BuildOverriddenMappings(Actions, Defaults, Overrides);
+
+    TestEqual(TEXT("The rebuilt list keeps every row"), Result.Num(), Defaults.Num());
+    TestEqual(TEXT("Jump's displayed key moved to the override"), Result[5].Key, FKey(EKeys::F));
+    TestEqual(TEXT("Jump's gamepad alternate keeps its default"), Result[6].Key, FKey(EKeys::Gamepad_FaceButton_Bottom));
+    TestEqual(TEXT("Fire is untouched by Jump's override"), Result[7].Key, FKey(EKeys::LeftMouseButton));
+    TestEqual(TEXT("Move's W keeps its default"), Result[0].Key, FKey(EKeys::W));
+
+    // A multi-row displayed key moves on EVERY row it holds — a half-moved
+    // W would leave forward bound to both the old and the new key.
+    Overrides.Empty();
+    Overrides.Add(TEXT("Move"), EKeys::Up);
+    Result = UBreakerGameSettingsLibrary::BuildOverriddenMappings(Actions, Defaults, Overrides);
+    TestEqual(TEXT("Move's first W row moved"), Result[0].Key, FKey(EKeys::Up));
+    TestEqual(TEXT("Move's second W row moved with it"), Result[1].Key, FKey(EKeys::Up));
+    TestEqual(TEXT("Move's S keeps its default"), Result[2].Key, FKey(EKeys::S));
+    TestEqual(TEXT("Move's A keeps its default"), Result[3].Key, FKey(EKeys::A));
+    TestEqual(TEXT("Move's D keeps its default"), Result[4].Key, FKey(EKeys::D));
+    TestEqual(TEXT("Jump keeps its default with only Move overridden"), Result[5].Key, FKey(EKeys::SpaceBar));
+
+    // An override for an action with no rows changes nothing.
+    Overrides.Empty();
+    Overrides.Add(TEXT("Reload"), EKeys::V);
+    Result = UBreakerGameSettingsLibrary::BuildOverriddenMappings(Actions, Defaults, Overrides);
+    for (int32 Index = 0; Index < Result.Num(); ++Index)
+    {
+        TestEqual(TEXT("An unmapped action's override moves nothing"), Result[Index].Key, Defaults[Index].Key);
+    }
+
+    // RESET: an empty override map reproduces the defaults exactly.
+    Overrides.Empty();
+    Result = UBreakerGameSettingsLibrary::BuildOverriddenMappings(Actions, Defaults, Overrides);
+    TestEqual(TEXT("No overrides keeps every row"), Result.Num(), Defaults.Num());
+    for (int32 Index = 0; Index < Result.Num(); ++Index)
+    {
+        TestEqual(TEXT("No overrides reproduces every default key"), Result[Index].Key, Defaults[Index].Key);
+    }
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerKeybindRuntimeContextTest,
+    "RiorsEdge.Settings.KeybindRuntimeContext",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerKeybindRuntimeContextTest::RunTest(const FString& Parameters)
+{
+    // A minimal config: two actions, one context, authored the way
+    // DA_PlayerInputConfig is.
+    UInputAction* JumpAction = NewObject<UInputAction>(GetTransientPackage());
+    UInputAction* FireAction = NewObject<UInputAction>(GetTransientPackage());
+    UInputMappingContext* Authored = NewObject<UInputMappingContext>(GetTransientPackage());
+    Authored->MapKey(JumpAction, EKeys::SpaceBar);
+    Authored->MapKey(FireAction, EKeys::LeftMouseButton);
+    UBreakerInputConfig* Config = NewObject<UBreakerInputConfig>(GetTransientPackage());
+    Config->DefaultMappingContext = Authored;
+    Config->Jump = JumpAction;
+    Config->Fire = FireAction;
+
+    // No overrides: nullptr, meaning "register the authored asset itself" —
+    // no clone exists to drift from the asset, and RESET ALL lands here.
+    TMap<FName, FKey> Overrides;
+    TestNull(TEXT("No overrides builds no clone"),
+        UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(Config, Overrides, GetTransientPackage()));
+
+    // One override: a clone whose Jump row carries the override, whose Fire
+    // row keeps its default — and the authored asset is untouched.
+    Overrides.Add(TEXT("Jump"), EKeys::F);
+    UInputMappingContext* Clone =
+        UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(Config, Overrides, GetTransientPackage());
+    if (!Clone) { AddError(TEXT("An override must build a clone")); return false; }
+    TestNotEqual(TEXT("The clone is a different object from the asset"),
+        static_cast<UObject*>(Clone), static_cast<UObject*>(Authored));
+    TestEqual(TEXT("The clone keeps every row"), Clone->GetMappings().Num(), Authored->GetMappings().Num());
+    TestEqual(TEXT("The clone's Jump row carries the override"), Clone->GetMappings()[0].Key, FKey(EKeys::F));
+    TestEqual(TEXT("The clone's Jump row still drives the Jump action"),
+        Clone->GetMappings()[0].Action.Get(), static_cast<const UInputAction*>(JumpAction));
+    TestEqual(TEXT("The clone's Fire row keeps its default"), Clone->GetMappings()[1].Key, FKey(EKeys::LeftMouseButton));
+    TestEqual(TEXT("The AUTHORED asset's Jump row is untouched"), Authored->GetMappings()[0].Key, FKey(EKeys::SpaceBar));
+
+    // Degenerate inputs answer nullptr rather than asserting.
+    TestNull(TEXT("A null config builds nothing"),
+        UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(nullptr, Overrides, GetTransientPackage()));
+    Config->DefaultMappingContext = nullptr;
+    TestNull(TEXT("A config with no context builds nothing"),
+        UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(Config, Overrides, GetTransientPackage()));
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerKeybindChangeBroadcastTest,
+    "RiorsEdge.Settings.KeybindChangeBroadcast",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerKeybindChangeBroadcastTest::RunTest(const FString& Parameters)
+{
+    UBreakerGameSettings* Settings = NewObject<UBreakerGameSettings>(GetTransientPackage());
+    if (!Settings) { AddError(TEXT("Could not create a settings object")); return false; }
+
+    int32 Broadcasts = 0;
+    TMap<FName, FKey> LastSeen;
+    FDelegateHandle Handle = UBreakerGameSettings::OnKeybindOverridesChanged().AddLambda(
+        [&Broadcasts, &LastSeen](const TMap<FName, FKey>& Overrides)
+        {
+            ++Broadcasts;
+            LastSeen = Overrides;
+        });
+
+    // Set fires, carrying the new map.
+    Settings->SetKeybindOverride(TEXT("Jump"), EKeys::F);
+    TestEqual(TEXT("SetKeybindOverride broadcasts"), Broadcasts, 1);
+    TestEqual(TEXT("The broadcast carries the new override"),
+        LastSeen.FindRef(TEXT("Jump")), FKey(EKeys::F));
+
+    // Clearing an action that was never overridden is not a change.
+    Settings->ClearKeybindOverride(TEXT("Fire"));
+    TestEqual(TEXT("Clearing a non-override does not broadcast"), Broadcasts, 1);
+
+    // Clearing a real override fires, and the map it carries has moved on.
+    Settings->ClearKeybindOverride(TEXT("Jump"));
+    TestEqual(TEXT("Clearing a live override broadcasts"), Broadcasts, 2);
+    TestEqual(TEXT("The broadcast map no longer holds the cleared action"), LastSeen.Num(), 0);
+
+    // Reset on an already-empty map is not a change; reset with overrides is.
+    Settings->ResetKeybindsToDefault();
+    TestEqual(TEXT("Resetting an empty map does not broadcast"), Broadcasts, 2);
+    Settings->SetKeybindOverride(TEXT("Aim"), EKeys::Q);
+    Settings->ResetKeybindsToDefault();
+    TestEqual(TEXT("Reset with live overrides broadcasts"), Broadcasts, 4);
+    TestEqual(TEXT("Reset broadcasts an empty map"), LastSeen.Num(), 0);
+
+    // The delegate is static and outlives this test — the lambda captures
+    // stack locals, so it MUST come off before they die.
+    UBreakerGameSettings::OnKeybindOverridesChanged().Remove(Handle);
     return true;
 }
 

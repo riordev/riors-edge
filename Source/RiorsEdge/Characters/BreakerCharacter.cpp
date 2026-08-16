@@ -16,6 +16,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Input/BreakerInputConfig.h"
+#include "Settings/BreakerGameSettings.h"
 #include "InputAction.h"
 #include "InputActionValue.h"
 #include "InputMappingContext.h"
@@ -52,6 +53,14 @@
 #include "InputCoreTypes.h"
 #include "Engine/GameViewportClient.h"
 #include "Kismet/KismetSystemLibrary.h"
+// Explicit rather than transitive: this file uses GEngine, the world timer
+// manager, ULocalPlayer's subsystem accessor and Slate's FOnClicked directly,
+// and used to receive all four through other headers' include chains — which
+// other passes are free to trim.
+#include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
+#include "TimerManager.h"
+#include "Framework/SlateDelegates.h"
 #include "UI/BreakerMenu.h"
 
 ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer)
@@ -272,7 +281,10 @@ void ABreakerCharacter::BeginPlay()
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("FOV"), SavedFOV, GGameUserSettingsIni);
     GConfig->GetFloat(TEXT("RiorsEdge.Playtest"), TEXT("Sensitivity"), LookSensitivity, GGameUserSettingsIni);
     GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("InvertLookY"), bInvertLookY, GGameUserSettingsIni);
-    LookSensitivity = FMath::Clamp(LookSensitivity, 0.2f, 2.0f);
+    // D27: ONE clamp for sensitivity, owned by the settings model — every
+    // reader/writer of this ini key goes through it (see the -/= nudges and
+    // ApplyMenuSettings below).
+    LookSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(LookSensitivity);
     BaseFieldOfView = FMath::Clamp(SavedFOV, 70.0f, 120.0f);
     ApplyBaseFieldOfView();
     // Presentation binds to the movement rule, never the other way round: the
@@ -282,16 +294,19 @@ void ABreakerCharacter::BeginPlay()
     {
         Movement->OnDashStarted.AddDynamic(this, &ThisClass::HandleDashStarted);
     }
-    if (const APlayerController* PC = Cast<APlayerController>(GetController()))
+    // R10: the mapping context this pawn registers carries the player's saved
+    // keybind overrides, not the untouched default — the settings screen's
+    // rebinds are live. BeginPlay re-runs on every map arrival (OpenLevel
+    // destroys the pawn), so overrides re-apply on every spawn; the delegate
+    // below covers mid-session rebinds from the settings screen. AddUObject
+    // binds weakly, so a destroyed pawn's entry is skipped and compacted at
+    // the next broadcast — no unsubscribe needed.
+    if (IsLocallyControlled() && InputConfig && InputConfig->DefaultMappingContext)
     {
-        if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
-        {
-            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-            {
-                if (InputConfig && InputConfig->DefaultMappingContext)
-                    Subsystem->AddMappingContext(InputConfig->DefaultMappingContext, 0);
-            }
-        }
+        UBreakerGameSettings* ProfileSettings = NewObject<UBreakerGameSettings>(GetTransientPackage());
+        ProfileSettings->LoadOrDefaults();
+        ApplyKeybindOverrides(ProfileSettings->KeybindOverrides);
+        UBreakerGameSettings::OnKeybindOverridesChanged().AddUObject(this, &ThisClass::ApplyKeybindOverrides);
     }
     // THE TITLE MENU BELONGS TO SESSIONS THAT HAVE NOT ENTERED THE WORLD YET.
     // OpenLevel destroys the pawn, so BeginPlay re-runs on every map arrival —
@@ -524,6 +539,45 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     if (InputConfig->AbilityOne) Input->BindAction(InputConfig->AbilityOne, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityOne);
     if (InputConfig->AbilityTwo) Input->BindAction(InputConfig->AbilityTwo, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityTwo);
     if (InputConfig->Ultimate) Input->BindAction(InputConfig->Ultimate, ETriggerEvent::Started, this, &ThisClass::ActivateUltimate);
+}
+
+void ABreakerCharacter::ApplyKeybindOverrides(const TMap<FName, FKey>& Overrides)
+{
+    // NOTE ON THE TWO INPUT PATHS: the legacy BindAction/BindAxis block in
+    // SetupPlayerInputComponent above runs only when InputConfig or the
+    // EnhancedInputComponent is missing. The shipped config has both —
+    // DefaultInput.ini sets DefaultInputComponentClass to
+    // EnhancedInputComponent and DA_PlayerInputConfig is authored — so the
+    // Enhanced path is the live one, and it is the one overrides cover. The
+    // legacy path is the "input asset not cooked" fallback, driven by the
+    // ini's raw Action/AxisMappings; a build in that state has no default
+    // mapping context to rewrite and keeps its ini keys.
+    const APlayerController* PC = Cast<APlayerController>(GetController());
+    ULocalPlayer* LocalPlayer = PC ? PC->GetLocalPlayer() : nullptr;
+    UEnhancedInputLocalPlayerSubsystem* Subsystem =
+        LocalPlayer ? LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+    if (!Subsystem || !InputConfig || !InputConfig->DefaultMappingContext)
+    {
+        return;
+    }
+
+    // Out with whatever this pawn registered before — the previous clone on
+    // a mid-session rebind, or the plain default. RemoveMappingContext on a
+    // context that was never added is a harmless no-op, so both removals can
+    // run unconditionally.
+    if (ActiveMappingContext)
+    {
+        Subsystem->RemoveMappingContext(ActiveMappingContext);
+    }
+    Subsystem->RemoveMappingContext(InputConfig->DefaultMappingContext);
+
+    // A rebuilt clone when any override exists; the authored asset itself
+    // when none do (RESET ALL lands here, restoring defaults live). Same
+    // priority (0) the default was always registered at.
+    UInputMappingContext* Rebuilt =
+        UBreakerGameSettingsLibrary::BuildRuntimeMappingContext(InputConfig, Overrides, this);
+    ActiveMappingContext = Rebuilt ? Rebuilt : InputConfig->DefaultMappingContext.Get();
+    Subsystem->AddMappingContext(ActiveMappingContext, 0);
 }
 
 void ABreakerCharacter::ActivateAbilityOne()
@@ -1281,8 +1335,12 @@ void ABreakerCharacter::CopyPlaytestReport() { if (Playtest) Playtest->CopyRepor
 void ABreakerCharacter::TogglePlaytestDiagnostics() { if (Playtest) Playtest->ToggleDiagnostics(); }
 void ABreakerCharacter::IncreaseFOV() { BaseFieldOfView = FMath::Clamp(BaseFieldOfView + 5.0f, 70.0f, 120.0f); ApplyBaseFieldOfView(); SavePlaytestSettings(); }
 void ABreakerCharacter::DecreaseFOV() { BaseFieldOfView = FMath::Clamp(BaseFieldOfView - 5.0f, 70.0f, 120.0f); ApplyBaseFieldOfView(); SavePlaytestSettings(); }
-void ABreakerCharacter::IncreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity + 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
-void ABreakerCharacter::DecreaseSensitivity() { LookSensitivity = FMath::Clamp(LookSensitivity - 0.1f, 0.2f, 3.0f); SavePlaytestSettings(); }
+// D27: these nudges used to clamp to 0.2-3.0 while the settings screen and
+// the ini load clamped the SAME value to 0.2-2.0, so a nudged 2.1+ silently
+// snapped back on the next menu open or restart. One clamp now, the settings
+// model's, everywhere the value is written.
+void ABreakerCharacter::IncreaseSensitivity() { LookSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(LookSensitivity + 0.1f); SavePlaytestSettings(); }
+void ABreakerCharacter::DecreaseSensitivity() { LookSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(LookSensitivity - 0.1f); SavePlaytestSettings(); }
 
 void ABreakerCharacter::SavePlaytestSettings() const
 {
@@ -1294,7 +1352,7 @@ void ABreakerCharacter::SavePlaytestSettings() const
 
 void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bool bNewInvertLookY)
 {
-    LookSensitivity = FMath::Clamp(NewSensitivity, 0.2f, 2.0f);
+    LookSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(NewSensitivity);  // D27: the one clamp
     bInvertLookY = bNewInvertLookY;
     BaseFieldOfView = FMath::Clamp(NewFOV, 70.0f, 120.0f);
     ApplyBaseFieldOfView();

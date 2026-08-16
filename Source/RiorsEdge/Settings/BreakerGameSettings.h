@@ -11,6 +11,17 @@
 
 class UBreakerInputConfig;
 class UInputAction;
+class UInputMappingContext;
+
+// Fired by UBreakerGameSettings whenever the keybind override map changes
+// (SetKeybindOverride / ClearKeybindOverride / ResetKeybindsToDefault).
+// Carries the full override map so a listener (ABreakerCharacter's input
+// setup) can rebuild its live mapping context without holding a pointer to
+// the settings object that changed — the settings screen owns its own model
+// instance and the character never sees it. (The alias exists because the
+// map type's comma cannot appear bare inside the delegate macro.)
+using FBreakerKeybindOverrideMap = TMap<FName, FKey>;
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnBreakerKeybindOverridesChanged, const FBreakerKeybindOverrideMap& /*Overrides*/);
 
 // Window mode the player picks from the settings screen. Kept as our own
 // enum rather than engine EWindowMode::Type so the model layer does not leak
@@ -40,13 +51,13 @@ public:
     // slider's OnValueChanged) can prove a bound without touching the object
     // that owns the field. ----
 
-    // Matches the range ABreakerCharacter::ApplyMenuSettings and its
-    // GConfig load already enforce (Characters/BreakerCharacter.cpp:222,
-    // 959) — the range the EXISTING settings screen slider lives in today.
-    // Note: the keyboard nudge path (IncreaseSensitivity/DecreaseSensitivity,
-    // BreakerCharacter.cpp:946-947) clamps to 0.2-3.0, a wider, pre-existing
-    // inconsistency this pass does not resolve — BreakerCharacter.cpp is out
-    // of territory. This model follows the settings-screen bound.
+    // THE one clamp for mouse sensitivity (D27 resolved): every writer of
+    // the "RiorsEdge.Playtest / Sensitivity" ini key — this model, the
+    // settings screen slider, ABreakerCharacter::ApplyMenuSettings, and the
+    // character's -/= keyboard nudges — now calls through here. The nudge
+    // path used to clamp to 0.2-3.0 while everything else clamped to
+    // 0.2-2.0, so a nudged-up value silently snapped down on the next menu
+    // open; the settings-screen bound [0.2, 2.0] won.
     UFUNCTION(BlueprintPure, Category = "Settings|Clamp")
     static float ClampMouseSensitivity(float Value);
 
@@ -142,6 +153,44 @@ public:
     // is a legitimate state (a build with no input asset cooked) and not an
     // error the settings screen should refuse to open over.
     static TMap<FName, TArray<FKey>> ProjectDefaultKeybinds();
+
+    // ---- Applying overrides to a LIVE mapping context (R10) --------------
+    //
+    // The settings screen shows exactly one key per action (the action's
+    // FIRST default mapping, via FirstKeyPerAction) and an override replaces
+    // that shown key. These two functions make the running game agree with
+    // the screen: the override rewrites precisely the mappings that carry
+    // the action's first default key, and every other mapping — the A/S/D
+    // of a WASD Move, a gamepad alternate on the same action — keeps its
+    // default exactly. UEnhancedInputUserSettings was considered and
+    // rejected for this pass: it requires player-mappable key settings
+    // authored per-mapping on the input assets plus opt-in project config,
+    // a content migration this code-only pass cannot ship. Cloning the
+    // context is the whole of what the screen promises, with no asset edits.
+
+    // THE PURE HALF. Given the action list, the default mapping rows and the
+    // override map, produce the mapping rows a runtime context should carry.
+    // For each overridden action: every row of that action whose key equals
+    // the action's first default key (first valid key in row order — the one
+    // key the settings screen displays and FirstKeyPerAction picks) gets the
+    // override key; every other row passes through untouched, modifiers,
+    // triggers and all. An override for an action with no rows is ignored —
+    // there is no displayed binding it could be replacing. An empty override
+    // map returns the defaults verbatim, which is what makes RESET ALL a
+    // plain rebuild rather than a special case.
+    static TArray<FEnhancedActionKeyMapping> BuildOverriddenMappings(
+        const TArray<TPair<FName, const UInputAction*>>& ActionsByName,
+        const TArray<FEnhancedActionKeyMapping>& DefaultMappings,
+        const TMap<FName, FKey>& Overrides);
+
+    // THE IMPURE HALF: builds a transient UInputMappingContext (outered to
+    // Outer, so it lives and dies with the pawn that registers it) whose
+    // rows are BuildOverriddenMappings' output for Config's default context.
+    // Returns nullptr when there is nothing to override — no config, no
+    // default context, or an empty override map — meaning "register the
+    // default asset itself"; the caller never registers both.
+    static UInputMappingContext* BuildRuntimeMappingContext(
+        const UBreakerInputConfig* Config, const TMap<FName, FKey>& Overrides, UObject* Outer);
 };
 
 // The settings MODEL and persistence layer: input (sensitivity, scoped
@@ -270,14 +319,24 @@ public:
     // offered separately so a UI can warn and let the player confirm the
     // rebind anyway (a valid choice: two actions sharing a key is sometimes
     // intentional, e.g. context-sensitive binds).
-    void SetKeybindOverride(FName Action, FKey Key) { KeybindOverrides.Add(Action, Key); }
+    void SetKeybindOverride(FName Action, FKey Key);
 
     // Removes a single override so Action falls back through to its default.
-    void ClearKeybindOverride(FName Action) { KeybindOverrides.Remove(Action); }
+    void ClearKeybindOverride(FName Action);
 
     // Drops every override. Defaults live on the UBreakerInputConfig data
     // asset, not here, so there is nothing to reset TO — resetting is just
     // "no overrides remain", which is exactly what falling through to
     // ResolveActionKey's Defaults argument already means.
-    void ResetKeybindsToDefault() { KeybindOverrides.Empty(); }
+    void ResetKeybindsToDefault();
+
+    // Fires after any of the three mutators above changes the override map,
+    // carrying the map's new contents. STATIC on purpose: the settings
+    // screen builds its own model instance (SBreakerMenu::GameSettings) and
+    // the character never holds it, so an instance delegate would have
+    // nobody able to subscribe. A process has one player profile, so a
+    // process-wide "the profile's keybinds changed" is the honest scope.
+    // Listeners bind with AddUObject (weak — a destroyed pawn is skipped and
+    // compacted at the next broadcast, so no unsubscribe choreography).
+    static FOnBreakerKeybindOverridesChanged& OnKeybindOverridesChanged();
 };

@@ -50,9 +50,7 @@ namespace BreakerForgeTest
     FBreakerForgeWallet BreakerForgeRichWallet()
     {
         FBreakerForgeWallet Wallet;
-        Wallet.Add(EBreakerForgeCurrency::Slag, 100000);
-        Wallet.Add(EBreakerForgeCurrency::Flux, 100000);
-        Wallet.Add(EBreakerForgeCurrency::Sigil, 100000);
+        Wallet.Add(1000000);
         return Wallet;
     }
 }
@@ -67,36 +65,32 @@ bool FBreakerForgeWalletTest::RunTest(const FString& Parameters)
     using namespace BreakerForgeTest;
 
     FBreakerForgeWallet Wallet;
-    TestEqual(TEXT("A fresh wallet is empty"), Wallet.Get(EBreakerForgeCurrency::Slag), 0);
-    Wallet.Add(EBreakerForgeCurrency::Slag, 30);
+    TestEqual(TEXT("A fresh wallet is empty"), Wallet.Get(), 0);
+    Wallet.Add(30);
 
     FBreakerForgeCost Affordable;
-    Affordable.Currency = EBreakerForgeCurrency::Slag;
     Affordable.Amount = 20;
     TestTrue(TEXT("An affordable cost is affordable"), Wallet.CanAfford(Affordable));
     TestTrue(TEXT("...and spends"), Wallet.Spend(Affordable));
-    TestEqual(TEXT("...exactly its amount"), Wallet.Get(EBreakerForgeCurrency::Slag), 10);
+    TestEqual(TEXT("...exactly its amount"), Wallet.Get(), 10);
 
     FBreakerForgeCost TooMuch;
-    TooMuch.Currency = EBreakerForgeCurrency::Slag;
     TooMuch.Amount = 50;
     TestFalse(TEXT("An unaffordable cost is refused"), Wallet.Spend(TooMuch));
     // The property that matters: a refused spend takes NOTHING. A partial spend
     // is how one refused craft turns into a lost-currency bug report.
-    TestEqual(TEXT("A refused spend takes nothing at all"), Wallet.Get(EBreakerForgeCurrency::Slag), 10);
+    TestEqual(TEXT("A refused spend takes nothing at all"), Wallet.Get(), 10);
 
-    // Currencies are separate ledgers; Slag never pays a Sigil price.
-    FBreakerForgeCost WrongCurrency;
-    WrongCurrency.Currency = EBreakerForgeCurrency::Sigil;
-    WrongCurrency.Amount = 1;
-    TestFalse(TEXT("Slag does not pay a Sigil price"), Wallet.Spend(WrongCurrency));
-
-    // A wallet deserialized short (a save written before a currency existed)
-    // grows rather than dropping the grant on the floor.
+    // THE ONE-CURRENCY MIGRATION ARITHMETIC (owner ruling 2026-08-16). A v3
+    // wallet's Slag/Flux/Sigil array folds into Riftglass at the stated 1/6/60
+    // conversion, and doing it twice cannot double a balance.
     FBreakerForgeWallet Legacy;
-    Legacy.Amounts.Reset();
-    Legacy.Add(EBreakerForgeCurrency::Sigil, 5);
-    TestEqual(TEXT("A short wallet grows instead of losing a grant"), Legacy.Get(EBreakerForgeCurrency::Sigil), 5);
+    Legacy.Amounts = { 42, 7, 1 };
+    TestTrue(TEXT("A legacy wallet reports a collapse"), Legacy.CollapseLegacyDenominations());
+    TestEqual(TEXT("42 Slag + 7 Flux + 1 Sigil = 42 + 42 + 60 Riftglass"), Legacy.Get(), 144);
+    TestTrue(TEXT("The legacy array is emptied"), Legacy.Amounts.IsEmpty());
+    TestFalse(TEXT("A second collapse is a no-op"), Legacy.CollapseLegacyDenominations());
+    TestEqual(TEXT("...and doubles nothing"), Legacy.Get(), 144);
     return true;
 }
 
@@ -109,39 +103,32 @@ bool FBreakerForgeSalvageTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerForgeTest;
 
-    // Salvage is the ONLY currency source, so the rarity ordering it pays is
-    // what makes a drop worth picking up rather than walking past.
-    float PreviousSlag = -1.0f;
+    // Salvage's rarity ordering is what makes a drop worth picking up rather
+    // than walking past.
+    float Previous = -1.0f;
     for (int32 RarityIndex = 0; RarityIndex <= static_cast<int32>(EBreakerItemRarity::Anomalous); ++RarityIndex)
     {
         const FBreakerItemInstance Item = BreakerForgeMakeItem(static_cast<EBreakerItemRarity>(RarityIndex), 5, {TEXT("Core.Health")});
-        const FBreakerForgeWallet Yield = UBreakerForgeLibrary::SalvageValue(Item);
-        const float Slag = static_cast<float>(Yield.Get(EBreakerForgeCurrency::Slag));
-        TestTrue(TEXT("Every rarity pays some Slag"), Slag > 0.0f);
-        TestTrue(TEXT("Salvage value rises with rarity"), Slag > PreviousSlag);
-        PreviousSlag = Slag;
+        const float Riftglass = static_cast<float>(UBreakerForgeLibrary::SalvageValue(Item).Get());
+        TestTrue(TEXT("Every rarity pays some Riftglass"), Riftglass > 0.0f);
+        TestTrue(TEXT("Salvage value rises with rarity"), Riftglass > Previous);
+        Previous = Riftglass;
     }
 
-    // Sigil comes ONLY from Aberrant and above. That is what turns "wear it or
-    // melt it" into a decision at exactly the rarities where a player owns
-    // several and may equip at most three (O11).
-    TestEqual(TEXT("Exceptional pays no Sigil"),
-        UBreakerForgeLibrary::SalvageValue(BreakerForgeMakeItem(EBreakerItemRarity::Exceptional, 5, {TEXT("Core.Health")}))
-            .Get(EBreakerForgeCurrency::Sigil), 0);
-    TestTrue(TEXT("Aberrant pays Sigil"),
-        UBreakerForgeLibrary::SalvageValue(BreakerForgeMakeItem(EBreakerItemRarity::Aberrant, 5, {TEXT("Core.Health")}))
-            .Get(EBreakerForgeCurrency::Sigil) > 0);
-
-    // Item level scales Slag only. Flux and Sigil stay rarity-pure so farming a
-    // low level cannot substitute for finding the rarity, which is the shortest
-    // route from "minimal crafting" to "crafting replaces looting".
+    // Item level scales only the BASE part of the yield; the rarity bonus is
+    // flat, so farming a low level cannot substitute for finding the rarity —
+    // the shortest route from "minimal crafting" to "crafting replaces
+    // looting". Proven by the high-level yield being strictly LESS than the
+    // low-level yield fully scaled: if the whole row scaled, they would match.
     FBreakerItemInstance LowLevel = BreakerForgeMakeItem(EBreakerItemRarity::Aberrant, 5, {TEXT("Core.Health")});
     LowLevel.ItemLevel = 1;
-    const FBreakerForgeWallet Low = UBreakerForgeLibrary::SalvageValue(LowLevel);
-    const FBreakerForgeWallet High = UBreakerForgeLibrary::SalvageValue(BreakerForgeMakeItem(EBreakerItemRarity::Aberrant, 5, {TEXT("Core.Health")}));
-    TestTrue(TEXT("Item level scales the Slag yield"), High.Get(EBreakerForgeCurrency::Slag) > Low.Get(EBreakerForgeCurrency::Slag));
-    TestEqual(TEXT("Item level does not scale Sigil"),
-        High.Get(EBreakerForgeCurrency::Sigil), Low.Get(EBreakerForgeCurrency::Sigil));
+    const int32 Low = UBreakerForgeLibrary::SalvageValue(LowLevel).Get();
+    const int32 High = UBreakerForgeLibrary::SalvageValue(BreakerForgeMakeItem(EBreakerItemRarity::Aberrant, 5, {TEXT("Core.Health")})).Get();
+    TestTrue(TEXT("Item level scales the yield"), High > Low);
+    // ilvl 50 scalar is 1 + 49*0.06 = 3.94; a fully-scaled row would pay
+    // Low * 3.94. The flat rarity bonus keeps the real yield well under that.
+    TestTrue(TEXT("The rarity bonus does not scale with item level"),
+        static_cast<float>(High) < static_cast<float>(Low) * 3.94f);
     return true;
 }
 
@@ -165,15 +152,18 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
 
     // Forge-gated exactly like the respec. This is checked BEFORE anything is
     // spent, so a refused craft cannot cost currency.
-    const int32 SlagBefore = Wallet.Get(EBreakerForgeCurrency::Slag);
+    const int32 BalanceBefore = Wallet.Get();
     TestEqual(TEXT("Tempering away from a Forge is refused"),
         static_cast<int32>(UBreakerForgeLibrary::Temper(Item, 0, Wallet, /*bIsAtForge=*/false)),
         static_cast<int32>(EBreakerForgeResult::NotAtForge));
-    TestEqual(TEXT("A refused craft costs nothing"), Wallet.Get(EBreakerForgeCurrency::Slag), SlagBefore);
+    TestEqual(TEXT("A refused craft costs nothing"), Wallet.Get(), BalanceBefore);
     TestEqual(TEXT("...and changes nothing"), Item.Affixes[0].Tier, 4);
 
-    // Walk the whole ladder to the bottom of the curve.
+    // Walk the whole ladder to the bottom of the curve. The price must climb
+    // monotonically rung over rung — with one currency, the LADDER is the
+    // gate, so a cheaper deep rung would be an economy bug, not a tuning nit.
     int32 Steps = 0;
+    int32 PreviousCost = 0;
     while (Item.Affixes[0].Tier > -1 && Steps < 20)
     {
         const int32 Before = Item.Affixes[0].Tier;
@@ -183,6 +173,9 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
             static_cast<int32>(Result), static_cast<int32>(EBreakerForgeResult::Success));
         TestEqual(TEXT("Tempering advances exactly one tier"), Item.Affixes[0].Tier, Before - 1);
         TestTrue(TEXT("The published cost is a real price"), Cost.Amount > 0);
+        TestTrue(*FString::Printf(TEXT("The ladder climbs: into T%d costs more than the rung before"), Before - 1),
+            Cost.Amount > PreviousCost);
+        PreviousCost = Cost.Amount;
         ++Steps;
     }
 
@@ -199,11 +192,11 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
 
     // Nowhere left to go, and the refusal is explicit rather than a silent
     // no-op that takes the currency.
-    const int32 SigilBefore = Wallet.Get(EBreakerForgeCurrency::Sigil);
+    const int32 AtCeilingBalance = Wallet.Get();
     TestEqual(TEXT("T-1 is the ceiling"),
         static_cast<int32>(UBreakerForgeLibrary::Temper(Item, 0, Wallet, true)),
         static_cast<int32>(EBreakerForgeResult::AtTierCeiling));
-    TestEqual(TEXT("A ceiling refusal costs nothing"), Wallet.Get(EBreakerForgeCurrency::Sigil), SigilBefore);
+    TestEqual(TEXT("A ceiling refusal costs nothing"), Wallet.Get(), AtCeilingBalance);
 
     // RARITY STILL CAPS CRAFTING. Otherwise crafting would erase rarity's
     // meaning in the same session this pass gave it one.
@@ -225,17 +218,20 @@ bool FBreakerForgeTemperTest::RunTest(const FString& Parameters)
         static_cast<int32>(UBreakerForgeLibrary::Temper(Standard, 0, Rich, true)),
         static_cast<int32>(EBreakerForgeResult::AtTierCeiling));
 
-    // T0/T-1 ARE SIGIL-ONLY. No amount of Slag reaches them, which is what
-    // makes the spike a chase rather than an afternoon.
+    // THE SPIKE IS PRICED, NOT GATED. With one currency the old "Sigil-only"
+    // rule became a flat boss-scale price: a wallet one short of the T0 rung
+    // is refused, and the refused craft spends nothing.
     FBreakerItemInstance Nearly = BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 1, {TEXT("Offense.WeaponDamage")});
-    FBreakerForgeWallet SlagOnly;
-    SlagOnly.Add(EBreakerForgeCurrency::Slag, 1000000);
-    SlagOnly.Add(EBreakerForgeCurrency::Flux, 1000000);
-    TestEqual(TEXT("T0 costs Sigil"),
-        static_cast<int32>(UBreakerForgeLibrary::TemperCost(Nearly, 0).Currency), static_cast<int32>(EBreakerForgeCurrency::Sigil));
-    TestEqual(TEXT("Slag and Flux cannot buy the spike"),
-        static_cast<int32>(UBreakerForgeLibrary::Temper(Nearly, 0, SlagOnly, true)),
+    const FBreakerForgeCost SpikeCost = UBreakerForgeLibrary::TemperCost(Nearly, 0);
+    TestTrue(TEXT("The spike outprices the whole normal ladder"),
+        SpikeCost.Amount > UBreakerForgeLibrary::TemperCost(
+            BreakerForgeMakeItem(EBreakerItemRarity::Anomalous, 2, {TEXT("Offense.WeaponDamage")}), 0).Amount);
+    FBreakerForgeWallet OneShort;
+    OneShort.Add(SpikeCost.Amount - 1);
+    TestEqual(TEXT("One Riftglass short of the spike is refused"),
+        static_cast<int32>(UBreakerForgeLibrary::Temper(Nearly, 0, OneShort, true)),
         static_cast<int32>(EBreakerForgeResult::Unaffordable));
+    TestEqual(TEXT("The refusal spends nothing"), OneShort.Get(), SpikeCost.Amount - 1);
 
     // Prolific already grants a tier at aggregation time, so its printed
     // ceiling tightens by the same step. Two rules that each grant a tier must
@@ -344,7 +340,7 @@ bool FBreakerForgeLoopTest::RunTest(const FString& Parameters)
     UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>(Owner);
     Equipment->BindAttributes(Attributes);
 
-    TestEqual(TEXT("The wallet starts empty"), Equipment->GetForgeWallet().Get(EBreakerForgeCurrency::Slag), 0);
+    TestEqual(TEXT("The wallet starts empty"), Equipment->GetForgeWallet().Get(), 0);
 
     // Salvage is the only currency source, and it destroys the item.
     FBreakerItemInstance Junk = BreakerForgeMakeItem(EBreakerItemRarity::Uncommon, 6, {TEXT("Core.Health")});
@@ -352,7 +348,7 @@ bool FBreakerForgeLoopTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The junk is in the backpack"), Equipment->GetBackpack().Num(), 1);
     TestTrue(TEXT("Salvage succeeds"), Equipment->SalvageFromBackpack(Junk.ItemId));
     TestEqual(TEXT("Salvage destroys the item"), Equipment->GetBackpack().Num(), 0);
-    TestTrue(TEXT("Salvage pays into the wallet"), Equipment->GetForgeWallet().Get(EBreakerForgeCurrency::Slag) > 0);
+    TestTrue(TEXT("Salvage pays into the wallet"), Equipment->GetForgeWallet().Get() > 0);
     TestFalse(TEXT("Salvaging a missing item is refused"), Equipment->SalvageFromBackpack(FGuid::NewGuid()));
 
     // Bulk salvage shares its predicate with the bulk discard, so the count the
@@ -374,8 +370,7 @@ bool FBreakerForgeLoopTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The item equips"), Equipment->EquipItem(Worn));
     const float BeforeHealth = Attributes->GetMaxHealth();
 
-    Equipment->GrantForgeCurrency(EBreakerForgeCurrency::Slag, 100000);
-    Equipment->GrantForgeCurrency(EBreakerForgeCurrency::Flux, 100000);
+    Equipment->GrantForgeCurrency(1000000);
     TestEqual(TEXT("Tempering an equipped item away from a Forge is refused"),
         static_cast<int32>(Equipment->TemperItem(Worn.ItemId, 0, false)), static_cast<int32>(EBreakerForgeResult::NotAtForge));
     TestEqual(TEXT("Tempering an unknown id is refused"),
