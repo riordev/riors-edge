@@ -80,7 +80,7 @@ Results **do not reach stdout**. Grep the log file:
 Saved/Logs/riors_edge.log      →  grep for  Result={Fail}
 ```
 
-**Baseline suite count: 312 passing, 0 failing** (measured on this tree at commit 70b8ea4). *(An earlier draft of this document carried 252 with an uncertainty note, taken from a stale line in `CONTEXT.md`. 312 is measured, not inferred. Re-run the suite on your first build and treat what you measure as the baseline; a count BELOW 312 means tests went missing, which is itself the regression.)*
+**Baseline suite count: 314 passing, 0 failing** (measured at commit 1f6a2ba: the 312 measured at 70b8ea4 plus `RiorsEdge.Game.BootFlow.ShippedConfiguration` and `RiorsEdge.Progression.LevelPointEntitlement`). *(An earlier draft of this document carried 252 with an uncertainty note, taken from a stale line in `CONTEXT.md`. Re-run the suite on your first build and treat what you measure as the baseline; a count BELOW 314 means tests went missing, which is itself the regression.)*
 
 **Standalone game:**
 ```
