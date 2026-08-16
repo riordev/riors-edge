@@ -16,14 +16,17 @@ namespace BreakerAbilityTags
     // Swift, the vertical-slice class (Class-Kits §1.2).
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Lead);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_CadenceBreak);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Overdrive);
 
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Lead);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_CadenceBreak);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Overdrive);
 
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Lead);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_CadenceBreak);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ultimate_Overdrive);
 
     // Branch keystones (spec D1). A keystone node grants a passive GE whose

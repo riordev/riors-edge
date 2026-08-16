@@ -33,10 +33,22 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKe
 // CONSUMED
 //   Node_SkimDiscipline  Abilities/BreakerAbility_Skim.cpp — with the node
 //                        owned, Skim aimed steeply down becomes Hard Stop
-//                        (all velocity cancelled). PARTIAL: the node's other
-//                        half, "Skim may be used twice per airtime", still
-//                        needs the airborne-action counter, and Hard Stop's
-//                        0.6s damage-reduction window needs Combat/.
+//                        (all velocity cancelled, 0.6s protective window via
+//                        the incoming-damage chain) and the airborne-use
+//                        ceiling rises from one to two per airtime (2026-08-16;
+//                        the counter lives on the ability instance, reset off
+//                        LandedDelegate).
+//   Node_SpendToLive     Abilities/BreakerAbility_Skim.cpp — Hard Stop's
+//                        window becomes immunity (chain multiplier 0.0) and
+//                        its committed cost doubles (2026-08-16).
+//   Node_MomentumShield  Classes/BreakerMomentumComponent.cpp — at Redline,
+//                        grounded, the loop holds a keyed incoming-damage
+//                        reduction; the fraction is an O2 PLACEHOLDER for the
+//                        still-missing Damage Reduction While Airborne affix
+//                        (2026-08-16).
+//   Node_SecondWind      Abilities/BreakerAbility_CadenceBreak.cpp — the
+//                        stack survives target swaps and misses; only a full
+//                        second without a hit resets it (2026-08-16).
 //   Node_PhantomStep     Classes/BreakerMomentumComponent.cpp — a passive
 //                        dodge proc opens a 0.5s guaranteed-dodge window on a
 //                        2.0s internal cooldown. PARTIAL: guaranteed dodge is

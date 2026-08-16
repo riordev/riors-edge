@@ -259,12 +259,19 @@ void UBreakerAbility_Overhaul::ActivateAbility(const FGameplayAbilitySpecHandle 
     if (bOverpressureActive)
     {
         // AR10 Overpressure: the bet reverses. No reserve is drawn into the
-        // magazine; instead the window credits reserve up front and every shot
-        // fired inside it restores a little more. NEAREST HONEST NOTE,
-        // recorded: the doc's literal capacity SHRINK cannot land — the
-        // weapon's capacity hook rejects negative deltas and Weapons/ is not
-        // this pass's territory — so the conversion is expressed as the
-        // reserve credit alone, at O2 placeholder size.
+        // magazine; the doc's literal capacity SHRINK now lands — the
+        // weapon's capacity hook accepts a negative delta (the 2026-08-16
+        // weapon-half pay pass closed the seam this note used to record as
+        // missing): the magazine shrinks for the window, rounds it can no
+        // longer hold settle to reserve 1:1 on the weapon, and the same
+        // WindowKey pop that settles the base bet restores the capacity.
+        // On top of the mechanical settle, the window credits reserve up
+        // front and every shot fired inside it restores a little more.
+        const int32 DesiredShrink = FMath::FloorToInt(Weapon->GetEffectiveMagazineSize() * FMath::Clamp(OverpressureCapacityShrinkFraction, 0.0f, 1.0f));
+        if (DesiredShrink > 0)
+        {
+            Weapon->PushMagazineCapacityOverride(WindowKey(), -DesiredShrink);
+        }
         Weapon->AddReserveAmmoFraction(OverpressureReserveGrantFraction);
         Weapon->OnShot.AddDynamic(this, &UBreakerAbility_Overhaul::HandleOverpressureShot);
     }

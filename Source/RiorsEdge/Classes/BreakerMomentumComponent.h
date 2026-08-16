@@ -112,6 +112,21 @@ public:
     // recently paid (R2: 20%)."
     static float FeedRefundFraction(int32 FeedRank);
 
+    // ---- K9 Momentum Shield (Class-Kits §1.4, LIVE 2026-08-16) ------------
+    // Transcribed: "While at Redline, incoming damage is reduced by an amount
+    // equal to the Damage Reduction While Airborne affix value even when
+    // grounded. Rewrite: it changes WHEN an existing stat applies, not its
+    // magnitude." Paid through the incoming-damage chain Combat/ already
+    // exposes (UBreakerCombatComponent::PushIncomingDamageModifier — the same
+    // stage gear-rolled physical reduction occupies), pushed and removed from
+    // this loop, which is the one place that knows the Redline band. The
+    // GROUNDED gate is the node's own: airborne application is the affix's job
+    // the day it exists, and applying here too would double it up then.
+    // Returns the chain multiplier: 1.0 (no change) or 1 - fraction.
+    static float MomentumShieldIncomingMultiplier(bool bNodeOwned, EBreakerMomentumState State, bool bGrounded, float ReductionFraction);
+    // Key for this loop's entry on the owner's incoming-damage chain.
+    static FName MomentumShieldModifierKey();
+
     // The last external spend this loop observed (an ability cost is the one
     // writer of the class resource that is not this component), for Feed and
     // for tests. 0 until a spend has been seen.
@@ -169,6 +184,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SlowDecayRate = 6.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float DecayGraceSeconds = 1.0f;
 
+    // K9 Momentum Shield's magnitude. O2 PLACEHOLDER: stands in for the
+    // Damage Reduction While Airborne affix value the node re-sites — that
+    // affix has no row in Items/BreakerAffixLibrary yet, so there is no roll
+    // to read. Replaced by the equipped item's roll the day the affix exists.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Shield", meta=(ClampMin="0", ClampMax="1")) float MomentumShieldReductionFraction = 0.25f;   // O2 PLACEHOLDER
+
     // Phantom Step (Core.Kinesis.PhantomStep): "a successful Dodge grants brief
     // invulnerability on a 2.0s internal cooldown". Implemented as a full-dodge
     // window pushed onto the combat component's existing passive DodgeChance —
@@ -209,6 +230,10 @@ private:
     int32 GetFrenzyNodeRank(FName NodeId) const;
     void RefreshState();
     void TryPhantomStep();
+    // K9's push/remove bookkeeping: keeps the owner's incoming-damage chain in
+    // step with the multiplier above. Called from AdvanceLoop once posture is
+    // known, and with bGrounded=false on any path that must tear it down.
+    void UpdateMomentumShield(bool bGrounded);
 
     struct FLoopOverrideEntry
     {
@@ -252,4 +277,9 @@ private:
     // baseline means "not yet observed".
     float LastKnownResource = -1.0f;
     float LastObservedSpend = 0.0f;
+
+    // K9 Momentum Shield: whether this loop currently holds an entry on the
+    // owner's incoming-damage chain, so push and remove happen exactly on the
+    // Redline-grounded edges rather than every tick.
+    bool bMomentumShieldPushed = false;
 };

@@ -1,6 +1,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Abilities/BreakerAbility_CadenceBreak.h"
 #include "Abilities/BreakerAbility_Cleave.h"
 #include "Abilities/BreakerAbility_Closequarter.h"
 #include "Abilities/BreakerAbility_Fracture.h"
@@ -189,6 +190,27 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Lead->CooldownSeconds = 10.0f;
     Lead->WindowDuration = 6.0f; // Class-Kits §1.2 row S6: mark lasts 6s.
     Registry.Add(Lead);
+
+    // S2 Cadence Break — Class-Kits §1.2 row S2: 35 Momentum, 8s cooldown,
+    // 3s state. This row closes the "Swift.CadenceBreak does not exist in the
+    // ability fallback registry" gap that Slipcut Mastery and Second Wind both
+    // record in Progression/BreakerProgressionLibrary.cpp; the F7 grant itself
+    // still waits on that (read-only in this pass) file adding the grant line.
+    // ClassAbilityTwo affinity like Lead's: affinity is a preference, not an
+    // exclusive claim (CanOccupySlot only fences the Ultimate slot).
+    UBreakerAbilityDefinition* CadenceBreak = MakeFallback(TEXT("FallbackAbility_Swift_CadenceBreak"));
+    CadenceBreak->AbilityId = TEXT("Swift.CadenceBreak");
+    CadenceBreak->ClassId = EBreakerClassId::Swift;
+    CadenceBreak->DisplayName = FText::FromString(TEXT("Cadence Break"));
+    CadenceBreak->Description = FText::FromString(TEXT("Completes the reload and opens a state where consecutive hits on one target stack flat damage."));
+    CadenceBreak->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    CadenceBreak->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_CadenceBreak;
+    CadenceBreak->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_CadenceBreak;
+    CadenceBreak->AbilityClass = UBreakerAbility_CadenceBreak::StaticClass();
+    CadenceBreak->ResourceCost = 35.0f;
+    CadenceBreak->CooldownSeconds = 8.0f;
+    CadenceBreak->WindowDuration = 3.0f; // Class-Kits §1.2 row S2: "a 3s state".
+    Registry.Add(CadenceBreak);
 
     // Overdrive — Class-Kits §1.2 ultimate: 100 Momentum (full bar), no
     // cooldown; the cost is the cooldown. Base window 8s.

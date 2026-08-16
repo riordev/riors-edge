@@ -795,6 +795,20 @@ void ABreakerDeployable::HandleZoneOccupantEntered(AActor* Occupant)
         Enemy->ApplyModifierMovementProfile(DisruptorSlowMultiplier, -1.0f);
         SlowedEnemies.AddUnique(Enemy);
 
+        // TK8 INTERDICTION: the field also delays the wind-up of telegraphed
+        // attacks begun inside it — a keyed push on the enemy's telegraph
+        // seam, per-serial like the Patience strip so two fields never share a
+        // key. Clamped at 1: delays, NEVER cancels (and never shortens, §0).
+        // NEAREST HONEST SCOPE, recorded: the key pops on exit, so a wind-up
+        // begun inside and carried out of the field loses the delay at the
+        // boundary rather than keeping it to the swing.
+        if (OwnerHasNodeTag(BreakerNodeTags::Node_TK_Interdiction.GetTag()))
+        {
+            Enemy->PushWindupDurationMultiplier(
+                FName(*FString::Printf(TEXT("Deployable.Interdiction.%d"), PlacementSerial)),
+                FMath::Max(1.0f, InterdictionWindupMultiplier));
+        }
+
         // TK9 Patience, the Disruptor half: a field armed and unentered for
         // 10s applies its FLAT armour cut at double value on the FIRST enemy
         // to enter — a second keyed strip beside the zone's own, popped on
@@ -823,6 +837,9 @@ void ABreakerDeployable::HandleZoneOccupantExited(AActor* Occupant)
         // primitive exists on enemies to compose with.
         Enemy->ApplyModifierMovementProfile(1.0f, -1.0f);
         SlowedEnemies.Remove(Enemy);
+        // Unconditional pop: keyed removal of a never-pushed key is a no-op,
+        // and gating it on the node tag would leak the delay across a respec.
+        Enemy->PopWindupDurationMultiplier(FName(*FString::Printf(TEXT("Deployable.Interdiction.%d"), PlacementSerial)));
         if (PatienceStruckEnemies.Remove(Enemy) > 0)
         {
             if (UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>())
@@ -945,6 +962,8 @@ void ABreakerDeployable::EndPlay(const EEndPlayReason::Type Reason)
         if (ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Slowed.Get()))
         {
             Enemy->ApplyModifierMovementProfile(1.0f, -1.0f);
+            // A dead field must not leave its Interdiction delay behind either.
+            Enemy->PopWindupDurationMultiplier(FName(*FString::Printf(TEXT("Deployable.Interdiction.%d"), PlacementSerial)));
         }
     }
     SlowedEnemies.Reset();

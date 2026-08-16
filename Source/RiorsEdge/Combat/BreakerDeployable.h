@@ -256,6 +256,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float DeadmanBlastRadiusCm = 300.0f;   // O2 PLACEHOLDER
     // TK3: the line-of-sight trigger's reach ("within its range" — no seed).
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float TripwireTriggerRangeCm = 900.0f;   // O2 PLACEHOLDER
+    // TK8 Interdiction: how much the Disruptor stretches enemy wind-ups begun
+    // inside it, through the enemy's keyed telegraph seam. ClampMin 1 is the
+    // node's own law — "Delays — never cancels" — and a value below 1 would
+    // SHORTEN a telegraph, which Encounter-Design §0 forbids outright.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="1")) float InterdictionWindupMultiplier = 1.6f;   // O2 PLACEHOLDER
 
     // --- Anchor Point (Class-Kits-Tank §2 T3) ------------------------------
     // 2.5 m wide x 2 m tall; health 20% of the Tank's maximum health; 12s.

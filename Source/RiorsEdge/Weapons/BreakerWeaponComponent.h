@@ -494,6 +494,16 @@ public:
     // ReservePerRound reserve per round drawn (G2's seed is 3:1), and raises
     // capacity by exactly what was drawn. ReservePerRound == 0 raises capacity
     // only and moves no rounds. Returns the rounds actually drawn.
+    //
+    // NEGATIVE DeltaRounds is the SHRINK form (AR10 Overpressure: "capacity
+    // converts into reserve instead"). The delta is clamped so the effective
+    // magazine never drops below 1 (ClampMagazineCapacityDelta), rounds the
+    // shrunk capacity can no longer hold move magazine -> reserve 1:1 on the
+    // push — they are real rounds changing pockets, not a conversion, so no
+    // ratio applies and nothing is owed on the pop: the pop simply restores
+    // capacity and the player reloads into the headroom. ReservePerRound is
+    // ignored for a shrink. Returns the (negative) capacity delta actually
+    // applied, 0 when nothing could shrink.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon|Magazine")
     int32 PushMagazineCapacityOverride(FName Key, int32 DeltaRounds, int32 ReservePerRound = 0);
     // The pop settles the UNSPENT remainder back: converted rounds still in
@@ -508,6 +518,24 @@ public:
     // floored at 1.
     UFUNCTION(BlueprintPure, Category="Weapon|Magazine")
     int32 GetEffectiveMagazineSize() const;
+
+    // ---- Gunsmith / Tank weapon-half node rules (2026-08-16) --------------
+    // The weapon-side consumers of the Armory/Bastion tags the tree already
+    // publishes. Every one is bit-identical when the node is unowned; the
+    // pure halves live on FBreakerWeaponMath and are pinned world-free.
+
+    // AR3 Chambered: true while the free post-reload round is armed — set by
+    // a completing reload when the node is owned, spent by the next shot,
+    // dropped by anything that changes which weapon is in the hands.
+    UFUNCTION(BlueprintPure, Category="Weapon|Nodes")
+    bool IsChamberedRoundArmed() const { return bChamberedRoundArmed; }
+
+    // B7 Emplacement: whether spread currently reads as stationary — node
+    // owned and the owner within the Grit layer's own anchor-near radius.
+    // GetSpeedFraction (the one movement-spread input) reads this, so the
+    // fired cone, the predicted cone and the HUD crosshair agree.
+    UFUNCTION(BlueprintPure, Category="Weapon|Nodes")
+    bool IsSpreadReadingStationary() const;
 
 protected:
     UFUNCTION(Server, Reliable) void ServerStartFire();
@@ -554,6 +582,17 @@ private:
     // True while the current fire cycle began from a genuinely full magazine —
     // the MagazineEmptied event's anti-farm clause (see the delegate comment).
     bool bFireCycleStartedFull = false;
+    // AR3 Chambered: the free round a completed reload armed (node-gated at
+    // the arm site). Server fire-path state, cleared by every path that
+    // changes which weapon is in the hands.
+    bool bChamberedRoundArmed = false;
+    // AR5's once-per-magazine guard: with the dump threshold at 1 the event
+    // fires while a round is still chambered, and this stops the actual last
+    // round re-firing it. Cleared where the magazine refills.
+    bool bMagazineDumpBroadcastThisCycle = false;
+    // Node-tag read on the owner's progression component, the same question
+    // the Marksman rules ask by rank. False with no component.
+    bool OwnerHasNodeTag(const FGameplayTag& Tag) const;
     // Keyed additive deltas over the definition's MagazineSize. No expiry: an
     // ability window owns its pop, exactly like the incoming-modifier chain.
     struct FMagazineCapacityOverrideEntry

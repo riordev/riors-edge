@@ -759,6 +759,7 @@ float UBreakerAbility_Mark::GetResourceCost() const
 }
 
 FName UBreakerAbility_Mark::IncomingModifierKey() { return TEXT("Support.Mark"); }
+FName UBreakerAbility_Mark::TellModifierKey() { return TEXT("Support.Mark.Tell"); }
 
 void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
@@ -850,6 +851,22 @@ void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     // anyone passes through it (§U5). Deep Mark rides the same key.
     TargetCombat->PushIncomingDamageModifier(IncomingModifierKey(), MarkedDamageMultiplier + DeepMarkDamagePerDepth * MarkDepth);
 
+    // WA6 TELL, the softening half: while the mark lives the marked enemy hits
+    // you softer — a keyed push on the ENEMY's outgoing-damage seam, popped
+    // wherever the incoming key pops so the two halves cannot drift. Solo the
+    // Support is the only target an enemy has, so mark-lifetime scope IS
+    // "while it attacks you" (R2's allies clause waits on a party existing).
+    // The telegraph half of the node text is carried by the enemies' universal
+    // wind-up tells; a mark-scoped EXTRA telegraph read remains recorded
+    // absent — there is no HUD surface for it yet.
+    if (SupportHasNode(Character, BreakerNodeTags::Node_WA_Tell.GetTag()))
+    {
+        if (ABreakerEnemy* MarkedEnemy = Cast<ABreakerEnemy>(Target))
+        {
+            MarkedEnemy->PushOutgoingDamageMultiplier(TellModifierKey(), TellOutgoingMultiplier);
+        }
+    }
+
     MarkedTarget = Target;
     if (UBreakerCombatComponent* OwnCombat = Character->FindComponentByClass<UBreakerCombatComponent>())
     {
@@ -873,11 +890,24 @@ void UBreakerAbility_Mark::PointMarkAt(AActor* NewTarget, float Duration)
         {
             OldCombat->RemoveIncomingDamageModifier(IncomingModifierKey());
         }
+        // WA6: the softening travels with the paint (pop of an unpushed key is
+        // a no-op for a build without the node).
+        if (ABreakerEnemy* OldEnemy = Cast<ABreakerEnemy>(Old))
+        {
+            OldEnemy->PopOutgoingDamageMultiplier(TellModifierKey());
+        }
     }
     MarkDepth = 0;   // a jumped mark lands shallow
     if (UBreakerCombatComponent* NewCombat = NewTarget->FindComponentByClass<UBreakerCombatComponent>())
     {
         NewCombat->PushIncomingDamageModifier(IncomingModifierKey(), MarkedDamageMultiplier);
+    }
+    if (SupportHasNode(Character, BreakerNodeTags::Node_WA_Tell.GetTag()))
+    {
+        if (ABreakerEnemy* NewEnemy = Cast<ABreakerEnemy>(NewTarget))
+        {
+            NewEnemy->PushOutgoingDamageMultiplier(TellModifierKey(), TellOutgoingMultiplier);
+        }
     }
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
@@ -1005,6 +1035,13 @@ void UBreakerAbility_Mark::EndAbility(const FGameplayAbilitySpecHandle Handle, c
             {
                 TargetCombat->RemoveIncomingDamageModifier(IncomingModifierKey());
             }
+            // WA6: the softening dies with the mark, unconditionally — a pop
+            // of a never-pushed key is a no-op, and gating it on the node tag
+            // would leak the softening across a respec.
+            if (ABreakerEnemy* MarkedEnemy = Cast<ABreakerEnemy>(Target))
+            {
+                MarkedEnemy->PopOutgoingDamageMultiplier(TellModifierKey());
+            }
         }
         MarkedTarget.Reset();
         if (UBreakerCombatComponent* Combat = BoundCombat.Get())
@@ -1059,9 +1096,11 @@ void UBreakerAbility_Suppress::ActivateAbility(const FGameplayAbilitySpecHandle 
     Spec.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.Support.Suppress"), false);
     // WA3 FIELD OF VIEW: Suppress reaches further (6 m -> 8 m, O2 PLACEHOLDER).
     // Its instant-slow clause is already structural — the slow lands on the
-    // occupant-entered edge, frame one — and R2's accuracy cut stays with the
-    // recorded absence above.
-    const bool bFieldOfView = SupportHasNode(Character, BreakerNodeTags::Node_WA_FieldOfView.GetTag());
+    // occupant-entered edge, frame one. The accuracy cut (formerly recorded
+    // absent) pays through the enemy aim-error seam in HandleOccupantEntered:
+    // delayed at base, INSTANT at R2 — the rank captured here decides.
+    FieldOfViewRank = SupportNodeRank(Character, TEXT("Support.Warden.FieldOfView"));
+    const bool bFieldOfView = FieldOfViewRank > 0;
     Spec.RadiusCm = bFieldOfView ? 800.0f : RadiusCm;
     Spec.Duration = Definition ? Definition->WindowDuration : 6.0f;
     Spec.TickInterval = 1.0f;
@@ -1121,12 +1160,51 @@ void UBreakerAbility_Suppress::PressureTick()
     }
 }
 
+FName UBreakerAbility_Suppress::AccuracyModifierKey() { return TEXT("Support.Suppress.Accuracy"); }
+
 void UBreakerAbility_Suppress::HandleOccupantEntered(AActor* Occupant)
 {
     if (ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Occupant))
     {
         Enemy->ApplyModifierMovementProfile(SlowMultiplier, -1.0f);
         SlowedEnemies.AddUnique(Enemy);
+
+        // §U6's accuracy half, through the enemy aim-error seam. Base: the cut
+        // lands after the application delay (and only if the enemy is STILL
+        // inside when it elapses). WA3 R2: it lands on this edge, frame one —
+        // the same instant/delayed split as the node's slow clause. One shared
+        // key: the 10s cooldown against the 6s zone means two Suppress fields
+        // never coexist, and keyed replace would merely refresh if they did.
+        if (FieldOfViewRank >= 2 || AccuracyApplyDelaySeconds <= 0.0f)
+        {
+            ApplyAccuracyCut(Enemy);
+        }
+        else if (UWorld* World = GetWorld())
+        {
+            const TWeakObjectPtr<AActor> WeakEnemy = Enemy;
+            FTimerHandle DelayHandle;
+            World->GetTimerManager().SetTimer(DelayHandle,
+                FTimerDelegate::CreateWeakLambda(this, [this, WeakEnemy]()
+                {
+                    // Still inside? SlowedEnemies is the occupancy ledger; an
+                    // exited (or expired — the ledger resets) enemy shoots
+                    // straight again and must not receive a late cut.
+                    if (AActor* Still = WeakEnemy.Get())
+                    {
+                        if (SlowedEnemies.Contains(WeakEnemy)) ApplyAccuracyCut(Still);
+                    }
+                }),
+                AccuracyApplyDelaySeconds, false);
+        }
+    }
+}
+
+void UBreakerAbility_Suppress::ApplyAccuracyCut(AActor* Occupant)
+{
+    if (ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Occupant))
+    {
+        Enemy->PushAimErrorMultiplier(AccuracyModifierKey(), FMath::Max(1.0f, SuppressAccuracyMultiplier));
+        AccuracyCutEnemies.AddUnique(Enemy);
     }
 }
 
@@ -1136,6 +1214,10 @@ void UBreakerAbility_Suppress::HandleOccupantExited(AActor* Occupant)
     {
         Enemy->ApplyModifierMovementProfile(1.0f, -1.0f);
         SlowedEnemies.Remove(Enemy);
+        if (AccuracyCutEnemies.Remove(Enemy) > 0)
+        {
+            Enemy->PopAimErrorMultiplier(AccuracyModifierKey());
+        }
     }
 }
 
@@ -1149,6 +1231,15 @@ void UBreakerAbility_Suppress::HandleZoneExpired()
         }
     }
     SlowedEnemies.Reset();
+    // The zone dying must not leave anyone aiming wide forever.
+    for (const TWeakObjectPtr<AActor>& Cut : AccuracyCutEnemies)
+    {
+        if (ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Cut.Get()))
+        {
+            Enemy->PopAimErrorMultiplier(AccuracyModifierKey());
+        }
+    }
+    AccuracyCutEnemies.Reset();
     ActiveZone = nullptr;
     if (UWorld* World = GetWorld())
     {

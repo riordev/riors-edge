@@ -120,6 +120,13 @@ public:
     // AddReserveAmmoFraction speaks.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressureReserveGrantFraction = 0.25f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0")) float OverpressurePerShotReserveFraction = 0.02f;   // O2 PLACEHOLDER
+    // AR10's literal capacity SHRINK, live now that the weapon's capacity
+    // hook accepts a negative delta (2026-08-16, the weapon-half pay pass):
+    // the window shrinks the magazine by this fraction of its effective size
+    // at activation — the mirror of the base bet's +100% growth cap — and
+    // the pop restores it, rounds displaced by the shrink settling to
+    // reserve 1:1 on the weapon.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Overhaul", meta=(ClampMin="0", ClampMax="1")) float OverpressureCapacityShrinkFraction = 0.5f;   // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleOverpressureShot(const FBreakerShotResult& Shot);

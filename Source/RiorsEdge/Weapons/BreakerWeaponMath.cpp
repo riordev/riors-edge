@@ -127,6 +127,43 @@ int32 FBreakerWeaponMath::LoadedRefundRounds(int32 ShotsInWindow, int32 LoadedRa
     return LoadedRank >= 2 ? ShotsInWindow : ShotsInWindow / 2;   // Class-Kits §1.3 F2 R1/R2
 }
 
+int32 FBreakerWeaponMath::MagazineDebitRounds(bool bChamberedRoundArmed)
+{
+    // AR3: the armed chambered round is free; everything else costs exactly
+    // the one round it always has.
+    return bChamberedRoundArmed ? 0 : 1;
+}
+
+int32 FBreakerWeaponMath::MagazineDumpThresholdRounds(bool bLastRoundOwned)
+{
+    // AR5: the payout moves from "the magazine emptied" to "your last round".
+    return bLastRoundOwned ? 1 : 0;
+}
+
+int32 FBreakerWeaponMath::ReserveCapRounds(int32 StartingReserve, float CapMultiplier, bool bNoReserveOwned)
+{
+    // AR11: the halving applies to the CEILING, inside the ceil, so 2x of an
+    // odd starting reserve halves exactly rather than rounding twice.
+    const float Multiplier = FMath::Max(0.0f, CapMultiplier) * (bNoReserveOwned ? 0.5f : 1.0f);
+    return FMath::CeilToInt(FMath::Max(0, StartingReserve) * Multiplier);
+}
+
+bool FBreakerWeaponMath::SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm)
+{
+    // B7: owned, and physically at the anchor by the Grit layer's own radius.
+    // No anchor standing reads as an infinite distance, which fails here
+    // honestly rather than needing a separate "none" case.
+    return bEmplacementOwned && AnchorNearRadiusCm > 0.0f && AnchorDistanceCm <= AnchorNearRadiusCm;
+}
+
+int32 FBreakerWeaponMath::ClampMagazineCapacityDelta(int32 EffectiveSizeWithoutEntry, int32 DeltaRounds)
+{
+    if (DeltaRounds >= 0) return DeltaRounds;
+    // Shrink form: never below one chambered round. A shrink against a
+    // magazine already at 1 clamps to zero, which the push refuses to store.
+    return FMath::Max(DeltaRounds, 1 - FMath::Max(1, EffectiveSizeWithoutEntry));
+}
+
 int32 FBreakerWeaponMath::SecondaryShotSeed(uint32 OwnerHash, int32 ShotSequence, uint32 Salt, int32 Index)
 {
     // Same seed material as the primary draws, salted twice: once by the

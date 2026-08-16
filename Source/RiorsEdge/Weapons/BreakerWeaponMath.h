@@ -158,6 +158,65 @@ public:
      */
     static int32 LoadedRefundRounds(int32 ShotsInWindow, int32 LoadedRank);
 
+    // ---- Gunsmith / Tank weapon-half node rules (Class-Kits-Gunsmith §4.1,
+    // Class-Kits-Tank Bastion B7) ------------------------------------------
+    // The pure halves of the weapon-layer consumers, world-free by the same
+    // standing as the Marksman/Frenzy block above: the suite pins the rule,
+    // the component keeps only the wiring.
+
+    /**
+     * Chambered (Class-Kits-Gunsmith §4.1 AR3): "The first shot after a
+     * completed reload consumes no ammunition." The reload-to-fire boundary:
+     * FinishReload arms the chambered round when the node is owned, and the
+     * next round fired debits this many rounds from the magazine. Unarmed
+     * (every build without the node, and every shot after the first) debits
+     * exactly 1 — the pre-node behaviour to the bit.
+     */
+    static int32 MagazineDebitRounds(bool bChamberedRoundArmed);
+
+    /**
+     * Last Round (Class-Kits-Gunsmith §4.1 AR5, weapon half): "The
+     * magazine-dump payout fires on your last round rather than on empty."
+     * Returns the magazine count AT OR BELOW which the dump event fires,
+     * post-debit: 0 without the node (the last round leaving, the authored
+     * boundary), 1 with it (the payout arrives while the last round is still
+     * chambered — and the rig's window rule, which ignores the event under
+     * this node, already lives on UBreakerAbility_SidearmRig).
+     */
+    static int32 MagazineDumpThresholdRounds(bool bLastRoundOwned);
+
+    /**
+     * No Reserve (Class-Kits-Gunsmith §4.1 AR11, weapon half): "Your maximum
+     * reserve is halved." The reserve ceiling AddReserveAmmoFraction fills to,
+     * in rounds: ceil(Starting x CapMultiplier), halved under the node before
+     * the ceil so the halving is exact and still grants at least one round of
+     * headroom on the smallest reserves. Without the node the number is the
+     * pre-node cap to the bit. (The doubled Scrap payout half lives on
+     * UBreakerScrapComponent, already shipped.)
+     */
+    static int32 ReserveCapRounds(int32 StartingReserve, float CapMultiplier, bool bNoReserveOwned);
+
+    /**
+     * Emplacement (Class-Kits-Tank, Bastion B7, weapon half): "behind your
+     * own Anchor Point your spread reads as stationary." True when the node
+     * is owned and the owner stands within the anchor-proximity radius the
+     * Grit layer already measures (B2/B4/B8's own geometry, one definition of
+     * "at your anchor" for the whole class). The weapon zeroes its speed
+     * fraction — movement spread reads exactly as standing still — and
+     * touches nothing else about the cone.
+     */
+    static bool SpreadReadsStationary(bool bEmplacementOwned, float AnchorDistanceCm, float AnchorNearRadiusCm);
+
+    /**
+     * Capacity-delta clamp for PushMagazineCapacityOverride's shrink form
+     * (Overpressure, §4.1 AR10). A positive delta passes through untouched; a
+     * negative delta is floored so the effective magazine never drops below
+     * one round — a weapon that cannot chamber anything is a hang, not a
+     * downside. EffectiveSizeWithoutEntry is the capacity as it stands before
+     * this entry lands (base plus every OTHER live override).
+     */
+    static int32 ClampMagazineCapacityDelta(int32 EffectiveSizeWithoutEntry, int32 DeltaRounds);
+
     /**
      * Seed for a draw that must not perturb the primary shot sequence.
      * Multishot's extra pellets and the secondary hits' crit rolls draw from

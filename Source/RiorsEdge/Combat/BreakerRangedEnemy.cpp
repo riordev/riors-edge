@@ -155,14 +155,19 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     // --- Fire cycle: wind-up (the tell), then the shot ---------------------
     if (bWindingUp)
     {
+        // Through the keyed telegraph seam, sampled per frame: unkeyed this is
+        // exactly the authored WindupSeconds; Interdiction stretches the tell
+        // (and the emitter ramp with it — the bloom slows to match, so the
+        // telegraph never finishes before the shot it warns about).
+        const float EffectiveWindup = WindupSeconds * GetComposedWindupDurationMultiplier();
         const float Elapsed = static_cast<float>(Now - WindupStartTime);
-        UpdateTelegraph(UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(Elapsed, WindupSeconds));
+        UpdateTelegraph(UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(Elapsed, EffectiveWindup));
         // Committing to a shot costs mobility, so the player can also read the
         // tell from the enemy's feet, not only from the emitter.
         OutSpeedScale *= WindupMoveScale;
         StateLabel = TEXT("AIMING");
 
-        if (Elapsed >= WindupSeconds)
+        if (Elapsed >= EffectiveWindup)
         {
             bWindingUp = false;
             LastAttackTime = Now;
@@ -212,8 +217,18 @@ void ABreakerRangedEnemy::FireVolley(const AActor* Target)
     const FVector AimPoint = UBreakerRangedBehaviorLibrary::ComputeAimPoint(
         Muzzle, TargetPoint, Target->GetVelocity(), ProjectileSpeed, LeadFraction);
 
-    const FVector BaseDirection = (AimPoint - Muzzle).GetSafeNormal();
+    FVector BaseDirection = (AimPoint - Muzzle).GetSafeNormal();
     if (BaseDirection.IsNearlyZero()) return;
+
+    // The aim-error seam. LATTICE's authored aim is EXACT (spread 0), so only
+    // the keyed excess over 1.0 opens a cone — Suppress's accuracy cut is the
+    // consumer. Guarded so an unkeyed volley never touches the RNG stream and
+    // stays bit-identical to the authored aim solve.
+    const float ErrorConeDegrees = GetEffectiveSpreadDegrees(0.0f, GetComposedAimErrorMultiplier(), AimErrorUnitDegrees);
+    if (ErrorConeDegrees > 0.0f)
+    {
+        BaseDirection = FMath::VRandCone(BaseDirection, FMath::DegreesToRadians(ErrorConeDegrees));
+    }
 
     const int32 Count = FMath::Max(ProjectilesPerVolley, 1);
     for (int32 Index = 0; Index < Count; ++Index)
@@ -234,7 +249,9 @@ void ABreakerRangedEnemy::FireVolley(const AActor* Target)
         if (!Projectile) continue;
 
         FBreakerDamageRequest Shot;
-        Shot.BaseDamage = AttackDamage;
+        // Through the outgoing seam (WA6's softening lands here); unkeyed it
+        // IS the chassis AttackDamage exactly.
+        Shot.BaseDamage = GetEffectiveAttackDamage();
         Shot.DamageFamily = EBreakerDamageFamily::Physical;
         // Enemies do not crit; crit is the player's multiplier
         // (Encounter-Design §0).

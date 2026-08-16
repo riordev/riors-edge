@@ -143,6 +143,67 @@ public:
     UFUNCTION(BlueprintCallable, Category="Enemy|Modifiers")
     void ConfigureAsSplitCopy(int32 InAreaLevel, float HealthFraction);
 
+    // --- Keyed enemy-side seams (the FlatArmorReduction pattern) -----------
+    // Three multiplicative, keyed lanes the player's node layer can drive.
+    // The rules are the armour lane's rules, one layer over: re-pushing a key
+    // REPLACES it (two overlapping copies of one effect share a key and so
+    // never stack), popping removes it, and the composed value is the PRODUCT
+    // of the live keys. An empty lane composes to exactly 1.0, and every
+    // consumer multiplies an authored value by it, so unkeyed behaviour is
+    // bit-identical to the authored numbers — the suite pins that.
+
+    // (1) Telegraph duration. >1.0 stretches every wind-up this enemy reads
+    // through the seam (the melee lunge wind-up, LATTICE's WindupSeconds).
+    // Sampled PER FRAME, so a delay pushed mid-wind-up extends the remainder
+    // of the tell rather than waiting for the next one. A stretched tell is
+    // strictly kinder to the player; a multiplier below 1.0 would SHORTEN a
+    // telegraph, which Encounter-Design §0 forbids — consumers clamp at 1.0.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PushWindupDurationMultiplier(FName Key, float Multiplier);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PopWindupDurationMultiplier(FName Key);
+    UFUNCTION(BlueprintPure, Category="Enemy|Seams")
+    float GetComposedWindupDurationMultiplier() const;
+
+    // (2) Aim error. A DEGRADATION multiplier on the ranged archetypes' shot
+    // direction: 1.0 is the authored aim, and the excess over 1.0 both scales
+    // any authored spread and opens AimErrorUnitDegrees of fresh error cone
+    // per unit of excess — see GetEffectiveSpreadDegrees. That last clause is
+    // what lets an accuracy cut land on LATTICE, whose authored aim is exact
+    // (a plain multiplier would multiply zero and change nothing).
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PushAimErrorMultiplier(FName Key, float Multiplier);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PopAimErrorMultiplier(FName Key);
+    UFUNCTION(BlueprintPure, Category="Enemy|Seams")
+    float GetComposedAimErrorMultiplier() const;
+
+    // (3) Outgoing damage. <1.0 means this enemy hits SOFTER. Composed into
+    // GetEffectiveAttackDamage, which every attack-damage build site reads
+    // (melee contact hit, LATTICE volley, VEIL burst), so a mark that pushes
+    // here softens the enemy's whole output while the key lives.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PushOutgoingDamageMultiplier(FName Key, float Multiplier);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Seams")
+    void PopOutgoingDamageMultiplier(FName Key);
+    UFUNCTION(BlueprintPure, Category="Enemy|Seams")
+    float GetComposedOutgoingDamageMultiplier() const;
+
+    // AttackDamage after the keyed outgoing lane. THE damage-build input:
+    // attack sites read this, never the raw field, so the softening seam has
+    // exactly one place to land. Unkeyed it IS AttackDamage, bit-identical.
+    UFUNCTION(BlueprintPure, Category="Enemy|Seams")
+    float GetEffectiveAttackDamage() const { return AttackDamage * GetComposedOutgoingDamageMultiplier(); }
+
+    // Pure: the shot cone (half-angle, degrees) for an authored spread under a
+    // composed aim-error multiplier M:
+    //   Authored * M + UnitDegrees * (M - 1), floored at zero.
+    // M == 1.0 returns the authored spread EXACTLY (x*1 and +0 are exact in
+    // float), M > 1 degrades even a zero-spread marksman, and M < 1 (an
+    // accuracy BUFF, no consumer today) tightens toward zero. Static so the
+    // suite pins the arithmetic with no world.
+    static float GetEffectiveSpreadDegrees(float AuthoredSpreadDegrees, float ComposedAimErrorMultiplier, float AimErrorUnitDegrees);
+
 protected:
     virtual void BeginPlay() override;
     // Virtual so the boss can end an encounter rather than recycle a corpse.
@@ -313,6 +374,12 @@ protected:
     // Movement during the wind-up, as a fraction of normal. The crouch.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Approach", meta=(ClampMin="0", ClampMax="1")) float LungeWindupMoveScale = 0.25f;   // O2 PLACEHOLDER
 
+    // The aim-error seam's unit: how many degrees of error cone ONE full unit
+    // of keyed degradation (multiplier 2.0) opens on this enemy's shots, over
+    // and above any authored spread. Only read when a key is live — at the
+    // neutral 1.0 the term is exactly zero and authored aim is untouched.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Seams", meta=(ClampMin="0")) float AimErrorUnitDegrees = 10.0f;   // O2 PLACEHOLDER
+
     // Shared state a derived archetype legitimately needs to read or drive.
     // PatrolPhase doubles as the per-enemy desync seed so a pack never acts in
     // lockstep; StateLabel is what the playtest HUD prints over the enemy.
@@ -358,4 +425,11 @@ private:
     FVector LungeLockedDirection = FVector::ZeroVector;
     bool bLungeWindingUp = false;
     float WeakPointBaseScale = 0.4f;
+
+    // The three seam lanes. Plain maps, not UPROPERTYs: entries are pushed and
+    // popped by live effects that also own the teardown (the armour lane's
+    // discipline), so nothing here needs to survive serialization.
+    TMap<FName, float> WindupDurationMultipliers;
+    TMap<FName, float> AimErrorMultipliers;
+    TMap<FName, float> OutgoingDamageMultipliers;
 };

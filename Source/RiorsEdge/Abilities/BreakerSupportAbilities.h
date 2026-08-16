@@ -198,6 +198,8 @@ public:
     virtual float GetResourceCost() const override;
 
     static FName IncomingModifierKey();
+    // WA6 Tell's softening key, on the ENEMY's keyed outgoing-damage seam.
+    static FName TellModifierKey();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float TargetRangeCm = 3000.0f;   // O2 PLACEHOLDER (§U5 authors no range)
     // O2 PLACEHOLDER: "takes increased damage" with no magnitude authored.
@@ -208,6 +210,10 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) int32 DeepMarkMaxDepth = 3;             // O2 PLACEHOLDER
     // WA11's shortened leash. O2 PLACEHOLDER ("much shorter").
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.5")) float HuntersEconomyDuration = 4.0f;
+    // WA6 TELL, the softening half: while the mark lives the marked enemy hits
+    // you softer — a keyed multiplier on the enemy's outgoing-damage seam.
+    // Below 1 by definition, above 0 by law: softer, never disarmed.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.05", ClampMax="1")) float TellOutgoingMultiplier = 0.75f;   // O2 PLACEHOLDER
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
@@ -225,9 +231,12 @@ private:
 };
 
 // U6 Suppress (§3 U6, Warden): a 6s zone, 6 m radius, at the aim point.
-// Enemies inside are slowed; it deals no damage at all. THE ACCURACY HALF IS
-// RECORDED ABSENT: enemy fire has no accuracy or spread concept to reduce, so
-// the slow is the whole implementable payload today.
+// Enemies inside are slowed; it deals no damage at all. The accuracy half was
+// RECORDED ABSENT until the enemy aim-error seam existed; it pays now as a
+// keyed aim-error multiplier on enemies inside — landing after the doc's
+// application delay at base, and INSTANTLY with WA3 Field of View R2 ("the
+// accuracy cut lands instantly too"), the same instant/delayed split the
+// node's slow clause describes.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Suppress : public UBreakerSupportAbility
 {
@@ -252,14 +261,31 @@ public:
     // WA5 PRESSURE: the slow, count-independent occupancy trickle (per second).
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecond = 1.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 = 2.0f;   // O2 PLACEHOLDER
+    // The accuracy cut, through the enemy's keyed aim-error seam. Above 1 by
+    // clamp: the seam reads excess-over-one as degradation, so 1.0 would be a
+    // cut that cuts nothing.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="1")) float SuppressAccuracyMultiplier = 1.75f;   // O2 PLACEHOLDER
+    // §U6's application delay on the cut. WA3 R2 removes it ("the accuracy cut
+    // lands instantly too"); at base the enemy shoots straight for this long
+    // after entering, so there is something for R2 to buy.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float AccuracyApplyDelaySeconds = 1.0f;   // O2 PLACEHOLDER
+
+    static FName AccuracyModifierKey();
 
 private:
     void PressureTick();
+    // Pushes the keyed cut on one enemy and books it for the pop.
+    void ApplyAccuracyCut(AActor* Occupant);
 
     UPROPERTY() TObjectPtr<ABreakerZoneActor> ActiveZone;
     TArray<TWeakObjectPtr<AActor>> SlowedEnemies;
+    // Enemies carrying this zone's accuracy cut, booked for pop on exit/expiry.
+    TArray<TWeakObjectPtr<AActor>> AccuracyCutEnemies;
     FTimerHandle PressureTimer;
     int32 PressureRank = 0;
+    // WA3 rank, captured at activation (the zone outlives the ability object's
+    // activation frame, so the read happens once, like PressureRank).
+    int32 FieldOfViewRank = 0;
 };
 
 // CONDUIT (§3.1 ultimate): 100 Charge, no cooldown, 12s. For the duration

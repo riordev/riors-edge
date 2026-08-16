@@ -7,14 +7,18 @@ namespace BreakerAbilityTags
 
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Skim, "Ability.Class.Swift.Skim");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Lead, "Ability.Class.Swift.Lead");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_CadenceBreak, "Ability.Class.Swift.CadenceBreak");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Overdrive, "Ability.Class.Swift.Overdrive");
 
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Skim, "Cooldown.Class.Swift.Skim");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Lead, "Cooldown.Class.Swift.Lead");
+    UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_CadenceBreak, "Cooldown.Class.Swift.CadenceBreak");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Overdrive, "Cooldown.Class.Swift.Overdrive");
 
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Skim, "State.Ability.Skim");
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Lead, "State.Ability.Lead");
+    // Spec §4.2: ActivationOwnedTags State.Ability.CadenceBreak.
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_CadenceBreak, "State.Ability.CadenceBreak");
     UE_DEFINE_GAMEPLAY_TAG(State_Ultimate_Overdrive, "State.Ultimate.Overdrive");
 
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_Bloodrhythm, "Keystone.Swift.Bloodrhythm");

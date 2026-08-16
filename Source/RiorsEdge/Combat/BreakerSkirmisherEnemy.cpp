@@ -311,8 +311,13 @@ void ABreakerSkirmisherEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, fl
         else
         {
             AimElapsed += DeltaSeconds;
-            UpdateMuzzle(UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(AimElapsed, AimSeconds) * 0.6f);
-            if (AimElapsed >= AimSeconds + BurstCooldownSeconds)
+            // The aim glow is this archetype's wind-up, so it reads the same
+            // keyed telegraph seam as the lunge and LATTICE's emitter: unkeyed
+            // the multiplier is exactly 1.0 and this IS AimSeconds; a keyed
+            // delay stretches the tell, never the cooldown after it.
+            const float EffectiveAimSeconds = AimSeconds * GetComposedWindupDurationMultiplier();
+            UpdateMuzzle(UBreakerRangedBehaviorLibrary::GetTelegraphAlpha(AimElapsed, EffectiveAimSeconds) * 0.6f);
+            if (AimElapsed >= EffectiveAimSeconds + BurstCooldownSeconds)
             {
                 AimElapsed = 0.0f;
                 RoundsLeftInBurst = FMath::Max(1, RoundsPerBurst);
@@ -355,7 +360,12 @@ void ABreakerSkirmisherEnemy::FireRound(const AActor* Target)
     const FVector Base = (Target->GetActorLocation() - Muzzle).GetSafeNormal();
     if (Base.IsNearlyZero()) return;
 
-    const FVector Direction = FMath::VRandCone(Base, FMath::DegreesToRadians(FMath::Max(0.0f, SpreadDegrees)));
+    // Authored spread through the aim-error seam: unkeyed the composed
+    // multiplier is exactly 1.0 and the cone IS SpreadDegrees bit for bit;
+    // Suppress's accuracy cut widens it (and opens extra unit cone on top).
+    const float EffectiveSpread = GetEffectiveSpreadDegrees(
+        FMath::Max(0.0f, SpreadDegrees), GetComposedAimErrorMultiplier(), AimErrorUnitDegrees);
+    const FVector Direction = FMath::VRandCone(Base, FMath::DegreesToRadians(EffectiveSpread));
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -375,7 +385,10 @@ void ABreakerSkirmisherEnemy::FireRound(const AActor* Target)
     // Per-round damage is a FRACTION of the chassis attack, so the whole burst
     // is roughly one attack and the archetype is not secretly three times as
     // dangerous as its area level claims.
-    Shot.BaseDamage = GetAttackDamage() * FMath::Max(0.0f, DamagePerRoundFraction);
+    // GetEffectiveAttackDamage, not the raw chassis number: the outgoing seam
+    // (WA6's mark softening) must catch every build site, and unkeyed the two
+    // are bit-identical.
+    Shot.BaseDamage = GetEffectiveAttackDamage() * FMath::Max(0.0f, DamagePerRoundFraction);
     Shot.DamageFamily = EBreakerDamageFamily::Physical;
     // Enemies do not crit; crit is the player's multiplier (§0).
     Shot.bCanCritical = false;

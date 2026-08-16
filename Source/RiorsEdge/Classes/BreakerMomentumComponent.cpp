@@ -303,6 +303,54 @@ float UBreakerMomentumComponent::FeedRefundFraction(int32 FeedRank)
     return FeedRank >= 2 ? 0.20f : 0.10f;   // §1.3 F6 R1/R2
 }
 
+FName UBreakerMomentumComponent::MomentumShieldModifierKey()
+{
+    return TEXT("MomentumShield");
+}
+
+float UBreakerMomentumComponent::MomentumShieldIncomingMultiplier(bool bNodeOwned, EBreakerMomentumState State, bool bGrounded, float ReductionFraction)
+{
+    // Class-Kits §1.4 K9, transcribed: "While at Redline, incoming damage is
+    // reduced ... even when grounded." Without the node, off Redline, or
+    // airborne (the affix's own posture, not this node's), the chain sees
+    // exactly nothing — the bit-identity half of the rule.
+    if (!bNodeOwned || State != EBreakerMomentumState::Redline || !bGrounded)
+    {
+        return 1.0f;
+    }
+    return 1.0f - FMath::Clamp(ReductionFraction, 0.0f, 1.0f);
+}
+
+void UBreakerMomentumComponent::UpdateMomentumShield(bool bGrounded)
+{
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    if (!Progression && GetOwner())
+    {
+        Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    }
+    const bool bNodeOwned = bIsSwift && Progression && Progression->HasNodeTag(BreakerNodeTags::Node_MomentumShield.GetTag());
+    const float Multiplier = MomentumShieldIncomingMultiplier(bNodeOwned, CachedState, bGrounded, MomentumShieldReductionFraction);
+    const bool bWantPush = Multiplier < 1.0f;
+    if (bWantPush == bMomentumShieldPushed)
+    {
+        return;
+    }
+    UBreakerCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
+    if (!Combat)
+    {
+        return;
+    }
+    if (bWantPush)
+    {
+        Combat->PushIncomingDamageModifier(MomentumShieldModifierKey(), Multiplier);
+    }
+    else
+    {
+        Combat->RemoveIncomingDamageModifier(MomentumShieldModifierKey());
+    }
+    bMomentumShieldPushed = bWantPush;
+}
+
 void UBreakerMomentumComponent::ApplyMomentumDelta(float Delta)
 {
     if (!Attributes || FMath::IsNearlyZero(Delta)) return;
@@ -486,6 +534,9 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     {
         PendingGrants = 0.0f;
         bHasLastLocation = false;
+        // A non-Swift owner holds no shield entry: tear down anything a class
+        // swap left behind (bGrounded=false composes to "remove").
+        UpdateMomentumShield(false);
         return;
     }
 
@@ -506,6 +557,12 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     else AirborneCreditRemaining = AirborneCreditSeconds;
     if (bWallRiding) WallRideCreditRemaining = FMath::Max(0.0f, WallRideCreditRemaining - DeltaTime);
     else WallRideCreditRemaining = WallRideCreditSeconds;
+
+    // K9 Momentum Shield rides the loop tick because this is the one place
+    // that knows both the band and the posture. CachedState is last tick's
+    // refresh at worst — a one-frame edge on a defensive window, the same
+    // tolerance every band-conditioned read in this file accepts.
+    UpdateMomentumShield(!bAirborne);
 
     // One-shot dash credit, gated by the movement component's own dash
     // cooldown so refunded charges cannot be farmed.

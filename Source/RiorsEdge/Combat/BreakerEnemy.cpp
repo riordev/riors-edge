@@ -548,18 +548,23 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     if (bLungeWindingUp)
     {
         // Crouched and slow. It has already chosen where it is going.
+        // The wind-up length reads through the keyed telegraph seam, sampled
+        // per frame: unkeyed the multiplier is exactly 1.0 and this IS the
+        // authored LungeWindupSeconds; a Disruptor's Interdiction stretches
+        // the remainder of the tell (delays, never cancels — TK8).
+        const float EffectiveWindup = LungeWindupSeconds * GetComposedWindupDurationMultiplier();
         OutSpeedScale = LungeWindupMoveScale;
         OutDirection = ToPlayer;
         StateLabel = TEXT("WIND-UP");
         if (WeakPointVisual)
         {
-            const float Alpha = LungeWindupSeconds > 0.0f
-                ? FMath::Clamp(static_cast<float>(Now - LungeWindupStartTime) / LungeWindupSeconds, 0.0f, 1.0f)
+            const float Alpha = EffectiveWindup > 0.0f
+                ? FMath::Clamp(static_cast<float>(Now - LungeWindupStartTime) / EffectiveWindup, 0.0f, 1.0f)
                 : 1.0f;
             WeakPointVisual->SetRelativeScale3D(FVector(
                 FMath::Lerp(WeakPointBaseScale, WeakPointBaseScale * LungeWeakPointSwell, Alpha)));
         }
-        if ((Now - LungeWindupStartTime) >= LungeWindupSeconds)
+        if ((Now - LungeWindupStartTime) >= EffectiveWindup)
         {
             bLungeWindingUp = false;
             LungeStartTime = Now;
@@ -591,7 +596,9 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     UBreakerCombatComponent* TargetCombat = TargetPawn->FindComponentByClass<UBreakerCombatComponent>();
     if (!TargetCombat) return;
     FBreakerDamageRequest Damage;
-    Damage.BaseDamage = AttackDamage;
+    // Through the outgoing seam: a WA6 mark softening this enemy lands here.
+    // Unkeyed the lane composes to exactly 1.0 and this IS AttackDamage.
+    Damage.BaseDamage = GetEffectiveAttackDamage();
     Damage.DamageFamily = EBreakerDamageFamily::Physical;
     Damage.bCanCritical = false;
     Damage.SetInstigator(this);
@@ -600,6 +607,87 @@ void ABreakerEnemy::PerformAttack(APawn* TargetPawn)
     // Anchored's slow and Cascading's hazard both hang off a LANDED hit rather
     // than a swing, so a whiff costs the player nothing.
     if (ModifierComponent) ModifierComponent->NotifyAttackLanded(TargetPawn->GetActorLocation());
+}
+
+// ---------------------------------------------------------------------------
+// The keyed enemy-side seams (the FlatArmorReduction pattern, one layer over:
+// keyed replace-on-push, pop-by-key, composed as a PRODUCT, empty lane == 1.0
+// exactly so every unkeyed consumer is bit-identical to its authored value).
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Shared lane arithmetic so the three seams cannot drift apart.
+    void BreakerEnemyPushSeamKey(TMap<FName, float>& Lane, FName Key, float Multiplier)
+    {
+        if (Key.IsNone()) return;
+        // Re-pushing REPLACES — the anti-stack rule. Negative multipliers are
+        // meaningless in every lane; clamp at zero rather than inverting.
+        Lane.Add(Key, FMath::Max(0.0f, Multiplier));
+    }
+
+    float BreakerEnemyComposeSeamLane(const TMap<FName, float>& Lane)
+    {
+        float Product = 1.0f;
+        for (const TPair<FName, float>& Entry : Lane) Product *= Entry.Value;
+        return Product;
+    }
+}
+
+void ABreakerEnemy::PushWindupDurationMultiplier(FName Key, float Multiplier)
+{
+    BreakerEnemyPushSeamKey(WindupDurationMultipliers, Key, Multiplier);
+}
+
+void ABreakerEnemy::PopWindupDurationMultiplier(FName Key)
+{
+    WindupDurationMultipliers.Remove(Key);
+}
+
+float ABreakerEnemy::GetComposedWindupDurationMultiplier() const
+{
+    return BreakerEnemyComposeSeamLane(WindupDurationMultipliers);
+}
+
+void ABreakerEnemy::PushAimErrorMultiplier(FName Key, float Multiplier)
+{
+    BreakerEnemyPushSeamKey(AimErrorMultipliers, Key, Multiplier);
+}
+
+void ABreakerEnemy::PopAimErrorMultiplier(FName Key)
+{
+    AimErrorMultipliers.Remove(Key);
+}
+
+float ABreakerEnemy::GetComposedAimErrorMultiplier() const
+{
+    return BreakerEnemyComposeSeamLane(AimErrorMultipliers);
+}
+
+void ABreakerEnemy::PushOutgoingDamageMultiplier(FName Key, float Multiplier)
+{
+    BreakerEnemyPushSeamKey(OutgoingDamageMultipliers, Key, Multiplier);
+}
+
+void ABreakerEnemy::PopOutgoingDamageMultiplier(FName Key)
+{
+    OutgoingDamageMultipliers.Remove(Key);
+}
+
+float ABreakerEnemy::GetComposedOutgoingDamageMultiplier() const
+{
+    return BreakerEnemyComposeSeamLane(OutgoingDamageMultipliers);
+}
+
+float ABreakerEnemy::GetEffectiveSpreadDegrees(float AuthoredSpreadDegrees, float ComposedAimErrorMultiplier, float AimErrorUnitDegrees)
+{
+    const float M = FMath::Max(0.0f, ComposedAimErrorMultiplier);
+    // At M == 1.0 both terms are exact float identities (x*1.0f and +0.0f), so
+    // an unkeyed enemy's cone IS its authored spread bit for bit. The excess
+    // over 1.0 opens fresh cone even on a zero-spread marksman; a below-1.0
+    // buff can tighten an authored spread but never below zero.
+    return FMath::Max(0.0f,
+        AuthoredSpreadDegrees * M + FMath::Max(0.0f, AimErrorUnitDegrees) * (M - 1.0f));
 }
 
 void ABreakerEnemy::SetBodyVisible(bool bVisible)

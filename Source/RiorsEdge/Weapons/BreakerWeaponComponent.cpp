@@ -6,6 +6,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -53,6 +54,14 @@ namespace
     FGameplayTag BreakerSightlineTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Sightline"), false); }
     FGameplayTag BreakerOverpenetrationTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Overpenetration"), false); }
     FGameplayTag BreakerMarksmanCalledShotTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.CalledShot"), false); }
+
+    // Gunsmith Armory / Tank Bastion tags this component consumes (2026-08-16,
+    // the weapon-half pay pass). Same posture as the Marksman tags above:
+    // requested soft so a rig without the tag table reads "not owned".
+    FGameplayTag BreakerChamberedTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Gunsmith.Armory.Chambered"), false); }
+    FGameplayTag BreakerArmoryLastRoundTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Gunsmith.Armory.LastRound"), false); }
+    FGameplayTag BreakerNoReserveTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Gunsmith.Armory.NoReserve"), false); }
+    FGameplayTag BreakerBastionEmplacementTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Tank.Bastion.Emplacement"), false); }
 
     // Loaded's refund window (Class-Kits §1.3 F2: "the shots fired in the
     // previous 2s"). Transcribed, not tuned.
@@ -670,6 +679,11 @@ float UBreakerWeaponComponent::GetAimAlpha() const
 float UBreakerWeaponComponent::GetSpeedFraction() const
 {
     if (!GetOwner() || MoveSpreadReferenceSpeed <= 0.0f) return 0.0f;
+    // B7 Emplacement (weapon half): behind your own Anchor Point the spread
+    // reads as stationary — the speed fraction is the ONE movement input to
+    // spread, so zeroing it here changes the fired cone, the predicted cone
+    // and the HUD crosshair together and nothing else about the shot.
+    if (IsSpreadReadingStationary()) return 0.0f;
     return FMath::Clamp(static_cast<float>(GetOwner()->GetVelocity().Size2D()) / MoveSpreadReferenceSpeed, 0.0f, 1.0f);
 }
 
@@ -686,6 +700,25 @@ int32 UBreakerWeaponComponent::GetClassNodeRank(FName NodeId) const
 {
     const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
     return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+}
+
+bool UBreakerWeaponComponent::OwnerHasNodeTag(const FGameplayTag& Tag) const
+{
+    if (!Tag.IsValid()) return false;
+    const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression && Progression->HasNodeTag(Tag);
+}
+
+bool UBreakerWeaponComponent::IsSpreadReadingStationary() const
+{
+    // B7 Emplacement's weapon half. The tag read is first so every non-Tank
+    // build pays no component lookup beyond it; the geometry is the Grit
+    // layer's own anchor-near radius, one definition of "at your anchor" for
+    // B2/B4/B7/B8 alike.
+    if (!OwnerHasNodeTag(BreakerBastionEmplacementTag())) return false;
+    const UBreakerGritComponent* Grit = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerGritComponent>() : nullptr;
+    if (!Grit) return false;
+    return FBreakerWeaponMath::SpreadReadsStationary(true, Grit->GetOwnAnchorDistanceCm(), Grit->AnchorNearRadiusCm);
 }
 
 bool UBreakerWeaponComponent::IsOwnerAirborne() const
@@ -893,9 +926,13 @@ void UBreakerWeaponComponent::EquipArchetype(EBreakerWeaponArchetype NewArchetyp
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
     CurrentArchetype = NewArchetype;
     bReloading = false;
-    // A different weapon starts its pattern from zero.
+    // A different weapon starts its pattern from zero — and drops the node
+    // boundary state: a chambered free round and a spent dump both belong to
+    // the magazine that is no longer in the hands.
     BurstShotIndex = 0;
     BloomDegrees = 0.0f;
+    bChamberedRoundArmed = false;
+    bMagazineDumpBroadcastThisCycle = false;
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     MagazineAmmo = Definition ? Definition->MagazineSize : 0;
     ReserveAmmo = Definition ? Definition->StartingReserveAmmo : 0;
@@ -954,8 +991,11 @@ void UBreakerWeaponComponent::EquipSlot(int32 SlotNumber)
     bReloading = false;
     // The incoming weapon starts its pattern from zero; any kick still in the
     // air keeps settling, because the aim it moved is still the player's aim.
+    // Node boundary state stays with the outgoing magazine (see EquipArchetype).
     BurstShotIndex = 0;
     BloomDegrees = 0.0f;
+    bChamberedRoundArmed = false;
+    bMagazineDumpBroadcastThisCycle = false;
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
 
@@ -1054,6 +1094,8 @@ void UBreakerWeaponComponent::SetSlotArchetype(int32 SlotNumber, EBreakerWeaponA
         CurrentArchetype = NewArchetype;
         BurstShotIndex = 0;
         BloomDegrees = 0.0f;
+        bChamberedRoundArmed = false;
+        bMagazineDumpBroadcastThisCycle = false;
         MagazineAmmo = Definition->MagazineSize;
         ReserveAmmo = Definition->StartingReserveAmmo;
         OnReloadChanged.Broadcast(false);
@@ -1293,11 +1335,21 @@ bool UBreakerWeaponComponent::FireOnce()
     {
         bFireCycleStartedFull = true;
     }
-    --MagazineAmmo;
+    // AR3 Chambered: the round a completed reload armed is free — the debit
+    // is 0 for exactly that one shot, 1 for every other shot any build ever
+    // fires (the pure rule; the arm site is FinishReload, node-gated there).
+    MagazineAmmo -= FBreakerWeaponMath::MagazineDebitRounds(bChamberedRoundArmed);
+    bChamberedRoundArmed = false;
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
-    if (MagazineAmmo <= 0)
+    // AR5 Last Round moves the dump boundary: threshold 0 without the node
+    // (the last round LEAVING, the authored rule to the bit), 1 with it (the
+    // payout fires while the last round is still chambered). The guard keeps
+    // it one event per magazine cycle either way — with the threshold at 1
+    // the actual last round leaving must not pay a second dump.
+    if (MagazineAmmo <= FBreakerWeaponMath::MagazineDumpThresholdRounds(OwnerHasNodeTag(BreakerArmoryLastRoundTag()))
+        && !bMagazineDumpBroadcastThisCycle)
     {
-        // On the LAST ROUND LEAVING the magazine — never on the reload.
+        bMagazineDumpBroadcastThisCycle = true;
         OnMagazineEmptied.Broadcast(bFireCycleStartedFull);
         bFireCycleStartedFull = false;
     }
@@ -2061,6 +2113,12 @@ void UBreakerWeaponComponent::FinishReload()
     MagazineAmmo += Loaded;
     ReserveAmmo -= Loaded;
     bReloading = false;
+    // The magazine refilled: the next cycle may pay its dump again (AR5's
+    // once-per-cycle guard), and AR3 Chambered arms its free round — "the
+    // first shot after a COMPLETED reload", so the arm site is here and
+    // nowhere else, node-read at the boundary the rule names.
+    bMagazineDumpBroadcastThisCycle = false;
+    bChamberedRoundArmed = OwnerHasNodeTag(BreakerChamberedTag());
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
     // Scrap's reload clause as a parameter: rounds only ever leave a magazine
@@ -2074,11 +2132,32 @@ void UBreakerWeaponComponent::FinishReload()
 
 int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 DeltaRounds, int32 ReservePerRound)
 {
-    if (Key.IsNone() || DeltaRounds <= 0) return 0;
+    if (Key.IsNone() || DeltaRounds == 0) return 0;
     // Re-pushing the same key SETTLES the old entry first rather than
     // stacking: a re-cast refreshes, and stacking two conversions under one
     // key would strand the first one's economy.
     PopMagazineCapacityOverride(Key);
+
+    if (DeltaRounds < 0)
+    {
+        // The SHRINK form (AR10 Overpressure: capacity converts into
+        // reserve). Clamped so the weapon always chambers at least one
+        // round; rounds the shrunk capacity can no longer hold change
+        // pockets, magazine -> reserve, 1:1 — they are real rounds, not a
+        // conversion, so no ratio applies and the pop owes nothing back.
+        FMagazineCapacityOverrideEntry Entry;
+        Entry.DeltaRounds = FBreakerWeaponMath::ClampMagazineCapacityDelta(GetEffectiveMagazineSize(), DeltaRounds);
+        if (Entry.DeltaRounds >= 0) return 0;
+        MagazineCapacityOverrides.Add(Key, Entry);
+        const int32 Displaced = FMath::Max(0, MagazineAmmo - GetEffectiveMagazineSize());
+        if (Displaced > 0)
+        {
+            MagazineAmmo -= Displaced;
+            ReserveAmmo += Displaced;
+            OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+        }
+        return Entry.DeltaRounds;
+    }
 
     FMagazineCapacityOverrideEntry Entry;
     Entry.ReservePerRound = FMath::Max(0, ReservePerRound);
@@ -2182,6 +2261,8 @@ void UBreakerWeaponComponent::ResetAmmunition()
     MagazineAmmo = CurrentSlot == 1 ? SlotOneMagazineAmmo : SlotTwoMagazineAmmo;
     ReserveAmmo = CurrentSlot == 1 ? SlotOneReserveAmmo : SlotTwoReserveAmmo;
     bReloading = false;
+    bChamberedRoundArmed = false;
+    bMagazineDumpBroadcastThisCycle = false;
     ResetWeaponFeel();
     OnReloadChanged.Broadcast(false);
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
@@ -2195,8 +2276,14 @@ void UBreakerWeaponComponent::AddReserveAmmoFraction(float Fraction)
     // O2 placeholder: cap at 2x StartingReserveAmmo. Enough headroom that a
     // good streak banks a cushion, tight enough that reserve still matters.
     const float ReserveCapMultiplier = 2.0f;
+    // AR11 No Reserve (weapon half): "Your maximum reserve is halved." Read
+    // once per grant and applied inside the pure cap rule; the doubled Scrap
+    // payout half already lives on UBreakerScrapComponent. A reserve sitting
+    // above the halved cap settles down to it on the next grant — the Min is
+    // the settle, honest rather than instantaneous.
+    const bool bNoReserve = OwnerHasNodeTag(BreakerNoReserveTag());
 
-    auto GrantToSlot = [this, Fraction, ReserveCapMultiplier](EBreakerWeaponArchetype Archetype, int32& SlotReserve)
+    auto GrantToSlot = [this, Fraction, ReserveCapMultiplier, bNoReserve](EBreakerWeaponArchetype Archetype, int32& SlotReserve)
     {
         const UBreakerWeaponDefinition* Definition = GetPrototypeDefinition(Archetype);
         if (!Definition) return;
@@ -2204,7 +2291,7 @@ void UBreakerWeaponComponent::AddReserveAmmoFraction(float Fraction)
         // Round up so small fractions on low-reserve weapons (rocket: 16)
         // still grant at least one round.
         const int32 Granted = FMath::CeilToInt(Starting * Fraction);
-        const int32 Cap = FMath::CeilToInt(Starting * ReserveCapMultiplier);
+        const int32 Cap = FBreakerWeaponMath::ReserveCapRounds(Starting, ReserveCapMultiplier, bNoReserve);
         SlotReserve = FMath::Min(SlotReserve + Granted, Cap);
     };
 
