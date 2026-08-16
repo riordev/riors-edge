@@ -1660,7 +1660,12 @@ FBreakerShotChannels UBreakerWeaponComponent::MomentumChannelBonus(EBreakerMomen
         Bonus.PierceCount += 1;   // O2 PLACEHOLDER — Running: rounds punch through
         // Momentum in the bar is what arms the posture bonuses: the coupling
         // is Momentum manipulating projectiles, not airtime doing it for free.
-        if (bAirborne) Bonus.AdditionalProjectiles += 1.0f;   // O2 PLACEHOLDER — airborne: the shot doubles
+        // Airborne base coupling halved 1.0 -> 0.5 (owner ruling 2026-08-16):
+        // a second pellet every other shot, not a free doubled shot. The full
+        // double is now a PURCHASE — Swift.Kinetic.AirWork authors the other
+        // +0.5 while airborne, so the doubled airborne shot is a build
+        // decision the tree sells rather than posture paying it outright.
+        if (bAirborne) Bonus.AdditionalProjectiles += 0.5f;   // O2 PLACEHOLDER — airborne: half a pellet; Air Work restores the double
         else if (bSliding) Bonus.AdditionalProjectiles += 0.5f;   // O2 PLACEHOLDER — sliding: a second pellet every other shot
     }
     if (State == EBreakerMomentumState::Redline)

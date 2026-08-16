@@ -805,10 +805,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SkimDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Air Work also carries the airborne-multishot buy-up (owner ruling
+    // 2026-08-16): the base momentum coupling's airborne bonus halved
+    // 1.0 -> 0.5 (MomentumChannelBonus), and the other half moved HERE as a
+    // purchase — +0.5 projectile while airborne, restoring the full doubled
+    // shot for a build that pays for it. Air Work is the natural home: it is
+    // Kinetic's airborne-craft node, already about doing more with airtime.
+    // The ProjectileCount Flat lane composes with the coupling's 0.5 in
+    // GetShotChannels, and the Airborne condition means the fraction only
+    // accumulates while off the ground.
     Node = MakeNode(TEXT("Swift.Kinetic.AirWork"), TEXT("Air Work"),
-        TEXT("Airborne handling improves sharply while at Redline."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Airborne handling improves sharply, and airborne shots recover their full second projectile."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Landing"));
     AddEffect(Node, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::ProjectileCount, EBreakerNodeStatBucket::Flat, 0.5f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER — owner ruling 2026-08-16: restores the halved airborne coupling to a full double
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AirWork.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1543,24 +1553,22 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Wellspring.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The branch keystone O3 permits (2 of 3 for Caster). Class-Kits VW12 is
-    // the node the codebase already anticipated: its More targets
-    // DamageOverTime, and UBreakerProgressionComponent::AggregateStats only
-    // composes a MorePercent effect into DamageMoreMultiplier when
-    // StatTarget == Damage (see its own comment, "audit item 2" /
-    // "Class-Kits' VW12"). EBreakerNodeStatTarget and EBreakerNodeStatBucket
-    // both HAVE the vocabulary for this effect -- DamageOverTime +
-    // MorePercent is a legal pair -- so this is authored exactly as
-    // specified, unlike Edgework/Cascade below. It is presently a SILENT
-    // NO-OP at runtime (the aggregator logs a warning once) until O34's open
-    // question -- whether Increased Damage and Increased DoT share one bucket
-    // for DoT ticks, or keep multiplying -- is ruled on. Not redesigned, not
-    // retargeted to plain Damage, not moved to a different bucket; recorded
-    // here exactly as Class-Kits leaves it.
+    // The branch keystone O3 permits (2 of 3 for Caster). Class-Kits VW12,
+    // and the A4 question is now ANSWERED (owner ruling 2026-08-16): DoT
+    // ticks share ONE additive Increased bucket, and the DamageOverTime More
+    // lane exists. VW12's canon text is a DoT More SPECIFICALLY ("More
+    // multiplier (2 of 3): damage over time is multiplied by 1.30" — §2.4
+    // VW12), NOT a damage-More, so it stays authored as DamageOverTime +
+    // MorePercent and now COMPOSES: AggregateStats selects it with the Damage
+    // Mores (one O34 budget, strongest three, per-source 1.30 ceiling),
+    // carries it on the DamageOverTimeMultiplier attribute's More product,
+    // and UBreakerCombatComponent::ComposeDotSourcePower multiplies it into
+    // the tick's More side under the single O34 ceiling. Direct hits never
+    // see it — DoT only is the tax, exactly as the canon prices it.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
-        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. A MORE multiplier to damage over time -- see the code comment; O34 leaves it un-composed pending an aggregation-bucket ruling."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Damage over time is multiplied by 1.30 -- a MORE multiplier, DoT ticks only, inside the one O34 More budget."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
-    AddEffect(Node, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30, per Class-Kits VW12's stated ceiling
+    AddEffect(Node, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30 per Class-Kits VW12; LIVE under A4 (owner ruling 2026-08-16)
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_LongDark.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());
@@ -1634,18 +1642,22 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 
     // The branch keystone O3 permits (3 of 3 for Caster; Caster's budget is
     // now fully allocated across its three branches, same shape as Swift's).
-    // Class-Kits MS12 conditions its More on "targets carrying 3+ distinct
-    // status types" -- a STACKING condition, which O30 explicitly names as
-    // one of the axes EBreakerBuildCondition cannot express (it is
-    // movement-only). Exactly the Reaction Chain (E10) situation again: the
-    // only authorable form would be unconditional, which is a strictly
-    // stronger generalist than the designed node and not a placeholder value
-    // this pass may invent. The slot is reserved, not spent; the keystone
-    // still exists, is still a cornerstone, and still grants the ability
-    // layer's tag so Unmake's Cascade row resolves.
+    // Class-Kits MS12's designed line was "1.25x More vs targets carrying 3+
+    // distinct status types". The stacking condition it needed EXISTS now
+    // (EBreakerBuildCondition::TargetMultiStatus, threshold 3 — O30's axis,
+    // landed with the target-condition pass), but a target-conditional More
+    // is unsupported BY RULE (Hook-And-Condition-Vocabulary §3.3: it would
+    // re-run the strongest-three selection per event per target), so the
+    // owner RE-AUTHORED it (ruling 2026-08-16): the payoff ships as a
+    // TARGET-RIDER INCREASED line — +25% Increased Damage against targets
+    // carrying 3+ distinct statuses, published through
+    // BuildTargetConditionRiders and resolved in ReceiveDamage, joining the
+    // one additive bucket while it holds. Same trigger, same magnitude
+    // number, honest bucket. Caster's third More SLOT stays unspent.
     Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
-        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage vs. 3+ status targets' 1.25x More is a recorded gap -- see the code comment; no stacking condition exists to key it honestly."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f, EBreakerBuildCondition::TargetMultiStatus); // O2 PLACEHOLDER — owner ruling 2026-08-16: MS12's 1.25x More re-authored as a target-rider Increased line
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cascade.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag());

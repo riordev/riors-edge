@@ -193,6 +193,16 @@ public:
     // this line exists in the stream).
     static const TArray<FBreakerAffixDefinition>& GetAnomalousAffixPool();
 
+    // The elemental leg of the defense triad (owner ruling 2026-08-16/17):
+    // AUTHORED-BUT-UNGATED. A real definition with a real consumer
+    // (FBreakerEquipmentStats::ElementalResistancePercent ->
+    // UBreakerCombatComponent::ReceiveDamage's Elemental branch), held out of
+    // every droppable pool because no slice enemy deals Elemental damage yet
+    // — the full reasoning, and the one-line path into the pool when O5/O38
+    // land, is on the definition in the .cpp. Resolvable via FindAffix so an
+    // item carrying it never aggregates to a lie.
+    static const FBreakerAffixDefinition& GetElementalResistanceAffix();
+
     // The companion downsides some special affixes carry (PairedAffixId).
     // Never drawable: no roll loop iterates this array. Constant negative
     // values in ordinary buckets — see the field's comment on

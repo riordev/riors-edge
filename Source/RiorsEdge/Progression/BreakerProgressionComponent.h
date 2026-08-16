@@ -134,6 +134,17 @@ public:
     static constexpr int32 MaxDamageMoreSources = 3;
     static constexpr float SingleMoreCeiling = 1.30f;
 
+    // Static tree-legality check (owner ruling 2026-08-16): a node with
+    // MaxRank > 1 may NEVER author a MorePercent effect. Rank does not scale
+    // a More — a rank-2 x1.25 would be x1.5625, which no node table means —
+    // so a multi-rank More node is authored nonsense whichever way the
+    // aggregator resolves it. AggregateStats already refuses to scale the
+    // value by rank; this makes the refusal a red test instead of a silent
+    // repricing. Pure and static so the content suite can scan every
+    // registered tree with no actor; OutReason names the offending node for
+    // the test log.
+    static bool IsNodeMoreAuthoringLegal(const UBreakerProgressionNode* Node, FString* OutReason = nullptr);
+
     // O39's implementation note: "ApplySliceDefaultsIfFresh's auto-lock to
     // Swift should be retired to a dev convenience once the class screen's
     // real path works, so the screen is actually exercised." This is that

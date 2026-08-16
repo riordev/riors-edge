@@ -2,6 +2,7 @@
 
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Items/BreakerEquipmentComponent.h"
 
 UBreakerStatusComponent::UBreakerStatusComponent()
 {
@@ -21,9 +22,58 @@ void UBreakerStatusComponent::GrantStatusImmunity(float DurationSeconds)
     StatusImmunityRemaining = FMath::Max(StatusImmunityRemaining, DurationSeconds);
 }
 
+float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
+{
+    float Chance = AilmentAvoidanceChance;
+    // Gear's leg, read from GetStats() exactly as the combat component reads
+    // Physical DR — one consumer, one clamp, no attribute lane to audit.
+    if (const AActor* Owner = GetOwner())
+    {
+        if (const UBreakerEquipmentComponent* Equipment = Owner->FindComponentByClass<UBreakerEquipmentComponent>())
+        {
+            Chance += Equipment->GetStats().AilmentAvoidanceChancePercent / 100.0f;
+        }
+    }
+    return FMath::Clamp(Chance, 0.0f, MaxAilmentAvoidanceChance);
+}
+
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+
+    // --- Ailment avoidance: one roll per application, at the door ---------
+    // BEFORE the immunity check by ruling: avoidance is the ORDINARY defence
+    // and immunity the absolute one, so an application refused by the roll
+    // never consumes anyone's attention during an immunity window, and the
+    // determinism tests can pin the roll without granting immunity first.
+    // Seeded like dodge (FRandomStream over a derived seed plus a salt,
+    // never a shared RNG): the spec carries no seed field — it lives in
+    // Progression/, another lane's file — so the application seed is the
+    // status tag's hash mixed with this component's application ordinal,
+    // which preserves the property that matters: same component, same
+    // sequence of applications, same verdicts, in a live game and in
+    // automation alike. Refreshes and stack adds roll too, because a
+    // reapplication IS an application; ticks of a status that already landed
+    // are built in AdvanceStatuses and never come back through this door,
+    // so they structurally cannot re-roll.
+    const uint32 ApplicationSeed = HashCombine(GetTypeHash(Spec.StatusTag), ApplicationsAttempted++);
+    const float AvoidanceChance = GetEffectiveAilmentAvoidanceChance();
+    if (AvoidanceChance > 0.0f)
+    {
+        FRandomStream AvoidanceRandom(HashCombine(ApplicationSeed, 0xA110Bu));
+        if (AvoidanceRandom.FRand() < AvoidanceChance)
+        {
+            // Refused entirely: no DoT, no stacks, no refresh — and not
+            // silently. The transient status hands the HUD what was avoided.
+            FBreakerActiveStatus Avoided;
+            Avoided.Spec = Spec;
+            Avoided.DamageFamily = DamageFamily;
+            Avoided.Instigator = Instigator;
+            OnStatusAvoided.Broadcast(Avoided);
+            return;
+        }
+    }
+
     // The immunity window refuses NEW applications outright — refreshes and
     // stack adds included, because a refresh IS an application.
     if (IsStatusImmune()) return;
@@ -79,7 +129,12 @@ void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
     // The immunity clock runs whether or not any status is live — it is a
     // window on the OWNER, not on the list.
     if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !Combat || ActiveStatuses.IsEmpty()) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || ActiveStatuses.IsEmpty()) return;
+    // Lazy re-bind: BeginPlay's bind misses a combat component added after it
+    // (and never runs at all on a worldless test rig). A status list with no
+    // combat sink still cannot tick.
+    if (!Combat) Combat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    if (!Combat) return;
 
     for (int32 Index = ActiveStatuses.Num() - 1; Index >= 0; --Index)
     {

@@ -59,13 +59,24 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             GetOwner()->GetActorForwardVector(), GetOwner()->GetActorLocation(),
             Request.SourceLocation, RearArcArmorMultiplier, RearArcCosine);
     }
-    // Gear-rolled physical damage reduction folds into the incoming
-    // multiplier so the resolution order stays single-path.
-    if (Request.DamageFamily == EBreakerDamageFamily::Physical)
+    // Gear-rolled damage reduction folds into the incoming multiplier so the
+    // resolution order stays single-path. Physical DR and Elemental
+    // resistance are the same mechanism aimed at different families (the
+    // defense triad, owner ruling 2026-08-16/17): each pays only against its
+    // own family, and TrueDamage answers to neither — that is what True
+    // means. The Elemental branch is authored ahead of any enemy that deals
+    // Elemental damage, deliberately: the stat's consumer exists TODAY so
+    // the day elemental incoming lands (O5/O38) the gear line pays with no
+    // further wiring — and until then the branch is simply never taken,
+    // because no request arrives carrying the family.
+    if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
         if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
         {
-            Defense.IncomingDamageMultiplier *= 1.0f - Equipment->GetStats().PhysicalDamageReductionPercent / 100.0f;
+            const float ReductionPercent = Request.DamageFamily == EBreakerDamageFamily::Physical
+                ? Equipment->GetStats().PhysicalDamageReductionPercent
+                : Equipment->GetStats().ElementalResistancePercent;
+            Defense.IncomingDamageMultiplier *= 1.0f - ReductionPercent / 100.0f;
         }
     }
     // Pushed incoming modifiers compose on top, in the same stage: Caster's
@@ -302,12 +313,44 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
 
 float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat)
 {
-    // Application-time snapshot only. The chain's product is budgeted by
-    // GetComposedMoreMultiplier, so a window folded in here and the attribute
-    // side it rides on still compose to at most the one O34 ceiling.
-    const float AttributePower = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    // A4 RULED (owner ruling 2026-08-16): DoT ticks share ONE additive
+    // Increased bucket. Increased Damage and Increased DoT no longer multiply
+    // for ticks — a build holding +50% Damage and +40% DoT ticks at
+    // (1 + 0.50 + 0.40), never 1.50 x 1.40. The two lanes' Increased sums are
+    // recovered by dividing each composed attribute by its own post-clamp More
+    // product (the aggregator's fold is (1 + Inc) x prod(More), so the division
+    // is exact), folded into one bucket, and the More side — Damage Mores, the
+    // DoT More lane VW12/Long Dark authors, and the outgoing window chain —
+    // multiplies back on top under the ONE O34 ceiling.
+    //
+    // Application-time snapshot only, as before: the returned value is the
+    // spec's whole truth and ticks never re-read anything.
+    float IncreasedBucket = 1.0f;   // 1 + sum(Increased Damage) + sum(Increased DoT)
+    float AttributeMoreProduct = 1.0f;
+    if (SourceAttributes)
+    {
+        const FBreakerAttributeAggregator& Aggregator = SourceAttributes->GetAttributeAggregator();
+        const float DamageMore = FMath::Max(Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier), UE_SMALL_NUMBER);
+        const float DotMore = FMath::Max(Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), UE_SMALL_NUMBER);
+        const float DamageIncreased = SourceAttributes->GetDamageMultiplier() / DamageMore;
+        const float DotIncreased = SourceAttributes->GetDamageOverTimeMultiplier() / DotMore;
+        IncreasedBucket = DamageIncreased + (DotIncreased - 1.0f);
+        AttributeMoreProduct = DamageMore * DotMore;
+    }
     const float WindowProduct = OwnerCombat ? OwnerCombat->GetComposedMoreMultiplier() : 1.0f;
-    return AttributePower * WindowProduct;
+    // O34: ONE More ceiling for the tick path too. The window chain is already
+    // budgeted against the Damage More side; the DoT More lane joins the same
+    // single budget here rather than opening a second one. Loud when it bites,
+    // like every other clamp site — a silent clamp is a build that lies.
+    const float RawMore = AttributeMoreProduct * WindowProduct;
+    const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+    if (RawMore > Ceiling + UE_KINDA_SMALL_NUMBER)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Tick More total %.3f (attributes %.3f x window %.3f) exceeds the %.3f ceiling (O34); clamping."),
+            RawMore, AttributeMoreProduct, WindowProduct, Ceiling);
+    }
+    const float TotalMore = FMath::Min(RawMore, Ceiling);
+    return IncreasedBucket * TotalMore;
 }
 
 void UBreakerCombatComponent::PushIncomingDamageModifier(FName Key, float Multiplier)

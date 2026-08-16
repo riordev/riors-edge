@@ -123,7 +123,15 @@ FBreakerDamageRequest UBreakerDamageLibrary::MakeSnapshotDotTick(const FBreakerS
     Request.DamageFamily = DamageFamily;
     Request.DamageTypeTag = StatusSpec.StatusTag;
     Request.SourceTags = StatusSpec.Snapshot.SourceTags;
-    Request.SourceDamageMultiplier = StatusSpec.Snapshot.SourcePower * StatusSpec.Snapshot.DamageOverTimeMultiplier;
+    // A4 (owner ruling 2026-08-16): SourcePower IS the whole tick multiplier.
+    // UBreakerCombatComponent::ComposeDotSourcePower folds Increased Damage and
+    // Increased DoT into ONE additive bucket at application time, with the More
+    // side composed on top under the single O34 ceiling. Multiplying the
+    // snapshot's DamageOverTimeMultiplier here again — the old line — was the
+    // lane-times-lane composition the ruling retired; the field survives on the
+    // snapshot for display and for application sites that still capture it, but
+    // the tick pays from SourcePower alone.
+    Request.SourceDamageMultiplier = StatusSpec.Snapshot.SourcePower;
     Request.CriticalChance = StatusSpec.Snapshot.CriticalChance;
     Request.CriticalMultiplier = StatusSpec.Snapshot.CriticalMultiplier;
     Request.ProcCoefficient = StatusSpec.ProcCoefficient;

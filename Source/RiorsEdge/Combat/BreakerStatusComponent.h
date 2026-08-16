@@ -99,6 +99,36 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Combat|Status") int32 GetEffectiveStackCap() const;
 
+    // --- Ailment avoidance (defense triad, owner ruling 2026-08-16/17) ----
+    // A chance to refuse a status infliction ENTIRELY, rolled exactly once
+    // per application at the top of ApplyStatus — BEFORE the immunity
+    // primitive, which stays the absolute refusal it always was. The roll is
+    // seeded/deterministic like dodge (an FRandomStream over the application
+    // seed plus a salt, never FMath::FRand), and it exists only at the
+    // application door: ticks of a status that already landed never re-roll,
+    // and a refused application refuses everything — the DoT, the stack add,
+    // the refresh — because "avoided" means the wound never happened.
+    //
+    // The chance is baseline-plus-gear, the DodgeChance pattern on the combat
+    // component: classes/tests set the baseline here, gear supplies
+    // FBreakerEquipmentStats::AilmentAvoidanceChancePercent (already capped
+    // at aggregation), and the composed total is clamped below 1 so gear can
+    // never rebuild GrantStatusImmunity out of suffixes.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1"))
+    float AilmentAvoidanceChance = 0.0f;
+
+    // The composed ceiling. O2 PLACEHOLDER, and deliberately the SAME number
+    // as the gear cap (FBreakerEquipmentStats::AilmentAvoidanceCapPercent /
+    // 100): one ceiling, stated twice only because Items/ cannot be included
+    // from this header — RiorsEdge.Combat.DefenseTriad.AvoidanceGate pins
+    // that the two agree so they cannot drift apart silently.
+    static constexpr float MaxAilmentAvoidanceChance = 0.75f;
+
+    // Baseline + gear, clamped. Pure and world-free so the HUD, the tooltip
+    // and the tests all read the number the roll actually uses.
+    UFUNCTION(BlueprintPure, Category="Combat|Status")
+    float GetEffectiveAilmentAvoidanceChance() const;
+
     // --- Immunity ---------------------------------------------------------
     // The status-immunity primitive Purge's §U2 window was recorded absent
     // without (2026-08-16, built for Medic MD7 Field Kit — a cleanse rule,
@@ -123,6 +153,11 @@ public:
     // detonation from a status that simply ran out. Support's Charge loop and
     // the Affliction nodes both care about the difference.
     UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusConsumed;
+    // Raised when the avoidance roll refuses an application, carrying a
+    // transient status built from the refused spec (it was never added to the
+    // list). A refused ailment that refuses SILENTLY reads as a broken status
+    // system, so the HUD gets a hook — the project's "visible tell" rule.
+    UPROPERTY(BlueprintAssignable, Category="Combat|Status") FBreakerStatusEvent OnStatusAvoided;
 
 private:
     UPROPERTY() TArray<FBreakerActiveStatus> ActiveStatuses;
@@ -132,4 +167,15 @@ private:
     // owner authored.
     int32 StackCapDelta = 0;
     float StatusImmunityRemaining = 0.0f;
+    // The avoidance roll's application ordinal. FBreakerStatusApplicationSpec
+    // carries no seed field (it lives in Progression/, another lane's file),
+    // so the application seed is derived HERE from what ApplyStatus already
+    // receives: the status tag's hash mixed with this counter. That keeps
+    // the dodge property — same component, same application sequence, same
+    // outcomes, and never a shared engine RNG — while consecutive
+    // applications of the same status still roll independently instead of
+    // all sharing one verdict. Counted per application ATTEMPT (valid specs
+    // only), whether or not it lands, so equipping avoidance mid-fight does
+    // not shift the seeds of everything after it.
+    uint32 ApplicationsAttempted = 0;
 };

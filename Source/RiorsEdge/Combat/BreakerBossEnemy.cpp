@@ -17,7 +17,7 @@
 
 ABreakerBossEnemy::ABreakerBossEnemy()
 {
-    // Rank Boss is x25 health and x2 damage out of the chassis rank table
+    // Rank Boss rank is x75 (O2 PLACEHOLDER, owner ruling 2026-08-16: boss HP x3) health and x2 damage out of the chassis rank table
     // (Power-Curve §2), derived from O18's 20-45s band against a sub-1s trash
     // target. The boss does NOT author its own health number: §3.2's literal
     // 2400 was anchored to a placeholder baseline that no longer exists, and

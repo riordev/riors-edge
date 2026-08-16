@@ -573,7 +573,7 @@ Identity: damage over time, sustain, and controlled zones. The attrition branch 
 | VW9 — Snapshot Discipline | 4 | 1 | 2 | DoTs applied while the caster is standing inside their own zone snapshot as if the caster's Critical Chance were 25 points higher. Reads Master 6.4's snapshot contract directly. Does not create a second multiplier. |
 | VW10 — Terminal | 4 | 1 | 2 | DoTs applied by this Caster do not expire on targets below 25% health; they persist until death or cleanse. |
 | VW11 — Long Debt | 4 | 1 | 2 | While Mana is negative, all Caster DoTs tick at double frequency and the caster takes 25% increased damage instead of 15%. **RESOLVED [O10] — tick interval is snapshotted with discrete steps, so this node applies at application time only (a DoT applied while Overcast keeps double frequency for its lifetime). Unblocked.** |
-| VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. **[O34 — OPEN, not redesigned]** This node's More targets DamageOverTime specifically, and the aggregator's More lane is currently authored only for the general Damage target (verified: `BreakerProgressionComponent::AggregateStats` composes a More-bucket effect into the product only when `StatTarget == Damage`) — a DoT-targeted More is presently un-authorable, and silently contributes nothing rather than multiplying anything. Whether Increased Damage and Increased DoT should share one additive bucket for DoT ticks, or keep multiplying, is the explicit open owner question under O34 (`Damage-Pipeline.md` §4a's canon table already flags this exact node as blocked on it). Recorded here pending that call — not redesigned, not retargeted to plain Damage, not moved to a different bucket. |
+| VW12 — LONG DARK (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (2 of 3):** damage over time is multiplied by 1.30. **[O34 — RULED 2026-08-16 (A4), LIVE]** The owner ruled the open question: DoT ticks share **one additive Increased bucket** (Increased Damage and Increased DoT no longer multiply for ticks), and the DamageOverTime More lane now exists. This node's DoT-targeted More composes as authored: `AggregateStats` selects it together with Damage Mores (one O34 budget — strongest three, per-source 1.30 ceiling) and `ComposeDotSourcePower` multiplies it into the tick's More side under the single O34 ceiling. DoT ticks only; direct hits never see it — that remains the tax. Not retargeted, not re-bucketed: authored and paying exactly as this row always specified. |
 
 ## 2.5 Caster branch — MULTISPELL
 
@@ -594,7 +594,7 @@ Identity: sequencing different statuses to create reactions — **Multispell rot
 | MS9 — Interference | 4 | 1 | 2 | Resonance's damage scaling changes from linear in distinct-status-count to a fixed value per status *plus* a flat bonus at 3+. Deliberately re-shaped away from a count multiplier — the anti-explosion rewrite. |
 | MS10 — Prepared | 4 | 1 | 2 | Overcast's doubled generation also applies to Multispell's status-application bonuses, and the negative floor drops to -35. |
 | MS11 — Conductor's Rule | 4 | 1 | 2 | Only one reaction may trigger per target per 0.5s, and reactions that would have triggered instead grant 10 Mana. Turns the "same application must not trigger multiple reactions" architecture requirement into a *player-facing benefit* rather than an invisible clamp. **NEEDS-RE-SITING [Mana inversion]** — the compensation half is conditional income against the 6.0/s cap, so the consolation prize for a suppressed reaction is now a much smaller one. The clamp itself is unaffected and is the half that matters architecturally. |
-| MS12 — CASCADE (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **More multiplier (3 of 3):** damage against targets carrying 3 or more distinct status types is multiplied by 1.25. Caster's three More multipliers are now spent. |
+| MS12 — CASCADE (keystone) | 5 | 1 | 4 | Rewrites Unmake (above). **RE-AUTHORED (owner ruling 2026-08-16):** the designed "1.25x More vs 3+ status targets" ships as a **target-rider Increased line** — +25% Increased Damage against targets carrying 3 or more distinct status types (`TargetMultiStatus`), resolved target-side in `ReceiveDamage`. Same trigger and magnitude, honest bucket: a target-conditional More is unsupported by rule (Hook-And-Condition-Vocabulary §3.3). Caster's third More **slot stays unspent**. |
 
 ## 2.6 Caster — worked builds against 30 points
 
@@ -719,8 +719,8 @@ Decay: none. Global cap 18/s. Spending: abilities cost Charge, 4-10s cooldowns.
 | Swift | Kinetic | 1.25x weapon damage | Airborne |
 | Swift | Marksman | 1.25x | Beyond 40 m |
 | Caster | Spellblade | 1.30x melee | Melee only |
-| Caster | Void Whisperer | 1.30x DoT | DoT only — **[O34 — OPEN]** un-authorable today as specified, see §2.4 VW12 |
-| Caster | Multispell | 1.25x | Target has 3+ distinct statuses |
+| Caster | Void Whisperer | 1.30x DoT | DoT only — **[O34 — RULED 2026-08-16 (A4), LIVE]** authored and composing, see §2.4 VW12 |
+| Caster | Multispell | *(slot unspent)* | Re-authored 2026-08-16 as +25% Increased vs 3+ distinct statuses (target rider) — see §2.5 MS12 |
 | Gunsmith / Tank / Support | one per branch | TBD | To be authored with the full treatments |
 
 **RESOLVED [O3]:** these multiply as an **unordered product**; each is authored on a branch keystone (the only legal class-layer site); the **build-wide cap is 3**; and **Aberrant signatures may not author a More**, so the Aberrant layer does not spend against this budget.

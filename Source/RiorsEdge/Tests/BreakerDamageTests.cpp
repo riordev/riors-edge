@@ -65,10 +65,17 @@ bool FBreakerSnapshotDotTest::RunTest(const FString& Parameters)
     Defense.Armor = 100.0f;
 
     const FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Tick, Defense);
-    // Raw: 10 * 2 stacks * 1.2 power * 1.5 DoT * 2 crit = 72.
+    // A4 (owner ruling 2026-08-16): SourcePower IS the whole tick multiplier —
+    // ComposeDotSourcePower folds Increased Damage and Increased DoT into one
+    // additive bucket at application. The snapshot's DamageOverTimeMultiplier
+    // (1.5 above) is deliberately NOT multiplied in again; a tick that paid
+    // SourcePower x DotMult would be the lane-times-lane composition the
+    // ruling retired. Raw: 10 * 2 stacks * 1.2 power * 2 crit = 48.
     // Physical bypass DoT receives half of normal 50% armour mitigation: 25%.
-    TestEqual(TEXT("Snapshot critical fixes raw tick damage"), Result.RawDamage, 72.0f);
-    TestEqual(TEXT("Physical bypass DoT uses half armour mitigation"), Result.HealthDamage, 54.0f);
+    TestEqual(TEXT("Snapshot critical fixes raw tick damage"), Result.RawDamage, 48.0f);
+    TestEqual(TEXT("The snapshot's DoT field no longer multiplies the tick (A4 additive bucket)"),
+        Tick.SourceDamageMultiplier, Status.Snapshot.SourcePower, 0.0001f);
+    TestEqual(TEXT("Physical bypass DoT uses half armour mitigation"), Result.HealthDamage, 36.0f);
     TestEqual(TEXT("Bypass leaves shield untouched"), Result.RemainingShield, 100.0f);
     TestTrue(TEXT("Snapshot critical result persists"), Result.bCritical);
     return true;

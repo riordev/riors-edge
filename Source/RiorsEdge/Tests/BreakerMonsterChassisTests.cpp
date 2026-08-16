@@ -134,12 +134,17 @@ bool FBreakerChassisRankTest::RunTest(const FString& Parameters)
     }
 
     // The rank ratios are derivable from O18's targets rather than guessed:
-    // trash <1s and elite ~3s IS an elite health ratio of 3, and a boss at
-    // 20-45s against a 1s trash is a ratio inside 20-45.
+    // trash <1s and elite ~3s IS an elite health ratio of 3. The boss RANK row
+    // tripled under the owner ruling 2026-08-16 (boss HP x3, 25 -> 75), so the
+    // pinned band triples with it: x60-120 is the old doc band x20-40 times
+    // three. The boss ACTOR still carries its 0.35 archetype discount, so the
+    // fielded fight is a net x26.25 over trash — this pin is honestly the rank
+    // table's number, not the fielded one.
     TestTrue(TEXT("Elite ratio sits in the doc's x3-4 band"),
         Params.EliteHealthMultiplier >= 3.0f && Params.EliteHealthMultiplier <= 4.0f);
-    TestTrue(TEXT("Boss ratio sits in the doc's x20-40 band"),
-        Params.BossHealthMultiplier >= 20.0f && Params.BossHealthMultiplier <= 40.0f);
+    TestTrue(TEXT("Boss ratio sits in the tripled x60-120 band (owner ruling 2026-08-16)"),
+        Params.BossHealthMultiplier >= 60.0f && Params.BossHealthMultiplier <= 120.0f);
+    TestEqual(TEXT("Boss rank row is exactly the ruled x75"), Params.BossHealthMultiplier, 75.0f, 0.0001f);
     TestTrue(TEXT("Modifier-bearing ratio sits in the doc's x2-3 band"),
         Params.ModifierHealthMultiplier >= 2.0f && Params.ModifierHealthMultiplier <= 3.0f);
 

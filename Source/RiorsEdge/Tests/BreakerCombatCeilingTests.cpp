@@ -327,6 +327,67 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// A4 (owner ruling 2026-08-16): DoT ticks share ONE additive Increased
+// bucket. Increased Damage and Increased DoT fold additively for ticks —
+// +50% Damage and +40% DoT is a x1.9 tick, never 1.5 x 1.4 = 2.1 — and the
+// DoT More lane (VW12 / Long Dark) multiplies on top inside the one O34
+// ceiling.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCeilingDotAdditiveBucketTest,
+    "RiorsEdge.Combat.Ceiling.DotAdditiveBucket",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerCombatCeilingTest;
+
+    // ---- The bucket rule itself ------------------------------------------
+    {
+        UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
+        FBreakerAttributeContribution Offer;
+        Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, 50.0f);
+        Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, 40.0f);
+        Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
+
+        TestEqual(TEXT("The direct-hit attribute reads its own lane alone"), Attributes->GetDamageMultiplier(), 1.5f, 0.0001f);
+        TestEqual(TEXT("The DoT attribute reads its own lane alone"), Attributes->GetDamageOverTimeMultiplier(), 1.4f, 0.0001f);
+        TestEqual(TEXT("A4: the two Increased lanes fold ADDITIVELY for ticks (1 + 0.5 + 0.4)"),
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr), 1.9f, 0.0001f);
+    }
+
+    // ---- The DoT More lane composes on top, still under the one budget ----
+    {
+        UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
+        FBreakerAttributeContribution Offer;
+        Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, 50.0f);
+        Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, 40.0f);
+        // Long Dark's shape: a 1.30x More on the DoT lane.
+        Offer.ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
+        Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
+
+        TestEqual(TEXT("A DoT More multiplies the additive bucket for ticks (1.9 x 1.30)"),
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr), 1.9f * 1.3f, 0.001f);
+        TestEqual(TEXT("A DoT More never inflates a direct hit"), Attributes->GetDamageMultiplier(), 1.5f, 0.0001f);
+    }
+
+    // ---- One O34 ceiling across Damage Mores + DoT More -------------------
+    AddExpectedError(TEXT("exceeds the"), EAutomationExpectedErrorFlags::Contains, 0);
+    {
+        UBreakerAttributeSet* Attributes = CeilingTestMakeAttributes();
+        FBreakerAttributeContribution Offer = CeilingTestTreeMores(3);
+        Offer.ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
+        Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
+
+        // Three Damage Mores already sit AT the ceiling; a DoT More on top of
+        // that raw offer buys the tick nothing more — the fold clamps the
+        // combined More side at the single budget.
+        TestEqual(TEXT("The tick's total More side clamps at the one O34 ceiling"),
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr),
+            FBreakerAttributeAggregator::ComposedMoreCeiling(), 0.001f);
+    }
+    return true;
+}
+
 // Fracture parity, worldless half 1: the CONTRACT. A request composed by the
 // chain at cast and handed to ABreakerProjectileBase reaches the impact
 // verbatim — window product, carried-status snapshot and all. (The fill site,

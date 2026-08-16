@@ -299,4 +299,72 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Multi-rank More validator (owner ruling 2026-08-16). Rank never scales a
+// More — AggregateStats refuses to multiply one by rank — so a node with
+// MaxRank > 1 authoring a MorePercent effect is authored nonsense: it
+// promises ranks it cannot pay. UBreakerProgressionComponent::
+// IsNodeMoreAuthoringLegal is the static rule; this test runs it over EVERY
+// registered tree so an offender fails red at authoring time, and proves the
+// validator itself bites on a synthetic offender.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMultiRankMoreValidatorTest,
+    "RiorsEdge.Progression.MultiRankMoreValidator",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMultiRankMoreValidatorTest::RunTest(const FString& Parameters)
+{
+    // Every registered tree passes today, and must keep passing.
+    int32 NodesScanned = 0;
+    for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
+    {
+        if (!TestNotNull(TEXT("Registered tree is valid"), Tree)) continue;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            ++NodesScanned;
+            FString Reason;
+            if (!UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(Node, &Reason))
+            {
+                AddError(FString::Printf(TEXT("Multi-rank More: %s"), *Reason));
+            }
+        }
+    }
+    TestTrue(TEXT("The scan actually walked the registered content"), NodesScanned > 100);
+
+    // The validator bites: a synthetic node with MaxRank 2 and a MorePercent
+    // effect fails, with a reason naming the node.
+    UBreakerProgressionNode* Offender = NewObject<UBreakerProgressionNode>();
+    Offender->NodeId = TEXT("Test.Synthetic.MultiRankMore");
+    Offender->MaxRank = 2;
+    FBreakerNodeEffect IllegalMore;
+    IllegalMore.StatTarget = EBreakerNodeStatTarget::Damage;
+    IllegalMore.StatBucket = EBreakerNodeStatBucket::MorePercent;
+    IllegalMore.ValuePerRank = 25.0f;
+    Offender->Effects.Add(IllegalMore);
+
+    FString OffenderReason;
+    TestFalse(TEXT("A MaxRank-2 node authoring a MorePercent effect is illegal"),
+        UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(Offender, &OffenderReason));
+    TestTrue(TEXT("The refusal names the offending node"), OffenderReason.Contains(TEXT("Test.Synthetic.MultiRankMore")));
+
+    // And the boundary holds in both directions: the same effect at MaxRank 1
+    // is legal (that is every shipped keystone), and a multi-rank node with
+    // no More is untouched by this rule.
+    Offender->MaxRank = 1;
+    TestTrue(TEXT("The same More at MaxRank 1 is legal (keystone shape)"),
+        UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(Offender));
+    UBreakerProgressionNode* MultiRankIncreased = NewObject<UBreakerProgressionNode>();
+    MultiRankIncreased->NodeId = TEXT("Test.Synthetic.MultiRankIncreased");
+    MultiRankIncreased->MaxRank = 3;
+    FBreakerNodeEffect LegalIncreased;
+    LegalIncreased.StatTarget = EBreakerNodeStatTarget::Damage;
+    LegalIncreased.StatBucket = EBreakerNodeStatBucket::IncreasedPercent;
+    LegalIncreased.ValuePerRank = 5.0f;
+    MultiRankIncreased->Effects.Add(LegalIncreased);
+    TestTrue(TEXT("A multi-rank Increased node is untouched by the rule"),
+        UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(MultiRankIncreased));
+    return true;
+}
+
 #endif

@@ -420,7 +420,9 @@ public:
     // PERCEPTIBLE (a pierce the player cannot see is dead content):
     //   Running:  +1 Pierce            — moving fast makes rounds punch through.
     //   Redline:  +1 Pierce, +1 Chain  — held speed makes them arc onward too.
-    //   Airborne: +1 whole projectile  — leaving the ground doubles the shot.
+    //   Airborne: +0.5 projectile      — a second pellet every other shot
+    //             (owner ruling 2026-08-16: halved from +1; the full double is
+    //             bought back through Swift.Kinetic.AirWork's +0.5 airborne).
     //   Sliding:  +0.5 projectile      — a second pellet every other shot.
     // Airborne/sliding multishot requires at least Running: the coupling is
     // Momentum manipulating projectiles, not posture doing it for free.

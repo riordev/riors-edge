@@ -1354,7 +1354,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
     {
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
         [
-            MenuText(FText::FromString(TEXT("MOVEMENT-DRIVEN ARPG LOOTER SHOOTER")), 11, SoftText)
+            MenuText(FText::FromString(TEXT("LOOT THE RIFTS. OUTRUN THE EDGE.")), 11, SoftText)
         ];
         Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
         [
@@ -1386,7 +1386,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
     // happened to have spawned.
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
     [
-        MenuText(FText::FromString(TEXT("MOVEMENT-DRIVEN ARPG LOOTER SHOOTER")), 11, SoftText)
+        MenuText(FText::FromString(TEXT("LOOT THE RIFTS. OUTRUN THE EDGE.")), 11, SoftText)
     ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
     [

@@ -100,21 +100,23 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerDroppedMoreLaneIsLoudTest::RunTest(const FString& Parameters)
 {
-    // A MorePercent effect on any target but Damage used to vanish with no
-    // signal at all -- Class-Kits' VW12 authors exactly this, a DoT More.
-    // The fix does not make it PAY (the aggregation lane for a non-Damage
-    // More does not exist yet, same as before); it makes the drop LOUD.
+    // A MorePercent effect on a target with no More lane used to vanish with
+    // no signal at all. The historical example here was VW12's DoT More --
+    // that one now PAYS under A4 (owner ruling 2026-08-16: Damage and
+    // DamageOverTime both compose a More product), so the loud-drop coverage
+    // moves to a target that still has no More lane. MoveSpeed is a fair
+    // stand-in: a real lane for Increased, no More lane, and none planned.
     UBreakerProgressionNode* Node = NewObject<UBreakerProgressionNode>();
-    Node->NodeId = TEXT("Test.DroppedDoTMore");
+    Node->NodeId = TEXT("Test.DroppedMoveSpeedMore");
     Node->MaxRank = 1;
     FBreakerNodeEffect Effect;
-    Effect.StatTarget = EBreakerNodeStatTarget::DamageOverTime;
+    Effect.StatTarget = EBreakerNodeStatTarget::MoveSpeed;
     Effect.StatBucket = EBreakerNodeStatBucket::MorePercent;
     Effect.ValuePerRank = 25.0f;
     Node->Effects.Add(Effect);
 
     TArray<const UBreakerProgressionNode*> Nodes = {Node};
-    TArray<FBreakerNodeRank> Ranks = {{TEXT("Test.DroppedDoTMore"), 1}};
+    TArray<FBreakerNodeRank> Ranks = {{TEXT("Test.DroppedMoveSpeedMore"), 1}};
 
     // 0 occurrences tolerates the "warn once per node id" cache already
     // having fired for this exact id earlier in the same process, matching
@@ -122,9 +124,32 @@ bool FBreakerDroppedMoreLaneIsLoudTest::RunTest(const FString& Parameters)
     // warning check).
     AddExpectedError(TEXT("MorePercent effect"), EAutomationExpectedErrorFlags::Contains, 0);
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks);
-    // The drop is real: DamageOverTimeMultiplier stays neutral. Loud does not
-    // mean fixed -- the point is that it is no longer silent.
-    TestEqual(TEXT("The dropped DoT More still does not move DamageOverTimeMultiplier"), Stats.DamageOverTimeMultiplier, 1.0f, 0.0001f);
+    // The drop is real: MoveSpeedMultiplier stays neutral and the source is
+    // not counted into the More budget. Loud does not mean fixed -- the point
+    // is that it is no longer silent.
+    TestEqual(TEXT("The dropped MoveSpeed More still does not move MoveSpeedMultiplier"), Stats.MoveSpeedMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("A laneless More is not a source in the O34 budget"), Stats.DamageMoreSourceCount, 0);
+
+    // And the A4 counterpart, asserted where the old expectation lived: a
+    // DamageOverTime More now COMPOSES instead of dropping -- it counts as a
+    // held source and rides the DoT lane's More product in the contribution.
+    UBreakerProgressionNode* DotNode = NewObject<UBreakerProgressionNode>();
+    DotNode->NodeId = TEXT("Test.ComposedDoTMore");
+    DotNode->MaxRank = 1;
+    FBreakerNodeEffect DotEffect;
+    DotEffect.StatTarget = EBreakerNodeStatTarget::DamageOverTime;
+    DotEffect.StatBucket = EBreakerNodeStatBucket::MorePercent;
+    DotEffect.ValuePerRank = 25.0f;
+    DotNode->Effects.Add(DotEffect);
+    TArray<const UBreakerProgressionNode*> DotNodes = {DotNode};
+    TArray<FBreakerNodeRank> DotRanks = {{TEXT("Test.ComposedDoTMore"), 1}};
+    FBreakerAttributeContribution Contribution;
+    const FBreakerNodeStats DotStats = UBreakerProgressionComponent::AggregateStats(DotNodes, DotRanks, &Contribution);
+    TestEqual(TEXT("A4: a DoT More counts as a held More source"), DotStats.DamageMoreSourceCount, 1);
+    TestEqual(TEXT("A4: the DoT More rides the DoT lane's contribution, not the Damage lane's"),
+        Contribution.GetMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.25f, 0.0001f);
+    TestEqual(TEXT("A4: the direct-hit More contribution stays neutral"),
+        Contribution.GetMore(EBreakerAggregatedAttribute::DamageMultiplier), 1.0f, 0.0001f);
     return true;
 }
 

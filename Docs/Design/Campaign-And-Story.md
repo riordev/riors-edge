@@ -896,3 +896,40 @@ finished story mission is *replayable at all* — the closing ritual implies the
 rift is gone. Recommendation: story rifts are one-time and the repeatable layer
 is separate local rifts in the same zone, which keeps the fiction honest. Needs
 a call before the zone content plan.
+
+---
+
+## AS-RULED 2026-08-16/17 — additive addendum (owner chat, pending O49+ transcription)
+
+**This section is purely additive. Nothing above is edited by it.** Staged in
+`Docs/Owner-Rulings-Pending-Ratification.md` (second batch); not law until it
+lands in `Decisions.md`.
+
+**1. Location canon re-affirmed.** The owner re-affirmed this document's
+five-location spine from the story treatment, verbatim in shape:
+
+- **Anchor** — the MMO hub. **Not instanced.** Shared social space.
+- **Local Rifts** — the core instanced loop: enter, clear, close. Closing
+  erases the timeline behind it (§1.1).
+- **The Breach** — the Act II gate (A2-0, A2-B).
+- **Erased Earths** — Act III's semi-open **shared** zones (A3-0 through A3-6).
+- **Rior's Frontier** — endgame scaling. Outside this document; see §5.
+
+**2. Endgame content taxonomy ruled.** Anomalies (the primary endgame farm —
+open map, mixed-rarity packs, map boss), Raids (7, checkpoints, puzzles),
+Dungeons (smaller raids, 4), Conquest (up to 9 matchmade, warzone). Full
+transcription and reconciliation — including the Anomaly-vs-Frontier naming
+question O8 already ruled once — live in `Game-Modes.md`'s AS-RULED block, not
+here. **Where those four types sit relative to the five locations above is an
+explicit OPEN owner question**; the likely mapping (Anomalies as the content
+shape of Rior's Frontier) is deliberately not authored.
+
+**3. THE GYM IS NON-CANON playtest space** (owner: "very obviously"). This
+resolves a continuity question this document created and the build then
+collided with: §3.4 rule 1 forbids any Altered asset appearing before A2-1,
+and the gym spawns the **Severed Drudge** (`Combat/BreakerAlteredEnemy.cpp`),
+an Altered enemy, in content a fresh character can reach at level 1. Because
+the gym sits nowhere in the location canon and outside the fiction entirely,
+rule 1 is **not violated and needs no exception** — it binds campaign and
+canon content only. The rule itself is unchanged and remains verified by asset
+reference search over *shipping campaign* content.

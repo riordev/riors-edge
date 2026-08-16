@@ -58,12 +58,22 @@ enum class EBreakerStatTarget : uint8
     MoveSpeed,
     DropChance,
     PhysicalDamageReduction,
-    // RESERVED, NOT LIVE. There is no elemental resistance model yet (O5 rules
-    // the elements Rift/Entropy/Void and puts resistances after armour, before
-    // shields), so this target has no aggregated field and no consumer. It is
-    // deliberately absent from the slice affix pool — an affix that rolls it
-    // would be a line of text that does nothing. Wire it with the resistance
-    // model, not before.
+    // AUTHORED, CONSUMED, NOT YET DROPPABLE (owner ruling 2026-08-16, the
+    // defense triad). This target now HAS an aggregated field
+    // (FBreakerEquipmentStats::ElementalResistancePercent) and a live consumer
+    // (UBreakerCombatComponent::ReceiveDamage folds it into the incoming
+    // multiplier for EBreakerDamageFamily::Elemental, the exact mirror of the
+    // PhysicalDamageReduction read site) — so a line that rolls it genuinely
+    // reduces Elemental damage. What does not exist yet is any enemy that
+    // DEALS Elemental damage: every enemy damage site in Combat/ authors
+    // Physical or TrueDamage, and the per-element model (Rift/Entropy/Void)
+    // is post-slice per O5/O38. The affix definition therefore stays OUT of
+    // the droppable pools (UBreakerAffixLibrary::GetElementalResistanceAffix
+    // holds it, resolvable but never rolled) so no player spends a suffix on
+    // a stat the slice cannot test them with — the "lies to nobody" rule,
+    // one step up: the LINE is honest, so the POOL has to be. The day
+    // elemental incoming lands, pool entry is one Add() in
+    // BuildSliceAffixPool.
     ElementalDamageReduction,
     CriticalChance,
     CriticalDamage,
@@ -138,6 +148,19 @@ enum class EBreakerStatTarget : uint8
     // Maximum Resource the only interesting resource stat, which is one line
     // holding up a whole class's gearing.
     ResourceEfficiency,
+    // ---- The defense triad (owner ruling 2026-08-16/17) -------------------
+    // Chance to resist an ailment/status infliction ENTIRELY, in whole
+    // percent. The middle leg of the triad (Physical DR / ailment avoidance /
+    // elemental resistance): Physical DR shrinks bullets, this REFUSES
+    // ailments — the roll happens once per application inside
+    // UBreakerStatusComponent::ApplyStatus (before the immunity primitive,
+    // deterministic like dodge), and a refused application never lands its
+    // DoT, its stacks, or its refresh. Ticks of a status that already landed
+    // never re-roll — avoidance is a door, not a per-tick tax. Deliberately
+    // NOT a percentage the DoT math reads: a 30% avoidance is "3 of 10
+    // Bleeds never happen", which is a felt event, where "-30% DoT damage"
+    // is a smaller number on a tick nobody reads.
+    AilmentAvoidance,
     Count UMETA(Hidden)
 };
 
@@ -472,4 +495,33 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     // inventory can show a raised cap instead of a number that stopped moving
     // for no visible reason.
     UPROPERTY(BlueprintReadOnly) float PhysicalDamageReductionCap = DefaultPhysicalDamageReductionCap;
+
+    // ---- The defense triad (owner ruling 2026-08-16/17) -------------------
+    // Ailment avoidance from gear, in whole percent, already capped. Consumer:
+    // UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance reads this
+    // (plus its own baseline) and rolls at ApplyStatus. NOT an attribute on
+    // purpose — like Physical DR it is read from GetStats() at its one
+    // consumer, so gear is the single writer and the cap below cannot be
+    // outbid from a second lane nobody audits.
+    //
+    // O2 PLACEHOLDER cap: 75%, and the ceiling is load-bearing rather than
+    // cosmetic — 100% avoidance would be the immunity primitive
+    // (GrantStatusImmunity) rebuilt out of suffixes, and immunity is a
+    // granted WINDOW, never a standing gear state. Full T1 stacking (5 lines
+    // x 30%) is meant to slam into this cap; the last two lines are the
+    // over-commit tax.
+    static constexpr float AilmentAvoidanceCapPercent = 75.0f;
+    UPROPERTY(BlueprintReadOnly) float AilmentAvoidanceChancePercent = 0.0f;
+
+    // Elemental resistance from gear, in whole percent, already capped.
+    // Consumer: UBreakerCombatComponent::ReceiveDamage, the Elemental-family
+    // mirror of PhysicalDamageReductionPercent two fields up. Aggregated
+    // honestly TODAY so the day an enemy deals Elemental damage the stat
+    // pays with zero further wiring; the affix that feeds it is deliberately
+    // not droppable yet — see EBreakerStatTarget::ElementalDamageReduction.
+    // O2 PLACEHOLDER cap: mirrors the Physical DR default. No rule rewrite
+    // raises it (Relentless is explicitly the PHYSICAL cap), so it is a
+    // plain constant rather than a published, rewritable field.
+    static constexpr float ElementalResistanceCapPercent = 60.0f;
+    UPROPERTY(BlueprintReadOnly) float ElementalResistancePercent = 0.0f;
 };

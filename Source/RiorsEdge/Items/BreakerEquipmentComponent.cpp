@@ -785,6 +785,20 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     Stats.PhysicalDamageReductionCap = Rules.PhysicalDamageReductionCap;
     Stats.PhysicalDamageReductionPercent = FMath::Min(
         IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::PhysicalDamageReduction)], Rules.PhysicalDamageReductionCap);
+    // The other two legs of the defense triad, capped at their own named
+    // ceilings the same way. Both are read from GetStats() at exactly one
+    // consumer each (the status component's application roll; the combat
+    // component's Elemental-family branch) rather than submitted as
+    // attributes — the Physical DR pattern, kept deliberately, so the caps
+    // here are the only clamp anyone has to audit. Clamped at zero from
+    // below too: no authored downside exists for either yet, but a negative
+    // avoidance CHANCE would be a probability nobody can roll.
+    Stats.AilmentAvoidanceChancePercent = FMath::Clamp(
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AilmentAvoidance)],
+        0.0f, FBreakerEquipmentStats::AilmentAvoidanceCapPercent);
+    Stats.ElementalResistancePercent = FMath::Clamp(
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::ElementalDamageReduction)],
+        0.0f, FBreakerEquipmentStats::ElementalResistanceCapPercent);
     Stats.CriticalChanceBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalChance)] / 100.0f;
     Stats.CriticalMultiplierBonus = FlatByTarget[static_cast<int32>(EBreakerStatTarget::CriticalDamage)] / 100.0f;
     Stats.SlideSpeedMultiplier = Increased(EBreakerStatTarget::SlideSpeed);

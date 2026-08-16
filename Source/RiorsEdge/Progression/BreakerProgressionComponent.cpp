@@ -702,7 +702,16 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // applied. Sorting and truncating a list is the only honest way to enforce
     // "a build may hold at most three": composing first and clamping the
     // product afterwards would silently reprice the nodes the player chose.
-    TArray<float> DamageMoreMultipliers;
+    //
+    // A4 (owner ruling 2026-08-16): the DoT More lane now exists — VW12 / Long
+    // Dark's DamageOverTime-targeted MorePercent composes instead of being
+    // warn-and-dropped. Both lanes share the ONE O34 budget, so the selection
+    // runs over Damage and DamageOverTime sources TOGETHER: strongest three
+    // across both, each clamped at the per-source ceiling, and each selected
+    // source lands in its own lane's product (a DoT More multiplies ticks only,
+    // through ComposeDotSourcePower; it never inflates a direct hit).
+    struct FBreakerMoreSource { float Multiplier = 1.0f; bool bDotLane = false; };
+    TArray<FBreakerMoreSource> MoreSources;
     float ActiveConditionalPercent = 0.0f;
     float PotentialConditionalPercent = 0.0f;
 
@@ -773,28 +782,32 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
 
             if (Effect.StatBucket == EBreakerNodeStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
-            else if (Effect.StatTarget == EBreakerNodeStatTarget::Damage)
+            else if (Effect.StatTarget == EBreakerNodeStatTarget::Damage
+                || Effect.StatTarget == EBreakerNodeStatTarget::DamageOverTime)
             {
                 // Rank does NOT scale a More multiplier — a rank-2 x1.25 would
                 // be x1.5625, which no node table means. Every More node in the
-                // content is single-rank; this is the guard, not a limitation.
-                DamageMoreMultipliers.Add(1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f);
+                // content is single-rank; IsNodeMoreAuthoringLegal is the
+                // validator that keeps it so, and this Min against rank 1 is
+                // the belt-and-braces guard behind it.
+                // A4 (owner ruling 2026-08-16): DamageOverTime joined Damage
+                // as a composable More lane — VW12 / Long Dark now pays.
+                MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f,
+                    Effect.StatTarget == EBreakerNodeStatTarget::DamageOverTime });
             }
             else
             {
                 // Audit item 2: every OTHER target used to drop a MorePercent
-                // effect with no signal at all — Class-Kits' VW12 authors a
-                // DoT More that would silently no-op. Only Damage composes a
-                // More product today; a future DamageOverTime (or any other)
-                // More needs its own aggregation lane before it can pay out,
-                // exactly like Damage's DamageMoreMultipliers array above.
+                // effect with no signal at all. Damage and (since A4)
+                // DamageOverTime compose a More product; any other target
+                // still needs its own aggregation lane before it can pay out.
                 // Loud once per offending node rather than silent forever.
                 static TSet<FName> WarnedOnceNodeIds;
                 if (!WarnedOnceNodeIds.Contains(Node->NodeId))
                 {
                     WarnedOnceNodeIds.Add(Node->NodeId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only EBreakerNodeStatTarget::Damage composes a More product — this effect is silently dropped."),
+                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only EBreakerNodeStatTarget::Damage and DamageOverTime compose a More product — this effect is silently dropped."),
                         *Node->NodeId.ToString(), Target);
                 }
             }
@@ -803,14 +816,19 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     }
 
     // O3's hard cap of three, and Damage-Pipeline §4's per-multiplier ceiling of
-    // 1.30x. The strongest three win, so a fourth purchase is dead weight the
-    // player can be told about rather than a quiet nerf to the other three.
-    Stats.DamageMoreSourceCount = DamageMoreMultipliers.Num();
-    DamageMoreMultipliers.Sort([](float A, float B) { return A > B; });
+    // 1.30x. The strongest three win — across BOTH lanes, one budget (A4/O34) —
+    // so a fourth purchase is dead weight the player can be told about rather
+    // than a quiet nerf to the other three. The source count reports every held
+    // source, DoT Mores included: the skill screen's "N / 3 MORE" is the whole
+    // budget, not the direct-hit lane alone.
+    Stats.DamageMoreSourceCount = MoreSources.Num();
+    MoreSources.Sort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });
     float DamageMoreProduct = 1.0f;
-    for (int32 Index = 0; Index < FMath::Min(DamageMoreMultipliers.Num(), MaxDamageMoreSources); ++Index)
+    float DotMoreProduct = 1.0f;
+    for (int32 Index = 0; Index < FMath::Min(MoreSources.Num(), MaxDamageMoreSources); ++Index)
     {
-        DamageMoreProduct *= FMath::Min(DamageMoreMultipliers[Index], SingleMoreCeiling);
+        const float Clamped = FMath::Min(MoreSources[Index].Multiplier, SingleMoreCeiling);
+        (MoreSources[Index].bDotLane ? DotMoreProduct : DamageMoreProduct) *= Clamped;
     }
     Stats.DamageMoreMultiplier = DamageMoreProduct;
     Stats.ActiveConditionalDamagePercent = ActiveConditionalPercent;
@@ -823,6 +841,16 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     };
 
     Stats.BonusHealth = Flat(EBreakerNodeStatTarget::Health);
+    // CRIT IS A BOUNDED FLAT SIDE-CHANNEL BY DESIGN — documented as intended
+    // (owner ruling 2026-08-16). Both crit lanes are Flat-bucket only: nodes
+    // and gear bid flat points of chance and flat points of multiplier, there
+    // is no Increased-percent lane for either, and none is missing. Crit's
+    // ceiling is therefore the SUM of what the content authors, not a
+    // percentage stack that scales with everything else — it cannot be
+    // Increased-scaled into a mandatory stat, and an IncreasedPercent effect
+    // authored against CriticalChance/CriticalDamage is dropped by the bucket
+    // dispatch above exactly like any other laneless line. Do not "fix" this
+    // by adding an Increased lane; the bound is the ruling.
     Stats.CriticalChanceBonus = Flat(EBreakerNodeStatTarget::CriticalChance) / 100.0f;
     Stats.CriticalMultiplierBonus = Flat(EBreakerNodeStatTarget::CriticalDamage) / 100.0f;
     Stats.DodgeChanceBonus = Flat(EBreakerNodeStatTarget::DodgeChance) / 100.0f;
@@ -923,8 +951,43 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         {
             OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, DamageMoreProduct);
         }
+        // A4 (owner ruling 2026-08-16): the DoT More lane rides the
+        // DamageOverTimeMultiplier attribute's More product — selected and
+        // per-source-clamped above WITH the Damage Mores, one shared budget.
+        // ComposeDotSourcePower divides it back out of the composed attribute
+        // to keep the Increased half additive, then multiplies it into the
+        // tick's More side under the one O34 ceiling. Direct hits never see it.
+        if (!FMath::IsNearlyEqual(DotMoreProduct, 1.0f))
+        {
+            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, DotMoreProduct);
+        }
     }
     return Stats;
+}
+
+bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgressionNode* Node, FString* OutReason)
+{
+    // The rule this validates lives in AggregateStats: a More multiplier is a
+    // single-rank purchase by construction, and the fold there refuses to
+    // scale one by rank. A node that authors MorePercent at MaxRank > 1 is
+    // therefore content that promises ranks it cannot pay (owner ruling
+    // 2026-08-16: fail it statically rather than reprice it silently).
+    if (!Node) return true;
+    if (Node->MaxRank <= 1) return true;
+    for (const FBreakerNodeEffect& Effect : Node->Effects)
+    {
+        if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent)
+        {
+            if (OutReason)
+            {
+                *OutReason = FString::Printf(
+                    TEXT("node '%s' authors a MorePercent effect (stat target %d) at MaxRank %d — More multipliers are single-rank only"),
+                    *Node->NodeId.ToString(), static_cast<int32>(Effect.StatTarget), Node->MaxRank);
+            }
+            return false;
+        }
+    }
+    return true;
 }
 
 TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetConditionRiders(

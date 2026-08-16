@@ -5,8 +5,70 @@
 **Scope:** mixed — slice: arena + wave-mode content only; post-slice: dungeons, raids, Conquest, and Anomaly/Frontier tiered content (see `Vertical-Slice.md`).
 **Last reconciled against: O40** (2026-08-14).
 
-Domain: Local Rifts, Frontiers, Dungeons (4), Raids (7), Conquest (9).
+Domain: Local Rifts, Frontiers, Dungeons (4), Raids (7), Conquest (up to 9).
 Status: Local Rifts and Frontiers are full designs. Dungeon/Raid/Conquest are one-page treatments.
+
+---
+
+## AS-RULED 2026-08-16/17 — Endgame content taxonomy (owner chat, pending O49+ transcription)
+
+> Transcribed from the owner's 2026-08-16/17 chat. Staged in
+> `Docs/Owner-Rulings-Pending-Ratification.md` (second batch); not yet in the
+> ledger, and under O28 the ledger is the only authority. The owner's words,
+> lightly compressed:
+>
+> - **ANOMALIES** — map tilesets, "different modded versions from the base
+>   game" — **THE primary endgame farm.** A relatively open map; kill lots of
+>   packs of mixed-rarity mobs dropping gear; a map boss at the end.
+> - **RAIDS** — large-scale maps, natural progression with checkpoints, bosses
+>   and difficult puzzles; **7 players** cooperating to a final boss with
+>   really good loot.
+> - **DUNGEONS** — smaller raids, **parties of 4**.
+> - **CONQUEST** — reclaiming land: a giant warzone, **up to 9 matchmade
+>   players**, thousands of mobs and minibosses.
+>
+> **Location canon, re-affirmed from the story treatment in the same chat:**
+> **Anchor** (MMO hub, NOT instanced), **Local Rifts** (the core instanced
+> loop — enter, clear, close; closing erases the timeline), **The Breach**
+> (Act II gate), **Erased Earths** (Act III semi-open shared zones),
+> **Rior's Frontier** (endgame scaling). This matches §2's content type map.
+>
+> **Reconciliation with this document, item by item:**
+>
+> 1. **The "Anomaly" description is §4's Frontier, re-affirmed in shape.**
+>    "Relatively open map, packs of mixed rarity dropping gear, map boss at
+>    the end, the primary endgame farm" is §4.1–§4.5 almost clause for clause.
+>    But the owner's *word* was **Anomalies**, and O8 renamed exactly that word
+>    to **Frontier** to close the collision with the **Anomalous** rarity.
+>    **This pass does not un-ratify O8.** The shape is re-affirmed; the name is
+>    an owner question: chat vocabulary reads as the owner's natural word for
+>    the same content type, and "Frontier" remains the working name until the
+>    owner explicitly rules the rename dead. **OPEN — does O8 stand?** (If the
+>    name reverts, the §1 vocabulary table and the O32 rarity-vs-item
+>    correction both need a sweep; the rarity collision O8 closed reopens.)
+> 2. **Raids — §6 and O31 stand, re-affirmed.** 7 players, checkpoints
+>    ("natural progression with checkpoints"), final boss, top-tier loot.
+>    "Bosses and difficult puzzles" independently confirms O31's puzzle-first
+>    reading of the mode.
+> 3. **Dungeons — §5's party of 4 re-affirmed.** The owner's framing is
+>    "smaller raids," a structural statement. §5's *reward* function (the
+>    targeted-farm home of Dungeon-exclusive Aberrant signatures) is not
+>    contradicted, but it was not re-affirmed either — it stands as design,
+>    not ruling.
+> 4. **Conquest — §7 re-affirmed with one correction: "up to 9," not
+>    exactly 9.** The fixed nine-player read in §7's header and §2's table is
+>    **superseded**: nine is the matchmaking ceiling, not a requirement, so
+>    the mode must play at fewer. "Thousands of mobs and minibosses"
+>    re-affirms count-scaling as the mode's identity (§7 Scaling).
+> 5. **OPEN — where Anomalies/Raids/Dungeons/Conquest sit relative to the five
+>    canon locations.** The likely mapping (Anomalies are the content shape of
+>    Rior's Frontier; the group modes hang off the Anchor) is *not ruled* and
+>    is deliberately not authored here. Owner call.
+> 6. **THE GYM IS NON-CANON playtest space** (owner: "very obviously"). It
+>    sits nowhere in the location canon, and nothing that spawns in it — the
+>    Severed Drudge included — binds the campaign's continuity rules. This
+>    resolves the Drudge/Act-II continuity question; see
+>    `Campaign-And-Story.md`'s AS-RULED addendum.
 ~~Authority: subordinate to `Docs/Design/Master-Sheet-Import.txt`. Every LOCKED decision there is law here.~~
 **SUPERSEDED [O28].** The master sheet is a raw import and has **lost its
 standing** — it is historical source material, not law, and is not to be cited
@@ -85,6 +147,13 @@ Vocabulary after O8:
 
 **"Anomaly"/"Anomalies" no longer appear in this document as a content type.** Every remaining use of "Anomalous" in this document is a *rarity* reference and is correct as written.
 
+> **[AS-RULED 2026-08-16/17]** The owner's endgame-taxonomy chat used
+> **"Anomalies"** as the name of the primary endgame farm — the pre-O8 word,
+> describing exactly §4's Frontier. The AS-RULED block at the top of this
+> document records the reconciliation: the shape is re-affirmed, O8's rename is
+> *not* overturned by chat vocabulary, and whether the name reverts is an
+> explicit OPEN owner question. Until ruled, **Frontier stands.**
+
 **GAP [O8]:** §4.3 already uses **"Frontier pack"** as the name of the top pack-rarity tier inside a Frontier. Post-rename that reads as "the Frontier pack in a Frontier." O8 renames the content type only and does not rule on the pack tier name, so it is left as written. This needs an owner naming decision for the pack tier; do not resolve it in propagation.
 
 ---
@@ -108,7 +177,7 @@ Frontier is a rift-shaped mode the player runs afterwards — see that document'
 | **Frontier** | 1-5 | Yes | Yes, infinite | T0 bases, Aberrant, Anomalous, T-1 materials | **Build second** |
 | Dungeon | 4 | Yes | Yes, lockout-lite | Targeted Aberrant signatures | Post-slice |
 | Raid | 7 | Yes | Yes, weekly-ish | Guaranteed T-1, unique Anomalous | Post-slice |
-| Conquest | 9 matchmade | Yes | Yes | Volume + Frontier access currency | Post-slice |
+| Conquest | up to 9 matchmade *(was "9" — superseded, AS-RULED 2026-08-16/17)* | Yes | Yes | Volume + Frontier access currency | Post-slice |
 
 ### Repeatable vs one-time ratio — RECOMMENDATION
 
@@ -627,7 +696,13 @@ The Frontier reward package, per completed run:
 
 ## 7. CONQUEST — one-page treatment
 
-**9 players, matchmade. Handcrafted maps, procedural front-line state. Repeatable.**
+**Up to 9 players, matchmade. Handcrafted maps, procedural front-line state. Repeatable.**
+
+> **[AS-RULED 2026-08-16/17]** The owner's ruling is "**up to 9** matchmade
+> players" — nine is the ceiling, not a requirement. The fixed-nine reading
+> this section was written around is superseded; everything below must hold at
+> smaller matchmade counts too. "Thousands of mobs and minibosses" and
+> "reclaiming land — a giant warzone" are re-affirmed verbatim.
 
 **Function:** the low-commitment, high-volume, drop-in mode. Reclaiming land. Thousands of enemies, mini-bosses, a warzone. It is the mode a player runs when they do not want to think.
 

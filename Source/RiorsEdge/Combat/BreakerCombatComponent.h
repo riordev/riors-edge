@@ -85,14 +85,20 @@ public:
     // submissions alike), 1.0 when no attribute set is bound.
     UFUNCTION(BlueprintPure, Category="Combat|Outgoing") float GetAttributeSideMoreProduct() const;
 
-    // Snapshot-time source power for a DoT APPLICATION: the composed
-    // DamageMultiplier attribute times the outgoing chain's budgeted More
-    // product. DoTs snapshot offensive stats at application (locked rule), and
-    // before this the chain's product was NOT in the snapshot — a bleed applied
-    // inside an Overdrive window ticked as if the window did not exist. Called
-    // at application time only, never per tick; ticks already resolved read
-    // their spec's captured value and stay untouched. Null-safe on both
-    // arguments so every application site can call it unconditionally.
+    // Snapshot-time source power for a DoT APPLICATION — the WHOLE tick
+    // multiplier since A4 (owner ruling 2026-08-16): Increased Damage and
+    // Increased DoT fold into ONE additive bucket (1 + IncDamage + IncDoT),
+    // then the More side (Damage Mores x the DoT More lane x the outgoing
+    // chain's budgeted product) multiplies on top under the one O34 ceiling.
+    // The snapshot's separate DamageOverTimeMultiplier field is display-side
+    // only now; MakeSnapshotDotTick no longer multiplies it in, because doing
+    // so is exactly the lane-times-lane composition A4 retired.
+    // DoTs snapshot offensive stats at application (locked rule), and before
+    // this existed the chain's product was NOT in the snapshot — a bleed
+    // applied inside an Overdrive window ticked as if the window did not
+    // exist. Called at application time only, never per tick; ticks already
+    // resolved read their spec's captured value and stay untouched. Null-safe
+    // on both arguments so every application site can call it unconditionally.
     static float ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat);
 
     // Incoming-damage modifier chain (Ability-Implementation-Spec §4.4). Keyed

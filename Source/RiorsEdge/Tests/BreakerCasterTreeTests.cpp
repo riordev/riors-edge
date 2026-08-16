@@ -3,7 +3,10 @@
 #include "Misc/AutomationTest.h"
 #include "GameFramework/Actor.h"
 #include "Abilities/BreakerAbilityTags.h"
+#include "Attributes/BreakerAttributeAggregation.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -256,13 +259,11 @@ bool FBreakerCasterTreesLegalEffectsTest::RunTest(const FString& Parameters)
 // O3/O34 budget: the greediest legal single-branch Caster build (a full
 // Void Whisperer walk, the only Caster branch that authors a MorePercent
 // effect at all) must not push the composed More product past the ceiling.
-// Long Dark's More targets DamageOverTime, which
-// UBreakerProgressionComponent::AggregateStats does not yet compose into
-// DamageMoreMultiplier (see the code comment on Long Dark and O34) -- so
-// today this resolves to a product of exactly 1.0 with zero counted sources.
-// That is the honest number, asserted directly rather than assumed, so a
-// future DoT-More aggregation lane changes this test's expectation instead
-// of silently drifting past the ceiling unnoticed.
+// A4 (owner ruling 2026-08-16): the DoT More lane EXISTS now — Long Dark's
+// DamageOverTime-targeted 1.30x composes onto the DamageOverTimeMultiplier
+// attribute's More product, counts as one source in the shared O34 budget,
+// and never touches the direct-hit Damage More product. This test is the
+// pin the old comment promised would change when the lane landed.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCasterTreesMoreCeilingTest,
@@ -298,11 +299,18 @@ bool FBreakerCasterTreesMoreCeilingTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Long Dark's keystone tag is live once bought"),
         Stats.GrantedTags.HasTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag()));
 
-    // The honest number today: DamageOverTime-targeted Mores are not composed
-    // (O34), so a full Void Whisperer contributes nothing to the Damage More
-    // product or its source count.
-    TestEqual(TEXT("A full Void Whisperer contributes no Damage More source today (O34 gap)"), Stats.DamageMoreSourceCount, 0);
-    TestEqual(TEXT("A full Void Whisperer's Damage More product is neutral today (O34 gap)"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
+    // A4: Long Dark PAYS. It counts as one held More source in the shared
+    // budget, lands on the DoT lane's More product, and leaves the direct-hit
+    // Damage More product neutral — DoT only is the tax the canon prices.
+    TestEqual(TEXT("Long Dark counts as one More source in the shared O34 budget (A4)"), Stats.DamageMoreSourceCount, 1);
+    TestEqual(TEXT("Long Dark leaves the direct-hit Damage More product neutral (DoT only)"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("Long Dark's 1.30x rides the DoT lane's More product (A4)"),
+        Attributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.30f, 0.0001f);
+    // And it reaches an actual tick: the whole-tick multiplier composed for a
+    // DoT application carries the 1.30x (times whatever Increased the walk
+    // bought, additively — the A4 bucket rule).
+    TestTrue(TEXT("A full Void Whisperer's DoT tick pays the Long Dark More"),
+        UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr) >= 1.30f - UE_KINDA_SMALL_NUMBER);
 
     // A hard, content-independent ceiling check regardless: whatever the
     // product is, it must never exceed the O3-cap composed against the
@@ -310,6 +318,47 @@ bool FBreakerCasterTreesMoreCeilingTest::RunTest(const FString& Parameters)
     const float AbsoluteCeiling = FMath::Pow(UBreakerProgressionComponent::SingleMoreCeiling,
         static_cast<float>(UBreakerProgressionComponent::MaxDamageMoreSources));
     TestTrue(TEXT("The composed product stays under the O3 ceiling"), Stats.DamageMoreMultiplier <= AbsoluteCeiling + UE_KINDA_SMALL_NUMBER);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// MS12 Cascade re-authored (owner ruling 2026-08-16): the designed "1.25x
+// More vs 3+ status targets" ships as a TARGET-RIDER INCREASED line — +25%
+// Increased Damage conditioned on TargetMultiStatus, published through
+// BuildTargetConditionRiders and resolved target-side in ReceiveDamage.
+// Caster's third More slot stays unspent; the keystone's payoff is real.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCascadeTargetRiderTest,
+    "RiorsEdge.Progression.CasterTrees.CascadeTargetRider",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCascadeTargetRiderTest::RunTest(const FString& Parameters)
+{
+    UBreakerProgressionTree* Multispell = UBreakerProgressionLibrary::GetCasterMultispellTree();
+    if (!TestNotNull(TEXT("Multispell tree exists"), Multispell)) return false;
+
+    TArray<const UBreakerProgressionNode*> Nodes;
+    for (const UBreakerProgressionNode* Node : Multispell->Nodes) Nodes.Add(Node);
+    TArray<FBreakerNodeRank> Ranks;
+    Ranks.Add({ TEXT("Caster.Multispell.Cascade"), 1 });
+
+    // The node authors NO More: the slot stays unspent (the re-authoring's
+    // whole point), and the payoff is not a source in the O34 budget.
+    const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks);
+    TestEqual(TEXT("Cascade spends no More source (re-authored as Increased)"), Stats.DamageMoreSourceCount, 0);
+    TestEqual(TEXT("Cascade's rider is not composed source-side (deferred to the target site)"),
+        Stats.DamageMultiplier, 1.0f, 0.0001f);
+
+    // The rider row itself: one line, Damage / Increased / +25, keyed on the
+    // stacking predicate Class-Kits MS12 always named.
+    const TArray<FBreakerTargetConditionRider> Riders =
+        UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks);
+    if (!TestEqual(TEXT("Cascade publishes exactly one target rider"), Riders.Num(), 1)) return false;
+    TestTrue(TEXT("The rider keys on TargetMultiStatus (3+ distinct statuses)"),
+        Riders[0].Condition == EBreakerBuildCondition::TargetMultiStatus);
+    TestTrue(TEXT("The rider targets Damage"), Riders[0].StatTarget == EBreakerNodeStatTarget::Damage);
+    TestEqual(TEXT("The rider is +25% Increased (O2 PLACEHOLDER, owner ruling 2026-08-16)"), Riders[0].Percent, 25.0f, 0.0001f);
     return true;
 }
 

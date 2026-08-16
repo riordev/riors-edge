@@ -162,7 +162,32 @@ namespace
         Pool.Add(MakeAffix(TEXT("Core.MaxResource"), TEXT("Maximum Resource"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::MaxResource, EBreakerStatBucket::Flat, AllSlots, 8.0f, 100.0f));
         Pool.Add(MakeAffix(TEXT("Core.MoveSpeed"), TEXT("Movement Speed"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::MoveSpeed, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 18.0f, 60.0f));
         Pool.Add(MakeAffix(TEXT("Core.DropChance"), TEXT("Drop Chance"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::DropChance, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 31.0f, 60.0f));
-        Pool.Add(MakeAffix(TEXT("Core.PhysicalDR"), TEXT("Physical Damage Reduction"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::PhysicalDamageReduction, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 18.0f));
+        // The bullet leg of the defense triad (owner ruling 2026-08-16/17).
+        // CEILING EXTENDED 18 -> 26 under the ruling's "extend its tiers if
+        // thin" — and the build-profile audit (finding 2) showed it was thin:
+        // monster damage grows x8.5 across L10->L50 while this was the only
+        // percent-DR lane on gear, so hits-to-die INVERTED (7.9 -> 3.9). The
+        // floor stays 2.0 per the O29 rule (floors never move; a level-1 drop
+        // stays bit-identical). At the character-cap tier T6 the line pays
+        // ~6.7% instead of ~5.6%; five committed lines are ~33% (bullets
+        // taken x0.67) instead of ~28%. The 60% cap (80 with Relentless)
+        // still bites at three T1 lines, which is the over-commit tax.
+        // O2 PLACEHOLDER: 2% (T12) -> 26% (T1).
+        Pool.Add(MakeAffix(TEXT("Core.PhysicalDR"), TEXT("Physical Damage Reduction"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::PhysicalDamageReduction, EBreakerStatBucket::IncreasedPercent, AllSlots, 2.0f, 26.0f));
+        // The ailment leg of the triad: a chance to refuse a status
+        // infliction outright, rolled once per application at
+        // UBreakerStatusComponent::ApplyStatus (seeded/deterministic like
+        // dodge; ticks of a landed status never re-roll). Rolls on the five
+        // ARMOUR-shaped homes and not the weapons/necklace: refusing wounds
+        // is what plating is for, and the per-slot identity table keeps the
+        // necklace and guns as the offence/utility slots.
+        // O2 PLACEHOLDER: 3% (T12) -> 30% (T1); T6 (character cap) ~8.8%, so
+        // three committed lines at 50 refuse ~26% of ailments. Larger per
+        // line than Physical DR because it is a COIN FLIP against one damage
+        // stream, not a guaranteed cut against the main one; the 75% cap on
+        // FBreakerEquipmentStats is where full T1 stacking lands.
+        Pool.Add(MakeAffix(TEXT("Core.AilmentAvoidance"), TEXT("Ailment Avoidance"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::AilmentAvoidance, EBreakerStatBucket::IncreasedPercent,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist}, 3.0f, 30.0f, 70.0f));
         // Slide Speed and Dash Cooldown now roll on the two WEAPON slots as
         // well as their armour homes. That is not breadth for its own sake:
         // the owner's sidearm lean is "sidearm slide speed", and a lean toward
@@ -511,6 +536,38 @@ const TArray<FBreakerAffixDefinition>& UBreakerAffixLibrary::GetSpecialDownsideP
     return Pool;
 }
 
+const FBreakerAffixDefinition& UBreakerAffixLibrary::GetElementalResistanceAffix()
+{
+    // The elemental leg of the defense triad (owner ruling 2026-08-16/17),
+    // AUTHORED-BUT-UNGATED — the stated choice, and why:
+    //
+    // The reserved-target precedent ("so it lies to nobody") bans a line that
+    // aggregates to nothing. This line no longer would: the aggregated field
+    // and the ReceiveDamage consumer are live, so the tooltip "Reduces
+    // Elemental damage taken" is TRUE the moment it prints. But truth is not
+    // the whole standard — no enemy in the slice deals Elemental damage
+    // (every enemy damage site authors Physical or TrueDamage; the
+    // Rift/Entropy/Void model is post-slice per O5/O38), so a droppable line
+    // would be a suffix that costs a real suffix slot and pays nothing a
+    // playtester can feel. That is the same failure with better paperwork.
+    // So the definition lives HERE, resolvable through FindAffix (a granted
+    // or test item carrying it aggregates truthfully) and iterated by NO roll
+    // loop — pool exclusion by membership, the exact mechanism the special
+    // pools already use. Entering the drop pool is one Add() in
+    // BuildSliceAffixPool the day elemental incoming exists.
+    //
+    // Band mirrors Physical DR's pre-extension reference shape scaled to its
+    // own job: one family of a future damage split rather than today's whole
+    // incoming stream. O2 PLACEHOLDER: 2% (T12) -> 18% (T1), 60% cap
+    // (FBreakerEquipmentStats::ElementalResistanceCapPercent).
+    static const FBreakerAffixDefinition Affix = MakeAffix(
+        TEXT("Core.ElementalResist"), TEXT("Elemental Resistance"), EBreakerAffixCategory::Suffix,
+        EBreakerStatTarget::ElementalDamageReduction, EBreakerStatBucket::IncreasedPercent,
+        {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves,
+         EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace}, 2.0f, 18.0f);
+    return Affix;
+}
+
 bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
 {
     switch (Target)
@@ -549,6 +606,11 @@ const FBreakerAffixDefinition* UBreakerAffixLibrary::FindAffix(const TArray<FBre
     // rarity while still always being READ.
     if (const FBreakerAffixDefinition* Found = GetAberrantAffixPool().FindByPredicate(ById)) return Found;
     if (const FBreakerAffixDefinition* Found = GetAnomalousAffixPool().FindByPredicate(ById)) return Found;
+    // The authored-but-ungated elemental leg resolves here for the same
+    // reason the special pools do: an item that CARRIES the line (granted,
+    // test fixture, future content) must aggregate and print it truthfully,
+    // while no generic candidate walk can ever OFFER it.
+    if (GetElementalResistanceAffix().AffixId == AffixId) return &GetElementalResistanceAffix();
     return GetSpecialDownsidePool().FindByPredicate(ById);
 }
 

@@ -80,10 +80,16 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     // --- Rank table (Power-Curve.md §2) ------------------------------------
     // These are RATIOS to trash at the SAME area level, which is what makes
     // them derivable rather than guessed: O18 wants trash <1s and elite ~3s,
-    // so the elite health ratio IS 3. Boss 25 against a 1s trash lands at 25s,
-    // inside O18's 20-45s band. The shipping ConfigureElite used 2.0x health
-    // and measured 3.01s elite only because trash was simultaneously 1.81x too
-    // slow; the two errors were cancelling.
+    // so the elite health ratio IS 3. The shipping ConfigureElite used 2.0x
+    // health and measured 3.01s elite only because trash was simultaneously
+    // 1.81x too slow; the two errors were cancelling.
+    //
+    // Boss moved 25 -> 75 (owner ruling 2026-08-16: boss HP x3). The RANK row
+    // is what tripled, not the boss actor: ABreakerBossEnemy keeps its 0.35
+    // archetype ratio, so the fielded boss lands at a net x26.25 over trash
+    // (~3x the old effective x8.75) — inside O18's 20-45s band once the
+    // archetype discount is counted, where the old net fight was ending in
+    // single digits.
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
     float EliteHealthMultiplier = 3.0f;   // O2 PLACEHOLDER (doc band x3-4)
@@ -98,7 +104,7 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     float ModifierDamageMultiplier = 1.25f;   // O2 PLACEHOLDER
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
-    float BossHealthMultiplier = 25.0f;   // O2 PLACEHOLDER (doc band x20-40)
+    float BossHealthMultiplier = 75.0f;   // O2 PLACEHOLDER (owner ruling 2026-08-16: boss HP x3, 25 -> 75; old doc band x20-40 triples with it)
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis|Rank", meta=(ClampMin="1"))
     float BossDamageMultiplier = 2.0f;   // O2 PLACEHOLDER

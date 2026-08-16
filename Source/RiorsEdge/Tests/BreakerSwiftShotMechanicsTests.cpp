@@ -5,7 +5,9 @@
 #include "Classes/BreakerMomentumComponent.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
@@ -190,13 +192,38 @@ bool FBreakerSwiftMomentumCouplingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Redline adds +1 chain"), Redline.ChainCount, 1);
 
     // Airborne and sliding modulate multishot — but only with a bar to spend.
+    // Airborne halved 1.0 -> 0.5 (owner ruling 2026-08-16): base coupling is a
+    // second pellet every other shot; the full airborne double is now bought
+    // back through Swift.Kinetic.AirWork's +0.5 airborne ProjectileCount line.
     const FBreakerShotChannels AirborneRunning = UBreakerWeaponComponent::MomentumChannelBonus(EBreakerMomentumState::Running, true, false);
-    TestEqual(TEXT("airborne at Running doubles the shot"), AirborneRunning.AdditionalProjectiles, 1.0f);
+    TestEqual(TEXT("airborne at Running is half a pellet (owner ruling 2026-08-16; Air Work restores the double)"), AirborneRunning.AdditionalProjectiles, 0.5f);
     const FBreakerShotChannels SlidingRunning = UBreakerWeaponComponent::MomentumChannelBonus(EBreakerMomentumState::Running, false, true);
     TestEqual(TEXT("sliding at Running is half a pellet (every other shot)"), SlidingRunning.AdditionalProjectiles, 0.5f);
     // Airborne beats sliding when both are somehow true — one bonus, not two.
     const FBreakerShotChannels Both = UBreakerWeaponComponent::MomentumChannelBonus(EBreakerMomentumState::Redline, true, true);
-    TestEqual(TEXT("airborne and sliding do not stack"), Both.AdditionalProjectiles, 1.0f);
+    TestEqual(TEXT("airborne and sliding do not stack"), Both.AdditionalProjectiles, 0.5f);
+
+    // The buy-up itself: Air Work authors the other +0.5 while airborne, so
+    // coupling + node restore the full doubled shot. Aggregated with the
+    // Airborne condition live it pays; with the default (grounded) state it
+    // does not — the restoration is airtime-gated exactly like the coupling.
+    {
+        TArray<const UBreakerProgressionNode*> KineticNodes;
+        for (const UBreakerProgressionNode* Node : UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes) KineticNodes.Add(Node);
+        TArray<FBreakerNodeRank> Ranks;
+        Ranks.Add({ TEXT("Swift.Kinetic.AirWork"), 1 });
+
+        FBreakerBuildConditionState AirborneState;
+        AirborneState.Set(EBreakerBuildCondition::Airborne, true);
+        const FBreakerNodeStats AirborneStats = UBreakerProgressionComponent::AggregateStats(KineticNodes, Ranks, nullptr, AirborneState);
+        TestEqual(TEXT("Air Work restores +0.5 projectile while airborne (owner ruling 2026-08-16)"),
+            AirborneStats.BonusProjectileCount, 0.5f, 0.0001f);
+        TestEqual(TEXT("coupling plus Air Work is the full doubled airborne shot"),
+            AirborneStats.BonusProjectileCount + AirborneRunning.AdditionalProjectiles, 1.0f, 0.0001f);
+
+        const FBreakerNodeStats GroundedStats = UBreakerProgressionComponent::AggregateStats(KineticNodes, Ranks);
+        TestEqual(TEXT("Air Work's restoration pays nothing on the ground"), GroundedStats.BonusProjectileCount, 0.0f, 0.0001f);
+    }
 
     // The state bands themselves are the momentum component's pinned rule;
     // re-asserted at the boundary here so the coupling and the loop can never

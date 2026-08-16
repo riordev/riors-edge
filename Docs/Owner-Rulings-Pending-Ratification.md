@@ -91,3 +91,53 @@ chat are a go") and transcribed as O41–O48 in `Decisions.md`.*
   *Outcome 2026-08-16: RULED (O48) — frozen long-term; the Breakpoint Sandbox's
   dev spawning (now with an item-level control) is THE testing route for
   gated/chase items.*
+
+---
+
+## Second batch — rulings made in the 2026-08-16/17 chat, awaiting transcription (O49+)
+
+**Written 2026-08-16/17.** Same contract as the first batch: each entry is
+phrased so the owner can transcribe it as an O-entry verbatim, or overturn it.
+Nothing is law until it lands in `Decisions.md`.
+
+- **P9 — Bosses ×3.** Owner authorization for the three-boss batch made in the
+  same chat. The seat is reserved here; the full ruling text is carried by
+  that batch's own doc/implementation pass (boss lane), and the owner should
+  confirm its wording at transcription time rather than this one-liner.
+- **P10 — The defense triad.** Owner ruling on the defensive-layer triad from
+  the same chat. Seat reserved here; full text carried by that batch's
+  defense-lane pass — confirm wording at transcription, as with P9.
+- **P11 — Endgame content taxonomy.** Four endgame content types, in the
+  owner's words: **Anomalies** — map tilesets, "different modded versions from
+  the base game," THE primary endgame farm; relatively open map, kill lots of
+  packs of mixed-rarity mobs dropping gear, map boss at the end. **Raids** —
+  large-scale maps, natural progression with checkpoints, bosses and difficult
+  puzzles, 7 players cooperating to a final boss with really good loot.
+  **Dungeons** — smaller raids, parties of 4. **Conquest** — reclaiming land:
+  a giant warzone, up to 9 matchmade players, thousands of mobs and
+  minibosses. Location canon re-affirmed from the story treatment: Anchor
+  (MMO hub, not instanced), Local Rifts (core instanced loop; closing erases
+  the timeline), The Breach (Act II gate), Erased Earths (Act III semi-open
+  shared zones), Rior's Frontier (endgame scaling).
+  Transcribed as the AS-RULED block in `Docs/Design/Game-Modes.md` with
+  per-item reconciliation. **Two sub-questions the transcription should also
+  answer:** (a) the owner's word "Anomalies" vs O8's ratified rename to
+  "Frontier" — does O8 stand? (the reconciliation assumes it does until
+  overturned); (b) where the four types sit relative to the five canon
+  locations — deliberately left unmapped rather than authored.
+- **P12 — The gym is NON-CANON playtest space** (owner: "very obviously").
+  It sits nowhere in the location canon and binds no continuity rule —
+  specifically resolving the Severed Drudge vs "no Altered asset before
+  A2-1" collision (`Campaign-And-Story.md` §3.4 rule 1) without an exception:
+  the rule binds campaign/canon content only. Recorded in both
+  `Game-Modes.md` and `Campaign-And-Story.md` AS-RULED sections.
+- **P13 — Recommendations adopted.** The owner adopted this batch's standing
+  RECOMMENDATION items from chat. The adopted list should be enumerated at
+  transcription so each promoted recommendation gets ledger standing rather
+  than staying doc-level advice; entries not on the enumerated list remain
+  recommendations, not rulings.
+- **Copy consequence, executed under O41 (no new ruling needed):** the title
+  screen's "MOVEMENT-DRIVEN ARPG LOOTER SHOOTER" line — the exact retired
+  phrasing O41 names — replaced in `UI/BreakerMenu.cpp` with
+  "LOOT THE RIFTS. OUTRUN THE EDGE." The "BREAK THE LINE. KEEP THE MOMENTUM."
+  frame subtitle is kept.
