@@ -3,11 +3,15 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "BreakerDeployable.generated.h"
 
+class ABreakerEnemy;
 class ABreakerZoneActor;
 class UBreakerAttributeSet;
 class UBreakerCombatComponent;
+class UBreakerProgressionComponent;
+class UBreakerScrapComponent;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
@@ -27,6 +31,22 @@ enum class EBreakerDeployableType : uint8
     // Gunsmith density cap because the cap is a Scrap-economy rule
     // (Class-Kits-Gunsmith §2.1) and the Tank has no Scrap economy.
     AnchorPoint
+};
+
+// Why a deployable died. The FIELD TECH tier-2 rows split the one destruction
+// path by cause without splitting the refund rule: Requisition (FT5) and
+// Deadman (FT11) fire on EnemyDamage ONLY — "not by expiry, not by the density
+// cap" is the doc's own emphasis — and Command Detonation (TK11) is the one
+// cause that refunds NOTHING ("refunds nothing", also the doc's words).
+UENUM(BlueprintType)
+enum class EBreakerDeployableDestructionCause : uint8
+{
+    Expired,
+    EnemyDamage,
+    DensityCull,
+    Exhausted,
+    // TK11: manually detonated. No refund.
+    Command
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerDeployableEvent, class ABreakerDeployable*, Deployable);
@@ -96,8 +116,14 @@ public:
 
     // The ONE destruction path (§2.2): expiry, damage death, and density-cap
     // cull all come through here, and the refund is identical for all three.
+    // The parameterless form stays for callers with nothing to say about cause.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Deployable")
     void DestroyDeployable();
+    // The cause-aware form the Field Tech tier-2/4 nodes read: still ONE path,
+    // one refund arithmetic — the cause gates the Requisition/Deadman riders
+    // and the Command no-refund rule, never the fraction.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Deployable")
+    void DestroyDeployableWithCause(EBreakerDeployableDestructionCause Cause);
 
     // --- Placement and the density cap (static, §2.1/§2.3) ----------------
 
@@ -123,6 +149,49 @@ public:
     static int32 TotalCapFor(const AActor* OwnerCharacter);
 
     static const TArray<TWeakObjectPtr<ABreakerDeployable>>& GetLiveDeployables();
+
+    // ---- Gunsmith node rules (2026-08-16, the branch-tree pay pass) --------
+    // Pure statics carry each rule's arithmetic so the suite pins them with no
+    // world; the actor paths below read owner node tags/ranks live (the
+    // Cleave's Edge posture), so a respec moves every rule on its next event.
+
+    // FT8 Logistics: the Ammo Crate stops counting against the density cap.
+    static bool CountsAgainstDensityCap(EBreakerDeployableType Type, bool bOwnerHasLogistics);
+    // FT9 Redundancy: total cap 4 -> 5 (per-type stays 2, invariantly).
+    static int32 BaseTotalCapFor(bool bHasRedundancy);
+    // FT5 Requisition: the replacement discount, 10 at rank 1, 18 at rank 2.
+    static float RequisitionDiscountFor(int32 Rank);
+    // FT3 Second Shift: remaining lifetime after a qualifying reload — +8s
+    // (R2: +14s), never past double the BASE lifetime. The 2x-base ceiling is
+    // the anti-farm rule and applies to the remaining clock, so reload-cycling
+    // in a corner cannot bank a permanent field.
+    static float SecondShiftLifetime(int32 Rank, float BaseLifetime, float CurrentRemaining);
+    // TK2 Quick Set: arm delay halved (R2: removed)...
+    static float QuickSetArmDelay(int32 Rank, float BaseDelay);
+    // ...and at R2 a no-delay charge triggers on a radius 1 m smaller until a
+    // second has passed since it armed.
+    static float QuickSetTriggerRadius(int32 Rank, float SecondsSinceArmed, float BaseRadiusCm);
+    // TK4 Rearm: one charge every 6s (R2: 4s); 0 = the node is not owned.
+    static float RearmInterval(int32 Rank);
+    // TK7 Ordnance: 4 charges instead of 3.
+    static int32 OrdnanceMineCount(bool bHasOrdnance, int32 BaseCount);
+    // TK7's anti-explosion clause: charges detonating within 1s of the same
+    // cluster's previous detonation are ONE damage instance for procs.
+    static float OrdnanceProcCoefficient(bool bHasOrdnance, double Now, double LastDetonationTime);
+    // TK9 Patience: armed and untriggered for 10s = triggers harder.
+    static bool PatienceQualifies(float ArmedUntriggeredSeconds);
+
+    // FT5 Requisition's replacement window: a pending same-type discount keyed
+    // per owner, registered by the enemy-destruction path, consumed by the
+    // deploy ability that spends it. Expires 8s after the destruction.
+    static void RegisterReplacementCredit(AActor* OwnerCharacter, EBreakerDeployableType Type, float Discount, double ExpiryWorldTime);
+    static float PendingReplacementDiscount(const AActor* OwnerCharacter, EBreakerDeployableType Type, double Now);
+    static void ConsumeReplacementCredit(AActor* OwnerCharacter, EBreakerDeployableType Type);
+
+    // TK11 Command Detonation: detonates every ARMED live charge across the
+    // owner's Mine Clusters at once and destroys the emptied clusters through
+    // the Command cause (no refund). Returns how many charges detonated.
+    static int32 CommandDetonateOwnedMines(AActor* OwnerCharacter);
 
     UPROPERTY(BlueprintAssignable, Category="Deployable") FBreakerDeployableEvent OnDeployableDestroyed;
 
@@ -174,6 +243,20 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Disruptor", meta=(ClampMin="0", ClampMax="1")) float DisruptorSlowMultiplier = 0.55f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Disruptor", meta=(ClampMin="1")) float DisruptorHealth = 100.0f;     // O2 PLACEHOLDER
 
+    // --- Node-rule tuning (all O2 PLACEHOLDER unless doc-cited) ------------
+    // FT3: "within their radius" — the doc authors no number; near = this.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float SecondShiftRadiusCm = 900.0f;   // O2 PLACEHOLDER
+    // FT6: the health a crate charge restores at rank 1 (rank 2 doubles it).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float ForemanHealPerCharge = 15.0f;   // O2 PLACEHOLDER
+    // FT7: LOS grace, doc-seeded ("seed 1.2s of grace").
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float TurretLOSGraceSeconds = 1.2f;   // §FT7 seed
+    // FT11: the Deadman detonation, as a fraction of the owner's scaled weapon
+    // base (the §1.3 rule every deployable damage number obeys).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float DeadmanDamageCoefficient = 1.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float DeadmanBlastRadiusCm = 300.0f;   // O2 PLACEHOLDER
+    // TK3: the line-of-sight trigger's reach ("within its range" — no seed).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|Nodes", meta=(ClampMin="0")) float TripwireTriggerRangeCm = 900.0f;   // O2 PLACEHOLDER
+
     // --- Anchor Point (Class-Kits-Tank §2 T3) ------------------------------
     // 2.5 m wide x 2 m tall; health 20% of the Tank's maximum health; 12s.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deployable|AnchorPoint", meta=(ClampMin="0")) float AnchorWidthCm = 250.0f;     // §T3
@@ -183,6 +266,13 @@ public:
     UFUNCTION() void HandleCombatDeath();
     UFUNCTION() void HandleZoneOccupantEntered(AActor* Occupant);
     UFUNCTION() void HandleZoneOccupantExited(AActor* Occupant);
+    // FT3 Second Shift: the owner's reload completing near this deployable.
+    UFUNCTION() void HandleOwnerReloadCompleted(bool bAnyRoundFired);
+    // FT2 Overwatch: tracks the enemy the owner last damaged (turrets only).
+    UFUNCTION() void HandleOwnerHitDealt(const FBreakerHitContext& Hit);
+    // TK5 Attrition Field: the owner's kill, position-checked against the
+    // Disruptor's field (Disruptors only).
+    UFUNCTION() void HandleOwnerKillDealt(const FBreakerHitContext& Hit);
 
 protected:
     virtual void BeginPlay() override;
@@ -195,6 +285,16 @@ protected:
     void MarkActed();
     // Owner's scaled weapon base damage (O35), 0 without a weapon component.
     float OwnerWeaponBaseDamage() const;
+    // Node reads off the owner (null-safe: no progression = no node, every
+    // authored behaviour bit-identical).
+    const UBreakerProgressionComponent* OwnerProgression() const;
+    UBreakerScrapComponent* OwnerScrap() const;
+    int32 OwnerNodeRank(FName NodeId) const;
+    bool OwnerHasNodeTag(const FGameplayTag& Tag) const;
+    // FT11's Deadman blast (and nothing else's): radial, enemies only, through
+    // the one damage pipeline, crediting the owner. Never chains — it damages
+    // enemies, not deployables, so a second generation cannot exist.
+    void DetonateRadialBlast(const FVector& Center, float DamageCoefficient, float RadiusCm, float ProcCoefficient);
 
     UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> BodyVisual;
@@ -224,12 +324,48 @@ private:
     {
         FVector Location = FVector::ZeroVector;
         float ArmRemaining = 0.0f;
+        // TK2/TK9: how long this charge has been armed and untriggered.
+        float SecondsSinceArmed = 0.0f;
         bool bLive = true;
     };
     TArray<FMineCharge> Mines;
 
     // Enemies currently slowed by this Disruptor, so EndPlay can restore them.
     TArray<TWeakObjectPtr<AActor>> SlowedEnemies;
+
+    // ---- Node-rule state ---------------------------------------------------
+    // Authored (pre-extension) lifetime: FT3's 2x ceiling and TK9's Disruptor
+    // age both measure against the base, never the extended clock.
+    float BaseLifetime = 0.0f;
+    // Seconds since placement (lifetime pauses do not stop age).
+    float AgeSeconds = 0.0f;
+    // FT3: one extension per reload per deployable is natural (one event per
+    // reload); nothing else needed.
+    // FT2: the enemy the owner most recently damaged. KNOWN LIMITATION,
+    // recorded: deployable damage is attributed to the owner (SI-8), so a
+    // turret's own hits also move this — "the target YOU last damaged" reads
+    // slightly sticky. The alternative (a per-source split on OnHitDealt) is
+    // combat-owner territory.
+    TWeakObjectPtr<ABreakerEnemy> LastOwnerDamagedEnemy;
+    // FT7/FT2-R2/FT10: current turret target and its LOS-grace clock.
+    TWeakObjectPtr<ABreakerEnemy> CurrentTurretTarget;
+    double TurretLOSLostTime = -1000.0;
+    // FT10 (and FT2 R2): the next turret shot skips the cadence gate.
+    bool bTurretFreeShotPending = false;
+    // FT6: half-rate consumption toggle while the interactor's reserve is full.
+    bool bForemanSkipCharge = false;
+    // TK4: time until the next rearm while the cluster sits empty.
+    float RearmAccumulator = 0.0f;
+    // TK7: the same-cluster 1s proc-merge window.
+    double LastMineDetonationTime = -1000.0;
+    // TK9 (Disruptor half): the double strip pays on the FIRST entry only.
+    bool bAnyEnemyEnteredField = false;
+    // Enemies carrying this deployable's Patience armour strip, keyed for the
+    // pop on exit/death.
+    TArray<TWeakObjectPtr<AActor>> PatienceStruckEnemies;
+    // Bound-owner bookkeeping so EndPlay unbinds exactly what Initialize bound.
+    TWeakObjectPtr<UBreakerCombatComponent> BoundOwnerCombat;
+    TWeakObjectPtr<class UBreakerWeaponComponent> BoundOwnerWeapon;
 
     static int32 NextPlacementSerial;
 };

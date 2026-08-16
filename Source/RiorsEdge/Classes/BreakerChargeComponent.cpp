@@ -2,10 +2,13 @@
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 
 UBreakerChargeComponent::UBreakerChargeComponent()
 {
@@ -39,6 +42,20 @@ void UBreakerChargeComponent::BeginPlay()
     // Notify* entry points take the split explicitly until the healing result
     // carries it (Class-Kits-Support §5.1 ranks that as the missing hook that
     // blocks the Medic branch entirely).
+    //
+    // 2026-08-16: the healing result NOW carries the split (FBreakerHealResult
+    // reports HealthHealed / Overheal / ShieldGranted separately), so the
+    // OnHealed binding below is honest at last. It exists for MD1 Field
+    // Dressing — the heals that arrive from OUTSIDE the Support kit — and
+    // stands down whenever a Support ability's explicit crediting scope is
+    // open, so no heal is ever counted twice.
+    if (AActor* Owner = GetOwner())
+    {
+        if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+        {
+            Combat->OnHealed.AddDynamic(this, &UBreakerChargeComponent::HandleOwnerHealed);
+        }
+    }
     HandleProgressionChanged();
     CachedBand = BandForFraction(GetChargeFraction(), AttunedFraction, ResonantFraction);
 }
@@ -231,6 +248,19 @@ void UBreakerChargeComponent::HandleProgressionChanged()
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     bIsSupport = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Support;
     if (!bIsSupport) PendingGrants = 0.0f;
+
+    RankFieldDressing = 0; RankSteadyHands = 0; bBloodDebt = false; RankSustain = 0;
+    bShieldConversionNodes = false;
+    if (bIsSupport && Progression)
+    {
+        RankFieldDressing = Progression->GetNodeRank(TEXT("Support.Medic.FieldDressing"), EBreakerPointCurrency::ClassPoints);
+        RankSteadyHands = Progression->GetNodeRank(TEXT("Support.Medic.SteadyHands"), EBreakerPointCurrency::ClassPoints);
+        bBloodDebt = Progression->HasNodeTag(BreakerNodeTags::Node_MD_BloodDebt.GetTag());
+        RankSustain = Progression->GetNodeRank(TEXT("Support.Conductor.Sustain"), EBreakerPointCurrency::ClassPoints);
+        bShieldConversionNodes = Progression->HasNodeTag(BreakerNodeTags::Node_MD_Overflow.GetTag())
+            || Progression->GetNodeRank(TEXT("Support.Medic.SecondOpinion"), EBreakerPointCurrency::ClassPoints) > 0;
+    }
+    if (!bBloodDebt) BloodDebtPool = 0.0f;
 }
 
 bool UBreakerChargeComponent::IsActiveForOwner() const
@@ -287,6 +317,26 @@ void UBreakerChargeComponent::NotifyHealingDone(float EffectiveHeal, float Overh
     // It contributes nothing; the parameter exists to make the rule visible at
     // every call site instead of buried in this file.
     (void)Overheal;
+    // MD10 Blood Debt: healing — self included, at FULL rate, before any
+    // metering — banks into the pool. The pool is health units, not Charge, and
+    // it is capped; the spend lives with the Mark ability.
+    if (bBloodDebt && EffectiveHeal > 0.0f && IsActiveForOwner())
+    {
+        BloodDebtPool = FMath::Min(BloodDebtPoolCap, BloodDebtPool + EffectiveHeal);
+    }
+    // MD4 Steady Hands: at Attuned or better, self-heal Charge credits shave
+    // Support cooldowns (R2: ally-heal credits too), at most once a second.
+    if (RankSteadyHands > 0 && EffectiveHeal > 0.0f && IsActiveForOwner()
+        && (bSelfTargeted || RankSteadyHands >= 2)
+        && CachedBand != EBreakerChargeBand::Cold)
+    {
+        const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+        if (Now - LastSteadyHandsTime >= SteadyHandsIntervalSeconds)
+        {
+            LastSteadyHandsTime = Now;
+            ShaveAllAbilityCooldowns(SteadyHandsShaveSeconds);
+        }
+    }
     float Amount = HealingGeneration(EffectiveHeal, TargetMaxHealth, HealthFractionPerCharge, ProcCoefficient);
     if (bSelfTargeted)
     {
@@ -343,7 +393,60 @@ void UBreakerChargeComponent::NotifyAssist()
 
 void UBreakerChargeComponent::SetAnyBuffActive(bool bActive)
 {
+    // CO3 Sustain's edge: the grace clock starts when the LAST buff expires.
+    if (bAnyBuffActive && !bActive)
+    {
+        SecondsSinceBuffExpire = 0.0f;
+    }
     bAnyBuffActive = bActive;
+}
+
+void UBreakerChargeComponent::HandleOwnerHealed(const FBreakerHealResult& Result)
+{
+    // MD1 Field Dressing: healing yourself pays Charge at the ally rate even
+    // from non-Support sources — leech, regen, pickups. Anything a Support
+    // ability healed arrives inside a crediting scope and is skipped here, so
+    // this listener covers exactly the sources the node names. The RATE is the
+    // ordinary one and the self-heal sub-cap still meters it — metering is not
+    // a rate change, per this component's own top comment. R2's ally-received
+    // clause rides the same event (an ally's heal lands here too) and is
+    // vacuous solo. KNOWN LIMIT, recorded: OnHealed carries no source tag, so
+    // Support-vs-non-Support is told apart by the scope, not the source.
+    if (!IsActiveForOwner() || SupportHealScopeDepth > 0 || RankFieldDressing <= 0) return;
+    if (!Attributes) return;
+    const float OwnMaxHealth = Attributes->GetMaxHealth();
+    if (Result.HealthHealed > 0.0f || Result.Overheal > 0.0f)
+    {
+        NotifyHealingDone(Result.HealthHealed, Result.Overheal, OwnMaxHealth, /*bSelfTargeted=*/true, 1.0f);
+    }
+    if (Result.ShieldGranted > 0.0f)
+    {
+        NotifyShieldingDone(Result.ShieldGranted, 0.0f, OwnMaxHealth, /*bSelfTargeted=*/true);
+    }
+}
+
+float UBreakerChargeComponent::ConsumeBloodDebt()
+{
+    const float Pool = BloodDebtPool;
+    BloodDebtPool = 0.0f;
+    return Pool;
+}
+
+void UBreakerChargeComponent::ShaveAllAbilityCooldowns(float Seconds)
+{
+    if (Seconds <= 0.0f) return;
+    const IAbilitySystemInterface* AbilityOwner = Cast<IAbilitySystemInterface>(GetOwner());
+    UAbilitySystemComponent* ASC = AbilityOwner ? AbilityOwner->GetAbilitySystemComponent() : nullptr;
+    if (!ASC) return;
+    // Every live cooldown effect moves its start time BACK, which shortens its
+    // remaining duration by the same amount — the one honest way to shave a
+    // GAS cooldown without owning the effect.
+    FGameplayEffectQuery Query;
+    Query.EffectDefinition = UBreakerAbilityCooldownEffect::StaticClass();
+    for (const FActiveGameplayEffectHandle& Handle : ASC->GetActiveEffects(Query))
+    {
+        ASC->ModifyActiveEffectStartTime(Handle, -Seconds);
+    }
 }
 
 void UBreakerChargeComponent::SetInCombat(bool bNowInCombat)
@@ -393,6 +496,19 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
     // per-source buckets do.
     SelfHealBudget = FMath::Min(SelfHealBudget + SelfHealRateCap * DeltaTime, SelfHealRateCap);
 
+    // MD5/MD9's shield conversions need a ceiling to exist: MaxShield
+    // initialises to 0 for every player, and a conversion into a zero-cap bar
+    // grants nothing. Node-gated and raise-only. O2 PLACEHOLDER fraction,
+    // borrowed from Tank §T1's 25%-of-max-health cap.
+    if (bShieldConversionNodes)
+    {
+        const float ShieldCeiling = Attributes->GetMaxHealth() * 0.25f;
+        if (ShieldCeiling > Attributes->GetMaxShield())
+        {
+            Attributes->ApplyMaxShield(ShieldCeiling);
+        }
+    }
+
     if (IsInSafeZone())
     {
         PendingGrants = 0.0f;
@@ -429,8 +545,17 @@ void UBreakerChargeComponent::AdvanceLoop(float DeltaTime)
 
     // Buff uptime is the loop's only rate source, and it is the one that makes
     // the class work solo: it pays for keeping a buff up on ONE target, and the
-    // one target is allowed to be yourself.
-    const float Rate = BuffUptimeGeneration(bAnyBuffActive, bInCombat, BuffUptimeRate) * GenerationMultiplier;
+    // one target is allowed to be yourself. CO3 Sustain smooths the sawtooth:
+    // for a short grace after the last buff expires the source keeps paying —
+    // still combat-gated, still count-independent.
+    bool bEffectiveUptime = bAnyBuffActive;
+    if (!bEffectiveUptime && RankSustain > 0)
+    {
+        const float Grace = RankSustain >= 2 ? SustainGraceSecondsRank2 : SustainGraceSeconds;
+        bEffectiveUptime = SecondsSinceBuffExpire <= Grace;
+    }
+    if (!bAnyBuffActive) SecondsSinceBuffExpire += DeltaTime;
+    const float Rate = BuffUptimeGeneration(bEffectiveUptime, bInCombat, BuffUptimeRate) * GenerationMultiplier;
 
     float Budget = ClampGeneration(EffectiveCap, EffectiveCap) * DeltaTime;
     float Generated = FMath::Min(ClampGeneration(Rate, EffectiveCap) * DeltaTime, Budget);

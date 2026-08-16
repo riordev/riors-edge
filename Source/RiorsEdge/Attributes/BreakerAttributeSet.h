@@ -156,6 +156,14 @@ public:
     // outside the combat component may call these.
     void ApplyHealth(float NewValue);
     void ApplyShield(float NewValue);
+    // The shield CEILING, same null-safe route (2026-08-16). Until this
+    // existed no player path could own a shield at all: MaxShield initialises
+    // to 0, Shield clamps to it, and the generated setter asserts without a
+    // live ASC — so Rend's overheal-to-shield and the whole Leech/Medic shield
+    // layer silently granted nothing. The class-resource components establish
+    // the class's authored ceiling through here (Class-Kits-Tank §T1: 25% of
+    // maximum health).
+    void ApplyMaxShield(float NewValue);
     // Same reason, for the monster chassis. ABreakerEnemy::ApplyChassis wrote
     // MaxHealth through the generated setter, so constructing an enemy outside
     // a world ensured — which meant the chassis curve could only ever be tested

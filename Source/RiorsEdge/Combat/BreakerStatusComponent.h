@@ -99,6 +99,18 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Combat|Status") int32 GetEffectiveStackCap() const;
 
+    // --- Immunity ---------------------------------------------------------
+    // The status-immunity primitive Purge's §U2 window was recorded absent
+    // without (2026-08-16, built for Medic MD7 Field Kit — a cleanse rule,
+    // which is why it lives here). While the window is open, NEW status
+    // applications are refused outright; statuses already running are
+    // untouched (cleansing them is the cleanse's own job). Refreshes, never
+    // stacks: a second grant extends to the longer remaining window.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Combat|Status")
+    void GrantStatusImmunity(float DurationSeconds);
+
+    UFUNCTION(BlueprintPure, Category="Combat|Status") bool IsStatusImmune() const { return StatusImmunityRemaining > 0.0f; }
+
     // Drives the DoT clocks. Called from TickComponent, and directly by tests
     // so the whole component is exercisable without a world — the same
     // precedent as UBreakerAbilityStateComponent::AdvanceTime.
@@ -119,4 +131,5 @@ private:
     // so a node granting +2 stacks does not permanently rewrite the value an
     // owner authored.
     int32 StackCapDelta = 0;
+    float StatusImmunityRemaining = 0.0f;
 };

@@ -90,6 +90,43 @@ int32 FBreakerWeaponMath::SelectNearestTarget(const FVector& Origin, const TArra
     return BestIndex;
 }
 
+float FBreakerWeaponMath::SteadyMovementSpreadDegrees(float MovementSpreadDegrees, float AimAlpha, int32 SteadyRank, bool bAirborne)
+{
+    if (SteadyRank <= 0 || AimAlpha <= 0.0f || MovementSpreadDegrees <= 0.0f) return MovementSpreadDegrees;
+    // §1.5 M2's rank split: R1 is the grounded rule, R2 extends it airborne.
+    if (bAirborne && SteadyRank < 2) return MovementSpreadDegrees;
+    // Relief scales with aim progress so the rule arrives at the pace every
+    // other ADS benefit does — full sights, no movement penalty at all.
+    return MovementSpreadDegrees * (1.0f - FMath::Clamp(AimAlpha, 0.0f, 1.0f));
+}
+
+float FBreakerWeaponMath::LeadRangeGateCm(float BaseGateCm, bool bCalledShotOwned, bool bRedline)
+{
+    // Class-Kits §1.5 M11 / node text: 25 m -> 10 m. The 10 m is transcribed;
+    // the base gate stays whatever Lead authored, so retuning Lead retunes
+    // the un-rewritten case without touching this rule.
+    constexpr float CalledShotGateCm = 1000.0f;   // §1.5 M11: 10 m
+    return (bCalledShotOwned && bRedline) ? CalledShotGateCm : BaseGateCm;
+}
+
+float FBreakerWeaponMath::LedgerRefundFraction(int32 LedgerRank)
+{
+    if (LedgerRank <= 0) return 0.0f;
+    return LedgerRank >= 2 ? 0.50f : 0.25f;   // Class-Kits §1.5 M3 R1/R2
+}
+
+float FBreakerWeaponMath::MarkJumpRadiusCm(int32 MarkEconomyRank)
+{
+    if (MarkEconomyRank <= 0) return 0.0f;
+    return MarkEconomyRank >= 2 ? 2500.0f : 1500.0f;   // Class-Kits §1.5 M5: 15 m / 25 m
+}
+
+int32 FBreakerWeaponMath::LoadedRefundRounds(int32 ShotsInWindow, int32 LoadedRank)
+{
+    if (LoadedRank <= 0 || ShotsInWindow <= 0) return 0;
+    return LoadedRank >= 2 ? ShotsInWindow : ShotsInWindow / 2;   // Class-Kits §1.3 F2 R1/R2
+}
+
 int32 FBreakerWeaponMath::SecondaryShotSeed(uint32 OwnerHash, int32 ShotSequence, uint32 Salt, int32 Index)
 {
     // Same seed material as the primary draws, salted twice: once by the

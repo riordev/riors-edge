@@ -72,6 +72,11 @@ private:
     FTimerHandle WindowTimer;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
     bool bBloodlineActive = false;
+    // L11 EXSANGUINATE: the window expires 2s after the last landing hit
+    // instead of on the authored clock. NEAREST HONEST FILTER, recorded: the
+    // hit context cannot tell a melee swing from a bullet, so any non-DoT hit
+    // sustains the window until a melee discriminator exists on the context.
+    bool bExsanguinate = false;
 };
 
 // T3 Anchor Point (§2 T3, starter, Bastion): a frontal cover panel with its
@@ -142,9 +147,19 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0", ClampMax="1")) float SelfDamageFraction = 0.5f;   // §T5 placeholder
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BreachCharge", meta=(ClampMin="0")) float KnockbackImpulse = 1400.0f;   // O2 PLACEHOLDER
 
+    // D7 DEMOLITION: two charges sharing one cooldown. CheckCooldown admits one
+    // extra cast while the first cooldown runs; ApplyCooldown declines to
+    // restart the timer for that cast, so both charges return together when the
+    // ONE cooldown expires — "sharing one cooldown", literally.
+    virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+    virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
 private:
     void Detonate(FVector BlastLocation);
     FTimerHandle FuseTimer;
+    // Demolition bookkeeping: true while the second charge has been spent into
+    // a still-running cooldown. Mutable because CheckCooldown is const.
+    mutable bool bDemolitionSecondSpent = false;
 };
 
 // T6 Ground Zero (§2 T6, Demolitionist): usable only while airborne; slams
@@ -178,6 +193,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0", ClampMax="1")) float MinimumPowerFraction = 0.4f;   // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float StaggerSeconds = 1.5f;   // §T6
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="0")) float SlamDownSpeed = 2200.0f;   // O2 PLACEHOLDER
+    // D8 TERMINAL DESCENT's raised power ceiling under the speed stand-in:
+    // sqrt(25/12) ~= 1.44 — the fall speed a 25 m drop reaches relative to the
+    // 12 m cap's, so the node's "cap 25 m instead of 12" survives the honest
+    // kin quantity. O2 PLACEHOLDER like the rest of the scaling.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="GroundZero", meta=(ClampMin="1")) float TerminalDescentPowerCap = 1.44f;
 };
 
 // HOLD (§2.1 ultimate): 100 Grit, no cooldown, 10s. Caps the damage any single

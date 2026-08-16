@@ -1,5 +1,6 @@
 #include "Weapons/BreakerWeaponComponent.h"
 
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Abilities/BreakerAbility_Lead.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -45,8 +46,17 @@ namespace
     // reads "not owned" rather than asserting.
     const FName BreakerPierceDisciplineNodeId(TEXT("Swift.Marksman.PierceDiscipline"));
     const FName BreakerAngleNodeId(TEXT("Swift.Marksman.Angle"));
+    const FName BreakerSteadyNodeId(TEXT("Swift.Marksman.Steady"));
+    const FName BreakerLedgerNodeId(TEXT("Swift.Marksman.Ledger"));
+    const FName BreakerMarkEconomyNodeId(TEXT("Swift.Marksman.MarkEconomy"));
+    const FName BreakerLoadedNodeId(TEXT("Swift.Frenzy.Loaded"));
     FGameplayTag BreakerSightlineTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Sightline"), false); }
     FGameplayTag BreakerOverpenetrationTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Overpenetration"), false); }
+    FGameplayTag BreakerMarksmanCalledShotTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.CalledShot"), false); }
+
+    // Loaded's refund window (Class-Kits §1.3 F2: "the shots fired in the
+    // previous 2s"). Transcribed, not tuned.
+    constexpr double BreakerLoadedWindowSeconds = 2.0;
 
     // Recoil belongs in the archetype table beside cadence, spread, falloff and
     // damage, so the five weapons kick like five weapons. Every number here is
@@ -672,9 +682,28 @@ float UBreakerWeaponComponent::GetAimMoveSpeedMultiplier() const
     return FBreakerWeaponFeel::AimMoveSpeedMultiplier(ResolveRecoilProfile(), GetAimAlpha());
 }
 
+int32 UBreakerWeaponComponent::GetClassNodeRank(FName NodeId) const
+{
+    const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+}
+
+bool UBreakerWeaponComponent::IsOwnerAirborne() const
+{
+    if (!GetOwner()) return false;
+    // The same posture read GetShotChannels already uses, so "airborne" can
+    // never mean two different things on the same fire path.
+    return FBreakerBuildConditionState::EvaluateForActor(GetOwner()).IsActive(EBreakerBuildCondition::Airborne);
+}
+
 float UBreakerWeaponComponent::GetMovementSpreadDegrees() const
 {
-    return FBreakerWeaponFeel::MovementSpreadDegrees(ResolveRecoilProfile(), GetSpeedFraction(), GetAimAlpha());
+    const float Alpha = GetAimAlpha();
+    const float Movement = FBreakerWeaponFeel::MovementSpreadDegrees(ResolveRecoilProfile(), GetSpeedFraction(), Alpha);
+    // Steady (Class-Kits §1.5 M2): aiming while moving no longer widens
+    // spread — the rule half, applied to the same number the trace uses so
+    // the HUD's honest crosshair and the round agree about the purchase.
+    return FBreakerWeaponMath::SteadyMovementSpreadDegrees(Movement, Alpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
 }
 
 float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
@@ -685,7 +714,9 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     // Partway into ADS is partway to the aimed cone, not the whole thing.
     const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, Alpha);
     const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
-    const float Movement = FBreakerWeaponFeel::MovementSpreadDegrees(Profile, GetSpeedFraction(), Alpha);
+    // GetMovementSpreadDegrees, not the raw feel-layer read: Steady's rule
+    // (§1.5 M2) must shape the predicted cone exactly as it shapes the shot.
+    const float Movement = GetMovementSpreadDegrees();
     return FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, BloomDegrees, BurstShotIndex, Movement);
 }
 
@@ -1171,6 +1202,30 @@ void UBreakerWeaponComponent::StartReload()
     const UBreakerWeaponDefinition* Definition = ResolveDefinition();
     if (!Definition || bReloading || bSwapping || MagazineAmmo >= GetEffectiveMagazineSize() || ReserveAmmo <= 0) return;
     StopFire();
+    // Loaded (Class-Kits §1.3 F2, LIVE): "Reloading while at Redline refunds
+    // ammunition to the magazine equal to the shots fired in the previous 2s
+    // (R1: half, R2: all)." Both facts — the Redline read and the 2s window —
+    // are captured at the moment the player COMMITS to the reload; the refund
+    // itself settles in FinishReload, ahead of the reserve draw, so it is
+    // paid in reserve the reload no longer has to spend. A rule rewrite of
+    // the reload's economy; reload SPEED is untouched, per the doc's own
+    // clause.
+    PendingLoadedRefundRounds = 0;
+    const int32 LoadedRank = GetClassNodeRank(BreakerLoadedNodeId);
+    if (LoadedRank > 0 && GetOwner())
+    {
+        const UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>();
+        if (Momentum && Momentum->IsActiveForOwner() && Momentum->GetMomentumState() == EBreakerMomentumState::Redline)
+        {
+            const double Now = GetWorld()->GetTimeSeconds();
+            int32 ShotsInWindow = 0;
+            for (const double Time : RecentShotTimes)
+            {
+                if (Now - Time <= BreakerLoadedWindowSeconds) ++ShotsInWindow;
+            }
+            PendingLoadedRefundRounds = FBreakerWeaponMath::LoadedRefundRounds(ShotsInWindow, LoadedRank);
+        }
+    }
     bReloading = true;
     OnReloadChanged.Broadcast(true);
     GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ThisClass::FinishReload, Definition->ReloadDuration, false);
@@ -1226,6 +1281,11 @@ bool UBreakerWeaponComponent::FireOnce()
     }
 
     LastShotTime = GetWorld()->GetTimeSeconds();
+    // Loaded's 2s window (Class-Kits §1.3 F2): every trigger pull is stamped
+    // and the list pruned in place, so it can never hold more than one
+    // window's worth of the fastest cadence in the game.
+    RecentShotTimes.Add(LastShotTime);
+    RecentShotTimes.RemoveAll([this](double Time) { return LastShotTime - Time > BreakerLoadedWindowSeconds; });
     // Scrap's magazine-dump clause: the cycle counts as "started full" only
     // when this round left a genuinely full magazine (Class-Kits-Gunsmith
     // §1.1 — topping off at 1/30 and firing one round does not re-arm it).
@@ -1253,7 +1313,12 @@ bool UBreakerWeaponComponent::FireOnce()
     const float ShotAimAlpha = GetAimAlpha();
     const FBreakerRecoilProfile AimedProfile = FBreakerWeaponFeel::ProfileAtAimAlpha(RecoilProfile, ShotAimAlpha);
     const float BaseSpread = FMath::Lerp(Definition->HipSpreadDegrees, Definition->AimSpreadDegrees, ShotAimAlpha);
-    const float MovementSpread = FBreakerWeaponFeel::MovementSpreadDegrees(AimedProfile, GetSpeedFraction(), ShotAimAlpha);
+    // Steady (Class-Kits §1.5 M2): with the node owned, aiming while moving
+    // no longer widens spread — R1 grounded, R2 airborne too. Same pure rule
+    // the predicted-cone accessors apply, fed the same aim progress.
+    const float MovementSpread = FBreakerWeaponMath::SteadyMovementSpreadDegrees(
+        FBreakerWeaponFeel::MovementSpreadDegrees(AimedProfile, GetSpeedFraction(), ShotAimAlpha),
+        ShotAimAlpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
     const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread);
 
     // Recoil state for this shot, resolved before the pellets so the cosmetic
@@ -1281,10 +1346,23 @@ bool UBreakerWeaponComponent::FireOnce()
 
     // Lead's mark, resolved once per shot rather than once per pellet: the mark
     // cannot change between the pellets of a single trigger pull. A mark with
-    // no remaining time reads as no mark at all.
-    const UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
-    const AActor* MarkedTarget = (AbilityState && AbilityState->GetMarkRemaining() > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
-    const float LeadMinimumRangeCm = UBreakerAbility_Lead::DefaultMinimumRangeCm();
+    // no remaining time reads as no mark at all. Non-const because Mark
+    // Economy (§1.5 M5, below the pellet loop) may re-site the mark.
+    UBreakerAbilityStateComponent* AbilityState = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerAbilityStateComponent>() : nullptr;
+    const float MarkRemainingAtPull = AbilityState ? AbilityState->GetMarkRemaining() : 0.0f;
+    const AActor* MarkedTarget = (AbilityState && MarkRemainingAtPull > 0.0f) ? AbilityState->GetMarkedTarget() : nullptr;
+    // Momentum and progression, read once per trigger pull and shared by every
+    // rule below (Called Shot's gate, Pierce Discipline's grant, Ledger's
+    // refund, Mark Economy's jump).
+    UBreakerMomentumComponent* Momentum = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerMomentumComponent>() : nullptr;
+    const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    const bool bRedline = Momentum && Momentum->IsActiveForOwner() && Momentum->GetMomentumState() == EBreakerMomentumState::Redline;
+    // Called Shot (Class-Kits §1.5 M11, LIVE): at Redline, Lead's range gate
+    // drops from 25 m to 10 m, so the mark pays at conversational distance.
+    const float LeadMinimumRangeCm = FBreakerWeaponMath::LeadRangeGateCm(
+        UBreakerAbility_Lead::DefaultMinimumRangeCm(),
+        Progression && Progression->HasNodeTag(BreakerMarksmanCalledShotTag()),
+        bRedline);
 
     // Item level, read once per trigger pull. Every pellet of a shotgun blast
     // and any bleed those pellets apply share this one reading, so a shot can
@@ -1347,15 +1425,83 @@ bool UBreakerWeaponComponent::FireOnce()
     // bound Multishot/Pierce interaction" — the cap is per trigger pull for
     // exactly that reason. Swift-gated twice over: the node is Swift-locked
     // and the momentum component is inert for every other class.
-    if (PiercedThisPull > 0 && GetOwner())
+    if (PiercedThisPull > 0)
     {
-        UBreakerMomentumComponent* Momentum = GetOwner()->FindComponentByClass<UBreakerMomentumComponent>();
-        const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
         const int32 DisciplineRank = Progression ? Progression->GetNodeRank(BreakerPierceDisciplineNodeId, EBreakerPointCurrency::ClassPoints) : 0;
         if (Momentum && Momentum->IsActiveForOwner() && DisciplineRank > 0)
         {
             const float PerTarget = DisciplineRank >= 2 ? 7.0f : 4.0f;   // Class-Kits §1.5 M6 R1/R2
             Momentum->GrantMomentum(static_cast<float>(FMath::Min(PiercedThisPull, 3)) * PerTarget);   // §1.5 M6 cap: 3
+        }
+    }
+
+    // Ledger and Mark Economy (Class-Kits §1.5 M3 / M5, LIVE): both rules key
+    // off the mark this pull was fired against, so they resolve here, after
+    // the pellets, from the one mark reading the whole pull shares.
+    if (MarkedTarget)
+    {
+        bool bMarkHit = false;
+        for (const FBreakerPelletImpact& Pellet : Shot.Pellets)
+        {
+            if (Pellet.bHit && Pellet.HitActor == MarkedTarget) { bMarkHit = true; break; }
+        }
+        for (int32 Index = 0; !bMarkHit && Index < Shot.SecondaryImpacts.Num(); ++Index)
+        {
+            const FBreakerSecondaryImpact& Leg = Shot.SecondaryImpacts[Index];
+            if (Leg.bHit && Leg.HitActor == MarkedTarget) bMarkHit = true;
+        }
+
+        // Ledger (§1.5 M3, transcribed): "Momentum spent on Marksman abilities
+        // is refunded at 25% (R2: 50%) if the ability's effect lands a hit
+        // within its window." Lead is the Marksman ability that exists; its
+        // effect "lands a hit" when a shot connects with the marked target
+        // inside the mark window, and the refund pays ONCE per cast — the
+        // bookkeeping treats a mark as new when its target changed or its
+        // remaining time jumped up (a re-cast refreshes; time only runs down).
+        // The cost refunded is the registry's own authored cost (§1.2 S6: 40),
+        // so retuning Lead retunes the refund.
+        const int32 LedgerRank = GetClassNodeRank(BreakerLedgerNodeId);
+        if (bMarkHit && LedgerRank > 0 && Momentum && Momentum->IsActiveForOwner())
+        {
+            const bool bFreshMark = LedgerRefundedTarget.Get() != MarkedTarget
+                || MarkRemainingAtPull > LedgerRefundedMarkRemaining;
+            if (bFreshMark)
+            {
+                const UBreakerAbilityDefinition* LeadDefinition = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Lead"));
+                const float Refund = (LeadDefinition ? LeadDefinition->GetResourceCost() : 0.0f)
+                    * FBreakerWeaponMath::LedgerRefundFraction(LedgerRank);
+                if (Refund > 0.0f)
+                {
+                    Momentum->GrantMomentum(Refund);
+                    LedgerRefundedTarget = MarkedTarget;
+                    LedgerRefundedMarkRemaining = MarkRemainingAtPull;
+                }
+            }
+        }
+
+        // Mark Economy (§1.5 M5, transcribed): "Lead's mark persists through
+        // the target's death and jumps to the nearest enemy within 15 m
+        // (R2: 25 m). Proc coefficient 0 on the jump" — the jump moves the
+        // mark and nothing else: no damage, no status, no Momentum, so it
+        // cannot chain-generate. The weapon is the one killer this component
+        // can see; a marked target dying to a DoT or an ally keeps the old
+        // behaviour (mark reads back as expired) until the spec's
+        // UBreakerMarkComponent owns marks and deaths in one place.
+        const int32 EconomyRank = GetClassNodeRank(BreakerMarkEconomyNodeId);
+        if (EconomyRank > 0 && AbilityState && MarkRemainingAtPull > 0.0f)
+        {
+            const UBreakerCombatComponent* MarkedCombat = MarkedTarget->FindComponentByClass<UBreakerCombatComponent>();
+            if (MarkedCombat && MarkedCombat->IsDead())
+            {
+                TArray<const AActor*> Excluded;
+                Excluded.Add(MarkedTarget);
+                if (AActor* JumpTarget = FindNearestChainTarget(MarkedTarget->GetActorLocation(),
+                    FBreakerWeaponMath::MarkJumpRadiusCm(EconomyRank), Excluded))
+                {
+                    // The surviving window rides along: persistence, not a re-cast.
+                    AbilityState->SetMark(JumpTarget, MarkRemainingAtPull);
+                }
+            }
         }
     }
     MulticastShotCosmetics(Shot);
@@ -1903,6 +2049,13 @@ void UBreakerWeaponComponent::FinishReload()
     // Fills to the EFFECTIVE capacity, so a reload completing inside an
     // Overhaul window fills to the overridden size and one completing after
     // the pop fills to base (Class-Kits-Gunsmith §3 G2's stated requirement).
+    // Loaded's free rounds first (§1.3 F2, captured at reload start), THEN
+    // reserve for the remainder: the refund is worth exactly the reserve it
+    // saves, which is what makes it a purchase a player with a full crate of
+    // reserve still feels the day the crate runs low.
+    const int32 FreeRounds = FMath::Clamp(PendingLoadedRefundRounds, 0, FMath::Max(0, GetEffectiveMagazineSize() - MagazineAmmo));
+    PendingLoadedRefundRounds = 0;
+    MagazineAmmo += FreeRounds;
     const int32 Needed = FMath::Max(0, GetEffectiveMagazineSize() - MagazineAmmo);
     const int32 Loaded = FMath::Min(Needed, ReserveAmmo);
     MagazineAmmo += Loaded;
@@ -1915,7 +2068,8 @@ void UBreakerWeaponComponent::FinishReload()
     // the magazine since it was last full" — a top-off of an untouched
     // magazine cannot start (StartReload's full-magazine gate), and a reload
     // that loads zero because reserve ran dry mid-cycle still credits nothing.
-    OnReloadCompleted.Broadcast(Loaded > 0);
+    // Loaded's free rounds count: they exist only because rounds were fired.
+    OnReloadCompleted.Broadcast(Loaded + FreeRounds > 0);
 }
 
 int32 UBreakerWeaponComponent::PushMagazineCapacityOverride(FName Key, int32 DeltaRounds, int32 ReservePerRound)

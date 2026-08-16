@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerGritComponent.generated.h"
 
 class UBreakerAttributeSet;
+class UBreakerCombatComponent;
 class UBreakerProgressionComponent;
 
 UENUM(BlueprintType)
@@ -120,6 +122,64 @@ public:
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Grit") void GrantGrit(float Amount);
 
+    // --- Leech/Bastion/Demolitionist node consumers (2026-08-16) -------------
+    // These are the readers the tree's WAITING ON comments name for the rules
+    // that live at the resource loop rather than on an ability. Every one of
+    // them is gated on a node tag or rank and is bit-identical when unowned.
+
+    // Bastion B4 R2 (Held Ground): placing an Anchor Point re-triggers the
+    // combat-entry grant, once per combat state. The ability calls this after a
+    // successful placement; without the node's second rank it does nothing.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Grit|Nodes") void NotifyAnchorPlaced();
+
+    // Bastion B5 (Answering Fire): a keyed, expiring multiplier on the
+    // PROXIMITY source only — deliberately narrower than the loop override's
+    // all-source lane. NEAREST HONEST FORM, recorded: no threat list exists to
+    // ask "is the near enemy one I Provoked", so Provoke pushes this for its
+    // own window and the boost rides the window rather than the enemy.
+    UFUNCTION(BlueprintCallable, Category="Grit|Nodes") void PushProximityRateBoost(FName Key, float Multiplier, float Duration);
+    UFUNCTION(BlueprintCallable, Category="Grit|Nodes") void PopProximityRateBoost(FName Key);
+    UFUNCTION(BlueprintPure, Category="Grit|Nodes") float GetProximityRateMultiplier() const;
+
+    // Demolitionist D11 (Chain Reaction): per-target blast timestamps. Returns
+    // the number of stacking flat bonuses the CURRENT blast has earned on this
+    // target (0 for the first blast; capped), and records the blast. The
+    // explosive application site calls it once per enemy per blast.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Grit|Nodes") int32 RegisterExplosiveBlast(AActor* Target);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float ChainReactionWindowSeconds = 1.5f;   // node text
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="1")) int32 ChainReactionMaxStacks = 3;   // node text
+
+    // Leech L9 (Nothing Wasted): every heal's UNROUTED overheal becomes shield.
+    // Bound to the owner's combat OnHealed in BeginPlay; public and callable
+    // directly so a world-less rig can drive it (the house test pattern).
+    UFUNCTION() void HandleOwnerHealed(const FBreakerHealResult& Result);
+
+    // The Leech shield hold-then-decay clock (Class-Kits-Tank §T1's
+    // "4%/s after 3s", previously a recorded absence). Built here because the
+    // Leech nodes L2/L8 rewrite it and a rule nobody runs cannot be rewritten.
+    // Tank-only, shield-only; every magnitude O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|LeechShield", meta=(ClampMin="0")) float LeechShieldDecayDelaySeconds = 3.0f;   // §T1
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|LeechShield", meta=(ClampMin="0", ClampMax="1")) float LeechShieldDecayFractionPerSecond = 0.04f;   // §T1
+    // L10 (Reciprocity) tunables: fraction of absorbed damage returned, and the
+    // window it returns over.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|LeechShield", meta=(ClampMin="0", ClampMax="1")) float ReciprocityReturnFraction = 0.2f;   // node text
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|LeechShield", meta=(ClampMin="0.05")) float ReciprocityReturnSeconds = 2.0f;   // node text
+
+    // B2 (Footing) / B4 (Held Ground) / B8 (Interposition) geometry, all
+    // measured against the nearest LIVE Anchor Point this Tank owns.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float AnchorNearRadiusCm = 300.0f;   // B4: 3 m
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float InterpositionRadiusCm = 400.0f;   // B8: 4 m
+    // B8's solo headroom stand-in: shield trickle as a fraction of max health
+    // per second while inside the field. O2 PLACEHOLDER, recorded substitution
+    // (no ally exists to share with; the field pays its owner).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float InterpositionShieldFractionPerSecond = 0.02f;   // O2 PLACEHOLDER
+    // B9 (Conversion): flat damage per point of CURRENT shield. O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grit|Nodes", meta=(ClampMin="0")) float ConversionFlatPerShieldPoint = 0.1f;   // O2 PLACEHOLDER
+
+    // Distance to the nearest live Anchor Point owned by this actor, or a huge
+    // number when none stands. Exposed for tests.
+    UFUNCTION(BlueprintPure, Category="Grit|Nodes") float GetOwnAnchorDistanceCm() const;
+
     // Loop overrides, the Momentum push/pop shape verbatim. HOLD is the caller
     // this exists for — it suspends nothing but multiplies generation against a
     // raised cap — and the Tank kit explicitly needs the KEYED form because
@@ -229,6 +289,46 @@ private:
 
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     TWeakObjectPtr<UBreakerProgressionComponent> CachedProgression;
+    TWeakObjectPtr<UBreakerCombatComponent> CachedCombat;
+    UBreakerCombatComponent* ResolveCombat();
+
+    // Node-rank cache, refreshed on every progression change so the per-frame
+    // loop never walks the tree. All zero/false for a non-Tank or a bare rig.
+    int32 RankSlowBleed = 0;        // L2
+    int32 RankFeedTheWound = 0;     // L4
+    int32 RankTransfusion = 0;      // L6
+    bool bSecondHeart = false;      // L8
+    bool bNothingWasted = false;    // L9
+    bool bReciprocity = false;      // L10
+    int32 RankFooting = 0;          // B2
+    int32 RankHeldGround = 0;       // B4
+    bool bInterposition = false;    // B8
+    bool bConversion = false;       // B9
+
+    // Leech shield clock state.
+    float PreviousShield = 0.0f;
+    float SecondsSinceShieldGain = 1000.0f;
+    float ShieldAbsorbedSinceGain = 0.0f;
+    float ReciprocityHealRemaining = 0.0f;
+    float ReciprocityHealPerSecond = 0.0f;
+    bool bAnchorRegrantUsed = false;
+    // Nothing Wasted's reentrancy guard: routing overheal to shield must never
+    // observe its own write.
+    bool bRoutingOverheal = false;
+
+    struct FProximityBoostEntry
+    {
+        float Multiplier = 1.0f;
+        double ExpiryTime = -1.0;
+    };
+    mutable TMap<FName, FProximityBoostEntry> ProximityBoosts;
+
+    struct FChainReactionEntry
+    {
+        double LastBlastTime = -1000.0;
+        int32 Stacks = 0;
+    };
+    TMap<TWeakObjectPtr<AActor>, FChainReactionEntry> ChainReactionStamps;
 
     bool bIsTank = false;
     bool bEnemyNear = false;

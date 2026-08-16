@@ -56,11 +56,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKe
 //           (Momentum loop knobs: cheap, all in Classes/, none done here),
 //           Node_Redirect (needs a cooldown-reduction path into GAS),
 //           Node_EvadeConversion (loop knob), Node_AirWork (affix tier read).
-//   Marksman: Node_LongLens, Node_Steady, Node_Ledger, Node_Angle,
-//           Node_MarkEconomy (mark jump on death — belongs with
-//           UBreakerMarkComponent), Node_PierceDiscipline, Node_Sightline,
+//   Marksman: Node_LongLens,
 //           Node_Lead (second simultaneous mark — needs a mark *list* here,
 //           not a single MarkTarget).
+//   CONSUMED since this list was written (2026-08-16 consumer waves — the
+//   readers live in Weapons/BreakerWeaponComponent + BreakerWeaponMath):
+//           Node_Steady, Node_Ledger, Node_MarkEconomy (weapon-kill jump
+//           half; DoT/ally deaths still wait on UBreakerMarkComponent),
+//           Node_Angle, Node_PierceDiscipline, Node_Sightline,
+//           Node_TriggerDiscipline (Frenzy's), Node_TunnelVision and
+//           Node_OpenWound (target riders), Node_Redirect, Node_NoGround,
+//           Node_Reserve, Node_NoSafety (loop valve).
 // ---------------------------------------------------------------------------
 UCLASS(ClassGroup=Abilities, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerAbilityStateComponent : public UActorComponent

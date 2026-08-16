@@ -108,6 +108,56 @@ public:
      */
     static int32 SelectNearestTarget(const FVector& Origin, const TArray<FVector>& Candidates, float MaxRadiusCm);
 
+    // ---- Marksman / Frenzy rule halves (Class-Kits §1.3 / §1.5) -----------
+    // The pure halves of the weapon-layer node rules, kept dependency-free
+    // here so the world-free suite can pin buy-the-node-observable changes
+    // while UBreakerWeaponComponent keeps only the wiring.
+
+    /**
+     * Steady (Class-Kits §1.5 M2): "ADS while moving above the slide
+     * threshold does not increase spread. R2: ADS while airborne likewise."
+     * Takes the COMPOSED movement-spread penalty the feel layer already
+     * produced and relieves it by aim progress: at full ADS the penalty is
+     * exactly zero, partway into the sights it is partway gone — the same
+     * ramp every other ADS benefit rides. Rank 1 covers grounded movement
+     * only; airborne movement keeps its full penalty until rank 2. With no
+     * ranks (or from the hip) the input passes through untouched, so every
+     * non-owner is bit-identical.
+     */
+    static float SteadyMovementSpreadDegrees(float MovementSpreadDegrees, float AimAlpha, int32 SteadyRank, bool bAirborne);
+
+    /**
+     * Called Shot (Class-Kits §1.5 M11, the node text's own numbers): "At
+     * Redline, Lead's range gate drops from 25 m to 10 m." Both clauses are
+     * required — the node owned AND the bar at Redline — otherwise the
+     * authored gate passes through unchanged.
+     */
+    static float LeadRangeGateCm(float BaseGateCm, bool bCalledShotOwned, bool bRedline);
+
+    /**
+     * Ledger (Class-Kits §1.5 M3): "Momentum spent on Marksman abilities is
+     * refunded at 25% (R2: 50%) if the ability's effect lands a hit within
+     * its window." Returns the refunded FRACTION of the ability's cost;
+     * rank 0 refunds nothing.
+     */
+    static float LedgerRefundFraction(int32 LedgerRank);
+
+    /**
+     * Mark Economy (Class-Kits §1.5 M5): "Lead's mark persists through the
+     * target's death and jumps to the nearest enemy within 15 m (R2: 25 m)."
+     * Returns the seek radius in centimetres; rank 0 returns 0 (no jump).
+     */
+    static float MarkJumpRadiusCm(int32 MarkEconomyRank);
+
+    /**
+     * Loaded (Class-Kits §1.3 F2): "Reloading while at Redline refunds
+     * ammunition to the magazine equal to the shots fired in the previous 2s
+     * (R1: half, R2: all)." Returns the FREE rounds this reload adds before
+     * reserve is drawn; the half rounds down, so one shot at rank 1 refunds
+     * nothing rather than half a round. Rank 0 refunds nothing.
+     */
+    static int32 LoadedRefundRounds(int32 ShotsInWindow, int32 LoadedRank);
+
     /**
      * Seed for a draw that must not perturb the primary shot sequence.
      * Multishot's extra pellets and the secondary hits' crit rolls draw from

@@ -3,9 +3,15 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDeployable.h"
+#include "Combat/BreakerEnemy.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 
 UBreakerGritComponent::UBreakerGritComponent()
 {
@@ -43,8 +49,31 @@ void UBreakerGritComponent::BeginPlay()
     // make rocket-jumping the cheapest Grit engine in the game — the exact
     // outcome §1.3 rule 2 exists to forbid. NotifyDamageTaken takes the split
     // explicitly instead, so the caller cannot get it wrong by omission.
+    //
+    // The HEALED delegate is a different matter (2026-08-16): FBreakerHealResult
+    // reports effective heal, overheal and granted shield as separate
+    // quantities, which is exactly the split Leech L9 Nothing Wasted needs, so
+    // that one binding is now taken. The handler is a no-op without the node.
+    if (AActor* Owner = GetOwner())
+    {
+        if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
+        {
+            CachedCombat = Combat;
+            Combat->OnHealed.AddDynamic(this, &UBreakerGritComponent::HandleOwnerHealed);
+        }
+    }
     HandleProgressionChanged();
     CachedBand = BandForFraction(GetGritFraction());
+    PreviousShield = Attributes ? Attributes->GetShield() : 0.0f;
+}
+
+UBreakerCombatComponent* UBreakerGritComponent::ResolveCombat()
+{
+    if (!CachedCombat.IsValid() && GetOwner())
+    {
+        CachedCombat = GetOwner()->FindComponentByClass<UBreakerCombatComponent>();
+    }
+    return CachedCombat.Get();
 }
 
 void UBreakerGritComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
@@ -237,6 +266,26 @@ void UBreakerGritComponent::HandleProgressionChanged()
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
     bIsTank = Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::Tank;
     if (!bIsTank) PendingGrants = 0.0f;
+
+    // Node-rank cache: read once per progression change, never per frame.
+    // Ranked nodes read GetNodeRank (their R2 clause is a magnitude); pure
+    // rule-rewrite nodes read their tag.
+    RankSlowBleed = 0; RankFeedTheWound = 0; RankTransfusion = 0;
+    bSecondHeart = false; bNothingWasted = false; bReciprocity = false;
+    RankFooting = 0; RankHeldGround = 0; bInterposition = false; bConversion = false;
+    if (bIsTank && Progression)
+    {
+        RankSlowBleed = Progression->GetNodeRank(TEXT("Tank.Leech.SlowBleed"), EBreakerPointCurrency::ClassPoints);
+        RankFeedTheWound = Progression->GetNodeRank(TEXT("Tank.Leech.FeedTheWound"), EBreakerPointCurrency::ClassPoints);
+        RankTransfusion = Progression->GetNodeRank(TEXT("Tank.Leech.Transfusion"), EBreakerPointCurrency::ClassPoints);
+        bSecondHeart = Progression->HasNodeTag(BreakerNodeTags::Node_L_SecondHeart.GetTag());
+        bNothingWasted = Progression->HasNodeTag(BreakerNodeTags::Node_L_NothingWasted.GetTag());
+        bReciprocity = Progression->HasNodeTag(BreakerNodeTags::Node_L_Reciprocity.GetTag());
+        RankFooting = Progression->GetNodeRank(TEXT("Tank.Bastion.Footing"), EBreakerPointCurrency::ClassPoints);
+        RankHeldGround = Progression->GetNodeRank(TEXT("Tank.Bastion.HeldGround"), EBreakerPointCurrency::ClassPoints);
+        bInterposition = Progression->HasNodeTag(BreakerNodeTags::Node_B_Interposition.GetTag());
+        bConversion = Progression->HasNodeTag(BreakerNodeTags::Node_B_Conversion.GetTag());
+    }
 }
 
 bool UBreakerGritComponent::IsActiveForOwner() const
@@ -310,8 +359,16 @@ void UBreakerGritComponent::NotifyDamageTaken(float HealthDamage, float ShieldDa
     // full.
     SecondsSinceContact = 0.0f;
 
+    // L10 Reciprocity's ledger: what the shield absorbed since it last stood.
+    if (ShieldDamage > 0.0f) ShieldAbsorbedSinceGain += ShieldDamage;
+
+    // L4 Feed the Wound rewrites the shield-absorption rate: half -> two-thirds
+    // (R2: full rate). The shared damage cap still binds below, exactly as the
+    // node text promises.
+    const float EffectiveShieldRate = RankFeedTheWound >= 2 ? 1.0f
+        : (RankFeedTheWound == 1 ? (2.0f / 3.0f) : ShieldRateFraction);
     const float Raw = DamageTakenGeneration(HealthDamage, ShieldDamage, Attributes->GetMaxHealth(),
-        GritPerHealthFraction, HealthFractionPerGrit, ShieldRateFraction, ProcCoefficient);
+        GritPerHealthFraction, HealthFractionPerGrit, EffectiveShieldRate, ProcCoefficient);
     const float Scaled = Raw * SelfDamageScalar(SelfDamageRate, bSelfInflicted);
     // Self-damage draws from its OWN, much smaller bucket as well as being
     // rate-scaled. Two independent guards on one source, because §1.3 rule 2
@@ -326,14 +383,21 @@ void UBreakerGritComponent::NotifyDamageTaken(float HealthDamage, float ShieldDa
 void UBreakerGritComponent::NotifyBlockProc()
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || !bInCombat || IsInSafeZone()) return;
+    // L6 Transfusion: WHILE SHIELDED, the proc pays more on a slightly faster
+    // internal cooldown (+9, R2 +12, ICD 0.4 -> 0.3). G4's per-source cap below
+    // is exactly why the shorter ICD is not a back door — the node comment says
+    // so and the budget draw enforces it.
+    const bool bTransfusion = RankTransfusion > 0 && Attributes && Attributes->GetShield() > 0.0f;
+    const float EffectiveInterval = bTransfusion ? 0.3f : BlockProcInterval;   // O2 PLACEHOLDER
+    const float EffectiveGrant = bTransfusion ? (RankTransfusion >= 2 ? 12.0f : 9.0f) : BlockProcGrant;   // node text
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    if (Now - LastBlockGrantTime < BlockProcInterval) return;
+    if (Now - LastBlockGrantTime < EffectiveInterval) return;
     LastBlockGrantTime = Now;
     // The internal cooldown ALREADY implies the per-source cap at the default
     // values. The cap is enforced anyway, and separately, so that a node
     // shortening the ICD cannot silently uncap the source — the guard is
     // against a future node, not against today's numbers.
-    PendingGrants += DrawFromBudget(BlockProcGrant, BlockBudget);
+    PendingGrants += DrawFromBudget(EffectiveGrant, BlockBudget);
 }
 
 void UBreakerGritComponent::NotifyMeleeKill()
@@ -363,7 +427,13 @@ void UBreakerGritComponent::SetInCombat(bool bNowInCombat)
     // the same reason: a grant on every refresh hands a player a free bar for
     // doing nothing. Deliberately outside the metered budget, because the entry
     // grant's whole job is to be there in the first frame.
-    if (bInCombat && !bWasInCombat) GrantGrit(CombatEntryGrant);
+    if (bInCombat && !bWasInCombat)
+    {
+        GrantGrit(CombatEntryGrant);
+        // B4 Held Ground R2's once-per-combat re-grant re-arms on the same edge
+        // the entry grant fires on.
+        bAnchorRegrantUsed = false;
+    }
     if (!bInCombat)
     {
         // Leaving combat arms the drain rather than snapping the bar to zero, so
@@ -403,6 +473,106 @@ bool UBreakerGritComponent::TrySpendGrit(float Cost)
     return true;
 }
 
+void UBreakerGritComponent::NotifyAnchorPlaced()
+{
+    // B4 Held Ground, second rank only: placing an Anchor Point re-triggers the
+    // combat-entry grant, ONCE per combat state — same edge-triggered shape as
+    // the entry grant itself, so it can never be farmed by re-placing.
+    if (RankHeldGround < 2 || !bInCombat || bAnchorRegrantUsed) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    bAnchorRegrantUsed = true;
+    GrantGrit(CombatEntryGrant);
+}
+
+void UBreakerGritComponent::PushProximityRateBoost(FName Key, float Multiplier, float Duration)
+{
+    if (Key.IsNone()) return;
+    FProximityBoostEntry Entry;
+    Entry.Multiplier = FMath::Max(0.0f, Multiplier);
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    ProximityBoosts.Add(Key, Entry);
+}
+
+void UBreakerGritComponent::PopProximityRateBoost(FName Key)
+{
+    ProximityBoosts.Remove(Key);
+}
+
+float UBreakerGritComponent::GetProximityRateMultiplier() const
+{
+    const UWorld* World = GetWorld();
+    const double Now = World ? World->GetTimeSeconds() : 0.0;
+    float Composed = 1.0f;
+    for (auto It = ProximityBoosts.CreateIterator(); It; ++It)
+    {
+        if (IsLoopOverrideExpired(It.Value().ExpiryTime, Now)) { It.RemoveCurrent(); continue; }
+        Composed *= It.Value().Multiplier;
+    }
+    return Composed;
+}
+
+int32 UBreakerGritComponent::RegisterExplosiveBlast(AActor* Target)
+{
+    if (!Target) return 0;
+    const UWorld* World = GetWorld();
+    const double Now = World ? World->GetTimeSeconds() : 0.0;
+    // Prune targets whose window lapsed (or who died), so the map never grows.
+    for (auto It = ChainReactionStamps.CreateIterator(); It; ++It)
+    {
+        if (!It.Key().IsValid() || Now - It.Value().LastBlastTime > ChainReactionWindowSeconds)
+        {
+            It.RemoveCurrent();
+        }
+    }
+    FChainReactionEntry& Entry = ChainReactionStamps.FindOrAdd(Target);
+    // First blast in a window pays no bonus; each later blast inside the window
+    // pays one more stack, hard-capped — the node's exact sentence. The -1000
+    // sentinel keeps a fresh entry out of the window even at world time zero.
+    if (Now - Entry.LastBlastTime <= ChainReactionWindowSeconds)
+    {
+        Entry.Stacks = FMath::Min(Entry.Stacks + 1, ChainReactionMaxStacks);
+    }
+    else
+    {
+        Entry.Stacks = 0;
+    }
+    Entry.LastBlastTime = Now;
+    return Entry.Stacks;
+}
+
+void UBreakerGritComponent::HandleOwnerHealed(const FBreakerHealResult& Result)
+{
+    // L9 Nothing Wasted: EVERY heal's overheal routes to Leech shield, not just
+    // Rend's. Only the UNROUTED remainder converts — a request that already
+    // asked for overheal-to-shield reports both, and converting the reported
+    // overheal again would pay the same units twice.
+    if (!bNothingWasted || !bIsTank || bRoutingOverheal || !Attributes) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+    const float Unrouted = Result.Overheal - Result.ShieldGranted;
+    if (Unrouted <= 0.0f) return;
+    const float MaxShield = Attributes->GetMaxShield();
+    if (MaxShield <= 0.0f) return;
+    bRoutingOverheal = true;
+    Attributes->ApplyShield(FMath::Min(MaxShield, Attributes->GetShield() + Unrouted));
+    bRoutingOverheal = false;
+}
+
+float UBreakerGritComponent::GetOwnAnchorDistanceCm() const
+{
+    const AActor* Owner = GetOwner();
+    if (!Owner) return TNumericLimits<float>::Max();
+    float Best = TNumericLimits<float>::Max();
+    for (const TWeakObjectPtr<ABreakerDeployable>& Weak : ABreakerDeployable::GetLiveDeployables())
+    {
+        const ABreakerDeployable* Deployable = Weak.Get();
+        if (!Deployable || Deployable->GetDeployableType() != EBreakerDeployableType::AnchorPoint) continue;
+        if (Deployable->GetOwningCharacter() != Owner) continue;
+        Best = FMath::Min(Best, static_cast<float>(FVector::Dist(Owner->GetActorLocation(), Deployable->GetActorLocation())));
+    }
+    return Best;
+}
+
 void UBreakerGritComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -433,6 +603,128 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
+    // ---- Anchor-keyed node rules (B2/B4/B8), one distance query for all ----
+    const bool bAnyAnchorNode = RankFooting > 0 || RankHeldGround > 0 || bInterposition;
+    const float AnchorDistance = bAnyAnchorNode ? GetOwnAnchorDistanceCm() : TNumericLimits<float>::Max();
+    const bool bNearOwnAnchor = AnchorDistance <= AnchorNearRadiusCm;
+
+    // B2 Footing: near your own Anchor Point the proximity source reaches 7 m
+    // (R2: 9 m) instead of 5. The 5 m scan lives with the character; this is
+    // the EXTENSION only, so a build without the node is bit-identical.
+    bool bExtendedNear = false;
+    if (RankFooting > 0 && bNearOwnAnchor && !bEnemyNear && bInCombat)
+    {
+        const float ExtendedRadius = RankFooting >= 2 ? 900.0f : 700.0f;   // node text
+        if (UWorld* World = GetWorld())
+        {
+            for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+            {
+                const ABreakerEnemy* Enemy = *It;
+                if (!Enemy) continue;
+                const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
+                if (!EnemyCombat || EnemyCombat->IsDead()) continue;
+                if (FVector::DistSquared(Owner->GetActorLocation(), Enemy->GetActorLocation()) <= ExtendedRadius * ExtendedRadius)
+                {
+                    bExtendedNear = true;
+                    break;
+                }
+            }
+        }
+        // The extended contact holds the lapse window open on the same footing
+        // as the 5 m contact — half the window's definition, wider.
+        if (bExtendedNear) SecondsSinceContact = 0.0f;
+    }
+
+    // ---- The Leech shield clock (L2/L8/L10) --------------------------------
+    // A Tank OWNS a shield ceiling: §T1 authors the overheal-to-shield cap at
+    // 25% of maximum health, and until this write existed MaxShield was 0 for
+    // every player, so the entire conversion path granted nothing. Raise-only,
+    // so a larger ceiling from any future source survives. O2 PLACEHOLDER.
+    const float LeechShieldCeiling = Attributes->GetMaxHealth() * 0.25f;   // §T1
+    if (LeechShieldCeiling > Attributes->GetMaxShield())
+    {
+        Attributes->ApplyMaxShield(LeechShieldCeiling);
+    }
+    // Shield GAIN resets the hold clock; after the hold, the shield bleeds.
+    // Built for the Leech nodes; base numbers are §T1's 3s / 4%/s.
+    const float ShieldNow = Attributes->GetShield();
+    if (ShieldNow > PreviousShield + KINDA_SMALL_NUMBER)
+    {
+        SecondsSinceShieldGain = 0.0f;
+    }
+    else
+    {
+        SecondsSinceShieldGain += DeltaTime;
+    }
+    // Break detection BEFORE decay, so only damage-driven breaks pay
+    // Reciprocity — decay reaching zero pays nothing (post-break heal is the
+    // node; a decayed shield absorbed what it absorbed and simply lapsed).
+    if (bReciprocity && PreviousShield > 0.0f && ShieldNow <= 0.0f && ShieldAbsorbedSinceGain > 0.0f)
+    {
+        ReciprocityHealRemaining = ShieldAbsorbedSinceGain * ReciprocityReturnFraction;
+        ReciprocityHealPerSecond = ReciprocityHealRemaining / FMath::Max(0.05f, ReciprocityReturnSeconds);
+    }
+    if (ShieldNow <= 0.0f) ShieldAbsorbedSinceGain = 0.0f;
+
+    float ShieldAfterDecay = ShieldNow;
+    if (ShieldNow > 0.0f)
+    {
+        // L2 Slow Bleed rewrites the HOLD, never the rate: 3s -> 5s (R2: 8s).
+        const float EffectiveDelay = RankSlowBleed >= 2 ? 8.0f : (RankSlowBleed == 1 ? 5.0f : LeechShieldDecayDelaySeconds);   // node text
+        // L8 Second Heart: no decay at all while IRONCLAD.
+        const bool bDecayHeld = bSecondHeart && CachedBand == EBreakerGritBand::Ironclad;
+        if (!bDecayHeld && SecondsSinceShieldGain >= EffectiveDelay && LeechShieldDecayFractionPerSecond > 0.0f)
+        {
+            ShieldAfterDecay = FMath::Max(0.0f, ShieldNow - ShieldNow * LeechShieldDecayFractionPerSecond * DeltaTime);
+            Attributes->ApplyShield(ShieldAfterDecay);
+        }
+    }
+
+    // B8 Interposition's solo half: alone, the sharing field pays its owner —
+    // a shield trickle while standing inside it. Recorded substitution for the
+    // ally share (O2 PLACEHOLDER magnitude); the field is a radius, not the
+    // panel-backed wedge, until the panel owns real geometry.
+    if (bInterposition && bInCombat && AnchorDistance <= InterpositionRadiusCm)
+    {
+        const float MaxShield = Attributes->GetMaxShield();
+        if (MaxShield > 0.0f && ShieldAfterDecay < MaxShield)
+        {
+            const float Trickle = Attributes->GetMaxHealth() * InterpositionShieldFractionPerSecond * DeltaTime;
+            ShieldAfterDecay = FMath::Min(MaxShield, ShieldAfterDecay + Trickle);
+            Attributes->ApplyShield(ShieldAfterDecay);
+        }
+    }
+    PreviousShield = ShieldAfterDecay;
+
+    // L10 Reciprocity's payout: 20% of what broke, over 2s, AFTER the break.
+    if (ReciprocityHealRemaining > 0.0f)
+    {
+        const float Pay = FMath::Min(ReciprocityHealPerSecond * DeltaTime, ReciprocityHealRemaining);
+        ReciprocityHealRemaining -= Pay;
+        if (UBreakerCombatComponent* Combat = ResolveCombat())
+        {
+            Combat->ApplyHealingAmount(Pay, Owner, FGameplayTag());
+        }
+    }
+
+    // B9 Conversion: hits carry flat damage scaled to CURRENT shield. The keyed
+    // outgoing modifier is refreshed every frame so spending the shield drops
+    // the bonus with it — "hold it or use it", literally.
+    if (bConversion)
+    {
+        if (UBreakerCombatComponent* Combat = ResolveCombat())
+        {
+            if (ShieldAfterDecay > 0.0f)
+            {
+                Combat->PushOutgoingModifier(TEXT("Bastion.Conversion"), ShieldAfterDecay * ConversionFlatPerShieldPoint, 1.0f, 0.5f);
+            }
+            else
+            {
+                Combat->RemoveOutgoingModifier(TEXT("Bastion.Conversion"));
+            }
+        }
+    }
+
     const float GenerationMultiplier = GetGenerationMultiplier();
     const float EffectiveCap = FMath::Max(0.0f, GlobalGenerationCap * GenerationMultiplier);
 
@@ -440,9 +732,10 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     // viability without requiring damage intake — a Tank holding ground against
     // one enemy is generating. It is metered through the same global budget as
     // the events rather than paid separately, so "20/s from all sources
-    // combined" means all sources.
+    // combined" means all sources. The proximity boost lane (B5) scales this
+    // source alone and composes under the same caps.
     float Rate = 0.0f;
-    if (bInCombat) Rate += ProximityGeneration(bEnemyNear, ProximityRate) * GenerationMultiplier;
+    if (bInCombat) Rate += ProximityGeneration(bEnemyNear || bExtendedNear, ProximityRate * GetProximityRateMultiplier()) * GenerationMultiplier;
 
     float Budget = ClampGeneration(EffectiveCap, EffectiveCap) * DeltaTime;
     float Generated = FMath::Min(ClampGeneration(Rate, EffectiveCap) * DeltaTime, Budget);
@@ -465,7 +758,11 @@ void UBreakerGritComponent::AdvanceLoop(float DeltaTime)
     // build through an approach and spend at the point of contact, which is the
     // whole reason the shape is a lapse timer rather than Momentum's state test.
     // The loop valve's decay lane scales the rate at the one place it is paid.
-    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended(), DecayPerSecond) * GetDecayRateMultiplier();
+    // B4 Held Ground: standing within 3 m of your own Anchor Point suspends
+    // Grit decay outright — the banking rewrite, keyed to the panel's presence
+    // and bounded by its lifetime and cooldown exactly as the node argues.
+    const bool bHeldGround = RankHeldGround > 0 && bNearOwnAnchor;
+    const float Decay = DecayRate(IsLapseWindowOpen(), IsDecaySuspended() || bHeldGround, DecayPerSecond) * GetDecayRateMultiplier();
     if (Decay > 0.0f) ApplyGritDelta(-Decay * DeltaTime);
     RefreshBand();
 }

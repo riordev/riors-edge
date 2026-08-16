@@ -88,6 +88,35 @@ public:
     UFUNCTION(BlueprintPure, Category="Momentum|Loop") float GetDecayRateMultiplier() const;
     UFUNCTION(BlueprintPure, Category="Momentum|Loop") int32 GetActiveLoopOverrideCount() const;
 
+    // ---- Frenzy rule halves (Class-Kits §1.3, LIVE 2026-08-16) ------------
+    // The branch's fire-cadence rules live HERE, on the loop they pay into,
+    // fed by the weapon's own delegates (OnShot / OnMagazineEmptied) and the
+    // combat component's kill event. Each pure rule is a static so the
+    // world-free suite pins buy-the-node-observable changes.
+
+    // F1 Trigger Discipline: "Momentum generation from weak-point hits no
+    // longer requires being airborne or sliding. R2: internal cooldown
+    // 0.25s -> 0.15s." Both halves transcribed. The posture rule: satisfied
+    // when the component never required posture, when the owner holds it, or
+    // when the node is owned at any rank.
+    static bool WeakPointPostureSatisfied(bool bRequiresAirborneOrSlide, bool bAirborneOrSliding, int32 TriggerDisciplineRank);
+    // R2's shorter internal cooldown; ranks 0-1 keep the authored interval.
+    static float WeakPointIntervalForRank(float BaseInterval, int32 TriggerDisciplineRank);
+
+    // F4 Rhythm: "Every 5th consecutive hit on any target generates +8
+    // Momentum, ignoring the global per-second cap. R2: every 4th. Missing
+    // resets the counter." The stride per rank; 0 means the node pays nothing.
+    static int32 RhythmStride(int32 RhythmRank);
+
+    // F6 Feed: "Kills refund Momentum equal to 10% of the ability cost most
+    // recently paid (R2: 20%)."
+    static float FeedRefundFraction(int32 FeedRank);
+
+    // The last external spend this loop observed (an ability cost is the one
+    // writer of the class resource that is not this component), for Feed and
+    // for tests. 0 until a spend has been seen.
+    UFUNCTION(BlueprintPure, Category="Momentum") float GetLastObservedSpend() const { return LastObservedSpend; }
+
     // Pure loop rules, exposed for tests and for the eventual DA_MomentumPolicy
     // asset that will own these numbers.
     static EBreakerMomentumState StateForFraction(float Fraction);
@@ -154,13 +183,30 @@ public:
     // binds this directly. Idempotent; calling it spuriously costs a lookup.
     UFUNCTION() void HandleProgressionChanged();
 
-private:
+    // Public for the same worldless-suite reason as HandleProgressionChanged:
+    // the suite cannot rely on BeginPlay to bind delegates, so the Frenzy
+    // rule handlers are directly callable. HandleShot drives Rhythm (F4) and
+    // the weak-point grant (with F1's posture rewrite); HandleMagazineEmptied
+    // is Dry Fire (F5); HandleKillDealt is Feed (F6).
     UFUNCTION() void HandleShot(const FBreakerShotResult& Shot);
+    UFUNCTION() void HandleMagazineEmptied(bool bStartedFull);
+    UFUNCTION() void HandleKillDealt(const FBreakerHitContext& Hit);
+
+private:
     UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
 
     UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     bool IsInSafeZone() const;
     void ApplyMomentumDelta(float Delta);
+    // Spend observation (Feed's producer half). Every write this component
+    // makes goes through ApplyMomentumDelta, so any DECREASE of the class
+    // resource between our own writes is an external spend — and ability
+    // costs are the one external writer that decreases it. Called before
+    // every internal write and at the top of the loop; records the drop in
+    // LastObservedSpend and re-baselines the cache either way.
+    void ObserveExternalSpend();
+    // Rank of a Frenzy node on the cached progression component, 0 without one.
+    int32 GetFrenzyNodeRank(FName NodeId) const;
     void RefreshState();
     void TryPhantomStep();
 
@@ -195,4 +241,15 @@ private:
     double LastDodgeGrantTime = -1000.0;
     double LastPhantomStepTime = -1000.0;
     double LastObservedDashTime = -1000.0;
+
+    // ---- Frenzy rule-half state (Class-Kits §1.3) -------------------------
+    // Rhythm's consecutive-hit counter (F4). Hitscan only: a rocket's shot
+    // record carries no pellets and neither advances nor resets the count —
+    // launching a rocket is not "missing".
+    int32 ConsecutiveHits = 0;
+    // Feed's spend observation: the class resource as this component last
+    // left (or saw) it, and the size of the last external drop. Negative
+    // baseline means "not yet observed".
+    float LastKnownResource = -1.0f;
+    float LastObservedSpend = 0.0f;
 };

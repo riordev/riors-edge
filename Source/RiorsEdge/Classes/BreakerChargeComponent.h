@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerChargeComponent.generated.h"
 
@@ -118,6 +119,41 @@ public:
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Charge") void GrantCharge(float Amount);
 
+    // --- Medic/Conductor/Warden node consumers (2026-08-16) ------------------
+    // Readers for the tree rules that live at the resource loop. Everything
+    // below is gated on a node tag or rank and bit-identical when unowned.
+
+    // The Support-ability crediting scope. Support abilities credit their own
+    // heals EXPLICITLY (they know the effective/overheal split and the proc
+    // coefficient); while a scope is open the OnHealed listener stands down so
+    // one heal is never credited twice. MD1 Field Dressing's whole subject is
+    // the heals that arrive OUTSIDE any scope — leech, regen, pickups.
+    UFUNCTION(BlueprintCallable, Category="Charge|Nodes") void BeginSupportHealScope() { ++SupportHealScopeDepth; }
+    UFUNCTION(BlueprintCallable, Category="Charge|Nodes") void EndSupportHealScope() { SupportHealScopeDepth = FMath::Max(0, SupportHealScopeDepth - 1); }
+
+    // Bound to the owner's combat OnHealed in BeginPlay; public and directly
+    // callable so a world-less rig can drive it (the house test pattern).
+    UFUNCTION() void HandleOwnerHealed(const FBreakerHealResult& Result);
+
+    // MD10 Blood Debt: the banked pool, fed by healing credits at full rate
+    // while the node is owned, spent whole by the next weapon hit on a marked
+    // target (the Mark ability owns the spend).
+    UFUNCTION(BlueprintPure, Category="Charge|Nodes") float GetBloodDebtPool() const { return BloodDebtPool; }
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Charge|Nodes") float ConsumeBloodDebt();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float BloodDebtPoolCap = 150.0f;   // O2 PLACEHOLDER
+
+    // MD4 Steady Hands / CO7 Conducting: the cooldown-shave path into GAS. Every
+    // active UBreakerAbilityCooldownEffect on the owner's ability system has its
+    // remaining time reduced by Seconds. Null-safe: a rig without an ability
+    // system shaves nothing and says nothing.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Charge|Nodes") void ShaveAllAbilityCooldowns(float Seconds);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SteadyHandsShaveSeconds = 0.5f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0.1")) float SteadyHandsIntervalSeconds = 1.0f;   // node text: at most once a second
+
+    // CO3 Sustain: the buff-uptime grace after the last buff expires.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSeconds = 2.0f;        // O2 PLACEHOLDER (R1)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Charge|Nodes", meta=(ClampMin="0")) float SustainGraceSecondsRank2 = 4.0f;   // O2 PLACEHOLDER (R2)
+
     // Loop overrides, the Momentum push/pop shape. CONDUIT does NOT push one:
     // its rewrite is that abilities cost nothing, which is an ABILITY-LAYER
     // cost multiplier (FBreakerAbilityVariant::AbilityCostMultiplier already
@@ -221,4 +257,21 @@ private:
     float SelfHealBudget = 0.0f;
     double LastAssistTime = -1000.0;
     double LastCleanseTime = -1000.0;
+
+    // Node-rank cache, refreshed on progression change.
+    int32 RankFieldDressing = 0;   // MD1
+    int32 RankSteadyHands = 0;     // MD4
+    bool bBloodDebt = false;       // MD10
+    int32 RankSustain = 0;         // CO3
+    // MD5/MD9 convert into shield, which needs a ceiling to exist (MaxShield
+    // initialises to 0 for every player). Owned-node-gated so a build without
+    // either stays bit-identical.
+    bool bShieldConversionNodes = false;
+
+    int32 SupportHealScopeDepth = 0;
+    float BloodDebtPool = 0.0f;
+    double LastSteadyHandsTime = -1000.0;
+    // Own clock rather than world time, so the Sustain grace is exercisable on
+    // a world-less rig through AdvanceLoop — the house test pattern.
+    float SecondsSinceBuffExpire = 1000.0f;
 };

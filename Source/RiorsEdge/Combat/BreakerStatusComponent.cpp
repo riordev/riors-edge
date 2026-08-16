@@ -14,9 +14,19 @@ void UBreakerStatusComponent::BeginPlay()
     Combat = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr;
 }
 
+void UBreakerStatusComponent::GrantStatusImmunity(float DurationSeconds)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || DurationSeconds <= 0.0f) return;
+    // Refreshes to the longer window, never stacks.
+    StatusImmunityRemaining = FMath::Max(StatusImmunityRemaining, DurationSeconds);
+}
+
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+    // The immunity window refuses NEW applications outright — refreshes and
+    // stack adds included, because a refresh IS an application.
+    if (IsStatusImmune()) return;
 
     for (FBreakerActiveStatus& Active : ActiveStatuses)
     {
@@ -66,6 +76,9 @@ void UBreakerStatusComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 void UBreakerStatusComponent::AdvanceStatuses(float DeltaTime)
 {
+    // The immunity clock runs whether or not any status is live — it is a
+    // window on the OWNER, not on the list.
+    if (StatusImmunityRemaining > 0.0f) StatusImmunityRemaining = FMath::Max(0.0f, StatusImmunityRemaining - DeltaTime);
     if (!GetOwner() || !GetOwner()->HasAuthority() || !Combat || ActiveStatuses.IsEmpty()) return;
 
     for (int32 Index = ActiveStatuses.Num() - 1; Index >= 0; --Index)

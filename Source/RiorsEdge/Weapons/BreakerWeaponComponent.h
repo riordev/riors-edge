@@ -629,6 +629,28 @@ private:
         const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
         float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed);
 
+    // ---- Marksman / Frenzy rule-half state (Class-Kits §1.3 / §1.5) --------
+    // Server-side timestamps of recent trigger pulls, pruned to Loaded's 2s
+    // window on write. Exists only to answer "how many shots left this weapon
+    // in the 2s before this reload began" (§1.3 F2).
+    TArray<double> RecentShotTimes;
+    // Free rounds the reload currently in flight owes (Loaded, §1.3 F2).
+    // Captured at reload START — the Redline check and the 2s window are both
+    // read the moment the player commits to the reload — and settled in
+    // FinishReload before reserve is drawn, so the refund is paid in saved
+    // reserve rather than vanishing into an already-full magazine.
+    int32 PendingLoadedRefundRounds = 0;
+    // Ledger's once-per-mark bookkeeping (§1.5 M3: the refund pays when the
+    // mark CONNECTS, not per shot into it). A mark is "new" when its target
+    // changed or its remaining time jumped UP past the value recorded at the
+    // last refund — a re-cast refreshes the window, time only ever runs down.
+    TWeakObjectPtr<const AActor> LedgerRefundedTarget;
+    float LedgerRefundedMarkRemaining = -1.0f;
+    // Rank of a class-point node on the owner, 0 with no progression component.
+    int32 GetClassNodeRank(FName NodeId) const;
+    // Steady's posture read (§1.5 M2's R2 clause needs airborne).
+    bool IsOwnerAirborne() const;
+
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;
     // Owner ground speed over MoveSpreadReferenceSpeed, clamped to [0,1].

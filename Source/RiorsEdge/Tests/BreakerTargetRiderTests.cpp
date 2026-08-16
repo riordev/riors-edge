@@ -29,12 +29,14 @@
 // bit-identically to a build where none of this exists; that pin is half of
 // this file.
 //
-// These tests author node effects by CONSTRUCTION (NewObject nodes in a
-// hand-built tree), not from BreakerProgressionLibrary: no library node
-// targets a Target* condition yet — that authoring pass is listed in the
-// wave report, and the machinery must be proven before content leans on it.
-// All values are O2 PLACEHOLDER structure-only numbers; magnitude is not
-// under test.
+// Most tests here author node effects by CONSTRUCTION (NewObject nodes in a
+// hand-built tree), not from BreakerProgressionLibrary, so the machinery is
+// proven independently of content. The first library authoring pass has now
+// landed — Open Wound (TargetBleeding), Tunnel Vision (TargetElite) and
+// Culling (TargetLowHealth) — and FBreakerTargetRiderLibraryAuthoringTest at
+// the foot of this file verifies those three real nodes publish through the
+// same BuildTargetConditionRiders path. All values are O2 PLACEHOLDER
+// structure-only numbers; magnitude is not under test.
 // ---------------------------------------------------------------------------
 
 namespace BreakerTargetRiderTest
@@ -311,6 +313,71 @@ bool FBreakerTargetRiderTableTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("a Flat target-conditional effect is dropped, never published"),
             UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks).Num(), 0);
     }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The first library authoring pass: the three rider lines exist ON REAL NODES
+// and publish through the real table build (no hand-built tree, no injection).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTargetRiderLibraryAuthoringTest,
+    "RiorsEdge.Combat.TargetRiders.LibraryAuthoring",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTargetRiderLibraryAuthoringTest::RunTest(const FString& Parameters)
+{
+    // A Swift with the three rider-carrying nodes: Open Wound and Tunnel
+    // Vision are Core (class-agnostic), Culling is Marksman. Loaded state, so
+    // the rows are produced by the real RecalculateStats path off the real
+    // fallback trees — LoadProgressionState resolves the Swift class
+    // definition itself.
+    AActor* Attacker = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Attacker);
+    FBreakerProgressionState State;
+    State.PermanentClass = EBreakerClassId::Swift;
+    State.CoreNodeRanks.Add({TEXT("Core.Affliction.OpenWound"), 1});
+    State.CoreNodeRanks.Add({TEXT("Core.Precision.TunnelVision"), 1});
+    State.ClassNodeRanks.Add({TEXT("Swift.Marksman.Culling"), 1});
+    Progression->LoadProgressionState(State);
+
+    const TArray<FBreakerTargetConditionRider>& Riders = Progression->GetTargetConditionRiders();
+    TestEqual(TEXT("The three authored library lines publish exactly three rider rows"), Riders.Num(), 3);
+
+    auto FindRider = [&Riders](EBreakerBuildCondition Condition) -> const FBreakerTargetConditionRider*
+    {
+        return Riders.FindByPredicate([Condition](const FBreakerTargetConditionRider& Rider) { return Rider.Condition == Condition; });
+    };
+    for (const EBreakerBuildCondition Condition : { EBreakerBuildCondition::TargetBleeding,
+        EBreakerBuildCondition::TargetElite, EBreakerBuildCondition::TargetLowHealth })
+    {
+        const FBreakerTargetConditionRider* Rider = FindRider(Condition);
+        if (!TestNotNull(TEXT("Each authored condition has its row"), Rider)) continue;
+        // Structure, not magnitude (O2): the row is Damage-target,
+        // rank-scaled to something positive, and composed with no
+        // AlsoRequires — each line is a single honest condition.
+        TestEqual(TEXT("Rider rows are Damage-target (the one lane ReceiveDamage consumes)"),
+            Rider->StatTarget, EBreakerNodeStatTarget::Damage);
+        TestTrue(TEXT("Rider rows carry a positive rank-scaled percent"), Rider->Percent > 0.0f);
+        TestEqual(TEXT("The authored lines compose no extra requirements"), Rider->AlsoRequires.Num(), 0);
+    }
+
+    // The unconditional halves of the same purchases still pay the ordinary
+    // way: Tunnel Vision's crit damage and Culling's unconditional More reach
+    // the aggregate exactly as before the rider lines were added — the rider
+    // is ADDITIVE authoring, not a re-route of what the nodes already did.
+    const FBreakerNodeStats& Stats = Progression->GetNodeStats();
+    TestTrue(TEXT("Tunnel Vision's flat crit-damage line still aggregates"), Stats.CriticalMultiplierBonus > 0.0f);
+    TestEqual(TEXT("Culling's unconditional More still composes at its authored value"), Stats.DamageMoreMultiplier, 1.18f, 0.0001f);
+
+    // A build without the nodes publishes no rows at all — the whole
+    // pre-existing population is untouched by the authoring pass.
+    AActor* Bare = NewObject<AActor>();
+    UBreakerProgressionComponent* BareProgression = NewObject<UBreakerProgressionComponent>(Bare);
+    FBreakerProgressionState BareState;
+    BareState.PermanentClass = EBreakerClassId::Swift;
+    BareProgression->LoadProgressionState(BareState);
+    TestEqual(TEXT("A Swift with none of the nodes publishes no riders"), BareProgression->GetTargetConditionRiders().Num(), 0);
     return true;
 }
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayTagContainer.h"
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerScrapComponent.generated.h"
 
@@ -63,7 +64,11 @@ public:
     // budget — and that shortness is the design, not an omission.
     void AdvanceLoop(float DeltaTime);
 
-    UFUNCTION(BlueprintPure, Category="Scrap") EBreakerScrapState GetScrapState() const { return CachedState; }
+    // LIVE, not the cached copy: the band answers from the bar as it stands
+    // this instant, so a rule reading it mid-event (Tithe's cap bypass, Cheap
+    // Work's price) can never act on last frame's band. CachedState remains
+    // the change-detection state behind OnScrapStateChanged only.
+    UFUNCTION(BlueprintPure, Category="Scrap") EBreakerScrapState GetScrapState() const { return StateForFraction(GetScrapFraction(), StockedFraction, SurplusFraction); }
     UFUNCTION(BlueprintPure, Category="Scrap") bool IsActiveForOwner() const;
     UFUNCTION(BlueprintPure, Category="Scrap") float GetScrap() const;
     UFUNCTION(BlueprintPure, Category="Scrap") float GetScrapFraction() const;
@@ -92,12 +97,52 @@ public:
     // when the magazine was full at the start of the cycle — topping off at 1/30
     // and firing one round does not re-arm it.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyMagazineEmptied(bool bStartedFull);
-    // O30: NOTHING CALLS THESE TWO. They are the deployable system's half of the
-    // contract, written now so the arithmetic is pinned by a test before the
-    // system that needs it exists, and so a future deployable cannot invent its
-    // own economy.
+    // The deployable half of the contract (live as of the deployable system:
+    // ABreakerDeployable calls both).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyDeployableDestroyed(float DeployableScrapCost);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyDeployableDamageDealt(float DamageAppliedToHealth);
+
+    // ---- Gunsmith node consumers (2026-08-16, the branch-tree pay pass) ----
+    // Each reads the owner's aggregated node tags/ranks through the progression
+    // component — the Cleave's Edge posture — so a respec moves the rule on the
+    // next event with no rebind.
+
+    // AR4 Deep Pockets: reserve picked up OVER a full reserve converts to Scrap
+    // instead of vanishing. RECEIVER HALF of the contract: the ammo pickup path
+    // (not this lane's territory) must report the overflow; without the node the
+    // call pays nothing, so wiring it early is safe. Metered through the global
+    // cap, per the node row ("respects the 15/s global cap").
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyAmmoPickupOverflow(float OverflowRounds);
+    // AR9 Reciprocal: an Ammo Returned on Kill affix trigger also pays Scrap,
+    // OUTSIDE the per-second cap (the node row's own words). RECEIVER HALF: no
+    // such affix event exists yet; the affix layer calls this when it lands.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap|Generation") void NotifyAmmoReturnedOnKill(int32 RoundsReturned);
+    // TK5 Attrition Field: an enemy killed inside the owner's Disruptor field.
+    // Called by ABreakerDeployable's kill-inside-field detection; pays 8 (R2:
+    // 14) outside the global cap, nothing without the node.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Scrap") void NotifyDisruptorFieldKill();
+
+    // AR2 Working Stock: how many tiers faster the owner's reload reads to
+    // anything that reads reload tier. 1 while Dry (R2: also Stocked) with the
+    // node, else 0. PUBLISHED HALF: no reload-tier affix reader exists yet —
+    // this is the band-side answer waiting for it, an honest number nobody
+    // reads rather than a silent gap.
+    UFUNCTION(BlueprintPure, Category="Scrap") int32 GetReloadTierShift() const;
+
+    // FT1 Salvage: the refund fraction destruction actually pays — 0.65 at rank
+    // 1, 0.80 at rank 2 (the hard ceiling), the authored default without it.
+    UFUNCTION(BlueprintPure, Category="Scrap") float GetEffectiveDestructionRefundFraction() const;
+
+    // Pure rules for the above, pinned by tests.
+    static float SalvageRefundFraction(int32 SalvageRank, float BaseFraction);
+    static float AttritionFieldRefund(int32 Rank);
+    static int32 ReloadTierShiftFor(int32 WorkingStockRank, EBreakerScrapState State);
+
+    // Owned-rank read for the Gunsmith node layer (ClassPoints wallet), 0 with
+    // no progression component. Public so the deployable/ability consumers and
+    // the tests ask the same question the same way.
+    int32 GetGunsmithNodeRank(FName NodeId) const;
+    bool HasOwnedNodeTag(const FGameplayTag& Tag) const;
 
     // Direct credit, mirroring UBreakerMomentumComponent::GrantMomentum and
     // UBreakerManaComponent::GrantMana(bIgnoreGlobalCap=true): it bypasses the
@@ -173,6 +218,12 @@ public:
     // deployable set mid-wave.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float GlobalGenerationCap = 15.0f;   // O2 PLACEHOLDER
 
+    // AR4's "fixed rate" (the doc authors the shape, not the number): Scrap per
+    // overflowed reserve round; rank 2 doubles it (doc: "R2: doubled rate").
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float OverflowScrapPerRound = 0.5f;   // O2 PLACEHOLDER
+    // AR9's per-returned-round rate (the doc authors no magnitude).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Scrap|Generation", meta=(ClampMin="0")) float ReciprocalScrapPerReturn = 2.0f;   // O2 PLACEHOLDER
+
     // Band thresholds as fractions of MaxClassResource, not absolutes, so a
     // Maximum Resource roll does not accidentally move what Surplus means
     // (the rule Tank states explicitly for IRONCLAD and every band obeys).
@@ -204,4 +255,8 @@ private:
     bool bIsGunsmith = false;
     EBreakerScrapState CachedState = EBreakerScrapState::Dry;
     float PendingGrants = 0.0f;
+    // AR6 Cold Barrel's "reload from an empty magazine" fact, assembled from
+    // the two events this component already hears: the magazine emptied, and
+    // no reload has completed since. Consumed by the next reload-completed.
+    bool bMagazineEmptiedSinceReload = false;
 };

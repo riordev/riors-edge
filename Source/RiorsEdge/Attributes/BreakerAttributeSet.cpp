@@ -179,6 +179,11 @@ void UBreakerAttributeSet::ApplyShield(float NewValue)
     WriteAttributeValue(GetShieldAttribute(), Shield, NewValue);
 }
 
+void UBreakerAttributeSet::ApplyMaxShield(float NewValue)
+{
+    WriteAttributeValue(GetMaxShieldAttribute(), MaxShield, NewValue);
+}
+
 void UBreakerAttributeSet::ApplyMaxHealth(float NewValue)
 {
     WriteAttributeValue(GetMaxHealthAttribute(), MaxHealth, NewValue);

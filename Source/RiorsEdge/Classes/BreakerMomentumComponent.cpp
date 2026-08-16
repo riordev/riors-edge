@@ -38,14 +38,23 @@ void UBreakerMomentumComponent::BeginPlay()
         if (UBreakerWeaponComponent* Weapon = Owner->FindComponentByClass<UBreakerWeaponComponent>())
         {
             Weapon->OnShot.AddDynamic(this, &UBreakerMomentumComponent::HandleShot);
+            // Dry Fire (Class-Kits §1.3 F5) rides the magazine-economy event
+            // the weapon already broadcasts for Scrap: the last round LEAVING
+            // the magazine, never the reload.
+            Weapon->OnMagazineEmptied.AddDynamic(this, &UBreakerMomentumComponent::HandleMagazineEmptied);
         }
         if (UBreakerCombatComponent* Combat = Owner->FindComponentByClass<UBreakerCombatComponent>())
         {
             Combat->OnDamageReceived.AddDynamic(this, &UBreakerMomentumComponent::HandleDamageReceived);
+            // Feed (Class-Kits §1.3 F6) rides the attacker-side kill event.
+            Combat->OnKillDealt.AddDynamic(this, &UBreakerMomentumComponent::HandleKillDealt);
         }
     }
     HandleProgressionChanged();
     CachedState = StateForFraction(GetMomentumFraction());
+    // Baseline the spend observer at whatever the bar holds now, so the first
+    // observation after BeginPlay cannot misread starting resource as a spend.
+    LastKnownResource = GetMomentum();
 }
 
 void UBreakerMomentumComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
@@ -53,6 +62,7 @@ void UBreakerMomentumComponent::BindAttributes(UBreakerAttributeSet* InAttribute
     Attributes = InAttributes;
     HandleProgressionChanged();
     CachedState = StateForFraction(GetMomentumFraction());
+    LastKnownResource = GetMomentum();
 }
 
 EBreakerMomentumState UBreakerMomentumComponent::StateForFraction(float Fraction)
@@ -242,9 +252,63 @@ bool UBreakerMomentumComponent::IsInSafeZone() const
     return GameMode && GameMode->IsInSafeZone(Owner->GetActorLocation());
 }
 
+void UBreakerMomentumComponent::ObserveExternalSpend()
+{
+    const float Current = GetMomentum();
+    // A drop between our own writes is an external spend: every write this
+    // component makes re-baselines through here, and the one external writer
+    // that DECREASES the class resource is the ability cost effect. External
+    // increases just re-baseline.
+    if (LastKnownResource >= 0.0f && Current < LastKnownResource - KINDA_SMALL_NUMBER)
+    {
+        LastObservedSpend = LastKnownResource - Current;
+    }
+    LastKnownResource = Current;
+}
+
+int32 UBreakerMomentumComponent::GetFrenzyNodeRank(FName NodeId) const
+{
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    if (!Progression && GetOwner())
+    {
+        Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    }
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+}
+
+bool UBreakerMomentumComponent::WeakPointPostureSatisfied(bool bRequiresAirborneOrSlide, bool bAirborneOrSliding, int32 TriggerDisciplineRank)
+{
+    // Class-Kits §1.3 F1, transcribed: "Momentum generation from weak-point
+    // hits no longer requires being airborne or sliding."
+    return !bRequiresAirborneOrSlide || bAirborneOrSliding || TriggerDisciplineRank > 0;
+}
+
+float UBreakerMomentumComponent::WeakPointIntervalForRank(float BaseInterval, int32 TriggerDisciplineRank)
+{
+    // §1.3 F1 R2, transcribed: internal cooldown 0.25s -> 0.15s. The base
+    // interval is the component's own authored knob, so ranks 0-1 keep
+    // whatever it says even if it is retuned away from 0.25.
+    return TriggerDisciplineRank >= 2 ? 0.15f : BaseInterval;
+}
+
+int32 UBreakerMomentumComponent::RhythmStride(int32 RhythmRank)
+{
+    if (RhythmRank <= 0) return 0;
+    return RhythmRank >= 2 ? 4 : 5;   // §1.3 F4 R1/R2
+}
+
+float UBreakerMomentumComponent::FeedRefundFraction(int32 FeedRank)
+{
+    if (FeedRank <= 0) return 0.0f;
+    return FeedRank >= 2 ? 0.20f : 0.10f;   // §1.3 F6 R1/R2
+}
+
 void UBreakerMomentumComponent::ApplyMomentumDelta(float Delta)
 {
     if (!Attributes || FMath::IsNearlyZero(Delta)) return;
+    // Observe BEFORE writing: our own write must not mask a spend that
+    // happened since the last one.
+    ObserveExternalSpend();
     const float Max = Attributes->GetMaxClassResource();
     // ApplyClassResource, not the generated SetClassResource — the same reason
     // the Mana loop and UBreakerCombatComponent's resource helpers use it: the
@@ -256,6 +320,8 @@ void UBreakerMomentumComponent::ApplyMomentumDelta(float Delta)
     // component that somehow found itself on an Overcasting bank still cannot
     // generate into a debt it does not own.
     Attributes->ApplyClassResource(FMath::Clamp(Attributes->GetClassResource() + Delta, 0.0f, Max));
+    // Re-baseline so this write never reads back as a spend.
+    LastKnownResource = Attributes->GetClassResource();
 }
 
 void UBreakerMomentumComponent::GrantMomentum(float Amount)
@@ -284,13 +350,77 @@ void UBreakerMomentumComponent::RefreshState()
 
 void UBreakerMomentumComponent::HandleShot(const FBreakerShotResult& Shot)
 {
-    if (!Shot.bWeakPoint || !GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+
+    // Rhythm (Class-Kits §1.3 F4, LIVE, transcribed): "Every 5th consecutive
+    // hit on any target generates +8 Momentum, ignoring the global per-second
+    // cap. R2: every 4th. Missing resets the counter." Any-target, so this is
+    // the component's own counter rather than the ability state's per-target
+    // streak; "ignoring the cap" is GrantMomentum's direct-credit path rather
+    // than the metered PendingGrants queue. Hitscan only — a rocket's shot
+    // record carries no pellets and is neither a hit nor a miss here.
+    if (Shot.GetPelletCount() > 0)
+    {
+        if (Shot.bHit)
+        {
+            ++ConsecutiveHits;
+            const int32 Stride = RhythmStride(GetFrenzyNodeRank(TEXT("Swift.Frenzy.Rhythm")));
+            if (Stride > 0 && ConsecutiveHits % Stride == 0)
+            {
+                GrantMomentum(8.0f);   // §1.3 F4: +8, outside the cap
+            }
+        }
+        else
+        {
+            ConsecutiveHits = 0;
+        }
+    }
+
+    if (!Shot.bWeakPoint) return;
+    // Trigger Discipline (Class-Kits §1.3 F1, LIVE, transcribed): weak-point
+    // generation no longer requires being airborne or sliding, and R2 runs
+    // the internal cooldown at 0.15s instead of the authored 0.25s.
+    const int32 TriggerRank = GetFrenzyNodeRank(TEXT("Swift.Frenzy.TriggerDiscipline"));
     const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
-    if (bWeakPointRequiresAirborneOrSlide && !(Movement && (Movement->IsFalling() || Movement->IsSliding()))) return;
+    const bool bAirborneOrSliding = Movement && (Movement->IsFalling() || Movement->IsSliding());
+    if (!WeakPointPostureSatisfied(bWeakPointRequiresAirborneOrSlide, bAirborneOrSliding, TriggerRank)) return;
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    if (Now - LastWeakPointGrantTime < WeakPointInterval) return;
+    if (Now - LastWeakPointGrantTime < WeakPointIntervalForRank(WeakPointInterval, TriggerRank)) return;
     LastWeakPointGrantTime = Now;
     PendingGrants += WeakPointGrant;
+}
+
+void UBreakerMomentumComponent::HandleMagazineEmptied(bool bStartedFull)
+{
+    // Dry Fire (Class-Kits §1.3 F5, LIVE, transcribed): "Firing the last
+    // round in a magazine generates +12 Momentum." The event already fires on
+    // the last round LEAVING the magazine and never on the reload, and a
+    // reload always fills the whole magazine, so emptying one costs a full
+    // magazine of ammunition — the node cannot be farmed faster than the
+    // player can shoot. bStartedFull is Scrap's dump clause, not this one:
+    // F5 rewards emptying rather than tapping, wherever the magazine started.
+    // R2's second half — "also refunds 1s of ability cooldown" — has no seam
+    // here (cooldowns live on the ability system); it stays WAITING, recorded
+    // on the node in BreakerProgressionLibrary.cpp.
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    if (GetFrenzyNodeRank(TEXT("Swift.Frenzy.DryFire")) <= 0) return;
+    GrantMomentum(12.0f);   // §1.3 F5: +12
+}
+
+void UBreakerMomentumComponent::HandleKillDealt(const FBreakerHitContext& Hit)
+{
+    // Feed (Class-Kits §1.3 F6, LIVE, transcribed): "Kills refund Momentum
+    // equal to 10% of the ability cost most recently paid (R2: 20%). Ties the
+    // loop to the kill without a flat Resource on Kill duplicate." The cost
+    // most recently paid is whatever the spend observer last saw leave the
+    // bar; a Swift who has cast nothing yet gets nothing, which is the node's
+    // own design (the refund is OF a cost).
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsActiveForOwner() || IsInSafeZone()) return;
+    // A spend this frame may not have been observed yet — look before paying.
+    ObserveExternalSpend();
+    const float Fraction = FeedRefundFraction(GetFrenzyNodeRank(TEXT("Swift.Frenzy.Feed")));
+    if (Fraction <= 0.0f || LastObservedSpend <= 0.0f) return;
+    GrantMomentum(LastObservedSpend * Fraction);
 }
 
 void UBreakerMomentumComponent::HandleDamageReceived(const FBreakerDamageResult& Result)
@@ -349,6 +479,9 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
 {
     AActor* Owner = GetOwner();
     if (!Owner || !Owner->HasAuthority() || !Attributes || DeltaTime <= 0.0f) return;
+    // One deterministic spend observation per tick, so Feed's "cost most
+    // recently paid" is current even on frames where this loop writes nothing.
+    ObserveExternalSpend();
     if (!IsActiveForOwner())
     {
         PendingGrants = 0.0f;

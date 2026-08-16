@@ -2,10 +2,12 @@
 
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/BreakerGunsmithAbilities.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Game/BreakerGameMode.h"
 #include "GameFramework/Actor.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "Progression/BreakerProgressionLibrary.h"
 
 UBreakerScrapComponent::UBreakerScrapComponent()
 {
@@ -264,22 +266,144 @@ void UBreakerScrapComponent::NotifyKill(float ProcCoefficient)
 
 void UBreakerScrapComponent::NotifyReloadCompleted(bool bAnyRoundFired)
 {
-    QueueGrant(ReloadGeneration(bAnyRoundFired, ReloadGrant));
+    // AR6 Cold Barrel: a reload completing while the emptied flag is up is a
+    // reload from an empty magazine (rounds only leave by firing, and nothing
+    // refills a magazine but a reload). Once per reload by construction — the
+    // flag is consumed here. The shave itself is the Sidearm Rig's rule.
+    const bool bFromEmpty = bMagazineEmptiedSinceReload;
+    bMagazineEmptiedSinceReload = false;
+    if (bFromEmpty)
+    {
+        const int32 ColdBarrelRank = GetGunsmithNodeRank(TEXT("Gunsmith.Armory.ColdBarrel"));
+        if (ColdBarrelRank > 0)
+        {
+            UBreakerAbility_SidearmRig::ShaveCooldownForEmptyReload(GetOwner(), ColdBarrelRank);
+        }
+    }
+
+    // AR11 No Reserve: reload and magazine Scrap pay double. NOTE, recorded:
+    // the reserve-halving half of the node lives on the weapon's reserve cap
+    // (Weapons/ territory) and is still waiting; the doubling is real either
+    // way and reads as the node's upside until the downside lands.
+    const float Multiplier = HasOwnedNodeTag(BreakerNodeTags::Node_AR_NoReserve.GetTag()) ? 2.0f : 1.0f;
+    QueueGrant(ReloadGeneration(bAnyRoundFired, ReloadGrant) * Multiplier);
 }
 
 void UBreakerScrapComponent::NotifyMagazineEmptied(bool bStartedFull)
 {
-    QueueGrant(MagazineDumpGeneration(bStartedFull, MagazineDumpGrant));
+    bMagazineEmptiedSinceReload = true;
+    // AR1 Field Stripping R2: the full-at-cycle-start requirement on the dump
+    // source is removed. (R1's clause — reload credit paying on a partial
+    // reload provided a round was fired — is ALREADY the shipped base rule:
+    // ReloadGeneration keys on bAnyRoundFired and nothing else, exactly the
+    // doc's own anti-farm wording. Rank 1 therefore changes nothing here and
+    // rank 2 is the rank that moves this event.)
+    const bool bTreatAsFull = bStartedFull
+        || GetGunsmithNodeRank(TEXT("Gunsmith.Armory.FieldStripping")) >= 2;
+    const float Multiplier = HasOwnedNodeTag(BreakerNodeTags::Node_AR_NoReserve.GetTag()) ? 2.0f : 1.0f;
+    QueueGrant(MagazineDumpGeneration(bTreatAsFull, MagazineDumpGrant) * Multiplier);
 }
 
 void UBreakerScrapComponent::NotifyDeployableDestroyed(float DeployableScrapCost)
 {
-    QueueGrant(DestructionRefund(DeployableScrapCost, DestructionRefundFraction));
+    QueueGrant(DestructionRefund(DeployableScrapCost, GetEffectiveDestructionRefundFraction()));
 }
 
 void UBreakerScrapComponent::NotifyDeployableDamageDealt(float DamageAppliedToHealth)
 {
-    QueueGrant(DeployableDamageGeneration(DamageAppliedToHealth, DeployableDamagePerScrap));
+    const float Generated = DeployableDamageGeneration(DamageAppliedToHealth, DeployableDamagePerScrap);
+    // FT4 Tithe: while Surplus, deployable-damage Scrap ignores the per-second
+    // cap — paid directly instead of queued through the metered budget. The
+    // band gate keeps it accelerating the top of the bar only. (R2's shorter
+    // per-deployable ICD still waits: the ICD itself is recorded-unenforced,
+    // see DeployableDamageInterval.)
+    if (HasOwnedNodeTag(BreakerNodeTags::Node_FT_Tithe.GetTag())
+        && GetScrapState() == EBreakerScrapState::Surplus)
+    {
+        GrantScrap(Generated);
+        return;
+    }
+    QueueGrant(Generated);
+}
+
+void UBreakerScrapComponent::NotifyAmmoPickupOverflow(float OverflowRounds)
+{
+    const int32 Rank = GetGunsmithNodeRank(TEXT("Gunsmith.Armory.DeepPockets"));
+    if (Rank <= 0 || OverflowRounds <= 0.0f) return;
+    // Metered (the node row: "respects the 15/s global cap"), doubled at R2.
+    QueueGrant(OverflowRounds * OverflowScrapPerRound * (Rank >= 2 ? 2.0f : 1.0f));
+}
+
+void UBreakerScrapComponent::NotifyAmmoReturnedOnKill(int32 RoundsReturned)
+{
+    if (!HasOwnedNodeTag(BreakerNodeTags::Node_AR_Reciprocal.GetTag()) || RoundsReturned <= 0) return;
+    // OUTSIDE the per-second cap, per the node row — the direct-credit path.
+    GrantScrap(RoundsReturned * ReciprocalScrapPerReturn);
+}
+
+void UBreakerScrapComponent::NotifyDisruptorFieldKill()
+{
+    const float Refund = AttritionFieldRefund(GetGunsmithNodeRank(TEXT("Gunsmith.Tinkerer.AttritionField")));
+    if (Refund <= 0.0f) return;
+    // "ignoring the global cap" — direct credit, like the node refund pattern.
+    GrantScrap(Refund);
+}
+
+int32 UBreakerScrapComponent::GetReloadTierShift() const
+{
+    return ReloadTierShiftFor(GetGunsmithNodeRank(TEXT("Gunsmith.Armory.WorkingStock")), GetScrapState());
+}
+
+float UBreakerScrapComponent::GetEffectiveDestructionRefundFraction() const
+{
+    return SalvageRefundFraction(GetGunsmithNodeRank(TEXT("Gunsmith.FieldTech.Salvage")), DestructionRefundFraction);
+}
+
+float UBreakerScrapComponent::SalvageRefundFraction(int32 SalvageRank, float BaseFraction)
+{
+    // FT1: 65% at rank 1, 80% at rank 2 — "the hard ceiling", transcribed.
+    if (SalvageRank >= 2) return 0.80f;
+    if (SalvageRank == 1) return 0.65f;
+    return FMath::Clamp(BaseFraction, 0.0f, 1.0f);
+}
+
+float UBreakerScrapComponent::AttritionFieldRefund(int32 Rank)
+{
+    // TK5: 8 Scrap at rank 1, 14 at rank 2, transcribed.
+    if (Rank >= 2) return 14.0f;
+    if (Rank == 1) return 8.0f;
+    return 0.0f;
+}
+
+int32 UBreakerScrapComponent::ReloadTierShiftFor(int32 WorkingStockRank, EBreakerScrapState State)
+{
+    // AR2: one tier faster while Dry; R2 extends the band to Stocked. Never a
+    // percentage — a band-and-tier rewrite only.
+    if (WorkingStockRank >= 2) return State != EBreakerScrapState::Surplus ? 1 : 0;
+    if (WorkingStockRank == 1) return State == EBreakerScrapState::Dry ? 1 : 0;
+    return 0;
+}
+
+int32 UBreakerScrapComponent::GetGunsmithNodeRank(FName NodeId) const
+{
+    if (!CachedProgression.IsValid() && GetOwner())
+    {
+        const_cast<UBreakerScrapComponent*>(this)->CachedProgression =
+            GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    }
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+}
+
+bool UBreakerScrapComponent::HasOwnedNodeTag(const FGameplayTag& Tag) const
+{
+    if (!CachedProgression.IsValid() && GetOwner())
+    {
+        const_cast<UBreakerScrapComponent*>(this)->CachedProgression =
+            GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
+    }
+    const UBreakerProgressionComponent* Progression = CachedProgression.Get();
+    return Progression && Progression->HasNodeTag(Tag);
 }
 
 void UBreakerScrapComponent::GrantScrap(float Amount)

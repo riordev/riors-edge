@@ -53,6 +53,17 @@ public:
     // (Cadence, Metronome). A BOOL, never a count: five buffs pay what one
     // pays (the anti-farm shape the Charge component's setter enforces).
     static void RefreshBuffUptime(ABreakerCharacter* Character);
+
+protected:
+    // The cooldown-shave/clear path into GAS for THIS ability's own cooldown
+    // effect, found by its dynamically-added cooldown tag. Built for the Medic
+    // and Warden refund nodes (MD3/MD11/WA2/WA9). Null-safe everywhere.
+    void ShaveOwnCooldownSeconds(float Seconds) const;
+    void ClearOwnCooldown() const;
+
+    // Node reads, the Cleave's Edge pattern; null-safe (no progression = 0).
+    static int32 SupportNodeRank(const ABreakerCharacter* Character, const TCHAR* NodeId);
+    static bool SupportHasNode(const ABreakerCharacter* Character, const FGameplayTag& Tag);
 };
 
 // U1 Patch (§3 U1, starter, Medic): instant heal on the ally under the
@@ -67,6 +78,8 @@ class RIORSEDGE_API UBreakerAbility_Patch : public UBreakerSupportAbility
 public:
     UBreakerAbility_Patch();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+    // MD11 NO TRIAGE: far cheaper. The cooldown half is shaved after commit.
+    virtual float GetResourceCost() const override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Patch", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // §U1: 20 m
     // O2 PLACEHOLDER: §U1 authors "a percentage of the target's maximum
@@ -88,6 +101,8 @@ class RIORSEDGE_API UBreakerAbility_Purge : public UBreakerSupportAbility
 public:
     UBreakerAbility_Purge();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+    // MD11 NO TRIAGE: far cheaper, self-only (both halves in the cpp).
+    virtual float GetResourceCost() const override;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Purge", meta=(ClampMin="0")) float TargetRangeCm = 2000.0f;   // O2 PLACEHOLDER (mirrors Patch)
 };
@@ -111,9 +126,24 @@ public:
 
     static FName WindowKey();
 
+    UFUNCTION() void HandleBatonOccupantEntered(AActor* Occupant);
+    UFUNCTION() void HandleBatonOccupantExited(AActor* Occupant);
+    UFUNCTION() void HandleBatonZoneExpired();
+
+    // CO11 DETACHED BATON's stationary zone radius. O2 PLACEHOLDER ("much
+    // larger" than the followed aura, which has no radius of its own yet).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cadence", meta=(ClampMin="0")) float DetachedBatonRadiusCm = 800.0f;
+
 private:
+    void ShaveTick();
+
     FTimerHandle WindowTimer;
+    FTimerHandle ConductingTimer;
+    UPROPERTY() TObjectPtr<ABreakerZoneActor> BatonZone;
     bool bCadenceActive = false;
+    // CO4 Rehearsal: set when EndAbility tears down a window that still had
+    // time — i.e. a re-application — so the next activation can refund.
+    bool bReappliedWhileLive = false;
 };
 
 // U4 Metronome (§3 U4, Conductor): an 8s state in which consecutive weapon
@@ -146,6 +176,8 @@ private:
     bool bMetronomeActive = false;
     int32 Stacks = 0;
     double LastHitTime = -1000.0;
+    // CO4 Rehearsal: a re-application refreshes stacks-intact and refunds.
+    bool bReappliedWhileLive = false;
 };
 
 // U5 Mark (§3 U5, starter, Warden): paints the target under the crosshair for
@@ -162,21 +194,34 @@ public:
     UBreakerAbility_Mark();
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+    // WA11 HUNTER'S ECONOMY: Mark costs nothing (duration halved in the cpp).
+    virtual float GetResourceCost() const override;
 
     static FName IncomingModifierKey();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float TargetRangeCm = 3000.0f;   // O2 PLACEHOLDER (§U5 authors no range)
     // O2 PLACEHOLDER: "takes increased damage" with no magnitude authored.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) float MarkedDamageMultiplier = 1.15f;   // O2 PLACEHOLDER
+    // WA8 DEEP MARK: per-depth damage-taken increase and Charge-yield bonus.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkDamagePerDepth = 0.05f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0")) float DeepMarkYieldPerDepth = 0.25f;    // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="1")) int32 DeepMarkMaxDepth = 3;             // O2 PLACEHOLDER
+    // WA11's shortened leash. O2 PLACEHOLDER ("much shorter").
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Mark", meta=(ClampMin="0.5")) float HuntersEconomyDuration = 4.0f;
 
 private:
     UFUNCTION() void HandleHitDealt(const FBreakerHitContext& Hit);
     void CloseMark();
+    void PointMarkAt(AActor* NewTarget, float Duration);
 
     FTimerHandle MarkTimer;
     TWeakObjectPtr<UBreakerCombatComponent> BoundCombat;
     TWeakObjectPtr<AActor> MarkedTarget;
     bool bMarkActive = false;
+    // WA8: how deep the current mark runs. Survives re-activation (instanced
+    // per actor); reset whenever the mark points at a NEW target.
+    int32 MarkDepth = 0;
+    float ActiveMarkDuration = 10.0f;
 };
 
 // U6 Suppress (§3 U6, Warden): a 6s zone, 6 m radius, at the aim point.
@@ -201,10 +246,20 @@ public:
     // Same enemy movement-profile mutator (and the same recorded Fleetfoot
     // restore limitation) as the Disruptor's slow.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0", ClampMax="1")) float SlowMultiplier = 0.55f;   // O2 PLACEHOLDER
+    // WA7 SUPPRESSION: FLAT armour cut on enemies inside — flat, never a
+    // percentage, the boss-cap protection. O2 PLACEHOLDER magnitude.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float SuppressionArmorCut = 30.0f;
+    // WA5 PRESSURE: the slow, count-independent occupancy trickle (per second).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecond = 1.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Suppress", meta=(ClampMin="0")) float PressureChargePerSecondRank2 = 2.0f;   // O2 PLACEHOLDER
 
 private:
+    void PressureTick();
+
     UPROPERTY() TObjectPtr<ABreakerZoneActor> ActiveZone;
     TArray<TWeakObjectPtr<AActor>> SlowedEnemies;
+    FTimerHandle PressureTimer;
+    int32 PressureRank = 0;
 };
 
 // CONDUIT (§3.1 ultimate): 100 Charge, no cooldown, 12s. For the duration
