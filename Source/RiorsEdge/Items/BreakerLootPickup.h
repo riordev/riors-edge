@@ -6,12 +6,21 @@
 #include "BreakerLootPickup.generated.h"
 
 class ABreakerCharacter;
+class UMaterialInstanceDynamic;
+class UPointLightComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
-// A dropped item lying on the ground: a small floating rarity-tinted box under
-// a tall thin rarity beam, picked up with F. Despawns after five minutes so a
-// long session cannot carpet the arena with junk.
+// A dropped item lying on the ground: a small floating rarity-tinted box that
+// bobs and spins, picked up with F. Despawns after five minutes so a long
+// session cannot carpet the arena with junk.
+//
+// LOOT DRAMA scales with the tier, because the drop is the paycheck and the
+// paycheck must be readable from across the arena BEFORE the player walks
+// over: Standard is just the tinted box; Uncommon adds a modest column;
+// Exceptional+ get a genuine vertical light beam (emissive, taller and
+// brighter by tier) plus a rarity-coloured point light; Aberrant and Anomalous
+// pulse. Every magnitude O2 PLACEHOLDER.
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerLootPickup : public AActor
 {
@@ -36,6 +45,9 @@ public:
     // Rarity chroma shared with the HUD. Anomalous keeps its rift teal — it is
     // a rift-class object, so the object-chroma law permits it.
     static FLinearColor ColorForRarity(EBreakerItemRarity Rarity);
+    // 0 (Standard) .. 4 (Anomalous): the one ladder every drama knob below
+    // scales from, so a new rarity cannot get a beam without getting a light.
+    static int32 TierForRarity(EBreakerItemRarity Rarity);
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Loot", meta=(ClampMin="50")) float InteractionRange = 350.0f;
 
@@ -47,9 +59,19 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USphereComponent> PickupSphere;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> ItemVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> RarityBeam;
+    // Rarity-coloured glow around the drop, Exceptional and above. What makes
+    // an Aberrant on the far side of a pillar announce itself off the walls.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UPointLightComponent> RarityLight;
 
 private:
     UPROPERTY(ReplicatedUsing=OnRep_Item) FBreakerItemInstance Item;
     float BobTime = 0.0f;
     FVector VisualBaseLocation = FVector::ZeroVector;
+    // The beam's emissive dynamic material and this rarity's resolved drama
+    // numbers, cached by ApplyRarityVisuals so Tick's pulse never re-derives.
+    UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> BeamMaterial;
+    int32 CachedTier = 0;
+    FLinearColor CachedColor = FLinearColor::White;
+    float CachedBeamIntensity = 0.0f;
+    float CachedLightIntensity = 0.0f;
 };

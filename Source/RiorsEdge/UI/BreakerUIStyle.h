@@ -250,6 +250,12 @@ namespace BreakerUI
     inline constexpr float DamageBodyPixels = 26.0f;   // SPEC: 40
     inline constexpr float DamageCritPixels = 52.0f;   // SPEC: 80
     inline constexpr float DamageWeakPointPixels = 40.0f; // SPEC: 64
+    // DoT ticks sit BELOW the body size: they are bookkeeping, not an event,
+    // and at body size a three-target Bleed drowned the gunfire it rode over.
+    inline constexpr float DamageDoTPixels = 16.0f;    // O2 PLACEHOLDER
+    // Killing blows multiply whatever size their kind already earned: a kill
+    // is the heaviest read of its own family, never a fourth colour.
+    inline constexpr float DamageKillScale = 1.25f;    // O2 PLACEHOLDER
 
     // How much of a hit has to disappear into mitigation before the number
     // says so. Below this it is ordinary armour shaving and saying so every

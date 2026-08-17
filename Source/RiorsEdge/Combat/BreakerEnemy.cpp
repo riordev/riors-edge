@@ -401,6 +401,9 @@ FString ABreakerEnemy::GetEnemyStateLabel() const
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    // Cosmetic death beat first, BEFORE the authority gate: it is client-legal
+    // presentation and a dead server-side pawn must still finish its crumple.
+    UpdateDeathPresentation(DeltaSeconds);
     if (!HasAuthority() || !GetWorld()) return;
     if (bDead)
     {
@@ -717,7 +720,11 @@ void ABreakerEnemy::HandleDeath()
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SetBodyVisible(false);
+    // The body no longer vanishes on the death frame: it pops, crumples to
+    // ash and THEN hides, all inside the corpse window the respawn timer and
+    // SetLifeSpan already grant. Collision is off above, so the beat is pure
+    // presentation. S2 NOTE (unowned domain): the death thump would fire here.
+    StartDeathPresentation(bLastHitWasWeakPoint);
     // Unconditional like XP, and for the same reason: GrantLoot pays the
     // crafting currency before its item roll, and gating the whole call on
     // bDropsLoot made the wallet inherit loot's wave-gating — in wave mode 5
@@ -826,6 +833,147 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
         EngagedSeconds += static_cast<float>(FMath::Min(Now - LastDamageEventTime, 1.5));
     }
     LastDamageEventTime = Now;
+
+    // The body ANSWERS the hit: a one-blink material pulse, gold when the hit
+    // was a weak point. Cosmetic only — nothing above reads it.
+    StartHitFlash(Result.bWeakPoint);
+}
+
+// --- Hit / death presentation (cosmetic only) ------------------------------
+
+namespace
+{
+    // All O2 PLACEHOLDER, tuned by eye against capture stills.
+    constexpr float BreakerHitFlashSeconds = 0.07f;
+    constexpr float BreakerDeathPopSeconds = 0.12f;
+    constexpr float BreakerDeathBeatSeconds = 0.45f;
+    constexpr float BreakerDeathBeatWeakPointSeconds = 0.60f;
+    constexpr float BreakerDeathPopScale = 0.12f;
+    constexpr float BreakerDeathPopWeakPointScale = 0.24f;
+    // Ash: near-black with a breath of the body's violet, so the corpse reads
+    // as burnt out rather than as painted black.
+    const FLinearColor BreakerDeathAshColor(0.05f, 0.045f, 0.06f);
+    const FLinearColor BreakerHitFlashColor(1.35f, 1.30f, 1.25f);
+    const FLinearColor BreakerHitFlashWeakPointColor(1.60f, 1.15f, 0.35f);
+}
+
+void ABreakerEnemy::CaptureBodyMaterials()
+{
+    BodyMaterialBases.Reset();
+    for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
+        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
+    {
+        if (!Part) continue;
+        UMaterialInstanceDynamic* Dynamic = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0));
+        if (!Dynamic) continue;
+        // The CURRENT colour, not the constructor's: subclasses repaint their
+        // bodies (the Altered's severance tint, the Warden's plate) and the
+        // restore must return exactly that.
+        FLinearColor Base = FLinearColor::White;
+        Dynamic->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Base);
+        BodyMaterialBases.Emplace(Dynamic, Base);
+    }
+}
+
+void ABreakerEnemy::StartHitFlash(bool bWeakPoint)
+{
+    // Never over the death beat: the crumple owns the materials once it runs.
+    if (bDead || DeathPresentationElapsed >= 0.0f) return;
+    // Capture only from a rested body, so a flash landing mid-flash cannot
+    // capture the flash colour as the base and stick the body white.
+    if (!bHitFlashActive) CaptureBodyMaterials();
+    bHitFlashActive = true;
+    const FLinearColor Flash = bWeakPoint ? BreakerHitFlashWeakPointColor : BreakerHitFlashColor;
+    for (const auto& Pair : BodyMaterialBases)
+    {
+        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Flash);
+    }
+    GetWorldTimerManager().SetTimer(HitFlashTimer, this, &ThisClass::EndHitFlash, BreakerHitFlashSeconds, false);
+}
+
+void ABreakerEnemy::EndHitFlash()
+{
+    if (!bHitFlashActive) return;
+    bHitFlashActive = false;
+    for (const auto& Pair : BodyMaterialBases)
+    {
+        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
+    }
+}
+
+void ABreakerEnemy::StartDeathPresentation(bool bWeakPointKill)
+{
+    // A flash in flight would have captured true bases; settle it first so the
+    // beat's own capture below is honest.
+    GetWorldTimerManager().ClearTimer(HitFlashTimer);
+    EndHitFlash();
+    CaptureBodyMaterials();
+    DeathBaseScale = GetActorScale3D();
+    bDeathBeatWeakPoint = bWeakPointKill;
+    DeathPresentationElapsed = 0.0f;
+}
+
+void ABreakerEnemy::UpdateDeathPresentation(float DeltaSeconds)
+{
+    if (DeathPresentationElapsed < 0.0f) return;
+    DeathPresentationElapsed += DeltaSeconds;
+    const float Total = bDeathBeatWeakPoint ? BreakerDeathBeatWeakPointSeconds : BreakerDeathBeatSeconds;
+    if (DeathPresentationElapsed >= Total)
+    {
+        SetBodyVisible(false);
+        ResetDeathPresentation();
+        return;
+    }
+
+    const FLinearColor Flash = bDeathBeatWeakPoint ? BreakerHitFlashWeakPointColor : BreakerHitFlashColor;
+    if (DeathPresentationElapsed <= BreakerDeathPopSeconds)
+    {
+        // Beat one, THE POP: the whole assembly (actor scale, so subclass
+        // dressing and the elite multiplier ride along) swells and lands back,
+        // painted in the flash colour. Weak-point kills pop harder and gold.
+        const float Alpha = DeathPresentationElapsed / BreakerDeathPopSeconds;
+        const float PopScale = bDeathBeatWeakPoint ? BreakerDeathPopWeakPointScale : BreakerDeathPopScale;
+        SetActorScale3D(DeathBaseScale * (1.0f + PopScale * FMath::Sin(Alpha * PI)));
+        for (const auto& Pair : BodyMaterialBases)
+        {
+            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Flash);
+        }
+    }
+    else
+    {
+        // Beat two, THE CRUMPLE: squash toward the ground, spreading slightly,
+        // while the flash colour burns down to ash. Ease-in on the squash so
+        // the collapse accelerates like a fall rather than a slide.
+        const float Alpha = FMath::Clamp(
+            (DeathPresentationElapsed - BreakerDeathPopSeconds) / FMath::Max(Total - BreakerDeathPopSeconds, KINDA_SMALL_NUMBER),
+            0.0f, 1.0f);
+        const float Eased = Alpha * Alpha;
+        const float SquashZ = FMath::Max(0.08f, 1.0f - Eased);
+        const float SpreadXY = 1.0f + 0.30f * Eased;
+        SetActorScale3D(DeathBaseScale * FVector(SpreadXY, SpreadXY, SquashZ));
+        const FLinearColor Burn = FMath::Lerp(Flash, BreakerDeathAshColor, Eased);
+        for (const auto& Pair : BodyMaterialBases)
+        {
+            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Burn);
+        }
+    }
+}
+
+void ABreakerEnemy::ResetDeathPresentation()
+{
+    // Settle any hit flash first; its own restore path handles the colours.
+    GetWorldTimerManager().ClearTimer(HitFlashTimer);
+    EndHitFlash();
+    if (DeathPresentationElapsed < 0.0f) return;
+    DeathPresentationElapsed = -1.0f;
+    // Scale is only ever touched by the beat, so it is only restored when a
+    // beat ran — an elite's authored scale must never be stamped with the
+    // default just because this was called defensively.
+    SetActorScale3D(DeathBaseScale);
+    for (const auto& Pair : BodyMaterialBases)
+    {
+        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
+    }
 }
 
 void ABreakerEnemy::GrantExperience()
@@ -953,6 +1101,9 @@ void ABreakerEnemy::RespawnEnemy()
         BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
         BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        // Defensive: if the respawn delay was ever tuned under the death
+        // beat's length, the body must come back at its own scale and colours.
+        ResetDeathPresentation();
         SetBodyVisible(true);
         bDead = false;
         FirstDamageTime = -1.0;

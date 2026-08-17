@@ -1,6 +1,7 @@
 #include "UI/BreakerTracerRenderer.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/PlayerController.h"
@@ -75,6 +76,26 @@ ABreakerTracerRenderer::ABreakerTracerRenderer()
     {
         SparkMeshes.Add(MakePooledMesh(this, Root, FString::Printf(TEXT("Spark%d"), Index), TracerShapeSphere));
     }
+
+    // The blink lights. Shadowless and short-range: the job is "the wall
+    // noticed", not "the room is lit". Pooled for the same reason as
+    // everything else in this actor.
+    ImpactLights.Reserve(ImpactLightSlots);
+    for (int32 Index = 0; Index < ImpactLightSlots; ++Index)
+    {
+        UPointLightComponent* Light = CreateDefaultSubobject<UPointLightComponent>(
+            *FString::Printf(TEXT("ImpactLight%d"), Index));
+        if (Light)
+        {
+            Light->SetupAttachment(Root);
+            Light->SetIntensity(0.0f);
+            Light->SetCastShadows(false);
+            Light->SetAttenuationRadius(Look.ImpactLightRadiusCm);
+            Light->SetVisibility(false);
+            Light->SetUsingAbsoluteLocation(true);
+        }
+        ImpactLights.Add(Light);
+    }
 }
 
 void ABreakerTracerRenderer::BeginPlay()
@@ -100,7 +121,8 @@ void ABreakerTracerRenderer::BeginPlay()
     BuildMaterials(SparkMeshes, SparkMaterials);
 }
 
-void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale)
+void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale,
+    const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds)
 {
     // Round-robin. Overwriting the oldest slot is the right failure: when
     // twelve rounds really are in the air the one that disappears is the one
@@ -108,15 +130,35 @@ void ABreakerTracerRenderer::ClaimTracerSlot(const FVector& Start, const FVector
     FTracerSlot& Slot = TracerState[NextTracerSlot];
     Slot.Start = Start;
     Slot.End = End;
-    Slot.StartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    Slot.StartTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
     Slot.bActive = true;
     Slot.ThicknessScale = ThicknessScale;
+    Slot.HeadColor = HeadColor;
+    Slot.TrailColor = TrailColor;
     NextTracerSlot = (NextTracerSlot + 1) % TracerSlots;
 }
 
 void ABreakerTracerRenderer::AddTracer(const FVector& Start, const FVector& End)
 {
-    ClaimTracerSlot(Start, End, 1.0f);
+    ClaimTracerSlot(Start, End, 1.0f, BreakerUI::Orange, BreakerUI::OrangeDeep);
+}
+
+void ABreakerTracerRenderer::AddSecondaryLeg(const FVector& Start, const FVector& End, bool bHit, float DelaySeconds)
+{
+    // Cyan, the player/system token: this is the build acting, not the gun.
+    // The leg flies like a round (SampleTracer replays it from ITS OWN start),
+    // so a chain arc visibly leaves the enemy it chained from.
+    ClaimTracerSlot(Start, End, SecondaryThicknessScale,
+        BreakerUI::Cyan, BreakerUI::Cyan * 0.35f, DelaySeconds);
+    if (bHit)
+    {
+        const float LegFlight = BreakerHUD::TracerFlightSeconds(
+            Flight, static_cast<float>((End - Start).Size()));
+        // Secondary hits are never weak points today (the leg struct carries
+        // no flag); the ordinary orange spark plus the cyan streak is already
+        // a distinct signature.
+        AddImpact(End, false, DelaySeconds + LegFlight);
+    }
 }
 
 int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets)
@@ -132,7 +174,8 @@ int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const F
     for (int32 StreakIndex = 0; StreakIndex < StreakCount; ++StreakIndex)
     {
         const int32 PelletIndex = BreakerHUD::SpreadStreakPellet(StreakIndex, StreakCount, PelletCount);
-        ClaimTracerSlot(Start, Pellets[PelletIndex].End, SpreadThicknessScale);
+        ClaimTracerSlot(Start, Pellets[PelletIndex].End, SpreadThicknessScale,
+            BreakerUI::Orange, BreakerUI::OrangeDeep);
     }
 
     // --- Flashes: every landed pellet, up to the spark budget ---------------
@@ -155,12 +198,26 @@ int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const F
 
 void ABreakerTracerRenderer::AddImpact(const FVector& Location, bool bWeakPoint, float DelaySeconds)
 {
+    const double ArrivalTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
+
     FSparkSlot& Slot = SparkState[NextSparkSlot];
     Slot.Location = Location;
-    Slot.StartTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
+    Slot.StartTime = ArrivalTime;
     Slot.bWeakPoint = bWeakPoint;
     Slot.bActive = true;
     NextSparkSlot = (NextSparkSlot + 1) % SparkSlots;
+
+    // Every spark also claims a blink light. The light pool is smaller on
+    // purpose: under a shotgun blast the last six pellets keep their glow and
+    // the rest keep only the emissive spark, which still reads as one blast.
+    // S2 NOTE (unowned domain): the per-impact tick SOUND would be scheduled
+    // off this same arrival time — noted here, not built.
+    FImpactLightSlot& LightSlot = ImpactLightState[NextImpactLightSlot];
+    LightSlot.Location = Location;
+    LightSlot.StartTime = ArrivalTime;
+    LightSlot.bWeakPoint = bWeakPoint;
+    LightSlot.bActive = true;
+    NextImpactLightSlot = (NextImpactLightSlot + 1) % ImpactLightSlots;
 }
 
 void ABreakerTracerRenderer::ResolveView(FVector& OutLocation, float& OutVerticalHalfFOV) const
@@ -232,8 +289,17 @@ void ABreakerTracerRenderer::Tick(float DeltaSeconds)
             continue;
         }
 
+        const float Age = static_cast<float>(Now - Slot.StartTime);
+        if (Age < 0.0f)
+        {
+            // A secondary leg scheduled for the future: hidden, not finished.
+            Hide(Head);
+            Hide(Trail);
+            continue;
+        }
+
         const BreakerHUD::FTracerSample Sample = BreakerHUD::SampleTracer(
-            Flight, Slot.Start, Slot.End, static_cast<float>(Now - Slot.StartTime));
+            Flight, Slot.Start, Slot.End, Age);
         if (!Sample.bVisible)
         {
             // Arrived, or never had room to be a streak. Either way the slot
@@ -262,13 +328,13 @@ void ABreakerTracerRenderer::Tick(float DeltaSeconds)
 
         PlaceSegment(Head, HeadMaterials.IsValidIndex(Index) ? HeadMaterials[Index].Get() : nullptr,
             Sample.HeadStart, Sample.Head, Thickness,
-            BreakerUI::Orange, Look.HeadIntensity * Fade);
+            Slot.HeadColor, Look.HeadIntensity * Fade);
 
         if (BreakerHUD::TracerHasTrail(Sample))
         {
             PlaceSegment(Trail, TrailMaterials.IsValidIndex(Index) ? TrailMaterials[Index].Get() : nullptr,
                 Sample.Tail, Sample.HeadStart, Thickness * Look.TrailThicknessScale,
-                BreakerUI::OrangeDeep, Look.TrailIntensity * Fade);
+                Slot.TrailColor, Look.TrailIntensity * Fade);
         }
         else
         {
@@ -320,5 +386,42 @@ void ABreakerTracerRenderer::Tick(float DeltaSeconds)
             SparkMaterials.IsValidIndex(Index) ? SparkMaterials[Index].Get() : nullptr,
             Color, Look.ImpactIntensity * (1.0f - Progress));
         if (Mesh->bHiddenInGame) Mesh->SetHiddenInGame(false);
+    }
+
+    // The blink lights: pop to full the instant the round arrives, decay as a
+    // square so most of the light is in the first frames — a blink, not a lamp.
+    for (int32 Index = 0; Index < ImpactLightSlots; ++Index)
+    {
+        FImpactLightSlot& Slot = ImpactLightState[Index];
+        UPointLightComponent* Light = ImpactLights.IsValidIndex(Index) ? ImpactLights[Index].Get() : nullptr;
+        if (!Light) continue;
+        if (!Slot.bActive)
+        {
+            if (Light->IsVisible()) Light->SetVisibility(false);
+            continue;
+        }
+
+        const float Age = static_cast<float>(Now - Slot.StartTime);
+        if (Age < 0.0f)
+        {
+            if (Light->IsVisible()) Light->SetVisibility(false);
+            continue;
+        }
+        if (Age >= Look.ImpactLightSeconds)
+        {
+            Slot.bActive = false;
+            Light->SetVisibility(false);
+            continue;
+        }
+
+        const float Progress = Age / FMath::Max(Look.ImpactLightSeconds, KINDA_SMALL_NUMBER);
+        const float Falloff = FMath::Square(1.0f - Progress);
+        // Weak points blink in their gold and noticeably harder — the loudest
+        // frame of a weak-point hit is the light, not the spark.
+        Light->SetWorldLocation(Slot.Location);
+        Light->SetLightColor(Slot.bWeakPoint ? BreakerUI::Gold : BreakerUI::Orange);
+        Light->SetIntensity(Look.ImpactLightIntensity
+            * (Slot.bWeakPoint ? Look.WeakPointLightScale : 1.0f) * Falloff);
+        if (!Light->IsVisible()) Light->SetVisibility(true);
     }
 }

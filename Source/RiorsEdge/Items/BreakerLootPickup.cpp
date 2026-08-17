@@ -1,12 +1,14 @@
 #include "Items/BreakerLootPickup.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Components/PointLightComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "UI/BreakerGlowMaterial.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -33,6 +35,31 @@ namespace
         if (!Enum) return FString();
         return Enum->GetNameStringByValue(Value).ToUpper();
     }
+
+    // --- The rarity drama ladder, indexed by TierForRarity. ----------------
+    // Every value O2 PLACEHOLDER, tuned by eye against capture stills. One
+    // table so the whole presentation moves together per tier: a rarity's
+    // beam, light, pulse and box size can never disagree about how loud it is.
+    struct FBreakerLootDramaRow
+    {
+        float BeamHeightM;        // 0 = no beam at all
+        float BeamThickness;      // relative XY scale of the column
+        float BeamIntensity;      // emissive multiplier on the rarity colour
+        float LightIntensity;     // 0 = no point light
+        float LightRadiusCm;
+        bool bPulses;             // Aberrant+ breathe so the eye snags on them
+        float BoxScale;           // the item box grows a little with the tier
+        float SpinDegreesPerSecond;
+    };
+    constexpr FBreakerLootDramaRow BreakerLootDrama[5] =
+    {
+        //  hM   thick  beamI  lightI   radius  pulse  box    spin
+        { 0.0f, 0.00f,  0.0f,    0.0f,    0.0f, false, 0.38f,  45.0f },  // Standard
+        { 2.2f, 0.05f,  0.8f,    0.0f,    0.0f, false, 0.40f,  60.0f },  // Uncommon
+        { 4.0f, 0.07f,  1.6f, 1800.0f,  750.0f, false, 0.44f,  80.0f },  // Exceptional
+        { 7.0f, 0.09f,  2.6f, 4500.0f, 1400.0f, true,  0.48f, 110.0f },  // Aberrant
+        { 9.5f, 0.11f,  3.4f, 7000.0f, 1800.0f, true,  0.52f, 140.0f },  // Anomalous
+    };
 }
 
 ABreakerLootPickup::ABreakerLootPickup()
@@ -61,12 +88,24 @@ ABreakerLootPickup::ABreakerLootPickup()
     RarityBeam = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RarityBeam"));
     RarityBeam->SetupAttachment(PickupSphere);
     RarityBeam->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    // Short marker column, not a flagpole: tall enough to spot over cover,
-    // low enough not to skyline the whole field.
+    RarityBeam->SetCastShadow(false);
+    // Height, thickness and brightness are TIER-DRIVEN now — see the drama
+    // table above; ApplyRarityVisuals poses this. The default here is the
+    // Uncommon column so a beam with no item yet is the quiet one.
     RarityBeam->SetRelativeScale3D(FVector(0.05f, 0.05f, 2.2f));
-    RarityBeam->SetRelativeLocation(FVector(0.0f, 0.0f, 105.0f));
+    RarityBeam->SetRelativeLocation(FVector(0.0f, 0.0f, 110.0f));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> BeamMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (BeamMesh.Succeeded()) RarityBeam->SetStaticMesh(BeamMesh.Object);
+
+    // The Exceptional+ announcement: a rarity-coloured light so the drop is
+    // visible off the surfaces around it, not only when directly in view.
+    // Shadowless — it is a beacon, not a lamp.
+    RarityLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("RarityLight"));
+    RarityLight->SetupAttachment(PickupSphere);
+    RarityLight->SetRelativeLocation(FVector(0.0f, 0.0f, 60.0f));
+    RarityLight->SetIntensity(0.0f);
+    RarityLight->SetCastShadows(false);
+    RarityLight->SetVisibility(false);
 }
 
 void ABreakerLootPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -104,13 +143,69 @@ FLinearColor ABreakerLootPickup::ColorForRarity(EBreakerItemRarity Rarity)
     }
 }
 
+int32 ABreakerLootPickup::TierForRarity(EBreakerItemRarity Rarity)
+{
+    switch (Rarity)
+    {
+    case EBreakerItemRarity::Uncommon:    return 1;
+    case EBreakerItemRarity::Exceptional: return 2;
+    case EBreakerItemRarity::Aberrant:    return 3;
+    case EBreakerItemRarity::Anomalous:   return 4;
+    case EBreakerItemRarity::Standard:
+    default:                              return 0;
+    }
+}
+
 void ABreakerLootPickup::ApplyRarityVisuals()
 {
-    const FLinearColor Color = ColorForRarity(Item.Rarity);
-    ApplyPickupColor(ItemVisual, Color);
-    // The beam has no translucency to work with, so "alpha" is expressed as
-    // colour intensity: a dimmer column that still reads as the rarity hue.
-    ApplyPickupColor(RarityBeam, Color * 0.35f);
+    CachedTier = FMath::Clamp(TierForRarity(Item.Rarity), 0, 4);
+    const FBreakerLootDramaRow& Drama = BreakerLootDrama[CachedTier];
+    CachedColor = ColorForRarity(Item.Rarity);
+    CachedBeamIntensity = Drama.BeamIntensity;
+    CachedLightIntensity = Drama.LightIntensity;
+
+    ApplyPickupColor(ItemVisual, CachedColor);
+    if (ItemVisual) ItemVisual->SetRelativeScale3D(FVector(Drama.BoxScale));
+
+    // The beam is LIGHT now, not paint: the unlit-additive glow material (the
+    // tracer's), so an Anomalous column reads across the arena and does not go
+    // grey in shadow. Standard has no beam at all — silence is what makes the
+    // tiers above it loud.
+    if (RarityBeam)
+    {
+        if (Drama.BeamHeightM > 0.0f)
+        {
+            RarityBeam->SetVisibility(true);
+            RarityBeam->SetRelativeScale3D(FVector(Drama.BeamThickness, Drama.BeamThickness, Drama.BeamHeightM));
+            // Unit cylinder is 100 cm tall about its centre: lift by half the
+            // height so the column grows UP from the drop.
+            RarityBeam->SetRelativeLocation(FVector(0.0f, 0.0f, Drama.BeamHeightM * 50.0f));
+            if (!BeamMaterial) BeamMaterial = BreakerUI::MakeGlowMaterial(RarityBeam);
+            BreakerUI::SetGlowColor(BeamMaterial, CachedColor, CachedBeamIntensity);
+        }
+        else
+        {
+            RarityBeam->SetVisibility(false);
+        }
+    }
+
+    if (RarityLight)
+    {
+        const bool bLit = Drama.LightIntensity > 0.0f;
+        RarityLight->SetVisibility(bLit);
+        if (bLit)
+        {
+            RarityLight->SetLightColor(CachedColor);
+            RarityLight->SetIntensity(Drama.LightIntensity);
+            RarityLight->SetAttenuationRadius(Drama.LightRadiusCm);
+        }
+        else
+        {
+            RarityLight->SetIntensity(0.0f);
+        }
+    }
+    // S2 NOTE (unowned domain): the tiered drop chime would play once here,
+    // pitched by CachedTier — noted, not built.
 }
 
 void ABreakerLootPickup::Tick(float DeltaSeconds)
@@ -118,8 +213,19 @@ void ABreakerLootPickup::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     if (!ItemVisual) return;
     BobTime += DeltaSeconds;
+    const FBreakerLootDramaRow& Drama = BreakerLootDrama[FMath::Clamp(CachedTier, 0, 4)];
     ItemVisual->SetRelativeLocation(VisualBaseLocation + FVector(0.0f, 0.0f, FMath::Sin(BobTime * 2.0f) * 6.0f));
-    ItemVisual->AddLocalRotation(FRotator(0.0f, 45.0f * DeltaSeconds, 0.0f));
+    // Higher tiers spin faster: motion is the cheapest "look at me" there is.
+    ItemVisual->AddLocalRotation(FRotator(0.0f, Drama.SpinDegreesPerSecond * DeltaSeconds, 0.0f));
+
+    // Aberrant+ breathe: the beam and the light swell and settle together on
+    // a slow pulse, which is what snags the eye at the edge of the screen.
+    if (Drama.bPulses)
+    {
+        const float Pulse = 0.72f + 0.28f * FMath::Sin(BobTime * 3.2f);   // O2 PLACEHOLDER
+        if (BeamMaterial) BreakerUI::SetGlowColor(BeamMaterial, CachedColor, CachedBeamIntensity * Pulse);
+        if (RarityLight && CachedLightIntensity > 0.0f) RarityLight->SetIntensity(CachedLightIntensity * Pulse);
+    }
 }
 
 FText ABreakerLootPickup::GetDisplayLabel() const

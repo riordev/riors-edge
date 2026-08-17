@@ -7,6 +7,7 @@
 #include "BreakerTracerRenderer.generated.h"
 
 class UMaterialInstanceDynamic;
+class UPointLightComponent;
 class UStaticMeshComponent;
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,24 @@ public:
     // pool size.
     int32 AddSpread(const FVector& Start, TArrayView<const FBreakerPelletImpact> Pellets);
 
+    // One SECONDARY leg of a shot: a pierce continuation, a chain arc or a
+    // ricochet bounce (FBreakerShotResult::SecondaryImpacts). Drawn in its own
+    // tint so the Swift identity is SEEABLE — a pierce that looks identical to
+    // the round that caused it is invisible content. DelaySeconds is how long
+    // after the trigger pull this leg begins (the primary round's flight, plus
+    // a beat per leg), so an arc visibly CONTINUES from the hit rather than
+    // appearing alongside it. Schedules its own impact spark when the leg
+    // landed.
+    void AddSecondaryLeg(const FVector& Start, const FVector& End, bool bHit, float DelaySeconds);
+
+    // Legs one trigger pull may draw. Six of twelve slots: a deep
+    // pierce+chain build fires legs every shot, and the cap is what keeps a
+    // multishot Swift from evicting its own primary streaks. O2 PLACEHOLDER
+    static constexpr int32 MaxSecondaryLegStreaks = 6;
+    // Legs are slightly thinner than the round that spawned them — the
+    // continuation, not the shot. O2 PLACEHOLDER
+    static constexpr float SecondaryThicknessScale = 0.8f;
+
     // Slots one spread may occupy, out of TracerSlots. Four of twelve leaves
     // room for two more spreads plus a swap to another weapon mid-flight.
     // O2 PLACEHOLDER
@@ -168,12 +187,20 @@ private:
     {
         FVector Start = FVector::ZeroVector;
         FVector End = FVector::ZeroVector;
+        // May be in the FUTURE: a secondary leg schedules itself to begin when
+        // the round that spawned it arrives. A slot whose time has not come
+        // yet is hidden, not recycled.
         double StartTime = 0.0;
         bool bActive = false;
         // 1.0 for an ordinary round; SpreadThicknessScale for one sub-streak
         // of a spread. Held per slot rather than read at draw time because the
         // slot outlives the call that filled it.
         float ThicknessScale = 1.0f;
+        // Primary rounds are the weapon orange; secondary legs carry the
+        // player-system cyan so pierce/chain/ricochet read as manipulation
+        // rather than as more bullets. Held per slot, same reason as above.
+        FLinearColor HeadColor = FLinearColor::White;
+        FLinearColor TrailColor = FLinearColor::White;
     };
 
     struct FSparkSlot
@@ -195,6 +222,23 @@ private:
     UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> TrailMaterials;
     UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> SparkMaterials;
 
+    // Impact BLINK lights: a small pool of point lights that pop where a round
+    // landed, so the surface around the hit answers it. Far fewer than sparks
+    // because a dynamic light is the expensive primitive in this file — when
+    // more hits land than lights exist, the newest hits win, which is where
+    // the player is looking anyway.
+    static constexpr int32 ImpactLightSlots = 6;
+    struct FImpactLightSlot
+    {
+        FVector Location = FVector::ZeroVector;
+        double StartTime = 0.0;   // Already includes the flight delay.
+        bool bWeakPoint = false;
+        bool bActive = false;
+    };
+    UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> ImpactLights;
+    FImpactLightSlot ImpactLightState[ImpactLightSlots];
+    int32 NextImpactLightSlot = 0;
+
     FTracerSlot TracerState[TracerSlots];
     FSparkSlot SparkState[SparkSlots];
     int32 NextTracerSlot = 0;
@@ -209,8 +253,10 @@ private:
         const FLinearColor& Color, float Intensity);
     static void Hide(UStaticMeshComponent* Mesh);
     // The one place a tracer slot is claimed, so the round-robin cursor and the
-    // per-slot state can never disagree.
-    void ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale);
+    // per-slot state can never disagree. DelaySeconds > 0 schedules the streak
+    // to begin in the future (secondary legs).
+    void ClaimTracerSlot(const FVector& Start, const FVector& End, float ThicknessScale,
+        const FLinearColor& HeadColor, const FLinearColor& TrailColor, float DelaySeconds = 0.0f);
 };
 
 constexpr int32 ABreakerTracerRenderer::GetSparkSlots() { return SparkSlots; }

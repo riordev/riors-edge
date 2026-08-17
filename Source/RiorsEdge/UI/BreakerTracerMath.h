@@ -89,6 +89,16 @@ namespace BreakerHUD
         float ImpactSeconds = 0.10f;            // O2 PLACEHOLDER
         float ImpactRadiusCm = 13.0f;           // O2 PLACEHOLDER
         float ImpactIntensity = 4.0f;           // O2 PLACEHOLDER
+
+        // --- Impact light -----------------------------------------------
+        // The emissive spark is a shape; the point light is what makes the
+        // wall AROUND the impact answer it. Slightly longer than the spark so
+        // the glow is the thing that lingers, the way an afterimage does.
+        // Weak points blink brighter, in their gold.
+        float ImpactLightSeconds = 0.14f;       // O2 PLACEHOLDER
+        float ImpactLightIntensity = 5000.0f;   // O2 PLACEHOLDER
+        float ImpactLightRadiusCm = 420.0f;     // O2 PLACEHOLDER
+        float WeakPointLightScale = 2.6f;       // O2 PLACEHOLDER
     };
 
     // Effective speed for one shot: the nominal speed, trimmed so the flight

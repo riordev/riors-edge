@@ -923,6 +923,13 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
             *BreakerWeaponArchetypeNames::Display(Next), bAimed ? TEXT("ADS") : TEXT("hip"));
     }, Interval, true, FMath::Max(0.5f, Interval * 0.5f));
 
+    // The capture pawn is classless with no nodes, so every projectile
+    // channel is zero and the pierce/chain/ricochet legs — the thing the
+    // tracer layer exists to make SEEABLE — could never appear in a reel.
+    // Arm a modest demo bonus through the same public seam an ability window
+    // uses. Dev-only by construction, like everything else in this function.
+    Weapon->PushShotChannelBonus(TEXT("CaptureDemo"), 0.0f, 1, 1, 1);
+
     // ...and pulse the trigger, because a capture of an idle player proves
     // nothing about the two things this blockout exists for: that the recoil
     // spring visibly moves the gun, and that the muzzle flash lands at the
@@ -931,6 +938,67 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
     GetWorldTimerManager().SetTimer(ViewmodelFireTimer, [this]()
     {
         if (!Weapon) return;
+        // Dev-capture aim assist. The harness photographs a stationary pawn,
+        // and a pawn that only ever shoots the sky can verify NOTHING about
+        // impacts, tracers, enemy hit reactions or loot: every earlier cycle
+        // run fired its whole reel into a wall. Point the view at the nearest
+        // living enemy before each pulse. Dev-only by construction — this
+        // whole function is behind -BreakerCycleWeapons — and it moves the
+        // CONTROLLER, exactly as a human hand would, so the recoil/trace
+        // contract is exercised rather than bypassed.
+        if (AController* CaptureController = GetController())
+        {
+            const FVector Eye = FirstPersonCamera ? FirstPersonCamera->GetComponentLocation() : GetActorLocation();
+            // Nearest VISIBLE enemy first — the first capture of this assist
+            // aimed through a slab and photographed thirty shots into rock —
+            // then the nearest at all as the fallback, so the muzzle/kick reel
+            // still fires when the whole wave is behind cover.
+            AActor* BestVisibleTrash = nullptr;
+            AActor* BestVisibleAny = nullptr;
+            AActor* NearestAny = nullptr;
+            float BestTrashSq = FMath::Square(200000.0f);
+            float BestVisibleSq = FMath::Square(200000.0f);
+            float BestAnySq = FMath::Square(200000.0f);
+            for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+            {
+                if (!*It || It->IsDeadEnemy()) continue;
+                const FVector Chest = It->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
+                const float DistSq = static_cast<float>(FVector::DistSquared(GetActorLocation(), It->GetActorLocation()));
+                if (DistSq < BestAnySq) { BestAnySq = DistSq; NearestAny = *It; }
+                if (DistSq >= BestVisibleSq && DistSq >= BestTrashSq) continue;
+                FCollisionQueryParams LOSParams(SCENE_QUERY_STAT(BreakerCaptureAim), false, this);
+                FHitResult LOS;
+                const bool bBlocked = GetWorld()->LineTraceSingleByChannel(LOS, Eye, Chest, ECC_Visibility, LOSParams)
+                    && LOS.GetActor() != *It;
+                if (bBlocked) continue;
+                if (DistSq < BestVisibleSq) { BestVisibleSq = DistSq; BestVisibleAny = *It; }
+                // Prefer killable trash over an elite: a reel parked on a
+                // warded elite photographs absorption forever and never a
+                // death beat or a drop.
+                if (!It->IsElite() && DistSq < BestTrashSq) { BestTrashSq = DistSq; BestVisibleTrash = *It; }
+            }
+            AActor* CaptureTarget = BestVisibleTrash ? BestVisibleTrash : BestVisibleAny;
+            if (!CaptureTarget) CaptureTarget = NearestAny;
+            if (CaptureTarget)
+            {
+                // The field's enemies live 60-80 m from the authored spawn and
+                // never close (detection is 22 m), so an unmoving capture pawn
+                // photographs specks. Step to fifteen metres from the target
+                // whenever it is far: every reel frame then shows combat at a
+                // readable size. TeleportTo adjusts out of geometry.
+                const FVector TargetLocation = CaptureTarget->GetActorLocation();
+                if (FVector::DistSquared(GetActorLocation(), TargetLocation) > FMath::Square(3000.0f))
+                {
+                    const FVector Toward = (GetActorLocation() - TargetLocation).GetSafeNormal2D();
+                    TeleportTo(TargetLocation + Toward * 1500.0f + FVector(0.0f, 0.0f, 60.0f), GetActorRotation());
+                }
+                // Chest height rather than the head: the point is hits on the
+                // body with occasional weak points, not a permanent headshot.
+                const FVector NewEye = FirstPersonCamera ? FirstPersonCamera->GetComponentLocation() : GetActorLocation();
+                CaptureController->SetControlRotation(
+                    (TargetLocation + FVector(0.0f, 0.0f, 30.0f) - NewEye).Rotation());
+            }
+        }
         Weapon->StartFire();
         FTimerHandle Release;
         GetWorldTimerManager().SetTimer(Release, [this]() { if (Weapon) Weapon->StopFire(); }, 0.12f, false);
@@ -1216,13 +1284,27 @@ void ABreakerCharacter::UpdateClassResourceStates()
 void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
+    // The muzzle blink follows the archetype's WEIGHT: the viewmodel kick is
+    // already the per-archetype "how hard does this gun hit the shoulder"
+    // number (shotgun 9.0, SMG 2.0), so the flash borrows it rather than
+    // inventing a second table that would drift from the first. A shotgun
+    // blink is therefore bigger AND lingers longer than an SMG's buzz, which
+    // is the difference the eye reads between heavy and fast in a still.
+    // All magnitudes O2 PLACEHOLDER.
+    const float KickUnits = Weapon ? Weapon->GetRecoilProfile().ViewmodelKickUnits : 3.2f;
     if (PrototypeMuzzleFlash)
     {
-        PrototypeMuzzleFlash->SetIntensity(8500.0f);
+        // Weapon-orange, matching the tracer's token, so the flash and the
+        // streak leaving it read as one event.
+        PrototypeMuzzleFlash->SetLightColor(FLinearColor(1.0f, 0.54f, 0.24f));   // O2 PLACEHOLDER
+        PrototypeMuzzleFlash->SetIntensity(5000.0f + 850.0f * KickUnits);        // O2 PLACEHOLDER
     }
+    // S2 NOTE (unowned domain): the per-archetype fire report would be
+    // triggered here, scaled by the same kick number — noted, not built.
     // The weapon mesh kick is no longer a timed snap: UBreakerWeaponComponent
     // runs a spring that this character samples every Tick.
-    GetWorldTimerManager().SetTimer(ShotCosmeticTimer, this, &ThisClass::EndShotCosmetics, 0.055f, false);
+    const float FlashSeconds = 0.035f + 0.004f * KickUnits;                      // O2 PLACEHOLDER
+    GetWorldTimerManager().SetTimer(ShotCosmeticTimer, this, &ThisClass::EndShotCosmetics, FlashSeconds, false);
 }
 
 void ABreakerCharacter::EndShotCosmetics()

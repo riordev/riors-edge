@@ -41,6 +41,18 @@ struct FBreakerHUDDamageNumber
     TWeakObjectPtr<AActor> Target;
     // A DoT tick reads differently from a strike and must not merge into one.
     bool bFromDoT = false;
+    // A killing blow is the heaviest read on the screen and holds longer; the
+    // overkill share is carried separately so it can be printed as its own
+    // distinct mark rather than silently inflating the number.
+    bool bKilled = false;
+    float Overkill = 0.0f;
+    // A sibling hit from the same trigger pull on a DIFFERENT target — a chain
+    // jump, a ricochet, an AoE's outer victims. Drawn lighter than the parent
+    // so the aimed hit stays the loudest of its own family.
+    bool bSecondary = false;
+    // Per-class-of-hit lifetime, latched at push: DoT ticks die fast so they
+    // never spam over gunfire, kills hold longest.
+    float Lifetime = 0.56f;
 };
 
 // One enemy, reduced to what the minimap needs. Collected during the enemy
@@ -98,6 +110,13 @@ private:
     void EnsureAbilityBinding(const ABreakerCharacter* Character);
 
     void DrawDefenseFeedback(const FVector2D& Center);
+    // Crosshair kill confirm: an eight-point burst, distinct from the hit
+    // ticks by geometry (through-centre strokes, expanding) as well as colour.
+    void DrawKillConfirm(const FVector2D& Center);
+    // Stepped screen-edge bands in the harm accent when health runs low.
+    // Solid fills only — FIELDPLATE has no gradients, so the "vignette" is
+    // two nested full-bleed frames, and urgency is a blink, not a fade.
+    void DrawLowHealthCue(const ABreakerCharacter* Character);
     void DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY);
     void DrawVitalsPlate(const ABreakerCharacter* Character, float X, float BottomY);
     void DrawCombatCluster(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
@@ -150,6 +169,11 @@ private:
     double LevelUpTime = -1000.0;
     int32 LevelUpShownLevel = 0;
     int32 LevelUpShownGain = 0;
+    // What the level actually granted, stated on the banner: "+1 CLASS +1
+    // CORE". Computed from the cap levels at the moment the event fired, so a
+    // level past a cap never claims a point it did not pay.
+    int32 LevelUpClassGain = 0;
+    int32 LevelUpCoreGain = 0;
     UPROPERTY() TObjectPtr<UBreakerWeaponComponent> BoundWeapon;
     UPROPERTY() TObjectPtr<UBreakerAbilityComponent> BoundAbilities;
     double LastDodgeTime = -1000.0;
@@ -196,6 +220,24 @@ private:
     // missing when a Warden's frontal armour eats a hit.
     float LastShotMitigatedFraction = 0.0f;
     double LastShotHitTime = -1000.0;
+
+    // Crosshair confirm latches, fed by HandlePlayerHitDealt so an ability's
+    // cleave confirms at the crosshair exactly as a bullet does. DoT ticks are
+    // deliberately excluded from all three — a Bleed on three targets would
+    // strobe the crosshair forever over nothing the player just did.
+    double LastHitDealtTime = -1000.0;
+    bool bHitDealtWeakPoint = false;
+    double LastKillConfirmTime = -1000.0;
+    bool bKillConfirmWeakPoint = false;
+
+    // The last non-DoT damage-number SPAWN, used to mark same-instant siblings
+    // on other targets as secondary (chain / ricochet / AoE spill).
+    double LastSiblingSpawnTime = -1000.0;
+    TWeakObjectPtr<AActor> LastSiblingSpawnTarget;
+
+    // One ring-buffer push, shared by the live feed and the capture preview so
+    // the two can never disagree about how a number enters the pool.
+    void PushDamageNumber(const FBreakerHUDDamageNumber& Number);
 
     // Filled once per frame by DrawEnemyHealthBars, consumed by DrawMinimap.
     // A member rather than a local so the allocation happens on the first few

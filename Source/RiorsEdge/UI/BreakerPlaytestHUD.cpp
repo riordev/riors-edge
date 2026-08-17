@@ -5,6 +5,8 @@
 #include "Abilities/BreakerAbilityStateComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Progression/BreakerProgressionComponent.h"
+// Cap levels only, for stating what a level actually granted on the banner.
+#include "Progression/BreakerProgressionLibrary.h"
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerChargeComponent.h"
 #include "Classes/BreakerGritComponent.h"
@@ -115,8 +117,47 @@ namespace BreakerHUD
     // balance — it changes nothing about damage, only how it is counted on
     // screen. O2 PLACEHOLDER.
     static constexpr float DamageNumberMergeWindow = 0.18f;
+
+    // --- Damage-number hierarchy timings/magnitudes. All presentation, all
+    // tuned by eye from capture screenshots. O2 PLACEHOLDER, every one.
+    // DoT ticks die fast (they recur forever; a long tail is spam), kills hold
+    // longest (the one number worth reading after the fight moves on).
+    static constexpr float DamageDoTLifetime = 0.35f;
+    static constexpr float DamageKillLifetime = 0.85f;
+    // Two non-DoT numbers born this close together on DIFFERENT targets are
+    // one trigger pull spilling over — chain, ricochet, AoE. The later ones
+    // are secondary and draw lighter than the parent.
+    static constexpr float DamageSecondaryWindow = 0.06f;
+    static constexpr float DamageSecondaryScale = 0.78f;
+    // Size-by-magnitude, logarithmic: each decade above the reference adds a
+    // twentieth, capped well before it can blur the kind hierarchy. A 100k hit
+    // reads a step heavier than a 1k hit of the same kind, never heavier than
+    // the next kind up.
+    static constexpr float DamageMagnitudeReference = 1000.0f;
+    static constexpr float DamageMagnitudeGainPerDecade = 0.05f;
+    static constexpr float DamageMagnitudeScaleCap = 1.15f;
+    // Overkill below a tenth of the printed number is trivia, not a mark.
+    static constexpr float DamageOverkillCaptionFraction = 0.10f;
+    static constexpr float DamageKillPopSeconds = 0.09f;
+
+    // Crosshair confirm timings. Sub-150ms on the tick, per the brief.
+    static constexpr float HitTickSeconds = 0.12f;        // O2 PLACEHOLDER
+    static constexpr float KillConfirmSeconds = 0.40f;    // O2 PLACEHOLDER
+
+    // Low-health screen-edge cue thresholds. Health only — shields regenerate
+    // and a full-shield character at low health is still one mistake from
+    // dying, which is exactly what the cue is for. O2 PLACEHOLDER.
+    static constexpr float LowHealthFraction = 0.35f;
+    static constexpr float LowHealthDireFraction = 0.15f;
+    // Loud states blink mechanically between the accent and its deep step —
+    // FIELDPLATE has no fades, so urgency is a metronome, not a breath.
+    static constexpr float LoudBlinkSeconds = 0.5f;       // O2 PLACEHOLDER
+
     // How long the level-up banner holds. Presentation, not balance.
     static constexpr float LevelUpBannerSeconds = 3.2f;   // O2 PLACEHOLDER
+    // Banner leaves like a panel: 120ms linear out, FIELDPLATE §04.
+    static constexpr float LevelUpOutSeconds = 0.12f;
+    static constexpr float LevelUpRailBlinkSeconds = 0.25f; // O2 PLACEHOLDER
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
     static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
 
@@ -349,6 +390,34 @@ void ABreakerPlaytestHUD::DrawHUD()
             }
         }
     }
+    else
+    {
+        // The universal hit tick: any landed damage the player DEALT — an
+        // ability's cleave, a detonation — confirms at the crosshair exactly
+        // as a bullet does. Same geometry as the shot tick so "I hit" is one
+        // mark everywhere; only reached when the shot path above did not
+        // already draw it, so a bullet never ticks twice. DoT ticks are
+        // excluded at the latch.
+        const double HitAge = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - LastHitDealtTime;
+        if (HitAge >= 0.0 && HitAge < BreakerHUD::HitTickSeconds)
+        {
+            const FLinearColor TickColor = bHitDealtWeakPoint ? BreakerUI::Gold : BreakerUI::Harm;
+            const float Inner = S(6.0f);
+            const float Outer = S(14.0f);
+            const float Diagonal = 0.7071f;
+            for (int32 Index = 0; Index < 4; ++Index)
+            {
+                const float DX = (Index & 1) ? 1.0f : -1.0f;
+                const float DY = (Index & 2) ? 1.0f : -1.0f;
+                DrawLine(Center.X + DX * Inner * Diagonal, Center.Y + DY * Inner * Diagonal,
+                         Center.X + DX * Outer * Diagonal, Center.Y + DY * Outer * Diagonal,
+                         TickColor, S(2.0f));
+            }
+        }
+    }
+    // The kill confirm draws OVER whichever tick fired: a kill is the one
+    // crosshair event that outranks everything else at the crosshair.
+    DrawKillConfirm(Center);
 
     // --- Bottom-left vitals (§Anchors) -----------------------------------
     DrawVitalsPlate(Character, S(BreakerUI::HudSafeMargin), Canvas->ClipY - S(BreakerUI::HudSafeMargin));
@@ -405,6 +474,9 @@ void ABreakerPlaytestHUD::DrawHUD()
         DrawRect(DamageColor, 0.0f, 0.0f, T, Canvas->ClipY);
         DrawRect(DamageColor, Canvas->ClipX - T, 0.0f, T, Canvas->ClipY);
     }
+    // Persistent low-health edge bands, under the transient damage flash's
+    // visual language and after it so the flash always reads over the bands.
+    DrawLowHealthCue(Character);
     if (Weapon && Weapon->IsReloading())
     {
         DrawSpecTextCentered(TEXT("RELOADING"), Center.X, Center.Y + S(48.0f), BreakerUI::Orange, 14.0f);
@@ -847,7 +919,26 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
     const float NotchW = S(2.0f);
     DrawRect(BreakerUI::BgVoid, X + Width * 0.33f, Y, NotchW, Height);
     DrawRect(BreakerUI::BgVoid, X + Width * 0.66f, Y, NotchW, Height);
-    DrawBorder(X, Y, Width, Height, Row.BorderColor, S(Row.BorderPixels));
+
+    // A LOUD state (Redline, Surplus, Ironclad, Resonant, Overcast — anything
+    // that widened its own border to 2px) pulses that border between the
+    // accent and its deep step on a metronome. A blink, never a fade: the
+    // deep colours are FIELDPLATE's own pressed/track-fill steps, so both
+    // phases are palette values and the plate never lowers opacity. The
+    // resting 1px border never pulses — quiet states stay quiet.
+    FLinearColor BorderColor = Row.BorderColor;
+    if (Row.BorderPixels >= 2.0f && GetWorld())
+    {
+        const bool bBlinkOn = FMath::Fmod(static_cast<float>(GetWorld()->GetTimeSeconds()),
+            BreakerHUD::LoudBlinkSeconds) < BreakerHUD::LoudBlinkSeconds * 0.5f;
+        if (!bBlinkOn)
+        {
+            if (BorderColor == BreakerUI::Orange) BorderColor = BreakerUI::OrangeDeep;
+            else if (BorderColor == BreakerUI::Harm) BorderColor = BreakerUI::HarmDeep;
+            else if (BorderColor == BreakerUI::Gold) BorderColor = BreakerUI::GoldDeep;
+        }
+    }
+    DrawBorder(X, Y, Width, Height, BorderColor, S(Row.BorderPixels));
 }
 
 // --------------------------------------------------------------------------
@@ -1215,7 +1306,7 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
     for (const FBreakerHUDDamageNumber& Number : DamageNumbers)
     {
         const float Age = static_cast<float>(Now - Number.Time);
-        if (Age < 0.0f || Age >= BreakerHUD::DamageNumberLifetime) continue;
+        if (Age < 0.0f || Age >= Number.Lifetime) continue;
         Visible.Add(&Number);
     }
     Visible.Sort([](const FBreakerHUDDamageNumber& A, const FBreakerHUDDamageNumber& B) { return A.Time < B.Time; });
@@ -1239,14 +1330,25 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         Placed.Add(Screen);
 
         const float Age = static_cast<float>(Now - Number->Time);
-        const float Alpha01 = Age / BreakerHUD::DamageNumberLifetime;
+        const float Alpha01 = Age / Number->Lifetime;
         // Ease-out rise: fast off the impact, settling as it fades. The last
-        // 200ms carry the fade, matching the motion spec.
-        const float Rise = S(BreakerUI::DamageRisePixels) * (1.0f - FMath::Square(1.0f - Alpha01));
-        const float FadeStart = 1.0f - 0.2f / BreakerHUD::DamageNumberLifetime;
+        // 200ms carry the fade, matching the motion spec. Rise distance rides
+        // the number's own lifetime so a short DoT tick travels a short way
+        // instead of streaking at three times the speed of everything else.
+        const float Rise = S(BreakerUI::DamageRisePixels)
+            * (Number->Lifetime / BreakerHUD::DamageNumberLifetime)
+            * (1.0f - FMath::Square(1.0f - Alpha01));
+        const float FadeStart = 1.0f - FMath::Min(0.2f / Number->Lifetime, 0.6f);
         const float Fade = Alpha01 <= FadeStart ? 1.0f : 1.0f - (Alpha01 - FadeStart) / (1.0f - FadeStart);
 
-        FLinearColor Face = BreakerUI::RarityStandard;
+        // --- The hierarchy. A number tells you WHAT you did before you read
+        // it: DoT ticks are small and grey and die young; body hits are
+        // mid-grey and modest; weak points are gold (the aim-skill lane);
+        // crits are orange and big; kills multiply whatever their kind earned
+        // and body-shot kills brighten to full white — the heaviest neutral
+        // read on the ramp. Secondary (chain/ricochet/AoE spill) draws lighter
+        // than its parent. Colour separates KIND, size separates WEIGHT.
+        FLinearColor Face = BreakerUI::TextSecondary;
         float SizePixels = BreakerUI::DamageBodyPixels;
         float PopScale = 1.15f;
         float PopSeconds = BreakerUI::MotionDamagePop;
@@ -1261,6 +1363,38 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         {
             Face = BreakerUI::Gold;
             SizePixels = BreakerUI::DamageWeakPointPixels;
+        }
+        else if (Number->bFromDoT)
+        {
+            // A DoT tick that crits or lands a weak point keeps its accent
+            // above — those reads outrank the source. A plain tick recedes.
+            Face = BreakerUI::TextMuted;
+            SizePixels = BreakerUI::DamageDoTPixels;
+            PopScale = 1.0f;   // bookkeeping does not pop
+        }
+
+        // Subtle size-by-magnitude, log not linear: a decade over the
+        // reference adds a twentieth, capped before it can cross kinds.
+        if (Number->Value > BreakerHUD::DamageMagnitudeReference)
+        {
+            const float Decades = FMath::LogX(10.0f, Number->Value / BreakerHUD::DamageMagnitudeReference);
+            SizePixels *= FMath::Min(1.0f + Decades * BreakerHUD::DamageMagnitudeGainPerDecade,
+                BreakerHUD::DamageMagnitudeScaleCap);
+        }
+
+        if (Number->bKilled)
+        {
+            SizePixels *= BreakerUI::DamageKillScale;
+            PopScale = FMath::Max(PopScale, 1.4f);
+            PopSeconds = BreakerHUD::DamageKillPopSeconds;
+            // A body-shot kill brightens to full white. Crit and weak-point
+            // kills keep their accents — the accent is the rarer read.
+            if (!Number->bCritical && !Number->bWeakPoint) Face = BreakerUI::RarityStandard;
+        }
+
+        if (Number->bSecondary)
+        {
+            SizePixels *= BreakerHUD::DamageSecondaryScale;
         }
         // Stack offset scales with the number's OWN size, so a 52px crit and a
         // 26px body hit in the same cluster separate by proportionate amounts
@@ -1292,11 +1426,25 @@ void ABreakerPlaytestHUD::DrawDamageNumbers()
         // Spawn oversized, settle to 100%: the pop is the hit confirmation.
         if (Age < PopSeconds) SizePixels *= PopScale;
 
+        // Secondary hits are lighter as well as smaller: the parent owns the
+        // full weight of the trigger pull.
+        const float DrawAlpha = Number->bSecondary ? Fade * 0.8f : Fade;
+
         const float NumberY = Screen.Y - Rise - Neighbours * StackOffset;
         DrawOutlinedNumber(BreakerUI::FormatDamage(Number->Value),
-            Screen.X, NumberY, Face, SizePixels, Fade);
+            Screen.X, NumberY, Face, SizePixels, DrawAlpha);
 
-        if (bAbsorbed)
+        // The overkill share of a killing blow, stated as its own mark in the
+        // harm accent under the number: the number says how hard the blow
+        // was, the caption says how much of it the corpse never felt. Skipped
+        // when trivial — a sliver of overkill is trivia, not a read.
+        if (Number->bKilled && Number->Overkill >= Number->Value * BreakerHUD::DamageOverkillCaptionFraction)
+        {
+            const float NumberHeight = MeasureSpecText(TEXT("0"), SizePixels).Y;
+            DrawOutlinedNumber(FString::Printf(TEXT("+%s OVER"), *BreakerUI::FormatDamage(Number->Overkill)),
+                Screen.X, NumberY + NumberHeight, BreakerUI::Harm, 13.0f, DrawAlpha);
+        }
+        else if (bAbsorbed)
         {
             // Caption under the number, at caption weight so it annotates
             // rather than competes — the same relationship the class-resource
@@ -1639,8 +1787,22 @@ void ABreakerPlaytestHUD::DrawExperienceRail(const ABreakerCharacter* Character)
     const float RailX = Canvas->ClipX * 0.5f - RailW * 0.5f;
     const float RailY = Canvas->ClipY - S(46.0f);
 
+    // While the level-up banner is live the rail joins the event: the fill
+    // blinks between gold and cyan on a metronome (a blink, never a fade —
+    // FIELDPLATE motion is mechanical) and the whole track takes a 1px gold
+    // frame. Same geometry, same position: the pulse is colour, so nothing
+    // shifts.
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float BannerAge = static_cast<float>(Now - LevelUpTime);
+    const bool bCelebrating = LevelUpShownLevel > 0
+        && BannerAge >= 0.0f && BannerAge < BreakerHUD::LevelUpBannerSeconds;
+    const bool bBlinkOn = bCelebrating
+        && FMath::Fmod(BannerAge, BreakerHUD::LevelUpRailBlinkSeconds) < BreakerHUD::LevelUpRailBlinkSeconds * 0.5f;
+
     DrawRect(BreakerUI::Panel10, RailX, RailY, RailW, RailH);
-    DrawRect(BreakerUI::Cyan, RailX, RailY, RailW * FMath::Clamp(Fraction, 0.0f, 1.0f), RailH);
+    DrawRect(bBlinkOn ? BreakerUI::Gold : BreakerUI::Cyan,
+        RailX, RailY, RailW * FMath::Clamp(Fraction, 0.0f, 1.0f), RailH);
+    if (bCelebrating) DrawBorder(RailX, RailY, RailW, RailH, BreakerUI::Gold, S(1.0f));
 
     // At the cap the bar reads full and the caption says so, rather than
     // showing a full bar next to a number that will never move again.
@@ -1649,7 +1811,8 @@ void ABreakerPlaytestHUD::DrawExperienceRail(const ABreakerCharacter* Character)
             *BreakerUI::FormatDamage(static_cast<float>(FMath::Max(0,
                 ToNext - FMath::RoundToInt(Fraction * static_cast<float>(ToNext))))))
         : FString::Printf(TEXT("LEVEL %d   MAX"), Level);
-    DrawSpecTextCentered(Caption, Canvas->ClipX * 0.5f, RailY - S(16.0f), BreakerUI::TextMuted, 11.0f);
+    DrawSpecTextCentered(Caption, Canvas->ClipX * 0.5f, RailY - S(16.0f),
+        bCelebrating ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f);
 }
 
 void ABreakerPlaytestHUD::DrawLevelUpBanner(const FVector2D& Center)
@@ -1659,16 +1822,61 @@ void ABreakerPlaytestHUD::DrawLevelUpBanner(const FVector2D& Center)
     const float Age = static_cast<float>(Now - LevelUpTime);
     if (Age < 0.0f || Age >= BreakerHUD::LevelUpBannerSeconds) return;
 
-    // Fades out over its last third rather than snapping off, so the eye is
-    // not pulled back to a thing that has already gone.
-    const float Fade = Age > BreakerHUD::LevelUpBannerSeconds * 0.66f
-        ? 1.0f - (Age - BreakerHUD::LevelUpBannerSeconds * 0.66f) / (BreakerHUD::LevelUpBannerSeconds * 0.34f)
-        : 1.0f;
-    const FString Text = LevelUpShownGain > 1
-        ? FString::Printf(TEXT("LEVEL %d   (+%d)"), LevelUpShownLevel, LevelUpShownGain)
+    // The EVENT treatment. A level is the single most earned moment in the
+    // loop and it gets a real plate: gold top rail (transient status, reward
+    // family), the level stated large, and the point grant stated explicitly
+    // so the player learns what they were just paid without opening a menu.
+    // In is a snap — frame one is the full banner, purchase-confirm style,
+    // because the commit must feel mechanical. Out is a 120ms linear fade,
+    // the panel-out motion, so leaving costs less than arriving. No layout
+    // shift: the plate is sized from its measured content and nothing else
+    // on the screen moves for it.
+    const float OutStart = BreakerHUD::LevelUpBannerSeconds - BreakerHUD::LevelUpOutSeconds;
+    const float Fade = Age <= OutStart ? 1.0f
+        : 1.0f - (Age - OutStart) / BreakerHUD::LevelUpOutSeconds;
+
+    const FString Title = LevelUpShownGain > 1
+        ? FString::Printf(TEXT("LEVEL %d  (+%d)"), LevelUpShownLevel, LevelUpShownGain)
         : FString::Printf(TEXT("LEVEL %d"), LevelUpShownLevel);
-    DrawSpecTextCentered(TEXT("LEVEL UP"), Center.X, Center.Y - S(120.0f), BreakerUI::Alpha(BreakerUI::Gold, Fade), 22.0f);
-    DrawSpecTextCentered(Text, Center.X, Center.Y - S(94.0f), BreakerUI::Alpha(BreakerUI::TextPrimary, Fade), 15.0f);
+    // The grant line: "+1 CLASS   +1 CORE". Both halves are optional past
+    // their caps; past both, the level still deserves its banner.
+    FString Grant;
+    if (LevelUpClassGain > 0) Grant = FString::Printf(TEXT("+%d CLASS"), LevelUpClassGain);
+    if (LevelUpCoreGain > 0)
+    {
+        if (!Grant.IsEmpty()) Grant += TEXT("   ");
+        Grant += FString::Printf(TEXT("+%d CORE"), LevelUpCoreGain);
+    }
+    if (Grant.IsEmpty()) Grant = TEXT("POINT CAP REACHED");
+
+    constexpr float TitlePixels = 24.0f;   // O2 PLACEHOLDER
+    constexpr float GrantPixels = 13.0f;   // O2 PLACEHOLDER
+    const FVector2D LabelSize = MeasureSpecText(TEXT("LEVEL UP"), 11.0f);
+    const FVector2D TitleSize = MeasureSpecText(Title, TitlePixels);
+    const FVector2D GrantSize = MeasureSpecText(Grant, GrantPixels);
+
+    const float Pad = S(BreakerUI::Space16);
+    const float ContentW = FMath::Max3(LabelSize.X, TitleSize.X, GrantSize.X);
+    const float PlateW = FMath::Max(S(260.0f), ContentW + Pad * 2.0f);
+    const float PlateH = S(BreakerUI::RailThickness) + Pad
+        + LabelSize.Y + S(BreakerUI::Space4) + TitleSize.Y + S(BreakerUI::Space8) + GrantSize.Y + Pad;
+    const float PlateX = Center.X - PlateW * 0.5f;
+    const float PlateY = Center.Y - S(190.0f);
+
+    // The plate never fades — FIELDPLATE plates do not lower opacity — so the
+    // out is carried by the text and the banner's plate leaves on its last
+    // frame whole, like a plate being unbolted rather than dissolving.
+    DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::Gold, EBreakerRail::Top);
+    // Purchase-confirm language: the border snaps to gold on frame one, no
+    // ease in, and decays back to the resting border over 260ms.
+    if (Age < 0.26f) DrawBorder(PlateX, PlateY, PlateW, PlateH, BreakerUI::Gold, S(1.0f));
+
+    float LineY = PlateY + S(BreakerUI::RailThickness) + Pad;
+    DrawSpecTextCentered(TEXT("LEVEL UP"), Center.X, LineY, BreakerUI::Gold, 11.0f, Fade);
+    LineY += LabelSize.Y + S(BreakerUI::Space4);
+    DrawSpecTextCentered(Title, Center.X, LineY, BreakerUI::TextPrimary, TitlePixels, Fade);
+    LineY += TitleSize.Y + S(BreakerUI::Space8);
+    DrawSpecTextCentered(Grant, Center.X, LineY, BreakerUI::Gold, GrantPixels, Fade);
 }
 
 void ABreakerPlaytestHUD::EnsureProgressionBinding(const ABreakerCharacter* Character)
@@ -1688,6 +1896,17 @@ void ABreakerPlaytestHUD::HandleLevelGained(int32 NewLevel, int32 LevelsGained)
     // single kill can cross more than one level early on, and a tell that says
     // "level 2" when the player reached 4 is worse than no tell.
     LevelUpShownGain = LevelsGained;
+    // What this level-up actually PAID, computed the same way the progression
+    // component grants it (one point per level up to each currency's cap), so
+    // the banner states the grant instead of leaving the player to discover
+    // it in a menu. A level past a cap claims nothing.
+    const int32 PrevLevel = NewLevel - LevelsGained;
+    LevelUpClassGain = FMath::Max(0,
+        FMath::Min(NewLevel, UBreakerProgressionLibrary::ClassPointCapLevel)
+        - FMath::Min(PrevLevel, UBreakerProgressionLibrary::ClassPointCapLevel));
+    LevelUpCoreGain = FMath::Max(0,
+        FMath::Min(NewLevel, UBreakerProgressionLibrary::CorePointCapLevel)
+        - FMath::Min(PrevLevel, UBreakerProgressionLibrary::CorePointCapLevel));
 }
 
 void ABreakerPlaytestHUD::EnsureAbilityBinding(const ABreakerCharacter* Character)
@@ -2014,6 +2233,28 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
                 Renderer->AddImpact(Shot.ImpactPoint, Shot.bWeakPoint, FlightSeconds);
             }
         }
+
+        // Secondary legs — pierce continuations, chain arcs, ricochet bounces.
+        // ALWAYS drawn, never subject to the tracer cadence: the channels are
+        // the Swift identity (owner ruling 2026-08-16) and a pierce the player
+        // cannot see is dead content. Each leg starts when the primary round
+        // ARRIVES, plus a beat per leg, so a chain visibly walks from enemy to
+        // enemy instead of appearing as one simultaneous web. Capped at the
+        // renderer's leg budget so a deep build cannot evict its own streaks.
+        if (!Shot.SecondaryImpacts.IsEmpty())
+        {
+            if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
+            {
+                int32 LegsDrawn = 0;
+                for (const FBreakerSecondaryImpact& Leg : Shot.SecondaryImpacts)
+                {
+                    if (LegsDrawn >= ABreakerTracerRenderer::MaxSecondaryLegStreaks) break;
+                    Renderer->AddSecondaryLeg(Leg.Start, Leg.End, Leg.bHit,
+                        FlightSeconds + 0.02f * LegsDrawn);   // O2 PLACEHOLDER stagger
+                    ++LegsDrawn;
+                }
+            }
+        }
     }
 
     // HOW MUCH DISAPPEARED. FBreakerDamageResult does not carry a mitigation
@@ -2062,6 +2303,22 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     const float Raw = Hit.Result.RawDamage;
     const float Mitigated = Raw > UE_SMALL_NUMBER
         ? FMath::Clamp(1.0f - Hit.Result.MitigatedDamage / Raw, 0.0f, 1.0f) : 0.0f;
+    const bool bWeak = Hit.bWeakPoint || Hit.Result.bWeakPoint;
+
+    // Crosshair confirms, from the same universal feed the numbers ride: an
+    // ability's cleave ticks the crosshair exactly as a bullet does. DoT
+    // ticks are excluded — a Bleed on three targets is not something the
+    // player just did, and it would strobe the crosshair forever.
+    if (!Hit.bFromDoT)
+    {
+        LastHitDealtTime = Now;
+        bHitDealtWeakPoint = bWeak;
+    }
+    if (Hit.Result.bKilled)
+    {
+        LastKillConfirmTime = Now;
+        bKillConfirmWeakPoint = bWeak;
+    }
 
     // MERGE rather than spawn. A shotgun resolves eight pellets as eight hits,
     // and a Bleed on three targets ticks on its own cadence forever — one
@@ -2078,12 +2335,20 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     {
         if (Existing.Target != Hit.Target) continue;
         if (Existing.bCritical != Hit.Result.bCritical) continue;
-        if (Existing.bWeakPoint != (Hit.bWeakPoint || Hit.Result.bWeakPoint)) continue;
+        if (Existing.bWeakPoint != bWeak) continue;
         if (Existing.bFromDoT != Hit.bFromDoT) continue;
         if (Now - Existing.Time > BreakerHUD::DamageNumberMergeWindow) continue;
 
         Existing.Value += Shown;
         Existing.Time = Now;
+        // A merged pellet that finished the target promotes the whole number
+        // to a killing blow — the shot killed, whichever pellet landed last.
+        if (Hit.Result.bKilled)
+        {
+            Existing.bKilled = true;
+            Existing.Lifetime = BreakerHUD::DamageKillLifetime;
+        }
+        Existing.Overkill += Hit.Result.OverkillDamage;
         // Deliberately NOT moving Existing.World: a merged number that chased
         // each pellet's impact point would jitter, and the first impact is as
         // honest a location as any for the sum.
@@ -2100,11 +2365,43 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     Number.Target = Hit.Target;
     Number.Value = Shown;
     Number.bCritical = Hit.Result.bCritical;
-    Number.bWeakPoint = Hit.bWeakPoint || Hit.Result.bWeakPoint;
+    Number.bWeakPoint = bWeak;
     Number.bFromDoT = Hit.bFromDoT;
     Number.MitigatedFraction = Mitigated;
     Number.Time = Now;
+    Number.bKilled = Hit.Result.bKilled;
+    Number.Overkill = Hit.Result.OverkillDamage;
+    Number.Lifetime = Hit.Result.bKilled ? BreakerHUD::DamageKillLifetime
+        : Hit.bFromDoT ? BreakerHUD::DamageDoTLifetime
+        : BreakerHUD::DamageNumberLifetime;
 
+    // SECONDARY: a second non-DoT number born within the sibling window on a
+    // DIFFERENT target is the same trigger pull spilling over — a chain jump,
+    // a ricochet, an AoE's outer victims. The contract carries no chain flag,
+    // so proximity in time is the honest signal available: two deliberate
+    // shots at two targets are 100ms+ apart at any human cadence, two chain
+    // legs resolve in the same instant. The parent (first spawn) keeps full
+    // weight; the spill draws lighter. Kills are never demoted — a kill by
+    // ricochet is still a kill.
+    if (!Hit.bFromDoT)
+    {
+        if (!Hit.Result.bKilled
+            && Now - LastSiblingSpawnTime < BreakerHUD::DamageSecondaryWindow
+            && LastSiblingSpawnTarget != Hit.Target)
+        {
+            Number.bSecondary = true;
+        }
+        LastSiblingSpawnTime = Now;
+        LastSiblingSpawnTarget = Hit.Target;
+    }
+
+    PushDamageNumber(Number);
+}
+
+// One door into the ring buffer, shared by the live feed and the capture
+// preview so the two can never disagree about how a number enters the pool.
+void ABreakerPlaytestHUD::PushDamageNumber(const FBreakerHUDDamageNumber& Number)
+{
     if (DamageNumbers.Num() < MaxDamageNumbers)
     {
         DamageNumbers.Add(Number);
@@ -2151,14 +2448,22 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
     const FVector Forward = Character->GetActorForwardVector();
     const FVector Right = Character->GetActorRightVector();
 
-    struct FPreviewHit { float Value; bool bCrit; bool bWeak; float Mitigated; float Side; float Up; };
-    // Body, weak point, crit, and an absorbed crit — the four reads that have
-    // to stay distinguishable from one another at a glance.
+    struct FPreviewHit
+    {
+        float Value; bool bCrit; bool bWeak; float Mitigated; float Side; float Up;
+        bool bDoT = false; bool bKilled = false; float Overkill = 0.0f; bool bSecondary = false;
+    };
+    // Every class of hit the hierarchy has to keep distinguishable at a
+    // glance: body, weak point, crit, absorbed crit, DoT tick, a killing blow
+    // with visible overkill, and a secondary (chain/ricochet) spill.
     static const FPreviewHit Hits[] = {
         { 8420.0f,   false, false, 0.00f, -1.30f,  40.0f },
         { 26800.0f,  false, true,  0.00f, -0.35f,  95.0f },
         { 148200.0f, true,  false, 0.00f,  0.55f, 150.0f },
         { 71500.0f,  true,  false, 0.47f,  1.55f,  60.0f },
+        { 1240.0f,   false, false, 0.00f, -0.85f, 150.0f, true },
+        { 96400.0f,  false, false, 0.00f,  1.70f, 190.0f, false, true, 31200.0f },
+        { 6100.0f,   false, false, 0.00f, -1.75f, 100.0f, false, false, 0.0f, true },
     };
     for (const FPreviewHit& Hit : Hits)
     {
@@ -2169,16 +2474,28 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
         Number.bWeakPoint = Hit.bWeak;
         Number.MitigatedFraction = Hit.Mitigated;
         Number.Time = Now;
-        if (DamageNumbers.Num() < MaxDamageNumbers)
-        {
-            DamageNumbers.Add(Number);
-            NextDamageNumberIndex = DamageNumbers.Num() % MaxDamageNumbers;
-        }
-        else
-        {
-            DamageNumbers[NextDamageNumberIndex] = Number;
-            NextDamageNumberIndex = (NextDamageNumberIndex + 1) % MaxDamageNumbers;
-        }
+        Number.bFromDoT = Hit.bDoT;
+        Number.bKilled = Hit.bKilled;
+        Number.Overkill = Hit.Overkill;
+        Number.bSecondary = Hit.bSecondary;
+        Number.Lifetime = Hit.bKilled ? BreakerHUD::DamageKillLifetime
+            : Hit.bDoT ? BreakerHUD::DamageDoTLifetime
+            : BreakerHUD::DamageNumberLifetime;
+        PushDamageNumber(Number);
+    }
+
+    // The crosshair kill confirm and the level-up moment, fabricated on the
+    // same cadence so a multi-shot capture run photographs both mid-event.
+    LastKillConfirmTime = Now;
+    bKillConfirmWeakPoint = false;
+    const float BannerAge = static_cast<float>(Now - LevelUpTime);
+    if (BannerAge < 0.0f || BannerAge > BreakerHUD::LevelUpBannerSeconds + 2.0f)
+    {
+        LevelUpTime = Now;
+        LevelUpShownLevel = 12;
+        LevelUpShownGain = 1;
+        LevelUpClassGain = 1;
+        LevelUpCoreGain = 1;
     }
 }
 
@@ -2205,6 +2522,102 @@ void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)
     // the armour/weapon family (orange).
     DrawSpecTextCentered(bShowDodge ? TEXT("DODGED") : TEXT("BLOCKED"),
         Center.X, Center.Y - S(108.0f), bShowDodge ? BreakerUI::Cyan : BreakerUI::Orange, 20.0f, Fade);
+}
+
+// --------------------------------------------------------------------------
+// Crosshair kill confirm. Distinct from the hit tick by GEOMETRY, per the
+// same argument the absorbed tick already makes: two states told only by
+// colour at one mark do not read in a fight. The hit tick is four short
+// diagonal strokes OUTSIDE the centre; the kill confirm is an eight-point
+// burst whose strokes push outward as it ages — the mark physically opens,
+// the way the target just did. Harm red for an ordinary kill, gold when the
+// killing blow was a weak-point hit, so the aim-skill lane keeps its colour
+// through the loudest confirm it can earn.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawKillConfirm(const FVector2D& Center)
+{
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float Age = static_cast<float>(Now - LastKillConfirmTime);
+    if (Age < 0.0f || Age >= BreakerHUD::KillConfirmSeconds) return;
+
+    const float T = Age / BreakerHUD::KillConfirmSeconds;
+    // Fast open, easing out: most of the travel in the first third.
+    const float Open = 1.0f - FMath::Square(1.0f - T);
+    // Line alpha fades over the back half. Lines over the world, not a plate.
+    const float Alpha = T < 0.5f ? 1.0f : 1.0f - (T - 0.5f) * 2.0f;
+    const FLinearColor Color = BreakerUI::Alpha(
+        bKillConfirmWeakPoint ? BreakerUI::Gold : BreakerUI::Harm, Alpha);
+
+    const float Inner = S(10.0f) + S(8.0f) * Open;
+    const float Length = S(11.0f);
+    const float Diagonal = 0.7071f;
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        const float DX = (Index & 1) ? 1.0f : -1.0f;
+        const float DY = (Index & 2) ? 1.0f : -1.0f;
+        // Diagonal strokes: the X of the burst.
+        DrawLine(Center.X + DX * Inner * Diagonal, Center.Y + DY * Inner * Diagonal,
+                 Center.X + DX * (Inner + Length) * Diagonal, Center.Y + DY * (Inner + Length) * Diagonal,
+                 Color, S(3.5f));
+    }
+    // Axis strokes, shorter: the + that makes it a burst rather than a
+    // second tick.
+    const float AxisInner = Inner * 0.9f;
+    const float AxisLength = Length * 0.6f;
+    DrawLine(Center.X - AxisInner - AxisLength, Center.Y, Center.X - AxisInner, Center.Y, Color, S(2.0f));
+    DrawLine(Center.X + AxisInner, Center.Y, Center.X + AxisInner + AxisLength, Center.Y, Color, S(2.0f));
+    DrawLine(Center.X, Center.Y - AxisInner - AxisLength, Center.X, Center.Y - AxisInner, Color, S(2.0f));
+    DrawLine(Center.X, Center.Y + AxisInner, Center.X, Center.Y + AxisInner + AxisLength, Color, S(2.0f));
+}
+
+// --------------------------------------------------------------------------
+// Low-health screen-edge cue. FIELDPLATE has no gradients, so this is not a
+// true vignette: two nested full-bleed frames in the harm accent, solid
+// fills, stepping in as health falls. Below the dire threshold the outer
+// band blinks on a metronome — a blink, never a fade, because urgency in
+// this system is mechanical. Health only: shields regenerate, and a
+// full-shield character at 10% health is still one mistake from dying.
+// Sits under the transient damage flash, which draws after it and brighter.
+// --------------------------------------------------------------------------
+void ABreakerPlaytestHUD::DrawLowHealthCue(const ABreakerCharacter* Character)
+{
+    const UBreakerAttributeSet* Attributes = Character ? Character->GetAttributes() : nullptr;
+    if (!Attributes || !Canvas) return;
+    const float MaxHealth = Attributes->GetMaxHealth();
+    // The preview forces the dire state: nothing in a headless run can lose
+    // health, so without this the cue is unphotographable — the exact failure
+    // mode the capture harness exists to close.
+    const float Fraction = IsCapturePreview() ? 0.12f
+        : (MaxHealth > UE_SMALL_NUMBER ? Attributes->GetHealth() / MaxHealth : 1.0f);
+    if (Fraction >= BreakerHUD::LowHealthFraction) return;
+
+    const bool bDire = Fraction < BreakerHUD::LowHealthDireFraction;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const bool bBlinkOn = !bDire
+        || FMath::Fmod(static_cast<float>(Now), BreakerHUD::LoudBlinkSeconds) < BreakerHUD::LoudBlinkSeconds * 0.5f;
+
+    // Outer band: always on while low; steps thicker as the state worsens.
+    // 0.75/0.45, up from a first pass at 0.6/0.35: over a bright sky the
+    // lower pair read as a polite pink picture frame, which is the opposite
+    // of what a near-death scream is for. Looked at, not guessed.
+    const float OuterT = S(bDire ? 5.0f : 3.0f);
+    const FLinearColor Outer = BreakerUI::Alpha(BreakerUI::Harm, bBlinkOn ? 0.75f : 0.45f);
+    DrawRect(Outer, 0.0f, 0.0f, Canvas->ClipX, OuterT);
+    DrawRect(Outer, 0.0f, Canvas->ClipY - OuterT, Canvas->ClipX, OuterT);
+    DrawRect(Outer, 0.0f, 0.0f, OuterT, Canvas->ClipY);
+    DrawRect(Outer, Canvas->ClipX - OuterT, 0.0f, OuterT, Canvas->ClipY);
+
+    if (bDire)
+    {
+        // Inner band, deep step, inset by the outer band: the second ring of
+        // the stepped vignette, only in the dire state.
+        const float InnerT = S(2.0f);
+        const FLinearColor Inner = BreakerUI::Alpha(BreakerUI::HarmDeep, 0.45f);
+        DrawRect(Inner, OuterT, OuterT, Canvas->ClipX - OuterT * 2.0f, InnerT);
+        DrawRect(Inner, OuterT, Canvas->ClipY - OuterT - InnerT, Canvas->ClipX - OuterT * 2.0f, InnerT);
+        DrawRect(Inner, OuterT, OuterT, InnerT, Canvas->ClipY - OuterT * 2.0f);
+        DrawRect(Inner, Canvas->ClipX - OuterT - InnerT, OuterT, InnerT, Canvas->ClipY - OuterT * 2.0f);
+    }
 }
 
 // --------------------------------------------------------------------------
