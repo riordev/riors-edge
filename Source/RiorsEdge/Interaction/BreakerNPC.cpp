@@ -1,8 +1,39 @@
 #include "Interaction/BreakerNPC.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Save/BreakerQuestContent.h"
+
+namespace
+{
+    // The person palette. Warm on purpose: every hostile in Combat/ tints
+    // cool (grey-violet chassis, harm-red bars), so warmth alone says
+    // "not a target" before range, name or prompt can. O2 PLACEHOLDER values —
+    // presentation, judged by screenshot, no gameplay meaning.
+    const FLinearColor NPCCoat  (0.42f, 0.30f, 0.18f); // waxed-canvas coat
+    const FLinearColor NPCFace  (0.78f, 0.62f, 0.46f); // a face, not a sensor
+    const FLinearColor NPCSash  (1.00f, 0.68f, 0.22f); // the bright amber trim
+    const FLinearColor NPCLight (1.00f, 0.72f, 0.35f); // campfire-warm glow
+
+    // Same stock-material-plus-dynamic-instance idiom as the hub and gym
+    // builders: BasicShapeMaterial exposes one "Color" vector param, so the
+    // whole palette costs zero assets.
+    void ApplyPersonColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
+    {
+        if (!Mesh) return;
+        UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
+            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+        if (!BaseMaterial) return;
+        if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
+        {
+            Dynamic->SetVectorParameterValue(TEXT("Color"), Color);
+            Mesh->SetMaterial(0, Dynamic);
+        }
+    }
+}
 
 ABreakerNPC::ABreakerNPC()
 {
@@ -32,6 +63,40 @@ ABreakerNPC::ABreakerNPC()
     {
         Head->SetStaticMesh(Sphere);
     }
+
+    // The sash: a thin bright band worn diagonally across the torso. Its job
+    // is silhouette-breaking colour — enemies are unbroken slabs, a person
+    // wears KIT — and it reads at the same distance the body shape does.
+    Trim = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Trim"));
+    Trim->SetupAttachment(Body);
+    Trim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Trim->SetRelativeScale3D(FVector(0.58f, 0.14f, 0.62f));
+    Trim->SetRelativeLocation(FVector(0.0f, 0.0f, 30.0f));
+    Trim->SetRelativeRotation(FRotator(0.0f, 0.0f, 28.0f));
+    if (UStaticMesh* TrimCube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+    {
+        Trim->SetStaticMesh(TrimCube);
+    }
+
+    // The idle glow: a soft warm pool, same idiom as the hub's prop lights
+    // (HubAttachPropLight) but owned by the NPC so it travels with them.
+    // Deliberately dimmer than the forge/crate props — a person is lit, not a
+    // beacon. No shadows: it is a read, not a light source that costs.
+    Glow = CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
+    Glow->SetupAttachment(Body);
+    Glow->SetRelativeLocation(FVector(0.0f, 0.0f, 60.0f));
+    Glow->SetLightColor(NPCLight);
+    Glow->SetIntensity(650.0f);
+    Glow->SetAttenuationRadius(520.0f);
+    Glow->SetCastShadows(false);
+}
+
+void ABreakerNPC::BeginPlay()
+{
+    Super::BeginPlay();
+    ApplyPersonColor(Visual, NPCCoat);
+    ApplyPersonColor(Head, NPCFace);
+    ApplyPersonColor(Trim, NPCSash);
 }
 
 bool ABreakerNPC::FindDialogueNode(FName NodeId, FBreakerDialogueNode& OutNode) const

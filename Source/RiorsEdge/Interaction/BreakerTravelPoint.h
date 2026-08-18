@@ -50,6 +50,9 @@ class RIORSEDGE_API ABreakerTravelPoint : public AActor
 
 public:
     ABreakerTravelPoint();
+    // Presentation: paints the rift-teal identity onto the shapes. Dynamic
+    // material instances need a live world, so not in the constructor.
+    virtual void BeginPlay() override;
 
     UFUNCTION(BlueprintPure, Category="Travel") float GetInteractionRange() const { return InteractionRange; }
     UFUNCTION(BlueprintPure, Category="Travel") FText GetPromptLabel() const { return PromptLabel; }
@@ -87,6 +90,14 @@ public:
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UCapsuleComponent> Body;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> Visual;
+    // THE BEACON (owner playtest 2026-08-17: "i dont know where the travel
+    // thing is in the anchor i simply just clicked around"). A tall unlit
+    // additive light column in the reserved rift-teal — teal is canon-reserved
+    // for rift objects, and travel IS the rift verb — plus a teal point light,
+    // so the gate is findable from anywhere on the plaza without hunting. The
+    // overhead "TRAVEL" label rides in the HUD with the NPC name labels.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UStaticMeshComponent> Beacon;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UPointLightComponent> BeaconLight;
 
     // O2 PLACEHOLDER — layout, not balance, but sized like the NPC default
     // (BreakerNPC::InteractionRange) so the two interactable kinds feel the

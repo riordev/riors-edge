@@ -1,6 +1,7 @@
 #include "Game/BreakerWorldBasics.h"
 
 #include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -69,6 +70,24 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
         {
             Atmosphere->SetupAttachment(Sky->GetRootComponent());
             Atmosphere->RegisterComponent();
+        }
+        // Distance haze in the game's steel-blue (owner: "everything just
+        // looks so stale"). A bare atmosphere renders every far surface at
+        // full local contrast, which is exactly the flat videogame-void read;
+        // a thin height fog gives the world aerial perspective — far things
+        // recede into the palette instead of just getting smaller. Start
+        // distance keeps the near field (the whole gym arena, the plaza
+        // centre) untouched, so nothing in combat range loses contrast.
+        // O2 PLACEHOLDER values, judged only by screenshot.
+        if (UExponentialHeightFogComponent* Fog = NewObject<UExponentialHeightFogComponent>(Sky))
+        {
+            Fog->SetupAttachment(Sky->GetRootComponent());
+            Fog->SetFogDensity(0.010f);
+            Fog->SetFogHeightFalloff(0.35f);
+            Fog->SetFogInscatteringColor(FLinearColor(0.33f, 0.44f, 0.58f)); // steel-blue
+            Fog->SetStartDistance(2200.0f);
+            Fog->SetFogMaxOpacity(0.82f);
+            Fog->RegisterComponent();
         }
 #if WITH_EDITOR
         Sky->SetActorLabel(TEXT("Runtime_Sky"));

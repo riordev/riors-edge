@@ -20,9 +20,13 @@
 #include "Interaction/BreakerTravelPoint.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/PackageName.h"
+#include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerExperience.h"
+#include "Save/BreakerCharacterRoster.h"
+#include "Save/BreakerSaveGame.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBootFlowConfigTest,
@@ -78,6 +82,21 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("The hub destination is registered (the way back)"),
         ABreakerTravelPoint::FindDestination(ABreakerTravelPoint::HubDestinationId, Destination));
     TestTrue(TEXT("The hub destination is enabled"), Destination.bEnabled);
+
+    // ---- The EnterWorld dispatch matrix ------------------------------------
+    // Entering a character travels into the Anchor (landing at the hub gate)
+    // from the front end AND from any mid-session switch. The third row is the
+    // shipped bug: switching characters loaded the new save onto the old
+    // character's pawn, at the old character's location ("when i select a new
+    // character i just immediately go to where my first character was").
+    TestTrue(TEXT("PLAY from the front end travels"),
+        ABreakerCharacter::ShouldTravelOnEnterWorld(/*bIsFrontEndMap=*/true, /*bHadMidSessionCharacter=*/false));
+    TestTrue(TEXT("RETURN TO TITLE on the front end, then PLAY: travels"),
+        ABreakerCharacter::ShouldTravelOnEnterWorld(true, true));
+    TestTrue(TEXT("Mid-session character switch: MUST TRAVEL, never load in place"),
+        ABreakerCharacter::ShouldTravelOnEnterWorld(false, true));
+    TestFalse(TEXT("PIE drop-in first pick on a template map stays in place (the daily workflow)"),
+        ABreakerCharacter::ShouldTravelOnEnterWorld(false, false));
 
     // A travel point never offers the place the player already is.
     ABreakerTravelPoint* GymGate = NewObject<ABreakerTravelPoint>();
@@ -140,5 +159,74 @@ bool FBreakerLevelPointEntitlementTest::RunTest(const FString& Parameters)
         Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 30);
     TestEqual(TEXT("Level 50 holds 50 Core Points"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 50);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCreatedCharacterKeepsItsClassTest,
+    "RiorsEdge.Game.BootFlow.CreatedCharacterKeepsItsClass",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCreatedCharacterKeepsItsClassTest::RunTest(const FString& Parameters)
+{
+    // THE OWNER'S BUG, AS SHIPPED ORDERING: "i made a caster and had swifts
+    // skill tree and abilities". Create writes a Caster save through the
+    // roster; the arriving pawn's progression component runs BeginPlay FIRST
+    // (which used to auto-lock Swift and take Swift's class definition) and
+    // loads the save SECOND. This test replays exactly that ordering at the
+    // component level: the worst case — the dev auto-lock has already fired —
+    // and then the roster-shaped Caster state loads over it. Every reader the
+    // front end trusts must answer CASTER afterwards.
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
+    // A test rig has no game instance, so the dev default still auto-locks
+    // Swift — deliberately: that is the stale definition the load must evict.
+    Progression->ApplySliceDefaultsIfFresh();
+    TestEqual(TEXT("Precondition: the fresh rig auto-locked Swift"),
+        Progression->GetProgressionState().PermanentClass, EBreakerClassId::Swift);
+
+    // The state UBreakerCharacterRoster::CreateCharacter writes: class and
+    // level only, loadout all-None, empty economy.
+    FBreakerProgressionState Created;
+    Created.PermanentClass = EBreakerClassId::Caster;
+    Created.CharacterLevel = 1;
+    Progression->LoadProgressionState(Created);
+
+    const UBreakerClassDefinition* Caster =
+        UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Caster);
+    const UBreakerClassDefinition* Swift =
+        UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift);
+    if (!Caster || !Swift || Caster->StartingClassAbilityIds.Num() == 0 || Swift->StartingClassAbilityIds.Num() == 0)
+    {
+        AddError(TEXT("Fallback class definitions missing — cannot exercise the create path."));
+        return false;
+    }
+
+    const FBreakerProgressionState& State = Progression->GetProgressionState();
+    TestEqual(TEXT("A created Caster IS a Caster after the load"),
+        State.PermanentClass, EBreakerClassId::Caster);
+
+    // The two readers the D-fix comment names answer from ClassDefinition, so
+    // the loadout seeding and the unlock answer are the honest probes of it.
+    TestEqual(TEXT("Ability slot one seeds from CASTER's starters, not the stale Swift definition"),
+        State.AbilityLoadout.ClassAbilityOne, Caster->StartingClassAbilityIds[0]);
+    TestEqual(TEXT("The ultimate seeds from CASTER's kit"),
+        State.AbilityLoadout.Ultimate, Caster->BaseUltimateId);
+    TestTrue(TEXT("A Caster starter ability is unlocked"),
+        Progression->IsAbilityUnlocked(Caster->StartingClassAbilityIds[0]));
+    TestFalse(TEXT("A Swift starter ability is NOT unlocked on a created Caster"),
+        Progression->IsAbilityUnlocked(Swift->StartingClassAbilityIds[0]));
+
+    // The skill screen enumerates trees here; none of them may belong to Swift.
+    for (const UBreakerProgressionTree* Tree : Progression->GetAvailableTrees())
+    {
+        if (!Tree) continue;
+        TestNotEqual(*FString::Printf(TEXT("Tree '%s' offered to a created Caster is not a Swift tree"),
+            *Tree->TreeId.ToString()), Tree->RequiredClass, EBreakerClassId::Swift);
+    }
+
+    // And the economy still seeds: a created character must arrive spendable.
+    TestEqual(TEXT("A created Caster arrives with the slice Class Point budget"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints),
+        UBreakerProgressionLibrary::SliceClassPointGrant);
     return true;
 }

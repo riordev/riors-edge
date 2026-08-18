@@ -28,6 +28,40 @@ void UBreakerEquipmentComponent::BeginPlay()
     BindAttributes(FoundAttributes);
 
     BindCombatEvents();
+
+    // The no-save path (PIE drop-ins, fixtures that never call RestoreState):
+    // a character that begins play owning nothing is armed here. The save
+    // path re-runs the same check at the end of RestoreState, so both births
+    // of a fresh equipment state produce the same armed spawn.
+    EnsureStarterKit();
+}
+
+const FName UBreakerEquipmentComponent::StarterRifleDefinitionId(TEXT("IssueRifle"));
+
+FBreakerItemInstance UBreakerEquipmentComponent::MakeStarterRifle()
+{
+    // Standard, ilvl 1, no affixes: "little to no stats" taken at its word.
+    // A real item rather than a phantom archetype, so SyncArchetypesToEquipment
+    // arms it, the save serialises it, and the first real drop displaces it
+    // through the ordinary equip path.
+    FBreakerItemInstance Item;
+    Item.ItemId = FGuid::NewGuid();
+    Item.DefinitionId = StarterRifleDefinitionId;
+    Item.Slot = EBreakerEquipSlot::Primary;
+    Item.Rarity = EBreakerItemRarity::Standard;
+    Item.ItemLevel = 1;
+    Item.WeaponArchetype = EBreakerWeaponArchetype::Rifle;
+    return Item;
+}
+
+void UBreakerEquipmentComponent::EnsureStarterKit()
+{
+    if (!HasAttributeAuthority()) return;
+    // Owning ANYTHING disqualifies — not merely an occupied Primary. A player
+    // who deliberately unequips their gun into the backpack has made a choice;
+    // silently handing them a second rifle would undo it.
+    if (Equipped.Num() > 0 || Backpack.Num() > 0) return;
+    EquipItem(MakeStarterRifle());
 }
 
 void UBreakerEquipmentComponent::BindCombatEvents()
@@ -424,6 +458,12 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
     Backpack = NewBackpack;
     RecalculateStats();
     OnEquipmentChanged.Broadcast();
+    // A fresh character's save carries two empty containers (the roster
+    // writes the save before the first session ever runs), so the fresh-save
+    // path lands here with nothing — the second birth of a fresh equipment
+    // state. EnsureStarterKit refuses to touch anyone who owns anything, so
+    // a veteran's load is byte-identical to before.
+    EnsureStarterKit();
 }
 
 bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)

@@ -329,6 +329,17 @@ void ABreakerCharacter::BeginPlay()
 void ABreakerCharacter::SaveGameState()
 {
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
+    // The pawn's identity has been re-pointed at a character whose state this
+    // pawn does not hold (EnterWorldAsCharacter, mid-travel). Writing now
+    // would stamp THIS pawn's state over that character's save — the exact
+    // clobber that turned a freshly created Caster into Swift.
+    if (bRefuseSavesForPendingCharacter) return;
+    // A FRONT-END pawn with no character has nothing worth persisting: its
+    // state is BeginPlay's fresh seeding, and writing it to the legacy slot
+    // is what AdoptLegacySaveIfPresent later adopts into an empty roster as a
+    // phantom level-1 Swift named BREAKER. The legacy slot stays writable
+    // everywhere a session can actually play in it (PIE drop-ins, captures).
+    if (!ActiveCharacterId.IsValid() && UBreakerGameInstance::IsFrontEndMap(this)) return;
     UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
     if (!Save) return;
     Save->Progression = Progression->GetProgressionState();
@@ -374,11 +385,24 @@ FString ABreakerCharacter::ActiveSaveSlotName() const
 
 void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
 {
-    // THE PATH FROM THE CHARACTER SCREEN INTO THE GAME. Before this, PLAY
-    // selected a character and then had nowhere to go: LoadGameState was
-    // hard-wired to the single legacy slot, so entering the world would have
-    // silently played the WRONG character. Order matters here — the id has to
-    // be set before the load, or the load reads the old global slot again.
+    // THE PATH FROM THE CHARACTER SCREEN INTO THE GAME. Order matters twice
+    // here, and both orderings shipped broken once:
+    //   1. The OUTGOING character is saved under its OWN slot BEFORE the id
+    //      changes. RETURN TO TITLE does not travel — the previous character's
+    //      pawn is still standing in the world holding unsaved state — and
+    //      after the id flips there is no correct slot to write it to.
+    //   2. From the moment the id names a character this pawn's state does not
+    //      belong to, this pawn must never save again. EndPlay's travel save
+    //      ran after the flip and wrote the front-end pawn's fresh
+    //      auto-locked-Swift state over the character the roster had just
+    //      created as Caster.
+    const bool bWasMidSessionCharacter = ActiveCharacterId.IsValid();
+    if (bWasMidSessionCharacter)
+    {
+        // Same character or not: the state this pawn holds belongs to the id
+        // it still carries, and this is the last moment that is true.
+        SaveGameState();
+    }
     ActiveCharacterId = CharacterId;
 
     // The id has to survive the level load, because OpenLevel destroys this
@@ -393,14 +417,24 @@ void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
     // because the hub and the gym were both already built in the one map the
     // game had. They are separate maps now, so the hub does not exist yet and
     // there is nothing to teleport to — this is a level load.
-    if (UBreakerGameInstance::IsFrontEndMap(this))
+    //
+    // MID-SESSION SWITCHES TRAVEL TOO. The old in-place branch loaded the new
+    // save onto the character-you-just-left's pawn: same location, same
+    // health, same live world — "when i select a new character i just
+    // immediately go to where my first character was". A character ENTERS the
+    // world through the Anchor's arrival (hub gate), always, so the switch is
+    // the same level load PLAY performs from the front end; the fresh pawn on
+    // the other side adopts the session id and loads clean.
+    if (ShouldTravelOnEnterWorld(UBreakerGameInstance::IsFrontEndMap(this), bWasMidSessionCharacter))
     {
+        bRefuseSavesForPendingCharacter = true;
         UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::AnchorMapName()));
         return;
     }
 
-    // Already in a world (a PIE drop-in, or the old single-map path): load and
-    // resume exactly as before, so nothing that worked yesterday stops.
+    // A session that never had a character and is not on the front end: a PIE
+    // drop-in on a template map. Load and resume in place exactly as before,
+    // so the daily editor workflow keeps working.
     LoadGameState();
     ResumeFromMenu();
 
@@ -1499,7 +1533,9 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     EBreakerMenuScreen Screen = EBreakerMenuScreen::Main;
     if (Wanted == TEXT("INVENTORY")) Screen = EBreakerMenuScreen::Inventory;
     else if (Wanted == TEXT("SKILLTREES") || Wanted == TEXT("SKILLS")) Screen = EBreakerMenuScreen::SkillTrees;
-    else if (Wanted == TEXT("LOADOUT")) Screen = EBreakerMenuScreen::Loadout;
+    // LOADOUT retired 2026-08-17 (equipment IS the loadout); the capture
+    // string keeps working and photographs what replaced it.
+    else if (Wanted == TEXT("LOADOUT")) Screen = EBreakerMenuScreen::Inventory;
     else if (Wanted == TEXT("SETTINGS")) Screen = EBreakerMenuScreen::Settings;
     else if (Wanted == TEXT("CLASS") || Wanted == TEXT("CLASSSELECT")) Screen = EBreakerMenuScreen::ClassSelect;
     else if (Wanted == TEXT("PAUSE")) Screen = EBreakerMenuScreen::Pause;

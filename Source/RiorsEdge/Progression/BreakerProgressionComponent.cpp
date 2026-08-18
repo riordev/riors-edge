@@ -13,6 +13,7 @@ static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttribu
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Game/BreakerGameInstance.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -388,7 +389,15 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
     // Permanent class can be loaded but never replaced by ordinary class
     // selection. Save migration/validation will be centralized later.
     State = NewState;
-    if (!ClassDefinition && State.PermanentClass != EBreakerClassId::None)
+    // Refetch on MISMATCH, not only on null — the same D-fix DevForceClass
+    // already carries, for the same two readers. BeginPlay's fresh-pawn
+    // seeding can lock Swift (and hold Swift's definition) BEFORE the save
+    // loads; loading a Caster save then replaced State but kept the Swift
+    // definition, so GetAvailableTrees and IsAbilityUnlocked — and the
+    // loadout seeding just below — all answered for the wrong class. A
+    // correctly-matching authored Data Asset is left exactly where it is.
+    if (State.PermanentClass != EBreakerClassId::None
+        && (!ClassDefinition || ClassDefinition->ClassId != State.PermanentClass))
     {
         ClassDefinition = UBreakerProgressionLibrary::GetFallbackClassDefinition(State.PermanentClass);
     }
@@ -564,7 +573,18 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     // Only pick a class for a character that has none; a chosen class is
     // kept. Gated on bAutoLockSwiftIfFresh (O39): default true keeps this
     // line's behaviour identical to before the flag existed.
-    if (bAutoLockSwiftIfFresh && State.PermanentClass == EBreakerClassId::None) ChoosePermanentClassById(EBreakerClassId::Swift);
+    //
+    // AND gated on the session NOT being driven by a roster character (O39's
+    // retirement note, now that the real class path works). A pawn whose
+    // session names an ActiveCharacterId is about to load — or has just
+    // loaded — that character's save, and that save is the ONLY authority on
+    // its class. Auto-locking Swift in the gap between BeginPlay and the load
+    // is how a created Caster arrived wearing Swift. Dev flows keep their
+    // Swift default: a capture run, a PIE drop-in and every test rig have no
+    // ActiveCharacterId (or no game instance at all) and are unchanged.
+    const UBreakerGameInstance* Session = GetOwner() ? GetOwner()->GetGameInstance<UBreakerGameInstance>() : nullptr;
+    const bool bRosterCharacterSession = Session && Session->ActiveCharacterId.IsValid();
+    if (bAutoLockSwiftIfFresh && !bRosterCharacterSession && State.PermanentClass == EBreakerClassId::None) ChoosePermanentClassById(EBreakerClassId::Swift);
     // O2 PLACEHOLDER: 10 Class / 12 Core is the XP-And-Pacing §9 slice budget
     // at cap 10; the shipping numbers come from the curve Data Asset.
     GrantPlaytestPoints(UBreakerProgressionLibrary::SliceClassPointGrant, UBreakerProgressionLibrary::SliceCorePointGrant);

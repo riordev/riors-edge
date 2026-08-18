@@ -148,6 +148,14 @@ private:
     void DrawDamageNumbers();
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
+    // Overhead floating labels for the friendly interactables — every
+    // ABreakerNPC prints its name in the warm person accent, every
+    // ABreakerTravelPoint prints TRAVEL in rift-teal — in the same
+    // project-and-DrawSpecTextCentered idiom as the enemy labels above. This
+    // is what makes Kess, the Quartermaster and the gate read as INTERACTIVE
+    // from across the plaza rather than only inside F-prompt range (owner
+    // playtest 2026-08-17).
+    void DrawInteractableLabels(const ABreakerCharacter* Character);
 
     // --- Ability legibility and active-effect feedback -------------------
     static const UBreakerAbilityStateComponent* GetAbilityState(const ABreakerCharacter* Character);

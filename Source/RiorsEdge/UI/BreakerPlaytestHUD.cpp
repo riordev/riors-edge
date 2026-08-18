@@ -26,6 +26,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerTravelPoint.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
 // Quest tracker: definitions and the pure state helpers (read-only — the HUD
@@ -303,6 +304,10 @@ void ABreakerPlaytestHUD::DrawHUD()
             S(BreakerUI::HudQuestTrackerWidth));
         DrawExperienceRail(Character);
         DrawLevelUpBanner(Center);
+        // Who can be talked to and where the way out is, readable from
+        // anywhere on the plaza — the Anchor's whole verb set, floating over
+        // the actors that own it.
+        DrawInteractableLabels(Character);
         if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
         {
             DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
@@ -327,6 +332,10 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawMarkedTarget(Character);
     DrawDamageNumbers();
     DrawLootPickups(Character);
+    // The gym camp's Kess/Quartermaster and its travel point get the same
+    // over-actor labels the Anchor draws; in a wave they sit far outside the
+    // arena, so they cost nothing to the combat read.
+    DrawInteractableLabels(Character);
 
     // Under the crosshair and under every plate: the ultimate frame is
     // ambient, never something the eye has to read past.
@@ -1629,6 +1638,59 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
                     bElite ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f * DistanceScale);
             }
         }
+    }
+}
+
+void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Character)
+{
+    UWorld* World = GetWorld();
+    if (!World || !Character) return;
+
+    const FVector ViewerLocation = Character->GetActorLocation();
+    // Plaza-wide on purpose: the vendors sit ~3.6 km of plaza diagonal apart
+    // from the gate, and a label that culls at combat-bar range (50 m) would
+    // answer "who is that" only after the walk it was meant to motivate.
+    constexpr float LabelMaxDistance = 9000.0f;
+    // Warm person accent for names — matches the NPC sash/glow palette, and is
+    // deliberately NOT the elite gold or the enemy grey so the populations
+    // never share a text colour.
+    const FLinearColor PersonWarm(1.0f, 0.78f, 0.45f);
+
+    const auto DistanceScaleFor = [&](float Distance)
+    {
+        const float Alpha = FMath::Clamp((Distance - 1200.0f) / (LabelMaxDistance - 1200.0f), 0.0f, 1.0f);
+        return FMath::Lerp(1.0f, 0.65f, Alpha);
+    };
+
+    for (TActorIterator<ABreakerNPC> It(World); It; ++It)
+    {
+        const ABreakerNPC* NPC = *It;
+        if (!NPC) continue;
+        const float Distance = FVector::Distance(ViewerLocation, NPC->GetActorLocation());
+        if (Distance > LabelMaxDistance) continue;
+        // Above the head sphere (rel Z 92 + radius), same idiom as the enemy
+        // bars' +120 anchor.
+        const FVector Projected = Project(NPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), false);
+        if (Projected.Z <= 0.0f) continue;
+        DrawSpecTextCentered(NPC->GetDisplayName().ToString().ToUpper(),
+            Projected.X, Projected.Y, PersonWarm, 12.0f * DistanceScaleFor(Distance));
+    }
+
+    for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
+    {
+        const ABreakerTravelPoint* TravelPoint = *It;
+        if (!TravelPoint) continue;
+        const float Distance = FVector::Distance(ViewerLocation, TravelPoint->GetActorLocation());
+        if (Distance > LabelMaxDistance) continue;
+        // Anchored at the marker, not the beacon tip: the 14 m column already
+        // owns the skyline, and a label at its top would leave the screen the
+        // moment the player got close.
+        const FVector Projected = Project(TravelPoint->GetActorLocation() + FVector(0.0f, 0.0f, 260.0f), false);
+        if (Projected.Z <= 0.0f) continue;
+        // Rift-teal, because travel is the rift verb — the one text colour the
+        // reserve permits, on the one label describing a rift object.
+        DrawSpecTextCentered(TEXT("TRAVEL"),
+            Projected.X, Projected.Y, BreakerUI::TealAnomalous, 13.0f * DistanceScaleFor(Distance));
     }
 }
 

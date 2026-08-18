@@ -357,8 +357,9 @@ void ABreakerGameMode::HandleBossDefeated()
     UE_LOG(LogTemp, Display, TEXT("[BreakerGym] FIELD MARSHAL down. Boss TTK sample recorded; F2 copies the report."));
 }
 
-float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn) const
+float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn, bool* bOutFoundFloor) const
 {
+    if (bOutFoundFloor) *bOutFoundFloor = false;
     if (bUseGroundZOverride) return GroundZOverride;
     const UWorld* World = GetWorld();
     if (!World || !Pawn) return Pawn ? Pawn->GetActorLocation().Z - 88.0f : 0.0f;
@@ -382,7 +383,9 @@ float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn) const
     }
     // No hits at all means an open map with no authored floor; the capsule
     // assumption is the only thing left and is correct in that case.
-    return Lowest == TNumericLimits<float>::Max() ? Centre.Z - 88.0f : Lowest;
+    const bool bFoundFloor = Lowest != TNumericLimits<float>::Max();
+    if (bOutFoundFloor) *bOutFoundFloor = bFoundFloor;
+    return bFoundFloor ? Lowest : Centre.Z - 88.0f;
 }
 
 void ABreakerGameMode::BuildFieldFrame(const APawn* Pawn)
@@ -391,7 +394,9 @@ void ABreakerGameMode::BuildFieldFrame(const APawn* Pawn)
     Frame.Forward = Pawn->GetActorForwardVector().GetSafeNormal2D();
     Frame.Right = Pawn->GetActorRightVector().GetSafeNormal2D();
     Frame.SpawnZ = Pawn->GetActorLocation().Z;
-    const float GroundZ = ResolveGroundZ(Pawn);
+    bool bFoundFloor = false;
+    const float GroundZ = ResolveGroundZ(Pawn, &bFoundFloor);
+    Frame.bAuthoredFloor = bFoundFloor;
     Frame.Ground = FVector(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y, GroundZ);
     bFieldFrameSet = true;
     UE_LOG(LogTemp, Display, TEXT("[BreakerGym] field frame: ground z %.0f, spawn z %.0f (%.0f cm of plinth), forward (%.2f, %.2f)"),
@@ -1705,6 +1710,18 @@ void ABreakerGameMode::SpawnExpandedField()
     SpawnFieldSlab(World, Frame, Shell, Front, -Side, Side, 0.0f, 40.0f, PaletteEarth, TEXT("Runtime_FieldApron"));
     SpawnFieldSlab(World, Frame, -Shell, Shell, -Side, -Shell, 0.0f, 40.0f, PaletteEarth, TEXT("Runtime_FieldApron"));
     SpawnFieldSlab(World, Frame, -Shell, Shell, Shell, Side, 0.0f, 40.0f, PaletteEarth, TEXT("Runtime_FieldApron"));
+    // THE FIFTH SLAB, only when the courtyard the four above abut DOES NOT
+    // EXIST. The shipped Lvl_Gym is an empty asset — no authored floor at all
+    // — so the ground probe found nothing and the rectangle-around-the-shell
+    // authoring left a 4000 x 4000 hole exactly under the arriving pawn
+    // ("theres no floor to the gym"). In Lvl_FirstPerson the probe hits the
+    // template Floor, this slab is skipped, and the abutting-never-overlapping
+    // rule (no coplanar z-fighting) is preserved untouched.
+    if (!Frame.bAuthoredFloor)
+    {
+        SpawnFieldSlab(World, Frame, -Shell, Shell, -Shell, Shell, 0.0f, 40.0f, PaletteEarth, TEXT("Runtime_FieldApron"));
+        UE_LOG(LogTemp, Display, TEXT("[BreakerGym] no authored floor under the shell — centre apron slab spawned."));
+    }
 
     // Tint patches: non-colliding flat plates that break 250 x 220 m of one
     // colour. Purely so the eye has something to judge speed against — a

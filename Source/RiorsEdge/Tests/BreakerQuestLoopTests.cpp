@@ -4,6 +4,7 @@
 #include "Interaction/BreakerNPC.h"
 #include "Save/BreakerQuestContent.h"
 #include "Save/BreakerQuestJournal.h"
+#include "Save/BreakerSaveGame.h"
 
 // A gated entry appears only with its flag set, and a blocked one disappears
 // once its flag arrives. Before conditions existed the UI iterated every choice
@@ -309,6 +310,116 @@ bool FBreakerQuestChainTest::RunTest(const FString& Parameters)
         TestEqual(FString::Printf(TEXT("%s survives a restore"), *QuestId.ToString()),
             UBreakerQuestLibrary::ComputeQuestState(Quest, Reloaded->GetState()), EBreakerQuestState::Complete);
     }
+    return true;
+}
+
+// THE FIRST CONTRACT AS A FRESH ROSTER CHARACTER ACTUALLY PLAYS IT (owner
+// playtest 2026-08-17: "i cant progress the quest or anything of that nature").
+// The quest LAYER was sound the whole time — the loop/chain tests above are
+// green — and the shipped block was upstream: the front-end pawn's EndPlay
+// save stamped an EMPTY journal over the roster character's slot on every
+// PLAY, and the gym had no floor to kill the spill on. This test pins the
+// seam those bugs travelled through and the earlier tests do not touch: the
+// real dialogue CLICKS (choice -> SetsQuestFlag -> journal), interleaved with
+// the real UBreakerSaveGame round trip at every map hop, exactly the
+// Anchor -> Gym -> Anchor path a fresh character walks. If any hop drops a
+// flag or a counter, or any greeting resolves wrong for the restored state,
+// this goes red with the hop named.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerFirstContractFreshWalkTest,
+    "RiorsEdge.Save.FirstContractFreshCharacterWalk",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerFirstContractFreshWalkTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerQuestFlags;
+
+    FBreakerQuestDefinition Contract;
+    if (!UBreakerQuestLibrary::FindQuest(TEXT("Quest.FirstContract"), Contract))
+    {
+        AddError(TEXT("The first contract is not registered"));
+        return false;
+    }
+
+    ABreakerNPC* Quartermaster = NewObject<ABreakerNPC>();
+    Quartermaster->DialogueNodes = ABreakerNPC::MakeQuartermasterDialogue();
+    Quartermaster->EntryOverrides = ABreakerNPC::MakeQuartermasterEntries();
+
+    // Click a VISIBLE choice by its target node (or, for terminal choices, by
+    // the flag it sets), applying SetsQuestFlag through the journal exactly as
+    // SBreakerMenu::BuildDialogueScreen's OnClicked does. Returns false when
+    // the player could not actually click it — a hidden offer is the bug this
+    // walk exists to catch, not a precondition.
+    const auto Click = [this, Quartermaster](UBreakerQuestJournal& Journal, FName NodeId, FName NextNodeId, FName SetsFlag) -> bool
+    {
+        FBreakerDialogueNode Node;
+        if (!Quartermaster->FindDialogueNode(NodeId, Node)) return false;
+        TArray<FBreakerDialogueChoice> Visible;
+        Quartermaster->GetVisibleChoices(Node, Journal.GetState(), Visible);
+        for (const FBreakerDialogueChoice& Choice : Visible)
+        {
+            if (Choice.NextNodeId != NextNodeId) continue;
+            if (SetsFlag != NAME_None && Choice.SetsQuestFlag != SetsFlag) continue;
+            if (Choice.SetsQuestFlag != NAME_None) Journal.SetFlag(Choice.SetsQuestFlag);
+            return true;
+        }
+        return false;
+    };
+
+    // A map hop, exactly as ABreakerCharacter does it: EndPlay writes
+    // Flags/Counters into the save object, the arriving pawn's fresh journal
+    // restores from it (SaveGameState / LoadGameState field-for-field).
+    const auto Travel = [](UBreakerQuestJournal& Departing) -> UBreakerQuestJournal*
+    {
+        UBreakerSaveGame* Save = NewObject<UBreakerSaveGame>();
+        Save->QuestFlags = Departing.GetState().Flags;
+        Save->QuestCounters = Departing.GetState().Counters;
+        Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
+        FString Note;
+        UBreakerSaveGame::MigrateToCurrent(*Save, Note);
+        UBreakerQuestJournal* Arriving = NewObject<UBreakerQuestJournal>();
+        Arriving->RestoreFrom(Save->QuestFlags, Save->QuestCounters);
+        return Arriving;
+    };
+
+    // --- Anchor, fresh character: hear the job, take it -------------------
+    UBreakerQuestJournal* Anchor = NewObject<UBreakerQuestJournal>();
+    TestEqual(TEXT("Fresh character greets on Start"),
+        Quartermaster->ResolveStartNodeId(Anchor->GetState()), FName(TEXT("Start")));
+    TestTrue(TEXT("The offer choice is clickable on Start"),
+        Click(*Anchor, TEXT("Start"), TEXT("Job"), FirstContractOffered));
+    TestTrue(TEXT("Accepting is clickable on Job"),
+        Click(*Anchor, TEXT("Job"), NAME_None, FirstContractAccepted));
+    TestEqual(TEXT("Contract is ACTIVE after the two clicks"),
+        UBreakerQuestLibrary::ComputeQuestState(Contract, Anchor->GetState()), EBreakerQuestState::Active);
+
+    // --- Travel to the gym: the flags ride the save -----------------------
+    UBreakerQuestJournal* Gym = Travel(*Anchor);
+    TestEqual(TEXT("The accepted contract survives the Anchor->Gym hop"),
+        UBreakerQuestLibrary::ComputeQuestState(Contract, Gym->GetState()), EBreakerQuestState::Active);
+
+    // The spill, as the gym spawns it: the named encounter's trash then its
+    // elite, through the same NotifyEnemyKilled the kill tracker calls.
+    const int32 TrashRequired = Contract.Objectives[0].RequiredCount;
+    for (int32 i = 0; i < TrashRequired; ++i) UBreakerQuestLibrary::NotifyEnemyKilled(*Gym, false);
+    UBreakerQuestLibrary::NotifyEnemyKilled(*Gym, true);
+    TestTrue(TEXT("Gym kills thin the spill"), Gym->HasFlag(FirstContractSpillThinned));
+    TestTrue(TEXT("The elite goes down"), Gym->HasFlag(FirstContractEliteDown));
+
+    // --- Travel back: the finished count rides the save -------------------
+    UBreakerQuestJournal* Back = Travel(*Gym);
+    TestEqual(TEXT("Ready to turn in after the Gym->Anchor hop"),
+        UBreakerQuestLibrary::ComputeQuestState(Contract, Back->GetState()), EBreakerQuestState::ReadyToTurnIn);
+    TestEqual(TEXT("The Quartermaster greets straight onto the turn-in"),
+        Quartermaster->ResolveStartNodeId(Back->GetState()), FName(TEXT("ReadyTurnIn")));
+    TestTrue(TEXT("Turning in is clickable"),
+        Click(*Back, TEXT("ReadyTurnIn"), NAME_None, FirstContractTurnedIn));
+    TestEqual(TEXT("The contract closes"),
+        UBreakerQuestLibrary::ComputeQuestState(Contract, Back->GetState()), EBreakerQuestState::Complete);
+
+    // The reward hook: turning in names a flag the reward path pays on.
+    TestEqual(TEXT("The turn-in flag is the reward trigger"),
+        Contract.TurnedInFlag, FName(FirstContractTurnedIn));
     return true;
 }
 

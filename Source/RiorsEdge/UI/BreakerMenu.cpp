@@ -862,7 +862,7 @@ void SBreakerMenu::HandleEscape()
     // character screens were MISSING from this list when they were added, so
     // Escape on them did nothing at all — a dead end on the one screen a new
     // player cannot avoid.
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Loadout || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox)
     {
         Rebuild(RootScreen);
     }
@@ -991,7 +991,11 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
     {
         case EBreakerMenuScreen::Pause: ContentHost->SetContent(BuildPauseScreen()); break;
         case EBreakerMenuScreen::Settings: ContentHost->SetContent(BuildSettingsScreen()); break;
-        case EBreakerMenuScreen::Loadout: ContentHost->SetContent(BuildLoadoutScreen()); break;
+        // Loadout is RETIRED (owner ruling 2026-08-17: "the loadout button and
+        // the ability to just pick a weapon shouldnt exist"). Equipment IS the
+        // loadout: which gun you hold comes from the item in your Primary/
+        // Secondary slot (SyncArchetypesToEquipment), never from a picker. A
+        // stale request for the value falls through to the default arm below.
         case EBreakerMenuScreen::Inventory: ContentHost->SetContent(BuildInventoryScreen()); break;
         case EBreakerMenuScreen::ClassSelect: ContentHost->SetContent(BuildClassSelectScreen()); break;
         case EBreakerMenuScreen::CharacterSelect: ContentHost->SetContent(BuildCharacterSelectScreen()); break;
@@ -1431,11 +1435,9 @@ TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
         if (Character.IsValid()) Character->ResumeFromMenu();
         return FReply::Handled();
     }), true));
-    AddButton(MakeButton(FText::FromString(TEXT("LOADOUT")), FOnClicked::CreateLambda([this]()
-    {
-        Rebuild(EBreakerMenuScreen::Loadout);
-        return FReply::Handled();
-    })));
+    // LOADOUT is gone from this column by ruling (2026-08-17): the archetype
+    // picker let players conjure any gun without owning one. INVENTORY is the
+    // loadout now — the weapon you carry is the weapon item you equip.
     AddButton(MakeButton(FText::FromString(TEXT("INVENTORY")), FOnClicked::CreateLambda([this]()
     {
         Rebuild(EBreakerMenuScreen::Inventory);
@@ -2404,97 +2406,16 @@ TSharedRef<SWidget> SBreakerMenu::MakeGearCard(const FText& Slot, const FText& N
         PanelRaised, Accent, FMargin(BreakerUI::Space16, BreakerUI::Space16));
 }
 
-TSharedRef<SWidget> SBreakerMenu::BuildLoadoutScreen()
-{
-    UBreakerWeaponComponent* Weapon = Character.IsValid() ? Character->GetWeapon() : nullptr;
-
-    struct FArchetypeEntry { EBreakerWeaponArchetype Archetype; const TCHAR* Name; const TCHAR* Details; };
-    static const FArchetypeEntry Archetypes[] =
-    {
-        { EBreakerWeaponArchetype::Rifle,   TEXT("RIFLE"),   TEXT("AUTOMATIC  |  30 ROUNDS  |  MID-RANGE") },
-        { EBreakerWeaponArchetype::SMG,     TEXT("SMG"),     TEXT("AUTOMATIC  |  35 ROUNDS  |  CLOSE-MID, HIGH CADENCE") },
-        { EBreakerWeaponArchetype::Sniper,  TEXT("SNIPER"),  TEXT("SEMI-AUTOMATIC  |  8 ROUNDS  |  LONG-RANGE") },
-        { EBreakerWeaponArchetype::Shotgun, TEXT("SHOTGUN"), TEXT("SEMI-AUTOMATIC  |  8 SHELLS  |  CLOSE-RANGE") },
-        { EBreakerWeaponArchetype::Rocket,  TEXT("ROCKET"),  TEXT("PROJECTILE  |  4 ROCKETS  |  AREA DAMAGE") },
-        // O27 breadth pass. A row here is the ONLY way an archetype is
-        // reachable from the loadout screen; a new weapon with no row is
-        // content that exists and cannot be picked.
-        { EBreakerWeaponArchetype::BurstRifle, TEXT("BURST RIFLE"),  TEXT("3-ROUND BURST  |  27 ROUNDS  |  MID-LONG, DISCIPLINE") },
-        { EBreakerWeaponArchetype::Machinegun, TEXT("MACHINEGUN"), TEXT("AUTOMATIC  |  120 ROUNDS  |  SUSTAINED, PLANTED") },
-        { EBreakerWeaponArchetype::Sidearm,    TEXT("SIDEARM"),    TEXT("SEMI-AUTOMATIC  |  14 ROUNDS  |  FAST SWAP, DEEP RESERVE") },
-    };
-
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    for (int32 SlotNumber = 1; SlotNumber <= 2; ++SlotNumber)
-    {
-        const EBreakerWeaponArchetype Assigned = Weapon ? Weapon->GetSlotArchetype(SlotNumber) : EBreakerWeaponArchetype::Rifle;
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)
-        [
-            MenuText(FText::FromString(FString::Printf(TEXT("SLOT %d — click an archetype to assign"), SlotNumber)), 11, Cyan, true)
-        ];
-        // FOUR per row, not eight. The O27 breadth pass took this row from five
-        // archetypes to eight while every tile still split one 880px panel, so
-        // "BURST RIFLE" and "MACHINEGUN" were drawn into ~90px and came out as
-        // "BURS" and "MACI" — the screen was clipping its own weapon names.
-        constexpr int32 ArchetypesPerRow = 4;
-        TSharedRef<SVerticalBox> RowStack = SNew(SVerticalBox);
-        TSharedPtr<SHorizontalBox> RowBox;
-        int32 ArchetypeIndex = 0;
-        for (const FArchetypeEntry& Entry : Archetypes)
-        {
-            if (ArchetypeIndex % ArchetypesPerRow == 0)
-            {
-                RowBox = SNew(SHorizontalBox);
-                RowStack->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 6.0f)[RowBox.ToSharedRef()];
-            }
-            ++ArchetypeIndex;
-            const bool bAssigned = Entry.Archetype == Assigned;
-            const EBreakerWeaponArchetype CapturedArchetype = Entry.Archetype;
-            const int32 CapturedSlot = SlotNumber;
-            RowBox->AddSlot().FillWidth(1.0f).Padding(0.0f, 0.0f, 6.0f, 0.0f)
-            [
-                SNew(SBox).HeightOverride(64.0f)
-                [
-                    // Assigned carries the accent ring, not an accent fill:
-                    // a solid cyan tile would outrank the screen title.
-                    BorderWrap(
-                        SNew(SButton)
-                        .ButtonColorAndOpacity(bAssigned ? PanelHover : Panel)
-                        .HAlign(HAlign_Center).VAlign(VAlign_Center)
-                        .OnClicked(FOnClicked::CreateLambda([this, CapturedSlot, CapturedArchetype]()
-                        {
-                            if (Character.IsValid() && Character->GetWeapon()) Character->GetWeapon()->SetSlotArchetype(CapturedSlot, CapturedArchetype);
-                            Rebuild(EBreakerMenuScreen::Loadout);
-                            return FReply::Handled();
-                        }))
-                        [
-                            MenuText(FText::FromString(Entry.Name), BreakerUI::TypeH2, bAssigned ? Primary : SoftText, true)
-                        ],
-                        // Weapons are the orange family; the assigned slot says so.
-                        bAssigned ? BreakerUI::Orange : BorderEmphasis,
-                        bAssigned ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
-                ]
-            ];
-        }
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)[RowStack];
-    }
-
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)[MenuText(FText::FromString(TEXT("ARMORY REFERENCE")), 12, SoftText, true)];
-    {
-        FString Reference;
-        for (const FArchetypeEntry& Entry : Archetypes)
-        {
-            Reference += FString::Printf(TEXT("%-8s  %s\n"), Entry.Name, Entry.Details);
-        }
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 12.0f)[MenuText(FText::FromString(Reference), 10, SoftText)];
-    }
-    Body->AddSlot().AutoHeight().Padding(0.0f, 10.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 12.0f, 0.0f, 0.0f)[MenuText(FText::FromString(TEXT("Two equipped weapons maximum  |  ESC Back")), 9, SoftText)];
-    // 1040, not 880: four H2 tiles per row need ~240 each before MACHINEGUN
-    // loses its last letter, and a weapon that cannot say its own name is not
-    // pickable in any useful sense.
-    return BuildFrame(FText::FromString(TEXT("LOADOUT")), FText::FromString(TEXT("WEAPON SLOTS / ARMORY")), Body, 1040.0f);
-}
+// BuildLoadoutScreen is GONE (owner ruling 2026-08-17: "the loadout button and
+// the ability to just pick a weapon shouldnt exist / players should start with
+// a basic rifle"). The archetype tiles let a player conjure any of the eight
+// guns with no item behind them; the weapon you hold now comes from the weapon
+// ITEM equipped in Primary/Secondary (UBreakerWeaponComponent::
+// SyncArchetypesToEquipment), and every fresh character spawns holding the
+// Issue Rifle (UBreakerEquipmentComponent::EnsureStarterKit). Nothing was
+// rehomed from the screen: everything on it was archetype furniture (the
+// picker tiles and an armory reference listing of the same eight rows), and
+// ability selection already lives on the ABILITIES tab.
 
 namespace
 {
@@ -2740,6 +2661,14 @@ namespace
             {
                 return Legendary.DisplayName.ToString().ToUpper();
             }
+        }
+        // The starter. The one non-legendary item with a name, because it is
+        // the one non-legendary item every character is guaranteed to meet:
+        // standard-issue kit says so on the card, and the first drop that
+        // outclasses it reads as an upgrade over "the gun they gave me".
+        if (Item.DefinitionId == UBreakerEquipmentComponent::StarterRifleDefinitionId)
+        {
+            return TEXT("ISSUE RIFLE");
         }
         if (Item.IsWeapon())
         {

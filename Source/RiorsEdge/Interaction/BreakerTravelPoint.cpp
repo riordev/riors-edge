@@ -1,7 +1,12 @@
 #include "Interaction/BreakerTravelPoint.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "UI/BreakerGlowMaterial.h"
+#include "UI/BreakerUIStyle.h"
 
 const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
 const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
@@ -24,9 +29,60 @@ ABreakerTravelPoint::ABreakerTravelPoint()
     Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Visual->SetRelativeScale3D(FVector(0.5f, 0.5f, 2.0f));
     Visual->SetRelativeLocation(FVector(0.0f, 0.0f, -12.0f));
-    if (UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+    UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    if (Cylinder)
     {
         Visual->SetStaticMesh(Cylinder);
+    }
+
+    // The beacon column: ~14 m of thin unlit teal rising out of the marker.
+    // Tall enough to clear the boundary pillars (2.6-scale, ~2.6 m) many times
+    // over, so it reads over every rooftop-height prop on the plaza from any
+    // approach — the same "you can navigate by it" job Destiny's Tower beacons
+    // do, in one primitive.
+    Beacon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Beacon"));
+    Beacon->SetupAttachment(Body);
+    Beacon->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Beacon->SetRelativeScale3D(FVector(0.18f, 0.18f, 14.0f));
+    Beacon->SetRelativeLocation(FVector(0.0f, 0.0f, 640.0f));
+    if (Cylinder)
+    {
+        Beacon->SetStaticMesh(Cylinder);
+    }
+
+    BeaconLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("BeaconLight"));
+    BeaconLight->SetupAttachment(Body);
+    BeaconLight->SetRelativeLocation(FVector(0.0f, 0.0f, 160.0f));
+    BeaconLight->SetLightColor(BreakerUI::TealHardware);
+    BeaconLight->SetIntensity(2400.0f);
+    BeaconLight->SetAttenuationRadius(1600.0f);
+    BeaconLight->SetCastShadows(false);
+}
+
+void ABreakerTravelPoint::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // The marker body wears hardware teal as PAINT (lit, shaded), the column
+    // wears Anomalous teal as LIGHT (unlit additive, MakeGlowMaterial): the
+    // object is teal because it is a rift object, and the beacon glows because
+    // it must survive distance, fog and shadow. Teal here is canon-legal —
+    // the reserve exists exactly so that rift objects, and only rift objects,
+    // get to spend it.
+    if (UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
+            nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+    {
+        if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Visual))
+        {
+            Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerUI::TealHardware);
+            Visual->SetMaterial(0, Dynamic);
+        }
+    }
+    if (UMaterialInstanceDynamic* GlowMaterial = BreakerUI::MakeGlowMaterial(Beacon))
+    {
+        // Intensity past 1.0 is what pushes the column into bloom; 4.0 reads
+        // as a light column without whiting out the sky behind it.
+        BreakerUI::SetGlowColor(GlowMaterial, BreakerUI::TealAnomalous, 4.0f);
     }
 }
 

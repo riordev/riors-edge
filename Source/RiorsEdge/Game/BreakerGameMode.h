@@ -401,6 +401,13 @@ public:
         FVector Forward = FVector::ForwardVector;
         FVector Right = FVector::RightVector;
         float SpawnZ = 0.0f;
+        // Whether the ground probe actually HIT authored floor. The apron's
+        // four slabs are authored as the rectangle AROUND the template
+        // courtyard's +/-2000 floor; in a map with no authored floor at all
+        // (the shipped Lvl_Gym is an empty asset) that rectangle has a
+        // 4000 x 4000 hole exactly under the arriving pawn — "theres no floor
+        // to the gym". False means SpawnExpandedField must fill the shell.
+        bool bAuthoredFloor = false;
         FVector At(float Fwd, float Rgt, float Up = 0.0f) const
         {
             return Ground + Forward * Fwd + Right * Rgt + FVector(0.0f, 0.0f, Up);
@@ -425,7 +432,10 @@ private:
     // plaza centre, and the plaza centre is inside the landmark obelisk.
     FTransform HubArrival = FTransform::Identity;
     bool bHubBuilt = false;
-    float ResolveGroundZ(const APawn* Pawn) const;
+    // The optional out-param reports whether any probe HIT authored floor —
+    // the fact BuildFieldFrame stores on the frame so the apron knows whether
+    // the courtyard shell it is built around actually exists.
+    float ResolveGroundZ(const APawn* Pawn, bool* bOutFoundFloor = nullptr) const;
 
     // Vantage cameras for -BreakerCaptureTour. A screenshot of the spawn view
     // says nothing about a LAYOUT, and a layout is exactly what this pass

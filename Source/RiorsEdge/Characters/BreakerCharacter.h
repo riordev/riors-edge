@@ -70,6 +70,14 @@ public:
     // load, because the pawn that knew it was destroyed by the load.
     void AdoptSessionCharacter();
     FGuid ActiveCharacterId;
+    // Armed by EnterWorldAsCharacter the moment this pawn's identity is
+    // re-pointed at a character whose state it does NOT hold. From then until
+    // the level load destroys it, every SaveGameState on this pawn is refused:
+    // EndPlay's travel save used to run AFTER the id changed, so the FRONT-END
+    // pawn's fresh state (auto-locked Swift, slice points, empty journal) was
+    // written over the roster's just-created save — "i made a caster and had
+    // swifts skill tree and abilities" was this one ordering.
+    bool bRefuseSavesForPendingCharacter = false;
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;
@@ -312,6 +320,16 @@ public:
     static bool ShouldShowInitialMenu(bool bIsFrontEndMap, bool bSessionHasActiveCharacter)
     {
         return bIsFrontEndMap || !bSessionHasActiveCharacter;
+    }
+    // The EnterWorldAsCharacter dispatch, pinned the same way. Entering a
+    // character TRAVELS (a level load into the Anchor, landing at the hub
+    // gate) from the front end and from any mid-session switch — the old
+    // in-place branch loaded the new character onto the old character's pawn,
+    // at the old character's location. The only in-place entry left is a PIE
+    // drop-in on a template map: no front end, no prior character.
+    static bool ShouldTravelOnEnterWorld(bool bIsFrontEndMap, bool bHadMidSessionCharacter)
+    {
+        return bIsFrontEndMap || bHadMidSessionCharacter;
     }
     // True in the Anchor (a social space): fire and abilities are refused and
     // the viewmodel presents lowered. Set once in BeginPlay from the map role

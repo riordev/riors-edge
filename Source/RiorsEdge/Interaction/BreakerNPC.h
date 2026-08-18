@@ -6,6 +6,7 @@
 #include "BreakerNPC.generated.h"
 
 class UCapsuleComponent;
+class UPointLightComponent;
 class UStaticMeshComponent;
 
 USTRUCT(BlueprintType)
@@ -65,6 +66,10 @@ class RIORSEDGE_API ABreakerNPC : public AActor
 
 public:
     ABreakerNPC();
+    // Presentation only: paints the person palette onto the basic shapes.
+    // Dynamic material instances need a live world, so this cannot happen in
+    // the constructor (which also runs on the CDO).
+    virtual void BeginPlay() override;
 
     UFUNCTION(BlueprintPure, Category="NPC") FText GetDisplayName() const { return DisplayName; }
     UFUNCTION(BlueprintPure, Category="NPC") FName GetStartNodeId() const { return StartNodeId; }
@@ -104,4 +109,13 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> Body;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Visual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Head;
+    // NPC READABILITY (owner playtest 2026-08-17: "no visual indicator that
+    // the npcs are people"). Enemies read as cool grey-violet silhouettes with
+    // harm-red bars; a person reads WARM: a bright amber sash across the
+    // chest, a warm palette on body and head, and a soft warm glow so the two
+    // populations separate at a glance and at distance. The overhead floating
+    // name label rides in the HUD (ABreakerPlaytestHUD::DrawInteractableLabels)
+    // in the same projected-canvas idiom the enemy labels use.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Trim;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UPointLightComponent> Glow;
 };

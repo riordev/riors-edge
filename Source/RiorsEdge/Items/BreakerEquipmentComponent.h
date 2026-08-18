@@ -56,6 +56,23 @@ public:
     UFUNCTION(BlueprintPure, Category="Equipment") const TArray<FBreakerItemInstance>& GetEquipped() const { return Equipped; }
     // Save/load path: replaces both containers wholesale and recalculates.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack);
+
+    // ---- Starter kit (owner ruling 2026-08-17) ----------------------------
+    // "Players should start with a basic rifle with little to no stats when
+    // they spawn in." The Issue Rifle: a real FBreakerItemInstance — Standard,
+    // ilvl 1, zero affixes — so it saves, loads, compares, salvages and gets
+    // replaced exactly like any drop. Static so tests and fixtures can mint
+    // one with no component.
+    static FBreakerItemInstance MakeStarterRifle();
+    // The starter's stable definition id ("IssueRifle"). The inventory card
+    // prints its standard-issue name off this id; nothing else keys on it.
+    static const FName StarterRifleDefinitionId;
+    // Equips the starter rifle iff this character owns NOTHING — no equipped
+    // piece, no backpack item. Called wherever a fresh equipment state is
+    // born (BeginPlay for the no-save path, RestoreState for a fresh save's
+    // empty containers), so a bare-handed spawn no longer exists on any
+    // player path. A veteran who owns anything at all is never touched.
+    void EnsureStarterKit();
     UFUNCTION(BlueprintPure, Category="Equipment") const FBreakerEquipmentStats& GetStats() const { return CachedStats; }
 
     // ---- Disclosure queries -----------------------------------------------

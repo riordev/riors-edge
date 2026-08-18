@@ -61,7 +61,10 @@ namespace
     //
     // Teal is reserved for rift objects per the owner's brief and O24's
     // "rift approaches" read; the hub is not a rift space, so no teal
-    // appears anywhere below.
+    // appears anywhere below. (The travel point ACTOR carries teal — its
+    // beacon and marker paint themselves in ABreakerTravelPoint::BeginPlay —
+    // because travel is the rift verb and the gate is a rift object. This
+    // builder still spawns none.)
     const FLinearColor HubPaletteEarth    (0.20f, 0.16f, 0.11f);
     const FLinearColor HubPaletteConcrete (0.33f, 0.35f, 0.30f);
     const FLinearColor HubPaletteStone    (0.24f, 0.26f, 0.23f);
@@ -154,7 +157,41 @@ void UBreakerHubBuilder::BuildPlazaAndBoundary(UWorld* World, const FBreakerHubF
         const FVector Offset = Frame.Forward.RotateAngleAxis(Angle, FVector::UpVector) * BoundaryRadius;
         HubSpawnShape(World, HubShapeCylinder, Frame.At(0.0f, 0.0f, 130.0f) + Offset,
             FVector(0.4f, 0.4f, 2.6f), FRotator::ZeroRotator, HubPaletteConcrete, true, TEXT("Runtime_HubBoundary"));
+        // Accent striping (owner: "everything just looks so stale"): a warm
+        // band near each pillar's crown, so the boundary reads as built
+        // hardware rather than sixteen identical grey tubes. Every fourth
+        // pillar goes rust instead of amber — repetition with variation is
+        // what a maintained perimeter looks like.
+        HubSpawnShape(World, HubShapeCylinder, Frame.At(0.0f, 0.0f, 234.0f) + Offset,
+            FVector(0.46f, 0.46f, 0.10f), FRotator::ZeroRotator,
+            (Pillar % 4 == 0) ? HubPaletteRust : HubPaletteAmber, false, TEXT("Runtime_HubBoundaryBand"));
     }
+
+    // ---- Ground variation (owner: "everything just looks so stale") -------
+    // The plaza was ONE uniform earth-brown slab. These overlays sit 2 cm
+    // proud of it (no collision, no gameplay) and break it into readable
+    // ground: a worn concrete walk running the gate-to-vendors spine, an
+    // apron where the vendors trade, and moss reclaiming the edges — the O24
+    // overgrown-Earth read (vegetation over ruins) at the cost of six shapes.
+    const FRotator PlazaYaw(0.0f, Frame.Forward.Rotation().Yaw, 0.0f);
+    // The spine: gate (forward -1800) through the obelisk to the vendor row.
+    HubSpawnShape(World, HubShapeCube, Frame.At(0.0f, 0.0f, 2.0f),
+        FVector(38.0f, 3.2f, 0.04f), PlazaYaw, HubPaletteConcrete, false, TEXT("Runtime_HubWalkway"));
+    // The vendor crossbar: Kess's forge to the Quartermaster's stall.
+    HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, 0.0f, 2.0f),
+        FVector(3.2f, 22.0f, 0.04f), PlazaYaw, HubPaletteConcrete, false, TEXT("Runtime_HubWalkway"));
+    // Stone aprons under each vendor's pitch, so the stalls sit ON something.
+    HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, -VendorLateral, 1.5f),
+        FVector(7.0f, 7.0f, 0.03f), PlazaYaw, HubPaletteStone, false, TEXT("Runtime_HubVendorApron"));
+    HubSpawnShape(World, HubShapeCube, Frame.At(VendorForward, VendorLateral, 1.5f),
+        FVector(7.0f, 7.0f, 0.03f), PlazaYaw, HubPaletteStone, false, TEXT("Runtime_HubVendorApron"));
+    // Moss, off the walked line: flat discs where the plaza meets the ring.
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(-800.0f, 1700.0f, 1.0f),
+        FVector(9.0f, 9.0f, 0.02f), FRotator::ZeroRotator, HubPaletteMoss, false, TEXT("Runtime_HubMoss"));
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(1100.0f, -1900.0f, 1.0f),
+        FVector(12.0f, 12.0f, 0.02f), FRotator::ZeroRotator, HubPaletteMoss, false, TEXT("Runtime_HubMoss"));
+    HubSpawnShape(World, HubShapeCylinder, Frame.At(-2100.0f, -700.0f, 1.0f),
+        FVector(7.0f, 7.0f, 0.02f), FRotator::ZeroRotator, HubPaletteMoss, false, TEXT("Runtime_HubMoss"));
 
     // A central landmark so the plaza reads as a destination, not just an
     // empty rectangle — a weathered obelisk, in the same overgrown-Earth

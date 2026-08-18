@@ -23,6 +23,10 @@ enum class EBreakerMenuScreen : uint8
     Main,
     Pause,
     Settings,
+    // RETIRED (owner ruling 2026-08-17). The archetype-picker screen is gone —
+    // equipment IS the loadout now. The value stays so nothing below it
+    // renumbers (these are logged and mapped from capture strings); no screen
+    // builds for it and no button reaches it.
     Loadout,
     Inventory,
     ClassSelect,
@@ -388,7 +392,6 @@ private:
     TSharedRef<SWidget> BuildMainScreen();
     TSharedRef<SWidget> BuildPauseScreen();
     TSharedRef<SWidget> BuildSettingsScreen();
-    TSharedRef<SWidget> BuildLoadoutScreen();
     TSharedRef<SWidget> BuildInventoryScreen();
     TSharedRef<SWidget> BuildClassSelectScreen();
     TSharedRef<SWidget> BuildCharacterSelectScreen();
