@@ -2,6 +2,7 @@
 
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -88,6 +89,37 @@ void UBreakerWorldBasics::EnsureWorldLighting(UWorld* World)
             Fog->SetStartDistance(2200.0f);
             Fog->SetFogMaxOpacity(0.82f);
             Fog->RegisterComponent();
+        }
+        // The rig had no post-process control at all, so the fixed-exposure
+        // pipeline (r.DefaultFeature.AutoExposure=False project-wide, see
+        // DefaultEngine.ini) rendered the sun/atmosphere/fog stack at whatever
+        // the raw scene radiance happened to be -- the Anchor plaza's pale
+        // concrete and sand under the sun ended up crushed against white
+        // with no material separation. An unbound PostProcessComponent on
+        // the sky actor is the cleanest zero-asset seam to correct this: it
+        // rides on the one actor that already represents "the sky" instead
+        // of requiring a separately-placed PostProcessVolume (which would
+        // need a bounding volume, another unlabelled actor, and per-map
+        // placement), and unbound means it applies everywhere without a
+        // volume to size or move. Manual exposure compensation is used
+        // (not min/max EV clamps) because auto-exposure is off project-wide;
+        // clamps on a disabled feature would do nothing.
+        // O2 PLACEHOLDER: exposure bias judged only by screenshot.
+        if (UPostProcessComponent* PostProcess = NewObject<UPostProcessComponent>(Sky))
+        {
+            PostProcess->SetupAttachment(Sky->GetRootComponent());
+            PostProcess->bUnbound = true;
+            PostProcess->Priority = 0.0f;
+            PostProcess->Settings.bOverride_AutoExposureBias = true;
+            PostProcess->Settings.AutoExposureBias = -0.7f; // EV; O2 PLACEHOLDER
+            // Belt-and-suspenders for the day auto-exposure gets switched
+            // back on for this project: keep the adapted range from ever
+            // reaching the blown-white end that flagged this fix.
+            PostProcess->Settings.bOverride_AutoExposureMinBrightness = true;
+            PostProcess->Settings.AutoExposureMinBrightness = 0.2f; // O2 PLACEHOLDER
+            PostProcess->Settings.bOverride_AutoExposureMaxBrightness = true;
+            PostProcess->Settings.AutoExposureMaxBrightness = 1.5f; // O2 PLACEHOLDER
+            PostProcess->RegisterComponent();
         }
 #if WITH_EDITOR
         Sky->SetActorLabel(TEXT("Runtime_Sky"));
