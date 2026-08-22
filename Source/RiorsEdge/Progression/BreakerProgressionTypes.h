@@ -268,12 +268,13 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // a NODE to reach it. One line each in AggregateStats, all joining the
     // same additive Increased bucket gear already bids into.
     //
-    // DashCooldown is deliberately NOT here, but the reason recorded for a
-    // milestone was already false when it was written and read as blocked work
-    // ever since: it claimed EBreakerAggregatedAttribute has no dash entry at
-    // all. It has DashCooldownReduction, replicated, floored, and bid into by
-    // gear's Move.DashCooldown affix. The lane is one line in AggregateStats
-    // and this case label, and it is unwired only because nobody has done it.
+    // DashCooldown, wired at last. The reason recorded against it for a
+    // milestone was false when it was written: it claimed
+    // EBreakerAggregatedAttribute had no dash entry at all. It has
+    // DashCooldownReduction — replicated, floored, and bid into by gear's
+    // Move.DashCooldown affix — so a tree line joins that same additive bucket
+    // rather than multiplying beside it, which is the whole reason the
+    // attribute stores the divisor.
     case EBreakerNodeStatTarget::AbilityCost:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
@@ -344,6 +345,7 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // waits on that mechanism, not on this one.
     case EBreakerNodeStatTarget::WeaponDamage:
     case EBreakerNodeStatTarget::AbilityDamage:
+    case EBreakerNodeStatTarget::DashCooldown:
         return true;
     default:
         // Every O30 widening entry. They become true one at a time as the

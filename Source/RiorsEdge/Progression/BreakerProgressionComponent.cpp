@@ -1081,17 +1081,14 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MaxClassResource, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::MaxClassResource)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::ClassResourceRegen, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::ClassResourceRegen)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::FireRateMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::FireRate)]);
-        // NO DASH LANE, and the roadmap that asked for one was wrong about why.
-        // EBreakerAggregatedAttribute has no dash entry at all: dash cooldown
-        // lives on FBreakerEquipmentStats and is read directly by
-        // UBreakerCharacterMovementComponent::GetComposedDashCooldownMultiplier.
-        // So the node target exists and there is nowhere for it to bid — which
-        // means a DashCooldown node is authored-but-inert, and
-        // BreakerStatTargetHasAggregationLane must keep reporting it as having
-        // no lane. Adding the attribute is a separate, larger change: the
-        // movement component would have to stop reading equipment directly, or
-        // the two layers would multiply instead of sharing one bucket, which is
-        // the exact bug fixed everywhere else in this codebase.
+        // The dash lane. The comment that used to sit here said there was
+        // nowhere for a node to bid because EBreakerAggregatedAttribute had no
+        // dash entry; it does, and it did then. Gear's Move.DashCooldown affix
+        // has been bidding into DashCooldownReduction the whole time, so this
+        // line puts the tree in the SAME additive bucket rather than beside it.
+        // Stored as the divisor (x1.20 == a 20% shorter cooldown), which is the
+        // only shape two layers can share one bucket in.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DashCooldownReduction, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DashCooldown)]);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
         // The two delivery lanes' More products, already selected out of the one
         // budget above. A shared More has been multiplied into both, which is

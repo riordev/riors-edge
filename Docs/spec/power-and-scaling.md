@@ -85,6 +85,12 @@ site.
 **A new multiplier lane requires a canon row and a conformance test before it
 merges.** The canon below is a standing discipline, not a one-time cleanup.
 
+**Removing a multiplier's gate is a canon event, exactly as adding a lane is.**
+Weak point sits outside the More budget BECAUSE skill gates it, so a source that
+guarantees one has bought a build multiplier, and it moves into the accounting
+the gate stood in for; crit does not also multiply on that hit. Gate removal
+adds no lane, so the rule above would never have caught it.
+
 **Conditional lines are texture, not the route to power.** The backbone is
 unconditional. A build must be able to be strong satisfying no conditions at
 all; composition makes a line more characterful, not more powerful, and a
@@ -203,6 +209,7 @@ Every lane permitted to touch outgoing player damage.
 | More | ONE ceiling, unordered product, 1.30^3, spanning every pool |
 | Crit | Site multiplier, build-gated |
 | Weak point | Site multiplier, skill-gated, [1.0, 2.0], outside the More budget |
+| Weak point, gate removed | A build multiplier. Inside the accounting the skill gate stood in for, and crit does not also multiply on that hit |
 | Distance falloff | Per-pellet geometry, not a stat-layer multiplier |
 | Fire rate | Named, watched, uncapped |
 | Target-conditional riders | The same additive bucket, never a multiplier |
@@ -269,6 +276,7 @@ does not own:
 | Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact` |
 | The composed More product never exceeds the ceiling, from any combination of layers | `Items.Rules.NeverAuthorsAMore` |
 | An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityLaneMore` |
+| A hit whose weak-point gate was removed does not also take crit | `Combat.Ceiling.GateRemoval` |
 | Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | The weapon and item-level ceilings are equal | `Items.TierLadder` |
 | Items rolled before the ladder widened keep their rolled values | `Items.LegacyItemsSurviveTheWiderLadder` |
@@ -281,13 +289,12 @@ does not own:
 | Boss TTK for a baseline build lands inside its target band | `Combat.PowerCurve.BossBand` |
 | An optimized build kills a boss substantially faster than the baseline band | `Combat.PowerCurve.BossOptimized` |
 
-Several of these are targets this spec asserts and the game does not currently
-meet. They are held by tests so the gap is a number on every build rather than
-a memory.
-
 ## Open
 
 - The conditional-line payout ratio is unauthored; the direction is stated
   above and the number waits on measurement.
+- Whether the ability pool gets a flat line. Added Damage bids Flat into the
+  weapon lane alone, so an ability build's flat layer is structurally 1.000 —
+  the half of the parity deficit that degrades fastest with gear depth.
 - The tier-bonus curve past its ordinary cap — how many endgame tiers reach
   item level 120 — is unauthored.

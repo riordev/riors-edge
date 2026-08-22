@@ -12,12 +12,12 @@ measurement without judging it.
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
 | Silent nodes | ceiling | 47 of 205 authored | ceiling 47 | ok |
-| Stat targets with no aggregation lane | ceiling | 7 of 33 | ceiling 7 | ok |
-| Aggregation lanes carrying nothing | ceiling | 8 of 25 lanes | ceiling 8 | ok |
+| Stat targets with no aggregation lane | ceiling | 6 of 33 | ceiling 6 | ok |
+| Aggregation lanes carrying nothing | ceiling | 9 of 26 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 48 of 99 asserted across 7 specs | ceiling 48, target 20 | ok |
+| Asserted invariants with no test | ceiling | 48 of 100 asserted across 7 specs | ceiling 48, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
@@ -30,7 +30,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 406
+- passing: 407
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 48
@@ -69,13 +69,12 @@ Authored, purchasable, costs a point, and produces no observable change. Counted
 
 ## Stat targets with no aggregation lane
 
-**ceiling** · 7 of 33 · ceiling 7
+**ceiling** · 6 of 33 · ceiling 6
 
 A node authored against one of these is silently unpaid. 1 further target(s) are delivered by a rider and are correctly laneless: MeleeDamage.
 
 - IncomingDamageReduction
 - Lifesteal
-- DashCooldown
 - RecoilRecovery
 - WeaponSpread
 - StatusDuration
@@ -83,7 +82,7 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 8 of 25 lanes · ceiling 8
+**ceiling** · 9 of 26 lanes · ceiling 9
 
 Plumbing with no author. Not harmful, but not free either.
 
@@ -94,6 +93,7 @@ Plumbing with no author. Not harmful, but not free either.
 - MaxClassResource
 - ClassResourceRegen
 - FireRate
+- DashCooldown
 - ChainCount
 
 ## Node tags with no consumer
@@ -171,7 +171,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 48 of 99 asserted across 7 specs · ceiling 48, target 20
+**ceiling** · 48 of 100 asserted across 7 specs · ceiling 48, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 

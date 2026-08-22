@@ -29,8 +29,11 @@ it is not optional: it is what stops wall-riding for Momentum and self-harm for
 Grit. Generation events carry a proc coefficient, so a tick generates at its
 coefficient rather than at full value.
 
-**No resource decays in a menu, at a Forge, or in the Anchor.** Decay is
-combat-state gated.
+**No resource decays in a menu, at a Forge, or in the Anchor.** Decay is barred
+in SAFE states — that enumeration is the rule. It is not "decay only in
+combat": a loop may move in the field between fights, and one that converges on
+a midpoint out of combat is moving toward a resting value rather than bleeding
+toward nothing.
 
 **Cost reduction joins the additive bucket. It never becomes a More.**
 
@@ -101,6 +104,15 @@ The bar starts full, spends down, and regenerates. Passive regeneration is the
 primary recovery path and sits outside the generation budget, so fighting well
 recovers at most about twice as fast as standing still rather than replacing
 the trickle entirely.
+
+**A rule rewrite may change where the bar rests, never how fast fighting pays.**
+The doubling bound above is the ceiling on combat recovery and nothing rewrites
+it. What a rewrite may do is move the resting point — a loop that converges on a
+midpoint out of combat drains from above it and regenerates from below it, so
+the bar is never at rest and a character never starts a fight verbless. That
+second clause is not decoration: Mana IS the cooldown, and O92 already names
+starting a fight without your resource as the mistake a permanent class cannot
+take back.
 
 **Mana is the cooldown.** No Caster ability authors a cooldown tag. An empty
 cooldown means cost-gated, and the HUD must distinguish that from a cooldown of

@@ -44,6 +44,20 @@ public:
     // decay has no primitive at all. Both differences are recorded on the
     // activation site rather than papered over.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float OverhealShieldFraction = 1.0f;   // O2 PLACEHOLDER
+    // TANK OWNS ITS OWN CEILING (O106). MaxShield initialises to 0 for every
+    // character, and the only thing that used to raise it was a SUPPORT node —
+    // UBreakerChargeComponent's conversion nodes, which set it to 25% of max
+    // health. So Rend's overheal-to-shield capped against zero and silently did
+    // nothing unless the player happened to hold Support nodes, which a Tank
+    // never does. A cross-class dependency nobody authored and no test could
+    // see, because both halves worked in isolation.
+    //
+    // Shield MAGNITUDE is affix-owned under O106 and the affix waits on the
+    // damage-versus-defence retune, so this is the interim ceiling and it is
+    // Tank's: raise-only, never lowering a ceiling another system set.
+    // O2 PLACEHOLDER: 25% of maximum health, the same fraction the Support path
+    // borrowed from Tank §T1 in the first place.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rend", meta=(ClampMin="0", ClampMax="1")) float ShieldCeilingHealthFraction = 0.25f;   // O2 PLACEHOLDER
 };
 
 // T2 Bloodline (§2 T2, Leech): 8s window doubling Life on Hit and extending it

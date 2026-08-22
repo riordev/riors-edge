@@ -189,6 +189,20 @@ Numbers are permanent and never reused.
 **O102** — Primitives are clustered into systems before they are priced. Sixteen items is a list; five of them being one healing-modifier chain is a decision.
 
 **O103** — Tree ids and node ids never move. A re-theme is delivered by the display field, so a branch commitment stored on disk always resolves.
+
+**O104** — Removing a multiplier's gate is a canon event. The multiplier moves into the accounting its gate stood in for: a guaranteed weak point is a build multiplier, and crit does not also multiply on that hit. Gate removal adds no lane, so nothing else would have caught it.
+
+**O105** — A keystone's forfeit may move from the verb to the resource. Momentum never decays airborne and drains on the ground: buildable on the wired decay lane with the existing sign convention, and it deletes both a primitive and a tile-authoring requirement.
+
+**O106** — Shield magnitude is affix-owned and the defence triad becomes a quartet. The affix does not ship until the damage-versus-defence retune lands, because a new defensive line while that ratio is 3.76 is defence scaling up to meet damage, which O91 forbids. Until then a shield doctrine pays in rules.
+
+**O107** — Multishot, pierce, chain and ricochet live in the rule tier, so they need no doctrine axis and no rename. The commit that deletes a class's branch trees lands their replacement rule nodes in the same commit.
+
+**O108** — A doctrine keystone is paid by its own doctrine's axis. Frenzy's stacks on consecutive hits to one target, not on weak points, which vacates weak point for Marksman so no two doctrines share an axis.
+
+**O109** — Out of combat a resource may CONVERGE on a midpoint, draining from above and regenerating from below. Decay is barred in safe states — the menu, the Forge, the Anchor — which is what the enumeration always said; "combat-state gated" over-generalised it. Convergence changes where the bar rests, never how fast fighting pays it.
+
+**O110** — A doctrine's self-targeted duplication is additive. "Twice at full value" is one bucket counted twice, never a multiplier: a doubled multiplicative buff is an unbudgeted More arriving through a doctrine, which O95 forbids, and the global clamp would silently eat it — leaving the keystone doing nothing for the solo player it was written for.
 ## Open
 
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.

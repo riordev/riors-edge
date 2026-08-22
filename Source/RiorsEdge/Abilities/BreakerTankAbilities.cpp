@@ -333,6 +333,17 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     // Under REND MASTERY the heal was already paid per target above.
     if (!bRendMastery && TotalPostMitigation > 0.0f && OwnerCombat)
     {
+        // Raise the ceiling this ability's own overheal will cap against. Without
+        // it the cap is whatever some other class's nodes happened to set, which
+        // for a Tank is zero — see ShieldCeilingHealthFraction's declaration.
+        if (SourceAttributes)
+        {
+            const float Ceiling = SourceAttributes->GetMaxHealth() * ShieldCeilingHealthFraction;
+            if (Ceiling > SourceAttributes->GetMaxShield())
+            {
+                GetBreakerAttributes()->ApplyMaxShield(Ceiling);
+            }
+        }
         FBreakerHealRequest Heal;
         Heal.Amount = TotalPostMitigation * HealFraction;
         Heal.bOverhealToShield = true;

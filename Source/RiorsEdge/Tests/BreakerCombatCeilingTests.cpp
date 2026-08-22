@@ -118,6 +118,67 @@ bool FBreakerCeilingOneBudgetTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// (d) O104: GATE REMOVAL IS A CANON EVENT.
+// Weak point sits outside the More budget because SKILL gates it — the price of
+// living outside a budget is a hard bound. A source that guarantees a weak point
+// has not removed a restriction, it has bought a build multiplier, so the
+// multiplier moves into the accounting the gate stood in for and the two site
+// multipliers stop composing on that hit.
+//
+// This is the rule with no natural enforcement: gate removal adds no lane, so
+// the canon's new-lane rule would never have caught it, and a keystone that
+// guaranteed a weak point AND kept crit would have shipped a 2.0x build
+// multiplier stacked on a crit multiplier with nothing budgeting either.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCeilingGateRemovalTest,
+    "RiorsEdge.Combat.Ceiling.GateRemoval",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCeilingGateRemovalTest::RunTest(const FString& Parameters)
+{
+    FBreakerDefenseState Defense;
+
+    // The shape a gate-removing source must submit: the weak point it granted,
+    // and crit refused on the same hit.
+    FBreakerDamageRequest Guaranteed;
+    Guaranteed.BaseDamage = 100.0f;
+    Guaranteed.bWeakPointHit = true;
+    Guaranteed.WeakPointMultiplier = UBreakerDamageLibrary::WeakPointMultiplierCeiling;
+    Guaranteed.bCanCritical = false;
+    Guaranteed.CriticalChance = 1.0f;          // would crit every time if permitted
+    Guaranteed.CriticalMultiplier = 2.0f;
+    const FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Guaranteed, Defense);
+
+    TestTrue(TEXT("The granted weak point lands"), Result.bWeakPoint);
+    TestFalse(TEXT("Crit does not also multiply on a gate-removed hit"), Result.bCritical);
+    TestEqual(TEXT("The hit is worth the weak point alone, never weak point x crit"),
+        Result.RawDamage, 100.0f * UBreakerDamageLibrary::WeakPointMultiplierCeiling, 0.01f);
+
+    // And the bound the gate paid for still holds: whatever a source authors,
+    // the resolve site clamps to the archetype range. A gate-removing keystone
+    // cannot buy its way past the ceiling by authoring a larger multiplier.
+    FBreakerDamageRequest Overreach = Guaranteed;
+    Overreach.WeakPointMultiplier = 5.0f;
+    const FBreakerDamageResult Clamped = UBreakerDamageLibrary::ResolveDamage(Overreach, Defense);
+    TestEqual(TEXT("An over-authored weak point still clamps to the canon bound"),
+        Clamped.RawDamage, 100.0f * UBreakerDamageLibrary::WeakPointMultiplierCeiling, 0.01f);
+
+    // The ordinary skill-gated hit is untouched: both multipliers compose,
+    // because the gate is still there and still doing the accounting.
+    FBreakerDamageRequest Earned;
+    Earned.BaseDamage = 100.0f;
+    Earned.bWeakPointHit = true;
+    Earned.WeakPointMultiplier = UBreakerDamageLibrary::WeakPointMultiplierCeiling;
+    Earned.bCanCritical = true;
+    Earned.bUseSnapshotCritical = true;
+    Earned.bSnapshotCriticalResult = true;
+    Earned.CriticalMultiplier = 2.0f;
+    const FBreakerDamageResult Both = UBreakerDamageLibrary::ResolveDamage(Earned, Defense);
+    TestTrue(TEXT("A skill-earned weak point may still crit"), Both.bCritical);
+    TestTrue(TEXT("And is worth more than the gate-removed hit"), Both.RawDamage > Result.RawDamage);
+    return true;
+}
+
 // (b) A single pushed modifier is clamped at the SAME per-source ceiling the
 // aggregator's budget derives from — cited, never restated.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
