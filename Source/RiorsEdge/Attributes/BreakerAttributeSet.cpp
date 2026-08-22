@@ -11,6 +11,18 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     // The 0/1 identities (empty shield, multiplier bases of 1.0) are shapes,
     // not balance, and carry no flag.
     InitHealth(100.0f);              // O2 PLACEHOLDER
+    // O2 PLACEHOLDER, and the defensive twin of the item-level-1 anchor: this is
+    // the only part of a character's effective health that does NOT scale, so it
+    // sets how much of survivability is character and how much is gear.
+    //
+    // IT IS THE ENTIRE 32% BETWEEN THE TWO INVERSION MEASUREMENTS. The gear
+    // health line grows x3.67 across the levelling range; what a character
+    // actually carries grows x2.78, because this constant is added to both ends
+    // and dilutes the proportion. Combat.Chassis.DamageBelowHealth compares
+    // damage to the LINE and reports 3.76; Combat.DefenseCurve.HitsToDie
+    // compares it to the CHARACTER and reports 4.96. O113 rules the second
+    // authoritative, so the O91 retune solves against a figure this constant
+    // is inside of — move it and the retune target moves with it.
     InitMaxHealth(100.0f);           // O2 PLACEHOLDER
     InitShield(0.0f);
     InitMaxShield(0.0f);

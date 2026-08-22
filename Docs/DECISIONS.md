@@ -213,6 +213,10 @@ Numbers are permanent and never reused.
 **O113** — Hits-to-die is the authoritative inversion measurement and the retune solves for it. The damage-versus-defence ratio is a proxy: it compares monster damage to the gear health LINE, where hits-to-die compares it to what a character actually carries. A constant base max health that does not scale drags total growth from x3.67 to x2.78, which is the whole of the 32% between them, so tuning to the proxy leaves hits-to-die still falling by 1.32x.
 
 **O114** — The boss band is two errors. Baseline throughput is 1.88x short on trash and elite before a boss is involved, and the x75 boss rank row is the one entry the spec's own derivation does not produce — a 20-45s boss over a sub-second trash target gives x22-50. Correcting both lands the band exactly; correcting either alone does not, and moving boss health to cover both would hide the shortfall on the enemies a player meets most.
+
+**O115** — An invariant asserting a property is invariant must be paired with one asserting its level. Flatness without magnitude reports green at any value, and it has produced two misses already.
+
+**O116** — The O91 retune anchors at the CAP, not at level 1. Time-to-die is 4.97s at the cap against a 4-5s target and 24.64s at level 1: the high end is the end that is correct, so the low end comes down rather than the high end up. Lowering damage growth alone, anchored at level 1, would take cap TTD to five times its target.
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
 - The zone-level table, and the mapping from content difficulty to tier bonus.
 - Whether 134 items per hour is the right drop rate. It sits mid-band and has never been argued about, and it governs whether a 300-400 hour chase reads as generous or as grinding.

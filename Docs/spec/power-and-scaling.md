@@ -82,6 +82,10 @@ weak point is skill-gated and bounded per archetype in [1.0, 2.0] and sits
 deliberately outside the More budget. Nothing else may multiply at the hit
 site.
 
+**An invariant asserting a property is INVARIANT must be paired with one
+asserting its LEVEL.** A flat curve can sit at any value forever and report
+green; trash and elite TTK sat 1.88x off at every level while flatness passed.
+
 **A new multiplier lane requires a canon row and a conformance test before it
 merges.** The canon below is a standing discipline, not a one-time cleanup.
 
@@ -115,9 +119,8 @@ design; the values are the knob.
     WeaponBase(ilvl)  = ArchetypeBase * (1 + w)^(ilvl - 1)
 
 `w = g`, so a baseline build's TTK is level-invariant and every felt gain comes
-from the multiplier band. `d` is materially below `g`: incoming damage scaling
-as fast as health means defence must grow as fast as offence, and every build
-becomes a defensive build.
+from the multiplier band. `d` is materially below `g`: incoming damage scaling as
+fast as health makes every build a defensive build.
 
 **`d` is set so that hits-to-die does not fall across the level range.** That is
 the property it exists to produce, and it is the test, not the value. Defence
@@ -160,15 +163,12 @@ not. That row is the one the rule does not produce.
 | TTD, no resources or sustain | 4–5s |
 | Optimized, and invested | substantially past the baseline figure, asserted separately |
 
-These describe a **baseline build in on-level content** — one point on two
-curves, not a constant to hold at every point of progression. An optimized
-character roughly forty hours past 50 deletes trash on contact.
+These describe a **baseline build in on-level content**. An optimized character
+roughly forty hours past 50 deletes trash on contact.
 
-**Bosses are meant to die fast to a comfortable build.** A fast optimized kill
-is the system working, not a chassis fault, so the two cases are asserted
-separately: the band holds for a baseline, and an optimized build is asserted
-to beat it. A single boss target measured against an optimized build is
-measuring the wrong character.
+**Bosses are meant to die fast to a comfortable build.** A fast optimized kill is
+the system working, so the two cases are asserted separately — a single target
+measured against an optimized build is measuring the wrong character.
 
 ### The affix tier ladder
 
@@ -233,14 +233,14 @@ whole build.
 
 An accelerating curve with per-act multipliers and one deliberate discontinuity
 — a discount across the act II/III seam, the only non-monotonic thing in the
-design. Roughly 40 hours solo to 50: short enough that a second character is a
-plausible thing to do when class selection is permanent, long enough that the
-tree decisions are made by someone who has learned the combat.
+design. Roughly 40 hours solo to 50: short enough that a second character is
+plausible when class selection is permanent, long enough that the tree
+decisions are made by someone who has learned the combat.
 
-Kill value derives from one unit so a single knob retunes the whole game, with
-rank as the multiplier. No rested experience, no death penalty, party-neutral
-with no headcount bonus, and an account-wide flat catch-up for alts — the one
-sanctioned exception to the additive bucket, and there is not a second.
+Kill value derives from one unit, with rank as the multiplier, so a single knob
+retunes the whole game. No rested experience, no death penalty, party-neutral,
+and an account-wide flat catch-up for alts — the one sanctioned exception to the
+additive bucket, and there is not a second.
 
 Points: one Class Point per level to 30, one Core Point per level to 50, plus
 fifteen from world content.
@@ -269,7 +269,7 @@ does not own:
 |---|---|
 | Baseline TTK is flat across area level 1–50 | `Combat.PowerCurve.Composition` |
 | Baseline trash TTK lands under its seed, and elite TTK inside its band | `Combat.PowerCurve.TrashTtk`, `Combat.PowerCurve.EliteTtk` |
-| Baseline TTK is flat across area level 50–100 | `Combat.PowerCurve.EndgameComposition` |
+| Baseline TTK is flat across 50–100, and TTD holds its level at both ends | `Combat.PowerCurve.EndgameComposition`, `Combat.DefenseCurve.TimeToDieBare` |
 | The chassis is monotonic and geometric; rank ordering holds | `Combat.Chassis.*` |
 | Weapon base tracks item level; archetype ordering survives scaling | `Weapons.ItemLevelCurve`, `Weapons.ItemLevelTracksMonsterHealth` |
 | The at-cap band lands in 8–10x | `Progression.PowerBand.AtCap` |
@@ -285,7 +285,7 @@ does not own:
 | A weapon hit draws weapon plus shared; an ability draws ability plus shared, and neither reads the other's specific pool | `Combat.Pools.Composition` |
 | A source authors at most one specific pool, plus optionally the shared one | `Combat.Pools.OneSpecificPoolPerSource` |
 | Best-to-worst build TTK spread stays inside the band, and is not explained by weapon archetype alone | `Progression.PowerBand.ArchetypeSpread` |
-| Hits-to-die does not fall across the level range | `Combat.DefenseCurve.HitsToDie` |
+| Hits-to-die does not fall, and a defensive commitment buys substantially more | `Combat.DefenseCurve.HitsToDie`, `Combat.DefenseCurve.TimeToDieInvested` |
 | Monster damage growth stays materially below health growth | `Combat.Chassis.DamageBelowHealth` |
 | Boss TTK for a baseline build lands inside its target band | `Combat.PowerCurve.BossBand` |
 | An optimized build kills a boss substantially faster than the baseline band | `Combat.PowerCurve.BossOptimized` |

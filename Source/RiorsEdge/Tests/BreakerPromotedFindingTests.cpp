@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Tests/BreakerStatusEmit.h"
@@ -85,6 +86,36 @@ namespace BreakerPromotedFindingTest
         if (Incoming <= 0.0f) return 0.0f;
         return PromotedEffectiveHealthAt(AreaLevel) / Incoming;
     }
+
+    // The same figure in the unit the target is authored in. One attacker at
+    // the shipped cadence — a pack kills faster, and a target written for a
+    // pack would have to say so.
+    //
+    // The cooldown is protected on ABreakerEnemy, so it is transcribed here
+    // rather than read. That is a SECOND SOURCE and it is the kind this project
+    // has been bitten by, so it is named: if the enemy default moves and this
+    // does not, the TTD figures drift silently. The honest fix is an accessor
+    // on the enemy; until there is one, this constant is the seam.
+    constexpr float PromotedEnemyAttackCooldown = 1.15f;   // ABreakerEnemy::AttackCooldown
+
+    float PromotedTimeToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
+    {
+        return PromotedHitsToDieAt(AreaLevel, Params) * PromotedEnemyAttackCooldown;
+    }
+
+    // What a full defensive commitment buys, from the shipped pool: the
+    // physical reduction line on every slot that carries it, at the tier the
+    // character cap can roll, clamped by the pool's own cap.
+    float PromotedInvestedDamageReduction()
+    {
+        const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        const FBreakerAffixDefinition* Line = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Core.PhysicalDR"));
+        if (!Line) return 0.0f;
+        const float Per = UBreakerAffixLibrary::ValueForTier(
+            *Line, UBreakerAffixLibrary::BestTierForItemLevel(50));
+        const int32 Slots = Line->AllowedSlots.Num();
+        return FMath::Min(Slots * Per / 100.0f, 0.60f);   // the pool's authored cap
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +162,85 @@ bool FBreakerDefenseCurveHitsToDieTest::RunTest(const FString& Parameters)
     TestTrue(*FString::Printf(
         TEXT("Hits-to-die never dips below its level-1 value anywhere in the range (worst %.2f)"), Worst),
         Worst >= First - UE_KINDA_SMALL_NUMBER);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// TIME-TO-DIE, AS A MAGNITUDE — THE SECOND CONSTRAINT ON THE RETUNE
+// ---------------------------------------------------------------------------
+// HitsToDie above asserts that the curve does not FALL and never asserts what
+// it should sit at. That is the identical shape that hid the throughput gap:
+// PowerCurve.Composition asserted flatness for as long as anyone can remember
+// and nobody asked what it was flat at, until a boss test tripped over it.
+//
+// Left alone it would repeat exactly. Solving for `d` with one constraint
+// anchors the range at the level-1 value and pulls the cap up to meet it, which
+// makes the report green while nobody has asked whether twenty-one hits is
+// right. These two tests are the second constraint, and they are written BEFORE
+// the retune rather than after it for that reason.
+//
+// Seconds, not hits, because the target is authored in seconds: hits-to-die
+// times the shipped enemy attack cooldown.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTimeToDieBareTest,
+    "RiorsEdge.Combat.DefenseCurve.TimeToDieBare",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTimeToDieBareTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Params;
+
+    // O18: four to five seconds with no resources or sustain.
+    constexpr float TtdFloor = 4.0f;
+    constexpr float TtdCeiling = 5.0f;
+
+    for (const int32 AreaLevel : {1, 25, 50})
+    {
+        AddInfo(FString::Printf(TEXT("TTD BARE  area level %2d: %.2fs (O18 target %.0f-%.0fs)"),
+            AreaLevel, PromotedTimeToDieAt(AreaLevel, Params), TtdFloor, TtdCeiling));
+    }
+
+    // BOTH ENDS ARE ASSERTED, and that is the entire point of this test. A
+    // single-point assertion would let the retune anchor wherever it liked.
+    const float AtOne = PromotedTimeToDieAt(1, Params);
+    const float AtCap = PromotedTimeToDieAt(50, Params);
+    TestTrue(*FString::Printf(TEXT("TTD at level 1 (%.2fs) is at most %.0fs"), AtOne, TtdCeiling),
+        AtOne <= TtdCeiling);
+    TestTrue(*FString::Printf(TEXT("TTD at level 1 (%.2fs) is at least %.0fs"), AtOne, TtdFloor),
+        AtOne >= TtdFloor);
+    TestTrue(*FString::Printf(TEXT("TTD at the cap (%.2fs) is at most %.0fs"), AtCap, TtdCeiling),
+        AtCap <= TtdCeiling);
+    TestTrue(*FString::Printf(TEXT("TTD at the cap (%.2fs) is at least %.0fs"), AtCap, TtdFloor),
+        AtCap >= TtdFloor);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTimeToDieInvestedTest,
+    "RiorsEdge.Combat.DefenseCurve.TimeToDieInvested",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTimeToDieInvestedTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Params;
+
+    // O18: "substantially higher invested". The number was never authored, so
+    // this asserts the RATIO the word has to mean at minimum — a defensive
+    // commitment that buys less than half again is not a commitment, it is a
+    // rounding error the player paid slots for.
+    constexpr float InvestedMustBeatBareBy = 1.5f;
+
+    const float Bare = PromotedTimeToDieAt(50, Params);
+    const float Invested = Bare / FMath::Max(1.0f - PromotedInvestedDamageReduction(), UE_SMALL_NUMBER);
+    AddInfo(FString::Printf(
+        TEXT("TTD INVESTED  area level 50: bare %.2fs, invested %.2fs at %.0f%% physical reduction (x%.2f)"),
+        Bare, Invested, 100.0f * PromotedInvestedDamageReduction(), Invested / FMath::Max(Bare, UE_SMALL_NUMBER)));
+
+    TestTrue(*FString::Printf(TEXT("A defensive commitment buys at least %.1fx the bare figure (x%.2f)"),
+        InvestedMustBeatBareBy, Invested / FMath::Max(Bare, UE_SMALL_NUMBER)),
+        Invested >= Bare * InvestedMustBeatBareBy);
     return true;
 }
 
