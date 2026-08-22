@@ -17,7 +17,7 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 48 of 100 asserted across 7 specs | ceiling 48, target 20 | ok |
+| Asserted invariants with no test | ceiling | 46 of 100 asserted across 7 specs | ceiling 46, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
@@ -31,9 +31,9 @@ measurement without judging it.
 ## Tests
 
 - passing: 407
-- expected red: 3
+- expected red: 5
 - **unexpected red: 0**
-- asserted invariants with no test: 48
+- asserted invariants with no test: 46
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -41,6 +41,8 @@ A test that was never written is the worst of the three: it looks asserted.
 **Expected red**
 
 - `RiorsEdge.Combat.Chassis.DamageBelowHealth`
+- `RiorsEdge.Combat.DefenseCurve.HitsToDie`
+- `RiorsEdge.Combat.PowerCurve.BossBand`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
@@ -171,7 +173,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 48 of 100 asserted across 7 specs · ceiling 48, target 20
+**ceiling** · 46 of 100 asserted across 7 specs · ceiling 46, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -215,7 +217,7 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.RuleBandImpact.Major  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.RuleBandImpact  —  power-and-scaling.md
-- …and 8 more
+- …and 6 more
 
 ## Offered-to-spendable ratio, per tree
 

@@ -28,12 +28,14 @@
     "goes red as an unexpected regression, and the fastest-looking fix is to",
     "revert the test — which deletes the finding it was written to hold.",
     "Each entry names the finding it encodes and the condition that deletes it.",
-    "Two promoted findings still land here when their tests are written:",
-    "archetype spread and boss band. Hits-to-die and ability-lane parity have",
-    "arrived; each was pinned to a target the game does not meet, which is the",
-    "point of a target pin and the reason both are red on purpose."
+    "One promoted finding is still owed a test: archetype spread. The other",
+    "three have arrived — hits-to-die, boss band and ability-lane parity — and",
+    "each was pinned to a target the game does not meet, which is the point of",
+    "a target pin and the reason they are red on purpose."
   ],
   "_expected_red": [
+    "Combat.DefenseCurve.HitsToDie :: Hits-to-die falls from 21.43 at area level 1 to 4.32 at 50 — 20% of where it started, monotonically, with no dip to blame on one band. This is the O91 inversion expressed as the quantity a player feels rather than as a growth ratio, and it is the same defect Combat.Chassis.DamageBelowHealth reports as 3.76. DELETE THIS ENTRY WHEN: the O91 retune lands and hits-to-die stops falling across the range. It is a FLOOR, not a band — a character getting tougher relative to content is allowed and O27 rather wants it; getting flimsier is not. Do not close it by raising gear defence.",
+    "Combat.PowerCurve.BossBand :: A baseline build kills an area-level-50 boss in 126.9s against O18's 20-45s target — nearly three times the ceiling. Boss health is 1,125,597 at rank multiplier 75 against a baseline weapon's 8,868 dps, and the baseline carries no multiplier band by construction. DELETE THIS ENTRY WHEN: the boss rank multiplier or the seed band is retuned so a baseline kill lands inside it. Combat.PowerCurve.BossOptimized asserts the other half separately and is unaffected: a fast optimized kill is the system working.",
     "Combat.Chassis.DamageBelowHealth :: Monster damage growth outruns gear defence growth by 3.76x across the levelling range (damage x13.78, defence x3.67), so hits-to-die falls from level 1 to 50 and a player at cap is one-shot by content they out-gear. DELETE THIS ENTRY WHEN: the O91 retune lands and the damage exponent comes down far enough that the ratio reaches 1.0. Do not close it by raising gear defence — O91 rules that direction out explicitly.",
     "Progression.PowerBand.AbilityLane :: Ability parity measures 0.647x at the cap against O99's ruled 0.85-1.15x, and 0.388x at endgame where the section is unpinned. An ability-geared build's ability lane composes to 65% of a weapon-geared build's weapon lane at the same gear depth, and the deficit WIDENS with gear depth rather than diluting - a lane with more lines compounds harder up a back-loaded ladder. Crit and More cancel exactly; the shortfall is flat 1.000 against 1.154 and increased 3.35 against 4.49. DELETE THIS ENTRY WHEN: ability affix breadth is authored, the flat-half question is answered, and the cap measurement reaches the band. Do not close it by widening the band, and do not close it by letting ability hits read the weapon pool - that is the partition deleted, not the gap closed.",
     "Progression.PowerBand.AtCap :: The at-cap band measures 6.53x against an authored 8-10x, on a baseline definition corrected 2026-08-22 (a realistically decent roll two tiers below what item level allows, derived identically at both measurement points; it was previously the theoretical worst roll, which made the number uninterpretable). DELETE THIS ENTRY WHEN: the owner rules on the band targets against the corrected basis — either the authored 8-10x moves, or content retunes until the measurement reaches it. Do not widen the assertion to make it pass."
@@ -52,8 +54,8 @@
     "why": "Already zero. Pinned so it stays that way." },
   "unexpected-red":          { "max": 0,   "kind": "measurement" },
 
-  "unimplemented-invariants": { "max": 48, "target": 20, "kind": "target",
-    "why": "Re-pinned 51 -> 48: PowerBand.AbilityLane was written by the O54 pool split, and the split added two invariants to power-and-scaling that landed WITH their tests rather than ahead of them. Pinned so it cannot grow, targeted so it does not sit there for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
+  "unimplemented-invariants": { "max": 46, "target": 20, "kind": "target",
+    "why": "Re-pinned 48 -> 46 as two of the three promoted findings got their tests — HitsToDie and BossBand, both red on purpose and both enumerated above. ArchetypeSpread is the third and is still owed. Before that, re-pinned 51 -> 48: PowerBand.AbilityLane was written by the O54 pool split, and the split added two invariants to power-and-scaling that landed WITH their tests rather than ahead of them. Pinned so it cannot grow, targeted so it does not sit there for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
 
   "loot-per-hour":           { "min": 110, "max": 160, "kind": "measurement",
     "why": "The reference figure the drop pipeline is tuned against, at the reference area level. Band rather than ceiling: too few items is as wrong as too many." },
