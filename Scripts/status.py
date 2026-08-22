@@ -506,10 +506,39 @@ EMITTED_BY_TEST = [
 # Pins and rendering
 # --------------------------------------------------------------------------
 
-def load_pins():
+def load_pins(section_keys):
+    """Read the pin file, and refuse a pin that names no section.
+
+    A pin key that matches nothing is silently unpinned, which looks exactly
+    like a section somebody decided to leave as measurement-only. That is the
+    same shape as every other silent-nothing this project has shipped, so a
+    typo here fails loudly rather than quietly disarming a ratchet.
+
+    `kind` is documentation for a human reading the file. The generator branches
+    on the section's DIRECTION, declared in build_sections, and never on `kind` —
+    so a two-sided pin takes the band path because its section says band, not
+    because its pin says so. The two must not be allowed to disagree.
+    """
     if not os.path.isfile(PINS):
         return {}
-    return json.loads(read(PINS))
+    pins = json.loads(read(PINS))
+    unknown = [k for k in pins
+               if not k.startswith("_") and k not in section_keys]
+    if unknown:
+        raise ParseError(
+            "pin file names sections that do not exist: " + ", ".join(sorted(unknown))
+            + ". A pin matching no section is silently inert — fix the key or "
+              "delete the pin.")
+    for key, pin in pins.items():
+        if key.startswith("_"):
+            continue
+        kind = pin.get("kind")
+        two_sided = "min" in pin and "max" in pin
+        if kind == "measurement" and two_sided:
+            raise ParseError(
+                f"pin '{key}' is documented as a measurement but is two-sided. "
+                "A measurement pin holds one edge; say which.")
+    return pins
 
 
 def judge(section, pin):
@@ -630,7 +659,13 @@ def main():
                          "problem by reporting zero.\n")
         return 2
 
-    pins = load_pins()
+    try:
+        pins = load_pins({sec["key"] for sec in sections}
+                         | {k for k, _, _, _ in EMITTED_BY_TEST}
+                         | {"unexpected-red"})
+    except ParseError as e:
+        sys.stderr.write("status: PIN FAILURE - " + str(e) + os.linesep)
+        return 2
     expected_red = set(pins.get("_expected_red", []))
     suite = parse_suite_log(expected_red)
     text, violations = render(sections, asserted, suite, pins)
