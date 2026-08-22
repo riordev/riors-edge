@@ -7,8 +7,8 @@
 // SEVERED DRUDGE — a LATE-severance Altered, built as a chassis, not an alien
 // (owner ruling: an externally-blocked-out creature was reworked as Altered
 // rather than shipped as an alien; there are no aliens in this game —
-// Story-Source §1.5 names exactly two families, Vestiges and the Altered, and
-// both are severed HUMANS. See Story-Source.md's "the longer a refugee is
+// Assets/story-source.md §1.5 names exactly two families, Vestiges and the Altered, and
+// both are severed HUMANS. See Assets/story-source.md's "the longer a refugee is
 // severed, the further they degrade, until nothing is left but the shape.").
 //
 // WHY LATE AND NOT MID OR EARLY. §1.5's ladder: Early still wears insignia,
@@ -24,7 +24,7 @@
 //
 // THE SOURCE BLOCKOUT, and what was kept from it. An external asset defined a
 // sprawling five-limbed mass in centimetres — off-fiction (no exoskeletons,
-// no extra limbs, no mandibles: Story-Source's Altered are humans months into
+// no extra limbs, no mandibles: Assets/story-source.md's Altered are humans months into
 // severance and the skeleton must stay legible) and off-collision (it did not
 // fit inside anything the game's hit-registration understands). What survives
 // is the IDEA, not the geometry: a low, heavy, asymmetric, weight-dragging
@@ -46,7 +46,7 @@
 // NO NEW ATTACK. This is a chassis lane, not a behaviour lane: the base
 // class's three-gear melee chase (sprint / weave / lunge) runs unmodified
 // except for the archetype's own speed and weave tuning below, exactly as
-// Story-Source's "nothing left but the shape" implies — it does not fight
+// Assets/story-source.md's "nothing left but the shape" implies — it does not fight
 // like a soldier, it just closes.
 //
 // EVERY NUMBER IS AN O2 PLACEHOLDER and none of it is playtested.

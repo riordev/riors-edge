@@ -43,7 +43,7 @@ namespace BreakerAlteredDetail
 
 ABreakerAlteredEnemy::ABreakerAlteredEnemy()
 {
-    // --- FAMILY (Story-Source §1.5) ----------------------------------------
+    // --- FAMILY (Assets/story-source.md §1.5) ----------------------------------------
     // LATE severance: "nothing is left but the shape." No equipment, no
     // insignia, no tactics — UsesCoverDiscipline() and FlinchesWhenHit() both
     // read false for (Altered, Late) through UBreakerEnemyFamilyLibrary, which
@@ -127,7 +127,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     BodyVisual->SetRelativeScale3D(FVector(0.66f, 0.50f, 0.55f));
     BreakerAlteredDetail::BreakerMakeAlteredMaterial(BodyVisual, BreakerAlteredDetail::OliveSlate);
 
-    // HeadVisual — kept small and low rather than removed: Story-Source is
+    // HeadVisual — kept small and low rather than removed: Assets/story-source.md is
     // explicit the skeleton must stay legible, and a body with no head reads
     // as a monster silhouette rather than a person who has degraded.
     // Half-extent 14 at offset (14, 0, 46): X: 0..28, Z: 32..60 — inside.

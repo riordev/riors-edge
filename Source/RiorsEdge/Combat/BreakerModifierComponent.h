@@ -55,7 +55,7 @@ public:
 
     // The roll path a spawner uses: deterministic in the seed, always legal,
     // and scoped to the enemy's FAMILY so a Vestige never gets a modifier that
-    // reads as tactical discipline (Story-Source §1.5).
+    // reads as tactical discipline (Assets/story-source.md §1.5).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Enemy|Modifiers")
     TArray<EBreakerEnemyModifier> RollAndApplyModifiers(int32 Seed,
         EBreakerEnemyFamily Family = EBreakerEnemyFamily::Vestige);

@@ -10,7 +10,7 @@ class UMaterialInstanceDynamic;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
-// SEVERED SKIRMISHER — the EARLY-severance Altered (Story-Source §1.5).
+// SEVERED SKIRMISHER — the EARLY-severance Altered (Assets/story-source.md §1.5).
 //
 // THE GAP IT FILLS, and it is the biggest one in the roster. Every enemy in the
 // project answers to the same verb. Skitter closes, Lattice holds a band,
@@ -19,7 +19,7 @@ class UStaticMeshComponent;
 // game has ever broken line of sight, and nothing has ever reacted to being
 // shot.
 //
-// Story-Source §1.5 says an early-stage Altered "still wears insignia, still
+// Assets/story-source.md §1.5 says an early-stage Altered "still wears insignia, still
 // uses cover, still flinches", and that severance stage should be readable from
 // the BEHAVIOUR and not only the model. This archetype is that sentence: it is
 // a trained soldier, and it fights like one.

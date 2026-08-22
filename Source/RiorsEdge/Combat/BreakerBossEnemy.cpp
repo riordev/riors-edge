@@ -31,12 +31,12 @@ ABreakerBossEnemy::ABreakerBossEnemy()
     ArchetypeHealthMultiplier = 0.35f;   // O2 PLACEHOLDER
     ArchetypeDamageMultiplier = 1.86f;   // inherits the Warden's sweep ratio
 
-    // FAMILY (Story-Source §1.5). The Field Marshal is Altered at EARLY
+    // FAMILY (Assets/story-source.md §1.5). The Field Marshal is Altered at EARLY
     // severance, and that is a mechanical claim rather than a label: it is the
     // most lucid hostile thing in the game, because it still gives ORDERS.
     // Command is the highest-order cognition anything on this spectrum
     // retains, so the boss sits at the lucid end and the fight's whole shape —
-    // adds that obey it — is what early severance MEANS. Story-Source §1.5's
+    // adds that obey it — is what early severance MEANS. Assets/story-source.md §1.5's
     // "the first humanoid that demonstrably gives orders" lands as a mechanic
     // before any dialogue says it.
     //

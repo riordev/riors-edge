@@ -50,7 +50,7 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     ArchetypeHealthMultiplier = 3.2f;   // O2 PLACEHOLDER (§2.3)
     ArchetypeDamageMultiplier = 1.86f;  // O2 PLACEHOLDER (§2.3: 26 sweep damage)
 
-    // FAMILY (Story-Source §1.5). The Warden is Altered, and it is authored at
+    // FAMILY (Assets/story-source.md §1.5). The Warden is Altered, and it is authored at
     // MID severance rather than early. Encounter-Design §2.3 describes an early
     // stage — "still wears insignia and still uses cover" — but the BEHAVIOUR
     // implemented here does not use cover and does not flinch: it advances,

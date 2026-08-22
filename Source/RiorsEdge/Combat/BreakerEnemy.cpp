@@ -360,7 +360,7 @@ FString ABreakerEnemy::GetEnemyModifierBanner() const
     // is what made six enemies' labels overlap into mush.
     //
     // The ALTERED family banner rides here rather than with the state for the
-    // same reason: Story-Source §1.5's severance stage is meant to be readable
+    // same reason: Assets/story-source.md §1.5's severance stage is meant to be readable
     // on sight, and it is the exception rather than the baseline, so it is an
     // announcement and not a status.
     TArray<FString> Parts;

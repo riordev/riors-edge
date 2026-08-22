@@ -9,7 +9,7 @@
 // INVENTORY LAYOUT — the loadout screen's rules, exercised without a screen.
 //
 // UI/BreakerMenu.cpp's BuildInventoryScreen is a view over
-// UBreakerEquipmentComponent built to Docs/Design/UI-Reference/Inventory.dc.html.
+// UBreakerEquipmentComponent built to Assets/ui-reference/Inventory.dc.html.
 // Everything in it that can be WRONG rather than merely ugly is arithmetic or a
 // mapping, and both live in BreakerInventoryLayout so they can be asserted with
 // no widget, no world and no Slate application:

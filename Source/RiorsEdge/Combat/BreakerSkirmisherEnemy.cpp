@@ -18,7 +18,7 @@ ABreakerSkirmisherEnemy::ABreakerSkirmisherEnemy()
     // EARLY-severance Altered. The stage is not decoration: UsesCoverDiscipline
     // and FlinchesWhenHit are asked of the family/stage pair every frame, so
     // re-authoring this actor as a late-stage Altered genuinely turns both
-    // behaviours off (Story-Source §1.5's "stage as art direction", made
+    // behaviours off (Assets/story-source.md §1.5's "stage as art direction", made
     // mechanical).
     Family = EBreakerEnemyFamily::Altered;
     SeveranceStage = EBreakerSeveranceStage::Early;

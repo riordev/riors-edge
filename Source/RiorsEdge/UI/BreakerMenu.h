@@ -74,7 +74,7 @@ enum class EBreakerMenuScreen : uint8
 // out of the builder so they can be exercised with no widget, no world and no
 // Slate application.
 //
-// Everything here is a PRESENTATION rule from Docs/Design/UI-Reference/
+// Everything here is a PRESENTATION rule from Assets/ui-reference/
 // Inventory.dc.html. Nothing here decides a game rule: which piece a swap
 // ejects, whether an affix is better or worse and what a rarity cap is are all
 // UBreakerEquipmentComponent's answers, arriving as FBreakerEquipPreview. This

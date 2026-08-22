@@ -104,7 +104,7 @@ bool FBreakerModifierSelectionSweepTest::RunTest(const FString& Parameters)
     int32 SeenModifiers = 0;
     TSet<EBreakerEnemyModifier> Seen;
 
-    // Swept across BOTH families, because family scoping (Story-Source §1.5)
+    // Swept across BOTH families, because family scoping (Assets/story-source.md §1.5)
     // means neither family alone can reach every modifier: a Vestige can never
     // roll Anchored or Warding Aura, and an Altered can never roll Splitting,
     // Phasing or Reflective. Sweeping one family and asserting reachability
@@ -161,7 +161,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerModifierFamilyScopeTest::RunTest(const FString& Parameters)
 {
-    // Story-Source §1.5: a Vestige has "no tactics that resemble a military",
+    // Assets/story-source.md §1.5: a Vestige has "no tactics that resemble a military",
     // so a modifier that reads as tactical discipline must never appear on one.
     TestFalse(TEXT("A Vestige never plants its stance"),
         EMods::IsModifierAllowedOnFamily(EBreakerEnemyModifier::Anchored, EBreakerEnemyFamily::Vestige));
