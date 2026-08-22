@@ -516,6 +516,11 @@ EMITTED_BY_TEST = [
     # A ceiling, not a band: a rewrite worth too little is a design problem to
     # notice, not a build to stop shipping. The test already asserts separately
     # that no rewrite LOWERS a build's damage, which is the lower edge.
+    ("damage-vs-defence-growth", "Monster damage growth against gear defence growth", CEILING,
+     "RiorsEdge.Combat.Chassis.DamageBelowHealth"),
+    # A ceiling, not a band: a rewrite worth too little is a design problem to
+    # notice, not a build to stop shipping. The test already asserts separately
+    # that no rewrite LOWERS a build's damage, which is the lower edge.
     ("rewrite-impact", "Worst single rewrite step on an optimized build", CEILING,
      "RiorsEdge.Progression.RuleBandImpact"),
 ]

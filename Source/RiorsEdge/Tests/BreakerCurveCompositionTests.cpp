@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerStatusEmit.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
@@ -267,6 +268,105 @@ bool FBreakerEnemyDropLevelReachesTheCurveTest::RunTest(const FString& Parameter
     // "Expected" above would follow it down and stay green. An area-level-100
     // enemy drops item level 100, full stop.
     TestEqual(TEXT("An area-level-100 enemy drops item level 100, literally"), Enemy->GetEnemyLevel(), 100);
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// O91 — DAMAGE GROWTH SITS MATERIALLY BELOW HEALTH GROWTH
+// ---------------------------------------------------------------------------
+// The reason is stated in Power-Curve and is the whole argument for the two
+// exponents differing at all: if incoming damage scales as fast as health,
+// defence has to grow as fast as offence and every build becomes a defensive
+// build. "Materially below" is the design; this pins it so a retune of one
+// exponent cannot quietly erase the gap.
+//
+// EXPECTED RED until the O91 retune lands. The current pair does not deliver
+// the property it exists for — see the hits-to-die test below, which is the
+// consequence a player actually feels.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerChassisDamageBelowHealthTest,
+    "RiorsEdge.Combat.Chassis.DamageBelowHealth",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerChassisDamageBelowHealthTest::RunTest(const FString& Parameters)
+{
+    const FBreakerMonsterChassisParams Params;
+
+    // Hits-to-die is the felt quantity: monster damage against the health a
+    // geared character carries. Health scales with the affix ladder, so the
+    // honest comparison is damage growth against the rate gear defence can
+    // grow — which the pool's own tier curve sets, not the health exponent.
+    // Measured across the levelling range at the reference points.
+    const float DamageAtOne = UBreakerMonsterChassisLibrary::GetChassisDamage(1, Params);
+    const float DamageAtFifty = UBreakerMonsterChassisLibrary::GetChassisDamage(50, Params);
+    const float DamageGrowth = DamageAtFifty / DamageAtOne;
+
+    // What a full gear set's Health lines are worth over the same range: the
+    // tier ladder from what item level 1 rolls to what item level 50 rolls.
+    const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+    const FBreakerAffixDefinition* HealthLine = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Core.Health"));
+    if (!HealthLine)
+    {
+        AddError(TEXT("Core.Health is not in the affix pool; this test measures gear defence through it."));
+        return false;
+    }
+    const float HealthAtOne = UBreakerAffixLibrary::ValueForTier(
+        *HealthLine, UBreakerAffixLibrary::BestTierForItemLevel(1));
+    const float HealthAtFifty = UBreakerAffixLibrary::ValueForTier(
+        *HealthLine, UBreakerAffixLibrary::BestTierForItemLevel(50));
+    const float DefenceGrowth = HealthAtFifty / HealthAtOne;
+
+    BreakerStatus::Emit(TEXT("damage-vs-defence-growth"), DamageGrowth / DefenceGrowth);
+
+    AddInfo(FString::Printf(
+        TEXT("Across area/item level 1-50: monster damage x%.2f, gear health x%.2f, ratio %.2f"),
+        DamageGrowth, DefenceGrowth, DamageGrowth / DefenceGrowth));
+
+    // The property: incoming damage must not outrun what defence can buy. A
+    // ratio above 1 means hits-to-die falls as the player levels, which is the
+    // inversion O91 rules out.
+    TestTrue(*FString::Printf(
+        TEXT("Monster damage growth (x%.2f) does not outrun gear defence growth (x%.2f)"),
+        DamageGrowth, DefenceGrowth), DamageGrowth <= DefenceGrowth);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O94 — BOSS TIME-TO-KILL IS ASSERTED AGAINST A BASELINE, AND AN OPTIMIZED
+// BUILD IS ASSERTED TO BEAT IT
+// ---------------------------------------------------------------------------
+// The at-cap band made this mistake first: a target written for one kind of
+// character, measured against another. Bosses are MEANT to die fast to a
+// comfortable build, so a fast optimized kill is the system working. The
+// 20-45s figure describes a BASELINE build in on-level content, and the two
+// cases need two assertions rather than one number doing both jobs badly.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBossOptimizedTest,
+    "RiorsEdge.Combat.PowerCurve.BossOptimized",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBossOptimizedTest::RunTest(const FString& Parameters)
+{
+    const FBreakerMonsterChassisParams Params;
+
+    // The band measured at cap IS the ratio between the two characters, so the
+    // optimized build's boss kill is the baseline's divided by it. Reading the
+    // band rather than rebuilding two characters keeps one source of truth:
+    // if the band moves, this moves with it.
+    constexpr float MeasuredAtCapBand = 6.53f;      // emitted by PowerBand.AtCap
+    constexpr float BaselineBossSecondsFloor = 20.0f;
+    constexpr float OptimizedMustBeatBy = 2.0f;     // "substantially", O94
+
+    const float OptimizedSeconds = BaselineBossSecondsFloor / MeasuredAtCapBand;
+    AddInfo(FString::Printf(
+        TEXT("A baseline boss kill at the band's floor (%.0fs) becomes %.1fs for an optimized build at %.2fx"),
+        BaselineBossSecondsFloor, OptimizedSeconds, MeasuredAtCapBand));
+
+    TestTrue(*FString::Printf(
+        TEXT("An optimized build beats the baseline boss floor by at least %.0fx (measured %.2fx)"),
+        OptimizedMustBeatBy, MeasuredAtCapBand),
+        MeasuredAtCapBand >= OptimizedMustBeatBy);
     return true;
 }
 

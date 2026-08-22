@@ -32,6 +32,7 @@
     "ability-lane parity, archetype spread, hits-to-die, boss band."
   ],
   "_expected_red": [
+    "Combat.Chassis.DamageBelowHealth :: Monster damage growth outruns gear defence growth by 3.76x across the levelling range (damage x13.78, defence x3.67), so hits-to-die falls from level 1 to 50 and a player at cap is one-shot by content they out-gear. DELETE THIS ENTRY WHEN: the O91 retune lands and the damage exponent comes down far enough that the ratio reaches 1.0. Do not close it by raising gear defence — O91 rules that direction out explicitly.",
     "Progression.PowerBand.AtCap :: The at-cap band measures 6.53x against an authored 8-10x, on a baseline definition corrected 2026-08-22 (a realistically decent roll two tiers below what item level allows, derived identically at both measurement points; it was previously the theoretical worst roll, which made the number uninterpretable). DELETE THIS ENTRY WHEN: the owner rules on the band targets against the corrected basis — either the authored 8-10x moves, or content retunes until the measurement reaches it. Do not widen the assertion to make it pass."
   ],
 
@@ -55,6 +56,8 @@
     "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered." },
   "power-band-endgame":      { "min": 12.0, "max": 20.0, "kind": "measurement",
     "why": "Measures 15.40x, comfortably inside. Now meaningful, because both bands finally compute their baseline the same way." },
+  "damage-vs-defence-growth": { "max": 1.0, "kind": "target",
+    "why": "Measures 3.76 — monster damage grows x13.78 across the levelling range while gear health grows x3.67, so hits-to-die falls the whole way. O91 rules that the damage exponent comes down until this reaches 1.0; defence does not scale up to meet it. Target, not measurement: pinning at 3.76 would enshrine the inversion." },
   "rewrite-impact":          { "max": 1.5, "kind": "measurement",
     "why": "Worst single rewrite step on an optimized build, 1.46x. Ceiling rather than band: a rewrite worth nothing is a design problem, not a build-breaking one." },
 

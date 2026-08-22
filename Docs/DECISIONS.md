@@ -173,10 +173,14 @@ Numbers are permanent and never reused.
 
 **O95** — Doctrines author no More multipliers. All three slots live in Core, where a full constellation behind a deep investment gate makes reaching one genuinely expensive — the composed cap only means something if a slot costs. A doctrine pays in rules instead: conversion, condition change, rule rewrite.
 
+**O96** — The two rewrite-impact ceilings — one for a three-minor stack, one for a major or a legendary's authored pair — are derived BEFORE any rewrite is authored against them. The single current ceiling is 97% spent and the restructure adds contributors, so authoring first guarantees a breach.
+
 ## Open
 
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
 - The zone-level table, and the mapping from content difficulty to tier bonus.
+- Whether 134 items per hour is the right drop rate. It sits mid-band and has never been argued about, and it governs whether a 300-400 hour chase reads as generous or as grinding.
+- Whether the at-cap band's 8-10x was ever derived or was seeded. It is the only reason that section is pinned as a target rather than a measurement.
 - Where the permanent class choice is made, once the Anchor is authored.
 - Who owns audio.
 - What replaces the shared pool as the tension between the two defensive constellations.

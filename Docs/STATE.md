@@ -17,27 +17,29 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 51 of 88 asserted across 7 specs | ceiling 51, target 20 | ok |
+| Asserted invariants with no test | ceiling | 49 of 88 asserted across 7 specs | ceiling 51, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
 | Build variance band, ability lane | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to emit it |
+| Monster damage growth against gear defence growth | ceiling | 3.76 | ceiling 1.0 | **OUT** |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 
 ## Tests
 
-- passing: 393
-- expected red: 1
+- passing: 394
+- expected red: 2
 - **unexpected red: 0**
-- asserted invariants with no test: 51
+- asserted invariants with no test: 49
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
+- `RiorsEdge.Combat.Chassis.DamageBelowHealth`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes
@@ -168,7 +170,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 51 of 88 asserted across 7 specs · ceiling 51, target 20
+**ceiling** · 49 of 88 asserted across 7 specs · ceiling 51, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -212,7 +214,7 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.RuleBandImpact.Major  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.RuleBandImpact  —  power-and-scaling.md
-- …and 11 more
+- …and 9 more
 
 ## Offered-to-spendable ratio, per tree
 
