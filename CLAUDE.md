@@ -6,20 +6,23 @@ The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
 `DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
 corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Open: 26 items in `DECISIONS.md`. Four `make status` sections sit out of band
+Open: 27 items in `DECISIONS.md`. Five `make status` sections sit out of band
 and every one is a target rather than a regression. 48 asserted invariants have
 no test yet; the priority order is in `Scripts/status-pins.json`.
 
-O54's three damage pools are built: `EBreakerAggregatedAttribute` carries a
-second delivery lane, the shared pool is a bid duplicated into both, and every
-submission site fills its source block through one function that names its
-delivery. The ability lane has a number for the first time — 0.65 against the
-weapon lane at the cap, unpinned because the parity band is unauthored.
+O54's three damage pools are built and O99 rules the parity band at 0.85–1.15x,
+red at 0.647x. Crit and the More product cancel exactly between an ability-geared
+and a weapon-geared build, so the shortfall is entirely breadth, in two halves:
+increased 3.35 against 4.49, which is unauthored content, and flat 1.000 against
+1.154, which is an unanswered question — the ability lane has no flat line
+because Added Damage bids into the weapon lane alone. Endgame parity is measured
+beside it and unpinned at 0.388x: the deficit **widens** with gear depth, because
+a lane with more lines compounds harder up a back-loaded ladder.
 
-Next, in order: rule the parity band now that there is something to rule it
-against; then author node content into the two lanes the split opened, which is
-also the largest lever on offered-to-spendable; then the stale doc citations
-left in `Source/` comments.
+Next, in order: widen `EBreakerNodeStatTarget` and `EBreakerBuildCondition`
+against the doctrine draft, which names the targets and conditions the content
+actually wants; then ability affix breadth, which is what closes O99; then the
+stale doc citations left in `Source/` comments.
 
 Update this section as the last step of each session.
 

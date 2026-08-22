@@ -28,14 +28,14 @@
     "goes red as an unexpected regression, and the fastest-looking fix is to",
     "revert the test — which deletes the finding it was written to hold.",
     "Each entry names the finding it encodes and the condition that deletes it.",
-    "Three promoted findings still land here when their tests are written:",
-    "archetype spread, hits-to-die, boss band. Ability-lane parity came off",
-    "this list without ever joining it — its test is written and it does not",
-    "fail, because the parity band is unauthored, so the section reports the",
-    "measurement and judges nothing until someone rules a band."
+    "Two promoted findings still land here when their tests are written:",
+    "archetype spread and boss band. Hits-to-die and ability-lane parity have",
+    "arrived; each was pinned to a target the game does not meet, which is the",
+    "point of a target pin and the reason both are red on purpose."
   ],
   "_expected_red": [
     "Combat.Chassis.DamageBelowHealth :: Monster damage growth outruns gear defence growth by 3.76x across the levelling range (damage x13.78, defence x3.67), so hits-to-die falls from level 1 to 50 and a player at cap is one-shot by content they out-gear. DELETE THIS ENTRY WHEN: the O91 retune lands and the damage exponent comes down far enough that the ratio reaches 1.0. Do not close it by raising gear defence — O91 rules that direction out explicitly.",
+    "Progression.PowerBand.AbilityLane :: Ability parity measures 0.647x at the cap against O99's ruled 0.85-1.15x, and 0.388x at endgame where the section is unpinned. An ability-geared build's ability lane composes to 65% of a weapon-geared build's weapon lane at the same gear depth, and the deficit WIDENS with gear depth rather than diluting - a lane with more lines compounds harder up a back-loaded ladder. Crit and More cancel exactly; the shortfall is flat 1.000 against 1.154 and increased 3.35 against 4.49. DELETE THIS ENTRY WHEN: ability affix breadth is authored, the flat-half question is answered, and the cap measurement reaches the band. Do not close it by widening the band, and do not close it by letting ability hits read the weapon pool - that is the partition deleted, not the gap closed.",
     "Progression.PowerBand.AtCap :: The at-cap band measures 6.53x against an authored 8-10x, on a baseline definition corrected 2026-08-22 (a realistically decent roll two tiers below what item level allows, derived identically at both measurement points; it was previously the theoretical worst roll, which made the number uninterpretable). DELETE THIS ENTRY WHEN: the owner rules on the band targets against the corrected basis — either the authored 8-10x moves, or content retunes until the measurement reaches it. Do not widen the assertion to make it pass."
   ],
 
@@ -59,6 +59,8 @@
     "why": "The reference figure the drop pipeline is tuned against, at the reference area level. Band rather than ceiling: too few items is as wrong as too many." },
   "power-band-atcap":        { "min": 8.0, "max": 10.0, "kind": "target",
     "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered." },
+  "power-band-ability":      { "min": 0.85, "max": 1.15, "kind": "target",
+    "why": "O99. Measures 0.647x at the cap. THE BAND CLOSES BY AUTHORING CONTENT, NOT BY TOUCHING THE COMPOSITION. The two builds hold an identical More product and identical crit lines, so both cancel exactly and parity is the flat ratio times the increased ratio - and both are short, in two different ways. INCREASED, 3.35 against 4.49: the ability pool is one seeded line per slot at placeholder values where the weapon pool is that line plus added damage, fire rate, five conditional lines and the projectile family. That half is unauthored content. FLAT, 1.000 against 1.154: the ability lane has no flat line at all, because Added Damage bids Flat into the weapon lane only and O54 names three INCREASED pools without settling the flat half. That half is an unanswered design question and is in the open list. Anyone reading this as a plumbing problem will 'fix' it by folding the weapon pool back into ability hits, which deletes the partition rather than closing the gap. Target, not measurement: 0.647x pinned would enshrine abilities as a second-class lane, the same mistake as pinning the defence inversion at 3.76." },
   "power-band-endgame":      { "min": 12.0, "max": 20.0, "kind": "measurement",
     "why": "Measures 15.40x, comfortably inside. Now meaningful, because both bands finally compute their baseline the same way." },
   "damage-vs-defence-growth": { "max": 1.0, "kind": "target",

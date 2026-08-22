@@ -518,7 +518,15 @@ EMITTED_BY_TEST = [
     # measurement that motivated the three-pool split was expressed in. The
     # section title said "build variance band" before the test existed, which
     # was a guess about what would be measured; this is what is.
-    ("power-band-ability", "Ability lane throughput against weapon lane", BAND,
+    ("power-band-ability", "Ability lane throughput against weapon lane, at cap", BAND,
+     "RiorsEdge.Progression.PowerBand.AbilityLane"),
+    # The same measurement at the top of the item-level ladder, reported beside
+    # the cap figure and deliberately unpinned. O99 rules the band AT THE CAP;
+    # whether it holds at item level 120 is a different question, because the
+    # endgame band is far more crit-driven and crit is currently a weapon-lane
+    # story. Divergence between these two rows is a finding of its own, and a
+    # row that reports without judging is how the report says so.
+    ("power-band-ability-endgame", "Ability lane throughput against weapon lane, endgame", BAND,
      "RiorsEdge.Progression.PowerBand.AbilityLane"),
     # A ceiling, not a band: a rewrite worth too little is a design problem to
     # notice, not a build to stop shipping. The test already asserts separately

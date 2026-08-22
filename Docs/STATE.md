@@ -23,14 +23,15 @@ measurement without judging it.
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane | band | 0.65 | no pin — measurement only | — |
+| Ability lane throughput against weapon lane, at cap | band | 0.65 | band 0.85–1.15 | **OUT** |
+| Ability lane throughput against weapon lane, endgame | band | 0.39 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 3.76 | ceiling 1.0 | **OUT** |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 
 ## Tests
 
-- passing: 399
-- expected red: 2
+- passing: 398
+- expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 48
 
@@ -40,6 +41,7 @@ A test that was never written is the worst of the three: it looks asserted.
 **Expected red**
 
 - `RiorsEdge.Combat.Chassis.DamageBelowHealth`
+- `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes

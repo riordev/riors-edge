@@ -70,6 +70,21 @@ namespace BreakerPowerBandTest
     constexpr float EndgameBandMinimum = 12.0f;   // O2 PLACEHOLDER seed (O36)
     constexpr float EndgameBandMaximum = 20.0f;   // O2 PLACEHOLDER seed (O36)
 
+    // O99: THE PARITY BAND. An ability-geared build and a weapon-geared build
+    // land within roughly 15% of each other at the same gear depth. This is the
+    // first time "neither lane trivializes the other" is a number rather than a
+    // sentiment, and it is a TARGET: the measurement is 0.647x and pinning
+    // there would enshrine abilities as a second-class lane, which is the same
+    // mistake as pinning the defence inversion at its current 3.76.
+    //
+    // Ruled at the CAP. Endgame parity is measured and reported beside it but
+    // deliberately unpinned — whether the figure holds at item level 120 is a
+    // different question, because the endgame band is far more crit-driven and
+    // crit is currently a weapon-lane story. Divergence between the two is a
+    // finding in its own right, not a second edge of this one.
+    constexpr float AbilityParityBandMinimum = 0.85f;
+    constexpr float AbilityParityBandMaximum = 1.15f;
+
     // The two measurement points. AT-CAP is the character cap; ENDGAME is the
     // top of the item-level ladder. Same character, same choices, same point
     // budget — only the gear differs, which is the whole thesis.
@@ -187,6 +202,11 @@ namespace BreakerPowerBandTest
         // additive bucket and which More product fed them, which is exactly the
         // comparison the parity figure wants to make.
         float ComposedAbilityMultiplier = 1.0f;
+        // Structurally 1.0 today, and that is a measurement rather than a
+        // placeholder: Added Damage bids Flat into the WEAPON lane only, and
+        // O54's three pools are three INCREASED pools — the flat half has no
+        // ability counterpart at all. Printed so the report says so.
+        float AbilityFlatLayer = 1.0f;
         float AbilityIncreasedLayer = 1.0f;
         float AbilityMoreLayer = 1.0f;
         float AbilityTotal = 1.0f;
@@ -241,6 +261,9 @@ namespace BreakerPowerBandTest
             + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)) / 100.0f;
         Build.AbilityMoreLayer = EquipmentOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
             * ProgressionOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Build.AbilityFlatLayer = 1.0f
+            + EquipmentOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
+            + ProgressionOffer.GetFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
         Build.ComposedAbilityMultiplier = Aggregator.Compose(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
         Build.AbilityTotal = Build.ComposedAbilityMultiplier * Build.EffectiveCrit;
         return Build;
@@ -830,18 +853,78 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     const FComposedBuild AbilityBuild = Compose(AbilityOptimizedLoadout(AtCapItemLevel, Tier), OptimizedRanks(), State);
     const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTierFor(AtCapItemLevel)), BaselineRanks(), State);
 
-    AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) increased x%.3f | more x%.3f => x%.2f"),
-        AtCapItemLevel, Tier, WeaponBuild.IncreasedLayer, WeaponBuild.MoreLayer, WeaponBuild.Total));
-    AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) increased x%.3f | more x%.3f => x%.2f"),
-        AtCapItemLevel, Tier, AbilityBuild.AbilityIncreasedLayer, AbilityBuild.AbilityMoreLayer, AbilityBuild.AbilityTotal));
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
+        AtCapItemLevel, Tier, WeaponBuild.FlatLayer, WeaponBuild.IncreasedLayer, WeaponBuild.MoreLayer, WeaponBuild.Total));
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
+        AtCapItemLevel, Tier, AbilityBuild.AbilityFlatLayer, AbilityBuild.AbilityIncreasedLayer, AbilityBuild.AbilityMoreLayer, AbilityBuild.AbilityTotal));
 
-    // PARITY. Emitted, deliberately unpinned: the parity band is unauthored, so
-    // the report prints the measurement and judges nothing. When the band is
-    // ruled, the pin is one entry in Scripts/status-pins.json and this test does
-    // not change.
+    // PARITY AT THE CAP, against O99's ruled band. EXPECTED RED: the figure is
+    // 0.647x and the band is 0.85-1.15x, and that gap is a work item with a
+    // number on it rather than an open question in a document.
+    //
+    // THE GAP IS AFFIX BREADTH, AND THE DIAGNOSIS IS IN THE LAYERS ABOVE.
+    // The two builds hold an identical More product and identical crit lines,
+    // so both cancel exactly and parity is the flat ratio times the increased
+    // ratio. BOTH are short, and they are two different pieces of work:
+    //
+    //   increased 3.35 against 4.49 — the ability pool is one seeded line per
+    //     slot at placeholder values, where the weapon pool is that line plus
+    //     added damage, fire rate, five conditional lines and the projectile
+    //     family. This half closes by authoring ability affix breadth.
+    //
+    //   flat 1.000 against 1.154 — the ability lane has NO FLAT LINE AT ALL.
+    //     Added Damage bids Flat into the weapon lane only, and O54 names three
+    //     INCREASED pools and says nothing about the flat half. This is an
+    //     unanswered design question rather than unauthored content, and it is
+    //     recorded as one.
+    //
+    // Neither half closes by touching the composition, and a future reader who
+    // "fixes" this by folding the weapon pool back into ability hits has
+    // deleted the partition rather than closed the gap.
     const float Parity = AbilityBuild.AbilityTotal / WeaponBuild.Total;
-    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY %.3fx (ability lane against weapon lane at the cap; band UNAUTHORED)"), Parity));
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) %.3fx against O99's %.2f-%.2fx"),
+        Parity, AbilityParityBandMinimum, AbilityParityBandMaximum));
     BreakerStatus::Emit(TEXT("power-band-ability"), Parity);
+    TestTrue(*FString::Printf(TEXT("PARITY %.3fx is at least %.2fx (O99)"), Parity, AbilityParityBandMinimum),
+        Parity >= AbilityParityBandMinimum);
+    TestTrue(*FString::Printf(TEXT("PARITY %.3fx is at most %.2fx (O99)"), Parity, AbilityParityBandMaximum),
+        Parity <= AbilityParityBandMaximum);
+    // The decomposition, because a single ratio does not say what to author.
+    // Crit and the More product CANCEL EXACTLY — the two builds hold identical
+    // crit lines and an identical More product — so parity is the flat ratio
+    // times the increased ratio and nothing else.
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) decomposes: flat %.3fx x increased %.3fx (crit and More cancel exactly)"),
+        AbilityBuild.AbilityFlatLayer / WeaponBuild.FlatLayer,
+        AbilityBuild.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer));
+
+    // PARITY AT ENDGAME, measured and reported, deliberately UNPINNED. Whether
+    // the cap figure holds at item level 120 is a different question: the
+    // endgame band is far more crit-driven and crit is currently a weapon-lane
+    // story, so the two are free to diverge — and if they do, THAT is the
+    // finding, not a second edge of O99. Asserting it against the cap's band
+    // would answer a question nobody has asked yet.
+    {
+        const int32 EndgameTier = OptimizedTierFor(EndgameItemLevel);
+        const FComposedBuild EndgameWeapon = Compose(OptimizedLoadout(EndgameItemLevel, EndgameTier), OptimizedRanks(), State);
+        const FComposedBuild EndgameAbility = Compose(AbilityOptimizedLoadout(EndgameItemLevel, EndgameTier), OptimizedRanks(), State);
+        const float EndgameParity = EndgameAbility.AbilityTotal / EndgameWeapon.Total;
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
+            EndgameItemLevel, EndgameTier, EndgameWeapon.FlatLayer, EndgameWeapon.IncreasedLayer, EndgameWeapon.MoreLayer, EndgameWeapon.Total));
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
+            EndgameItemLevel, EndgameTier, EndgameAbility.AbilityFlatLayer, EndgameAbility.AbilityIncreasedLayer, EndgameAbility.AbilityMoreLayer, EndgameAbility.AbilityTotal));
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) %.3fx — UNPINNED; divergence from the cap figure is its own finding"),
+            EndgameParity));
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) decomposes: flat %.3fx x increased %.3fx (crit and More cancel exactly)"),
+            EndgameAbility.AbilityFlatLayer / EndgameWeapon.FlatLayer,
+            EndgameAbility.AbilityIncreasedLayer / EndgameWeapon.IncreasedLayer));
+        // BOTH halves widen with gear depth, and the reason is the same in each:
+        // the back-loaded ladder multiplies what a line is worth, so a lane with
+        // more lines compounds harder as tiers deepen. The breadth deficit is
+        // not a constant offset that deep gear dilutes — deep gear WIDENS it.
+        // That is why parity has to be measured at two points and not one.
+        AddInfo(TEXT("ABILITY LANE  the deficit widens with gear depth: a lane with more lines compounds harder up a back-loaded ladder"));
+        BreakerStatus::Emit(TEXT("power-band-ability-endgame"), EndgameParity);
+    }
 
     // RESPONSE - the assertion the pools were built to make possible.
     const float Response = AbilityBuild.AbilityTotal / Baseline.AbilityTotal;
