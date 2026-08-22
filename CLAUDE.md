@@ -6,30 +6,28 @@ The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
 `DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
 corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Open: 31 items in `DECISIONS.md`. Five `make status` sections sit out of band
-and every one is a target rather than a regression. 48 asserted invariants have
-no test yet; the priority order is in `Scripts/status-pins.json`.
+Open: 31 items in `DECISIONS.md`. Six `make status` sections sit out of band and
+every one is a target rather than a regression. 48 asserted invariants have no
+test; the priority order is in `Scripts/status-pins.json` and the three promoted
+findings at the head of it are the only route to its 20 target.
 
-O54's three damage pools are built and O99 rules the parity band at 0.85–1.15x,
-red at 0.647x. Crit and the More product cancel exactly between an ability-geared
-and a weapon-geared build, so the shortfall is entirely breadth, in two halves:
-increased 3.35 against 4.49, which is unauthored content, and flat 1.000 against
-1.154, which is an unanswered question — the ability lane has no flat line
-because Added Damage bids into the weapon lane alone. Endgame parity is measured
-beside it and unpinned at 0.388x: the deficit **widens** with gear depth, because
-a lane with more lines compounds harder up a back-loaded ladder.
+The class layer is being rebuilt as fifteen doctrines. O101 settles the ordering:
+keystones need primitives, not vocabulary, and were never what O72 was waiting
+for — a keystone an enum entry unblocks is a minor with the wrong label. Sixteen
+primitives cluster into seven systems; a healing modifier chain and a per-target
+state record carry three keystones each. O104 is the rule with no natural
+enforcement — gate removal adds no lane, so nothing else would have caught it.
 
-O100 gives abilities an acquisition system: two free starters and a free
-ultimate per class, the rest bought one at a time with a token at the
-quartermaster. `Swift.CadenceBreak` — registered, offered and permanently
-refusable — is reachable for the first time. The save is v5; the v4 step hands
-every pre-v5 character the kit it could already reach and stamps its token
-counter so it is not paid retroactively.
+Next, in order: the Kinetic doctrine, which is the first per-doctrine slice and
+tests both the slicing rule and O107's delete-and-replace ordering constraint;
+then the three promoted findings; then gating the Forge tab, which
+content-and-modes already rules and the tab strip already violates; then the
+~400 stale doc citations left in `Source/` comments.
 
-Next, in order: widen `EBreakerNodeStatTarget` and `EBreakerBuildCondition`
-against the doctrine draft, which names the targets and conditions the content
-actually wants; then ability affix breadth, which is what closes O99; then the
-stale doc citations left in `Source/` comments.
+Two things waiting on a ruling rather than on work: the doctrine upgrade
+convention, which swings a doctrine between 24 and 14 points and the composition
+band between in and out; and the flat side of the damage pools, which is the
+half of the parity deficit that degrades fastest with gear depth.
 
 Update this section as the last step of each session.
 
