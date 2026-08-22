@@ -119,6 +119,19 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
         }
         TestTrue(TEXT("The quartermaster's dialogue opens the unlock screen"), bFoundDoor);
 
+        // O42/content-and-modes: the Forge is the same kind of interaction and
+        // was the inconsistency beside it — in the tab strip the pause menu
+        // opens. Kess is its only door now, on every entry state she has.
+        bool bFoundForgeDoor = false;
+        for (const FBreakerDialogueNode& Node : ABreakerNPC::MakeForgeKeeperDialogue())
+        {
+            for (const FBreakerDialogueChoice& Choice : Node.Choices)
+            {
+                if (Choice.Action == EBreakerDialogueAction::OpenForge) bFoundForgeDoor = true;
+            }
+        }
+        TestTrue(TEXT("Kess's dialogue opens the Forge"), bFoundForgeDoor);
+
         // The absence half is a source scan, because "no button anywhere reaches
         // this" is a statement about the whole menu file rather than about any
         // object a test can hold. The tab strip is built by AddTab and the pause
@@ -131,6 +144,8 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
         {
             TestFalse(TEXT("The quartermaster has no tab-strip entry"),
                 Menu.Contains(TEXT("AddTab(TEXT(\"QUARTERMASTER\")")));
+            TestFalse(TEXT("The Forge has no tab-strip entry either"),
+                Menu.Contains(TEXT("AddTab(TEXT(\"FORGE\")")));
             const int32 PauseBegin = Menu.Find(TEXT("SBreakerMenu::BuildPauseScreen"));
             if (PauseBegin != INDEX_NONE)
             {
@@ -141,6 +156,8 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
                 const FString PauseBody = Menu.Mid(PauseBegin, (PauseEnd == INDEX_NONE ? Menu.Len() : PauseEnd) - PauseBegin);
                 TestFalse(TEXT("The pause menu has no path to the quartermaster"),
                     PauseBody.Contains(TEXT("Quartermaster")));
+                TestFalse(TEXT("The pause menu has no path to the Forge"),
+                    PauseBody.Contains(TEXT("Forge")));
             }
         }
         else

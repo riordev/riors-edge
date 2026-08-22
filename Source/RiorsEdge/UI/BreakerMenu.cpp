@@ -1201,7 +1201,11 @@ TSharedRef<SWidget> SBreakerMenu::BuildScreenTabs(EBreakerMenuScreen ActiveScree
     // meaning.
     AddTab(TEXT("GEAR"), EBreakerMenuScreen::Inventory);
     AddTab(TEXT("SKILLS"), EBreakerMenuScreen::SkillTrees);
-    AddTab(TEXT("FORGE"), EBreakerMenuScreen::Forge);
+    // NO FORGE TAB. It is an Anchor interaction (content-and-modes), and a tab
+    // here is a pause-menu path: the pause menu's INVENTORY button opens this
+    // strip. Kess's dialogue is the only door, exactly as the quartermaster's
+    // is — that screen was built without a tab for this reason and the Forge
+    // was the inconsistency beside it.
     AddTab(TEXT("ABILITIES"), EBreakerMenuScreen::Abilities);
     return Tabs;
 }
@@ -4569,19 +4573,19 @@ namespace
         return Progression->PurchaseNode(Tree, NodeId, OutFailureReason);
     }
 
-    bool ProgressionRespec(UBreakerProgressionComponent* Progression, EBreakerPointCurrency Currency, FText& OutFailureReason)
+    bool ProgressionRespec(UBreakerProgressionComponent* Progression, EBreakerPointCurrency Currency, bool bIsAtForge, FText& OutFailureReason)
     {
         if (!Progression)
         {
             OutFailureReason = FText::FromString(TEXT("No progression component."));
             return false;
         }
-        // bIsAtForge is passed true unconditionally: Forge-proximity gating
-        // arrives with the hub. Until then respec is always available from
-        // the menu so the flow is testable. UI-UX-Spec 6.6 wants the button
-        // visible-but-disabled away from a Forge — wire that here when the
-        // hub exists.
-        return Progression->RespecAtForge(Currency, /*bIsAtForge=*/true, OutFailureReason);
+        // A REAL ANSWER NOW. This passed true unconditionally, with a comment
+        // deferring the gate until the hub existed; the hub exists, and the
+        // Forge screen is reachable only through Kess, so arriving here means
+        // the player is standing at one. The flag is set by that door and by
+        // nothing else, which is what makes the refusal path reachable.
+        return Progression->RespecAtForge(Currency, bIsAtForge, OutFailureReason);
     }
 
     // Points already committed to a tree, and the tree's full cost if every
@@ -6793,7 +6797,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             {
                 UBreakerProgressionComponent* Prog = Character.IsValid() ? Character->GetProgression() : nullptr;
                 FText FailureReason;
-                if (ProgressionRespec(Prog, BoardCurrency, FailureReason))
+                if (ProgressionRespec(Prog, BoardCurrency, bAtForge, FailureReason))
                 {
                     SkillTreeStatus = FText::FromString(FString::Printf(TEXT("%s POINTS REFUNDED"), *CurrencyLabel(BoardCurrency)));
                     if (Character.IsValid()) Character->SaveGameState();
@@ -7677,6 +7681,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
                     {
                         QuartermasterStatus = FText::GetEmpty();
                         Rebuild(EBreakerMenuScreen::Quartermaster);
+                        return FReply::Handled();
+                    }
+                    if (Action == EBreakerDialogueAction::OpenForge)
+                    {
+                        // Reached through Kess, so the player IS at the Forge.
+                        // This is what makes bIsAtForge a real answer rather
+                        // than a hardcoded true.
+                        bAtForge = true;
+                        ForgeStatus = FText::GetEmpty();
+                        Rebuild(EBreakerMenuScreen::Forge);
                         return FReply::Handled();
                     }
                     if (NextNodeId == NAME_None)

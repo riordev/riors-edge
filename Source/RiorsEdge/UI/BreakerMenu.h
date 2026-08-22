@@ -434,6 +434,10 @@ private:
     // The quartermaster's last refusal or confirmation, shown on the screen
     // and cleared by the next rebuild that has something new to say.
     FText QuartermasterStatus;
+    // True only while the Forge screen was entered through Kess. The respec
+    // gate reads it, so the "only available at a Forge" refusal is reachable
+    // instead of being a branch nothing could ever take.
+    bool bAtForge = false;
     // Reach: a picker over UBreakerAbilityComponent's selection API
     // (GetSelectableAbilityIds / PreviewSelection / TryEquipAbility), which
     // shipped with zero callers. See the ABILITIES tab note on EBreakerMenuScreen.

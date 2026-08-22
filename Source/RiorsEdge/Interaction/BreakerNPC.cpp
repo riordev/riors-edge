@@ -249,6 +249,12 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
         MakeNode(TEXT("Start"), TEXT("The Forge is cold today. Bring me something worth heating."),
         {
             MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
+            // O42/content-and-modes: the Forge is an Anchor interaction and this
+            // is now the only way to it, on every entry state Kess has. No node
+            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
+            // and the salvage chain reads its flags.
+            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
+                EBreakerDialogueAction::OpenForge),
             // Gated: Kess only acknowledges the contract once it is closed, and
             // this is the smallest possible proof that a flag changes what an
             // NPC says.
@@ -282,6 +288,12 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
         MakeNode(TEXT("Returned"), TEXT("(The Forge is still cold. Kess does not look up.) You came back. That's more than most."),
         {
             MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
+            // O42/content-and-modes: the Forge is an Anchor interaction and this
+            // is now the only way to it, on every entry state Kess has. No node
+            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
+            // and the salvage chain reads its flags.
+            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
+                EBreakerDialogueAction::OpenForge),
             MakeChoice(TEXT("The Quartermaster's contract is closed."), TEXT("Contract"), NAME_None, { FirstContractTurnedIn }),
             MakeChoice(TEXT("What would heat the Forge?"), TEXT("Salvage"), KessSalvageOffered, { FirstContractTurnedIn }, { KessSalvageAccepted }),
             MakeChoice(TEXT("Still gathering your feedstock."), TEXT("SalvageProgress"), NAME_None, { KessSalvageAccepted }, { KessSalvageTurnedIn }),
@@ -310,6 +322,12 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeForgeKeeperDialogue()
         MakeNode(TEXT("Warm"), TEXT("(The Forge is lit. Low, but lit.) You did that. Now find me something worth it."),
         {
             MakeChoice(TEXT("What do you do here?"), TEXT("Role")),
+            // O42/content-and-modes: the Forge is an Anchor interaction and this
+            // is now the only way to it, on every entry state Kess has. No node
+            // id or quest flag moves — BreakerQuestLoopTests walks this dialogue
+            // and the salvage chain reads its flags.
+            MakeChoice(TEXT("Open the Forge."), NAME_None, NAME_None, {}, {},
+                EBreakerDialogueAction::OpenForge),
             MakeChoice(TEXT("You're an Effigy, aren't you?"), TEXT("Effigy"), NAME_None, {}, { AskedKessAboutRior }),
             MakeChoice(TEXT("[Leave] Another time.")),
         }),

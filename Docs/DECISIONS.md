@@ -213,8 +213,6 @@ Numbers are permanent and never reused.
 - Who owns audio.
 - What replaces the shared pool as the tension between the two defensive constellations.
 - Whether weapon archetype outweighing class is intended identity or a table to flatten.
-- Whether the Forge screen stops being a tab. It sits in the strip the pause menu reaches, so "Forge and vendor are Anchor interactions and never appear in a pause menu" is violated today; the quartermaster is gated correctly and is currently the only service that is.
-- Whether respec gets real Forge proximity. `RespecAtForge` takes the gate as an argument and the menu passes true unconditionally, with a comment deferring it until the hub exists. The hub exists.
 - What becomes of the node ability-grant path. After the one redundant grant retires it has three readers on the node card and no writers.
 - Whether the quartermaster has an endgame role. Its stock is finite by construction — one token per unlockable — so it empties once the last ability is bought and is a levelling-window service thereafter.
 - Whether the ability pool gets a flat line. O54 names three Increased pools and settles nothing about the flat half, and Added Damage bids Flat into the weapon lane alone — so an ability build's flat layer is structurally 1.000 against a weapon build's 1.154 at the cap and 1.550 at endgame. Flat multiplies against the whole Increased bucket, so this is the half of the parity gap that widens fastest with gear depth.

@@ -22,7 +22,12 @@ enum class EBreakerDialogueAction : uint8
     // O100: the quartermaster's unlock screen. Unlocking is an Anchor
     // interaction, so this is the ONLY way that screen opens — it has no
     // tab-strip entry and no pause-menu path.
-    OpenQuartermaster
+    OpenQuartermaster,
+    // The Forge, for the same reason and by the same route. content-and-modes
+    // rules Forge and vendor Anchor interactions that never appear in a pause
+    // menu; the Forge was in the shared tab strip, which the pause menu's
+    // INVENTORY button opens two clicks deep.
+    OpenForge
 };
 
 USTRUCT(BlueprintType)
