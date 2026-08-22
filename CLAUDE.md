@@ -8,14 +8,12 @@ intent moved to the node, source material moved to `Assets/`.
 
 Written: power-and-scaling, items-and-crafting, progression-and-trees,
 classes-and-abilities, combat, content-and-modes, art-and-ui — all seven —
-plus `VISION.md`.
-Pending: `DECISIONS.md`, the `make status` generator, then the deletion pass
-as the last commit of the rewrite.
+plus `VISION.md` and `DECISIONS.md` — nine of the ten.
+Pending: the `make status` generator, then the deletion pass as the last
+commit of the rewrite.
 
-Awaiting the owner: the class branch tree shape, class induction siting, the
-fifth rarity's final name, and the rarity restructure's four open items. All
-of them are written into `DECISIONS.md` as open; specs write the shipped shape
-and mark the target unruled.
+Awaiting the owner: 32 items in `DECISIONS.md`'s open list. Specs write the
+shipped shape and mark the target unruled where a decision is held.
 
 Update this section as the last step of each spec session.
 
