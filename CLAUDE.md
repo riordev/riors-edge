@@ -6,8 +6,9 @@ Branch `docs/corpus-rewrite`. Replacing the documentation corpus with ten
 files. Preparatory passes are done: traps moved to their code sites, node
 intent moved to the node, source material moved to `Assets/`.
 
-Written: power-and-scaling, items-and-crafting, progression-and-trees.
-Pending: classes-and-abilities, combat, content-and-modes, art-and-ui, then `VISION.md`, `DECISIONS.md` and the
+Written: power-and-scaling, items-and-crafting, progression-and-trees,
+classes-and-abilities.
+Pending: combat, content-and-modes, art-and-ui, then `VISION.md`, `DECISIONS.md` and the
 `make status` generator. The deletion pass is the last commit — the
 remaining specs need their sources open.
 
