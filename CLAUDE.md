@@ -2,20 +2,19 @@
 
 ## Current work
 
-Branch `docs/corpus-rewrite`. Replacing the documentation corpus with ten
-files. Preparatory passes are done: traps moved to their code sites, node
-intent moved to the node, source material moved to `Assets/`.
+The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
+`DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
+corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Written: power-and-scaling, items-and-crafting, progression-and-trees,
-classes-and-abilities, combat, content-and-modes, art-and-ui — all seven —
-plus `VISION.md` and `DECISIONS.md` — nine of the ten.
-Pending: pins for `make status` (the first report is deliberately unpinned),
-then the deletion pass as the last commit of the rewrite.
+Open: 32 items in `DECISIONS.md`. Two `make status` sections are pinned to
+targets and are expected out of band — tree density and node-shape composition.
+49 asserted invariants have no test yet; the priority order is in
+`Scripts/status-pins.json`.
 
-Awaiting the owner: 32 items in `DECISIONS.md`'s open list. Specs write the
-shipped shape and mark the target unruled where a decision is held.
+Next, in order: an emission convention so the band and loot-rate sections can
+be machine-read; then the stale doc citations left in `Source/` comments.
 
-Update this section as the last step of each spec session.
+Update this section as the last step of each session.
 
 ## Build and test
 
