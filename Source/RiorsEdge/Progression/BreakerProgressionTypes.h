@@ -384,6 +384,26 @@ inline EBreakerDamagePool BreakerDamagePoolFor(EBreakerNodeStatTarget Target)
     }
 }
 
+// True for a target that is DELIVERED BY A RIDER and will therefore never have
+// an aggregation lane, however long anyone waits.
+//
+// This exists because "has no lane" was doing two jobs and the report could not
+// tell them apart: a target waiting for plumbing nobody has written, and a
+// target that is correctly laneless BY RULE. MeleeDamage is the second kind —
+// O98 rules melee a tag-keyed slice of the weapon pool rather than a fourth
+// pool, so it is selected by the Damage_Melee source tag on the request and an
+// aggregation lane is the wrong shape for it.
+//
+// The distinction is not cosmetic. Counted as a deficiency, MeleeDamage inflates
+// a ceiling that is supposed to ratchet down, and it has been mis-shelved as
+// "one lane away" three times — including once in a report that offered it as a
+// lane the doctrine pass would light up. A number that cannot go to zero teaches
+// people to stop reading it.
+inline bool BreakerStatTargetIsRiderDelivered(EBreakerNodeStatTarget Target)
+{
+    return Target == EBreakerNodeStatTarget::MeleeDamage;
+}
+
 // True for the pools a DIRECT hit reads — the two delivery lanes and the shared
 // pool that feeds both. DamageOverTime is a damage pool but not a delivered
 // one: it is snapshotted at application and composed by ComposeDotSourcePower,

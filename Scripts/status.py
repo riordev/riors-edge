@@ -198,7 +198,19 @@ def parse_lane_register(types_text):
                 re.finditer(r'case EBreakerNodeStatTarget::(\w+):', body[:false_at])}
     if not paid:
         raise ParseError(f"{TYPES}: lane register parsed as empty.")
-    return targets, paid
+
+    # Targets that are correctly laneless BY RULE, and so are not waiting for
+    # anything. Parsed from the same header rather than listed here, for the
+    # reason the lane register itself is hand-maintained in the source: a list
+    # in this file would be a second place to update and the first one to rot.
+    rider = set()
+    rider_fn = re.search(
+        r'BreakerStatTargetIsRiderDelivered\(EBreakerNodeStatTarget Target\)\s*\{(.*?)\n\}',
+        types_text, re.S)
+    if rider_fn:
+        rider = {m.group(1) for m in
+                 re.finditer(r'EBreakerNodeStatTarget::(\w+)', rider_fn.group(1))}
+    return targets, paid, rider
 
 
 def parse_conditions(text):
@@ -340,7 +352,7 @@ def build_sections(sources):
     conds_text = read(os.path.join(SRC, "Progression", "BreakerBuildConditions.h"))
 
     nodes = parse_nodes(lib)
-    targets, paid = parse_lane_register(types)
+    targets, paid, rider_delivered = parse_lane_register(types)
     conditions = parse_conditions(conds_text)
     declared_tags = parse_declared_tags(lib)
     index = build_consumer_index(sources)
@@ -366,7 +378,12 @@ def build_sections(sources):
     })
 
     # --- unmapped stat targets -------------------------------------------
-    unmapped = [t for t in targets if t not in paid]
+    # RIDER-DELIVERED TARGETS ARE NOT UNMAPPED. They will never have a lane —
+    # O98 rules melee a tag-keyed slice of the weapon pool, not a fourth pool —
+    # so counting them here made a ratcheting ceiling that could not reach zero,
+    # and three separate readings mistook one for a lane a content pass would
+    # light up. They are reported on their own line instead.
+    unmapped = [t for t in targets if t not in paid and t not in rider_delivered]
     authored_targets = {e for n in nodes for e in n["effects"]}
     # Iterate `targets` (an ordered list) rather than `paid` (a set): a report
     # whose lines reorder between runs shows a diff on every regeneration, and
@@ -378,7 +395,9 @@ def build_sections(sources):
         "key": "unmapped-stat-targets", "title": "Stat targets with no aggregation lane",
         "direction": CEILING, "value": len(unmapped), "unit": f"of {len(targets)}",
         "detail": unmapped,
-        "note": "A node authored against one of these is silently unpaid.",
+        "note": "A node authored against one of these is silently unpaid. "
+                + (f"{len(rider_delivered)} further target(s) are delivered by a rider and are "
+                   f"correctly laneless: {', '.join(sorted(rider_delivered))}." if rider_delivered else ""),
     })
     sections.append({
         "key": "empty-lanes", "title": "Aggregation lanes carrying nothing",

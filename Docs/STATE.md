@@ -12,7 +12,7 @@ measurement without judging it.
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
 | Silent nodes | ceiling | 47 of 205 authored | ceiling 47 | ok |
-| Stat targets with no aggregation lane | ceiling | 8 of 33 | ceiling 8 | ok |
+| Stat targets with no aggregation lane | ceiling | 7 of 33 | ceiling 7 | ok |
 | Aggregation lanes carrying nothing | ceiling | 8 of 25 lanes | ceiling 8 | ok |
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
@@ -69,11 +69,10 @@ Authored, purchasable, costs a point, and produces no observable change. Counted
 
 ## Stat targets with no aggregation lane
 
-**ceiling** · 8 of 33 · ceiling 8
+**ceiling** · 7 of 33 · ceiling 7
 
-A node authored against one of these is silently unpaid.
+A node authored against one of these is silently unpaid. 1 further target(s) are delivered by a rider and are correctly laneless: MeleeDamage.
 
-- MeleeDamage
 - IncomingDamageReduction
 - Lifesteal
 - DashCooldown
