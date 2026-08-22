@@ -148,6 +148,7 @@ def parse_nodes(lib_text):
             "ranks": int(m.group(3)), "cost": int(m.group(4)),
             "tree": tree_of(i), "line": i + 1,
             "effects": [], "tags": [], "cornerstone": False,
+            "conditions": [], "more": False,
         }
         # Walk forward to this node's Tree->Nodes.Add, collecting what it authors.
         for j in range(i + 1, min(i + 60, len(lines))):
@@ -158,6 +159,12 @@ def parse_nodes(lib_text):
                 node["effects"].append(e.group(1))
             for e in re.finditer(r'AddMoreEffect\(', l):
                 node["effects"].append("Damage")
+                node["more"] = True
+            if "MorePercent" in l:
+                node["more"] = True
+            for e in re.finditer(r'EBreakerBuildCondition::(\w+)', l):
+                if e.group(1) != "Always":
+                    node["conditions"].append(e.group(1))
             for t in re.finditer(r'BreakerNodeTags::(\w+)', l):
                 node["tags"].append(t.group(1))
             if "bCornerstone = true" in l:
@@ -339,9 +346,34 @@ def parse_suite_log(expected_red):
 # --------------------------------------------------------------------------
 
 def classify(node):
-    if node["cornerstone"] or node["cost"] >= 3:
+    """Node SHAPE, keyed on payload — never on what the node costs or how many
+    times you buy it.
+
+    The previous version read cornerstone / cost / ranks and nothing else, so it
+    was measuring RANK PRICING and reporting it as shape. Two nodes with byte-
+    identical rule payloads landed in different buckets because one was priced at
+    two ranks and the other at one; a doctrine shape read 62% or 0% purely on
+    that choice. A metric that answers a pricing question cannot be evidence in
+    a shape argument, and 120 nodes were about to be authored against it.
+
+    The signals here are all payload facts, in the spec's own vocabulary
+    ("ranked minors, notables carrying a rule or a condition, and convergence
+    and keystone"):
+
+      convergence/keystone  authors a More, or is flagged a cornerstone. O3
+                            permits a More ONLY on a convergence or keystone
+                            node, so authoring one IS the signal.
+      ranked minor          an unconditional stat line, and nothing else.
+      notable               carries a condition, or carries no stat line at all
+                            because its payload is a rule.
+
+    A granted tag is deliberately NOT a notable signal on its own: this project
+    authors rules-as-tags on nearly every node including stat nodes, so reading
+    the tag alone put 91% of the tree in one bucket and said nothing.
+    """
+    if node["cornerstone"] or node["more"]:
         return "convergence/keystone"
-    if node["ranks"] > 1:
+    if node["effects"] and not node["conditions"]:
         return "ranked minor"
     return "notable"
 

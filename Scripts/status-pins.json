@@ -71,5 +71,5 @@
   "offered-to-spendable":    { "min": 3.0, "kind": "target",
     "why": "0.63x on the worst tree. The largest gap in the report." },
   "node-shape-composition":  { "min": 55, "max": 65, "kind": "target",
-    "why": "52% is close enough that the band is the target rather than the measurement." }
+    "why": "14%, and the band is UNCHANGED — do not widen it to meet the number. It read 52% until classify() was keyed on payload instead of on rank pricing, which is the whole reason the reading moved: the old signal put two byte-identical rule payloads in different buckets depending on whether they were priced at one rank or two, so it was answering a pricing question and reporting it as shape. The honest number says what the section's own note always warned about — the tree is ~79% rule-shaped with almost nothing to fill a constellation between the interesting picks, which is what makes a large tree read as small. The gap got bigger because the instrument got truthful, not because the trees changed." }
 }

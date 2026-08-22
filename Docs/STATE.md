@@ -19,7 +19,7 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
 | Asserted invariants with no test | ceiling | 48 of 100 asserted across 7 specs | ceiling 48, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
-| Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
+| Node-shape composition, per tree | band | 14 % ranked minors, all trees | band 55–65 | **OUT** |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
@@ -242,24 +242,24 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Node-shape composition, per tree
 
-**band** · 52 % ranked minors, all trees · band 55–65  ·  **OUT**
+**band** · 14 % ranked minors, all trees · band 55–65  ·  **OUT**
 
 A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks.
 
-- GetCasterMultispellTree: 67% ranked minor, 22% notable, 11% convergence/keystone
-- GetCasterSpellbladeTree: 67% ranked minor, 22% notable, 11% convergence/keystone
-- GetCasterVoidWhispererTree: 67% ranked minor, 22% notable, 11% convergence/keystone
-- GetCoreSliceTree: 43% ranked minor, 40% notable, 17% convergence/keystone
-- GetGunsmithArmoryTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetGunsmithFieldTechTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetGunsmithTinkererTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetSupportConductorTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetSupportMedicTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetSupportWardenTree: 50% ranked minor, 42% notable, 8% convergence/keystone
+- GetCasterMultispellTree: 0% ranked minor, 89% notable, 11% convergence/keystone
+- GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone
+- GetCasterVoidWhispererTree: 11% ranked minor, 78% notable, 11% convergence/keystone
+- GetCoreSliceTree: 47% ranked minor, 53% notable, 0% convergence/keystone
+- GetGunsmithArmoryTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetGunsmithFieldTechTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetGunsmithTinkererTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetSupportConductorTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetSupportMedicTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetSupportWardenTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSwiftFrenzyTree: 54% ranked minor, 38% notable, 8% convergence/keystone
-- GetSwiftKineticTree: 57% ranked minor, 36% notable, 7% convergence/keystone
-- GetSwiftMarksmanTree: 54% ranked minor, 38% notable, 8% convergence/keystone
-- GetTankBastionTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetTankDemolitionistTree: 50% ranked minor, 42% notable, 8% convergence/keystone
-- GetTankLeechTree: 50% ranked minor, 42% notable, 8% convergence/keystone
+- GetSwiftKineticTree: 14% ranked minor, 79% notable, 7% convergence/keystone
+- GetSwiftMarksmanTree: 38% ranked minor, 54% notable, 8% convergence/keystone
+- GetTankBastionTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetTankDemolitionistTree: 0% ranked minor, 92% notable, 8% convergence/keystone
+- GetTankLeechTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 
