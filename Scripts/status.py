@@ -298,9 +298,20 @@ def normalise_test(name):
 # Suite log — expected red, unexpected red
 # --------------------------------------------------------------------------
 
+def expected_red_names(entries):
+    """An entry is `Test.Name :: why it is red and what deletes it`.
+
+    The policy requires every deliberate red to carry the finding it encodes
+    and its deletion condition, so the entry cannot be a bare test name — but
+    the matcher needs one. The name is everything before the separator.
+    """
+    return {e.split("::", 1)[0].strip() for e in entries}
+
+
 def parse_suite_log(expected_red):
     if not os.path.isfile(LOG):
         return None
+    expected_red = expected_red_names(expected_red)
     text = read(LOG)
     passed = set(re.findall(r'Result=\{Success\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))
     failed = set(re.findall(r'Result=\{Fail\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))

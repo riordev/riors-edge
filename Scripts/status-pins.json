@@ -24,7 +24,9 @@
     "The four promoted findings land here when their tests are written:",
     "ability-lane parity, archetype spread, hits-to-die, boss band."
   ],
-  "_expected_red": [],
+  "_expected_red": [
+    "Progression.PowerBand.AtCap :: The at-cap band measures 6.53x against an authored 8-10x, on a baseline definition corrected 2026-08-22 (a realistically decent roll two tiers below what item level allows, derived identically at both measurement points; it was previously the theoretical worst roll, which made the number uninterpretable). DELETE THIS ENTRY WHEN: the owner rules on the band targets against the corrected basis — either the authored 8-10x moves, or content retunes until the measurement reaches it. Do not widen the assertion to make it pass."
+  ],
 
   "silent-nodes":            { "max": 47,  "kind": "measurement",
     "why": "Drive this down regardless. A node a player spends a point on and gets nothing from is a broken promise, and it is the failure this project has shipped four times." },

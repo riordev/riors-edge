@@ -28,13 +28,17 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 394
-- expected red: 0
+- passing: 393
+- expected red: 1
 - **unexpected red: 0**
 - asserted invariants with no test: 49
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
+
+**Expected red**
+
+- `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes
 

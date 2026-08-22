@@ -69,27 +69,50 @@ namespace BreakerPowerBandTest
     constexpr float EndgameBandMinimum = 12.0f;   // O2 PLACEHOLDER seed (O36)
     constexpr float EndgameBandMaximum = 20.0f;   // O2 PLACEHOLDER seed (O36)
 
-    // AT-CAP fixture: item level 50, the character cap. The tier spread is
-    // deliberately the WIDEST a level-50 drop can actually roll -- WorstTier
-    // (the floor every drop can hit) for the baseline, BestTierForItemLevel
-    // (50) (the ceiling item level alone can reach) for the optimized build --
-    // rather than a "mid-tier" pairing. Measured (and cross-checked against
-    // the exact aggregation formula before this fixture was authored): the
-    // back-loaded ladder's shallow low end (T12..T6) does not have enough
-    // spread on its own to reach O36's 8x floor at any narrower pairing, so
-    // the O3 More budget and node choices -- identical in both bands, since
-    // character level does not change with item level -- supply most of the
-    // band here. That is recorded as a finding in CONTEXT.md, not hidden.
+    // The two measurement points. AT-CAP is the character cap; ENDGAME is the
+    // top of the item-level ladder. Same character, same choices, same point
+    // budget — only the gear differs, which is the whole thesis.
     constexpr int32 AtCapItemLevel = 50;
-
-    // ENDGAME fixture: unchanged from the single fixture that existed before
-    // O36 split it in two. Ilvl 120, tiers a level-120 Anomalous drop can
-    // produce without crafting (T1 is the natural-roll ceiling; T0/T-1 are
-    // Forge/rule territory). "One tier apart, not the whole ladder apart":
-    // the baseline found good gear, the optimized character found the best.
     constexpr int32 EndgameItemLevel = 120;
-    constexpr int32 EndgameBaselineTier = 3;
-    constexpr int32 EndgameOptimizedTier = 1;
+
+    // ---------------------------------------------------------------------
+    // WHAT A BASELINE IS — one definition, applied identically at both points.
+    // ---------------------------------------------------------------------
+    // The two fixtures used to disagree about this, and the disagreement made
+    // both numbers uninterpretable rather than only one.
+    //
+    // At cap the baseline was WorstTier: every one of twenty-four affix lines
+    // landing at the absolute floor of the ladder. That is not "hitting 50 is
+    // satisfying with decent power" — it is a character that will never exist,
+    // and a band measured against an impossible build measures nothing.
+    // Endgame, meanwhile, used a hardcoded T3 against T1: a realistically
+    // decent roll against a perfect one, which is the right idea.
+    //
+    // Worse, the two were not merely different, they leaned opposite ways, so
+    // comparing 8.08x against 15.40x compared nothing. The endgame figure
+    // looking comfortable inside its rails is precisely why nobody checked it.
+    //
+    // The definition, owner-ruled: a baseline is a REALISTICALLY DECENT roll,
+    // derived from item level exactly as the optimized tier is, and offset by
+    // the same number of tiers at both points. The offset is 2 because that is
+    // what the endgame pair already encoded (T3 against T1) — so the endgame
+    // number is unchanged by construction and only the broken half moves.
+    //
+    // The offset is the knob. Widening it makes the baseline worse and the
+    // band wider; it is not a free parameter and moving it moves both bands.
+    constexpr int32 BaselineTierOffset = 2;
+
+    // Tier numbers count DOWN as they improve, so +offset is worse gear.
+    int32 OptimizedTierFor(int32 ItemLevel)
+    {
+        return UBreakerAffixLibrary::BestTierForItemLevel(ItemLevel);
+    }
+
+    int32 BaselineTierFor(int32 ItemLevel)
+    {
+        return FMath::Min(UBreakerAffixLibrary::WorstTier,
+                          OptimizedTierFor(ItemLevel) + BaselineTierOffset);
+    }
 
     // One equipped piece, built from the real pool so a value can never drift
     // away from what the game would actually roll. Tier is the printed tier.
@@ -343,8 +366,8 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
     // produce", read as the widest legal spread rather than a fixed pair, so
     // the fixture tracks the tier curve instead of hardcoding a value that
     // could silently stop being reachable under a future retune.
-    const int32 BaselineTier = UBreakerAffixLibrary::WorstTier;
-    const int32 OptimizedTier = UBreakerAffixLibrary::BestTierForItemLevel(AtCapItemLevel);
+    const int32 BaselineTier = BaselineTierFor(AtCapItemLevel);
+    const int32 OptimizedTier = OptimizedTierFor(AtCapItemLevel);
 
     const FBreakerBuildConditionState State = MeasurementState();
     const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTier), BaselineRanks(), State);
@@ -424,17 +447,17 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
     using namespace BreakerPowerBandTest;
 
     const FBreakerBuildConditionState State = MeasurementState();
-    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, EndgameBaselineTier), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), State);
+    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, BaselineTierFor(EndgameItemLevel)), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), State);
 
     // The layer-by-layer report. Logged rather than only asserted, because the
     // arithmetic is the deliverable: a future tuning pass needs to see WHICH
     // layer moved, not just that the band broke.
     AddInfo(FString::Printf(TEXT("ENDGAME BASELINE  (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
-        EndgameItemLevel, EndgameBaselineTier, Baseline.FlatLayer, Baseline.IncreasedLayer, Baseline.MoreLayer, Baseline.EffectiveCrit,
+        EndgameItemLevel, BaselineTierFor(EndgameItemLevel), Baseline.FlatLayer, Baseline.IncreasedLayer, Baseline.MoreLayer, Baseline.EffectiveCrit,
         Baseline.CriticalChance * 100.0f, Baseline.CriticalMultiplier, Baseline.Total));
     AddInfo(FString::Printf(TEXT("ENDGAME OPTIMIZED (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f | crit x%.3f (%.0f%% @ x%.2f) => x%.2f"),
-        EndgameItemLevel, EndgameOptimizedTier, Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
+        EndgameItemLevel, OptimizedTierFor(EndgameItemLevel), Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
         Optimized.CriticalChance * 100.0f, Optimized.CriticalMultiplier, Optimized.Total));
 
     const float Ratio = Optimized.Total / Baseline.Total;
@@ -527,8 +550,8 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     using namespace BreakerPowerBandTest;
 
     const FBreakerBuildConditionState State = MeasurementState();
-    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, EndgameBaselineTier), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), State);
+    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, BaselineTierFor(EndgameItemLevel)), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), State);
     const float PlainBand = Optimized.Total / Baseline.Total;
 
     // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
@@ -554,7 +577,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // The rewrite lands on ONE piece, because the equip cap is one
         // Anomalous. Helmet: it carries damage, crit and a conditional line, so
         // every rollable rewrite has something on it to bite on.
-        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
+        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
         WithRule[0].Rule = Definition.Rule;
         const FComposedBuild Ruled = Compose(WithRule, OptimizedRanks(), State);
 
@@ -568,7 +591,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // measured somewhere its conditions are false, or the report says it is
         // worthless when it is the largest rewrite in the table.
         const FBreakerBuildConditionState Grounded;
-        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier), OptimizedRanks(), Grounded);
+        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), Grounded);
         const FComposedBuild GroundedRuled = Compose(WithRule, OptimizedRanks(), Grounded);
         const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
 
@@ -592,7 +615,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // The pass's own claim, asserted: an item with no rewrite composes exactly
     // as it did before rules existed. If this ever fails, a rewrite has leaked
     // out of its item and become a property of rarity.
-    TArray<FBreakerItemInstance> Untouched = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
+    TArray<FBreakerItemInstance> Untouched = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
     for (const FBreakerItemInstance& Item : Untouched)
     {
         TestEqual(TEXT("A power-band piece carries no rewrite despite being Anomalous"),
@@ -615,7 +638,7 @@ bool FBreakerConditionalDamageTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerPowerBandTest;
 
-    const TArray<FBreakerItemInstance> Loadout = OptimizedLoadout(EndgameItemLevel, EndgameOptimizedTier);
+    const TArray<FBreakerItemInstance> Loadout = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
     const TArray<FBreakerNodeRank> Ranks = OptimizedRanks();
 
     FBreakerBuildConditionState Grounded;
