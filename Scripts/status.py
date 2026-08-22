@@ -357,7 +357,12 @@ def build_sections(sources):
     # --- unmapped stat targets -------------------------------------------
     unmapped = [t for t in targets if t not in paid]
     authored_targets = {e for n in nodes for e in n["effects"]}
-    empty_lanes = [t for t in paid if t not in authored_targets]
+    # Iterate `targets` (an ordered list) rather than `paid` (a set): a report
+    # whose lines reorder between runs shows a diff on every regeneration, and
+    # a file that always shows a diff is one people stop reading diffs on.
+    # Same reasoning as dropping the commit stamp — determinism is what makes
+    # this file's diffs worth reading.
+    empty_lanes = [t for t in targets if t in paid and t not in authored_targets]
     sections.append({
         "key": "unmapped-stat-targets", "title": "Stat targets with no aggregation lane",
         "direction": CEILING, "value": len(unmapped), "unit": f"of {len(targets)}",

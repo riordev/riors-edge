@@ -82,12 +82,12 @@ A node authored against one of these is silently unpaid.
 
 Plumbing with no author. Not harmful, but not free either.
 
-- Armor
-- ChainCount
-- FireRate
 - AbilityArea
-- ClassResourceRegen
+- Armor
 - MaxClassResource
+- ClassResourceRegen
+- FireRate
+- ChainCount
 
 ## Node tags with no consumer
 
