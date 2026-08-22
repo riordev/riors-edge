@@ -37,9 +37,12 @@ building in a separate worktree, the lock is a false positive — the guard keys
 off the shared `UnrealEditor.exe`, not the project DLL. `-NoHotReloadFromIDE`
 is the correct override in that case only.
 
-**A build "completing" is not a build succeeding.** Piping build output through
-`tail` swallows the exit code. Check for `Result: Succeeded` or the exit code
-directly.
+**A command that prints something reassuring has not told you it succeeded.**
+Check the exit code of the thing you actually care about. This keeps arriving in
+new shapes: piping a build through `tail` swallows its exit code, and a newline
+where an `&&` was meant breaks the chain so the next command runs regardless —
+which is how a `git push` reported success after the `git merge` before it had
+failed. Neither printed anything alarming.
 
 Build:
 
