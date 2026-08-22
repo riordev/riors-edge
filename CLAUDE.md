@@ -6,28 +6,27 @@ The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
 `DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
 corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Open: 31 items in `DECISIONS.md`. Six `make status` sections sit out of band and
-every one is a target rather than a regression. 48 asserted invariants have no
-test; the priority order is in `Scripts/status-pins.json` and the three promoted
-findings at the head of it are the only route to its 20 target.
+Open: 29 items in `DECISIONS.md`. Four `make status` sections sit out of band and
+every one is a target. 46 asserted invariants have no test.
 
-The class layer is being rebuilt as fifteen doctrines. O101 settles the ordering:
-keystones need primitives, not vocabulary, and were never what O72 was waiting
-for — a keystone an enum entry unblocks is a minor with the wrong label. Sixteen
-primitives cluster into seven systems; a healing modifier chain and a per-target
-state record carry three keystones each. O104 is the rule with no natural
-enforcement — gate removal adds no lane, so nothing else would have caught it.
+The chassis has four live findings and they constrain each other. THE O91 RETUNE
+ANCHORS AT THE CAP, NOT LEVEL 1 (O116): time-to-die is 4.97s at the cap against
+a 4-5s target and 24.64s at level 1, so the low end comes down rather than the
+high end up — base monster damage from 16 toward ~79 and `d` from 0.055 to
+~0.021. Reading O91's "damage growth comes down" literally, anchored at level 1,
+would take cap TTD to five times its target. The boss band is two errors (O114)
+and closing either alone leaves it out of band. Hits-to-die is the authoritative
+inversion figure (O113); the 32% between it and the damage-vs-defence proxy is
+entirely the flat base max health, now flagged at its declaration.
 
-Next, in order: the Kinetic doctrine, which is the first per-doctrine slice and
-tests both the slicing rule and O107's delete-and-replace ordering constraint;
-then the three promoted findings; then gating the Forge tab, which
-content-and-modes already rules and the tab strip already violates; then the
-~400 stale doc citations left in `Source/` comments.
+Next, in order: `Progression.PowerBand.ArchetypeSpread`, the last promoted
+finding and the only remaining route to the 20 target; then the ~400 stale doc
+citations in `Source/`; then the Class Points delete, which is fully ruled
+(O111) and which the Kinetic doctrine waits on.
 
-Two things waiting on a ruling rather than on work: the doctrine upgrade
-convention, which swings a doctrine between 24 and 14 points and the composition
-band between in and out; and the flat side of the damage pools, which is the
-half of the parity deficit that degrades fastest with gear depth.
+Waiting on a ruling rather than on work: the flat side of the damage pools —
+the ability lane has no flat line at all, and it is the half of the parity
+deficit that degrades fastest with depth.
 
 Update this section as the last step of each session.
 
