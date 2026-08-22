@@ -153,6 +153,14 @@ namespace
     }
 }
 
+// TWO GUARDS, TWO PLACEMENT KINDS, AND THEY ARE NOT INTERCHANGEABLE.
+// IsAuthoredPieceBlocked (above) refuses an individual authored piece that
+// would land inside an instrument. This one refuses a CLUSTER CENTRE, and its
+// exclusions carry the cluster's own radius, so it is deliberately the harsher
+// of the two. Applying either to the other's callers is not a tightening — it
+// pushes the whole lattice off the near half of the field, because a cluster
+// radius measured against a per-piece rule excludes ground that has nothing
+// wrong with it. That regression has happened once already.
 bool UBreakerCoverLayoutLibrary::IsClusterCentreExcluded(const FBreakerCoverFieldParams& Params,
     float Forward, float Right, float ExtentCm)
 {

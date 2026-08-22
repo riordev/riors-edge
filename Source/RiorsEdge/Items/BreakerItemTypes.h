@@ -6,6 +6,15 @@
 #include "Weapons/BreakerWeaponArchetype.h"
 #include "BreakerItemTypes.generated.h"
 
+// APPEND ONLY. NEVER INSERT, NEVER REORDER, NEVER REUSE A RETIRED VALUE.
+// The three enums below are serialized BY VALUE into every saved item — slot,
+// rarity and affix category all ride in FBreakerItemInstance — so inserting an
+// entry re-points every stored item after the insertion point. A new slot
+// silently moves every saved Necklace into the Waist; a new rarity between
+// Aberrant and Anomalous turns every stored Anomalous into something else.
+// There is no version check that catches this, because the file is not
+// corrupt: it is valid data meaning something different. Renaming an
+// enumerator is safe (the value does not move); moving one is not.
 UENUM(BlueprintType)
 enum class EBreakerEquipSlot : uint8
 {

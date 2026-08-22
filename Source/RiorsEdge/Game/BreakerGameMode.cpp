@@ -388,6 +388,14 @@ float ABreakerGameMode::ResolveGroundZ(const APawn* Pawn, bool* bOutFoundFloor) 
     return bFoundFloor ? Lowest : Centre.Z - 88.0f;
 }
 
+// THE FIELD HAS NO FIXED WORLD POSITION, and that surprises people twice.
+// Ground, forward and right are all derived from the possessed pawn, so the
+// field is built relative to wherever the player happened to spawn and facing
+// however they happened to face. Two PIE sessions started from different
+// viewport camera positions produce the SAME field at different world
+// coordinates. Consequences: comparing absolute coordinates between two
+// sessions' screenshots or logs is meaningless, and every distance in this
+// file is field-relative through Frame.At(), never a world vector.
 void ABreakerGameMode::BuildFieldFrame(const APawn* Pawn)
 {
     if (!Pawn) return;

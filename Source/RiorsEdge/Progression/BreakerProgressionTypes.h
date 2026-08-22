@@ -5,6 +5,12 @@
 #include "Progression/BreakerBuildConditions.h"
 #include "BreakerProgressionTypes.generated.h"
 
+// APPEND ONLY. NEVER INSERT, NEVER REORDER, NEVER REUSE A RETIRED VALUE.
+// Serialized by value into the per-character save as PermanentClass, and class
+// selection is permanent — so inserting an entry does not produce a load
+// error, it produces a character who is silently now a different class, on a
+// choice the player was told they could not change. Renaming an enumerator is
+// safe; moving one is not.
 UENUM(BlueprintType)
 enum class EBreakerClassId : uint8
 {

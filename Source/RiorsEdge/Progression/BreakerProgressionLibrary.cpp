@@ -336,6 +336,14 @@ namespace
         AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, PercentAboveOne, Condition);
     }
 
+    // THESE OBJECTS LIVE FOR THE WHOLE PROCESS, AND THAT LEAKS BETWEEN TESTS.
+    // Every tree below is a static, root-set singleton built once and handed
+    // out by pointer, so a test that MUTATES a node — changing a cost, a gate,
+    // an effect, a rank — changes it for every subsequent test in the same
+    // editor session, in declaration order, with no reset between them. The
+    // failure looks like a test that passes alone and fails in the suite, or
+    // worse, one that passes in the suite because an earlier test happened to
+    // set it up. Read the tree; copy anything you intend to change.
     UBreakerProgressionTree* MakeTree(FName TreeId, const TCHAR* DisplayName, EBreakerPointCurrency Currency, EBreakerClassId RequiredClass)
     {
         UBreakerProgressionTree* Tree = NewObject<UBreakerProgressionTree>(GetTransientPackage(), UBreakerProgressionTree::StaticClass(), NAME_None, RF_Standalone);
@@ -2944,6 +2952,27 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // Caster do. The keystone reachability suite's honest-emptiness arm no
     // longer applies to these classes — from this commit, its FULL arm does,
     // and the nine Keystone.* tags resolve from the branch cornerstones.
+    //
+    // THE ORDER A SIXTH CLASS MUST BE BUILT IN. All five above were executed
+    // in exactly this sequence, and it is the template:
+    //   1. Attach the resource component (Characters/BreakerCharacter.cpp,
+    //      beside Momentum and Mana).
+    //   2. Wire its Notify* generation entry points from real callers in
+    //      combat / weapons / status / healing. An entry point with no caller
+    //      is a resource bar that sits at zero forever.
+    //   3. Write the UGameplayAbility subclasses and assign AbilityClass on
+    //      every row.
+    //   4. Add the row HERE, mirroring the registry ids exactly.
+    //   5. Add the class to DefaultAbilityIdForSlot
+    //      (Abilities/BreakerAbilityDefinition.cpp).
+    //   6. Add the resource to the HUD.
+    //   7. O39's gate then opens BY ITSELF — ClassHasImplementedKit is
+    //      derived, not a list, so nothing needs editing to admit the class.
+    // STEPS 3 AND 4 MUST NOT BE INVERTED. Registering a class definition
+    // before its abilities execute is what made every Caster ability read as
+    // locked: the class becomes selectable, the loadout resolves ids that do
+    // not run, and the player permanently locks into a kit that grants
+    // nothing. Abilities first, always.
     if (ClassId == EBreakerClassId::Gunsmith)
     {
         static UBreakerClassDefinition* Gunsmith = nullptr;
