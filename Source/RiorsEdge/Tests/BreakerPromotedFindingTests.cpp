@@ -61,6 +61,23 @@ namespace BreakerPromotedFindingTest
         return Base + PromotedGearHealthAt(UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel));
     }
 
+    // Seconds a BASELINE build takes to kill one enemy of this rank, in on-level
+    // content. Absolute rather than relative, so it needs a cadence and an
+    // archetype; both come from the shipped definitions. A baseline carries no
+    // multiplier band by construction, which is what makes it the baseline.
+    float PromotedBaselineSecondsToKill(int32 AreaLevel, EBreakerMonsterRank Rank,
+        const FBreakerMonsterChassisParams& Params)
+    {
+        const UBreakerWeaponDefinition* Definition = GetDefault<UBreakerWeaponDefinition>();
+        const float RoundsPerMinute = Definition ? Definition->RoundsPerMinute : 600.0f;
+        const int32 ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
+        const float PerShot = FBreakerWeaponMath::WeaponBaseDamage(
+            PromotedArchetypeBase, ItemLevel, PromotedWeaponGrowth());
+        const float DamagePerSecond = PerShot * RoundsPerMinute / 60.0f;
+        const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(AreaLevel, Rank, Params);
+        return Health / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
+    }
+
     // Hits a trash enemy needs to kill a baseline character at this area level.
     float PromotedHitsToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
     {
@@ -118,6 +135,74 @@ bool FBreakerDefenseCurveHitsToDieTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
+// TRASH AND ELITE TIME-TO-KILL, AS MAGNITUDES
+// ---------------------------------------------------------------------------
+// Combat.PowerCurve.Composition asserts the baseline TTK curve is FLAT across
+// area level and never asserts what it is flat AT. A curve can be perfectly
+// level and land at twice its target everywhere, which is what happened here: a
+// throughput shortfall on the two commonest enemies in the game survived every
+// green run until a boss test tripped over it, and the boss looked like the
+// fault.
+//
+// So these assert the magnitude the flatness test takes for granted, on the same
+// chassis and weapon maths. They are cheaper than any other finding outstanding,
+// and they are the figure every other TTK number in the project rests on.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTrashTtkTest,
+    "RiorsEdge.Combat.PowerCurve.TrashTtk",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTrashTtkTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Params;
+
+    // O18: trash a little under a second. A CEILING rather than a band — trash
+    // exists to be trivialized by an optimized build, so a baseline killing it
+    // faster than the seed is not a defect.
+    constexpr float TrashSecondsCeiling = 1.0f;
+
+    for (const int32 AreaLevel : {1, 25, 50})
+    {
+        AddInfo(FString::Printf(TEXT("TRASH TTK  area level %2d: %.2fs (O18 target under %.1fs)"),
+            AreaLevel, PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params),
+            TrashSecondsCeiling));
+    }
+
+    const float AtCap = PromotedBaselineSecondsToKill(50, EBreakerMonsterRank::Trash, Params);
+    TestTrue(*FString::Printf(TEXT("A baseline kills on-level trash in under %.1fs (measured %.2fs)"),
+        TrashSecondsCeiling, AtCap), AtCap <= TrashSecondsCeiling);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEliteTtkTest,
+    "RiorsEdge.Combat.PowerCurve.EliteTtk",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEliteTtkTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Params;
+
+    // O18: elite around three. A band, because an elite dying too fast is a rank
+    // that stopped meaning anything — the opposite failure from trash, which is
+    // why the two are asserted differently.
+    constexpr float EliteSecondsFloor = 2.0f;
+    constexpr float EliteSecondsCeiling = 4.0f;
+
+    const float AtCap = PromotedBaselineSecondsToKill(50, EBreakerMonsterRank::Elite, Params);
+    AddInfo(FString::Printf(TEXT("ELITE TTK  area level 50: %.2fs (O18 target ~3s, band %.0f-%.0fs)"),
+        AtCap, EliteSecondsFloor, EliteSecondsCeiling));
+
+    TestTrue(*FString::Printf(TEXT("A baseline kills an on-level elite in at least %.0fs (measured %.2fs)"),
+        EliteSecondsFloor, AtCap), AtCap >= EliteSecondsFloor);
+    TestTrue(*FString::Printf(TEXT("A baseline kills an on-level elite in at most %.0fs (measured %.2fs)"),
+        EliteSecondsCeiling, AtCap), AtCap <= EliteSecondsCeiling);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // BOSS TIME-TO-KILL, FOR A BASELINE BUILD
 // ---------------------------------------------------------------------------
 // O94: the 20-45s figure describes a BASELINE build in on-level content, and
@@ -144,24 +229,28 @@ bool FBreakerBossBandTest::RunTest(const FString& Parameters)
     constexpr float BossSecondsFloor = 20.0f;
     constexpr float BossSecondsCeiling = 45.0f;
 
-    const UBreakerWeaponDefinition* Definition = GetDefault<UBreakerWeaponDefinition>();
-    const float RoundsPerMinute = Definition ? Definition->RoundsPerMinute : 600.0f;
-
-    // Measured at the character cap, in on-level content: the point the band
-    // was authored to describe.
     constexpr int32 AreaLevel = 50;
-    const int32 ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
-    const float PerShot = FBreakerWeaponMath::WeaponBaseDamage(
-        PromotedArchetypeBase, ItemLevel, PromotedWeaponGrowth());
-    const float DamagePerSecond = PerShot * RoundsPerMinute / 60.0f;
+    const float Seconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Boss, Params);
+    const float TrashSeconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params);
+    const float TrashTarget = 0.9f;
+    const float Shortfall = TrashSeconds / TrashTarget;
 
-    const float BossHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
-        AreaLevel, EBreakerMonsterRank::Boss, Params);
-    const float Seconds = BossHealth / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
-
+    // TWO ERRORS, REPORTED SEPARATELY, because closing either one alone looks
+    // like progress and is not. The rank multiplier is half of this figure; the
+    // other half is a throughput shortfall that trash and elite carry too, and
+    // moving boss health to cover both would hide it on the enemies a player
+    // meets most.
+    AddInfo(FString::Printf(TEXT("BOSS BAND  area level %d: %.1fs (O18 target %.0f-%.0fs)"),
+        AreaLevel, Seconds, BossSecondsFloor, BossSecondsCeiling));
     AddInfo(FString::Printf(
-        TEXT("BOSS BAND  area level %d: %.0f health against %.1f dps (%.2f per shot at %.0f rpm) => %.1fs (O18 target %.0f-%.0fs)"),
-        AreaLevel, BossHealth, DamagePerSecond, PerShot, RoundsPerMinute, Seconds, BossSecondsFloor, BossSecondsCeiling));
+        TEXT("BOSS BAND  error 1, throughput: trash takes %.2fs against a %.1fs target, so the baseline is %.2fx short before a boss is involved"),
+        TrashSeconds, TrashTarget, Shortfall));
+    AddInfo(FString::Printf(
+        TEXT("BOSS BAND  error 2, rank: x75 authored, against x%.0f-%.0f derived from this band over the trash target"),
+        BossSecondsFloor / TrashTarget, BossSecondsCeiling / TrashTarget));
+    AddInfo(FString::Printf(
+        TEXT("BOSS BAND  throughput alone gives %.1fs, rank alone gives %.1fs, both together land the band"),
+        Seconds / Shortfall, Seconds * (BossSecondsCeiling / TrashTarget) / 75.0f));
 
     // A BASELINE build carries no multiplier band by construction — that is
     // what makes it the baseline — so this is weapon base against boss health

@@ -91,10 +91,9 @@ guarantees one has bought a build multiplier, and it moves into the accounting
 the gate stood in for; crit does not also multiply on that hit. Gate removal
 adds no lane, so the rule above would never have caught it.
 
-**Conditional lines are texture, not the route to power.** The backbone is
-unconditional. A build must be able to be strong satisfying no conditions at
-all; composition makes a line more characterful, not more powerful, and a
-two-condition line is worth more than a one-condition line only by a little.
+**Conditional lines are texture, not the route to power.** A build must be able
+to be strong satisfying no conditions at all, and a two-condition line is worth
+more than a one-condition line only by a little.
 
 **Choices beat accumulation.** The per-point spend baseline is a floor so that
 a purely defensive purchase is not literally zero offence. Because every build
@@ -134,8 +133,8 @@ the two hold.
 | `w` weapon growth | 0.09 | Equal to `g` by design, not by coincidence |
 
 Item level 1 is the anchor: the scalar is exactly 1.0 there, so the curve is
-opt-in by content rather than a silent retune of the only content anyone has
-played. An unequipped weapon is item level 1 for the same reason.
+opt-in by content rather than a silent retune of what has been played. An
+unequipped weapon is item level 1 for the same reason.
 
 ### Rank
 
@@ -147,7 +146,9 @@ played. An unequipped weapon is item level 1 for the same reason.
 | Boss | x75 | x2.0 |
 
 The ratios are derived from the targets rather than guessed. Trash under a
-second against elite at three seconds *is* an elite health ratio of three.
+second against elite at three seconds *is* an elite health ratio of three — and
+the same derivation on a 20–45s boss gives **x22–50**, which the authored x75 is
+not. That row is the one the rule does not produce.
 
 ### Targets
 
@@ -156,9 +157,8 @@ second against elite at three seconds *is* an elite health ratio of three.
 | Trash TTK | a little under 1s, scaling exponentially with difficulty |
 | Elite TTK | ~3s |
 | Boss TTK, baseline build | 20–45s, unless a special enemy claims the exception explicitly |
-| Boss TTK, optimized build | substantially under the baseline figure |
 | TTD, no resources or sustain | 4–5s |
-| TTD, invested | substantially higher |
+| Optimized, and invested | substantially past the baseline figure, asserted separately |
 
 These describe a **baseline build in on-level content** — one point on two
 curves, not a constant to hold at every point of progression. An optimized
@@ -268,6 +268,7 @@ does not own:
 | Invariant | Test |
 |---|---|
 | Baseline TTK is flat across area level 1–50 | `Combat.PowerCurve.Composition` |
+| Baseline trash TTK lands under its seed, and elite TTK inside its band | `Combat.PowerCurve.TrashTtk`, `Combat.PowerCurve.EliteTtk` |
 | Baseline TTK is flat across area level 50–100 | `Combat.PowerCurve.EndgameComposition` |
 | The chassis is monotonic and geometric; rank ordering holds | `Combat.Chassis.*` |
 | Weapon base tracks item level; archetype ordering survives scaling | `Weapons.ItemLevelCurve`, `Weapons.ItemLevelTracksMonsterHealth` |
@@ -291,8 +292,7 @@ does not own:
 
 ## Open
 
-- The conditional-line payout ratio is unauthored; the direction is stated
-  above and the number waits on measurement.
+- The conditional-line payout ratio is unauthored and waits on measurement.
 - Whether the ability pool gets a flat line. Added Damage bids Flat into the
   weapon lane alone, so an ability build's flat layer is structurally 1.000 —
   the half of the parity deficit that degrades fastest with gear depth.
