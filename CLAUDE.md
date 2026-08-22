@@ -2,9 +2,87 @@
 
 ## Build and test
 
-<!-- FILL THIS IN from Docs/HANDOFF.md §3 before deleting it. Build command,
-     test command, how to run the game, the two-machine constraint. This is the
-     only section of the old handoff worth keeping. -->
+**The cycle is BUILD → SUITE → COMMIT → PUSH, in that order, no shortcuts.**
+"Clean" means **zero** `Result={Fail}`. There are no deliberate reds; any
+failure is a regression without exception.
+
+**Never build while the editor is open.** Live Coding holds the lock and the
+build fails. Close the editor, or press Ctrl+Alt+F11 in it, first. One
+exception: when the owner has the *main* tree's editor open and you are
+building in a separate worktree, the lock is a false positive — the guard keys
+off the shared `UnrealEditor.exe`, not the project DLL. `-NoHotReloadFromIDE`
+is the correct override in that case only.
+
+**A build "completing" is not a build succeeding.** Piping build output through
+`tail` swallows the exit code. Check for `Result: Succeeded` or the exit code
+directly.
+
+Build:
+
+```bash
+"C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" RiorsEdgeEditor Win64 Development -Project="C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -WaitMutex
+```
+
+Suite — headless, no RHI. **Results do not reach stdout**; grep the log file:
+
+```bash
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi
+```
+
+```bash
+grep -c "Result={Fail}" Saved/Logs/riors_edge.log
+```
+
+A count *below* the previous passing total means tests went missing, which is
+itself the regression. `make status` reports the current total; do not pin it
+here.
+
+Standalone game:
+
+```bash
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -game -windowed -ResX=1920 -ResY=1080
+```
+
+### The capture harness
+
+The project photographs itself, and reading your own screenshots is expected of
+any visual work. Frames land in `Saved/Screenshots/breaker_NN.png`; the process
+exits ~2.5 s after the last. Capture runs on a **core ticker, not a world
+timer**, because opening a menu pauses the world.
+
+| Switch | Form | Effect |
+|---|---|---|
+| `-BreakerAutoPlay` | flag | Skips the title menu into the gym. **Required for `-BreakerCaptureMenu`**, which is parsed inside its branch. |
+| `-BreakerScreenshots=N` | int 1–60 | N frames then exit. First at 6.0 s, then every 2.0 s. |
+| `-BreakerCaptureMenu=<SCREEN>` | string | `INVENTORY`, `SKILLTREES`/`SKILLS`, `SETTINGS`, `CLASS`/`CLASSSELECT`, `PAUSE`, `CHARACTERSELECT`, `CHARACTERCREATE`, `DEVSANDBOX`/`SANDBOX`. Anything else **silently** falls back to the main screen. |
+| `-BreakerCaptureBoard=<BOARD>` | string, not a bare flag | `CORE`, `COMPARE`, `BRANCH<n>`. Also the back door to FORGE/ABILITIES when combined with `-BreakerCaptureMenu=INVENTORY`. |
+| `-BreakerCaptureTour` | flag | Eight authored field vantages instead of the player's eyes. |
+| `-BreakerCaptureHUD` | flag | Fabricates the HUD events a headless run cannot reach. |
+| `-BreakerCycleWeapons=<seconds>` | float > 0 | Walks the viewmodel through the archetypes. |
+| `-BreakerBossOnStart` | flag | Spawns the Field Marshal during the gym build. |
+
+Two permanent limits: the harness **cannot move a mouse**, so every hover state
+and every zoom/pan gesture is structurally unverifiable by it; and a vantage set
+is a hypothesis about what can go wrong — the ground-tearing defect was
+invisible from all seven existing vantages and needed an eighth.
+
+### Machines
+
+Unreal 5.8 on both, Git LFS installed per machine, and the repository never
+inside iCloud, OneDrive, Dropbox or a network drive.
+
+- **Windows** is the work machine: extended playtests, shader builds, profiling,
+  packaging, content-heavy work. Needs Visual Studio 2022 with *Game
+  development with C++*, Unreal tooling, and a current Windows SDK.
+- **The MacBook has limited memory** — treat it as lightweight authoring and
+  integration: C++ compilation, docs, Data Asset setup, small graybox edits,
+  short smoke tests. Keep editor scalability low. Do not run the editor, IDE
+  indexing and shader compilation at once. Do not repeatedly delete the DDC.
+  Needs Xcode and its command-line tools.
+- **Switching machines:** close Unreal, commit and push, then pull before
+  opening elsewhere. Never commit `Binaries`, `Intermediate`, `Saved` or
+  `DerivedDataCache`. Binary Unreal assets cannot be merged — coordinate
+  ownership of maps and Blueprints rather than resolving conflicts in them.
 
 ## Code discipline
 
