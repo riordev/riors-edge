@@ -7,10 +7,9 @@ files. Preparatory passes are done: traps moved to their code sites, node
 intent moved to the node, source material moved to `Assets/`.
 
 Written: power-and-scaling, items-and-crafting, progression-and-trees,
-classes-and-abilities, combat, content-and-modes.
-Pending: art-and-ui, then `VISION.md`, `DECISIONS.md` and the
-`make status` generator. The deletion pass is the last commit — the
-remaining specs need their sources open.
+classes-and-abilities, combat, content-and-modes, art-and-ui — all seven.
+Pending: `VISION.md`, `DECISIONS.md`, the `make status` generator, then the
+deletion pass as the last commit of the rewrite.
 
 Awaiting the owner: the class branch tree shape, class induction siting, the
 fifth rarity's final name, and the rarity restructure's four open items. All
