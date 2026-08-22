@@ -285,7 +285,7 @@ protected:
     // Rank multiplies the chassis rather than replacing it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Area") EBreakerMonsterRank MonsterRank = EBreakerMonsterRank::Trash;
 
-    // --- The two families (Story-Source §1.5) ------------------------------
+    // --- The two families (Assets/story-source.md §1.5) ------------------------------
     // Vestige is the default because everything that existed before the
     // families did is rift-native by fiction and by behaviour. It is a
     // GAMEPLAY field, not a lore tag: it scopes which modifiers may appear

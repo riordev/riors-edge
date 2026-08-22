@@ -254,7 +254,7 @@ EBreakerModifierFamilyScope UBreakerEnemyModifierLibrary::GetModifierFamilyScope
         return EBreakerModifierFamilyScope::VestigeOnly;
 
     // Tactical rules. Anchored plants a stance to hold ground; Warding Aura
-    // protects the squad. Both are DECISIONS, and Story-Source §1.5 says a
+    // protects the squad. Both are DECISIONS, and Assets/story-source.md §1.5 says a
     // Vestige has no tactics that resemble a military.
     case EBreakerEnemyModifier::Anchored:
     case EBreakerEnemyModifier::WardingAura:

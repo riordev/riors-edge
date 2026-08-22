@@ -10,7 +10,7 @@
 // The one thing that genuinely needs a world — "is the line from the threat to
 // this point blocked" — stays in the actor, and everything around it is here.
 //
-// This exists because Story-Source §1.5 makes cover use a readable marker of
+// This exists because Assets/story-source.md §1.5 makes cover use a readable marker of
 // EARLY severance on an Altered: "early stage still wears insignia, still uses
 // cover, still flinches." No enemy in the project did any of those; every one
 // of them either closes to contact or holds a band, so every fight is answered

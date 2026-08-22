@@ -404,6 +404,15 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
     // respec clearing the commitment.
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     Progression->ApplySliceDefaultsIfFresh();       // locks Swift, grants 10 class / 12 core
+    // GRANTING MORE POINTS THAN THE GAME DOES HIDES REACHABILITY BUGS, and
+    // this line is the reason six branch keystones sat unpurchasable for a
+    // whole milestone with a green suite: the shipped grant was 10, the gate
+    // was 8, a keystone cost 3, and every test that could have caught it
+    // handed itself 30. The headroom is legitimate HERE — this test asserts
+    // commitment semantics, not affordability, and it must be able to reach
+    // the nodes it is testing. But any test asserting that content is
+    // REACHABLE must run on the shipped entitlement, never on a grant, or it
+    // proves the rule against a character the game cannot produce.
     Progression->GrantPlaytestPoints(30, 0);        // headroom for this playthrough's purchases
     UBreakerProgressionTree* Frenzy = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
     UBreakerProgressionTree* Kinetic = UBreakerProgressionLibrary::GetSwiftKineticTree();

@@ -336,6 +336,14 @@ namespace
         AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, PercentAboveOne, Condition);
     }
 
+    // THESE OBJECTS LIVE FOR THE WHOLE PROCESS, AND THAT LEAKS BETWEEN TESTS.
+    // Every tree below is a static, root-set singleton built once and handed
+    // out by pointer, so a test that MUTATES a node — changing a cost, a gate,
+    // an effect, a rank — changes it for every subsequent test in the same
+    // editor session, in declaration order, with no reset between them. The
+    // failure looks like a test that passes alone and fails in the suite, or
+    // worse, one that passes in the suite because an earlier test happened to
+    // set it up. Read the tree; copy anything you intend to change.
     UBreakerProgressionTree* MakeTree(FName TreeId, const TCHAR* DisplayName, EBreakerPointCurrency Currency, EBreakerClassId RequiredClass)
     {
         UBreakerProgressionTree* Tree = NewObject<UBreakerProgressionTree>(GetTransientPackage(), UBreakerProgressionTree::StaticClass(), NAME_None, RF_Standalone);
@@ -748,16 +756,30 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
 
     Tree = MakeTree(TEXT("Swift.Kinetic"), TEXT("Swift — Kinetic"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift);
 
+    // Kinetic's entry loop knob: lengthening the airborne credit window is what
+    // lets a jump chain pay across the gap between two surfaces rather than only
+    // while a foot is on one.
+    // WAITING ON: the Momentum component's airborne credit window reading this
+    // tag. Cheap - the valve is already there, nothing turns it.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Kinetic.ReadTheRoom"), TEXT("Read the Room"),
         TEXT("Airborne Momentum generation credit lasts longer."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_ReadTheRoom.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Makes SHORT walls worth riding. Without a grace period after contact is
+    // lost, a two-metre wall pays nothing and the branch quietly demands
+    // architecture the field does not always have.
+    // WAITING ON: the wall-ride generation path holding credit open past
+    // contact loss.
     Node = MakeNode(TEXT("Swift.Kinetic.Contact"), TEXT("Contact"),
         TEXT("Wall ride Momentum generation continues briefly after losing contact."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Contact.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The slide-chain node. Its SlideSpeed line is live and does the felt half;
+    // the tag is the income half, so chaining slides is a Momentum decision and
+    // not only a speed one.
+    // WAITING ON: a slide-chain generation credit in the Momentum component.
     Node = MakeNode(TEXT("Swift.Kinetic.Carry"), TEXT("Carry"),
         TEXT("Slide chaining pays flat Momentum and carries more speed."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
     AddEffect(Node, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
@@ -779,12 +801,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Redirect.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Kinetic's identity loop - evasion IS the resource, which is the thing no
+    // other class converts. The DodgeChance line is live; the rule half (a
+    // larger yield on a shorter internal cooldown) is what makes the loop a
+    // build rather than a trickle.
+    // WAITING ON: the dodge proc's yield and ICD reading this tag.
     Node = MakeNode(TEXT("Swift.Kinetic.EvadeConversion"), TEXT("Evade Conversion"),
         TEXT("The passive dodge proc yields more Momentum on a shorter internal cooldown."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddEffect(Node, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_EvadeConversion.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The node that turns HEIGHT into a resource, so the vertical half of the
+    // movement kit has an income and a fall is a choice rather than a cost.
+    // WAITING ON: a fall-distance credit paid on landing.
     Node = MakeNode(TEXT("Swift.Kinetic.Landing"), TEXT("Landing"),
         TEXT("Long falls convert into Momentum on landing."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.ReadTheRoom"));
@@ -833,6 +863,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Downforce.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Kinetic's wall-ride payoff, and one of the branch's three conditional
+    // damage lines - the WallRiding condition is what keeps it from being a
+    // flat percentage doing the affix layer's job. Live: the conditional damage
+    // line pays whenever the condition holds. The tag is spare capacity for a
+    // rule half that has not been designed.
     Node = MakeNode(TEXT("Swift.Kinetic.Grind"), TEXT("Grind"),
         TEXT("Shots fired off a wall ride land significantly harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
@@ -932,6 +967,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
 
     Tree = MakeTree(TEXT("Swift.Marksman"), TEXT("Swift — Marksman"), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift);
 
+    // Marksman's entry node. Its crit-damage and damage lines are live; the
+    // DISTANCE half of its promise - that distant weak-point hits also generate
+    // Momentum - is the part that ties the branch to the resource, and it is the
+    // half that keeps Marksman from being a pure stat branch (the duplication
+    // Core-Tree-Redesign flags: these two lines restate Precision's).
+    // WAITING ON: a range-gated weak-point generation credit.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
         TEXT("Distant weak-point hits generate Momentum and land harder."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 1, 2, 1);
     AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
@@ -1263,6 +1304,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SlipcutMastery.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Frenzy's one unconditional damage increase, deliberately sited at the top
+    // of the branch so the cadence nodes below it stay conditional. Live: the
+    // damage line pays. The ammo-return-also-pays-Momentum half is what closes
+    // the branch's kill-to-fire-again loop.
+    // WAITING ON: the on-kill ammunition return crediting Momentum.
     Node = MakeNode(TEXT("Swift.Frenzy.AmmunitionEconomy"), TEXT("Ammunition Economy"),
         TEXT("Ammunition returned on a kill also pays Momentum. The branch's one unconditional increase to damage."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.DryFire"));
@@ -1405,11 +1451,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_ContactCharge.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Spellblade's answer to Cleave's own Bleed jamming the branch's income:
+    // the branch is built on melee uptime, and a status already present must
+    // not stop paying for the swing that reapplied it.
+    // WAITING ON: the Mana component's status-application generation skipping
+    // its already-present suppression for this tag, and the kill refund.
     Node = MakeNode(TEXT("Caster.Spellblade.FollowThrough"), TEXT("Follow Through"),
         TEXT("Cleave's Bleed generates its status-application Mana even when Bleed is already present, and refunds Mana on kill."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_FollowThrough.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The node that decides where Spellblade stands. Doubling weapon income at
+    // close range is the branch's whole positional argument — without it a
+    // Spellblade is a Caster who happens to own a melee ability.
+    // WAITING ON: the weapon-hit generation path reading a range band.
     Node = MakeNode(TEXT("Caster.Spellblade.Close"), TEXT("Close"),
         TEXT("Weapon hits at close range generate double Mana. Defines the branch's play distance."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Close.GetTag());
@@ -1433,6 +1488,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_MomentumTransfer.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The branch's only sustain, and the reason Overcast is survivable here:
+    // debt is paid in melee range, where the branch already wants to be.
+    // WAITING ON: the Lifesteal stat target's aggregation lane, plus a melee
+    // damage-dealt hook that can read the negative-Mana state.
     Node = MakeNode(TEXT("Caster.Spellblade.Bloodprice"), TEXT("Bloodprice"),
         TEXT("While Mana is negative, melee hits restore health equal to a portion of damage dealt."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Close"));
@@ -1497,11 +1556,20 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Seep.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Zone income deliberately INDEPENDENT of enemy count, so Void Whisperer
+    // still pays in a one-enemy fight. Scaling it per-enemy would make the
+    // branch's income a crowd-size stat and its worst case unplayable.
+    // WAITING ON: the zone actor crediting Mana per second while occupied.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.StandingWater"), TEXT("Standing Water"),
         TEXT("Zones generate Mana per second while at least one enemy is inside, independent of enemy count."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_StandingWater.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The not-shooting income — the branch's argument for putting the gun down.
+    // Flagged NEEDS-RE-SITING in its own description: the Mana inversion turned
+    // this from a trickle bonus into a doubling of the PRIMARY income, which is
+    // a different node than the one that was priced. O2 holds the magnitude.
+    // WAITING ON: a recently-fired recorder, and the regen path reading it.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
         TEXT("Passive Mana regeneration doubles while the caster has not fired a weapon recently. Flagged NEEDS-RE-SITING under the Mana inversion (Class-Kits §2.1.1) -- it now doubles the PRIMARY income, not a trickle bonus; O2 freeze holds its magnitude regardless."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
@@ -1524,12 +1592,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Lingering.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Keeps the branch's slow damage from also being its slow income: a DoT
+    // kill pays, so committing to attrition is not a resource penalty.
+    // WAITING ON: the kill path asking whether a Caster DoT was on the victim.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Attrition"), TEXT("Attrition"),
         TEXT("Enemies killed while affected by a Caster damage-over-time effect refund Mana."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Seep"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Attrition.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Makes Siphon castable DURING a fight rather than only after one. As
+    // shipped the channel breaks on any damage, which means the branch's
+    // sustain is only available when it is not needed.
+    // WAITING ON: Siphon's channel-break check reading a damage threshold.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Drain"), TEXT("Drain"),
         TEXT("Siphon's channel no longer breaks on damage below a fraction of the caster's max health."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Patience"));
@@ -1547,6 +1622,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Zonework.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The branch's only mobile play — every other Void Whisperer node rewards
+    // standing still, and one node has to answer the encounter that will not
+    // let you. One at a time, deliberately: two would be a moving safe zone.
+    // WAITING ON: a zone actor that can attach to the caster, and a
+    // one-at-a-time registry to enforce the limit.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Wellspring"), TEXT("Wellspring"),
         TEXT("A zone may be placed on the caster's own position and move with them for its duration. One at a time."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Lingering"));
@@ -1590,6 +1670,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Variance.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The rotation is the branch, so a missed cast must not cost a position in
+    // it. Advancing on hit rather than on cast is what makes the fantasy
+    // survivable at the skill floor O33 asks for.
+    // WAITING ON: Fracture advancing its status cycle on hit, not on cast.
     Node = MakeNode(TEXT("Caster.Multispell.Cycle"), TEXT("Cycle"),
         TEXT("Fracture's status cycle advances on hit rather than on cast, so a missed cast does not waste a position."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cycle.GetTag());
@@ -1613,12 +1697,21 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Chain.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Makes BREADTH the income: paying per distinct status consumed is what
+    // separates Multispell's rotation from Void Whisperer's mastery of one
+    // element (O19's stated split between the two branches).
+    // WAITING ON: Resonance's consumption path counting distinct types and
+    // refunding per type.
     Node = MakeNode(TEXT("Caster.Multispell.Payment"), TEXT("Payment"),
         TEXT("Resonance refunds Mana per distinct status consumed."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Cycle"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Payment.GetTag());
     Tree->Nodes.Add(Node);
 
+    // The three-status lump sum — the explicit reward for rotating all three
+    // rather than mastering one. Once per target on a cooldown because the
+    // uncapped version is a Mana engine, not a rotation.
+    // WAITING ON: a per-target status-application window recorder.
     Node = MakeNode(TEXT("Caster.Multispell.Sequence"), TEXT("Sequence"),
         TEXT("Applying three distinct status types to one target within a short window generates a Mana lump sum, once per target on a cooldown."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
@@ -1634,6 +1727,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Fracture.GetTag());
     Tree->Nodes.Add(Node);
 
+    // Detonating must not reset the rotation. Halving remaining duration
+    // instead of consuming is what lets the branch detonate and keep cycling,
+    // which is the difference between a rotation and a reload.
+    // WAITING ON: Resonance's consumption path learning to halve rather than
+    // consume.
     Node = MakeNode(TEXT("Caster.Multispell.Resonance"), TEXT("Resonance"),
         TEXT("Resonance no longer consumes the statuses it detonates; it halves their remaining duration instead."), EBreakerPointCurrency::ClassPoints, EBreakerClassId::Caster, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Payment"));
@@ -2944,6 +3042,27 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // Caster do. The keystone reachability suite's honest-emptiness arm no
     // longer applies to these classes — from this commit, its FULL arm does,
     // and the nine Keystone.* tags resolve from the branch cornerstones.
+    //
+    // THE ORDER A SIXTH CLASS MUST BE BUILT IN. All five above were executed
+    // in exactly this sequence, and it is the template:
+    //   1. Attach the resource component (Characters/BreakerCharacter.cpp,
+    //      beside Momentum and Mana).
+    //   2. Wire its Notify* generation entry points from real callers in
+    //      combat / weapons / status / healing. An entry point with no caller
+    //      is a resource bar that sits at zero forever.
+    //   3. Write the UGameplayAbility subclasses and assign AbilityClass on
+    //      every row.
+    //   4. Add the row HERE, mirroring the registry ids exactly.
+    //   5. Add the class to DefaultAbilityIdForSlot
+    //      (Abilities/BreakerAbilityDefinition.cpp).
+    //   6. Add the resource to the HUD.
+    //   7. O39's gate then opens BY ITSELF — ClassHasImplementedKit is
+    //      derived, not a list, so nothing needs editing to admit the class.
+    // STEPS 3 AND 4 MUST NOT BE INVERTED. Registering a class definition
+    // before its abilities execute is what made every Caster ability read as
+    // locked: the class becomes selectable, the loadout resolves ids that do
+    // not run, and the player permanently locks into a kit that grants
+    // nothing. Abilities first, always.
     if (ClassId == EBreakerClassId::Gunsmith)
     {
         static UBreakerClassDefinition* Gunsmith = nullptr;

@@ -4,7 +4,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "BreakerEnemyFamily.generated.h"
 
-// THE TWO FAMILIES — Story-Source.md §1.5, which is authoritative for enemy
+// THE TWO FAMILIES — Assets/story-source.md §1.5, which is authoritative for enemy
 // ARCHITECTURE (the O-ledger still rules systems).
 //
 // Before this, "enemy" was one undifferentiated taxonomy and the only axes

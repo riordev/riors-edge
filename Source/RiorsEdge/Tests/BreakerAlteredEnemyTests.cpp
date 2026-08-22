@@ -32,7 +32,7 @@ bool FBreakerAlteredEnemyFamilyTest::RunTest(const FString& Parameters)
     const ABreakerAlteredEnemy* Altered = GetDefault<ABreakerAlteredEnemy>();
     if (!TestNotNull(TEXT("The altered enemy has a default object"), Altered)) return false;
 
-    // Story-Source §1.5: two families, and this one is the Altered.
+    // Assets/story-source.md §1.5: two families, and this one is the Altered.
     TestTrue(TEXT("It is Altered, not Vestige"), Altered->GetFamily() == EBreakerEnemyFamily::Altered);
     // LATE severance: "nothing is left but the shape." This is the mechanical
     // claim, not a label — it is what turns cover discipline and flinching

@@ -370,7 +370,7 @@ bool FBreakerSkirmisherDefaultsTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("The skirmisher has a default object"), Skirmisher)) return false;
 
     // It is an EARLY-severance Altered, which is what turns cover and flinch on
-    // (Story-Source §1.5). This is the mechanical claim, not a label.
+    // (Assets/story-source.md §1.5). This is the mechanical claim, not a label.
     TestTrue(TEXT("The skirmisher is Altered"), Skirmisher->GetFamily() == EBreakerEnemyFamily::Altered);
     TestTrue(TEXT("...at early severance, which is what grants cover and flinch"),
         Skirmisher->GetSeveranceStage() == EBreakerSeveranceStage::Early);

@@ -112,7 +112,7 @@ enum class EBreakerModifierPressure : uint8
     Attrition
 };
 
-// Which FAMILY a modifier is allowed to appear on (Story-Source §1.5).
+// Which FAMILY a modifier is allowed to appear on (Assets/story-source.md §1.5).
 //
 // A modifier is a rule the enemy plays by, and a rule that reads as tactical
 // discipline makes sense on an Altered soldier and actively contradicts the
@@ -342,7 +342,7 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
     static int32 GetDistinctPressureCount(const TArray<EBreakerEnemyModifier>& Modifiers);
 
-    // --- Family scoping (Story-Source §1.5) -------------------------------
+    // --- Family scoping (Assets/story-source.md §1.5) -------------------------------
 
     UFUNCTION(BlueprintPure, Category="Enemy|Modifiers")
     static EBreakerModifierFamilyScope GetModifierFamilyScope(EBreakerEnemyModifier Modifier);

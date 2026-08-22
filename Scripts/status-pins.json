@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "Pins are authored deliberately and never generated from a run.",
+    "A MEASUREMENT pin sits at the current number: it cannot fail on anything",
+    "that exists today, only on new dead content. That is the ratchet stopping",
+    "regrowth, and it does not by itself force work.",
+    "A TARGET pin is set where the number should be. The section is EXPECTED to",
+    "sit out of band until the work lands; that is the point of it.",
+    "A pin may carry both a limit and a target: the limit fails the build, the",
+    "target states the direction of travel. There is no third kind — the",
+    "presence of both max and target is the signal, and the shape says so.",
+    "",
+    "`kind` is a note for whoever reads this file. The generator branches on the",
+    "section's DIRECTION, declared in status.py, and never on `kind`. A pin key",
+    "naming no section is refused rather than silently doing nothing."
+  ],
+
+  "_expected_red_comment": [
+    "Deliberate reds, enumerated. A red test not on this list is a regression.",
+    "ADD THE ENTRY IN THE SAME COMMIT THAT ADDS THE TEST. Otherwise the build",
+    "goes red as an unexpected regression, and the fastest-looking fix is to",
+    "revert the test — which deletes the finding it was written to hold.",
+    "Each entry names the finding it encodes and the condition that deletes it.",
+    "The four promoted findings land here when their tests are written:",
+    "ability-lane parity, archetype spread, hits-to-die, boss band."
+  ],
+  "_expected_red": [],
+
+  "silent-nodes":            { "max": 47,  "kind": "measurement",
+    "why": "Drive this down regardless. A node a player spends a point on and gets nothing from is a broken promise, and it is the failure this project has shipped four times." },
+  "dead-tags":               { "max": 118, "kind": "measurement",
+    "why": "118 of 202 looks alarming and is not all rot. Some is deliberate reserve ahead of consumers, which O72 now makes the required order: widen the vocabulary first, then author to it. The rest is the real backlog. Nobody has separated the two, and until someone does, this pin only stops the number growing." },
+  "dead-conditions":         { "max": 12,  "kind": "measurement" },
+  "unmapped-stat-targets":   { "max": 10,  "kind": "measurement" },
+  "empty-lanes":             { "max": 6,   "kind": "measurement" },
+  "uncalled-generation":     { "max": 0,   "kind": "measurement",
+    "why": "Already zero. Pinned so it stays that way." },
+  "unexpected-red":          { "max": 0,   "kind": "measurement" },
+
+  "unimplemented-invariants": { "max": 49, "target": 20, "kind": "target",
+    "why": "Pinned so it cannot grow, targeted so it does not sit at 49 for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
+
+  "offered-to-spendable":    { "min": 3.0, "kind": "target",
+    "why": "0.63x on the worst tree. The largest gap in the report." },
+  "node-shape-composition":  { "min": 55, "max": 65, "kind": "target",
+    "why": "52% is close enough that the band is the target rather than the measurement." }
+}
