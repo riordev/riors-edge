@@ -513,18 +513,25 @@ def load_pins():
 
 
 def judge(section, pin):
-    """Returns (state, message). State is one of ok / violated / unpinned."""
+    """Returns (state, message). State is one of ok / violated / unpinned.
+
+    A pin may carry a `target` alongside its limit. The limit is what FAILS the
+    build; the target is the direction of travel. A number that only has a
+    ceiling at its current value cannot grow, but it also has no reason to
+    shrink, and a section like that will sit where it is for a year.
+    """
     if pin is None:
         return "unpinned", "no pin — measurement only"
     v, d = section["value"], section["direction"]
+    tgt = f", target {pin['target']}" if "target" in pin else ""
     if d == CEILING:
         limit = pin["max"]
-        return ("ok" if v <= limit else "violated"), f"ceiling {limit}"
+        return ("ok" if v <= limit else "violated"), f"ceiling {limit}{tgt}"
     if d == FLOOR:
         limit = pin["min"]
-        return ("ok" if v >= limit else "violated"), f"floor {limit}"
+        return ("ok" if v >= limit else "violated"), f"floor {limit}{tgt}"
     lo, hi = pin["min"], pin["max"]
-    return ("ok" if lo <= v <= hi else "violated"), f"band {lo}–{hi}"
+    return ("ok" if lo <= v <= hi else "violated"), f"band {lo}–{hi}{tgt}"
 
 
 def git_head():
