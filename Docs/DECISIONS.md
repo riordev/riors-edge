@@ -183,6 +183,12 @@ Numbers are permanent and never reused.
 
 **O100** — The ultimate and two starters are free at level one; the remaining class abilities unlock one at a time, per character, bought with a one-time token at the quartermaster, an Anchor interaction. Not the crafting currency, which is account-wide and would let an established account buy out a new character at level one. One token per unlockable, so acquisition is an ordering choice rather than a scarcity one — do not later tighten the count and read scarcity into it.
 
+
+**O101** — Keystones are not on the vocabulary pass's critical path and never were: O72 governs the minor and rule tiers. A keystone an enum entry unblocks is a minor with the wrong label. Missing primitives are recorded at each keystone's own site and the node ships honestly short.
+
+**O102** — Primitives are clustered into systems before they are priced. Sixteen items is a list; five of them being one healing-modifier chain is a decision.
+
+**O103** — Tree ids and node ids never move. A re-theme is delivered by the display field, so a branch commitment stored on disk always resolves.
 ## Open
 
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
@@ -210,7 +216,7 @@ Numbers are permanent and never reused.
 - Whether party loot is instanced per player.
 - Whether Core Point respec carries friction at the keystone tier.
 - Whether one keystone per character is the right ceiling across all fifteen branches.
-- Whether the Core tree keeps a hub, and whether a re-theme rides an explicit axis field so node ids never move.
+- Whether the Core tree keeps a hub. A hub that is one of the axes privileges that axis.
 - Whether the offered More count grows if the axis count grows.
 - The conditional-line payout ratio.
 - Whether the modifier scope that disables a defensive layer also disables the class resource it generates.

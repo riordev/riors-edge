@@ -59,7 +59,9 @@ Check the exit code of the thing you actually care about. This keeps arriving in
 new shapes: piping a build through `tail` swallows its exit code, and a newline
 where an `&&` was meant breaks the chain so the next command runs regardless —
 which is how a `git push` reported success after the `git merge` before it had
-failed. Neither printed anything alarming.
+failed. Neither printed anything alarming. Reading a reassuring result out of
+the wrong file is the same failure: suite results are in
+`Saved/Logs/riors_edge.log`, never stdout.
 
 Build:
 

@@ -94,6 +94,19 @@ same line at that rate trains people to filter the channel. The project has
 shipped content that compiled, purchased, displayed and did nothing quietly
 four times; loudness is the standing answer.
 
+**Ids never move; a re-theme is a display change.** A tree id and a node id are
+save data — a character's branch commitment is stored as a tree id — so renaming
+a doctrine renames only what the screen prints. A re-theme that moved ids would
+strand every commitment on an id that no longer resolves, and it would do it
+silently, because the save is not corrupt: it points at nothing.
+
+**A node that needs a primitive the game lacks is recorded, never faked.** The
+same rule the ability layer already carries: the absence is written at the
+node's own site and the node ships honestly short. A keystone is where this
+bites, because a keystone is a rule rewrite by definition — if an enum entry
+unblocks it, it was a minor with the wrong label, and it is not what the
+vocabulary ordering is waiting for.
+
 **Nodes may be purchasable while inert.** Buying the node that reads a system
 before buying the system is a legitimate pattern and the tree should support it.
 
@@ -227,8 +240,6 @@ full constellations to fill.
   five-tier target. Decided together with density.
 - Where the Core tree's hub sits, or whether it keeps one — a hub that is one
   of the axes privileges that axis.
-- Whether a re-theme is delivered by an explicit axis field on the node, so
-  node ids never move and saves survive it.
 - Whether the count of offered More options grows if the axis count grows.
 - Whether the conditional-payout ratio differs by condition count. The stated
   direction is that it barely should.
