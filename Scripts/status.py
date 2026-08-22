@@ -370,11 +370,25 @@ def classify(node):
     A granted tag is deliberately NOT a notable signal on its own: this project
     authors rules-as-tags on nearly every node including stat nodes, so reading
     the tag alone put 91% of the tree in one bucket and said nothing.
+
+    THE FOURTH BUCKET IS NOT COMPUTED HERE, and that is deliberate. Scaffolding
+    — a gateway, a link, a node whose only payload is a tag nothing reads —
+    cannot be told from a real rule node by payload alone: every no-stat node in
+    this tree carries a tag, so a payload-only view finds no residual at all.
+    Separating them needs the consumer index, which build_sections has and this
+    function must not, or classify() stops being a pure statement about shape.
+    The section computes it there and reports it on its own line.
     """
     if node["cornerstone"] or node["more"]:
         return "convergence/keystone"
     if node["effects"] and not node["conditions"]:
         return "ranked minor"
+    if node["effects"] or node["conditions"]:
+        return "notable"
+    # No stat line and no condition: the payload is a rule, and a granted tag is
+    # how this project delivers one. The tag speaks ONLY here — used earlier it
+    # would swallow every stat node that also carries an identifying tag, which
+    # is most of them.
     return "notable"
 
 
@@ -533,13 +547,28 @@ def build_sections(sources):
             round(100 * c["notable"] / total),
             round(100 * c["convergence/keystone"] / total)))
     all_minor = sum(1 for n in nodes if classify(n) == "ranked minor")
+    # Scaffolding: no stat line, no condition, and no rule anything reads. A
+    # STRICT SUBSET of the silent nodes above — the difference is the silent
+    # nodes that ARE shaped and merely point at an unpaid target, which is a
+    # wiring problem where this is an authoring one.
+    all_nopay = sum(1 for n in nodes
+                    if not n["effects"] and not n["conditions"]
+                    and not any(tag_consumed(index, t) for t in n["tags"])
+                    and not id_consumed(index, n["id"]))
     sections.append({
         "key": "node-shape-composition", "title": "Node-shape composition, per tree",
         "direction": BAND, "value": round(100 * all_minor / max(1, len(nodes))),
         "unit": "% ranked minors, all trees",
         "detail": comp_rows,
         "note": "A tree that is almost entirely notable-shaped has nothing to fill a "
-                "constellation with between the interesting picks.",
+                "constellation with between the interesting picks. "
+                f"Of these, {all_nopay} are SCAFFOLDING — no stat line, no condition, "
+                "and no rule anything reads — a strict subset of the silent nodes "
+                "above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: "
+                "60% ranked minors means 60% unconditional stat lines, and O76 gives "
+                "raw percentages to affixes outright, so the authored 55-65 target "
+                "cannot be reached without breaking another rule. Until it is "
+                "re-derived this section reports and judges nothing.",
     })
 
     return sections, asserted

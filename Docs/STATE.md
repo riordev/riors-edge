@@ -19,7 +19,7 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
 | Asserted invariants with no test | ceiling | 48 of 100 asserted across 7 specs | ceiling 48, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
-| Node-shape composition, per tree | band | 14 % ranked minors, all trees | band 55–65 | **OUT** |
+| Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
@@ -242,9 +242,9 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 
 ## Node-shape composition, per tree
 
-**band** · 14 % ranked minors, all trees · band 55–65  ·  **OUT**
+**band** · 14 % ranked minors, all trees · no pin — measurement only
 
-A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks.
+A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 43 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
 - GetCasterMultispellTree: 0% ranked minor, 89% notable, 11% convergence/keystone
 - GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone

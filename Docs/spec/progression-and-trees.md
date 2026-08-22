@@ -122,10 +122,15 @@ repeatable source exists — a repeatable source is an infinite power track.
 build is refusal; that is what makes a choice a choice. Against the Core
 budget that is on the order of 200–325 offered nodes.
 
-**Composition, roughly 60 / 30 / 10:** ranked minors, notables carrying a rule
-or a condition, and convergence or keystone nodes. A tree that is almost
-entirely notable-shaped has nothing to fill a constellation with between the
-interesting picks, which is what makes a large tree read as small.
+**Composition is under re-derivation, and the old 60 / 30 / 10 is why.** Sixty
+percent ranked minors means sixty percent unconditional stat lines — which this
+spec calls the affix layer's job two paragraphs above, and which O76 gives to
+affixes outright. That ratio came from a game with no competing affix layer.
+
+The problem it was pointing at is real and unchanged: a tree with nothing to
+fill a constellation between the interesting picks reads as small however large
+it is. What fills it here cannot be unconditional stat lines. It is conditional
+lines — the tree's own texture, cheap and characterful — and small rules.
 
 **The gate is vocabulary, not count, and the ordering is explicit: widen the
 stat-target and condition vocabularies first, then author to the ratio.**

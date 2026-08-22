@@ -205,6 +205,10 @@ Numbers are permanent and never reused.
 **O110** — A doctrine's self-targeted duplication is additive. "Twice at full value" is one bucket counted twice, never a multiplier: a doubled multiplicative buff is an unbudgeted More arriving through a doctrine, which O95 forbids, and the global clamp would silently eat it — leaving the keystone doing nothing for the solo player it was written for.
 ## Open
 
+
+**O111** — The class-currency migration refunds nothing and reads nothing. Class Points are one per level to 30, so spent plus unspent is derivable from the payload alone, and O27 deletes the freed points rather than folding them: v5 to v6 clears the class rank array, zeroes the class wallet, clears any commitment naming one of the fifteen retiring branch ids from a frozen list, and stamps. No cost table and no node library.
+
+**O112** — The node-shape band is unpinned pending re-derivation. Sixty percent ranked minors means sixty percent unconditional stat lines, which O76 gives to affixes outright, so the authored target cannot be met without breaking another rule. The measured fourteen percent is honest and must not drive authoring until a band is derived for a tree whose percentages live on gear.
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
 - The zone-level table, and the mapping from content difficulty to tier bonus.
 - Whether 134 items per hour is the right drop rate. It sits mid-band and has never been argued about, and it governs whether a 300-400 hour chase reads as generous or as grinding.
