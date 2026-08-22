@@ -6,7 +6,7 @@ The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
 `DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
 corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Open: 27 items in `DECISIONS.md`. Five `make status` sections sit out of band
+Open: 31 items in `DECISIONS.md`. Five `make status` sections sit out of band
 and every one is a target rather than a regression. 48 asserted invariants have
 no test yet; the priority order is in `Scripts/status-pins.json`.
 
@@ -18,6 +18,13 @@ increased 3.35 against 4.49, which is unauthored content, and flat 1.000 against
 because Added Damage bids into the weapon lane alone. Endgame parity is measured
 beside it and unpinned at 0.388x: the deficit **widens** with gear depth, because
 a lane with more lines compounds harder up a back-loaded ladder.
+
+O100 gives abilities an acquisition system: two free starters and a free
+ultimate per class, the rest bought one at a time with a token at the
+quartermaster. `Swift.CadenceBreak` — registered, offered and permanently
+refusable — is reachable for the first time. The save is v5; the v4 step hands
+every pre-v5 character the kit it could already reach and stamps its token
+counter so it is not paid retroactively.
 
 Next, in order: widen `EBreakerNodeStatTarget` and `EBreakerBuildCondition`
 against the doctrine draft, which names the targets and conditions the content

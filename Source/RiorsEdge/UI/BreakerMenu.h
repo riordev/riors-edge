@@ -39,6 +39,13 @@ enum class EBreakerMenuScreen : uint8
     // rather than a tab flag on Inventory.
     Forge,
     Abilities,
+    // O100. NOT a peer of the four above, and deliberately absent from
+    // BuildScreenTabs: unlocking is an ANCHOR interaction, so its only entry is
+    // the quartermaster's dialogue. Adding it to the tab strip is exactly how
+    // the Forge became reachable from the pause menu, which content-and-modes
+    // rules out and which Game.BootFlow.ShippedConfiguration now asserts
+    // against for this screen.
+    Quartermaster,
     // The front door. Main is the title root (PLAY / SETTINGS / QUIT) and is
     // gated behind a press-any-key reveal; these two are what PLAY leads to.
     // Peers rather than modes of Main, for the same reason SkillTrees is its
@@ -423,6 +430,10 @@ private:
     // Reach: Items/BreakerForgeLibrary.h's three crafting verbs plus salvage,
     // wired to a wallet readout. See the FORGE tab note on EBreakerMenuScreen.
     TSharedRef<SWidget> BuildForgeScreen();
+    TSharedRef<SWidget> BuildQuartermasterScreen();
+    // The quartermaster's last refusal or confirmation, shown on the screen
+    // and cleared by the next rebuild that has something new to say.
+    FText QuartermasterStatus;
     // Reach: a picker over UBreakerAbilityComponent's selection API
     // (GetSelectableAbilityIds / PreviewSelection / TryEquipAbility), which
     // shipped with zero callers. See the ABILITIES tab note on EBreakerMenuScreen.

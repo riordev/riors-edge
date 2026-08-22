@@ -619,6 +619,25 @@ struct RIORSEDGE_API FBreakerProgressionState
     // freely purchasable regardless (O15 intact). A defaulted UPROPERTY, so
     // an existing save loads with no commitment and stays save-compatible.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName CommittedBranch = NAME_None;
+    // O100: ability acquisition, per character.
+    //
+    // The starters and the ultimate are free and are NOT listed here — they are
+    // read from the class definition, so this holds only what was bought. An
+    // empty array on a fresh character is therefore correct rather than a
+    // character with nothing.
+    //
+    // A save written before v5 has no such property and deserializes to empty,
+    // which for a legacy character means "everything you had is gone". That is
+    // the one reading this field must never be given, so the v4 -> v5 step in
+    // UBreakerSaveGame::MigrateToCurrent fills it before anything reads it.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> UnlockedAbilityIds;
+    // Tokens in hand, and tokens ever paid. The second is the same cumulative
+    // shape as LevelClassPointsGranted above and exists for the same reason: the
+    // component pays the positive difference between the level entitlement and
+    // what it has already paid, so a schedule retune can never double-pay and a
+    // retune that LOWERS the entitlement claws nothing back.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentAbilityTokens = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 AbilityTokensGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
 };
 

@@ -6,6 +6,7 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerClassDefinition.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -221,6 +222,16 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Unmake is seeded as the ultimate (D11)"), Seeded->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Caster.Unmake")));
     }
 
+    // O100 CHANGED WHAT "REACHABLE" MEANS, AND THIS TEST FOLLOWED IT RATHER
+    // THAN BEING WIDENED. The four non-starters are no longer free at level
+    // one — they are bought with a token at the quartermaster. So the assertion
+    // is now the honest one: each is reachable BY PLAYING, at the level the
+    // shipped schedule pays its token, and equips once bought.
+    //
+    // Nothing here grants more than the game grants: the level comes from the
+    // shipped XP curve and the token from the shipped entitlement. Handing the
+    // component a token directly would prove the equip path and say nothing
+    // about whether a player can ever get one.
     const TArray<FName> ClassAbilities = {
         TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
         TEXT("Caster.Fracture"), TEXT("Caster.Resonance")};
@@ -232,9 +243,20 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
         UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
         TestTrue(TEXT("Choosing Caster succeeds"), Progression->ChoosePermanentClassById(EBreakerClassId::Caster));
 
+        FText EarlyFailure;
+        TestFalse(*FString::Printf(TEXT("%s is locked before it is bought"), *AbilityId.ToString()),
+            Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityOne, AbilityId, EarlyFailure));
+
+        // Level to the last schedule entry through the shipped curve, which
+        // pays every token this class is owed.
+        Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
+            UBreakerProgressionLibrary::ClassPointCapLevel, Progression->ExperienceCurve));
+
         FText Failure;
+        TestTrue(*FString::Printf(TEXT("%s can be bought at the shipped entitlement (%s)"), *AbilityId.ToString(), *Failure.ToString()),
+            Progression->SpendAbilityToken(AbilityId, Failure));
         const bool bEquipped = Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityOne, AbilityId, Failure);
-        TestTrue(*FString::Printf(TEXT("%s unlocks and equips for a Caster (%s)"), *AbilityId.ToString(), *Failure.ToString()), bEquipped);
+        TestTrue(*FString::Printf(TEXT("%s equips once unlocked (%s)"), *AbilityId.ToString(), *Failure.ToString()), bEquipped);
         TestEqual(TEXT("The equipped id is recorded"), Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, AbilityId);
     }
 

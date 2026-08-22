@@ -89,6 +89,23 @@ public:
     // no attribute-value test can reach (RiorsEdge.Progression.ClassSwap*).
     UFUNCTION(BlueprintPure, Category="Progression") bool IsAbilityUnlocked(FName AbilityId) const;
 
+    // ---- O100: ability acquisition ---------------------------------------
+    // What this character can still buy, what it costs, and the one way to buy
+    // it. The quartermaster screen is a reader of these three and authors no
+    // rule of its own — the same division the ability component keeps with
+    // IsAbilityUnlocked, and for the same reason: two copies of an unlock rule
+    // drift.
+    UFUNCTION(BlueprintPure, Category="Progression") TArray<FName> GetUnlockableAbilityIds() const;
+    UFUNCTION(BlueprintPure, Category="Progression") int32 GetUnspentAbilityTokens() const { return State.UnspentAbilityTokens; }
+    // Refuses on: no class, no tokens, an id this class does not offer as
+    // unlockable, and an id already unlocked. A REFUSED SPEND COSTS NOTHING —
+    // the same rule as a refused craft, and the same failure class if it is
+    // broken: one refusal becomes a lost-currency report nobody can reproduce.
+    UFUNCTION(BlueprintCallable, Category="Progression") bool SpendAbilityToken(FName AbilityId, FText& OutFailureReason);
+    // Pays the level entitlement's token half. Called from
+    // GrantLevelPointEntitlement so the two can never disagree about level.
+    void GrantAbilityTokens();
+
     // Aggregated node output. Combat and movement read these rather than
     // walking node ranks themselves.
     UFUNCTION(BlueprintPure, Category="Progression") const FBreakerNodeStats& GetNodeStats() const { return CachedStats; }

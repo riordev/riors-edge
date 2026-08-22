@@ -1,5 +1,7 @@
 #include "Save/BreakerSaveGame.h"
 
+#include "Progression/BreakerProgressionLibrary.h"
+
 namespace
 {
     // MIGRATION LITERALS ARE FROZEN. They deliberately do not reference the
@@ -9,6 +11,52 @@ namespace
     const FName V1AcceptedFirstContract(TEXT("Quest.AcceptedFirstContract"));
     const FName V2FirstContractAccepted(TEXT("Quest.FirstContract.Accepted"));
     const FName V2FirstContractOffered(TEXT("Quest.FirstContract.Offered"));
+
+    // THE v5 KIT SNAPSHOT, AND IT IS FROZEN FOREVER. Same rule as the flag
+    // literals above, and it bites harder here.
+    //
+    // A v4 save predates ability unlocks, so every class ability it could reach
+    // was free — these lists are what "everything you had" MEANT at v4, and the
+    // step exists to hand it back rather than silently take it away.
+    //
+    // DO NOT READ THESE FROM UBreakerClassDefinition. A migration that reads
+    // live content depends on the build date rather than on the file: the day
+    // Swift's three missing abilities land, the same v4 save would arrive with
+    // four unlocks or one depending on when it was loaded — and the migration
+    // test would pass either way, because it reads the same live definition the
+    // step does. Frozen literals are what make the step provable, which is the
+    // whole property MigrateToCurrent exists to have.
+    //
+    // ONE DELIBERATE INEXACTNESS: Swift's v4 list held only its two starters,
+    // so Swift.CadenceBreak was not "previously available" — it was registered,
+    // offered and permanently refused, the defect O100 deletes. It is granted
+    // here anyway. Granting is not the failure this step guards against; taking
+    // an equipped ability away from a character that has it is.
+    struct FV5KitSnapshot { EBreakerClassId ClassId; TArray<FName> AbilityIds; };
+    const TArray<FV5KitSnapshot>& V4ToV5UnlockedKits()
+    {
+        static const TArray<FV5KitSnapshot> Kits = {
+            { EBreakerClassId::Swift, { TEXT("Swift.Skim"), TEXT("Swift.Lead"), TEXT("Swift.CadenceBreak") } },
+            { EBreakerClassId::Caster, { TEXT("Caster.Cleave"), TEXT("Caster.Rot"), TEXT("Caster.Closequarter"),
+                                         TEXT("Caster.Siphon"), TEXT("Caster.Fracture"), TEXT("Caster.Resonance") } },
+            { EBreakerClassId::Gunsmith, { TEXT("Gunsmith.SidearmRig"), TEXT("Gunsmith.Turret"), TEXT("Gunsmith.Overhaul"),
+                                           TEXT("Gunsmith.AmmoCrate"), TEXT("Gunsmith.MineCluster"), TEXT("Gunsmith.Disruptor") } },
+            { EBreakerClassId::Tank, { TEXT("Tank.Rend"), TEXT("Tank.AnchorPoint"), TEXT("Tank.Bloodline"),
+                                       TEXT("Tank.Provoke"), TEXT("Tank.BreachCharge"), TEXT("Tank.GroundZero") } },
+            { EBreakerClassId::Support, { TEXT("Support.Patch"), TEXT("Support.Mark"), TEXT("Support.Purge"),
+                                          TEXT("Support.Cadence"), TEXT("Support.Metronome"), TEXT("Support.Suppress") } },
+        };
+        return Kits;
+    }
+
+    // The unlockable COUNT each class had at v5, frozen for the same reason:
+    // the granted counter has to be stamped to what this build would have paid
+    // at that level, and reading the live definition would make the stamp move
+    // under a content change.
+    int32 V5UnlockableCount(EBreakerClassId ClassId)
+    {
+        return ClassId == EBreakerClassId::Swift ? 1 : 4;
+    }
 }
 
 bool UBreakerSaveGame::MigrateQuestFlagsV1ToV2(TArray<FName>& Flags)
@@ -43,6 +91,35 @@ bool UBreakerSaveGame::MigrateQuestFlagsV1ToV2(TArray<FName>& Flags)
     // Every other flag is carried through untouched, including any this build
     // does not recognise.
     return bChanged;
+}
+
+void UBreakerSaveGame::MigrateAbilityUnlocksV4ToV5(FBreakerProgressionState& Progression)
+{
+    // A v4 file has no UnlockedAbilityIds property, so deserialization left the
+    // array empty — and empty means "this character has bought nothing", which
+    // for a character that could reach its whole kit is valid data that now
+    // means something else. That is the append-only failure exactly, and it is
+    // why this step exists rather than trusting the default.
+    for (const FV5KitSnapshot& Kit : V4ToV5UnlockedKits())
+    {
+        if (Kit.ClassId != Progression.PermanentClass) continue;
+        for (const FName AbilityId : Kit.AbilityIds)
+        {
+            Progression.UnlockedAbilityIds.AddUnique(AbilityId);
+        }
+        break;
+    }
+
+    // AND STAMP THE COUNTER. Without this the character is paid the full token
+    // entitlement for its level against a kit that is already entirely
+    // unlocked, so it holds tokens it can never spend — a number on a screen
+    // that does nothing, which is the same defect in a different costume.
+    // A character with no class yet has bought nothing and is owed nothing.
+    if (Progression.PermanentClass != EBreakerClassId::None)
+    {
+        Progression.AbilityTokensGranted = UBreakerProgressionLibrary::AbilityTokenEntitlement(
+            Progression.CharacterLevel, V5UnlockableCount(Progression.PermanentClass));
+    }
 }
 
 bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote)
@@ -88,6 +165,9 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // v2-or-older file arrives here with an empty legacy array and
             // this is a no-op, exactly as it should be.
             Save.ForgeWallet.CollapseLegacyDenominations();
+            break;
+        case 4:
+            MigrateAbilityUnlocksV4ToV5(Save.Progression);
             break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a

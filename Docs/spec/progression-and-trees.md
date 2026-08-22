@@ -164,8 +164,6 @@ the thinnest. **That shape is not ruled.** It moves authored gates and breaks a
 pinned investment assertion, and it is entangled with the density question
 above, so the shipped shape stands until both are decided together.
 
-Two tier-3 nodes per branch each grant one equippable ability, so a class has
-six plus its ultimate, and two are free at level one.
 
 ### The axes
 

@@ -20,7 +20,7 @@ bool FBreakerPermanentClassTest::RunTest(const FString& Parameters)
     UBreakerClassDefinition* Swift = NewObject<UBreakerClassDefinition>();
     Swift->ClassAssetId = TEXT("Swift");
     Swift->ClassId = EBreakerClassId::Swift;
-    Swift->StartingClassAbilityIds = {TEXT("Blink"), TEXT("KineticBurst")};
+    Swift->StarterAbilityIds = {TEXT("Blink"), TEXT("KineticBurst")};
     Swift->BaseUltimateId = TEXT("Overdrive");
 
     UBreakerClassDefinition* Caster = NewObject<UBreakerClassDefinition>();

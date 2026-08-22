@@ -17,7 +17,7 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 48 of 90 asserted across 7 specs | ceiling 48, target 20 | ok |
+| Asserted invariants with no test | ceiling | 48 of 99 asserted across 7 specs | ceiling 48, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
@@ -30,7 +30,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 398
+- passing: 406
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 48
@@ -172,7 +172,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 48 of 90 asserted across 7 specs · ceiling 48, target 20
+**ceiling** · 48 of 99 asserted across 7 specs · ceiling 48, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 

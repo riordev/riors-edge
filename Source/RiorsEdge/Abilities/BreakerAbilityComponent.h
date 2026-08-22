@@ -35,7 +35,18 @@ enum class EBreakerAbilitySelectionResult : uint8
     WrongSlot,
     // Already sitting in one of the other slots. Two copies of one ability is
     // not a build, it is a bug the player can create for themselves.
-    AlreadyEquipped
+    AlreadyEquipped,
+    // O100: real, this class's, fits the slot, and the character has not bought
+    // it yet. APPENDED AT THE END, like every other enum in this project that
+    // content or a save could be holding a value from.
+    //
+    // Before this, PreviewSelection could not see the unlock rule at all, so a
+    // locked ability previewed as fine and the true refusal only appeared after
+    // the click. PreviewSelection now CALLS
+    // UBreakerProgressionComponent::IsAbilityUnlocked rather than restating it
+    // — progression owns the unlock rules, and a second copy here is precisely
+    // the drift TryEquipAbility's "ONE writer" comment warns about.
+    NotUnlocked
 };
 
 // One granted loadout slot. AbilityId is recorded even when the ability has no

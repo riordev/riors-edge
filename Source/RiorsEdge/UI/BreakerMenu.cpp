@@ -862,7 +862,7 @@ void SBreakerMenu::HandleEscape()
     // character screens were MISSING from this list when they were added, so
     // Escape on them did nothing at all — a dead end on the one screen a new
     // player cannot avoid.
-    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox)
+    if (CurrentScreen == EBreakerMenuScreen::Settings || CurrentScreen == EBreakerMenuScreen::Inventory || CurrentScreen == EBreakerMenuScreen::ClassSelect || CurrentScreen == EBreakerMenuScreen::SkillTrees || CurrentScreen == EBreakerMenuScreen::Forge || CurrentScreen == EBreakerMenuScreen::Abilities || CurrentScreen == EBreakerMenuScreen::Quartermaster || CurrentScreen == EBreakerMenuScreen::CharacterSelect || CurrentScreen == EBreakerMenuScreen::DevSandbox)
     {
         Rebuild(RootScreen);
     }
@@ -1002,6 +1002,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::CharacterCreate: ContentHost->SetContent(BuildCharacterCreateScreen()); break;
         case EBreakerMenuScreen::SkillTrees: ContentHost->SetContent(BuildSkillTreesScreen()); break;
         case EBreakerMenuScreen::Forge: ContentHost->SetContent(BuildForgeScreen()); break;
+        case EBreakerMenuScreen::Quartermaster: ContentHost->SetContent(BuildQuartermasterScreen()); break;
         case EBreakerMenuScreen::Abilities: ContentHost->SetContent(BuildAbilitiesScreen()); break;
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         case EBreakerMenuScreen::Travel: ContentHost->SetContent(BuildTravelScreen()); break;
@@ -7297,6 +7298,138 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         /*bFillHeight=*/true);
 }
 
+
+// ---------------------------------------------------------------------------
+// O100: THE QUARTERMASTER
+// ---------------------------------------------------------------------------
+// Where a token is spent. An ANCHOR interaction, which in this file means one
+// concrete thing: this screen has no BuildScreenTabs call and no AddTab entry,
+// so the only way in is the quartermaster's dialogue. That is not decoration —
+// the tab strip is precisely how the Forge became reachable from the pause menu
+// two clicks deep, which content-and-modes forbids, and a quartermaster added
+// as a fifth tab would inherit the same defect on day one.
+//
+// The screen AUTHORS NO RULE. It reads GetUnlockableAbilityIds,
+// GetUnspentAbilityTokens and IsAbilityUnlocked, and it spends through
+// SpendAbilityToken. Every refusal the player sees is progression's own text,
+// for the reason TryEquipAbility's "ONE writer" comment already gives: a second
+// copy of an unlock rule drifts from the first.
+TSharedRef<SWidget> SBreakerMenu::BuildQuartermasterScreen()
+{
+    UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
+    const FWideScreenMetrics Metrics = MeasureWideScreen();
+
+    const int32 Tokens = Progression ? Progression->GetUnspentAbilityTokens() : 0;
+
+    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
+    // Deliberately NO BuildScreenTabs here. See the block comment above.
+    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+    [
+        MakePlate(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("TOKENS")), BreakerUI::TypeCaption, Muted, true)]
+            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::AsNumber(Tokens), BreakerUI::TypeH2, Primary, true)],
+            PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space4))
+    ];
+    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
+    ];
+
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    if (!QuartermasterStatus.IsEmpty())
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MenuText(QuartermasterStatus, BreakerUI::TypeCaption, SoftText)
+        ];
+    }
+
+    const TArray<FName> Offered = Progression ? Progression->GetUnlockableAbilityIds() : TArray<FName>();
+    if (Offered.Num() == 0)
+    {
+        // A class with nothing left to sell is a real state, not an error: the
+        // stock is finite by design (one token per unlockable), so it empties
+        // once the last one is bought. Say so rather than showing a blank plate.
+        Body->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(TEXT("NOTHING IN STOCK FOR YOUR CLASS.")), BreakerUI::TypeCaption, Disabled)
+        ];
+    }
+
+    for (const FName AbilityId : Offered)
+    {
+        const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(AbilityId);
+        const bool bOwned = Progression && Progression->IsAbilityUnlocked(AbilityId);
+        const bool bAffordable = Tokens > 0;
+        const FName CapturedId = AbilityId;
+
+        TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+        Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(Definition ? Definition->DisplayName : FText::FromName(AbilityId),
+                    BreakerUI::TypeBody, bOwned ? Muted : Primary, true)
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, SoftText)
+            ]
+        ];
+        Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+        [
+            SNew(SBox).WidthOverride(160.0f)
+            [
+                bOwned
+                ? MenuText(FText::FromString(TEXT("UNLOCKED")), BreakerUI::TypeCaption, Muted, true)
+                : MakeButton(FText::FromString(TEXT("UNLOCK · 1 TOKEN")),
+                    FOnClicked::CreateLambda([this, CapturedId]()
+                    {
+                        UBreakerProgressionComponent* Target = Character.IsValid() ? Character->GetProgression() : nullptr;
+                        if (!Target) return FReply::Handled();
+                        FText Failure;
+                        // The screen never decides. Progression refuses or
+                        // spends, and its reason is what the player reads.
+                        if (Target->SpendAbilityToken(CapturedId, Failure))
+                        {
+                            QuartermasterStatus = FText::FromString(TEXT("UNLOCKED. EQUIP IT FROM THE ABILITIES TAB."));
+                        }
+                        else
+                        {
+                            QuartermasterStatus = Failure;
+                        }
+                        Rebuild(EBreakerMenuScreen::Quartermaster);
+                        return FReply::Handled();
+                    }),
+                    // PAINTED, NEVER FADED (the banned-patterns rule): an
+                    // unaffordable unlock renders as a secondary button rather
+                    // than a dimmed one, and the click is refused in the
+                    // handler by progression. Opacity on a subtree shows the
+                    // plate seams behind it.
+                    /*bPrimary=*/bAffordable)
+            ]
+        ];
+
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        [
+            MakePlate(Row, PanelRaised, BorderRest, FMargin(BreakerUI::Space16, BreakerUI::Space8))
+        ];
+    }
+
+    return BuildZonedFrame(
+        FText::FromString(TEXT("QUARTERMASTER")),
+        FText::FromString(TEXT("ABILITY UNLOCKS")),
+        HeaderRight,
+        Body,
+        SNullWidget::NullWidget,
+        Metrics.PanelWidth,
+        Metrics.PanelHeight,
+        /*bFillHeight=*/true);
+}
+
 TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
 {
     // Reach (Decisions.md O37): a picker over UBreakerAbilityComponent's
@@ -7524,17 +7657,28 @@ TSharedRef<SWidget> SBreakerMenu::BuildDialogueScreen()
         ++ChoiceNumber;
         const FName NextNodeId = Choice.NextNodeId;
         const FName QuestFlag = Choice.SetsQuestFlag;
+        const EBreakerDialogueAction Action = Choice.Action;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             BorderWrap(
             SNew(SButton)
             .ButtonColorAndOpacity(Panel)
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-            .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag]()
+            .OnClicked(FOnClicked::CreateLambda([this, NextNodeId, QuestFlag, Action]()
             {
                 if (Character.IsValid())
                 {
                     Character->AddQuestFlag(QuestFlag);
+                    // The action runs after the flag and BEFORE the end-of-
+                    // conversation exit, so a choice can both close the
+                    // dialogue and open a screen. This is the quartermaster's
+                    // only door (O100).
+                    if (Action == EBreakerDialogueAction::OpenQuartermaster)
+                    {
+                        QuartermasterStatus = FText::GetEmpty();
+                        Rebuild(EBreakerMenuScreen::Quartermaster);
+                        return FReply::Handled();
+                    }
                     if (NextNodeId == NAME_None)
                     {
                         Character->ResumeFromMenu();

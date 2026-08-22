@@ -348,4 +348,28 @@ public:
     // wants them read from a Data Asset eventually.
     static constexpr int32 ClassPointCapLevel = 30;
     static constexpr int32 CorePointCapLevel = 50;
+
+    // O100: ABILITY UNLOCK TOKENS. One token per unlockable ability, paid on an
+    // authored level schedule.
+    //
+    // AN ADVANCE ON THE EVENTUAL WORLD-CONTENT ENTITLEMENT, exactly as
+    // SliceClassPointGrant above is an advance on the levelling entitlement.
+    // The campaign is post-slice, so the milestones that will eventually hand
+    // these out do not exist; a token with no source would be a screen the
+    // player can open and never use, which is the reachability rule's own
+    // example. When the campaign lands, these levels are replaced by the
+    // milestones and the cumulative counter means no character is paid twice.
+    // O2 PLACEHOLDER: the four levels are shape, not balance.
+    //
+    // TRUNCATED PER CLASS to UnlockableAbilityIds.Num(). A flat four would pay
+    // Swift four tokens against one unlockable and strand three of them
+    // permanently on a shipped class — the same kind of unreachable content
+    // this whole pass exists to delete. Swift pays one today and grows to four
+    // the day its three missing abilities land, with nothing here to edit.
+    static constexpr int32 AbilityTokenLevels[] = {5, 12, 20, 30};
+
+    // How many tokens a character of this level and this many unlockables has
+    // earned in total. The component pays the difference against what it has
+    // already paid; see UBreakerProgressionComponent::GrantAbilityTokens.
+    static int32 AbilityTokenEntitlement(int32 CharacterLevel, int32 UnlockableCount);
 };

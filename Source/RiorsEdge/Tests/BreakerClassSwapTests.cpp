@@ -16,7 +16,7 @@
 // and deliberately KEPT whatever UBreakerClassDefinition was already held, and
 // two readers trust that object directly rather than the state:
 // GetAvailableTrees unioned ClassDefinition->BranchTrees, and IsAbilityUnlocked
-// answered from ClassDefinition->StartingClassAbilityIds/BaseUltimateId.
+// answered from ClassDefinition->StarterAbilityIds/BaseUltimateId.
 //
 // The reason it survived so long is the instructive part: RecalculateStats
 // already re-derived everything from State.PermanentClass, so every number in

@@ -201,12 +201,14 @@ bool ABreakerNPC::ValidateDialogue(FString& OutError) const
 namespace
 {
     FBreakerDialogueChoice MakeChoice(const TCHAR* Text, FName NextNodeId = NAME_None, FName SetsQuestFlag = NAME_None,
-        std::initializer_list<FName> RequiredFlags = {}, std::initializer_list<FName> BlockedByFlags = {})
+        std::initializer_list<FName> RequiredFlags = {}, std::initializer_list<FName> BlockedByFlags = {},
+        EBreakerDialogueAction Action = EBreakerDialogueAction::None)
     {
         FBreakerDialogueChoice Choice;
         Choice.Text = Text;
         Choice.NextNodeId = NextNodeId;
         Choice.SetsQuestFlag = SetsQuestFlag;
+        Choice.Action = Action;
         Choice.RequiredFlags = RequiredFlags;
         Choice.BlockedByFlags = BlockedByFlags;
         return Choice;
@@ -333,7 +335,7 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
     {
         MakeNode(TEXT("Start"), TEXT("Ammo's on the shelf, gear's in the crates. You breaking things or buying things?"),
         {
-            MakeChoice(TEXT("Show me what you've got. (Vendor — coming soon)"), TEXT("Vendor")),
+            MakeChoice(TEXT("Show me what you've got."), TEXT("Vendor")),
             // Offering and accepting are two different flags on purpose: a
             // contract the player heard and walked away from is a different
             // state from one never mentioned, and the quest object reads both.
@@ -348,8 +350,15 @@ TArray<FBreakerDialogueNode> ABreakerNPC::MakeQuartermasterDialogue()
             MakeChoice(TEXT("Still sweeping the source."), TEXT("DeeperProgress"), NAME_None, { DeeperAccepted }, { DeeperTurnedIn }),
             MakeChoice(TEXT("[Leave] Just passing through.")),
         }),
-        MakeNode(TEXT("Vendor"), TEXT("Storefront's not built yet, Breaker. The rift schedule says soon. Everything comes through the rift schedule eventually."),
+        // O100. THE NODE ID AND THE FLAG ARE LOAD-BEARING and are deliberately
+        // unchanged: BreakerQuestLoopTests walks this dialogue through
+        // ValidateDialogue / GetVisibleChoices / ResolveStartNodeId, and
+        // CheckedVendor is a registered quest flag two contracts read. The body
+        // text and the first choice's destination are what moved.
+        MakeNode(TEXT("Vendor"), TEXT("Requisitions, then. Anything your class is cleared for, I can sign out — one token a piece, and I don't take Riftglass for it. Rift work earns the tokens; I just hold the keys."),
         {
+            MakeChoice(TEXT("Show me the requisition list."), NAME_None, CheckedVendor, {}, {},
+                EBreakerDialogueAction::OpenQuartermaster),
             MakeChoice(TEXT("[Leave] I'll check back."), NAME_None, CheckedVendor),
         }),
         MakeNode(TEXT("Job"), TEXT("The spill out past the pad keeps regrouping. Thin it out, and put that elite down while you're at it. I count what comes back — that's the job."),

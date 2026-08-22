@@ -17,7 +17,10 @@
 
 #include "Characters/BreakerCharacter.h"
 #include "Game/BreakerGameInstance.h"
+#include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/PackageName.h"
 #include "Progression/BreakerClassDefinition.h"
@@ -97,6 +100,54 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
         ABreakerCharacter::ShouldTravelOnEnterWorld(false, true));
     TestFalse(TEXT("PIE drop-in first pick on a template map stays in place (the daily workflow)"),
         ABreakerCharacter::ShouldTravelOnEnterWorld(false, false));
+
+    // ---- O100: the quartermaster is an ANCHOR interaction -------------------
+    // Two halves, and both matter. REACHABLE: the shipped hub spawns the NPC
+    // and its dialogue carries the one choice that opens the screen — a screen
+    // with no door is the reachability rule's own example. NOT REACHABLE
+    // ANYWHERE ELSE: no tab-strip entry and no pause-menu path, which is what
+    // "Anchor interaction" means in this codebase and what the Forge tab
+    // currently violates.
+    {
+        bool bFoundDoor = false;
+        for (const FBreakerDialogueNode& Node : ABreakerNPC::MakeQuartermasterDialogue())
+        {
+            for (const FBreakerDialogueChoice& Choice : Node.Choices)
+            {
+                if (Choice.Action == EBreakerDialogueAction::OpenQuartermaster) bFoundDoor = true;
+            }
+        }
+        TestTrue(TEXT("The quartermaster's dialogue opens the unlock screen"), bFoundDoor);
+
+        // The absence half is a source scan, because "no button anywhere reaches
+        // this" is a statement about the whole menu file rather than about any
+        // object a test can hold. The tab strip is built by AddTab and the pause
+        // menu by BuildPauseScreen; a Quartermaster entry in either is the
+        // defect.
+        const FString MenuPath = FPaths::Combine(FPaths::ProjectDir(),
+            TEXT("Source"), TEXT("RiorsEdge"), TEXT("UI"), TEXT("BreakerMenu.cpp"));
+        FString Menu;
+        if (FFileHelper::LoadFileToString(Menu, *MenuPath))
+        {
+            TestFalse(TEXT("The quartermaster has no tab-strip entry"),
+                Menu.Contains(TEXT("AddTab(TEXT(\"QUARTERMASTER\")")));
+            const int32 PauseBegin = Menu.Find(TEXT("SBreakerMenu::BuildPauseScreen"));
+            if (PauseBegin != INDEX_NONE)
+            {
+                // The pause screen's own body only — a later screen mentioning
+                // the value is not a pause-menu path.
+                const int32 PauseEnd = Menu.Find(TEXT("TSharedRef<SWidget> SBreakerMenu::"), ESearchCase::CaseSensitive,
+                    ESearchDir::FromStart, PauseBegin + 40);
+                const FString PauseBody = Menu.Mid(PauseBegin, (PauseEnd == INDEX_NONE ? Menu.Len() : PauseEnd) - PauseBegin);
+                TestFalse(TEXT("The pause menu has no path to the quartermaster"),
+                    PauseBody.Contains(TEXT("Quartermaster")));
+            }
+        }
+        else
+        {
+            AddInfo(TEXT("Menu source not present (packaged build?); the absence scan was skipped."));
+        }
+    }
 
     // A travel point never offers the place the player already is.
     ABreakerTravelPoint* GymGate = NewObject<ABreakerTravelPoint>();
@@ -195,7 +246,7 @@ bool FBreakerCreatedCharacterKeepsItsClassTest::RunTest(const FString& Parameter
         UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Caster);
     const UBreakerClassDefinition* Swift =
         UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift);
-    if (!Caster || !Swift || Caster->StartingClassAbilityIds.Num() == 0 || Swift->StartingClassAbilityIds.Num() == 0)
+    if (!Caster || !Swift || Caster->StarterAbilityIds.Num() == 0 || Swift->StarterAbilityIds.Num() == 0)
     {
         AddError(TEXT("Fallback class definitions missing — cannot exercise the create path."));
         return false;
@@ -208,13 +259,13 @@ bool FBreakerCreatedCharacterKeepsItsClassTest::RunTest(const FString& Parameter
     // The two readers the D-fix comment names answer from ClassDefinition, so
     // the loadout seeding and the unlock answer are the honest probes of it.
     TestEqual(TEXT("Ability slot one seeds from CASTER's starters, not the stale Swift definition"),
-        State.AbilityLoadout.ClassAbilityOne, Caster->StartingClassAbilityIds[0]);
+        State.AbilityLoadout.ClassAbilityOne, Caster->StarterAbilityIds[0]);
     TestEqual(TEXT("The ultimate seeds from CASTER's kit"),
         State.AbilityLoadout.Ultimate, Caster->BaseUltimateId);
     TestTrue(TEXT("A Caster starter ability is unlocked"),
-        Progression->IsAbilityUnlocked(Caster->StartingClassAbilityIds[0]));
+        Progression->IsAbilityUnlocked(Caster->StarterAbilityIds[0]));
     TestFalse(TEXT("A Swift starter ability is NOT unlocked on a created Caster"),
-        Progression->IsAbilityUnlocked(Swift->StartingClassAbilityIds[0]));
+        Progression->IsAbilityUnlocked(Swift->StarterAbilityIds[0]));
 
     // The skill screen enumerates trees here; none of them may belong to Swift.
     for (const UBreakerProgressionTree* Tree : Progression->GetAvailableTrees())

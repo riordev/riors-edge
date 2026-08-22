@@ -56,7 +56,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerSaveWalletMigrationTest::RunTest(const FString& Parameters)
 {
-    TestEqual(TEXT("The current version is 4, the one-currency version"), UBreakerSaveGame::CurrentSaveVersion, 4);
+    // NOT a pin on the current version — this test owns the v3 -> v4 wallet
+    // step, and pinning the head version here made an unrelated migration
+    // (O100's v4 -> v5 unlock step) fail a wallet test. What it needs is that
+    // the step it owns still exists below the head.
+    TestTrue(TEXT("The one-currency step is still below the head version"), UBreakerSaveGame::CurrentSaveVersion >= 4);
 
     // A faithful v3 payload: version 3, real quest state, and a wallet whose
     // balance lives in the legacy Slag/Flux/Sigil array — exactly what a

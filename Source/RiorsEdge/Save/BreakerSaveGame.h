@@ -48,9 +48,18 @@ public:
     // worse than having no version at all, because it implies a guarantee that
     // does not exist — the first additive change would have been misread in
     // silence. MigrateToCurrent is what makes the number mean something.
-    static constexpr int32 CurrentSaveVersion = 4;
+    // Version 5 split the class kit into free starters and token-bought
+    // unlockables (O100); the step hands every pre-v5 character the kit it
+    // could already reach and stamps its token counter so it is not paid
+    // retroactively for abilities it already has.
+    static constexpr int32 CurrentSaveVersion = 5;
 
     UPROPERTY() int32 SaveVersion = 1;
+
+    // The v4 -> v5 step, exposed so the suite can prove it in isolation like
+    // MigrateQuestFlagsV1ToV2. Pure on the struct: no world, no slot, no class
+    // definition read at load time.
+    static void MigrateAbilityUnlocksV4ToV5(FBreakerProgressionState& Progression);
 
     // Brings a deserialized payload up to CurrentSaveVersion IN MEMORY, in
     // version order, one step at a time (Save-Architecture 5.2 — never a switch

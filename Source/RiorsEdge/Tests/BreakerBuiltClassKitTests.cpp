@@ -278,8 +278,14 @@ bool FBreakerBuiltClassDefinitionMirrorTest::RunTest(const FString& Parameters)
         if (!TestNotNull(*FString::Printf(TEXT("Class %d has a definition"), static_cast<int32>(ClassId)), Definition)) return false;
 
         TestEqual(TEXT("The definition describes its own class"), Definition->ClassId, ClassId);
-        TestEqual(TEXT("All seven ids are catalogued"), Definition->StartingClassAbilityIds.Num(), 7);
-        for (const FName AbilityId : Definition->StartingClassAbilityIds)
+        // O100: the kit is a partition now — two free starters, four bought
+        // unlockables, one free ultimate. Seven ids catalogued as before, in
+        // three fields instead of one.
+        TArray<FName> Catalogued = Definition->StarterAbilityIds;
+        Catalogued.Append(Definition->UnlockableAbilityIds);
+        Catalogued.Add(Definition->BaseUltimateId);
+        TestEqual(TEXT("All seven ids are catalogued"), Catalogued.Num(), 7);
+        for (const FName AbilityId : Catalogued)
         {
             const UBreakerAbilityDefinition* Ability = UBreakerAbilityDefinition::FindFallback(AbilityId);
             TestNotNull(*FString::Printf(TEXT("%s exists in the ability registry"), *AbilityId.ToString()), Ability);
@@ -294,10 +300,10 @@ bool FBreakerBuiltClassDefinitionMirrorTest::RunTest(const FString& Parameters)
         // The starters sit first, so ChoosePermanentClassById's [0]/[1]
         // seeding (D11) agrees with DefaultAbilityIdForSlot.
         TestEqual(TEXT("Starter one matches the default table"),
-            Definition->StartingClassAbilityIds[0],
+            Definition->StarterAbilityIds[0],
             UBreakerAbilityDefinition::DefaultAbilityIdForSlot(ClassId, EBreakerAbilitySlot::ClassAbilityOne));
         TestEqual(TEXT("Starter two matches the default table"),
-            Definition->StartingClassAbilityIds[1],
+            Definition->StarterAbilityIds[1],
             UBreakerAbilityDefinition::DefaultAbilityIdForSlot(ClassId, EBreakerAbilitySlot::ClassAbilityTwo));
         TestEqual(TEXT("The ultimate matches the default table"),
             Definition->BaseUltimateId,

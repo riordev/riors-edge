@@ -83,7 +83,7 @@ void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
     // was already held, and TWO readers trust it directly:
     // GetAvailableTrees unions ClassDefinition->BranchTrees (so a Caster was
     // handed Swift's three branch trees) and IsAbilityUnlocked answers from
-    // ClassDefinition->StartingClassAbilityIds/BaseUltimateId (so a Caster was
+    // ClassDefinition->StarterAbilityIds/BaseUltimateId (so a Caster was
     // offered Swift's abilities). RecalculateStats already guarded itself by
     // re-reading State.PermanentClass, which is why the STATS were right while
     // the whole front end was wrong — the bug was invisible to every test that
@@ -148,8 +148,8 @@ bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId Clas
     // different answers to "what am I holding".
     if (ClassDefinition)
     {
-        if (ClassDefinition->StartingClassAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StartingClassAbilityIds[0];
-        if (ClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StartingClassAbilityIds[1];
+        if (ClassDefinition->StarterAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StarterAbilityIds[0];
+        if (ClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StarterAbilityIds[1];
         State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
     RecalculateStats();
@@ -171,8 +171,8 @@ bool UBreakerProgressionComponent::ChoosePermanentClass(const UBreakerClassDefin
 
     ClassDefinition = const_cast<UBreakerClassDefinition*>(NewClassDefinition);
     State.PermanentClass = NewClassDefinition->ClassId;
-    if (NewClassDefinition->StartingClassAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = NewClassDefinition->StartingClassAbilityIds[0];
-    if (NewClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = NewClassDefinition->StartingClassAbilityIds[1];
+    if (NewClassDefinition->StarterAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = NewClassDefinition->StarterAbilityIds[0];
+    if (NewClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = NewClassDefinition->StarterAbilityIds[1];
     State.AbilityLoadout.Ultimate = NewClassDefinition->BaseUltimateId;
     RecalculateStats();
     // Same reason as ChoosePermanentClassById: this is the Data-Asset-driven
@@ -316,16 +316,25 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     else State.UnspentCorePoints += Refunded;
     if (Currency == EBreakerPointCurrency::ClassPoints)
     {
-        State.AbilityLoadout.ClassAbilityOne = ClassDefinition && ClassDefinition->StartingClassAbilityIds.Num() > 0
-            ? ClassDefinition->StartingClassAbilityIds[0] : NAME_None;
-        State.AbilityLoadout.ClassAbilityTwo = ClassDefinition && ClassDefinition->StartingClassAbilityIds.Num() > 1
-            ? ClassDefinition->StartingClassAbilityIds[1] : NAME_None;
+        State.AbilityLoadout.ClassAbilityOne = ClassDefinition && ClassDefinition->StarterAbilityIds.Num() > 0
+            ? ClassDefinition->StarterAbilityIds[0] : NAME_None;
+        State.AbilityLoadout.ClassAbilityTwo = ClassDefinition && ClassDefinition->StarterAbilityIds.Num() > 1
+            ? ClassDefinition->StarterAbilityIds[1] : NAME_None;
         State.AbilityLoadout.Ultimate = ClassDefinition ? ClassDefinition->BaseUltimateId : NAME_None;
         // O37: commitment is a class-branch choice, so the respec that clears
         // branch node ranks (including any keystone) clears the commitment
         // with them. This is the one-way rule's escape hatch: "no
         // un-committing without a Forge visit", not "never".
         State.CommittedBranch = NAME_None;
+        // AND NOT THE UNLOCKS. Everything else this function touches is
+        // refunded in full — ranks, points, the loadout, the commitment — so
+        // the reasonable default reading is that abilities go back too. They do
+        // not: an unlock is bought with a token that a respec does not return,
+        // and taking the ability while keeping the token spent would be a
+        // refund that costs the player something. UnlockedAbilityIds,
+        // UnspentAbilityTokens and AbilityTokensGranted are deliberately absent
+        // from this function; RiorsEdge.Progression.AbilityUnlocks.
+        // SurvivesRespec is what keeps them absent.
     }
     // Cleared ranks must clear their effects, tags and verb grants included.
     RecalculateStats();
@@ -411,8 +420,8 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
         && State.AbilityLoadout.ClassAbilityTwo.IsNone()
         && State.AbilityLoadout.Ultimate.IsNone())
     {
-        if (ClassDefinition->StartingClassAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StartingClassAbilityIds[0];
-        if (ClassDefinition->StartingClassAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StartingClassAbilityIds[1];
+        if (ClassDefinition->StarterAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = ClassDefinition->StarterAbilityIds[0];
+        if (ClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StarterAbilityIds[1];
         State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
     // Ranks were just bulk-replaced from outside; the running spent-points
@@ -510,6 +519,10 @@ int32 UBreakerProgressionComponent::AwardExperience(int32 Amount)
 void UBreakerProgressionComponent::GrantLevelPointEntitlement()
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    // O100's tokens ride the same trigger as the point entitlement and use the
+    // same cumulative shape, so a character who gains three levels at once, or
+    // whose level moves under a curve retune, is paid exactly once for each.
+    GrantAbilityTokens();
     // The entitlement is a FUNCTION OF LEVEL, not an event: min(Level, cap)
     // points per currency, minus what has already been paid. Event-shaped
     // grants ("+1 on each level-up") cannot survive the rederived-level rule —
@@ -688,6 +701,60 @@ const UBreakerProgressionNode* UBreakerProgressionComponent::FindOwnedNodeDefini
     return nullptr;
 }
 
+TArray<FName> UBreakerProgressionComponent::GetUnlockableAbilityIds() const
+{
+    return ClassDefinition ? ClassDefinition->UnlockableAbilityIds : TArray<FName>();
+}
+
+bool UBreakerProgressionComponent::SpendAbilityToken(FName AbilityId, FText& OutFailureReason)
+{
+    OutFailureReason = FText::GetEmpty();
+    if (!ClassDefinition || State.PermanentClass == EBreakerClassId::None)
+    {
+        OutFailureReason = LOCTEXT("UnlockNoClass", "Lock a class before unlocking abilities.");
+        return false;
+    }
+    // Not an ability this class sells. Checked before the token count so the
+    // player is told the real reason rather than "you have no tokens" for an id
+    // no number of tokens could ever buy.
+    if (!ClassDefinition->UnlockableAbilityIds.Contains(AbilityId))
+    {
+        OutFailureReason = LOCTEXT("UnlockNotOffered", "The quartermaster does not carry that.");
+        return false;
+    }
+    if (IsAbilityUnlocked(AbilityId))
+    {
+        OutFailureReason = LOCTEXT("UnlockAlreadyOwned", "Already unlocked.");
+        return false;
+    }
+    if (State.UnspentAbilityTokens <= 0)
+    {
+        OutFailureReason = LOCTEXT("UnlockNoTokens", "No unlock tokens.");
+        return false;
+    }
+
+    // EVERY REFUSAL ABOVE RETURNS BEFORE THIS POINT, so a refused spend has
+    // debited nothing. Partial spends are how one refusal becomes a
+    // lost-currency bug report, and the Forge's refused-craft rule is the same
+    // rule for the same reason.
+    --State.UnspentAbilityTokens;
+    State.UnlockedAbilityIds.AddUnique(AbilityId);
+    OnProgressionChanged.Broadcast();
+    return true;
+}
+
+void UBreakerProgressionComponent::GrantAbilityTokens()
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return;
+    if (!ClassDefinition) return;
+    const int32 Entitled = UBreakerProgressionLibrary::AbilityTokenEntitlement(
+        State.CharacterLevel, ClassDefinition->UnlockableAbilityIds.Num());
+    const int32 Owed = Entitled - State.AbilityTokensGranted;
+    if (Owed <= 0) return;
+    State.UnspentAbilityTokens += Owed;
+    State.AbilityTokensGranted = Entitled;
+}
+
 bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
 {
     // The definition is only authoritative for the class it actually describes.
@@ -698,8 +765,13 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     // this guard should never fire — which is exactly why it is cheap to keep.
     const bool bDefinitionDescribesCurrentClass =
         ClassDefinition && (State.PermanentClass == EBreakerClassId::None || ClassDefinition->ClassId == State.PermanentClass);
+    // O100: free at level one is the STARTERS and the ultimate. Everything else
+    // this class offers is bought, one token at a time, and lives in the
+    // character's own unlocked set — so two characters of the same class can
+    // hold different kits, which is the whole point of the system.
     if (bDefinitionDescribesCurrentClass
-        && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StartingClassAbilityIds.Contains(AbilityId))) return true;
+        && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StarterAbilityIds.Contains(AbilityId))) return true;
+    if (State.UnlockedAbilityIds.Contains(AbilityId)) return true;
     for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints, EBreakerPointCurrency::CorePoints})
     {
         TArray<const UBreakerProgressionNode*> Nodes;

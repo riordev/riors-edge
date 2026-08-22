@@ -1546,6 +1546,16 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     else if (Wanted == TEXT("CHARACTERSELECT") || Wanted == TEXT("CHARACTERS")) Screen = EBreakerMenuScreen::CharacterSelect;
     else if (Wanted == TEXT("CHARACTERCREATE") || Wanted == TEXT("CREATE")) Screen = EBreakerMenuScreen::CharacterCreate;
     else if (Wanted == TEXT("DEVSANDBOX") || Wanted == TEXT("SANDBOX")) Screen = EBreakerMenuScreen::DevSandbox;
+#if !UE_BUILD_SHIPPING
+    // O100. GUARDED, unlike its neighbours, and deliberately: the quartermaster
+    // is the one screen in this table with NO in-game path except an NPC
+    // conversation, so this switch is the only thing that can open it without
+    // one. Every other entry here has a button behind it and a capture switch
+    // is merely a shortcut; for this screen the switch would be a second door,
+    // which is exactly what the Anchor gating exists to prevent. A capture run
+    // is a non-shipping build by definition, so nothing is lost.
+    else if (Wanted == TEXT("QUARTERMASTER")) Screen = EBreakerMenuScreen::Quartermaster;
+#endif
 
     MenuWidget->ShowScreenForCapture(Screen);
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] menu screen '%s'"), *Wanted);

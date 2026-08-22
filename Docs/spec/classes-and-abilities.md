@@ -46,6 +46,14 @@ participate.
 them free at level one. Six against two slots is a loadout decision rather than
 a rotation.
 
+**The other four unlock one at a time, per character.** The ultimate and the two
+starters are free and never unlock; every remaining class ability is bought with
+a one-time token at the quartermaster, an Anchor interaction. Tokens rather than
+the crafting currency, because that currency is account-wide and would let an
+established account buy out a new character's kit at level one. One token per
+unlockable means acquisition is an ordering choice — which ability first —
+rather than a scarcity one.
+
 **Branch keystones rewrite the ultimate; they never replace it.** One ultimate
 per class, available from level one, with three distinct behaviours from three
 keystones and no additional ultimate assets.
@@ -157,6 +165,15 @@ own:
 | No class node authors a stat target a Core node on the same axis authors | `Progression.AxisOverlap` |
 | A resource-depleted condition cannot be satisfied by a loop that has never been spent | `Progression.ConditionVocabulary.ResourceDepleted` |
 | Every class's resource generates in every state that class is expected to fight in | `Classes.GenerationReachability` |
+| Starters, unlockables and the ultimate partition the class's registered abilities exactly | `Abilities.Catalogue.Partition` |
+| No registered ability is offered and permanently refusable | `Abilities.Catalogue.NoPermanentlyRefusable` |
+| Exactly two starters per class, and they seed both class slots | `Abilities.StarterPair` |
+| Every ability of every class is reachable by level 50 at the shipped token entitlement | `Progression.AbilityUnlocks.ReachableByFifty` |
+| No class is ever paid a token it cannot spend | `Progression.AbilityUnlocks.NoUnspendableTokens` |
+| A refused unlock costs nothing | `Progression.AbilityUnlocks.SpendRefusals` |
+| A Forge respec clears neither the unlocked set nor the token counters | `Progression.AbilityUnlocks.SurvivesRespec` |
+| Unlocks and token counters survive save and load | `Progression.AbilityUnlocks.SurviveSaveLoad` |
+| A save written before unlocks existed loads with its abilities still unlocked | `Save.Migration.V4ToV5` |
 
 The last two are targets the game does not currently meet.
 

@@ -167,6 +167,9 @@ FText UBreakerAbilityComponent::DescribeSelectionResult(EBreakerAbilitySelection
     case EBreakerAbilitySelectionResult::WrongClass:     return NSLOCTEXT("Breaker", "SelectWrongClass", "That ability belongs to another class.");
     case EBreakerAbilitySelectionResult::WrongSlot:      return NSLOCTEXT("Breaker", "SelectWrongSlot", "That ability cannot go in this slot.");
     case EBreakerAbilitySelectionResult::AlreadyEquipped:return NSLOCTEXT("Breaker", "SelectDuplicate", "That ability is already equipped.");
+    // Names where it is bought, because a refusal the player cannot act on is
+    // only half an answer.
+    case EBreakerAbilitySelectionResult::NotUnlocked:    return NSLOCTEXT("Breaker", "SelectNotUnlocked", "Not unlocked. See the quartermaster.");
     default:                                             return NSLOCTEXT("Breaker", "SelectRefused", "That ability cannot be equipped.");
     }
 }
@@ -197,8 +200,16 @@ EBreakerAbilitySelectionResult UBreakerAbilityComponent::PreviewSelection(EBreak
     const UBreakerProgressionComponent* Progression = GetProgression();
     if (!Progression) return EBreakerAbilitySelectionResult::NoClassChosen;
     const FBreakerProgressionState& State = Progression->GetProgressionState();
-    return ValidateSelection(State.PermanentClass, Slot, AbilityId,
+    const EBreakerAbilitySelectionResult Registry = ValidateSelection(State.PermanentClass, Slot, AbilityId,
         State.AbilityLoadout.ClassAbilityOne, State.AbilityLoadout.ClassAbilityTwo, State.AbilityLoadout.Ultimate);
+    if (Registry != EBreakerAbilitySelectionResult::Allowed) return Registry;
+    // The registry rules pass; the last question is whether this character has
+    // bought it. ASKED, NOT RESTATED — progression owns the unlock rule and
+    // this calls it, so the preview and the equip cannot disagree. Registry
+    // reasons win when both apply: "belongs to another class" is more useful
+    // than "not unlocked" for an id that could never be unlocked here.
+    if (!Progression->IsAbilityUnlocked(AbilityId)) return EBreakerAbilitySelectionResult::NotUnlocked;
+    return EBreakerAbilitySelectionResult::Allowed;
 }
 
 bool UBreakerAbilityComponent::TryEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason)
@@ -236,17 +247,12 @@ bool UBreakerAbilityComponent::TryEquipAbility(EBreakerAbilitySlot Slot, FName A
     // progression refuses (the ability is not unlocked yet), its own reason is
     // what the player sees — restating that rule here is how two copies drift.
     //
-    // KNOWN BLOCKER, and it is not in this file: for a CASTER this call always
-    // refuses today. UBreakerProgressionComponent::IsAbilityUnlocked answers
-    // from ClassDefinition->StartingClassAbilityIds / BaseUltimateId or from a
-    // purchased node's GrantedAbilityIds, and
-    // UBreakerProgressionLibrary::GetFallbackClassDefinition returns nullptr
-    // for every class but Swift — so a Caster has a null ClassDefinition and no
-    // ability reads as unlocked. Everything on this side of the seam works and
-    // is tested; the fix is a Caster row in that fallback class definition
-    // (Progression/, another lane), naming Cleave/Rot as starters and
-    // Caster.Unmake as the ultimate, with §2.3-2.5's grant nodes supplying the
-    // rest. Until then the default table is still what a Caster plays with.
+    // The blocker this comment used to describe is gone: every class has a
+    // fallback definition now, so no class is refused wholesale for want of one.
+    // What progression refuses today is an ability the character has not
+    // UNLOCKED (O100) — the starters and the ultimate are free, everything else
+    // is bought with a token at the quartermaster — and that refusal is a real
+    // answer rather than a missing row.
     if (!Progression->EquipAbility(Slot, AbilityId, OutFailureReason))
     {
         return false;

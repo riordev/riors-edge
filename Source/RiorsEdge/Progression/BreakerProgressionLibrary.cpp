@@ -357,6 +357,21 @@ namespace
 }
 
 // Node stat magnitudes below are gym-perceptibility tuning; wave-mode re-anchors.
+int32 UBreakerProgressionLibrary::AbilityTokenEntitlement(int32 CharacterLevel, int32 UnlockableCount)
+{
+    // Count the schedule entries the character has reached, then clamp to what
+    // the class can actually spend. The clamp is the whole reason this takes
+    // UnlockableCount at all: a token that cannot buy anything is not a
+    // reward, it is a counter the player watches and cannot use.
+    const int32 Capped = FMath::Clamp(UnlockableCount, 0, UE_ARRAY_COUNT(AbilityTokenLevels));
+    int32 Earned = 0;
+    for (int32 Index = 0; Index < Capped; ++Index)
+    {
+        if (CharacterLevel >= AbilityTokenLevels[Index]) ++Earned;
+    }
+    return Earned;
+}
+
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 {
     static UBreakerProgressionTree* Tree = nullptr;
@@ -1430,7 +1445,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
 // ABILITY GRANTS ARE NOT RE-AUTHORED HERE, DELIBERATELY. Class-Kits gates
 // four of Caster's six abilities behind Tier-3 "Grants" nodes (SB7/VW7/MS7/
 // MS8). GetFallbackClassDefinition(Caster) already lists all seven ability
-// ids as StartingClassAbilityIds — the O39 fix for a null-class-definition
+// ids across StarterAbilityIds and UnlockableAbilityIds — the O39 fix for a
+// null-class-definition
 // bug that predates this file — and Tests/BreakerProgressionAuditTests.cpp's
 // CasterAbilitiesUnlockTest equips every one of them with ZERO node
 // purchases. Gating them behind these new tree nodes would un-equip that
@@ -1821,7 +1837,8 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // class, zero spent.
 //
 // "GRANTS X" TIER-3 NODES DO NOT RE-AUTHOR ABILITY GRANTS. All seven ability
-// ids per class are StartingClassAbilityIds on the class definitions below
+// ids per class are partitioned across StarterAbilityIds, UnlockableAbilityIds
+// and BaseUltimateId on the class definitions below
 // (the O39 kits-playable pass), and BreakerBuiltClassKitTests equips them
 // with zero node purchases — gating them now would repeat the exact failure
 // the Caster catalogue comment documents. Each Tier-3 node carries the REST
@@ -3077,11 +3094,10 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
             "Scrap: a ledger of work already done -- no idle income, no decay. Deployables spend it; the gun in your hands costs nothing.");
         // Starters first (Sidearm Rig / Turret, Class-Kits-Gunsmith §3), so a
         // loadout seeded from [0]/[1] matches DefaultAbilityIdForSlot.
-        Gunsmith->StartingClassAbilityIds = {
-            TEXT("Gunsmith.SidearmRig"), TEXT("Gunsmith.Turret"),
+        Gunsmith->StarterAbilityIds = {TEXT("Gunsmith.SidearmRig"), TEXT("Gunsmith.Turret")};
+        Gunsmith->UnlockableAbilityIds = {
             TEXT("Gunsmith.Overhaul"), TEXT("Gunsmith.AmmoCrate"),
-            TEXT("Gunsmith.MineCluster"), TEXT("Gunsmith.Disruptor"),
-            TEXT("Gunsmith.FieldAssembly")};
+            TEXT("Gunsmith.MineCluster"), TEXT("Gunsmith.Disruptor")};
         Gunsmith->BaseUltimateId = TEXT("Gunsmith.FieldAssembly");
         // Class-Kits-Gunsmith §4 order: Armory, Field Tech, Tinkerer.
         Gunsmith->BranchTrees.Add(GetGunsmithArmoryTree());
@@ -3104,11 +3120,10 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Tank->Description = LOCTEXT("TankDescription",
             "Grit: banked by taking hits and holding ground, bleeding on a lapse timer. Stronger for being hit, never wanting to be hit more than necessary.");
         // Starters first (Rend / Anchor Point, Class-Kits-Tank §2).
-        Tank->StartingClassAbilityIds = {
-            TEXT("Tank.Rend"), TEXT("Tank.AnchorPoint"),
+        Tank->StarterAbilityIds = {TEXT("Tank.Rend"), TEXT("Tank.AnchorPoint")};
+        Tank->UnlockableAbilityIds = {
             TEXT("Tank.Bloodline"), TEXT("Tank.Provoke"),
-            TEXT("Tank.BreachCharge"), TEXT("Tank.GroundZero"),
-            TEXT("Tank.Hold")};
+            TEXT("Tank.BreachCharge"), TEXT("Tank.GroundZero")};
         Tank->BaseUltimateId = TEXT("Tank.Hold");
         // Class-Kits-Tank §3-5 order: Leech, Bastion, Demolitionist.
         Tank->BranchTrees.Add(GetTankLeechTree());
@@ -3131,11 +3146,10 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Support->Description = LOCTEXT("SupportDescription",
             "Charge: banked by healing, shielding, buff uptime and marked-target damage. Solo pays exactly what a party pays, source for source.");
         // Starters first (Patch / Mark, Class-Kits-Support §3).
-        Support->StartingClassAbilityIds = {
-            TEXT("Support.Patch"), TEXT("Support.Mark"),
+        Support->StarterAbilityIds = {TEXT("Support.Patch"), TEXT("Support.Mark")};
+        Support->UnlockableAbilityIds = {
             TEXT("Support.Purge"), TEXT("Support.Cadence"),
-            TEXT("Support.Metronome"), TEXT("Support.Suppress"),
-            TEXT("Support.Conduit")};
+            TEXT("Support.Metronome"), TEXT("Support.Suppress")};
         Support->BaseUltimateId = TEXT("Support.Conduit");
         // Class-Kits-Support §4 order: Medic, Conductor, Warden.
         Support->BranchTrees.Add(GetSupportMedicTree());
@@ -3158,8 +3172,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Caster->Description = LOCTEXT("CasterDescription",
             "Mana: a resource that starts full, spends down per cast, and regenerates -- with Overcast allowing a temporary debt.");
         // THE FIX ITSELF. UBreakerProgressionComponent::IsAbilityUnlocked
-        // answers only from ClassDefinition->BaseUltimateId /
-        // StartingClassAbilityIds (or a purchased node's GrantedAbilityIds),
+        // answers only from ClassDefinition->BaseUltimateId, its starters or
+        // the character's unlocked set (or a purchased node's
+        // GrantedAbilityIds),
         // and this function returned nullptr for every class but Swift, so a
         // Caster's ClassDefinition was null and EVERY Caster ability read as
         // locked no matter what UBreakerAbilityComponent::TryEquipAbility
@@ -3175,11 +3190,10 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         // trees' Tier-3 nodes therefore carry their OTHER Class-Kits content
         // (the rule-rewrite half of "Grants X") and leave the grant itself
         // exactly as catalogued here.
-        Caster->StartingClassAbilityIds = {
-            TEXT("Caster.Cleave"), TEXT("Caster.Rot"),             // Class-Kits §2.2 starters
+        Caster->StarterAbilityIds = {TEXT("Caster.Cleave"), TEXT("Caster.Rot")};   // Class-Kits §2.2 starters
+        Caster->UnlockableAbilityIds = {
             TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
-            TEXT("Caster.Fracture"), TEXT("Caster.Resonance"),
-            TEXT("Caster.Unmake")};
+            TEXT("Caster.Fracture"), TEXT("Caster.Resonance")};
         Caster->BaseUltimateId = TEXT("Caster.Unmake");
         // O39's "honest emptiness" is closed: Spellblade, Void Whisperer and
         // Multispell are now authored (Class-Kits §2.3-2.5), so BranchTrees
@@ -3208,7 +3222,13 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     Swift->Description = LOCTEXT("SwiftDescription", "Momentum: a decaying state built by moving and spent on short-cooldown bursts.");
     // Ids must match the ability fallback registry exactly, or a loadout
     // seeded from them resolves to nothing.
-    Swift->StartingClassAbilityIds = {TEXT("Swift.Skim"), TEXT("Swift.Lead")};
+    Swift->StarterAbilityIds = {TEXT("Swift.Skim"), TEXT("Swift.Lead")};
+    // The id that was stranded: registered, offered by the picker, and refused
+    // by every unlock path because Swift's old single list held only the two
+    // starters. It is Swift's whole unlockable kit until its three missing
+    // abilities land, and the token schedule truncates to this count rather
+    // than paying four against one.
+    Swift->UnlockableAbilityIds = {TEXT("Swift.CadenceBreak")};
     Swift->BaseUltimateId = TEXT("Swift.Overdrive");
     // Class-Kits §1.3-1.5 order: Frenzy, Kinetic, Marksman. The branch strip
     // reads this list, so it now shows the three chips the design names.

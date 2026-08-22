@@ -9,6 +9,22 @@ class UCapsuleComponent;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
+// What a choice does BESIDES routing and setting a flag. A typed field rather
+// than a screen enum, so Interaction/ takes no dependency on UI/, and rather
+// than the menu string-matching a node id — which would make an authored node
+// id load-bearing content nobody could ever rename.
+//
+// APPEND ONLY: dialogue is authorable content and this serializes by value.
+UENUM(BlueprintType)
+enum class EBreakerDialogueAction : uint8
+{
+    None,
+    // O100: the quartermaster's unlock screen. Unlocking is an Anchor
+    // interaction, so this is the ONLY way that screen opens — it has no
+    // tab-strip entry and no pause-menu path.
+    OpenQuartermaster
+};
+
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerDialogueChoice
 {
@@ -26,6 +42,9 @@ struct RIORSEDGE_API FBreakerDialogueChoice
     // player had done (Campaign-And-Story.md 6.3 #1).
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> RequiredFlags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> BlockedByFlags;
+    // Runs when the choice is picked, after the flag is written. None for every
+    // authored choice but one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerDialogueAction Action = EBreakerDialogueAction::None;
 };
 
 USTRUCT(BlueprintType)

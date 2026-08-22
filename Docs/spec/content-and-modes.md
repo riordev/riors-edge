@@ -132,8 +132,11 @@ cold outside. Verticality is functional.
 arrive at the boundary, stash, Forge, quartermaster, command post, gate. The
 player arrives full, so the stash is first or they carry loot the whole way and
 come back. The Forge is a room rather than a counter because it is the one
-place they spend real minutes. Command is by the gate because choosing what to
-run before choosing the build to run it with is backwards.
+place they spend real minutes. **The quartermaster signs out ability unlocks** —
+one token a piece, never the crafting currency — and sits between the Forge and
+the command post because deciding what a character can do comes before deciding
+what to do with it. Command is by the gate because choosing what to run before
+choosing the build to run it with is backwards.
 
 **Forge and vendor are Anchor interactions and never appear in a pause menu.**
 Respec being Forge-gated is a product decision, and a respec button in a menu

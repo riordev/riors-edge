@@ -181,6 +181,8 @@ Numbers are permanent and never reused.
 
 **O99** — Ability and weapon throughput sit within roughly 15% of each other at the same gear depth: the parity band is 0.85–1.15x, ruled at the cap. It is a target, not a measurement, and it closes by authoring ability affix breadth rather than by changing how the pools compose.
 
+**O100** — The ultimate and two starters are free at level one; the remaining class abilities unlock one at a time, per character, bought with a one-time token at the quartermaster, an Anchor interaction. Not the crafting currency, which is account-wide and would let an established account buy out a new character at level one. One token per unlockable, so acquisition is an ordering choice rather than a scarcity one — do not later tighten the count and read scarcity into it.
+
 ## Open
 
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
@@ -191,6 +193,10 @@ Numbers are permanent and never reused.
 - Who owns audio.
 - What replaces the shared pool as the tension between the two defensive constellations.
 - Whether weapon archetype outweighing class is intended identity or a table to flatten.
+- Whether the Forge screen stops being a tab. It sits in the strip the pause menu reaches, so "Forge and vendor are Anchor interactions and never appear in a pause menu" is violated today; the quartermaster is gated correctly and is currently the only service that is.
+- Whether respec gets real Forge proximity. `RespecAtForge` takes the gate as an argument and the menu passes true unconditionally, with a comment deferring it until the hub exists. The hub exists.
+- What becomes of the node ability-grant path. After the one redundant grant retires it has three readers on the node card and no writers.
+- Whether the quartermaster has an endgame role. Its stock is finite by construction — one token per unlockable — so it empties once the last ability is bought and is a levelling-window service thereafter.
 - Whether the ability pool gets a flat line. O54 names three Increased pools and settles nothing about the flat half, and Added Damage bids Flat into the weapon lane alone — so an ability build's flat layer is structurally 1.000 against a weapon build's 1.154 at the cap and 1.550 at endgame. Flat multiplies against the whole Increased bucket, so this is the half of the parity gap that widens fastest with gear depth.
 - Whether deployable stats snapshot at placement or read live, and — the same question wearing its other face — whether a deployable composes the outgoing More chain. It does not today, so a live ability window reaches every ability except a turret, which makes the one multiplier rule the canon actually enforces advisory in one place. The two are entangled: a deployable that snapshots at placement is *right* to miss a window opened afterwards, and one that reads live is not.
 - Whether enemies deal elemental damage at all.
