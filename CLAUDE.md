@@ -6,10 +6,10 @@ Branch `docs/corpus-rewrite`. Replacing the documentation corpus with ten
 files. Preparatory passes are done: traps moved to their code sites, node
 intent moved to the node, source material moved to `Assets/`.
 
-Written: `spec/power-and-scaling.md`.
-Pending: items-and-crafting, progression-and-trees, classes-and-abilities,
-combat, content-and-modes, art-and-ui, then `VISION.md`, `DECISIONS.md` and
-the `make status` generator. The deletion pass is the last commit — the
+Written: `spec/power-and-scaling.md`, `spec/items-and-crafting.md`.
+Pending: progression-and-trees, classes-and-abilities, combat,
+content-and-modes, art-and-ui, then `VISION.md`, `DECISIONS.md` and the
+`make status` generator. The deletion pass is the last commit — the
 remaining specs need their sources open.
 
 Awaiting the owner: the class branch tree shape, class induction siting, the
