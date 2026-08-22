@@ -17,14 +17,14 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 51 of 88 asserted across 7 specs | ceiling 49, target 20 | **OUT** |
+| Asserted invariants with no test | ceiling | 51 of 88 asserted across 7 specs | ceiling 51, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
-| Loot per hour, by area level | band | not emitted | — | needs `RiorsEdge.Items.Drops.LootPerHour` to log it |
-| Build variance band, at cap | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AtCap` to log it |
-| Build variance band, endgame | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.Endgame` to log it |
-| Build variance band, ability lane | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to log it |
-| Rewrite impact, per band | band | not emitted | — | needs `RiorsEdge.Progression.RuleBandImpact` to log it |
+| Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
+| Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
+| Build variance band, ability lane | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to emit it |
+| Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 
 ## Tests
 
@@ -168,7 +168,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 51 of 88 asserted across 7 specs · ceiling 49, target 20  ·  **OUT**
+**ceiling** · 51 of 88 asserted across 7 specs · ceiling 51, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 

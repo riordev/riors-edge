@@ -505,7 +505,7 @@ def build_sections(sources):
 # rather than inventing one.
 
 EMITTED_BY_TEST = [
-    ("loot-per-hour", "Loot per hour, by area level", BAND,
+    ("loot-per-hour", "Items dropped per hour, at the reference area level", BAND,
      "RiorsEdge.Items.Drops.LootPerHour"),
     ("power-band-atcap", "Build variance band, at cap", BAND,
      "RiorsEdge.Progression.PowerBand.AtCap"),
@@ -513,33 +513,65 @@ EMITTED_BY_TEST = [
      "RiorsEdge.Progression.PowerBand.Endgame"),
     ("power-band-ability", "Build variance band, ability lane", BAND,
      "RiorsEdge.Progression.PowerBand.AbilityLane"),
-    ("rewrite-impact", "Rewrite impact, per band", BAND,
+    # A ceiling, not a band: a rewrite worth too little is a design problem to
+    # notice, not a build to stop shipping. The test already asserts separately
+    # that no rewrite LOWERS a build's damage, which is the lower edge.
+    ("rewrite-impact", "Worst single rewrite step on an optimized build", CEILING,
      "RiorsEdge.Progression.RuleBandImpact"),
 ]
+
+
+def parse_emitted(section_keys):
+    """Read the [BreakerStatus] lines the suite emitted.
+
+    These numbers are computed inside the suite by code this script cannot
+    reach — the aggregator, the drop pipeline — and reimplementing either here
+    would be a second source of truth for numbers whose whole value is that
+    there is one. So the suite emits and this reads.
+
+    A key that matches no section is REPORTED, not dropped. A status line
+    nobody reads is the same silent nothing as a pin naming no section.
+    """
+    if not os.path.isfile(LOG):
+        return {}, []
+    found, unknown = {}, []
+    for m in re.finditer(r'\[BreakerStatus\] key=([\w.-]+) value=(-?[\d.]+)', read(LOG)):
+        key, value = m.group(1), float(m.group(2))
+        if key in section_keys:
+            found[key] = value
+        else:
+            unknown.append(key)
+    return found, sorted(set(unknown))
 
 
 # --------------------------------------------------------------------------
 # Pins and rendering
 # --------------------------------------------------------------------------
 
-def load_pins(section_keys):
-    """Read the pin file, and refuse a pin that names no section.
+def load_pins(section_directions):
+    """Read the pin file, and refuse a pin that cannot do its job.
 
-    A pin key that matches nothing is silently unpinned, which looks exactly
-    like a section somebody decided to leave as measurement-only. That is the
-    same shape as every other silent-nothing this project has shipped, so a
-    typo here fails loudly rather than quietly disarming a ratchet.
+    Two ways a pin is inert rather than wrong-valued, and both are silent:
 
-    `kind` is documentation for a human reading the file. The generator branches
-    on the section's DIRECTION, declared in build_sections, and never on `kind` —
-    so a two-sided pin takes the band path because its section says band, not
-    because its pin says so. The two must not be allowed to disagree.
+    A key that matches no section is never consulted, which looks exactly like
+    a section somebody decided to leave as measurement-only. A typo could
+    disarm a ratchet with no signal at all.
+
+    A pin whose SHAPE does not match its section's DIRECTION is half-read: a
+    ceiling section with only a `min` is never checked, and a band section with
+    only a `max` silently stops guarding its lower edge.
+
+    `kind` is deliberately NOT validated. It says WHY a pin sits where it does
+    — measurement or target — and that is orthogonal to shape. A band section's
+    measurement pin is legitimately two-sided; an earlier version of this
+    function conflated the two and rejected exactly that, which is how it came
+    to be written down here.
     """
     if not os.path.isfile(PINS):
         return {}
     pins = json.loads(read(PINS))
     unknown = [k for k in pins
-               if not k.startswith("_") and k not in section_keys]
+               if not k.startswith("_") and k not in section_directions]
     if unknown:
         raise ParseError(
             "pin file names sections that do not exist: " + ", ".join(sorted(unknown))
@@ -548,12 +580,13 @@ def load_pins(section_keys):
     for key, pin in pins.items():
         if key.startswith("_"):
             continue
-        kind = pin.get("kind")
-        two_sided = "min" in pin and "max" in pin
-        if kind == "measurement" and two_sided:
+        need = {CEILING: {"max"}, FLOOR: {"min"}, BAND: {"min", "max"}}[section_directions[key]]
+        missing = need - set(pin)
+        if missing:
             raise ParseError(
-                f"pin '{key}' is documented as a measurement but is two-sided. "
-                "A measurement pin holds one edge; say which.")
+                f"pin '{key}' is a {section_directions[key]} and is missing "
+                + ", ".join(sorted(missing))
+                + ". The unset edge would never be checked.")
     return pins
 
 
@@ -579,7 +612,7 @@ def judge(section, pin):
     return ("ok" if lo <= v <= hi else "violated"), f"band {lo}–{hi}{tgt}"
 
 
-def render(sections, asserted, suite, pins):
+def render(sections, asserted, suite, pins, emitted, unknown_emitted):
     L = []
     a = L.append
     a("# State")
@@ -610,8 +643,23 @@ def render(sections, asserted, suite, pins):
         mark = {"ok": "ok", "violated": "**OUT**", "unpinned": "—"}[state]
         a(f"| {s['title']} | {s['direction']} | {s['value']} {s['unit']} | {pintext} | {mark} |")
     for key, title, direction, test in EMITTED_BY_TEST:
-        a(f"| {title} | {direction} | not emitted | — | needs `{test}` to log it |")
+        if key in emitted:
+            fake = {"value": round(emitted[key], 2), "direction": direction}
+            state, pintext = judge(fake, pins.get(key))
+            if state == "violated":
+                violations.append(key)
+            mark = {"ok": "ok", "violated": "**OUT**", "unpinned": "—"}[state]
+            a(f"| {title} | {direction} | {fake['value']} | {pintext} | {mark} |")
+        else:
+            a(f"| {title} | {direction} | not emitted | — | needs `{test}` to emit it |")
     a("")
+
+    if unknown_emitted:
+        a("**Status lines nobody reads:** " + ", ".join(f"`{k}`" for k in unknown_emitted))
+        a("")
+        a("The suite emitted these keys and no section claims them. Either add the")
+        a("section or stop emitting — an unread status line is a silent nothing.")
+        a("")
 
     if suite is not None:
         a("## Tests")
@@ -673,15 +721,17 @@ def main():
         return 2
 
     try:
-        pins = load_pins({sec["key"] for sec in sections}
-                         | {k for k, _, _, _ in EMITTED_BY_TEST}
-                         | {"unexpected-red"})
+        directions = {sec["key"]: sec["direction"] for sec in sections}
+        directions.update({k: d for k, _, d, _ in EMITTED_BY_TEST})
+        directions["unexpected-red"] = CEILING
+        pins = load_pins(directions)
     except ParseError as e:
         sys.stderr.write("status: PIN FAILURE - " + str(e) + os.linesep)
         return 2
     expected_red = set(pins.get("_expected_red", []))
     suite = parse_suite_log(expected_red)
-    text, violations = render(sections, asserted, suite, pins)
+    emitted, unknown_emitted = parse_emitted({k for k, _, _, _ in EMITTED_BY_TEST})
+    text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted)
 
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)

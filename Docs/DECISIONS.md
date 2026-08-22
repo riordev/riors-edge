@@ -9,7 +9,7 @@ Numbers are permanent and never reused.
 
 **O2** — Every number is a placeholder until measured, and a new constant is flagged as one at its declaration. When two implementations are possible, prefer the one that authors nothing.
 
-**O3** — More multipliers compose as an unordered product; a build holds at most three; trees author them only on branch keystones and constellation Convergence or Keystone nodes.
+**O3** — More multipliers compose as an unordered product; a build holds at most three; they are authored only on Core constellation Convergence or Keystone nodes.
 
 **O4** — 300–400 hours to a finished build, and a build must be viable and playable by mid-campaign. Breadth of viable options is an explicit product goal — err toward more viable builds, not higher ceilings.
 
@@ -170,6 +170,8 @@ Numbers are permanent and never reused.
 **O93** — No experience at cap. A currency drops instead.
 
 **O94** — Boss time-to-kill is asserted against a **baseline** build in on-level content, and an optimized build beating it substantially is asserted separately. Bosses are meant to die fast to a comfortable build, so a fast optimized kill is correct behaviour rather than a chassis fault.
+
+**O95** — Doctrines author no More multipliers. All three slots live in Core, where a full constellation behind a deep investment gate makes reaching one genuinely expensive — the composed cap only means something if a slot costs. A doctrine pays in rules instead: conversion, condition change, rule rewrite.
 
 ## Open
 

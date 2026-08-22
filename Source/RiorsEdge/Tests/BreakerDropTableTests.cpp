@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerStatusEmit.h"
 #include "Items/BreakerDropTable.h"
 #include "Items/BreakerLootLibrary.h"
 
@@ -304,6 +305,8 @@ bool FBreakerDropLootPerHourTest::RunTest(const FString& Parameters)
     // point. Bounds are wide bands rather than equalities, because the values
     // are O2 PLACEHOLDER and the SHAPE is what is being asserted.
     const FBreakerLootRateProjection AtFifty = UBreakerDropTableLibrary::ProjectLootRate(Kills, 50, 0.0f, Params);
+    // The reference figure a human tunes against; see Tests/BreakerStatusEmit.h.
+    BreakerStatus::Emit(TEXT("loot-per-hour"), AtFifty.ItemsPerHour);
     TestTrue(TEXT("A documented hour is roughly 130 items, not roughly 690"),
         AtFifty.ItemsPerHour > 110.0f && AtFifty.ItemsPerHour < 160.0f);
     TestTrue(TEXT("Exceptional or better is a handful an hour, not a stream"),

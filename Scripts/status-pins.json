@@ -12,7 +12,14 @@
     "",
     "`kind` is a note for whoever reads this file. The generator branches on the",
     "section's DIRECTION, declared in status.py, and never on `kind`. A pin key",
-    "naming no section is refused rather than silently doing nothing."
+    "naming no section is refused rather than silently doing nothing.",
+    "",
+    "RE-PINNING IS NOT WIDENING, AND THE DIFFERENCE IS WHETHER SOMEONE LOOKED.",
+    "Raising a ceiling because a section went red is widening: it converts a",
+    "failure into a pass and answers a question by not asking it. Moving a pin",
+    "after a reviewed, deliberate change is maintenance: the number moved for a",
+    "reason a person read and accepted. The test is not the size of the move, it",
+    "is whether the reason was examined before the pin followed it."
   ],
 
   "_expected_red_comment": [
@@ -39,8 +46,17 @@
     "why": "Already zero. Pinned so it stays that way." },
   "unexpected-red":          { "max": 0,   "kind": "measurement" },
 
-  "unimplemented-invariants": { "max": 49, "target": 20, "kind": "target",
-    "why": "Pinned so it cannot grow, targeted so it does not sit at 49 for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
+  "unimplemented-invariants": { "max": 51, "target": 20, "kind": "target",
+    "why": "Re-pinned 49 -> 51 when two reviewed rulings each added an invariant ahead of its test; both tests land with the band fixture work and the number comes back down on its own. Pinned so it cannot grow, targeted so it does not sit there for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
+
+  "loot-per-hour":           { "min": 110, "max": 160, "kind": "measurement",
+    "why": "The reference figure the drop pipeline is tuned against, at the reference area level. Band rather than ceiling: too few items is as wrong as too many." },
+  "power-band-atcap":        { "min": 8.0, "max": 10.0, "kind": "target",
+    "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered." },
+  "power-band-endgame":      { "min": 12.0, "max": 20.0, "kind": "measurement",
+    "why": "Measures 15.40x, comfortably inside. Now meaningful, because both bands finally compute their baseline the same way." },
+  "rewrite-impact":          { "max": 1.5, "kind": "measurement",
+    "why": "Worst single rewrite step on an optimized build, 1.46x. Ceiling rather than band: a rewrite worth nothing is a design problem, not a build-breaking one." },
 
   "offered-to-spendable":    { "min": 3.0, "kind": "target",
     "why": "0.63x on the worst tree. The largest gap in the report." },

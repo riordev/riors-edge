@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerStatusEmit.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -390,6 +391,7 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
         Optimized.MoreLayer / Baseline.MoreLayer,
         Optimized.EffectiveCrit / Baseline.EffectiveCrit,
         Ratio, AtCapBandMinimum, AtCapBandMaximum));
+    BreakerStatus::Emit(TEXT("power-band-atcap"), Ratio);
 
     // THE SPREAD IS DELIBERATELY THE WIDEST ONE, AND THAT IS A FINDING, NOT A
     // CHOICE OF CONVENIENCE. The back-loaded ladder (O29) concentrates almost
@@ -467,6 +469,7 @@ bool FBreakerPowerBandEndgameTest::RunTest(const FString& Parameters)
         Optimized.MoreLayer / Baseline.MoreLayer,
         Optimized.EffectiveCrit / Baseline.EffectiveCrit,
         Ratio, EndgameBandMinimum, EndgameBandMaximum));
+    BreakerStatus::Emit(TEXT("power-band-endgame"), Ratio);
 
     // O36 (O2 PLACEHOLDER SEED): "seed rails 12-20x... the back-loaded ladder
     // currently measures ~15x, accepted pending playtest." This is the ruling
@@ -547,6 +550,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 {
+    // Worst step any single rewrite is worth on an optimized build — the one
+    // figure `make status` tracks for this section.
+    float WorstRuleStep = 0.0f;
     using namespace BreakerPowerBandTest;
 
     const FBreakerBuildConditionState State = MeasurementState();
@@ -596,6 +602,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
 
         const float StepCeiling = Definition.Rule == EBreakerItemRule::Prolific ? MaximumProlificRuleStep : MaximumRuleStep;
+        WorstRuleStep = FMath::Max(WorstRuleStep, Step);
 
         AddInfo(FString::Printf(TEXT("RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx) | ceiling x%.2f"),
             *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand, StepCeiling));
@@ -623,6 +630,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("The measured band is untouched by the rarity pass"),
         Compose(Untouched, OptimizedRanks(), State).Total / Baseline.Total, PlainBand, 0.0001f);
+    BreakerStatus::Emit(TEXT("rewrite-impact"), WorstRuleStep);
     return true;
 }
 
