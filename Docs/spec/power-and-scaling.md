@@ -248,13 +248,13 @@ does not own:
 | Baseline TTK is flat across area level 1–50 | `Combat.PowerCurve.Composition` |
 | Baseline TTK is flat across area level 50–100 | `Combat.PowerCurve.EndgameComposition` |
 | The chassis is monotonic and geometric; rank ordering holds | `Combat.Chassis.*` |
-| Weapon base tracks item level; archetype ordering survives scaling | `Weapons.ItemLevelCurve`, `.ArchetypeOrderingAcrossLevels` |
+| Weapon base tracks item level; archetype ordering survives scaling | `Weapons.ItemLevelCurve`, `Weapons.ItemLevelTracksMonsterHealth` |
 | The at-cap band lands in 8–10x | `Progression.PowerBand.AtCap` |
 | The endgame band lands in 12–20x | `Progression.PowerBand.Endgame` |
 | Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact` |
 | The composed More product never exceeds the ceiling, from any combination of layers | `Items.Rules.NeverAuthorsAMore` |
-| An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityMore` |
-| Every damage submission passes through the outgoing-modifier chain | `Combat.AbilitySubmissionConformance` |
+| An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityLaneMore` |
+| Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | The weapon and item-level ceilings are equal | `Items.TierLadder` |
 | Items rolled before the ladder widened keep their rolled values | `Items.LegacyItemsSurviveTheWiderLadder` |
 | Ability throughput sits within the parity band of weapon throughput at level 50 | `Progression.PowerBand.AbilityLane` |

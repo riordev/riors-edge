@@ -149,7 +149,7 @@ own:
 | Every generation entry point has a real caller, and every resource attaches | `Classes.BuiltClassKit.Generation` |
 | Every ability row names a real implementation, and the definition and registry ids mirror exactly | `Classes.BuiltClassKit.Registry` |
 | A wrong-slot ability id is refused; a wrong-class id falls back to the class default | `Abilities.SlotResolution` |
-| Every damage submission passes through the outgoing-modifier chain | `Combat.AbilitySubmissionConformance` |
+| Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | No Caster ability authors a cooldown | `Abilities.CasterHasNoCooldowns` |
 | A cast that would breach the resource floor is refused, not truncated | `Abilities.OvercastRefuses` |
 | Per-source generation caps hold under a maximal farming rotation | `Classes.GenerationCaps` |

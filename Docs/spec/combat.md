@@ -177,17 +177,17 @@ element model. It does not own:
 
 | Invariant | Test |
 |---|---|
-| Effective armour never goes negative, at any combination of flat and bypass reduction | `Combat.Armour.Floor` |
-| The boss cap clamps total reduction, not mitigation | `Combat.Armour.BossCap` |
-| A dodge returns zero damage and raises no on-hit effect | `Combat.Dodge.ShortCircuits` |
-| Facing armour applies on every armoured enemy, including to damage over time | `Combat.FacingArmour.Coverage` |
+| Effective armour never goes negative, at any combination of flat and bypass reduction | `Combat.Armor.Floor` |
+| The boss cap clamps total reduction, not mitigation | `Combat.Armor.BossCap` |
+| A dodge returns zero damage and raises no on-hit effect | `Combat.Defense.DodgeShortCircuits` |
+| Facing armour applies on every armoured enemy, including to damage over time | `Combat.FacingArmor.Coverage` |
 | Multishot projectiles proc at zero; ricochets at half and never chain | `Combat.ProcCoefficient.Law` |
 | Spread ancestry stops at depth two with a normalized payload | `Combat.ProcCoefficient.SpreadDepth` |
 | A damage-over-time snapshot survives reapplication unchanged | `Combat.Status.SnapshotStability` |
 | The trace follows the aim after recoil, at every archetype and accumulation level | `Weapons.RecoilPattern`, `Weapons.TraceFollowsAim` |
-| Melee coefficients read the full weapon base | `Weapons.MeleeCoefficient` |
-| Healing refuses a dead actor and reports overheal at full value | `Combat.Healing.Contract` |
-| Every damage submission passes through the outgoing-modifier chain | `Combat.AbilitySubmissionConformance` |
+| Melee coefficients read the full weapon base | `Combat.AbilityScaling.MeleeSwingsTheFullBlast` |
+| Healing refuses a dead actor and reports overheal at full value | `Combat.Healing.ThroughContract` |
+| Every damage submission passes through the outgoing-modifier chain | `Combat.Ceiling.AbilitySubmissionConformance` |
 | A reaction applies no status, and no target takes two inside one interval | `Combat.Elements.ReactionMatrix` |
 
 ## Open

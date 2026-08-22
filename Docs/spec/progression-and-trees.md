@@ -205,16 +205,16 @@ It does not own:
 
 | Invariant | Test |
 |---|---|
-| Every keystone is reachable at the shipped point entitlement, not a test grant | `Progression.KeystoneReachability` |
+| Every keystone is reachable at the shipped point entitlement, not a test grant | `Abilities.KeystoneReachability` |
 | Every keystone tag a node grants has a consumer, and every variant row's tag is granted by some node | `Abilities.KeystoneGrantsAreRead` |
 | Points per level match the entitlement, and the opening grant is an advance on it | `Progression.LevelPointEntitlement` |
 | The stat-target lane register matches what the aggregator actually consumes | `Progression.ConditionVocabulary.StatTargets` |
-| Condition and stat-target enum values are pinned against reordering | `Progression.ConditionVocabulary.Values` |
-| A dead condition or unpaid target warns rather than failing silently | `Progression.ConditionVocabulary.Loudness` |
+| Condition and stat-target enum values are pinned against reordering | `Progression.ConditionVocabulary.StatTargets` |
+| A dead condition or unpaid target warns rather than failing silently | `Progression.ConditionVocabulary.Evaluability` |
 | Target-side conditions resolve in the additive bucket and never as a More | `Combat.TargetRiders.*` |
 | No class node authors a stat target a Core node on the same axis authors | `Progression.AxisOverlap` |
 | Commitment unlocks the keystone tier and leaves ordinary nodes free | `Progression.BranchCommitment` |
-| A Forge respec restores the pre-purchase composition exactly | `Progression.RespecConvergence` |
+| A Forge respec restores the pre-purchase composition exactly | `Progression.RespecRestoresAttributes` |
 | Offered-to-spendable ratio per tree stays inside its band | `Progression.TreeDensity.Offered` |
 | Node-shape composition per tree stays inside its band | `Progression.TreeDensity.Composition` |
 

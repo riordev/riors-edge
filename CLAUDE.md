@@ -9,8 +9,8 @@ intent moved to the node, source material moved to `Assets/`.
 Written: power-and-scaling, items-and-crafting, progression-and-trees,
 classes-and-abilities, combat, content-and-modes, art-and-ui — all seven —
 plus `VISION.md` and `DECISIONS.md` — nine of the ten.
-Pending: the `make status` generator, then the deletion pass as the last
-commit of the rewrite.
+Pending: pins for `make status` (the first report is deliberately unpinned),
+then the deletion pass as the last commit of the rewrite.
 
 Awaiting the owner: 32 items in `DECISIONS.md`'s open list. Specs write the
 shipped shape and mark the target unruled where a decision is held.
@@ -182,10 +182,13 @@ Superseded rulings are deleted. Git has them. A ruling that needs a paragraph
 of context to understand is not yet a ruling.
 
 **Build state is generated, never written.**
-`make status` reports silent nodes, unmapped enum targets, unreachable
-rarities, dead tags, and unreferenced content. Do not hand-maintain any of
-this in prose. If you notice dead content, fix the generator or fix the
-content.
+`make status` — or `python Scripts/status.py` — writes `Docs/STATE.md`. Every
+section declares a direction: a **ceiling** falls and never rises, a **floor**
+rises and never falls, a **band** stays inside. Pins live in
+`Scripts/status-pins.json` and are authored deliberately, never generated from
+a run: where the current state is the problem, the pin is the target. Do not
+hand-maintain any of this in prose. If you notice dead content, fix the
+generator or fix the content.
 
 **History lives in git.**
 No `archive/` directory. No "kept for the record" sections. No dated log

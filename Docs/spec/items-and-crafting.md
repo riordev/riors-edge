@@ -240,7 +240,7 @@ This spec owns the item, the ladder, the roll, and the Forge. It does not own:
 | Tempering reaches the top of the tier spike and is worth the authored value | `Items.Forge.TemperReachesTheSpike` |
 | A craft on an equipped item moves the composed attribute | `Items.Forge.Loop` |
 | An on-kill affix pays through a real kill and stops exactly on unequip | `Items.Affixes.OnKillReachesGameplay` |
-| Equip caps hold at equip time and at save load | `Items.EquipLimits` |
+| Equip caps hold at equip time and at save load | `Items.Equipment.PerAxisCaps` |
 | A three-minor same-tag stack lands inside its band ceiling | `Progression.RuleBandImpact.MinorStack` |
 | A major rewrite, or a legendary's authored pair, lands inside its band ceiling | `Progression.RuleBandImpact.Major` |
 | The band holds for a build wearing a top-tier item | `Progression.PowerBand.Singular` |
