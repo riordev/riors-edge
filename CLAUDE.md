@@ -1,10 +1,37 @@
 # Rior's Edge — working rules
 
+## Current work
+
+Branch `docs/corpus-rewrite`. Replacing the documentation corpus with ten
+files. Preparatory passes are done: traps moved to their code sites, node
+intent moved to the node, source material moved to `Assets/`.
+
+Written: `spec/power-and-scaling.md`.
+Pending: items-and-crafting, progression-and-trees, classes-and-abilities,
+combat, content-and-modes, art-and-ui, then `VISION.md`, `DECISIONS.md` and
+the `make status` generator. The deletion pass is the last commit — the
+remaining specs need their sources open.
+
+Awaiting the owner: the class branch tree shape, class induction siting, the
+fifth rarity's final name, and the rarity restructure's four open items. All
+of them are written into `DECISIONS.md` as open; specs write the shipped shape
+and mark the target unruled.
+
+Update this section as the last step of each spec session.
+
 ## Build and test
 
 **The cycle is BUILD → SUITE → COMMIT → PUSH, in that order, no shortcuts.**
-"Clean" means **zero** `Result={Fail}`. There are no deliberate reds; any
-failure is a regression without exception.
+"Clean" means **zero unexpected** `Result={Fail}`.
+
+**Deliberate reds are legal only when enumerated.** A test may be red on
+purpose when it encodes a target the game does not yet meet — that is a work
+item with a number on it, which is worth more than an open question in a
+document. Each one names the finding it encodes and the condition that deletes
+it, and `make status` reports expected-red separately from unexpected-red. A
+red test that is not on that list is a regression, without exception. Never
+widen an asserted range to make a red go green: that is choosing an answer
+without saying so.
 
 **Never build while the editor is open.** Live Coding holds the lock and the
 build fails. Close the editor, or press Ctrl+Alt+F11 in it, first. One
