@@ -181,6 +181,15 @@ namespace BreakerPowerBandTest
         float CriticalMultiplier = 1.5f;
         float ComposedDamageMultiplier = 1.0f; // FlatLayer * IncreasedLayer * MoreLayer
         float Total = 1.0f;            // ComposedDamageMultiplier * EffectiveCrit
+        // O54's second delivery lane, composed from the same fold. Crit is a
+        // site multiplier and applies to both lanes identically, so AbilityTotal
+        // uses the same EffectiveCrit — the two totals differ only by which
+        // additive bucket and which More product fed them, which is exactly the
+        // comparison the parity figure wants to make.
+        float ComposedAbilityMultiplier = 1.0f;
+        float AbilityIncreasedLayer = 1.0f;
+        float AbilityMoreLayer = 1.0f;
+        float AbilityTotal = 1.0f;
     };
 
     FComposedBuild Compose(const TArray<FBreakerItemInstance>& Items, const TArray<FBreakerNodeRank>& Ranks,
@@ -196,7 +205,8 @@ namespace BreakerPowerBandTest
         // bucket. Both builds spend the same budget, so this is identical on
         // both sides and cannot be what separates them — which is exactly what
         // O27 asked for.
-        ProgressionOffer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier,
+        // Shared, matching RecalculateStats: the floor lands in both lanes.
+        ProgressionOffer.AddSharedIncreasedDamage(
             PowerBandFullPointBudget * 0.25f); // matches IncreasedDamagePerSpentPoint's default
 
         // The real aggregator, seeded with UBreakerAttributeSet's authored bases.
@@ -205,6 +215,7 @@ namespace BreakerPowerBandTest
         Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalChance)] = 0.05f;
         Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalMultiplier)] = 1.5f;
         Bases[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = 1.0f;
+        Bases[static_cast<int32>(EBreakerAggregatedAttribute::AbilityDamageMultiplier)] = 1.0f;
         Aggregator.CaptureBases(Bases);
         Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, EquipmentOffer);
         Aggregator.SetContribution(EBreakerAttributeContributor::Progression, ProgressionOffer);
@@ -225,6 +236,13 @@ namespace BreakerPowerBandTest
         Build.CriticalMultiplier = FMath::Max(1.0f, Aggregator.Compose(EBreakerAggregatedAttribute::CriticalMultiplier));
         Build.EffectiveCrit = 1.0f + Build.CriticalChance * (Build.CriticalMultiplier - 1.0f);
         Build.Total = Build.ComposedDamageMultiplier * Build.EffectiveCrit;
+
+        Build.AbilityIncreasedLayer = 1.0f + (EquipmentOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
+            + ProgressionOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier)) / 100.0f;
+        Build.AbilityMoreLayer = EquipmentOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier)
+            * ProgressionOffer.GetMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Build.ComposedAbilityMultiplier = Aggregator.Compose(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Build.AbilityTotal = Build.ComposedAbilityMultiplier * Build.EffectiveCrit;
         return Build;
     }
 
@@ -725,10 +743,133 @@ bool FBreakerAffixBreadthTest::RunTest(const FString& Parameters)
         // The rule O27 exposed: NO slot may be structurally incapable of
         // raising damage.
         TestTrue(*(Context + TEXT(" can raise damage at all")), OffensiveOnSlot >= 2);
+        // O54's half of the same invariant, and the half that was written in
+        // the spec and never checked: every slot can raise weapon damage AND
+        // every slot can raise ability damage. Before the pool split the second
+        // clause was not merely unchecked, it was unsatisfiable — there was no
+        // ability line to roll.
+        int32 WeaponLinesOnSlot = 0;
+        int32 AbilityLinesOnSlot = 0;
+        for (const FBreakerAffixDefinition& Affix : Pool)
+        {
+            if (!Affix.AllowsSlot(Slot)) continue;
+            const EBreakerStatTarget Target = Affix.StatTarget;
+            if (Target == EBreakerStatTarget::WeaponDamage || Target == EBreakerStatTarget::SharedDamage) ++WeaponLinesOnSlot;
+            if (Target == EBreakerStatTarget::AbilityDamage || Target == EBreakerStatTarget::SharedDamage) ++AbilityLinesOnSlot;
+        }
+        TestTrue(*(Context + TEXT(" can raise weapon damage")), WeaponLinesOnSlot >= 1);
+        TestTrue(*(Context + TEXT(" can raise ability damage")), AbilityLinesOnSlot >= 1);
         // Per-slot identity: gearing is a set of decisions, so every slot has
         // at least one conditional line of its own to chase.
         TestTrue(*(Context + TEXT(" has a conditional line of its own")), ConditionalOnSlot >= 1);
     }
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// O54: THE ABILITY LANE, MEASURED FOR THE FIRST TIME
+// ---------------------------------------------------------------------------
+// Ability throughput was measured at roughly 4% of rifle throughput, and the
+// ruled fix was giving abilities a pool of their own to scale in. Until the
+// three-pool split there was ONE damage bucket, so an ability build could only
+// grow by growing weapon damage - every ability build was a weapon build with
+// extra steps, and no number anywhere said so.
+//
+// This is that number. It reports two things and asserts only the one that is
+// derivable today:
+//
+//   PARITY   - what an ability-geared build's ability lane composes to against
+//              a weapon-geared build's weapon lane, at the character cap. The
+//              spec asserts this "sits within the parity band"; the band itself
+//              is UNAUTHORED, so the figure is emitted and left unpinned and
+//              the report prints it without judging it. Measuring before
+//              pinning is the correct order, and the one O2 asks for.
+//
+//   RESPONSE - whether the ability lane responds to being built for at all.
+//              That IS derivable, and it is what was actually broken: before
+//              the split an ability build's composed ability multiplier was
+//              identical to a baseline's, because nothing it could equip or
+//              purchase reached a lane that did not exist.
+// ---------------------------------------------------------------------------
+
+namespace BreakerPowerBandTest
+{
+    // The optimized loadout's shape with the offensive line swapped for the
+    // ability pool, plus the shared line on the three slots that carry it. Same
+    // slots, same tier, same number of offensive lines - so this compares two
+    // POOLS and not a rich build against a poor one.
+    TArray<FBreakerItemInstance> AbilityOptimizedLoadout(int32 ItemLevel, int32 Tier)
+    {
+        return MakeLoadout({
+            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
+            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
+            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.MaxResource")}},
+            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.ResourceRegen")}},
+        }, ItemLevel);
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPowerBandAbilityLaneTest,
+    "RiorsEdge.Progression.PowerBand.AbilityLane",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    const int32 Tier = OptimizedTierFor(AtCapItemLevel);
+    const FBreakerBuildConditionState State = MeasurementState();
+
+    const FComposedBuild WeaponBuild = Compose(OptimizedLoadout(AtCapItemLevel, Tier), OptimizedRanks(), State);
+    const FComposedBuild AbilityBuild = Compose(AbilityOptimizedLoadout(AtCapItemLevel, Tier), OptimizedRanks(), State);
+    const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTierFor(AtCapItemLevel)), BaselineRanks(), State);
+
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) increased x%.3f | more x%.3f => x%.2f"),
+        AtCapItemLevel, Tier, WeaponBuild.IncreasedLayer, WeaponBuild.MoreLayer, WeaponBuild.Total));
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) increased x%.3f | more x%.3f => x%.2f"),
+        AtCapItemLevel, Tier, AbilityBuild.AbilityIncreasedLayer, AbilityBuild.AbilityMoreLayer, AbilityBuild.AbilityTotal));
+
+    // PARITY. Emitted, deliberately unpinned: the parity band is unauthored, so
+    // the report prints the measurement and judges nothing. When the band is
+    // ruled, the pin is one entry in Scripts/status-pins.json and this test does
+    // not change.
+    const float Parity = AbilityBuild.AbilityTotal / WeaponBuild.Total;
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY %.3fx (ability lane against weapon lane at the cap; band UNAUTHORED)"), Parity));
+    BreakerStatus::Emit(TEXT("power-band-ability"), Parity);
+
+    // RESPONSE - the assertion the pools were built to make possible.
+    const float Response = AbilityBuild.AbilityTotal / Baseline.AbilityTotal;
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  RESPONSE %.2fx (an ability build's lane against a baseline's)"), Response));
+    TestTrue(*FString::Printf(TEXT("The ability lane responds to being built for (%.2fx)"), Response), Response > 2.0f);
+
+    // The shared pool reaches BOTH lanes - the one structural claim of the
+    // three-pool model that no single ratio can show. An ability build still
+    // carries the shared line and the per-point floor in its weapon lane.
+    TestTrue(TEXT("A shared line reaches the weapon lane of an ability build"),
+        AbilityBuild.IncreasedLayer > 1.0f);
+    TestTrue(TEXT("An ability build's ability lane outgrows its own weapon lane"),
+        AbilityBuild.AbilityIncreasedLayer > AbilityBuild.IncreasedLayer);
+    // And the mirror: a weapon build's ability lane carries the shared pool and
+    // nothing narrow, so it sits below its weapon lane. Neither lane is a copy
+    // of the other, which is the whole point of partitioning them.
+    TestTrue(TEXT("A weapon build's ability lane sits below its weapon lane"),
+        WeaponBuild.AbilityIncreasedLayer < WeaponBuild.IncreasedLayer);
+
+    // O74: ONE More ceiling spanning the pools. Neither lane alone may pass
+    // 1.30^3; the strongest-three selection upstream is what stops a build
+    // holding three in each, and this is the belt-and-braces reading of it.
+    const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+    TestTrue(TEXT("The ability lane's More product respects the one ceiling"),
+        AbilityBuild.AbilityMoreLayer <= Ceiling + UE_KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("The weapon lane's More product respects the one ceiling"),
+        AbilityBuild.MoreLayer <= Ceiling + UE_KINDA_SMALL_NUMBER);
+
     return true;
 }
 

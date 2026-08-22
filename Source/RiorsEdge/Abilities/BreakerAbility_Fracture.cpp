@@ -4,6 +4,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerProjectileBase.h"
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Engine/World.h"
@@ -55,7 +56,7 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Fracture.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Damage);
     Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
     Damage.SetInstigator(Character);
     // Route through the outgoing chain like every other damage submission
@@ -104,7 +105,8 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         // decides every tick of that application. The snapshot includes the
         // outgoing chain's budgeted window product — a status cast inside a
         // damage window carries it for life, one cast outside never gains it.
-        Entry.Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat);
+        Entry.Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat,
+            EBreakerDamageDelivery::Ability);
         Entry.Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Entry.Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
         Entry.Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;

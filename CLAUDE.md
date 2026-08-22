@@ -6,13 +6,20 @@ The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
 `DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
 corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
 
-Open: 32 items in `DECISIONS.md`. Two `make status` sections are pinned to
-targets and are expected out of band — tree density and node-shape composition.
-49 asserted invariants have no test yet; the priority order is in
-`Scripts/status-pins.json`.
+Open: 26 items in `DECISIONS.md`. Four `make status` sections sit out of band
+and every one is a target rather than a regression. 48 asserted invariants have
+no test yet; the priority order is in `Scripts/status-pins.json`.
 
-Next, in order: an emission convention so the band and loot-rate sections can
-be machine-read; then the stale doc citations left in `Source/` comments.
+O54's three damage pools are built: `EBreakerAggregatedAttribute` carries a
+second delivery lane, the shared pool is a bid duplicated into both, and every
+submission site fills its source block through one function that names its
+delivery. The ability lane has a number for the first time — 0.65 against the
+weapon lane at the cap, unpinned because the parity band is unauthored.
+
+Next, in order: rule the parity band now that there is something to rule it
+against; then author node content into the two lanes the split opened, which is
+also the largest lever on offered-to-spendable; then the stale doc citations
+left in `Source/` comments.
 
 Update this section as the last step of each session.
 

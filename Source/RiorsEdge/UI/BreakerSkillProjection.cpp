@@ -187,8 +187,11 @@ FBreakerNodeStats BreakerSkillProjection::BuildOffer(const FBreakerSkillSnapshot
         * FMath::Max(0.0f, Snapshot.IncreasedDamagePerSpentPoint);
     if (SpendPercent > 0.0f)
     {
-        OutOffer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, SpendPercent);
+        // Shared, exactly as RecalculateStats bids it (O54): the floor is a
+        // property of having spent points, not of how damage is delivered.
+        OutOffer.AddSharedIncreasedDamage(SpendPercent);
         Stats.DamageMultiplier += SpendPercent / 100.0f;
+        Stats.AbilityDamageMultiplier += SpendPercent / 100.0f;
     }
     return Stats;
 }

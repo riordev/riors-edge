@@ -170,6 +170,24 @@ enum class EBreakerStatTarget : uint8
     // Bleeds never happen", which is a felt event, where "-30% DoT damage"
     // is a smaller number on a tick nobody reads.
     AilmentAvoidance,
+
+    // ---- O54's other two pools, appended like everything above -----------
+    // WeaponDamage above is the weapon-delivered pool. These are the other two.
+    //
+    // AbilityDamage: the line that lets a build scale what its abilities do,
+    // and the reason the split was worth building — before it, gear could raise
+    // ability damage only by raising weapon damage, so every ability build was
+    // a weapon build with extra steps. O2 PLACEHOLDER values throughout; the
+    // ability lane has never been measured, and the test that measures it lands
+    // with this pass.
+    AbilityDamage,
+    // SharedDamage: O56's smaller, rarer line that feeds BOTH pools. It bids
+    // through FBreakerAttributeContribution::AddSharedIncreasedDamage, so one
+    // rolled line lands in each lane's single additive bucket rather than being
+    // a bucket of its own. Priced at roughly 40-50% of a specific pool's value
+    // at the same tier, which is what stops it being strictly better than the
+    // narrow lines it can substitute for.
+    SharedDamage,
     Count UMETA(Hidden)
 };
 

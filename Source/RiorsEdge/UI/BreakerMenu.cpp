@@ -2994,7 +2994,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
             {
                 const UBreakerAttributeSet* Attributes = Character.IsValid() ? Character->GetAttributes() : nullptr;
                 const float ComposedDamage = Attributes ? Attributes->GetDamageMultiplier() : Stats.WeaponDamageMultiplier;
-                AddTotalRow(TEXT("DAMAGE"), FString::Printf(TEXT("x%.2f"), ComposedDamage), BreakerUI::Orange);
+                AddTotalRow(TEXT("WEAPON DMG"), FString::Printf(TEXT("x%.2f"), ComposedDamage), BreakerUI::Orange);
+                // O54's other lane. Both rows, for the same reason the row above
+                // stopped printing only the gear half: a lane the totals panel
+                // does not show is a lane a player cannot tell they are building.
+                const float ComposedAbility = Attributes ? Attributes->GetAbilityDamageMultiplier() : 1.0f;
+                AddTotalRow(TEXT("ABILITY DMG"), FString::Printf(TEXT("x%.2f"), ComposedAbility), BreakerUI::Orange);
             }
             AddTotalRow(TEXT("CRIT CHANCE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalChanceBonus * 100.0f), BreakerUI::Orange);
             AddTotalRow(TEXT("CRIT DAMAGE"), FString::Printf(TEXT("+%.1f%%"), Stats.CriticalMultiplierBonus * 100.0f), BreakerUI::Orange);
@@ -8133,7 +8138,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
                 ]
             ];
         };
-        AddStatRow(TEXT("DAMAGE MULTIPLIER"), FString::Printf(TEXT("x%.3f"), Attributes->GetDamageMultiplier()));
+        // O54: two lanes, two rows. One row printing the weapon lane and calling
+        // it "damage" is what the sheet said before the split, and it would now
+        // be a screen that hides half of what a build composes — an ability
+        // build's whole offence would read as whatever its weapon lane happened
+        // to inherit from the shared pool.
+        AddStatRow(TEXT("WEAPON DAMAGE"), FString::Printf(TEXT("x%.3f"), Attributes->GetDamageMultiplier()));
+        AddStatRow(TEXT("ABILITY DAMAGE"), FString::Printf(TEXT("x%.3f"), Attributes->GetAbilityDamageMultiplier()));
         AddStatRow(TEXT("CRIT CHANCE"), FString::Printf(TEXT("%.1f%%"), Attributes->GetCriticalChance() * 100.0f));
         AddStatRow(TEXT("CRIT MULTIPLIER"), FString::Printf(TEXT("x%.2f"), Attributes->GetCriticalMultiplier()));
         AddStatRow(TEXT("MOVE SPEED"), FString::Printf(TEXT("%.0f cm/s"), Attributes->GetMoveSpeed()));

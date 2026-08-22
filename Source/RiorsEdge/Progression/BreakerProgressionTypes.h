@@ -86,10 +86,11 @@ enum class EBreakerNodeStatTarget : uint8
     // spell oriented over weapons)". These five are that ruling.
     //
     // AbilityDamage and WeaponDamage PARTITION Damage rather than replacing it:
-    // Damage stays the everything line, and these two are the narrower, more
-    // characterful lines a Caster or a Gunsmith tree wants. A node authors one
-    // of the three, never Damage plus a partition — that would double-dip the
-    // same additive bucket from one node.
+    // under O54 the Damage target is the SHARED pool, feeding both delivery
+    // lanes, and these two are the narrower, more characterful lines a Caster
+    // or a Gunsmith tree wants. A node authors one of the three, never Damage
+    // plus a partition — that is one lane's additive bucket double-dipped from
+    // a single node. BreakerDamagePoolFor below is the mapping, in one place.
     AbilityDamage,
     // Resource cost of abilities. The aggregated attribute ALREADY EXISTS
     // (EBreakerAggregatedAttribute::ResourceCostMultiplier) and gear already
@@ -267,11 +268,12 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // a NODE to reach it. One line each in AggregateStats, all joining the
     // same additive Increased bucket gear already bids into.
     //
-    // DashCooldown is deliberately NOT here despite the roadmap listing it:
-    // EBreakerAggregatedAttribute has no dash entry at all — dash cooldown
-    // lives on FBreakerEquipmentStats and the movement component reads it
-    // directly, so there is nowhere for a node to bid. See the comment at the
-    // call site.
+    // DashCooldown is deliberately NOT here, but the reason recorded for a
+    // milestone was already false when it was written and read as blocked work
+    // ever since: it claimed EBreakerAggregatedAttribute has no dash entry at
+    // all. It has DashCooldownReduction, replicated, floored, and bid into by
+    // gear's Move.DashCooldown affix. The lane is one line in AggregateStats
+    // and this case label, and it is unwired only because nobody has done it.
     case EBreakerNodeStatTarget::AbilityCost:
     case EBreakerNodeStatTarget::MaxClassResource:
     case EBreakerNodeStatTarget::ClassResourceRegen:
@@ -327,12 +329,73 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::AbilityArea:
     case EBreakerNodeStatTarget::AbilityDuration:
     case EBreakerNodeStatTarget::AbilityCooldown:
+    // ---- Wired by the O54 pool split -------------------------------------
+    // These two could not be wired a line at a time like everything above,
+    // because until the split there was ONE damage bucket for them to land in
+    // and a partition needs two. EBreakerAggregatedAttribute now carries
+    // AbilityDamageMultiplier beside DamageMultiplier; WeaponDamage bids the
+    // first, AbilityDamage the second, and the shared pool (the Damage target)
+    // bids both through FBreakerAttributeContribution::AddSharedIncreasedDamage.
+    //
+    // MeleeDamage stays false, and not for want of a bucket. Melee is
+    // weapon-DELIVERED under O55, so it is not a third pool — it is a narrower
+    // slice of the weapon pool selected by the Damage_Melee source tag on the
+    // request, which is a tag-keyed rider rather than an attribute lane. It
+    // waits on that mechanism, not on this one.
+    case EBreakerNodeStatTarget::WeaponDamage:
+    case EBreakerNodeStatTarget::AbilityDamage:
         return true;
     default:
         // Every O30 widening entry. They become true one at a time as the
         // coordinator wires each lane; see the vocabulary document §6.
         return false;
     }
+}
+
+// O54: which of the damage pools a stat target feeds, if any. One function so
+// the aggregator, the target-rider builder and the tests cannot disagree about
+// what "a damage line" means — they each used to answer it with their own
+// `== EBreakerNodeStatTarget::Damage`, which is how a partition target could be
+// added to the enum and then quietly pay nothing anywhere.
+//
+// Damage is the SHARED pool. It predates the split and thirty authored rows use
+// it, so rather than reauthor them it takes the meaning that leaves weapon
+// composition bit-identical and hands abilities the same lines: shared feeds
+// both. WeaponDamage and AbilityDamage are the narrow lines new content
+// authors when it wants one lane only.
+enum class EBreakerDamagePool : uint8
+{
+    None,
+    Weapon,
+    Ability,
+    Shared,
+    DamageOverTime
+};
+
+inline EBreakerDamagePool BreakerDamagePoolFor(EBreakerNodeStatTarget Target)
+{
+    switch (Target)
+    {
+    case EBreakerNodeStatTarget::Damage:          return EBreakerDamagePool::Shared;
+    case EBreakerNodeStatTarget::WeaponDamage:    return EBreakerDamagePool::Weapon;
+    case EBreakerNodeStatTarget::AbilityDamage:   return EBreakerDamagePool::Ability;
+    case EBreakerNodeStatTarget::DamageOverTime:  return EBreakerDamagePool::DamageOverTime;
+    default:                                      return EBreakerDamagePool::None;
+    }
+}
+
+// True for the pools a DIRECT hit reads — the two delivery lanes and the shared
+// pool that feeds both. DamageOverTime is a damage pool but not a delivered
+// one: it is snapshotted at application and composed by ComposeDotSourcePower,
+// so the figures that describe what a hit will do (the conditional-damage
+// readout, the target-side riders) exclude it, exactly as they did when Damage
+// was the only entry.
+inline bool BreakerIsDeliveredDamagePool(EBreakerNodeStatTarget Target)
+{
+    const EBreakerDamagePool Pool = BreakerDamagePoolFor(Target);
+    return Pool == EBreakerDamagePool::Weapon
+        || Pool == EBreakerDamagePool::Ability
+        || Pool == EBreakerDamagePool::Shared;
 }
 
 // Same aggregation law as equipment: flat values sum, then one additive
@@ -443,6 +506,12 @@ struct RIORSEDGE_API FBreakerNodeStats
     // field from DamageMultiplier on purpose: they are different buckets and
     // merging them would be the exact bug the aggregation rule exists to stop.
     UPROPERTY(BlueprintReadOnly) float DamageMoreMultiplier = 1.0f;
+    // O54's ability lane, the twin of the two fields above. The shared pool is
+    // inside BOTH DamageMultiplier and this one, because that is what shared
+    // means; a card printing them side by side is printing what each kind of
+    // hit will actually use, not two halves of one number to be added.
+    UPROPERTY(BlueprintReadOnly) float AbilityDamageMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float AbilityDamageMoreMultiplier = 1.0f;
     // How many More sources the build actually holds, before the cap. The skill
     // screen prints "3 / 3 MORE" from this so a fourth purchase visibly does
     // nothing rather than silently doing nothing.

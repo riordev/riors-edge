@@ -24,6 +24,10 @@ UBreakerAttributeSet::UBreakerAttributeSet()
     InitCriticalMultiplier(DefaultCriticalMultiplier);   // O2 PLACEHOLDER
     InitDamageMultiplier(1.0f);
     InitDamageOverTimeMultiplier(1.0f);
+    // O54's second pool, anchored at 1.0 exactly as the weapon lane is, so a
+    // character with nothing authored into it composes bit-identically to one
+    // that predates the split.
+    InitAbilityDamageMultiplier(1.0f);
     InitMoveSpeed(650.0f);           // O2 PLACEHOLDER
     // Multiplier-shaped, so 1.0 is "nothing contributed". The movement
     // component divides by DashCooldownReduction, which is why
@@ -53,6 +57,7 @@ void UBreakerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     BREAKER_REPLICATE(CriticalMultiplier);
     BREAKER_REPLICATE(DamageMultiplier);
     BREAKER_REPLICATE(DamageOverTimeMultiplier);
+    BREAKER_REPLICATE(AbilityDamageMultiplier);
     BREAKER_REPLICATE(MoveSpeed);
     BREAKER_REPLICATE(SlideSpeedMultiplier);
     BREAKER_REPLICATE(AirControlMultiplier);
@@ -83,7 +88,8 @@ void UBreakerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
     else if (Attribute == GetClassResourceFloorAttribute()) NewValue = FMath::Min(0.0f, NewValue);
     else if (Attribute == GetCriticalChanceAttribute()) NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
     else if (Attribute == GetCriticalMultiplierAttribute()) NewValue = FMath::Max(1.0f, NewValue);
-    else if (Attribute == GetDamageMultiplierAttribute() || Attribute == GetDamageOverTimeMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
+    else if (Attribute == GetDamageMultiplierAttribute() || Attribute == GetDamageOverTimeMultiplierAttribute()
+        || Attribute == GetAbilityDamageMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetMoveSpeedAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     else if (Attribute == GetSlideSpeedMultiplierAttribute() || Attribute == GetAirControlMultiplierAttribute()) NewValue = FMath::Max(0.0f, NewValue);
     // The movement component DIVIDES the dash cooldown by this. A floor rather
@@ -115,6 +121,7 @@ void UBreakerAttributeSet::CaptureAttributeBases()
     Values[static_cast<int32>(EBreakerAggregatedAttribute::MoveSpeed)] = GetMoveSpeed();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageOverTimeMultiplier)] = GetDamageOverTimeMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = GetDamageMultiplier();
+    Values[static_cast<int32>(EBreakerAggregatedAttribute::AbilityDamageMultiplier)] = GetAbilityDamageMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::SlideSpeedMultiplier)] = GetSlideSpeedMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::AirControlMultiplier)] = GetAirControlMultiplier();
     Values[static_cast<int32>(EBreakerAggregatedAttribute::DashCooldownReduction)] = GetDashCooldownReduction();
@@ -210,6 +217,10 @@ void UBreakerAttributeSet::RecomputeAggregatedAttributes()
     // this line existed: nothing wrote it, which is why no amount of gear or
     // skill-point spending changed how hard a weapon hit.
     WriteAttributeValue(GetDamageMultiplierAttribute(), DamageMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier));
+    // The ability-delivered lane's twin of the line above. Composed the same
+    // way from the same fold; which of the two a given hit reads is decided by
+    // EBreakerDamageDelivery at the submission site, never here.
+    WriteAttributeValue(GetAbilityDamageMultiplierAttribute(), AbilityDamageMultiplier, Aggregator.Compose(EBreakerAggregatedAttribute::AbilityDamageMultiplier));
 
     // The three movement multipliers the movement component now reads instead
     // of composing gear and tree together itself. Same reason as
@@ -284,6 +295,7 @@ BREAKER_ON_REP(CriticalChance)
 BREAKER_ON_REP(CriticalMultiplier)
 BREAKER_ON_REP(DamageMultiplier)
 BREAKER_ON_REP(DamageOverTimeMultiplier)
+BREAKER_ON_REP(AbilityDamageMultiplier)
 BREAKER_ON_REP(MoveSpeed)
 BREAKER_ON_REP(SlideSpeedMultiplier)
 BREAKER_ON_REP(AirControlMultiplier)

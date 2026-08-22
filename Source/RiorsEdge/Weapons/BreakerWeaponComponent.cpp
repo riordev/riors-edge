@@ -9,6 +9,7 @@
 #include "Classes/BreakerGritComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -1766,26 +1767,17 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     Damage.bWeakPointHit = bWeakPoint;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    // ONE number. Gear's Weapon Damage affix and every skill node that raises
-    // damage are already summed into the DamageMultiplier attribute's single
-    // additive Increased bucket; multiplying gear in separately here is what
-    // used to break the locked rule.
-    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
-    // STAGE 6: the source split, alongside the composed value it re-derives.
-    // ReceiveDamage needs the Increased bucket and the More product SEPARATELY
-    // to let a target-conditional rider join the additive bucket instead of
-    // multiplying (Hook-And-Condition-Vocabulary §3.3). The More half is the
-    // aggregator's post-clamp product; the Increased half is derived by
-    // division so (1 + Increased/100) x More == SourceDamageMultiplier holds
-    // exactly and a request with no satisfied rider recomposes to the same
-    // number it carried in. With no attribute set the defaults (0% / x1.0)
-    // are already the truthful split of the 1.0 composed value.
-    Damage.bHasSourceSplit = true;
-    if (SourceAttributes)
-    {
-        Damage.SourceMoreProduct = SourceAttributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier);
-        Damage.SourceIncreasedPercent = (Damage.SourceDamageMultiplier / FMath::Max(Damage.SourceMoreProduct, UE_SMALL_NUMBER) - 1.0f) * 100.0f;
-    }
+    // ONE number, and ONE place that derives it. Gear's Weapon Damage affix,
+    // every node that raises damage and the shared pool are already summed into
+    // the weapon lane's single additive Increased bucket; multiplying gear in
+    // separately here is what used to break the locked rule.
+    //
+    // FillSourcePools also fills the STAGE 6 split — the Increased bucket and
+    // the More product separately — so ReceiveDamage can let a
+    // target-conditional rider join the additive bucket instead of multiplying.
+    // O55: a gun shot is Weapon-delivered, which is the whole of the decision
+    // at this site.
+    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
     Damage.RandomSeed = DamageSeed;
     Damage.SourceLocation = GetOwner()->GetActorLocation();
     Damage.bHasSourceLocation = true;
@@ -2027,7 +2019,8 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     // outside never gains it, and a window opened after application changes
     // nothing. Application-time only — never per tick.
     Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(
-        SourceAttributes, GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr);
+        SourceAttributes, GetOwner() ? GetOwner()->FindComponentByClass<UBreakerCombatComponent>() : nullptr,
+        EBreakerDamageDelivery::Weapon);
     Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;
@@ -2055,19 +2048,12 @@ void UBreakerWeaponComponent::FireProjectile(const UBreakerWeaponDefinition* Def
     Damage.ArmorPenetration = Definition->ArmorPenetration;
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    // Same single composed number as the hitscan path.
-    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
-    // STAGE 6: the same source split the hitscan path fills, and the reason
-    // the split lives on the REQUEST at all: a rocket has no target at fire
-    // time, so its target-conditional riders can only resolve at impact, in
-    // ReceiveDamage, from the halves snapshotted here. The rocket carries the
-    // fire-time split exactly as it carries the fire-time modifiers below.
-    Damage.bHasSourceSplit = true;
-    if (SourceAttributes)
-    {
-        Damage.SourceMoreProduct = SourceAttributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier);
-        Damage.SourceIncreasedPercent = (Damage.SourceDamageMultiplier / FMath::Max(Damage.SourceMoreProduct, UE_SMALL_NUMBER) - 1.0f) * 100.0f;
-    }
+    // The same source block as the hitscan path, and the reason the split lives
+    // on the REQUEST at all: a rocket has no target at fire time, so its
+    // target-conditional riders can only resolve at impact, in ReceiveDamage,
+    // from the halves snapshotted here. The rocket carries the fire-time split
+    // exactly as it carries the fire-time modifiers below.
+    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
     Damage.RandomSeed = HashCombine(GetTypeHash(GetOwner()), ShotSequence);
     Damage.SetInstigator(GetOwner());
     // The rocket carries an already-composed request; modifiers active at the

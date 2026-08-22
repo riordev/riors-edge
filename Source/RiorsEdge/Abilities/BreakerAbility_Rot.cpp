@@ -4,6 +4,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -106,7 +107,7 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.TickDamage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Rot.GetTag());
     Spec.TickDamage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Spec.TickDamage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    Spec.TickDamage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Spec.TickDamage);
     Spec.TickDamage.SetInstigator(Character);
 
     // Poison is the payload Class-Kits names. It is a snapshotting DoT like
@@ -123,7 +124,8 @@ void UBreakerAbility_Rot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     Spec.StatusSpec.BaseDamagePerTick = PoisonDamagePerTick * LevelScalar;
     Spec.StatusSpec.Duration = PoisonDuration;
     Spec.StatusSpec.TickInterval = PoisonTickInterval;
-    Spec.StatusSpec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat);
+    Spec.StatusSpec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat,
+        EBreakerDamageDelivery::Ability);
     Spec.StatusSpec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Spec.StatusSpec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Spec.StatusSpec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;

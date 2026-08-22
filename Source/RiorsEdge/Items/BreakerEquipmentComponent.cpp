@@ -776,6 +776,13 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     // Every conditional damage line and the unconditional one share the single
     // additive Increased bucket for outgoing damage. Summed here once so both
     // the display figure below and the contribution submit the same number.
+    //
+    // O54: this sum is the WEAPON-delivered pool. The conditional family rides
+    // it because every one of those lines is a weapon-state condition — being
+    // airborne, sliding, wall-riding, in Redline, recently dashed — and the two
+    // bucket-crossing rewrites below feed it because Added Damage and Fire Rate
+    // are both weapon-side. The ability pool and the shared pool are summed
+    // separately just below; nothing here is silently doing double duty.
     float TotalIncreasedDamagePercent =
         IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirborneDamage)]
@@ -806,6 +813,14 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         TotalIncreasedDamagePercent += IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::FireRate)]
             * Rules.FireRateToIncreasedDamage;
     }
+
+    // O54's other two pools. The ability line is its own additive bucket; the
+    // shared line is added to BOTH lanes at the contribution, which is what
+    // "feeds both" means and why it is not summed into either total here.
+    const float TotalIncreasedAbilityDamagePercent =
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AbilityDamage)];
+    const float TotalSharedDamagePercent =
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::SharedDamage)];
 
     auto Increased = [&IncreasedByTarget](EBreakerStatTarget Target)
     {
@@ -929,6 +944,13 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // Every conditional line rides the SAME bid — they are not a second
         // multiplier and never were. Only the live ones are in the sum.
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, TotalIncreasedDamagePercent);
+        // O54: the ability pool's own bucket, and the shared pool bidding into
+        // both lanes from one rolled line. A weapon hit composes
+        // (1 + (Weapon + Shared)/100); an ability composes
+        // (1 + (Ability + Shared)/100). Neither reads the other's specific
+        // pool, so no line is counted twice inside one hit.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier, TotalIncreasedAbilityDamagePercent);
+        OutContribution->AddSharedIncreasedDamage(TotalSharedDamagePercent);
         // Added Damage lands in the FLAT lane of the same attribute, whose base
         // is 1.0. Flat sums first, so it is multiplied by the Increased bucket
         // rather than added after it — which is precisely why a flat line and an

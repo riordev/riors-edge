@@ -7,6 +7,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Engine/World.h"
@@ -748,7 +749,7 @@ void UBreakerAbility_FieldAssembly::HandleMachinistKill(const FBreakerHitContext
         Damage.ProcCoefficient = 0.5f;   // the turret's own discipline (§G3)
         Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = OwnerAttributes ? OwnerAttributes->GetDamageMultiplier() : 1.0f;
+        UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(Character);

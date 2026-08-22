@@ -5,6 +5,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -95,7 +96,7 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
         Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Resonance.GetTag());
         Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+        UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Damage);
         Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
         Damage.SourceLocation = Character->GetActorLocation();
         Damage.bHasSourceLocation = true;

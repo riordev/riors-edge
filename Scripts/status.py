@@ -511,7 +511,14 @@ EMITTED_BY_TEST = [
      "RiorsEdge.Progression.PowerBand.AtCap"),
     ("power-band-endgame", "Build variance band, endgame", BAND,
      "RiorsEdge.Progression.PowerBand.Endgame"),
-    ("power-band-ability", "Build variance band, ability lane", BAND,
+    # PARITY, not a variance band: what an ability-geared build's ability lane
+    # composes to against a weapon-geared build's weapon lane at the cap. That
+    # is the figure power-and-scaling asserts ("ability throughput sits within
+    # the parity band of weapon throughput at level 50") and the one the ~4%
+    # measurement that motivated the three-pool split was expressed in. The
+    # section title said "build variance band" before the test existed, which
+    # was a guess about what would be measured; this is what is.
+    ("power-band-ability", "Ability lane throughput against weapon lane", BAND,
      "RiorsEdge.Progression.PowerBand.AbilityLane"),
     # A ceiling, not a band: a rewrite worth too little is a design problem to
     # notice, not a build to stop shipping. The test already asserts separately

@@ -37,6 +37,18 @@ void FBreakerAttributeContribution::AddIncreasedPercent(EBreakerAggregatedAttrib
     if (Index != INDEX_NONE) IncreasedPercent[Index] += Percent;
 }
 
+void FBreakerAttributeContribution::AddSharedIncreasedDamage(float Percent)
+{
+    AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, Percent);
+    AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier, Percent);
+}
+
+void FBreakerAttributeContribution::ComposeSharedMoreDamage(float Multiplier)
+{
+    ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, Multiplier);
+    ComposeMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier, Multiplier);
+}
+
 void FBreakerAttributeContribution::ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier)
 {
     const int32 Index = AttributeIndex(Attribute);

@@ -426,8 +426,14 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // divisor). All four are single-bidder lanes like the projectile
     // channels: no aggregated attribute exists and gear does not bid.
     //
+    // Plus the two the O54 pool split wired: WeaponDamage and AbilityDamage.
+    // These are the only entries that were ever blocked on something larger
+    // than a line of aggregation — there was ONE damage bucket, and a partition
+    // needs two, so they waited on EBreakerAggregatedAttribute gaining
+    // AbilityDamageMultiplier rather than on anybody writing their lane.
+    //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 23);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 25);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet
@@ -445,16 +451,35 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
             BreakerStatTargetHasAggregationLane(Target));
     }
 
-    // Damage's partitions must not silently claim Damage's lane. A node
-    // authoring AbilityDamage today has to be visibly unpaid, not quietly
-    // folded into the general damage bucket, or the pilot-one-axis-end-to-end
-    // plan cannot tell whether the axis works.
-    TestFalse(TEXT("AbilityDamage does not borrow Damage's lane"),
+    // Damage's partitions no longer borrow Damage's lane — they have their own,
+    // which is what the O54 split built. What this now pins is the MAPPING:
+    // each of the three damage targets names a DIFFERENT pool, so a future
+    // edit cannot quietly collapse two of them back into one bucket and leave
+    // the enum looking partitioned.
+    TestTrue(TEXT("AbilityDamage has its own lane"),
         BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::AbilityDamage));
-    TestFalse(TEXT("WeaponDamage does not borrow Damage's lane"),
+    TestTrue(TEXT("WeaponDamage has its own lane"),
         BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::WeaponDamage));
-    TestFalse(TEXT("MeleeDamage does not borrow Damage's lane"),
+    TestEqual(TEXT("Damage is the shared pool"),
+        static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::Damage)),
+        static_cast<int32>(EBreakerDamagePool::Shared));
+    TestEqual(TEXT("WeaponDamage is the weapon pool"),
+        static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::WeaponDamage)),
+        static_cast<int32>(EBreakerDamagePool::Weapon));
+    TestEqual(TEXT("AbilityDamage is the ability pool"),
+        static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::AbilityDamage)),
+        static_cast<int32>(EBreakerDamagePool::Ability));
+
+    // MeleeDamage stays unpaid, and the reason is not "nobody got to it": melee
+    // is weapon-DELIVERED under O55, so it is a narrower slice of the weapon
+    // pool selected by the Damage_Melee source tag, not a fourth pool. It waits
+    // on that tag-keyed rider mechanism, and until then a node authoring it
+    // must be visibly unpaid rather than quietly folded into the weapon bucket.
+    TestFalse(TEXT("MeleeDamage does not borrow the weapon pool's lane"),
         BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::MeleeDamage));
+    TestEqual(TEXT("MeleeDamage is not a pool of its own"),
+        static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::MeleeDamage)),
+        static_cast<int32>(EBreakerDamagePool::None));
 
     // The enum is serialized by value into Data Assets, so the ten original
     // entries must keep their numbers. Pinning the first and last of the

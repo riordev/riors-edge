@@ -309,8 +309,10 @@ bool FBreakerCasterTreesMoreCeilingTest::RunTest(const FString& Parameters)
     // And it reaches an actual tick: the whole-tick multiplier composed for a
     // DoT application carries the 1.30x (times whatever Increased the walk
     // bought, additively — the A4 bucket rule).
+    // Ability-delivered: a Void Whisperer's ticks come from Caster abilities, so
+    // the lane the tick folds beside the DoT bucket is the ability pool (O55).
     TestTrue(TEXT("A full Void Whisperer's DoT tick pays the Long Dark More"),
-        UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr) >= 1.30f - UE_KINDA_SMALL_NUMBER);
+        UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Ability) >= 1.30f - UE_KINDA_SMALL_NUMBER);
 
     // A hard, content-independent ceiling check regardless: whatever the
     // product is, it must never exceed the O3-cap composed against the

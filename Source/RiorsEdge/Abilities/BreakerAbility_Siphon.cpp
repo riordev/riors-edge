@@ -5,6 +5,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "TimerManager.h"
@@ -159,7 +160,7 @@ void UBreakerAbility_Siphon::TickChannel()
     Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Siphon.GetTag());
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+    UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Damage);
     // A channel is not a damage-over-time STATUS: it is a repeated direct hit
     // from a live ability, so it does not snapshot and it does not carry
     // bIsDamageOverTime. Setting that flag would suppress Mana generation on a

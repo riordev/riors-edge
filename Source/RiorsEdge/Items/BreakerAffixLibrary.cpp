@@ -225,6 +225,38 @@ namespace
         // not four large ones you either find or do not.
         // O2 PLACEHOLDER: 3% (T12) -> 35% (T1); T-1 spikes to 126%.
         Pool.Add(MakeAffix(TEXT("Offense.WeaponDamage"), TEXT("Weapon Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WeaponDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 35.0f, 80.0f));
+        // --- O54's other two pools -----------------------------------------
+        // The line above became a POOL rather than the only damage line when
+        // the three-pool split landed, and these two are the rest of it.
+        //
+        // Increased Ability Damage, on every slot and at the same anchors as
+        // Weapon Damage. Deliberately a peer and not a smaller line: it is the
+        // only route an ability build has to scale, where a weapon build also
+        // has fire rate, added damage and the whole projectile family. The
+        // affix-breadth invariant reads "every slot can raise weapon damage;
+        // every slot can raise ability damage", so AllSlots is the rule and not
+        // a generosity.
+        // O2 PLACEHOLDER: 3% (T12) -> 35% (T1), mirroring the weapon line
+        // exactly. The ability lane has never been measured against the weapon
+        // lane; PowerBand.AbilityLane is what will say whether this is right,
+        // and it is the reason these values are a mirror rather than a guess
+        // with a story attached.
+        Pool.Add(MakeAffix(TEXT("Offense.AbilityDamage"), TEXT("Ability Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::AbilityDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 3.0f, 35.0f, 80.0f));
+        // O56's shared line: smaller, rarer, and it feeds BOTH pools. Priced at
+        // ~43% of a specific pool at the same tier, inside the ruled 40-50%
+        // band — enough that a build with both a weapon and an ability payload
+        // genuinely wants it, and never enough that it is the strictly better
+        // pick for a build that only has one.
+        //
+        // EVERY SLOT, per the ruling, and "rarer" carried by VALUE alone. An
+        // earlier draft expressed rarity as a narrower slot list, which reads
+        // reasonable and is a different rule: the ruling says every slot, and a
+        // shared line missing from five slots would make those slots' ability
+        // scaling depend on finding the one narrow ability line rather than on
+        // a choice between two.
+        // O2 PLACEHOLDER: 1.5% (T12) -> 15% (T1), ~43% of a specific pool at
+        // the same tier and inside O56's 40-50% band.
+        Pool.Add(MakeAffix(TEXT("Offense.SharedDamage"), TEXT("Increased Damage"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SharedDamage, EBreakerStatBucket::IncreasedPercent, AllSlots, 1.5f, 15.0f, 80.0f));
         // The flat half. Lands before the Increased bucket, so it is worth most
         // to a build that already has a large bucket to multiply it by — the
         // opposite scaling shape to the line above, which is the point.
@@ -573,6 +605,11 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     switch (Target)
     {
     case EBreakerStatTarget::WeaponDamage:
+    // O54's other two pools. Both are damage by any reading, and the breadth
+    // test's per-slot "can this slot raise damage at all" question has to count
+    // them or a slot carrying only ability lines would read as defensive.
+    case EBreakerStatTarget::AbilityDamage:
+    case EBreakerStatTarget::SharedDamage:
     case EBreakerStatTarget::AddedDamage:
     case EBreakerStatTarget::CriticalChance:
     case EBreakerStatTarget::CriticalDamage:

@@ -10,6 +10,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerGritComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerDeployable.h"
 #include "Combat/BreakerEnemy.h"
 #include "Engine/World.h"
@@ -152,7 +153,7 @@ namespace BreakerTankAbilityLocal
             Damage.DamageFamily = EBreakerDamageFamily::Physical;
             Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
             Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-            Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+            UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Ability, Damage);
             if (Mods.bEcho)
             {
                 // Proc coefficient 0 and no crit: the echo is a settlement, not
@@ -267,7 +268,10 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         Damage.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
         Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+        // O55: melee, so weapon-delivered — the same reading as Cleave, and
+        // the same reading the Damage_Melee tag above already gives the
+        // affix layer.
+        UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
         Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(TargetIndex) + static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
         Damage.SourceLocation = Params.Origin;
         Damage.bHasSourceLocation = true;

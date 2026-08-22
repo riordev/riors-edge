@@ -13,6 +13,22 @@ enum class EBreakerDamageFamily : uint8
     TrueDamage
 };
 
+// O55: which of O54's two specific damage pools a hit draws. Decided by what
+// DELIVERS the damage, never by what triggers it — a melee ability that swings
+// the equipped weapon is Weapon-delivered and draws the weapon pool, and a
+// Gunsmith deployable is a delivery mechanism for its owner rather than a pet,
+// so its shots are Ability-delivered. The rule pre-answers every future case,
+// which is why it is an enum on the request and not a judgement at each site.
+//
+// The shared pool is not a value here: it feeds BOTH lanes and is already
+// inside each composed lane by the time a request is filled.
+UENUM(BlueprintType)
+enum class EBreakerDamageDelivery : uint8
+{
+    Weapon,
+    Ability
+};
+
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerDamageRequest
 {
@@ -42,6 +58,18 @@ struct RIORSEDGE_API FBreakerDamageRequest
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceIncreasedPercent = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;
+    // O54/O55: which pool the source multiplier above was drawn from. Weapon is
+    // the default because it is what every pre-split request meant, and because
+    // an environmental hazard or a bare test rig that never sets it is not
+    // ability-delivered. The target-side rider pass reads it so a weapon-lane
+    // rider cannot pay on an ability hit.
+    //
+    // Do not fill this by hand alongside SourceDamageMultiplier — call
+    // UBreakerDamageLibrary::FillSourcePools, which sets the whole source block
+    // consistently. RiorsEdge.Combat.Ceiling.AbilitySubmissionConformance
+    // enforces that, because a site that sets one of the four and forgets the
+    // others is the failure this split can produce.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerDamageDelivery Delivery = EBreakerDamageDelivery::Weapon;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float CriticalChance = 0.0f;
     // Struct default only — live requests are filled from the attribute set
     // (or its named fallback constants). O2 PLACEHOLDER

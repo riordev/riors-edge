@@ -12,27 +12,27 @@ measurement without judging it.
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
 | Silent nodes | ceiling | 47 of 205 authored | ceiling 47 | ok |
-| Stat targets with no aggregation lane | ceiling | 10 of 33 | ceiling 10 | ok |
-| Aggregation lanes carrying nothing | ceiling | 6 of 23 lanes | ceiling 6 | ok |
+| Stat targets with no aggregation lane | ceiling | 8 of 33 | ceiling 8 | ok |
+| Aggregation lanes carrying nothing | ceiling | 8 of 25 lanes | ceiling 8 | ok |
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 49 of 88 asserted across 7 specs | ceiling 51, target 20 | ok |
+| Asserted invariants with no test | ceiling | 48 of 90 asserted across 7 specs | ceiling 48, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
-| Build variance band, ability lane | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to emit it |
+| Ability lane throughput against weapon lane | band | 0.65 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 3.76 | ceiling 1.0 | **OUT** |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 
 ## Tests
 
-- passing: 394
+- passing: 399
 - expected red: 2
 - **unexpected red: 0**
-- asserted invariants with no test: 49
+- asserted invariants with no test: 48
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -67,12 +67,10 @@ Authored, purchasable, costs a point, and produces no observable change. Counted
 
 ## Stat targets with no aggregation lane
 
-**ceiling** · 10 of 33 · ceiling 10
+**ceiling** · 8 of 33 · ceiling 8
 
 A node authored against one of these is silently unpaid.
 
-- AbilityDamage
-- WeaponDamage
 - MeleeDamage
 - IncomingDamageReduction
 - Lifesteal
@@ -84,11 +82,13 @@ A node authored against one of these is silently unpaid.
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 6 of 23 lanes · ceiling 6
+**ceiling** · 8 of 25 lanes · ceiling 8
 
 Plumbing with no author. Not harmful, but not free either.
 
+- AbilityDamage
 - AbilityArea
+- WeaponDamage
 - Armor
 - MaxClassResource
 - ClassResourceRegen
@@ -170,7 +170,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 49 of 88 asserted across 7 specs · ceiling 51, target 20
+**ceiling** · 48 of 90 asserted across 7 specs · ceiling 48, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -214,7 +214,7 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.RuleBandImpact.Major  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.RuleBandImpact  —  power-and-scaling.md
-- …and 9 more
+- …and 8 more
 
 ## Offered-to-spendable ratio, per tree
 

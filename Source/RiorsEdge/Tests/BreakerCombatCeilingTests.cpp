@@ -289,13 +289,13 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
     };
 
     // Applied OUTSIDE any window: the snapshot is the plain attribute side.
-    const float PowerOutside = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
+    const float PowerOutside = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat, EBreakerDamageDelivery::Weapon);
     TestEqual(TEXT("Outside a window the snapshot is the attribute side alone"), PowerOutside, 1.0f, 0.0001f);
 
     // Applied INSIDE a window: the snapshot carries the window's More.
     Combat->PushOutgoingModifier(UBreakerAbility_Overdrive::OutgoingModifierKey(), 0.0f,
         UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0f);
-    const float PowerInside = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
+    const float PowerInside = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat, EBreakerDamageDelivery::Weapon);
     TestEqual(TEXT("Inside a window the snapshot carries the window's More"),
         PowerInside, UBreakerAbility_Overdrive::OutgoingMoreMultiplier, 0.0001f);
 
@@ -321,7 +321,7 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
     // contributes nothing to a fresh snapshot either.
     AddExpectedError(TEXT("exceeds the"), EAutomationExpectedErrorFlags::Contains, 0);
     Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, CeilingTestTreeMores(3));
-    const float PowerAtCeiling = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
+    const float PowerAtCeiling = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat, EBreakerDamageDelivery::Weapon);
     TestEqual(TEXT("A snapshot at the tree ceiling gains nothing from the window (one budget)"),
         PowerAtCeiling, Attributes->GetDamageMultiplier(), 0.001f);
     return true;
@@ -352,7 +352,7 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The direct-hit attribute reads its own lane alone"), Attributes->GetDamageMultiplier(), 1.5f, 0.0001f);
         TestEqual(TEXT("The DoT attribute reads its own lane alone"), Attributes->GetDamageOverTimeMultiplier(), 1.4f, 0.0001f);
         TestEqual(TEXT("A4: the two Increased lanes fold ADDITIVELY for ticks (1 + 0.5 + 0.4)"),
-            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr), 1.9f, 0.0001f);
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Weapon), 1.9f, 0.0001f);
     }
 
     // ---- The DoT More lane composes on top, still under the one budget ----
@@ -366,7 +366,7 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
         Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
 
         TestEqual(TEXT("A DoT More multiplies the additive bucket for ticks (1.9 x 1.30)"),
-            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr), 1.9f * 1.3f, 0.001f);
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Weapon), 1.9f * 1.3f, 0.001f);
         TestEqual(TEXT("A DoT More never inflates a direct hit"), Attributes->GetDamageMultiplier(), 1.5f, 0.0001f);
     }
 
@@ -382,7 +382,7 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
         // that raw offer buys the tick nothing more — the fold clamps the
         // combined More side at the single budget.
         TestEqual(TEXT("The tick's total More side clamps at the one O34 ceiling"),
-            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr),
+            UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Weapon),
             FBreakerAttributeAggregator::ComposedMoreCeiling(), 0.001f);
     }
     return true;
@@ -419,7 +419,7 @@ bool FBreakerCeilingProjectileCarriesChainTest::RunTest(const FString& Parameter
     Carried.Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
     Carried.Spec.BaseDamagePerTick = 5.0f;
     Carried.Spec.Duration = 4.0f;
-    Carried.Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat);
+    Carried.Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(Attributes, Combat, EBreakerDamageDelivery::Weapon);
 
     ABreakerProjectileBase* Projectile = NewObject<ABreakerProjectileBase>(GetTransientPackage());
     if (!Projectile)
@@ -466,15 +466,23 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerCeilingSubmissionConformanceTest::RunTest(const FString& Parameters)
 {
-    const FString AbilitiesRoot = FPaths::Combine(FPaths::ProjectDir(), TEXT("Source"), TEXT("RiorsEdge"), TEXT("Abilities"));
-    if (!IFileManager::Get().DirectoryExists(*AbilitiesRoot))
+    // O54 widened the scan past Abilities/: the pool split put a SECOND thing
+    // every submission site must get right, and the sites that submit are not
+    // all abilities. A deployable and a weapon compose the same source block.
+    const FString SourceRoot = FPaths::Combine(FPaths::ProjectDir(), TEXT("Source"), TEXT("RiorsEdge"));
+    const TArray<FString> ScannedDirs = { TEXT("Abilities"), TEXT("Combat"), TEXT("Weapons") };
+    if (!IFileManager::Get().DirectoryExists(*FPaths::Combine(SourceRoot, ScannedDirs[0])))
     {
         AddInfo(TEXT("Source tree not present (packaged build?); conformance scan skipped."));
         return true;
     }
     TArray<FString> Files;
-    IFileManager::Get().FindFilesRecursive(Files, *AbilitiesRoot, TEXT("*.cpp"), true, false, true);
+    for (const FString& Dir : ScannedDirs)
+    {
+        IFileManager::Get().FindFilesRecursive(Files, *FPaths::Combine(SourceRoot, Dir), TEXT("*.cpp"), true, false, false);
+    }
     int32 Submitters = 0;
+    int32 PoolFillers = 0;
     for (const FString& File : Files)
     {
         FString Contents;
@@ -482,16 +490,48 @@ bool FBreakerCeilingSubmissionConformanceTest::RunTest(const FString& Parameters
         const bool bSubmits = Contents.Contains(TEXT("ReceiveDamage(")) || Contents.Contains(TEXT("InitializeProjectile("));
         if (!bSubmits) continue;
         ++Submitters;
-        if (!Contents.Contains(TEXT("ApplyOutgoingModifiers")))
+        // The O34 chain rule stays scoped to Abilities/, which is what it was
+        // written for and where the Fracture bug was. Enemies have no player
+        // More chain to compose, and a projectile carries an already-composed
+        // request by design. Widening the O54 check below to the whole damage
+        // tree is not a licence to widen this one — that would be a different
+        // finding, and it would arrive as a wall of false positives rather than
+        // as a decision someone made.
+        const bool bIsAbility = File.Replace(TEXT("\\"), TEXT("/")).Contains(TEXT("/Abilities/"));
+        if (bIsAbility && !Contents.Contains(TEXT("ApplyOutgoingModifiers")))
         {
             AddError(FString::Printf(
                 TEXT("O34 conformance: '%s' submits outgoing damage without composing the outgoing modifier chain. Route the request through ApplyOutgoingModifiers before it leaves the ability (the Fracture bug, again)."),
                 *File));
         }
+
+        // O54/O55 conformance. The source block is four fields that have to
+        // agree — the composed multiplier, the two halves of the split, and the
+        // delivery — and a site that sets the first by hand will get at least
+        // one of the other three wrong or stale. FillSourcePools is the only
+        // sanctioned way to fill it, which makes this checkable by scan rather
+        // than by whoever reviews the next ability.
+        // Two files OWN the source block rather than filling one: the damage
+        // library, which is where FillSourcePools lives, and the combat
+        // component, which recomposes it when a target-side rider fires. Both
+        // legitimately assign the field, and both are covered by their own
+        // tests (Combat.Pools.* and Combat.TargetRiders.*). Naming them is
+        // narrower than exempting anything that happens to mention the helper.
+        const FString Leaf = FPaths::GetCleanFilename(File);
+        const bool bOwnsTheSourceBlock = Leaf == TEXT("BreakerDamageLibrary.cpp") || Leaf == TEXT("BreakerCombatComponent.cpp");
+        if (!bOwnsTheSourceBlock && Contents.Contains(TEXT("SourceDamageMultiplier =")))
+        {
+            AddError(FString::Printf(
+                TEXT("O54 conformance: '%s' assigns SourceDamageMultiplier directly. Call UBreakerDamageLibrary::FillSourcePools with the site's EBreakerDamageDelivery instead — it fills the composed value, the Stage 6 split and the delivery together, and a hand-filled source block cannot keep those four in agreement."),
+                *File));
+        }
+        if (Contents.Contains(TEXT("FillSourcePools"))) ++PoolFillers;
     }
-    // Cleave, Siphon, Resonance and Fracture all submit today; if this ever
-    // reads zero the scan is looking at the wrong tree, not a clean one.
-    TestTrue(TEXT("The scan found the known submitting abilities"), Submitters >= 4);
+    // Cleave, Siphon, Resonance and Fracture all submit today, plus the weapon
+    // component and the deployables; if this ever reads zero the scan is
+    // looking at the wrong tree, not a clean one.
+    TestTrue(TEXT("The scan found the known submitting sites"), Submitters >= 4);
+    TestTrue(TEXT("The submitting sites route through FillSourcePools"), PoolFillers >= 4);
     return true;
 }
 

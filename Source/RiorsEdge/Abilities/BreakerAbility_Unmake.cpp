@@ -70,7 +70,8 @@ void UBreakerCascadeEchoListener::HandleStatusApplied(const FBreakerActiveStatus
     // own contract: one critical roll per application decides every tick.
     const UBreakerAttributeSet* SourceAttributes = CasterASC ? CasterASC->GetSet<UBreakerAttributeSet>() : nullptr;
     const UBreakerCombatComponent* OwnerCombat = CasterCharacter->FindComponentByClass<UBreakerCombatComponent>();
-    Echo.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat);
+    Echo.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat,
+        EBreakerDamageDelivery::Ability);
     Echo.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Echo.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Echo.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;

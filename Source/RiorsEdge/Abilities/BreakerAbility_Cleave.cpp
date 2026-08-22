@@ -7,6 +7,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -178,7 +179,12 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         Damage.SourceTags.AddTag(BreakerAbilityTags::Ability_Class_Caster_Cleave.GetTag());
         Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = SourceAttributes ? SourceAttributes->GetDamageMultiplier() : 1.0f;
+        // O55: Cleave SWINGS THE EQUIPPED WEAPON, so it is weapon-delivered
+        // and draws the weapon pool — the rule is decided by what delivers
+        // the damage, never by the fact that an ability triggered it. This is
+        // the case the rule exists to pre-answer, and the Damage_Melee tag
+        // above is the same reading at the affix layer.
+        UBreakerDamageLibrary::FillSourcePools(SourceAttributes, EBreakerDamageDelivery::Weapon, Damage);
         Damage.RandomSeed = HashCombine(GetTypeHash(Character), static_cast<uint32>(TargetIndex) + static_cast<uint32>(World->GetTimeSeconds() * 1000.0));
         Damage.SourceLocation = Params.Origin;
         Damage.bHasSourceLocation = true;
@@ -249,7 +255,9 @@ void UBreakerAbility_Cleave::ApplyCleaveBleed(AActor* Target, const UBreakerAttr
     // chain's budgeted window product: a bleed applied inside an Overdrive-like
     // window keeps that strength for its whole life, one applied outside never
     // gains it retroactively.
-    Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat);
+    // Weapon-delivered, like the swing that applied it (O55).
+    Spec.Snapshot.SourcePower = UBreakerCombatComponent::ComposeDotSourcePower(SourceAttributes, OwnerCombat,
+        EBreakerDamageDelivery::Weapon);
     Spec.Snapshot.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Spec.Snapshot.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     Spec.Snapshot.DamageOverTimeMultiplier = SourceAttributes ? SourceAttributes->GetDamageOverTimeMultiplier() : 1.0f;

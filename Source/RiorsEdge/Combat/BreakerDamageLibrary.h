@@ -25,6 +25,44 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat|Damage")
     static FBreakerDamageResult ResolveDamage(const FBreakerDamageRequest& Request, const FBreakerDefenseState& Defense);
 
+    // ---- O54: the three pools, composed ----------------------------------
+    // The whole rule, world-free so it can be proved with no actor, no world
+    // and no attribute set — which is the only reason the aggregation law is
+    // testable at all.
+    //
+    //   weapon-delivered  = (1 + (Weapon  + Shared) / 100) x MoreProduct
+    //   ability-delivered = (1 + (Ability + Shared) / 100) x MoreProduct
+    //
+    // A hit reads ONE lane. The shared percentage appears in both formulas and
+    // is never counted twice inside one of them, which is what makes it a legal
+    // contributor to two buckets rather than a second bucket of its own.
+    //
+    // Callers pass the SHARED sum separately from the two specific sums even
+    // though the live attributes already contain it folded in, because that is
+    // the form the law is written in and the form a test can falsify. The
+    // attribute-reading caller below passes zero for Shared for exactly that
+    // reason: by the time a lane is composed, its share is already inside it.
+    static float ComposeSourcePools(float WeaponIncreasedPercent, float AbilityIncreasedPercent,
+        float SharedIncreasedPercent, float MoreProduct, EBreakerDamageDelivery Delivery);
+
+    // Fills a request's ENTIRE source block — the composed multiplier, the
+    // Stage 6 split, and the delivery — from a live attribute set. Every
+    // submission site in the game calls this instead of assembling the four
+    // fields itself; that is the difference between one rule and thirteen
+    // copies of it, and the conformance scan enforces it.
+    //
+    // Each lane's Increased sum is recovered by dividing the composed attribute
+    // by that lane's own post-clamp More product. The aggregator's fold is
+    // (Base + Flat) x (1 + Increased/100) x prod(More), so the division is
+    // exact — the same recovery UBreakerCombatComponent::ComposeDotSourcePower
+    // already performs for the tick path.
+    //
+    // A null attribute set (an enemy, a hazard, a bare test rig) leaves the
+    // request at the identity: multiplier 1.0, no split, delivery unchanged
+    // except as named.
+    static void FillSourcePools(const class UBreakerAttributeSet* SourceAttributes,
+        EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request);
+
     UFUNCTION(BlueprintPure, Category="Combat|Damage")
     static float CalculateArmorMitigation(float Armor, float ArmorPenetration);
 

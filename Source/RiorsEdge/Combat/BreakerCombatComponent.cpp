@@ -130,8 +130,12 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
     //
     // The split gate first: without the source's Increased/More halves the
     // recomposition would have to guess how much of the composed multiplier is
-    // additive bucket, and a guess here is a second More by accident. Ability
-    // submissions and DoT ticks are composed-only today and take this exit.
+    // additive bucket, and a guess here is a second More by accident. Every
+    // live submission fills the split now that one function does it — the O54
+    // pass routed the ability sites through FillSourcePools too, so abilities
+    // get target riders for the first time. Snapshotted DoT ticks still take
+    // this exit: their multiplier is the application-time snapshot, and its
+    // halves were never carried.
     if (!Request.bHasSourceSplit) return;
 
     // A request outliving its dealer (a rocket in flight after the shooter
@@ -154,10 +158,16 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
     float RiderPercent = 0.0f;
     for (const FBreakerTargetConditionRider& Rider : Riders)
     {
-        // The builder only publishes Damage/IncreasedPercent rows today; the
-        // filter stays here too so a future row for a partition lane cannot
-        // silently pay into the general bucket.
-        if (Rider.StatTarget != EBreakerNodeStatTarget::Damage) continue;
+        // O54: a rider pays only into the lane this hit actually drew. The
+        // shared pool matches both deliveries by definition; a weapon-lane
+        // rider on an ability hit, or the reverse, is skipped rather than
+        // folded into the wrong bucket — which is the "silently pay into the
+        // general bucket" failure the pre-split filter was placed here to
+        // prevent, now that partition rows genuinely exist.
+        const EBreakerDamagePool RiderPool = BreakerDamagePoolFor(Rider.StatTarget);
+        const bool bLaneMatches = RiderPool == EBreakerDamagePool::Shared
+            || (RiderPool == EBreakerDamagePool::Ability) == (Request.Delivery == EBreakerDamageDelivery::Ability);
+        if (!BreakerIsDeliveredDamagePool(Rider.StatTarget) || !bLaneMatches) continue;
         if (Conditions.SatisfiesAll(Rider.Condition, Rider.AlsoRequires))
         {
             RiderPercent += Rider.Percent;
@@ -311,7 +321,8 @@ float UBreakerCombatComponent::GetComposedMoreMultiplier() const
     return Product;
 }
 
-float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat)
+float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat,
+    EBreakerDamageDelivery Delivery)
 {
     // A4 RULED (owner ruling 2026-08-16): DoT ticks share ONE additive
     // Increased bucket. Increased Damage and Increased DoT no longer multiply
@@ -325,14 +336,25 @@ float UBreakerCombatComponent::ComposeDotSourcePower(const UBreakerAttributeSet*
     //
     // Application-time snapshot only, as before: the returned value is the
     // spec's whole truth and ticks never re-read anything.
+    //
+    // O54/O55: WHICH damage lane joins that bucket is decided by what delivered
+    // the status. A Bleed put on by a weapon swing folds the weapon pool; a Rot
+    // zone placed by an ability folds the ability pool. Getting this wrong is
+    // not visible in a number — the tick simply scales off the wrong half of a
+    // build — which is why the delivery is a parameter every caller states
+    // rather than a default this function guesses.
     float IncreasedBucket = 1.0f;   // 1 + sum(Increased Damage) + sum(Increased DoT)
     float AttributeMoreProduct = 1.0f;
     if (SourceAttributes)
     {
         const FBreakerAttributeAggregator& Aggregator = SourceAttributes->GetAttributeAggregator();
-        const float DamageMore = FMath::Max(Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageMultiplier), UE_SMALL_NUMBER);
+        const bool bAbility = Delivery == EBreakerDamageDelivery::Ability;
+        const EBreakerAggregatedAttribute Lane = bAbility
+            ? EBreakerAggregatedAttribute::AbilityDamageMultiplier
+            : EBreakerAggregatedAttribute::DamageMultiplier;
+        const float DamageMore = FMath::Max(Aggregator.ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
         const float DotMore = FMath::Max(Aggregator.ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), UE_SMALL_NUMBER);
-        const float DamageIncreased = SourceAttributes->GetDamageMultiplier() / DamageMore;
+        const float DamageIncreased = (bAbility ? SourceAttributes->GetAbilityDamageMultiplier() : SourceAttributes->GetDamageMultiplier()) / DamageMore;
         const float DotIncreased = SourceAttributes->GetDamageOverTimeMultiplier() / DotMore;
         IncreasedBucket = DamageIncreased + (DotIncreased - 1.0f);
         AttributeMoreProduct = DamageMore * DotMore;

@@ -730,7 +730,15 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // across both, each clamped at the per-source ceiling, and each selected
     // source lands in its own lane's product (a DoT More multiplies ticks only,
     // through ComposeDotSourcePower; it never inflates a direct hit).
-    struct FBreakerMoreSource { float Multiplier = 1.0f; bool bDotLane = false; };
+    //
+    // O54 widened the same selection again. There are now three More lanes —
+    // the weapon-delivered pool, the ability-delivered pool and DoT ticks —
+    // plus SHARED sources, which multiply both delivery lanes from one
+    // purchase. O74 is what keeps this honest: the lanes share ONE budget of
+    // three, so a shared source spends one slot and not two, and adding a lane
+    // never adds headroom.
+    enum class EBreakerMoreLane : uint8 { Weapon, Ability, Shared, Dot };
+    struct FBreakerMoreSource { float Multiplier = 1.0f; EBreakerMoreLane Lane = EBreakerMoreLane::Weapon; };
     TArray<FBreakerMoreSource> MoreSources;
     float ActiveConditionalPercent = 0.0f;
     float PotentialConditionalPercent = 0.0f;
@@ -775,7 +783,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent) continue;
                 if (!Conditions.HasTargetState())
                 {
-                    if (bConditional && Effect.StatTarget == EBreakerNodeStatTarget::Damage
+                    if (bConditional && BreakerIsDeliveredDamagePool(Effect.StatTarget)
                         && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
                     {
                         PotentialConditionalPercent += Value;
@@ -790,7 +798,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             // rather than silently never paying, which is the failure mode that
             // produced the third jump and the phantom keystones.
             const bool bLive = Conditions.SatisfiesAll(Effect.Condition, Effect.AlsoRequires);
-            if (bConditional && Effect.StatTarget == EBreakerNodeStatTarget::Damage
+            if (bConditional && BreakerIsDeliveredDamagePool(Effect.StatTarget)
                 && Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent)
             {
                 PotentialConditionalPercent += Value;
@@ -802,8 +810,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
 
             if (Effect.StatBucket == EBreakerNodeStatBucket::Flat) FlatByTarget[Target] += Value;
             else if (Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent) IncreasedByTarget[Target] += Value;
-            else if (Effect.StatTarget == EBreakerNodeStatTarget::Damage
-                || Effect.StatTarget == EBreakerNodeStatTarget::DamageOverTime)
+            else if (BreakerDamagePoolFor(Effect.StatTarget) != EBreakerDamagePool::None)
             {
                 // Rank does NOT scale a More multiplier — a rank-2 x1.25 would
                 // be x1.5625, which no node table means. Every More node in the
@@ -812,8 +819,19 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 // the belt-and-braces guard behind it.
                 // A4 (owner ruling 2026-08-16): DamageOverTime joined Damage
                 // as a composable More lane — VW12 / Long Dark now pays.
-                MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f,
-                    Effect.StatTarget == EBreakerNodeStatTarget::DamageOverTime });
+                // O54: and the two delivery lanes joined it, with the shared
+                // pool as a fourth kind that multiplies both of them from one
+                // source. Still ONE budget of three (O74) — see the selection.
+                EBreakerMoreLane Lane = EBreakerMoreLane::Weapon;
+                switch (BreakerDamagePoolFor(Effect.StatTarget))
+                {
+                case EBreakerDamagePool::Weapon:         Lane = EBreakerMoreLane::Weapon;  break;
+                case EBreakerDamagePool::Ability:        Lane = EBreakerMoreLane::Ability; break;
+                case EBreakerDamagePool::Shared:         Lane = EBreakerMoreLane::Shared;  break;
+                case EBreakerDamagePool::DamageOverTime: Lane = EBreakerMoreLane::Dot;     break;
+                default: break;
+                }
+                MoreSources.Add({ 1.0f + FMath::Max(0.0f, Effect.ValuePerRank) / 100.0f, Lane });
             }
             else
             {
@@ -827,7 +845,7 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 {
                     WarnedOnceNodeIds.Add(Node->NodeId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only EBreakerNodeStatTarget::Damage and DamageOverTime compose a More product — this effect is silently dropped."),
+                        TEXT("[BreakerProgression] node '%s' authors a MorePercent effect on stat target %d, but only the damage pools (Damage, WeaponDamage, AbilityDamage, DamageOverTime) compose a More product — this effect is silently dropped."),
                         *Node->NodeId.ToString(), Target);
                 }
             }
@@ -843,14 +861,32 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // budget, not the direct-hit lane alone.
     Stats.DamageMoreSourceCount = MoreSources.Num();
     MoreSources.Sort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });
-    float DamageMoreProduct = 1.0f;
+    // O54/O74: four lanes out of ONE selection. A shared source is one slot of
+    // the three and multiplies both delivery lanes; it is not two purchases and
+    // it does not widen the budget. Splitting the budget per lane here would be
+    // the per-lane ceiling O74 exists to delete.
+    float WeaponMoreProduct = 1.0f;
+    float AbilityMoreProduct = 1.0f;
     float DotMoreProduct = 1.0f;
     for (int32 Index = 0; Index < FMath::Min(MoreSources.Num(), MaxDamageMoreSources); ++Index)
     {
         const float Clamped = FMath::Min(MoreSources[Index].Multiplier, SingleMoreCeiling);
-        (MoreSources[Index].bDotLane ? DotMoreProduct : DamageMoreProduct) *= Clamped;
+        switch (MoreSources[Index].Lane)
+        {
+        case EBreakerMoreLane::Weapon:  WeaponMoreProduct *= Clamped; break;
+        case EBreakerMoreLane::Ability: AbilityMoreProduct *= Clamped; break;
+        case EBreakerMoreLane::Dot:     DotMoreProduct *= Clamped; break;
+        case EBreakerMoreLane::Shared:
+            WeaponMoreProduct *= Clamped;
+            AbilityMoreProduct *= Clamped;
+            break;
+        }
     }
-    Stats.DamageMoreMultiplier = DamageMoreProduct;
+    // The display figure keeps meaning the weapon lane, which is what it meant
+    // before the split and what the skill screen's damage readout is measured
+    // against.
+    Stats.DamageMoreMultiplier = WeaponMoreProduct;
+    Stats.AbilityDamageMoreMultiplier = AbilityMoreProduct;
     Stats.ActiveConditionalDamagePercent = ActiveConditionalPercent;
     Stats.PotentialConditionalDamagePercent = PotentialConditionalPercent;
 
@@ -879,7 +915,13 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.SlideSpeedMultiplier = Increased(EBreakerNodeStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerNodeStatTarget::AirControl);
     Stats.DamageOverTimeMultiplier = Increased(EBreakerNodeStatTarget::DamageOverTime);
-    Stats.DamageMultiplier = Increased(EBreakerNodeStatTarget::Damage);
+    // O54: the display figures for each delivery lane. Each is the shared pool
+    // plus its own narrow line — the same sum the contribution bids, so the
+    // card and the attribute can never print different numbers.
+    Stats.DamageMultiplier = 1.0f + (IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::WeaponDamage)]) / 100.0f;
+    Stats.AbilityDamageMultiplier = 1.0f + (IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]
+        + IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityDamage)]) / 100.0f;
     // ---- Swift projectile channels (owner ruling 2026-08-16) --------------
     // Flat lanes only, on purpose: "+50% projectiles" is meaningless on a
     // single-shot weapon (the enum comment on ProjectileCount says so), and
@@ -937,7 +979,19 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::SlideSpeedMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::SlideSpeed)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AirControlMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AirControl)]);
         OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::DamageOverTime)]);
-        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
+
+        // ---- O54: the three pools -----------------------------------------
+        // Damage is the SHARED pool, so it bids into both delivery lanes from
+        // one authored percentage. Weapons compose exactly as they did before
+        // the split — shared feeds the weapon lane too — and the thirty rows
+        // already authored against this target now reach abilities as well,
+        // which is the whole reason this target took the shared meaning rather
+        // than the weapon one.
+        OutContribution->AddSharedIncreasedDamage(IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::Damage)]);
+        // The two narrow lines. Each joins ONE lane's additive bucket, beside
+        // the shared bid above and beside gear's affixes in the same bucket.
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::WeaponDamage)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::AbilityDamageMultiplier, IncreasedByTarget[static_cast<int32>(EBreakerNodeStatTarget::AbilityDamage)]);
 
         // ---- The six lanes whose attributes ALREADY EXISTED ---------------
         // Every one of these was a stat the aggregator could already carry and
@@ -967,9 +1021,17 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // the two layers would multiply instead of sharing one bucket, which is
         // the exact bug fixed everywhere else in this codebase.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::Armor, FlatByTarget[static_cast<int32>(EBreakerNodeStatTarget::Armor)]);
-        if (!FMath::IsNearlyEqual(DamageMoreProduct, 1.0f))
+        // The two delivery lanes' More products, already selected out of the one
+        // budget above. A shared More has been multiplied into both, which is
+        // why there is no third ComposeSharedMoreDamage call here — the
+        // duplication happened at selection, once, where the budget is spent.
+        if (!FMath::IsNearlyEqual(WeaponMoreProduct, 1.0f))
         {
-            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, DamageMoreProduct);
+            OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, WeaponMoreProduct);
+        }
+        if (!FMath::IsNearlyEqual(AbilityMoreProduct, 1.0f))
+        {
+            OutContribution->ComposeMore(EBreakerAggregatedAttribute::AbilityDamageMultiplier, AbilityMoreProduct);
         }
         // A4 (owner ruling 2026-08-16): the DoT More lane rides the
         // DamageOverTimeMultiplier attribute's More product — selected and
@@ -1041,17 +1103,24 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
             //    strongest-three More selection re-run per event per target,
             //    which is expensive and unexplainable to a player. Same
             //    warn-and-drop the aggregator gives every other unpaid More.
-            //  * Flat and non-Damage targets simply have no lane yet; they
+            //  * Flat and non-damage targets simply have no lane yet; they
             //    are dropped with the same loudness until one exists.
+            //
+            // O54 widened the second bullet, not the first: a rider may now
+            // name any DELIVERED damage pool — shared, weapon or ability — and
+            // the combat site pays it only into the lane the hit actually drew.
+            // DamageOverTime stays out: a tick snapshots at application, so a
+            // rider read per event against a live target has nothing to attach
+            // to.
             if (Effect.StatBucket != EBreakerNodeStatBucket::IncreasedPercent
-                || Effect.StatTarget != EBreakerNodeStatTarget::Damage)
+                || !BreakerIsDeliveredDamagePool(Effect.StatTarget))
             {
                 static TSet<FName> WarnedOnceTargetRiderNodeIds;
                 if (!WarnedOnceTargetRiderNodeIds.Contains(Node->NodeId))
                 {
                     WarnedOnceTargetRiderNodeIds.Add(Node->NodeId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerProgression] node '%s' authors a target-conditional effect in bucket %d on stat target %d, but target-side lines are Increased-bucket Damage only (Hook-And-Condition-Vocabulary §3.3) — this effect is dropped."),
+                        TEXT("[BreakerProgression] node '%s' authors a target-conditional effect in bucket %d on stat target %d, but target-side lines are Increased-bucket damage-pool lines only — this effect is dropped."),
                         *Node->NodeId.ToString(), static_cast<int32>(Effect.StatBucket), static_cast<int32>(Effect.StatTarget));
                 }
                 continue;
@@ -1106,8 +1175,14 @@ void UBreakerProgressionComponent::RecalculateStats()
     const float SpendPercent = GetPointSpendDamagePercent();
     if (SpendPercent > 0.0f)
     {
-        CachedContribution.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, SpendPercent);
+        // O54: SHARED, not weapon-only. The floor is a property of having spent
+        // points, not of how the damage is delivered — paying it into the
+        // weapon lane alone would make every point spent a small nerf to an
+        // ability build relative to a weapon one, which is the opposite of a
+        // floor that "lands on both equally".
+        CachedContribution.AddSharedIncreasedDamage(SpendPercent);
         CachedStats.DamageMultiplier += SpendPercent / 100.0f;
+        CachedStats.AbilityDamageMultiplier += SpendPercent / 100.0f;
     }
 
     ApplyStatsToAttributes();

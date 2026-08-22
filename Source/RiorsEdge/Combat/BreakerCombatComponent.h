@@ -99,7 +99,8 @@ public:
     // exist. Called at application time only, never per tick; ticks already
     // resolved read their spec's captured value and stay untouched. Null-safe
     // on both arguments so every application site can call it unconditionally.
-    static float ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat);
+    static float ComposeDotSourcePower(const UBreakerAttributeSet* SourceAttributes, const UBreakerCombatComponent* OwnerCombat,
+        EBreakerDamageDelivery Delivery);
 
     // Incoming-damage modifier chain (Ability-Implementation-Spec §4.4). Keyed
     // push/remove, composed multiplicatively into FBreakerDefenseState::

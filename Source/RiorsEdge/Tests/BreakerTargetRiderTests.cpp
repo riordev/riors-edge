@@ -294,7 +294,7 @@ bool FBreakerTargetRiderTableTest::RunTest(const FString& Parameters)
     // The doc rule (§3.3): a target-conditional MorePercent is NOT supported —
     // it would need the strongest-three More selection re-run per event per
     // target. Warn-and-drop, exactly like the aggregator's other unpaid Mores.
-    AddExpectedError(TEXT("target-side lines are Increased-bucket Damage only"), EAutomationExpectedErrorFlags::Contains, 0);
+    AddExpectedError(TEXT("target-side lines are Increased-bucket damage-pool lines only"), EAutomationExpectedErrorFlags::Contains, 0);
     {
         TArray<const UBreakerProgressionNode*> Nodes = { BreakerMakeRiderNode(
             TEXT("Test.Table.MoreRider"), EBreakerBuildCondition::TargetMultiStatus, {}, 25.0f,

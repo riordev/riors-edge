@@ -65,6 +65,13 @@ public:
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DamageMultiplier)
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_DamageOverTimeMultiplier, Category="Offense") FGameplayAttributeData DamageOverTimeMultiplier;
     BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, DamageOverTimeMultiplier)
+    // O54's ability pool. DamageMultiplier above is the weapon-delivered lane;
+    // this is the ability-delivered one, same shape and same base of 1.0. A
+    // hit reads exactly one of the two, chosen by EBreakerDamageDelivery.
+    // The shared pool has no attribute of its own — it bids into both. See
+    // EBreakerAggregatedAttribute::AbilityDamageMultiplier.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AbilityDamageMultiplier, Category="Offense") FGameplayAttributeData AbilityDamageMultiplier;
+    BREAKER_ATTRIBUTE_ACCESSORS(UBreakerAttributeSet, AbilityDamageMultiplier)
 
     // The character's composed walk speed in cm/s. The movement component owns
     // the authored base (it is EditAnywhere there, not here) and publishes it
@@ -201,6 +208,7 @@ protected:
     UFUNCTION() void OnRep_CriticalMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DamageMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_DamageOverTimeMultiplier(const FGameplayAttributeData& OldValue) const;
+    UFUNCTION() void OnRep_AbilityDamageMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_SlideSpeedMultiplier(const FGameplayAttributeData& OldValue) const;
     UFUNCTION() void OnRep_AirControlMultiplier(const FGameplayAttributeData& OldValue) const;

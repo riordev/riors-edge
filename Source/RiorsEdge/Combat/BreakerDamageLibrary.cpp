@@ -1,5 +1,52 @@
 #include "Combat/BreakerDamageLibrary.h"
 
+#include "Attributes/BreakerAttributeAggregation.h"
+#include "Attributes/BreakerAttributeSet.h"
+
+float UBreakerDamageLibrary::ComposeSourcePools(float WeaponIncreasedPercent, float AbilityIncreasedPercent,
+    float SharedIncreasedPercent, float MoreProduct, EBreakerDamageDelivery Delivery)
+{
+    const float SpecificPercent = Delivery == EBreakerDamageDelivery::Ability
+        ? AbilityIncreasedPercent
+        : WeaponIncreasedPercent;
+    // Floored on both factors so a hostile authored negative can never invert
+    // damage — the same guard the target-rider recomposition applies.
+    const float IncreasedFactor = FMath::Max(0.0f, 1.0f + (SpecificPercent + SharedIncreasedPercent) / 100.0f);
+    return IncreasedFactor * FMath::Max(0.0f, MoreProduct);
+}
+
+void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAttributes,
+    EBreakerDamageDelivery Delivery, FBreakerDamageRequest& Request)
+{
+    Request.Delivery = Delivery;
+    if (!SourceAttributes)
+    {
+        Request.SourceDamageMultiplier = 1.0f;
+        Request.SourceIncreasedPercent = 0.0f;
+        Request.SourceMoreProduct = 1.0f;
+        Request.bHasSourceSplit = false;
+        return;
+    }
+
+    const EBreakerAggregatedAttribute Lane = Delivery == EBreakerDamageDelivery::Ability
+        ? EBreakerAggregatedAttribute::AbilityDamageMultiplier
+        : EBreakerAggregatedAttribute::DamageMultiplier;
+
+    const float Composed = Delivery == EBreakerDamageDelivery::Ability
+        ? SourceAttributes->GetAbilityDamageMultiplier()
+        : SourceAttributes->GetDamageMultiplier();
+
+    Request.SourceDamageMultiplier = Composed;
+    // The split, so the target side can add a conditional Increased line
+    // without it becoming a second More. The lane's share of the shared pool is
+    // already inside Composed, which is why the shared argument is zero here:
+    // recovering it separately would add it twice.
+    Request.SourceMoreProduct = FMath::Max(
+        SourceAttributes->GetAttributeAggregator().ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
+    Request.SourceIncreasedPercent = (Composed / Request.SourceMoreProduct - 1.0f) * 100.0f;
+    Request.bHasSourceSplit = true;
+}
+
 float UBreakerDamageLibrary::CalculateArmorMitigation(float Armor, float ArmorPenetration)
 {
     const float EffectiveArmor = FMath::Max(0.0f, Armor - FMath::Max(0.0f, ArmorPenetration));

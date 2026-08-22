@@ -84,6 +84,31 @@ enum class EBreakerAggregatedAttribute : uint8
     // affix authors an Increased percentage OF THE REDUCTION; this is what the
     // ability cost path multiplies by.
     ResourceCostMultiplier,
+    // --- O54: the second damage pool ---------------------------------------
+    // Increased Ability Damage. DamageMultiplier above is the WEAPON-delivered
+    // lane; this is the ability-delivered one. Base 1.0, same shape, and the
+    // two are read by different hits — never both by one.
+    //
+    // THERE IS NO THIRD ATTRIBUTE FOR THE SHARED POOL, and that is deliberate.
+    // O54's Increased Damage feeds both lanes, so it is a bid DUPLICATED into
+    // both at contribution-build time (FBreakerAttributeContribution
+    // ::AddSharedIncreasedDamage) rather than an attribute of its own. A
+    // composed "shared multiplier" would be a number no hit ever reads and
+    // nothing could sensibly do with — the two lanes are what get composed,
+    // and each already contains its share. One authored line, two bids, still
+    // ONE additive bucket per lane.
+    //
+    // O55 decides which lane a hit draws by what DELIVERS the damage, not by
+    // what triggers it: a melee ability that swings the equipped weapon is
+    // weapon-delivered and reads DamageMultiplier. The discriminator is
+    // EBreakerDamageDelivery on the request; see BreakerDamageLibrary.
+    //
+    // O74: the More ceiling spans BOTH pools. It is one budget selected once
+    // in UBreakerProgressionComponent::AggregateStats (strongest three across
+    // every lane) and clamped again here per lane, so neither a lane alone nor
+    // the two together can pass 1.30^3. A per-lane ceiling would be the second
+    // budget the single ceiling exists to delete.
+    AbilityDamageMultiplier,
     // Class resource regenerated per second. Base 0; gear's Resource
     // Regeneration affix bids Flat.
     //
@@ -138,6 +163,23 @@ struct RIORSEDGE_API FBreakerAttributeContribution
     // Whole percent, matching how affixes and node effects are authored
     // (5.0 == 5%). Every source lands in the same additive bucket.
     void AddIncreasedPercent(EBreakerAggregatedAttribute Attribute, float Percent);
+    // O54's shared pool, and the ONLY implementation of it. Increased Damage
+    // feeds both delivery lanes, so it bids into both — one authored line, two
+    // bids, each landing in its lane's single additive bucket. A hit reads one
+    // lane, so nothing is double-counted; what would be double-counted is a
+    // source authoring a specific pool AND the shared one for the same
+    // percentage, which is the rule the tests hold.
+    //
+    // Kept as one function rather than two call-site AddIncreasedPercent lines
+    // because the equipment and progression contributors both need it and the
+    // moment they each write their own pair, one of them gains a lane the
+    // other has not.
+    void AddSharedIncreasedDamage(float Percent);
+    // The same duplication for the More side: a shared More multiplies both
+    // lanes from ONE selected source. The source count it spends against the
+    // O3 budget of three is decided upstream, by whoever selects; this only
+    // delivers the product it was given to both lanes.
+    void ComposeSharedMoreDamage(float Multiplier);
     // Composes into this contributor's More product. Reserved for tree
     // keystones and Anomalous rule rewrites (O3 caps the composed budget).
     void ComposeMore(EBreakerAggregatedAttribute Attribute, float Multiplier);
@@ -222,7 +264,15 @@ struct RIORSEDGE_API FBreakerAttributeAggregator
     // greppable rather than living inside an `if` in Compose.
     static bool IsMoreCappedAttribute(EBreakerAggregatedAttribute Attribute)
     {
-        return Attribute == EBreakerAggregatedAttribute::DamageMultiplier;
+        // O74: ONE ceiling across every damage pool. Both delivery lanes are
+        // capped, and they are capped by the SAME number rather than each
+        // getting one of its own — the budget is spent once, upstream, where
+        // the strongest three sources are selected across all lanes, and this
+        // is the belt-and-braces clamp behind that selection. Adding a lane
+        // here is not adding headroom; a build holding three Mores has three
+        // however they are distributed.
+        return Attribute == EBreakerAggregatedAttribute::DamageMultiplier
+            || Attribute == EBreakerAggregatedAttribute::AbilityDamageMultiplier;
     }
 
 private:

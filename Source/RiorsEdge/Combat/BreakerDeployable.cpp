@@ -4,6 +4,7 @@
 #include "Characters/BreakerCharacter.h"
 #include "Classes/BreakerScrapComponent.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerDamageLibrary.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Components/PointLightComponent.h"
@@ -536,7 +537,11 @@ void ABreakerDeployable::TickTurret(float DeltaSeconds)
     Damage.ProcCoefficient = TurretProcCoefficient;   // §G3: 0.5
     Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-    Damage.SourceDamageMultiplier = OwnerAttributes ? OwnerAttributes->GetDamageMultiplier() : 1.0f;
+    // O55: a deployable is a DELIVERY MECHANISM for its owner, not a pet with
+    // a stat block of its own — "a deployable's damage is the Gunsmith's
+    // damage" — so its shots draw the ability pool, exactly as the ability
+    // that placed it would have.
+    UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
     Damage.SourceLocation = MuzzleLocation;
     Damage.bHasSourceLocation = true;
     Damage.ImpactLocation = Target->GetActorLocation();
@@ -768,7 +773,7 @@ void ABreakerDeployable::DetonateMine(int32 MineIndex)
         Damage.ProcCoefficient = ProcCoefficient;
         Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = OwnerAttributes ? OwnerAttributes->GetDamageMultiplier() : 1.0f;
+        UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
         Damage.SourceLocation = Mine.Location;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);
@@ -937,7 +942,7 @@ void ABreakerDeployable::DetonateRadialBlast(const FVector& Center, float Damage
         Damage.ProcCoefficient = ProcCoefficient;
         Damage.CriticalChance = OwnerAttributes ? OwnerAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
         Damage.CriticalMultiplier = OwnerAttributes ? OwnerAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
-        Damage.SourceDamageMultiplier = OwnerAttributes ? OwnerAttributes->GetDamageMultiplier() : 1.0f;
+        UBreakerDamageLibrary::FillSourcePools(OwnerAttributes, EBreakerDamageDelivery::Ability, Damage);
         Damage.SourceLocation = Center;
         Damage.bHasSourceLocation = true;
         Damage.SetInstigator(OwnerActor);

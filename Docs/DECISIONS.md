@@ -175,6 +175,10 @@ Numbers are permanent and never reused.
 
 **O96** — The two rewrite-impact ceilings — one for a three-minor stack, one for a major or a legendary's authored pair — are derived BEFORE any rewrite is authored against them. The single current ceiling is 97% spent and the restructure adds contributors, so authoring first guarantees a breach.
 
+**O97** — The tree's generic damage target is the **shared** pool, feeding both delivery lanes. Weapon composition is unchanged and every node already authored against it now reaches abilities too; the narrow weapon and ability lines are what new content authors when it wants one lane only.
+
+**O98** — Melee is a tag-keyed slice of the weapon pool, not a fourth pool. It is weapon-delivered, so it waits on a rider keyed off the melee source tag rather than on an aggregation lane.
+
 ## Open
 
 - The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.

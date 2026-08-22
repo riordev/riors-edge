@@ -273,6 +273,8 @@ does not own:
 | The weapon and item-level ceilings are equal | `Items.TierLadder` |
 | Items rolled before the ladder widened keep their rolled values | `Items.LegacyItemsSurviveTheWiderLadder` |
 | Ability throughput sits within the parity band of weapon throughput at level 50 | `Progression.PowerBand.AbilityLane` |
+| A weapon hit draws weapon plus shared; an ability draws ability plus shared, and neither reads the other's specific pool | `Combat.Pools.Composition` |
+| A source authors at most one specific pool, plus optionally the shared one | `Combat.Pools.OneSpecificPoolPerSource` |
 | Best-to-worst build TTK spread stays inside the band, and is not explained by weapon archetype alone | `Progression.PowerBand.ArchetypeSpread` |
 | Hits-to-die does not fall across the level range | `Combat.DefenseCurve.HitsToDie` |
 | Monster damage growth stays materially below health growth | `Combat.Chassis.DamageBelowHealth` |
