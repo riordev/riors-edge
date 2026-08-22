@@ -114,6 +114,11 @@ from the multiplier band. `d` is materially below `g`: incoming damage scaling
 as fast as health means defence must grow as fast as offence, and every build
 becomes a defensive build.
 
+**`d` is set so that hits-to-die does not fall across the level range.** That is
+the property it exists to produce, and it is the test, not the value. Defence
+does not scale up to meet incoming damage — the damage curve comes down until
+the two hold.
+
 | Constant | Value | Note |
 |---|---|---|
 | `BaseHealth` | 220 | Area level 1 is the chassis that was actually measured |
@@ -144,13 +149,20 @@ second against elite at three seconds *is* an elite health ratio of three.
 |---|---|
 | Trash TTK | a little under 1s, scaling exponentially with difficulty |
 | Elite TTK | ~3s |
-| Boss TTK | 20–45s, unless a special enemy claims the exception explicitly |
+| Boss TTK, baseline build | 20–45s, unless a special enemy claims the exception explicitly |
+| Boss TTK, optimized build | substantially under the baseline figure |
 | TTD, no resources or sustain | 4–5s |
 | TTD, invested | substantially higher |
 
 These describe a **baseline build in on-level content** — one point on two
 curves, not a constant to hold at every point of progression. An optimized
 character roughly forty hours past 50 deletes trash on contact.
+
+**Bosses are meant to die fast to a comfortable build.** A fast optimized kill
+is the system working, not a chassis fault, so the two cases are asserted
+separately: the band holds for a baseline, and an optimized build is asserted
+to beat it. A single boss target measured against an optimized build is
+measuring the wrong character.
 
 ### The affix tier ladder
 
@@ -226,6 +238,9 @@ sanctioned exception to the additive bucket, and there is not a second.
 Points: one Class Point per level to 30, one Core Point per level to 50, plus
 fifteen from world content.
 
+**There is no experience at cap.** A currency drops instead — a conversion
+would be a post-cap progression track wearing a currency's clothes.
+
 ## Boundaries
 
 This spec owns the curves, the composition law, the pools and the bands. It
@@ -260,9 +275,11 @@ does not own:
 | Ability throughput sits within the parity band of weapon throughput at level 50 | `Progression.PowerBand.AbilityLane` |
 | Best-to-worst build TTK spread stays inside the band, and is not explained by weapon archetype alone | `Progression.PowerBand.ArchetypeSpread` |
 | Hits-to-die does not fall across the level range | `Combat.DefenseCurve.HitsToDie` |
-| Boss TTK lands inside its target band | `Combat.PowerCurve.BossBand` |
+| Monster damage growth stays materially below health growth | `Combat.Chassis.DamageBelowHealth` |
+| Boss TTK for a baseline build lands inside its target band | `Combat.PowerCurve.BossBand` |
+| An optimized build kills a boss substantially faster than the baseline band | `Combat.PowerCurve.BossOptimized` |
 
-The last four are targets this spec asserts and the game does not currently
+Several of these are targets this spec asserts and the game does not currently
 meet. They are held by tests so the gap is a number on every build rather than
 a memory.
 

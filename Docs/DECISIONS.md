@@ -23,8 +23,6 @@ Numbers are permanent and never reused.
 
 **O10** — Tick interval is part of the damage-over-time snapshot, and intervals are discrete so stacking has visibly diminishing steps.
 
-**O11** — Aberrant: up to three equipped, a global limit. Each carries one or two unique modifier affixes that help define builds; the owner names and designs them.
-
 **O13** — Rocket carries strong self-damage reduction and full self-knockback control, never immunity. Rocket-jumping is tolerated, never required.
 
 **O14** — The player is a person, lightly: a body, a face, minimal voice. Two player models are planned, Human and Effigy, and both are real.
@@ -155,20 +153,32 @@ Numbers are permanent and never reused.
 
 **O85** — The nameplate policy is a per-mode asset from day one.
 
+**O86** — Commitment is to a **doctrine**: one per character, changed only at the Forge. A doctrine grants a visible identity as well as mechanics — a Caster committed to Void Whisperer *is* a Void Whisperer, on the character sheet and to other players in the Anchor.
+
+**O87** — A top-tier item carries one major rewrite plus generic affixes stronger than an ordinary item's, so it sits on par with a good Aberrant rather than above it.
+
+**O88** — Minor rewrites are class-tagged, and class-tagged items drop for every class regardless of who is playing. That is a rule, not an oversight, and it is never to be "fixed" into smart loot.
+
+**O89** — The Focused/Modified split supersedes the unique modifier affixes Aberrant was promised.
+
+**O90** — The tier-bonus curve reaching the top of the item-level range is deferred until the endgame exists.
+
+**O91** — Monster damage growth comes down until hits-to-die stops falling across the level range. Defence does not scale up to meet it: damage growth is already meant to sit materially below health growth, and the current value does not deliver that.
+
+**O92** — Momentum's generation threshold is a trap and moves — lowered, or exempting aim-down-sights states, or both. A permanent class whose most natural playstyle disables its own resource is a mistake the player cannot take back.
+
+**O93** — No experience at cap. A currency drops instead.
+
+**O94** — Boss time-to-kill is asserted against a **baseline** build in on-level content, and an optimized build beating it substantially is asserted separately. Bosses are meant to die fast to a comfortable build, so a fast optimized kill is correct behaviour rather than a chassis fault.
+
 ## Open
 
-- Whether the Focused/Modified split supersedes the unique modifier affixes O11 promises, or still owes them.
-- Whether a top-tier item carries two major rewrites, or one major plus an authored forfeit line.
-- Whether minor rewrites come from one shared pool or are partly class-tagged.
-- The fifth tier's final display name, after a month of use.
-- The class branch tier shape: the shipped four-tier gating, or the 26-point five-tier target. Decided together with density.
+- The class layer's shape. Under exploration: doctrines of 4-5 transformative nodes at an 8-10 point budget, adjacency replacing investment gates, and the freed points moving to the Core budget.
+- The zone-level table, and the mapping from content difficulty to tier bonus.
 - Where the permanent class choice is made, once the Anchor is authored.
 - Who owns audio.
 - What replaces the shared pool as the tension between the two defensive constellations.
-- Whether the boss band moves or the chassis does, now that boss time-to-kill measures well under it.
-- Whether monster damage growth comes down or gear defence scales up, now that hits-to-die falls across the level range.
 - Whether weapon archetype outweighing class is intended identity or a table to flatten.
-- Whether Momentum's generation threshold is a deliberate tension or a trap.
 - Whether deployable stats snapshot at placement or read live.
 - Whether enemies deal elemental damage at all.
 - Where Anomalies, Raids, Dungeons and Conquest sit relative to the five canon locations.
@@ -179,13 +189,11 @@ Numbers are permanent and never reused.
 - Whether the two reward bands under each of Champion and Boss collapse to one.
 - Whether the dodge resource refund survives as base kit, becomes a tree rewrite, or dies.
 - Whether party loot is instanced per player.
-- Whether experience exists at cap.
 - Whether Core Point respec carries friction at the keystone tier.
 - Whether one keystone per character is the right ceiling across all fifteen branches.
 - Whether the Core tree keeps a hub, and whether a re-theme rides an explicit axis field so node ids never move.
 - Whether the offered More count grows if the axis count grows.
 - The conditional-line payout ratio.
-- The tier-bonus curve that reaches the top of the item-level range, and the zone-level table beneath it.
 - Whether the modifier scope that disables a defensive layer also disables the class resource it generates.
 - How much bespoke geometry elite modifiers need.
 - Whether the inventory grid gets the frame width its three-across layout needs.

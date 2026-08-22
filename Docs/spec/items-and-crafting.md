@@ -105,10 +105,11 @@ of two flavours:
 The four existing rewrites migrate down into Aberrant's minor pool. They are
 the right size for something worn three of.
 
-**The fifth tier becomes the singular tier.** One equipped, four affixes, major
-rewrites. Fewer affixes than Aberrant is deliberate: this tier leaves the power
-ladder. It is not an upgrade, it is a decision, and **a good Aberrant must be
-able to out-stat it.**
+**The fifth tier becomes the singular tier.** One equipped, and it carries
+**one major rewrite plus generic affixes stronger than an ordinary item's**, so
+it lands on par with a good Aberrant rather than above it. It is not an
+upgrade, it is a decision — the rewrite is what you came for, and the stats are
+what stop taking it from being a sacrifice.
 
 **The minor/major line, as a test a person can apply to a card:**
 
@@ -142,6 +143,12 @@ rewrite and a forfeit in one line.
 Aberrants, plus one major. A legendary's authored pair occupies the major slot
 rather than sitting beside it, so legendaries compete with rolled top-tier
 items instead of stacking with them.
+
+**Minor rewrites are class-tagged, and a class-tagged item drops for every
+class regardless of who is playing.** That is a rule, not an oversight. Finding
+a rewrite for a class you are not playing is the game telling you what else
+exists, and it is the raw material of a second character; smart loot would
+delete both. Nobody is to "fix" this later.
 
 **Stacking is not prohibited.** Three minor rewrites on the same mechanic is a
 legal and intended build — a player who wants to stack three area rewrites and
@@ -258,12 +265,6 @@ therefore the case the ceiling has to hold against.
 
 ## Open
 
-- Whether a top-tier item carries two major rewrites, or one major plus an
-  authored forfeit line.
-- Whether minor rewrites come from one shared pool or are partly class-tagged.
-- The fifth tier's final display name. The serialized value does not move
-  either way.
-- Whether the Focused/Modified split supersedes the undesigned "one or two
-  unique modifier affixes" Aberrant was promised, or still owes them.
-- The specific tier-bonus curve that reaches the top of the item-level range.
 - The zone-level table, and the mapping from content difficulty to tier bonus.
+- What the generic affixes on a top-tier item are worth, given they must land
+  it on par with a good Aberrant rather than above one.

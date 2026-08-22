@@ -168,12 +168,13 @@ trivially loopable on the class that can drive its bar negative deliberately.
 Depletion has to mean *drained past empty*: only a loop that rests full can
 satisfy it.
 
-**A resource the player cannot generate while playing normally is a trap.**
-Momentum's generation threshold currently sits above walking speed and above
-every heavy aim-down-sights movement state, so a Swift who aims is locked out
-of their own resource — and Marksman is the branch that most wants to aim.
-Either the threshold moves, or the tension is deliberate and the branch is
-authored around it, but it cannot stay unexamined.
+**A resource the player cannot generate while playing normally is a trap, and
+the threshold moves rather than the playstyle.** Momentum's generation
+threshold sat above walking speed and above every heavy aim-down-sights state,
+so a Swift who aimed was locked out of their own resource — and Marksman is the
+branch that most wants to aim. The threshold comes down, or aim-down-sights
+states are exempt from it, or both. A permanent class whose most natural
+playstyle disables its own resource is a mistake the player cannot take back.
 
 ## Open
 

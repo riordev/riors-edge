@@ -17,7 +17,7 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 49 of 86 asserted across 7 specs | ceiling 49, target 20 | ok |
+| Asserted invariants with no test | ceiling | 51 of 88 asserted across 7 specs | ceiling 49, target 20 | **OUT** |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 52 % ranked minors, all trees | band 55–65 | **OUT** |
 | Loot per hour, by area level | band | not emitted | — | needs `RiorsEdge.Items.Drops.LootPerHour` to log it |
@@ -31,7 +31,7 @@ measurement without judging it.
 - passing: 393
 - expected red: 1
 - **unexpected red: 0**
-- asserted invariants with no test: 49
+- asserted invariants with no test: 51
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -168,7 +168,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 49 of 86 asserted across 7 specs · ceiling 49, target 20
+**ceiling** · 51 of 88 asserted across 7 specs · ceiling 49, target 20  ·  **OUT**
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -212,7 +212,7 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.RuleBandImpact.Major  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.RuleBandImpact  —  power-and-scaling.md
-- …and 9 more
+- …and 11 more
 
 ## Offered-to-spendable ratio, per tree
 
