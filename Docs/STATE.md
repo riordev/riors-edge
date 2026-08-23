@@ -17,32 +17,27 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 43 of 104 asserted across 7 specs | ceiling 43, target 20 | ok |
+| Asserted invariants with no test | ceiling | 42 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
-| Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.65 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.39 | no pin — measurement only | — |
-| Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
-| Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
-| World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
+| Items dropped per hour, at the reference area level | band | not emitted | — | needs `RiorsEdge.Items.Drops.LootPerHour` to emit it |
+| Build variance band, at cap | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AtCap` to emit it |
+| Build variance band, endgame | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.Endgame` to emit it |
+| Ability lane throughput against weapon lane, at cap | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to emit it |
+| Ability lane throughput against weapon lane, endgame | band | not emitted | — | needs `RiorsEdge.Progression.PowerBand.AbilityLane` to emit it |
+| Monster damage growth against gear defence growth | ceiling | not emitted | — | needs `RiorsEdge.Combat.Chassis.DamageBelowHealth` to emit it |
+| Worst single rewrite step on an optimized build | ceiling | not emitted | — | needs `RiorsEdge.Progression.RuleBandImpact` to emit it |
+| World Core Point sources with no trigger | ceiling | not emitted | — | needs `RiorsEdge.Progression.WorldPoints.SoloReachable` to emit it |
 
 ## Tests
 
-- passing: 419
-- expected red: 2
+- passing: 1
+- expected red: 0
 - **unexpected red: 0**
-- asserted invariants with no test: 43
+- asserted invariants with no test: 42
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
-
-**Expected red**
-
-- `RiorsEdge.Progression.PowerBand.AbilityLane`
-- `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes
 
@@ -171,7 +166,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 43 of 104 asserted across 7 specs · ceiling 43, target 20
+**ceiling** · 42 of 104 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -182,7 +177,6 @@ A named test that was never written looks asserted and is not. This is worse tha
 - UI.Rarity.NonColourCue  —  art-and-ui.md
 - Art.FlatGreyTest  —  art-and-ui.md
 - UI.EquipLimit.SwapPicker  —  art-and-ui.md
-- UI.NoItemScore  —  art-and-ui.md
 - Classes.BuiltClassKit.Generation  —  classes-and-abilities.md
 - Classes.BuiltClassKit.Registry  —  classes-and-abilities.md
 - Abilities.CasterHasNoCooldowns  —  classes-and-abilities.md
@@ -215,7 +209,8 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md
 - Progression.PowerBand.ArchetypeSpread  —  power-and-scaling.md
 - Progression.AxisOverlap  —  progression-and-trees.md
-- …and 3 more
+- Progression.BranchCommitment  —  progression-and-trees.md
+- …and 2 more
 
 ## Offered-to-spendable ratio, per tree
 

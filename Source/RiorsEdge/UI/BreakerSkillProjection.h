@@ -4,6 +4,7 @@
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Progression/BreakerProgressionTypes.h"
 
+struct FBreakerItemInstance;
 class UBreakerAttributeSet;
 class UBreakerProgressionComponent;
 class UBreakerProgressionNode;
@@ -122,6 +123,30 @@ namespace BreakerSkillProjection
     // whole percent. This is what makes "my points did that" visible.
     RIORSEDGE_API float LayerIncreasedPercent(const FBreakerSkillSnapshot& Snapshot,
         EBreakerAttributeContributor Contributor, EBreakerAggregatedAttribute Attribute);
+
+    // ---- WHAT EQUIPPING THIS WOULD DO ------------------------------------
+    // The same trick as the skill projection, on the OTHER contributor. The
+    // aggregator holds exactly two — Equipment and Progression — and
+    // ComposeWithOffer swaps the second; this swaps the first, by re-running
+    // the equipment layer's own static AggregateStats over the loadout with one
+    // slot replaced. No second aggregation, no recomputed gear maths, and the
+    // bases and the fold are still the live character's.
+    //
+    // IT REPORTS PER LANE, and that is the entire reason it exists rather than
+    // a single number. A scalar "item score" cannot be honest across a
+    // partitioned damage model: the two delivery lanes measure 0.647x of each
+    // other at the cap and 0.388x at endgame, so one figure is wrong for
+    // whichever build the player actually has. Weapon and ability are reported
+    // separately because O54 partitions them by DELIVERY and no weighting
+    // between them is knowable from the item.
+    //
+    // Defence is honestly ONE number where damage is not, because survivability
+    // composes for everybody — but it is effective health AGAINST PHYSICAL, and
+    // the row says so. Block and dodge are chance layers (O1) and folding an
+    // average of them into a displayed total would be the same lie in a smaller
+    // font: a number that is right about nobody's actual hit.
+    RIORSEDGE_API TArray<FBreakerStatLine> ProjectEquip(const FBreakerSkillSnapshot& Snapshot,
+        const TArray<FBreakerItemInstance>& Equipped, const FBreakerItemInstance& Candidate);
 
     RIORSEDGE_API FString FormatStat(float Value, EBreakerStatFormat Format);
     // "+3%" / "+2.0%" / "+90". Empty when nothing moved.

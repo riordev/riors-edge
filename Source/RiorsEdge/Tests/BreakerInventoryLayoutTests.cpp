@@ -440,4 +440,52 @@ bool FBreakerInventoryLayoutBackpackTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// NO ITEM SCORE, ANYWHERE, EVER
+// ---------------------------------------------------------------------------
+// art-and-ui asserts it and the loadout subtitle violated it: it printed
+// "BREAKER - SWIFT - LV 1 - GEAR SCORE 1", the sum of equipped item levels, in
+// the subtitle of the most-used screen in the game. The rule is not cosmetic:
+// the endgame's thesis is that power lives in decisions, and one number saying
+// which item is better deletes the decision the endgame is made of. A scalar
+// also cannot be honest across O54's partitioned damage -- the two delivery
+// lanes measure 0.647x of each other at the cap, so any single figure is wrong
+// for whichever build the player actually has. The composed per-lane delta on
+// the Forge panel answers what the score was reaching for.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerNoItemScoreTest,
+    "RiorsEdge.UI.NoItemScore",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerNoItemScoreTest::RunTest(const FString& Parameters)
+{
+    const FString Meta = BreakerInventoryLayout::LoadoutMetaLine(TEXT("SWIFT"), 37);
+
+    // It says who and what level, because those are facts about the CHARACTER.
+    TestTrue(*FString::Printf(TEXT("The subtitle names the class (%s)"), *Meta), Meta.Contains(TEXT("SWIFT")));
+    TestTrue(*FString::Printf(TEXT("The subtitle names the level (%s)"), *Meta), Meta.Contains(TEXT("37")));
+
+    // EXACTLY ONE NUMBER. This is the assertion with teeth: an aggregate score
+    // is a second number, so counting them forbids re-adding one under any name
+    // at all, rather than banning the two words it happened to use.
+    int32 NumberRuns = 0;
+    bool bInRun = false;
+    for (const TCHAR Character : Meta)
+    {
+        const bool bDigit = FChar::IsDigit(Character);
+        if (bDigit && !bInRun) ++NumberRuns;
+        bInRun = bDigit;
+    }
+    TestEqual(*FString::Printf(TEXT("The subtitle carries one number, the level (%s)"), *Meta),
+        NumberRuns, 1);
+
+    // And the phrasings, named so a search for any of them lands here.
+    for (const TCHAR* Banned : { TEXT("SCORE"), TEXT("POWER LEVEL"), TEXT("RATING") })
+    {
+        TestFalse(*FString::Printf(TEXT("The subtitle does not print '%s'"), Banned),
+            Meta.Contains(Banned));
+    }
+    return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

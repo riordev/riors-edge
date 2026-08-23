@@ -6,6 +6,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerItemTypes.h"
 #include "UI/BreakerSkillProjection.h"
 
 // The skill screen prints "1.13x -> 1.16x" next to a node. These tests exist
@@ -238,6 +240,100 @@ bool FBreakerSkillProjectionGuardTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A classless character holds no ranks"), Fresh.Ranks.Num(), 0);
     TestEqual(TEXT("A classless projection is identity"),
         BreakerSkillProjection::ProjectPurchase(Fresh, TEXT("Core.Volley.Cyclic"), 1)[0].Before, 1.0f, 0.0001f);
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// WHAT EQUIPPING THIS WOULD DO
+// ---------------------------------------------------------------------------
+// The composed delta replaces the printed gear score, and the reason it can is
+// that it reports PER LANE. These pin the two properties a scalar could not
+// have: that an item touching one delivery lane moves only that lane, and that
+// equipping REPLACES rather than adds, so a downgrade reads as a loss.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEquipDeltaTest,
+    "RiorsEdge.UI.EquipDelta.PerLane",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEquipDeltaTest::RunTest(const FString& Parameters)
+{
+    FBreakerSkillSnapshot Snapshot;
+    Snapshot.bHasComposedAttributes = true;
+    // Both damage lanes are 1.0-based, so an empty aggregator composes to
+    // identity and every movement below is the gear layer alone.
+    TArray<float> Bases;
+    Bases.SetNumZeroed(FBreakerAttributeContribution::AttributeCount);
+    Bases[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = 1.0f;
+    Bases[static_cast<int32>(EBreakerAggregatedAttribute::AbilityDamageMultiplier)] = 1.0f;
+    Bases[static_cast<int32>(EBreakerAggregatedAttribute::CriticalMultiplier)] = 1.0f;
+    Bases[static_cast<int32>(EBreakerAggregatedAttribute::MaxHealth)] = 100.0f;
+    for (int32 Index = 0; Index < Bases.Num(); ++Index)
+    {
+        Snapshot.Aggregator.SetBase(static_cast<EBreakerAggregatedAttribute>(Index), Bases[Index]);
+    }
+
+    // One real affix out of the shipped pool, on one slot. Nothing invented.
+    const auto MakeItem = [](EBreakerEquipSlot Slot, const TCHAR* AffixId)
+    {
+        FBreakerItemInstance Item;
+        Item.ItemId = FGuid::NewGuid();
+        Item.Slot = Slot;
+        Item.ItemLevel = 50;
+        Item.Rarity = EBreakerItemRarity::Exceptional;
+        const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        if (const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(Pool, AffixId))
+        {
+            FBreakerRolledAffix Rolled;
+            Rolled.AffixId = AffixId;
+            Rolled.Tier = 6;
+            Rolled.Category = Definition->Category;
+            Rolled.Value = UBreakerAffixLibrary::ValueForTier(*Definition, 6);
+            Item.Affixes.Add(Rolled);
+        }
+        return Item;
+    };
+
+    const TArray<FBreakerItemInstance> Bare;
+    const FBreakerItemInstance WeaponPiece = MakeItem(EBreakerEquipSlot::Helmet, TEXT("Offense.WeaponDamage"));
+    const TArray<FBreakerStatLine> Weapon = BreakerSkillProjection::ProjectEquip(Snapshot, Bare, WeaponPiece);
+    if (!TestEqual(TEXT("The delta reports five rows"), Weapon.Num(), 5)) return false;
+
+    // THE PROPERTY A SCALAR COULD NOT HAVE. A weapon-lane roll moves the
+    // weapon lane and leaves the ability lane exactly where it was.
+    TestTrue(*FString::Printf(TEXT("A Weapon Damage roll raises the weapon lane (%.4f -> %.4f)"),
+        Weapon[0].Before, Weapon[0].After), Weapon[0].After > Weapon[0].Before);
+    TestEqual(TEXT("...and does not move the ability lane at all"),
+        Weapon[1].After, Weapon[1].Before, 0.0001f);
+
+    const FBreakerItemInstance AbilityPiece = MakeItem(EBreakerEquipSlot::Helmet, TEXT("Offense.AbilityDamage"));
+    const TArray<FBreakerStatLine> Ability = BreakerSkillProjection::ProjectEquip(Snapshot, Bare, AbilityPiece);
+    TestTrue(*FString::Printf(TEXT("An Ability Damage roll raises the ability lane (%.4f -> %.4f)"),
+        Ability[1].Before, Ability[1].After), Ability[1].After > Ability[1].Before);
+    TestEqual(TEXT("...and does not move the weapon lane at all"),
+        Ability[0].After, Ability[0].Before, 0.0001f);
+
+    // EQUIPPING REPLACES. An item is worth what it displaces, so swapping a
+    // good piece for a bare one of the same slot must read as a LOSS. A score
+    // that summed the candidate alone would call this an upgrade.
+    TArray<FBreakerItemInstance> Equipped;
+    Equipped.Add(WeaponPiece);
+    FBreakerItemInstance Downgrade;
+    Downgrade.ItemId = FGuid::NewGuid();
+    Downgrade.Slot = EBreakerEquipSlot::Helmet;
+    Downgrade.ItemLevel = 50;
+    const TArray<FBreakerStatLine> Worse = BreakerSkillProjection::ProjectEquip(Snapshot, Equipped, Downgrade);
+    TestTrue(*FString::Printf(TEXT("Swapping to an affixless piece reads as a loss (%.4f -> %.4f)"),
+        Worse[0].Before, Worse[0].After), Worse[0].After < Worse[0].Before);
+
+    // EFFECTIVE HEALTH IS NAMED FOR WHAT IT EXCLUDES, and it must be at least
+    // the health pool: dividing by survival can only raise it.
+    const FBreakerItemInstance HealthPiece = MakeItem(EBreakerEquipSlot::BodyArmour, TEXT("Core.PhysicalDR"));
+    const TArray<FBreakerStatLine> Defence = BreakerSkillProjection::ProjectEquip(Snapshot, Bare, HealthPiece);
+    TestTrue(TEXT("The defence row names the damage type it covers"),
+        Defence[4].Label.Contains(TEXT("PHYSICAL")));
+    TestTrue(*FString::Printf(TEXT("Physical reduction raises effective health (%.1f -> %.1f)"),
+        Defence[4].Before, Defence[4].After), Defence[4].After > Defence[4].Before);
     return true;
 }
 

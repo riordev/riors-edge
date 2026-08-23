@@ -1,6 +1,8 @@
 #include "UI/BreakerSkillProjection.h"
 
 #include "Attributes/BreakerAttributeSet.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemTypes.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
@@ -122,6 +124,86 @@ namespace
         OutValues[static_cast<int32>(EStatRow::DodgeChance)] = Stats.DodgeChanceBonus;
         OutValues[static_cast<int32>(EStatRow::BlockChance)] = Stats.BlockChanceBonus;
     }
+}
+
+namespace
+{
+    // One evaluation of a hypothetical loadout: the gear layer's own maths,
+    // folded through a copy of the character's live aggregator.
+    struct FBreakerEquipEvaluation
+    {
+        float WeaponDamage = 1.0f;
+        float AbilityDamage = 1.0f;
+        float CriticalChance = 0.0f;
+        float CriticalDamage = 1.0f;
+        float EffectiveHealthVsPhysical = 0.0f;
+    };
+
+    FBreakerEquipEvaluation BreakerEvaluateLoadout(const FBreakerSkillSnapshot& Snapshot,
+        const TArray<FBreakerItemInstance>& Items)
+    {
+        FBreakerAttributeContribution GearOffer;
+        const FBreakerEquipmentStats Stats = UBreakerEquipmentComponent::AggregateStats(Items, &GearOffer);
+
+        FBreakerAttributeAggregator Hypothetical = Snapshot.Aggregator;
+        Hypothetical.SetContribution(EBreakerAttributeContributor::Equipment, GearOffer);
+
+        FBreakerEquipEvaluation Out;
+        Out.WeaponDamage = Hypothetical.Compose(EBreakerAggregatedAttribute::DamageMultiplier);
+        Out.AbilityDamage = Hypothetical.Compose(EBreakerAggregatedAttribute::AbilityDamageMultiplier);
+        Out.CriticalChance = FMath::Clamp(Hypothetical.Compose(EBreakerAggregatedAttribute::CriticalChance), 0.0f, 1.0f);
+        Out.CriticalDamage = Hypothetical.Compose(EBreakerAggregatedAttribute::CriticalMultiplier);
+
+        // Effective health against physical: the health pool divided by what
+        // survives mitigation. The reduction comes back from AggregateStats
+        // ALREADY CAPPED, so this cannot report a defence the game would refuse
+        // to grant — including the raised cap a rule rewrite can buy.
+        const float MaxHealth = Hypothetical.Compose(EBreakerAggregatedAttribute::MaxHealth);
+        const float Surviving = FMath::Max(1.0f - Stats.PhysicalDamageReductionPercent / 100.0f, 0.01f);
+        Out.EffectiveHealthVsPhysical = MaxHealth / Surviving;
+        return Out;
+    }
+
+    FBreakerStatLine BreakerEquipRow(const TCHAR* Label, EBreakerStatFormat Format, float Before, float After)
+    {
+        FBreakerStatLine Line;
+        Line.Label = Label;
+        Line.Format = Format;
+        Line.Before = Before;
+        Line.After = After;
+        return Line;
+    }
+}
+
+TArray<FBreakerStatLine> BreakerSkillProjection::ProjectEquip(const FBreakerSkillSnapshot& Snapshot,
+    const TArray<FBreakerItemInstance>& Equipped, const FBreakerItemInstance& Candidate)
+{
+    TArray<FBreakerItemInstance> Hypothetical = Equipped;
+    // Equipping REPLACES the piece in that slot, which is what makes this a
+    // delta rather than a sum: an item's worth is what it displaces, and a
+    // score that ignored the displaced piece would rate a downgrade positively.
+    const int32 Existing = Hypothetical.IndexOfByPredicate(
+        [&Candidate](const FBreakerItemInstance& Item) { return Item.Slot == Candidate.Slot; });
+    if (Hypothetical.IsValidIndex(Existing)) Hypothetical[Existing] = Candidate;
+    else Hypothetical.Add(Candidate);
+
+    const FBreakerEquipEvaluation Now = BreakerEvaluateLoadout(Snapshot, Equipped);
+    const FBreakerEquipEvaluation Then = BreakerEvaluateLoadout(Snapshot, Hypothetical);
+
+    TArray<FBreakerStatLine> Lines;
+    Lines.Add(BreakerEquipRow(TEXT("WEAPON DAMAGE"), EBreakerStatFormat::Multiplier,
+        Now.WeaponDamage, Then.WeaponDamage));
+    Lines.Add(BreakerEquipRow(TEXT("ABILITY DAMAGE"), EBreakerStatFormat::Multiplier,
+        Now.AbilityDamage, Then.AbilityDamage));
+    Lines.Add(BreakerEquipRow(TEXT("CRIT CHANCE"), EBreakerStatFormat::PercentPoints,
+        Now.CriticalChance, Then.CriticalChance));
+    Lines.Add(BreakerEquipRow(TEXT("CRIT DAMAGE"), EBreakerStatFormat::Multiplier,
+        Now.CriticalDamage, Then.CriticalDamage));
+    // NAMED for what it excludes. Block and dodge are passive chance layers and
+    // are deliberately not in this number.
+    Lines.Add(BreakerEquipRow(TEXT("EFF. HEALTH vs PHYSICAL"), EBreakerStatFormat::Absolute,
+        Now.EffectiveHealthVsPhysical, Then.EffectiveHealthVsPhysical));
+    return Lines;
 }
 
 int32 BreakerSkillProjection::StatRowCount()

@@ -3591,21 +3591,25 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
     ];
 
-    // Meta line. Gear score is the sum of equipped item levels — O2
-    // PLACEHOLDER, the shipping formula is not authored yet.
+    // Meta line. NO GEAR SCORE, and the absence is the rule rather than an
+    // omission: art-and-ui says no screen prints an aggregate item score, and
+    // this line printed one — the sum of equipped item levels — in the subtitle
+    // of the most-used screen in the game.
+    //
+    // It is not a small violation. The endgame's whole thesis is that power
+    // lives in decisions, and a single number telling the player which item is
+    // better deletes the decision the endgame is made of. Worse, a scalar
+    // CANNOT be honest here: O54 partitions damage by delivery, and the two
+    // lanes measure 0.647x of each other at the cap and 0.388x at endgame, so
+    // any one figure is wrong for whichever build the player actually has.
+    //
+    // What the score was reaching for is answered by the composed delta on the
+    // Forge's detail panel, which reports per lane and cannot misprice one.
+    // RiorsEdge.UI.NoItemScore holds the absence.
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
-    int32 GearScore = 0;
-    if (Equipment)
-    {
-        for (const FBreakerItemInstance& EquippedItem : Equipment->GetEquipped())
-        {
-            if (EquippedItem.IsValid()) GearScore += EquippedItem.ItemLevel;
-        }
-    }
-    const FString MetaLine = FString::Printf(TEXT("BREAKER · %s · LV %d · GEAR SCORE %s"),
-        *ClassDisplayName(Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None),
-        Progression ? Progression->GetProgressionState().CharacterLevel : 1,
-        *BreakerUI::FormatTicker(static_cast<float>(GearScore)));
+    const FString MetaLine = BreakerInventoryLayout::LoadoutMetaLine(
+        ClassDisplayName(Progression ? Progression->GetProgressionState().PermanentClass : EBreakerClassId::None),
+        Progression ? Progression->GetProgressionState().CharacterLevel : 1);
 
     // ---- Zones -------------------------------------------------------------
     // 560 | 400 | the rest, separated by 1px DIVIDERS rather than by gutters —
@@ -7134,6 +7138,61 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
         [
             MenuText(FText::FromString(bSelectedEquipped ? TEXT("CURRENTLY EQUIPPED") : TEXT("IN BACKPACK")), BreakerUI::TypeCaption, Muted, true)
         ];
+
+        // ---- IF EQUIPPED: the composed delta, per lane ---------------------
+        // This is what the printed gear score was reaching for, and the reason
+        // a score could not do it: damage is partitioned by DELIVERY (O54), so
+        // one number has to pick a lane and is then wrong for whoever built the
+        // other one. The two lanes measure 0.647x of each other at the cap.
+        //
+        // Only for a piece NOT already worn — the delta against itself is zero,
+        // and five rows of nothing is worse than no rows.
+        //
+        // VERTICAL furniture on purpose. Every clipped-text report on this file
+        // has been horizontal overflow against the card width solve, and this
+        // adds no column: it is stacked rows in a panel that already scrolls.
+        UBreakerProgressionComponent* EquipProgression =
+            Character.IsValid() ? Character->GetProgression() : nullptr;
+        const UBreakerAttributeSet* EquipAttributes =
+            Character.IsValid() ? Character->GetAttributes() : nullptr;
+        if (!bSelectedEquipped && EquipProgression)
+        {
+            const FBreakerSkillSnapshot EquipSnapshot =
+                BreakerSkillProjection::MakeSnapshot(EquipProgression, EquipAttributes);
+            const TArray<FBreakerItemInstance> Worn =
+                Equipment ? Equipment->GetEquipped() : TArray<FBreakerItemInstance>();
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+            [
+                MenuText(FText::FromString(TEXT("IF EQUIPPED")), BreakerUI::TypeCaption, Cyan, true)
+            ];
+            for (const FBreakerStatLine& Line : BreakerSkillProjection::ProjectEquip(EquipSnapshot, Worn, SelectedItem))
+            {
+                // The same three colours the per-affix delta marks already use,
+                // so one screen does not teach two vocabularies for "better".
+                const FLinearColor RowColor = !Line.Changed() ? Muted
+                    : (Line.After > Line.Before ? Cyan : Harm);
+                ForgePanel->AddSlot().AutoHeight()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)
+                    [
+                        MenuText(FText::FromString(Line.Label), BreakerUI::TypeCaption, Muted, true)
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth()
+                    [
+                        MenuText(FText::FromString(Line.Changed()
+                            ? BreakerSkillProjection::FormatTransition(Line)
+                            : BreakerSkillProjection::FormatStat(Line.Before, Line.Format)),
+                            BreakerUI::TypeCaption, RowColor, true)
+                    ]
+                ];
+            }
+            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+            [
+                MenuText(FText::FromString(TEXT("EFFECTIVE HEALTH EXCLUDES BLOCK AND DODGE — BOTH ARE CHANCE")),
+                    BreakerUI::TypeCaption, Disabled, true)
+            ];
+        }
 
         // ---- TEMPER: one row per affix line --------------------------------
         ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)

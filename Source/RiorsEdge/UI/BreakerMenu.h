@@ -180,6 +180,23 @@ namespace BreakerInventoryLayout
     {
         return static_cast<float>(Characters) * CaptionAdvance;
     }
+    // THE LOADOUT SUBTITLE, and it is a function so that its ABSENCE of an item
+    // score can be asserted. It read "BREAKER · SWIFT · LV 1 · GEAR SCORE 1",
+    // and art-and-ui says no screen prints an aggregate item score — the rule
+    // exists because a single number telling the player which item is better
+    // deletes the decision the whole endgame is made of, and because a scalar
+    // cannot even be honest across O54's partitioned damage model.
+    //
+    // Extracted rather than left inline because a string built inside a Slate
+    // tree cannot be reached by a test, and a rule with nothing holding it is
+    // how this one came to be violated on the most-used screen in the game.
+    // RiorsEdge.UI.NoItemScore asserts the shape: the class, the level, and no
+    // second number for anything to be an aggregate of.
+    inline FString LoadoutMetaLine(const FString& ClassName, int32 CharacterLevel)
+    {
+        return FString::Printf(TEXT("BREAKER · %s · LV %d"), *ClassName, CharacterLevel);
+    }
+
     // The affix row's right-hand columns: the delta glyph and its magnitude.
     // 48 holds "1234.5", which is the widest value O29's affix ladder rolls.
     inline constexpr float DeltaValueColumn = 48.0f;
