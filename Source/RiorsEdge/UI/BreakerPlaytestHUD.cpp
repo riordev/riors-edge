@@ -2536,9 +2536,20 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
 {
     if (!IsCapturePreview() || !Character || !GetWorld()) return;
     const double Now = GetWorld()->GetTimeSeconds();
-    // Re-seeded on the damage numbers' own lifetime, so the capture always
-    // catches them mid-rise rather than after they have expired.
-    if (Now - LastPreviewSpawnTime < BreakerHUD::DamageNumberLifetime * 0.6) return;
+    // Re-seeded on the LONGEST lifetime in the set, so the capture catches
+    // numbers mid-rise without a seeding overlapping the one before it.
+    //
+    // It keyed off the default lifetime alone, which is shorter than both the
+    // kill and damage-over-time lifetimes — so the two longest-lived numbers
+    // were still on screen when the next seeding fired and each was drawn on
+    // top of a copy of itself. Found by reading a capture, not by a test: this
+    // is a photograph of the instrument, and every fabricated hit carries a
+    // null target so the real merge path cannot collapse them the way it would
+    // in play. Raising the DoT lifetime to clear the Bleed tick interval made
+    // it visibly worse, which is how it was noticed.
+    const float LongestLifetime = FMath::Max3(
+        BreakerHUD::DamageNumberLifetime, BreakerHUD::DamageDoTLifetime, BreakerHUD::DamageKillLifetime);
+    if (Now - LastPreviewSpawnTime < LongestLifetime) return;
     LastPreviewSpawnTime = Now;
 
     const FVector Eye = Character->GetActorLocation();
