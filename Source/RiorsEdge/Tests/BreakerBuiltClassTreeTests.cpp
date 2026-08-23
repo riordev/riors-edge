@@ -130,7 +130,7 @@ bool FBreakerBuiltClassTreesRegisteredTest::RunTest(const FString& Parameters)
         const FString TreeName = Branch.Tree->TreeId.ToString();
         TestTrue(*(TreeName + TEXT(" is in GetAllFallbackTrees()")), AllTrees.Contains(Branch.Tree));
         TestEqual(*(TreeName + TEXT(" is required by its class")), Branch.Tree->RequiredClass, Branch.ClassId);
-        TestEqual(*(TreeName + TEXT(" spends class points")), Branch.Tree->Currency, EBreakerPointCurrency::ClassPoints);
+        TestEqual(*(TreeName + TEXT(" spends class points")), Branch.Tree->Currency, EBreakerPointCurrency::CorePoints);
 
         const TArray<UBreakerProgressionTree*> ForClass = UBreakerProgressionLibrary::GetTreesForClass(Branch.ClassId);
         TestTrue(*(TreeName + TEXT(" is offered to its class")), ForClass.Contains(Branch.Tree));
@@ -376,7 +376,7 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     TestTrue(TEXT("Machinist purchases on the last three points of the level-11 budget"),
         Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
     TestEqual(TEXT("The level-11 budget is spent to exactly zero"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 0);
+        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
 
     // The purchase is not decorative: the branch identity tag and the
     // ultimate's keystone tag both reach the aggregate, so Field Assembly's

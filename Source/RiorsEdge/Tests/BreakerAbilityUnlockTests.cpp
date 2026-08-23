@@ -303,7 +303,7 @@ bool FBreakerAbilitySurvivesRespecTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Bought an ability"), Progression->SpendAbilityToken(Bought, Failure));
     const int32 TokensAfterBuy = Progression->GetUnspentAbilityTokens();
 
-    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
 
     TestTrue(TEXT("The unlock survives a Forge respec"), Progression->IsAbilityUnlocked(Bought));
     TestEqual(TEXT("The token count survives a Forge respec"), Progression->GetUnspentAbilityTokens(), TokensAfterBuy);

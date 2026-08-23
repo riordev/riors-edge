@@ -359,7 +359,7 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Core respec zeroes only the core running total"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
 
-    TestTrue(TEXT("Class respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Class respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Both running totals are zero after both respecs"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
     // A LOADED state carrying a stale/unknown node id: the running total is
@@ -405,7 +405,7 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
 
     // The rank itself is not deleted -- only its contribution stops. Swapping
     // back to Swift resumes it with no re-purchase.
-    TestEqual(TEXT("The rank itself survives the swap"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Carry"), EBreakerPointCurrency::ClassPoints), 1);
+    TestEqual(TEXT("The rank itself survives the swap"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Carry"), EBreakerPointCurrency::CorePoints), 1);
     Progression->DevForceClass(EBreakerClassId::Swift);
     TestEqual(TEXT("Swapping back resumes the contribution"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
     return true;
@@ -491,9 +491,9 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
         Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
 
     // --- RESPEC CLEARS -------------------------------------------------------
-    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Respec clears the commitment"), Progression->GetProgressionState().CommittedBranch, FName(NAME_None));
-    TestEqual(TEXT("Respec also clears Bloodrhythm's rank"), Progression->GetNodeRank(TEXT("Swift.Frenzy.Bloodrhythm"), EBreakerPointCurrency::ClassPoints), 0);
+    TestEqual(TEXT("Respec also clears Bloodrhythm's rank"), Progression->GetNodeRank(TEXT("Swift.Frenzy.Bloodrhythm"), EBreakerPointCurrency::CorePoints), 0);
 
     // A fresh commitment is possible again after the Forge visit.
     TestTrue(TEXT("A new commitment succeeds after the respec"), Progression->CommitToBranch(TEXT("Swift.Kinetic"), CommitFailure));
@@ -518,7 +518,7 @@ bool FBreakerAutoLockGateTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Default behaviour: a fresh character still auto-locks Swift"),
         DefaultProgression->GetProgressionState().PermanentClass, EBreakerClassId::Swift);
     TestEqual(TEXT("...and still receives the slice point grant"),
-        DefaultProgression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), UBreakerProgressionLibrary::SliceClassPointGrant);
+        DefaultProgression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), UBreakerProgressionLibrary::SliceCorePointGrant);
 
     // O39: turned off, a fresh character reaches the class screen with no
     // class chosen, so the screen is actually exercised instead of every
@@ -532,7 +532,7 @@ bool FBreakerAutoLockGateTest::RunTest(const FString& Parameters)
     // class choice, so it still arrives -- the class screen has something to
     // spend against once a class is picked.
     TestEqual(TEXT("...but the slice point grant is unaffected"),
-        GatedProgression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), UBreakerProgressionLibrary::SliceClassPointGrant);
+        GatedProgression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), UBreakerProgressionLibrary::SliceCorePointGrant);
 
     // A character that already chose a class is never touched by the flag
     // either way -- "only pick a class for a character that has none" is

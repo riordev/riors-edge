@@ -700,7 +700,7 @@ float UBreakerWeaponComponent::GetAimMoveSpeedMultiplier() const
 int32 UBreakerWeaponComponent::GetClassNodeRank(FName NodeId) const
 {
     const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::CorePoints) : 0;
 }
 
 bool UBreakerWeaponComponent::OwnerHasNodeTag(const FGameplayTag& Tag) const
@@ -1480,7 +1480,7 @@ bool UBreakerWeaponComponent::FireOnce()
     // and the momentum component is inert for every other class.
     if (PiercedThisPull > 0)
     {
-        const int32 DisciplineRank = Progression ? Progression->GetNodeRank(BreakerPierceDisciplineNodeId, EBreakerPointCurrency::ClassPoints) : 0;
+        const int32 DisciplineRank = Progression ? Progression->GetNodeRank(BreakerPierceDisciplineNodeId, EBreakerPointCurrency::CorePoints) : 0;
         if (Momentum && Momentum->IsActiveForOwner() && DisciplineRank > 0)
         {
             const float PerTarget = DisciplineRank >= 2 ? 7.0f : 4.0f;   // Class-Kits §1.5 M6 R1/R2
@@ -1812,7 +1812,7 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
     // Angle (§1.5 M4, transcribed): ricochet seeks within 12 m at rank 1 and
     // 20 m at rank 2, overriding the authored base radius when larger.
     float SeekRadiusCm = RicochetSeekRadiusCm;
-    if (const int32 AngleRank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::ClassPoints) : 0)
+    if (const int32 AngleRank = Progression ? Progression->GetNodeRank(BreakerAngleNodeId, EBreakerPointCurrency::CorePoints) : 0)
     {
         SeekRadiusCm = FMath::Max(SeekRadiusCm, AngleRank >= 2 ? 2000.0f : 1200.0f);   // Class-Kits §1.5 M4 R2/R1
     }

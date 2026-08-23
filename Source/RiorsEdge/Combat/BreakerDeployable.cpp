@@ -1072,7 +1072,7 @@ UBreakerScrapComponent* ABreakerDeployable::OwnerScrap() const
 int32 ABreakerDeployable::OwnerNodeRank(FName NodeId) const
 {
     const UBreakerProgressionComponent* Progression = OwnerProgression();
-    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::CorePoints) : 0;
 }
 
 bool ABreakerDeployable::OwnerHasNodeTag(const FGameplayTag& Tag) const

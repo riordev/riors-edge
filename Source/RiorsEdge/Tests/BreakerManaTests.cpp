@@ -320,7 +320,7 @@ bool FBreakerOvercastFloorClosesTest::RunTest(const FString& Parameters)
     FCasterRig Respec = MakeRig(EBreakerClassId::Caster, 30.0f);
     Respec.Mana->TrySpendMana(45.0f);
     FText Failure;
-    Respec.Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure);
+    Respec.Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure);
     TestEqual(TEXT("A respec keeps a Caster's floor open"), Respec.Attributes->GetClassResourceFloor(), -20.0f);
     TestTrue(TEXT("A respec does not silently repay the debt"), Respec.Mana->IsOvercast());
     return true;

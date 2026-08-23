@@ -183,7 +183,7 @@ AActor* UBreakerSupportAbility::ResolveAllyTarget(ABreakerCharacter* Caster, flo
 int32 UBreakerSupportAbility::SupportNodeRank(const ABreakerCharacter* Character, const TCHAR* NodeId)
 {
     const UBreakerProgressionComponent* Progression = Character ? Character->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::ClassPoints) : 0;
+    return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::CorePoints) : 0;
 }
 
 bool UBreakerSupportAbility::SupportHasNode(const ABreakerCharacter* Character, const FGameplayTag& Tag)

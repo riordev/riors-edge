@@ -339,7 +339,14 @@ public:
     // Class Point. At the doc's own milestones the totals agree exactly:
     // 10 Class at slice cap 10, 30 Class at 30, 50 Core at 50 (the Core
     // advance's extra 2 stands in for §7's first world-content grants).
-    static constexpr int32 SliceClassPointGrant = 10;
+    // RETIRED TO ZERO (O111). The slice lump used to advance 10 Class Points
+    // against the levelling entitlement; there is no Class Point to advance any
+    // more. It is NOT folded into SliceCorePointGrant -- O27 moves power into
+    // node choices rather than into a larger budget, so a fresh character opens
+    // with 12 for both the Core boards and the doctrine boards together. The
+    // symbol stays because three call sites seed retired save counters from it
+    // and zero is the correct seed for all three.
+    static constexpr int32 SliceClassPointGrant = 0;
     static constexpr int32 SliceCorePointGrant = 12;
 
     // XP-And-Pacing §4: one Class Point per level, exhausted at 30; one Core

@@ -51,10 +51,10 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     Progression->LoadProgressionState(Initial);
 
     FText Failure;
-    TestFalse(TEXT("Respec away from Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, false, Failure));
-    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::ClassPoints), 2);
-    TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
-    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::ClassPoints), 0);
+    TestFalse(TEXT("Respec away from Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, false, Failure));
+    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::CorePoints), 2);
+    TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::CorePoints), 0);
     TestEqual(TEXT("Forge respec refunds ranks when definitions are unavailable"), Progression->GetProgressionState().UnspentClassPoints, 5);
     return true;
 }

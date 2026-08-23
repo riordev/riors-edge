@@ -169,6 +169,11 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
         case 4:
             MigrateAbilityUnlocksV4ToV5(Save.Progression);
             break;
+        case 5:
+            // O111: Class Points are deleted. Nothing is refunded and nothing
+            // is read -- see MigrateClassCurrencyV5ToV6.
+            MigrateClassCurrencyV5ToV6(Save.Progression);
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its
@@ -185,4 +190,54 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
         OutNote = FString::Printf(TEXT("migrated save to version %d in %d step(s)"), Save.SaveVersion, Steps);
     }
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// O111 — the class-currency migration. REFUNDS NOTHING AND READS NOTHING.
+//
+// Class Points are deleted. Spent-plus-unspent is derivable from the payload
+// alone (one per level to 30), so nothing here needs a cost table to work out
+// what a character paid -- and O27 deletes the freed points rather than folding
+// them into Core, so there is nothing to hand back either.
+//
+// THE FIFTEEN BRANCH IDS ARE FROZEN LITERALS, AND THAT IS THE WHOLE POINT.
+// A migration that asked the live node library which branches exist would be
+// asking a library that no longer has them: by the time this runs, the branch
+// trees are doctrine trees under different ids. A migration must be readable
+// against the build that WROTE the save, not the build that is reading it, so
+// it carries its own copy of the world it is migrating away from. Do not
+// "tidy" this list into a library call. It is not duplication; it is the
+// historical record the live library deliberately no longer keeps.
+// ---------------------------------------------------------------------------
+void UBreakerSaveGame::MigrateClassCurrencyV5ToV6(FBreakerProgressionState& Progression)
+{
+    static const FName RetiringBranches[] = {
+        TEXT("Swift.Kinetic"),        TEXT("Swift.Marksman"),      TEXT("Swift.Frenzy"),
+        TEXT("Caster.Spellblade"),    TEXT("Caster.VoidWhisperer"), TEXT("Caster.Multispell"),
+        TEXT("Gunsmith.Armory"),      TEXT("Gunsmith.FieldTech"),  TEXT("Gunsmith.Tinkerer"),
+        TEXT("Tank.Leech"),           TEXT("Tank.Bastion"),        TEXT("Tank.Demolitionist"),
+        TEXT("Support.Medic"),        TEXT("Support.Conductor"),   TEXT("Support.Warden"),
+    };
+
+    // The ranks go because the nodes they name are funded from a different pool
+    // now. Leaving them would let a character keep a class build they can no
+    // longer have paid for, which is the refund this ruling refuses.
+    Progression.ClassNodeRanks.Reset();
+    Progression.UnspentClassPoints = 0;
+    Progression.LevelClassPointsGranted = 0;
+
+    // A commitment naming a branch that no longer exists resolves to nothing,
+    // and a commitment that resolves to nothing is worse than none: the save is
+    // not corrupt, it points at an id the game cannot answer. Cleared here so
+    // the player re-commits at the Forge, which is where commitment belongs.
+    // A commitment naming anything ELSE is left alone -- this step must not
+    // reach past the fifteen ids it knows about.
+    for (const FName& Retiring : RetiringBranches)
+    {
+        if (Progression.CommittedBranch == Retiring)
+        {
+            Progression.CommittedBranch = NAME_None;
+            break;
+        }
+    }
 }

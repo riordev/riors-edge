@@ -25,7 +25,16 @@ enum class EBreakerClassId : uint8
 UENUM(BlueprintType)
 enum class EBreakerPointCurrency : uint8
 {
-    ClassPoints,
+    // RETIRED (O111). Class Points are deleted: there is one pool of Core
+    // Points and the Core boards and the doctrine boards spend it together.
+    //
+    // THE VALUE STAYS AND IS NEVER REUSED. This enum is serialized by value
+    // into saves AND into Data Assets, so removing the enumerator would not
+    // delete the data -- it would leave every stored 0 meaning whatever moved
+    // into its place. Nothing may be inserted above it for the same reason.
+    // No tree and no node authors it any more; the v5 -> v6 migration clears
+    // the state that did.
+    ClassPoints_Retired,
     CorePoints
 };
 

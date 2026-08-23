@@ -258,7 +258,7 @@ bool UBreakerProgressionComponent::PurchaseNode(const UBreakerProgressionTree* T
     if (Existing) ++Existing->Rank;
     else Ranks.Add({NodeId, 1});
 
-    int32& AvailablePoints = Node->Currency == EBreakerPointCurrency::ClassPoints ? State.UnspentClassPoints : State.UnspentCorePoints;
+    int32& AvailablePoints = Node->Currency == EBreakerPointCurrency::ClassPoints_Retired ? State.UnspentClassPoints : State.UnspentCorePoints;
     AvailablePoints -= Node->CostPerRank;
     // Running total maintained here instead of recomputed by walking node
     // definitions inside GetSpentPoints/GetRefundValue on every
@@ -314,9 +314,9 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     // The running total this currency was tracking is refunded in full and
     // starts back at zero (audit item 6).
     SpentPointsFor(Currency) = 0;
-    if (Currency == EBreakerPointCurrency::ClassPoints) State.UnspentClassPoints += Refunded;
+    if (Currency == EBreakerPointCurrency::ClassPoints_Retired) State.UnspentClassPoints += Refunded;
     else State.UnspentCorePoints += Refunded;
-    if (Currency == EBreakerPointCurrency::ClassPoints)
+    if (Currency == EBreakerPointCurrency::ClassPoints_Retired)
     {
         State.AbilityLoadout.ClassAbilityOne = ClassDefinition && ClassDefinition->StarterAbilityIds.Num() > 0
             ? ClassDefinition->StarterAbilityIds[0] : NAME_None;
@@ -392,7 +392,7 @@ int32 UBreakerProgressionComponent::GetNodeRank(FName NodeId, EBreakerPointCurre
 
 int32 UBreakerProgressionComponent::GetUnspentPoints(EBreakerPointCurrency Currency) const
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.UnspentClassPoints : State.UnspentCorePoints;
+    return Currency == EBreakerPointCurrency::ClassPoints_Retired ? State.UnspentClassPoints : State.UnspentCorePoints;
 }
 
 void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressionState& NewState)
@@ -530,16 +530,16 @@ void UBreakerProgressionComponent::GrantLevelPointEntitlement()
     // grants ("+1 on each level-up") cannot survive the rederived-level rule —
     // a curve retune that jumps a character three levels would need to
     // remember how many events it owes, which is exactly this counter.
-    const int32 ClassEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::ClassPointCapLevel);
+    // O111: THE CLASS ENTITLEMENT IS GONE. There is one pool now, and the Core
+    // boards and the doctrine boards spend it together. The freed points are
+    // DELETED rather than folded into Core -- O27 moves power into node choices
+    // rather than into a larger budget, so absorbing thirty points here would
+    // undo the ruling that deleted them. UnspentClassPoints and
+    // LevelClassPointsGranted survive as save fields because they are
+    // serialized; the v5 -> v6 step zeroes them and nothing writes them again.
     const int32 CoreEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::CorePointCapLevel);
-    const int32 ClassOwed = ClassEntitled - State.LevelClassPointsGranted;
     const int32 CoreOwed = CoreEntitled - State.LevelCorePointsGranted;
-    if (ClassOwed <= 0 && CoreOwed <= 0) return;
-    if (ClassOwed > 0)
-    {
-        State.UnspentClassPoints += ClassOwed;
-        State.LevelClassPointsGranted = ClassEntitled;
-    }
+    if (CoreOwed <= 0) return;
     if (CoreOwed > 0)
     {
         State.UnspentCorePoints += CoreOwed;
@@ -654,7 +654,7 @@ int32 UBreakerProgressionComponent::GetRefundValue(EBreakerPointCurrency Currenc
     // array from scratch on every single call (CollectKnownNodes, itself
     // O(N^2) via TArray::AddUnique) — O(ranks x N^2) on GetSpentPoints's path,
     // which RecalculateStats calls on every movement-state transition.
-    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
+    return Currency == EBreakerPointCurrency::ClassPoints_Retired ? CachedSpentClassPoints : CachedSpentCorePoints;
 }
 
 void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
@@ -673,13 +673,13 @@ void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
         }
         return Total;
     };
-    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints);
+    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints_Retired);
     CachedSpentCorePoints = SumFor(EBreakerPointCurrency::CorePoints);
 }
 
 int32& UBreakerProgressionComponent::SpentPointsFor(EBreakerPointCurrency Currency)
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
+    return Currency == EBreakerPointCurrency::ClassPoints_Retired ? CachedSpentClassPoints : CachedSpentCorePoints;
 }
 
 void UBreakerProgressionComponent::CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const
@@ -794,7 +794,7 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     if (bDefinitionDescribesCurrentClass
         && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StarterAbilityIds.Contains(AbilityId))) return true;
     if (State.UnlockedAbilityIds.Contains(AbilityId)) return true;
-    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints, EBreakerPointCurrency::CorePoints})
+    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints_Retired, EBreakerPointCurrency::CorePoints})
     {
         TArray<const UBreakerProgressionNode*> Nodes;
         CollectKnownNodes(Nodes, Currency);
@@ -1233,7 +1233,7 @@ float UBreakerProgressionComponent::GetSpentPoints() const
     // rank x CostPerRank, which is exactly what a respec hands back — so a
     // 3-point Convergence node is worth three times a 1-point minor here, and
     // the total can never disagree with what the player was charged.
-    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints) + GetRefundValue(EBreakerPointCurrency::CorePoints));
+    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints_Retired) + GetRefundValue(EBreakerPointCurrency::CorePoints));
 }
 
 float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
@@ -1244,7 +1244,7 @@ float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
 void UBreakerProgressionComponent::RecalculateStats()
 {
     TArray<const UBreakerProgressionNode*> Nodes;
-    CollectKnownNodes(Nodes, EBreakerPointCurrency::ClassPoints);
+    CollectKnownNodes(Nodes, EBreakerPointCurrency::ClassPoints_Retired);
     CollectKnownNodes(Nodes, EBreakerPointCurrency::CorePoints);
 
     TArray<FBreakerNodeRank> Ranks = State.ClassNodeRanks;
@@ -1361,12 +1361,12 @@ void UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem()
 
 TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency)
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.ClassNodeRanks : State.CoreNodeRanks;
+    return Currency == EBreakerPointCurrency::ClassPoints_Retired ? State.ClassNodeRanks : State.CoreNodeRanks;
 }
 
 const TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency) const
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.ClassNodeRanks : State.CoreNodeRanks;
+    return Currency == EBreakerPointCurrency::ClassPoints_Retired ? State.ClassNodeRanks : State.CoreNodeRanks;
 }
 
 #undef LOCTEXT_NAMESPACE

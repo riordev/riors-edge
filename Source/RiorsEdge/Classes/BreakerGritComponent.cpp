@@ -275,14 +275,14 @@ void UBreakerGritComponent::HandleProgressionChanged()
     RankFooting = 0; RankHeldGround = 0; bInterposition = false; bConversion = false;
     if (bIsTank && Progression)
     {
-        RankSlowBleed = Progression->GetNodeRank(TEXT("Tank.Leech.SlowBleed"), EBreakerPointCurrency::ClassPoints);
-        RankFeedTheWound = Progression->GetNodeRank(TEXT("Tank.Leech.FeedTheWound"), EBreakerPointCurrency::ClassPoints);
-        RankTransfusion = Progression->GetNodeRank(TEXT("Tank.Leech.Transfusion"), EBreakerPointCurrency::ClassPoints);
+        RankSlowBleed = Progression->GetNodeRank(TEXT("Tank.Leech.SlowBleed"), EBreakerPointCurrency::CorePoints);
+        RankFeedTheWound = Progression->GetNodeRank(TEXT("Tank.Leech.FeedTheWound"), EBreakerPointCurrency::CorePoints);
+        RankTransfusion = Progression->GetNodeRank(TEXT("Tank.Leech.Transfusion"), EBreakerPointCurrency::CorePoints);
         bSecondHeart = Progression->HasNodeTag(BreakerNodeTags::Node_L_SecondHeart.GetTag());
         bNothingWasted = Progression->HasNodeTag(BreakerNodeTags::Node_L_NothingWasted.GetTag());
         bReciprocity = Progression->HasNodeTag(BreakerNodeTags::Node_L_Reciprocity.GetTag());
-        RankFooting = Progression->GetNodeRank(TEXT("Tank.Bastion.Footing"), EBreakerPointCurrency::ClassPoints);
-        RankHeldGround = Progression->GetNodeRank(TEXT("Tank.Bastion.HeldGround"), EBreakerPointCurrency::ClassPoints);
+        RankFooting = Progression->GetNodeRank(TEXT("Tank.Bastion.Footing"), EBreakerPointCurrency::CorePoints);
+        RankHeldGround = Progression->GetNodeRank(TEXT("Tank.Bastion.HeldGround"), EBreakerPointCurrency::CorePoints);
         bInterposition = Progression->HasNodeTag(BreakerNodeTags::Node_B_Interposition.GetTag());
         bConversion = Progression->HasNodeTag(BreakerNodeTags::Node_B_Conversion.GetTag());
     }

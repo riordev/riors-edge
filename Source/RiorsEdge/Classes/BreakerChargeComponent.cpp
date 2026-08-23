@@ -253,12 +253,12 @@ void UBreakerChargeComponent::HandleProgressionChanged()
     bShieldConversionNodes = false;
     if (bIsSupport && Progression)
     {
-        RankFieldDressing = Progression->GetNodeRank(TEXT("Support.Medic.FieldDressing"), EBreakerPointCurrency::ClassPoints);
-        RankSteadyHands = Progression->GetNodeRank(TEXT("Support.Medic.SteadyHands"), EBreakerPointCurrency::ClassPoints);
+        RankFieldDressing = Progression->GetNodeRank(TEXT("Support.Medic.FieldDressing"), EBreakerPointCurrency::CorePoints);
+        RankSteadyHands = Progression->GetNodeRank(TEXT("Support.Medic.SteadyHands"), EBreakerPointCurrency::CorePoints);
         bBloodDebt = Progression->HasNodeTag(BreakerNodeTags::Node_MD_BloodDebt.GetTag());
-        RankSustain = Progression->GetNodeRank(TEXT("Support.Conductor.Sustain"), EBreakerPointCurrency::ClassPoints);
+        RankSustain = Progression->GetNodeRank(TEXT("Support.Conductor.Sustain"), EBreakerPointCurrency::CorePoints);
         bShieldConversionNodes = Progression->HasNodeTag(BreakerNodeTags::Node_MD_Overflow.GetTag())
-            || Progression->GetNodeRank(TEXT("Support.Medic.SecondOpinion"), EBreakerPointCurrency::ClassPoints) > 0;
+            || Progression->GetNodeRank(TEXT("Support.Medic.SecondOpinion"), EBreakerPointCurrency::CorePoints) > 0;
     }
     if (!bBloodDebt) BloodDebtPool = 0.0f;
 }

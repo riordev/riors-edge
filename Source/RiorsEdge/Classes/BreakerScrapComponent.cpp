@@ -392,7 +392,7 @@ int32 UBreakerScrapComponent::GetGunsmithNodeRank(FName NodeId) const
             GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     }
     const UBreakerProgressionComponent* Progression = CachedProgression.Get();
-    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::CorePoints) : 0;
 }
 
 bool UBreakerScrapComponent::HasOwnedNodeTag(const FGameplayTag& Tag) const

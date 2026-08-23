@@ -52,7 +52,7 @@ public:
     // unlockables (O100); the step hands every pre-v5 character the kit it
     // could already reach and stamps its token counter so it is not paid
     // retroactively for abilities it already has.
-    static constexpr int32 CurrentSaveVersion = 5;
+    static constexpr int32 CurrentSaveVersion = 6;
 
     UPROPERTY() int32 SaveVersion = 1;
 
@@ -60,6 +60,9 @@ public:
     // MigrateQuestFlagsV1ToV2. Pure on the struct: no world, no slot, no class
     // definition read at load time.
     static void MigrateAbilityUnlocksV4ToV5(FBreakerProgressionState& Progression);
+    // O111. Reads nothing and refunds nothing -- see the definition for why the
+    // fifteen retiring branch ids are frozen literals rather than a library call.
+    static void MigrateClassCurrencyV5ToV6(FBreakerProgressionState& Progression);
 
     // Brings a deserialized payload up to CurrentSaveVersion IN MEMORY, in
     // version order, one step at a time (Save-Architecture 5.2 — never a switch

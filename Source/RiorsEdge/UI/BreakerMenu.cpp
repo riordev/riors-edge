@@ -4581,7 +4581,7 @@ namespace
     {
         if (!Progression) return 0;
         const FBreakerProgressionState& ProgState = Progression->GetProgressionState();
-        return Currency == EBreakerPointCurrency::ClassPoints ? ProgState.UnspentClassPoints : ProgState.UnspentCorePoints;
+        return Currency == EBreakerPointCurrency::ClassPoints_Retired ? ProgState.UnspentClassPoints : ProgState.UnspentCorePoints;
     }
 
     bool ProgressionPurchaseNode(UBreakerProgressionComponent* Progression, const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason)
@@ -4805,7 +4805,7 @@ namespace
 
     FString CurrencyLabel(EBreakerPointCurrency Currency)
     {
-        return Currency == EBreakerPointCurrency::ClassPoints ? TEXT("CLASS") : TEXT("CORE");
+        return Currency == EBreakerPointCurrency::ClassPoints_Retired ? TEXT("CLASS") : TEXT("CORE");
     }
 
     // INTEGRATION: the progression API is expected to grow
@@ -5478,14 +5478,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     for (const UBreakerProgressionTree* Tree : Trees)
     {
         if (!Tree) continue;
-        if (Tree->Currency == EBreakerPointCurrency::ClassPoints) ClassTrees.Add(Tree);
+        if (Tree->Currency == EBreakerPointCurrency::ClassPoints_Retired) ClassTrees.Add(Tree);
         else CoreTrees.Add(Tree);
     }
     if (SkillBoardTab == 0 && ClassTrees.IsEmpty() && !CoreTrees.IsEmpty()) SkillBoardTab = 1;
     if (SkillBoardTab == 1 && CoreTrees.IsEmpty() && !ClassTrees.IsEmpty()) SkillBoardTab = 0;
     const bool bCoreBoard = SkillBoardTab == 1;
 
-    const int32 UnspentClass = ProgressionGetUnspent(Progression, EBreakerPointCurrency::ClassPoints);
+    const int32 UnspentClass = ProgressionGetUnspent(Progression, EBreakerPointCurrency::ClassPoints_Retired);
     const int32 UnspentCore = ProgressionGetUnspent(Progression, EBreakerPointCurrency::CorePoints);
 
     int32 ClassSpent = 0;
@@ -6756,7 +6756,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
     bool bDevTools = false;
     GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevTools, GGameUserSettingsIni);
 
-    const EBreakerPointCurrency BoardCurrency = bCoreBoard ? EBreakerPointCurrency::CorePoints : EBreakerPointCurrency::ClassPoints;
+    const EBreakerPointCurrency BoardCurrency = bCoreBoard ? EBreakerPointCurrency::CorePoints : EBreakerPointCurrency::ClassPoints_Retired;
 
     TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::SkillTrees)];

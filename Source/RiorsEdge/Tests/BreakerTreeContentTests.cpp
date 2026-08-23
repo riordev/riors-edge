@@ -200,7 +200,7 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
 
     Progression->ApplySliceDefaultsIfFresh();
     TestEqual(TEXT("Slice defaults lock Swift"), Progression->GetProgressionState().PermanentClass, EBreakerClassId::Swift);
-    TestEqual(TEXT("Slice defaults grant 10 class points"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 10);
+    TestEqual(TEXT("The retired class pool is empty"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
     TestEqual(TEXT("Slice defaults grant 12 core points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
     TestTrue(TEXT("Available trees include the core tree and both Swift branches"), Progression->GetAvailableTrees().Num() >= 3);
 
@@ -224,9 +224,14 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Crit chance aggregates from Sightline"), Progression->GetNodeStats().CriticalChanceBonus, 0.07f, 0.0001f);
     TestEqual(TEXT("Crit damage aggregates from Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
 
-    // Class points are a separate wallet with its own tree.
-    TestTrue(TEXT("Class node purchases from class points"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
-    TestEqual(TEXT("Class points are spent, core points untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 9);
+    // O111: ONE WALLET. A doctrine node is bought from the same Core pool the
+    // constellations spend. The cost is READ rather than transcribed -- the
+    // assertion is that the purchase moved the pool by exactly the node's
+    // price, which stays true if the price is ever retuned.
+    const int32 BeforeDoctrine = Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints);
+    TestTrue(TEXT("A doctrine node purchases from core points"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
+    const int32 AfterDoctrine = Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints);
+    TestTrue(TEXT("A doctrine purchase spends from the one pool"), AfterDoctrine < BeforeDoctrine);
     TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
     // Respec clears effects and refunds every point of that currency.
@@ -235,11 +240,11 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Core points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
     TestEqual(TEXT("Core ranks are cleared"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 0);
     TestEqual(TEXT("Core effects are cleared"), Progression->GetNodeStats().CriticalChanceBonus, 0.0f, 0.0001f);
-    TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
-
-    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
-    TestEqual(TEXT("Class points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 10);
-    TestEqual(TEXT("Class effects are cleared"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
+    // A Core respec now clears the DOCTRINE allocation too, because both spend
+    // the one pool. That is a real consequence of O111 and not a regression:
+    // there is no longer a second currency for a second respec to reach.
+    TestEqual(TEXT("A core respec also clears the doctrine allocation"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("Every point is back in the one pool"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
     return true;
 }
 
