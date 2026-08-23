@@ -208,6 +208,29 @@ second instrument and it has a permanent hole — it cannot move a mouse, so
 every hover state, tooltip and zoom gesture in the project is unverifiable by
 it. Those are checked by a person or not at all.
 
+**The surfaces no instrument reaches**, named rather than described, because a
+hole nobody enumerates is a hole nobody checks. Every one of these needs a
+pointer to exist at all, so a screenshot cannot reach them and neither can a
+test:
+
+- **Item comparison tooltips** — the equipped-versus-hovered panel, and the
+  tooltip ordering rule above. A tooltip that hides which of two items is
+  better is the failure this spec opens with, and it is only observable here.
+- **Skill-tree node detail panels** — the card that appears on selection,
+  carrying the node's description, its per-rank effects and the before/after
+  projection. Three shipped node descriptions leaked internal authoring notes
+  into player-facing text for a milestone precisely because nothing looks here.
+- **Tree pan and zoom** — whether a constellation is legible at the zoom the
+  player actually uses, and whether the reachable area is reachable by drag.
+- **The equip-limit swap picker** — `UI.EquipLimit.SwapPicker` asserts a swap
+  is OFFERED; whether the picker is usable, and whether it names the item it
+  would displace, is a person's judgement.
+- **Every hover state on every screen** — the entire feedback layer that says a
+  control is live before it is pressed.
+
+A person looking at these is not a supplement to the instruments. For these
+five it is the only instrument there is.
+
 ## Open
 
 - Who owns audio. It is the largest unowned domain in the project: every enemy
