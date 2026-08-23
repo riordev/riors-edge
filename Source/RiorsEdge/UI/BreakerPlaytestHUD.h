@@ -221,7 +221,12 @@ private:
 
     static constexpr int32 MaxDamageNumbers = 24;
     TArray<FBreakerHUDDamageNumber> DamageNumbers;
-    int32 NextDamageNumberIndex = 0;
+    // The write cursor that used to live here is gone. It evicted in insertion
+    // order where art-and-ui says the cap culls oldest-first, and the two are
+    // not the same thing once merges refresh a number in place: the busiest
+    // number on the player's target was the first one dropped. Eviction is now
+    // BreakerDamageFeed::IndexToEvict, which prefers an expired slot and
+    // otherwise takes the genuinely oldest.
 
     // How much of the last landed shot was absorbed, latched in the shot
     // handler. Drives the crosshair's third tick state — the read the owner is

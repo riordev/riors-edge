@@ -1,5 +1,7 @@
 #include "UI/BreakerPlaytestHUD.h"
 
+#include "UI/BreakerDamageFeed.h"
+
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbilityStateComponent.h"
@@ -112,18 +114,23 @@ namespace BreakerHUD
     // or aim. Roughly matches the loot focus cone so the two agree about what
     // the player is pointing at.
     static constexpr float EnemyFocusMinimumDot = 0.985f;
-    // How long a damage number stays open to absorb further hits on the same
-    // target. Long enough to swallow a shotgun's pellets and a burst, short
-    // enough that two deliberate shots read as two numbers. Presentation, not
-    // balance — it changes nothing about damage, only how it is counted on
-    // screen. O2 PLACEHOLDER.
-    static constexpr float DamageNumberMergeWindow = 0.18f;
+    // The merge windows moved to UI/BreakerDamageFeed.h, which owns both of
+    // them because the spec authors two — direct and damage-over-time — and one
+    // shared 0.18s could satisfy neither. It sat above the Sidearm's 0.143s
+    // semi-automatic interval, so two deliberate shots merged into one number,
+    // and below the Bleed's 0.5s tick, so a damage-over-time effect could never
+    // merge at all.
 
     // --- Damage-number hierarchy timings/magnitudes. All presentation, all
     // tuned by eye from capture screenshots. O2 PLACEHOLDER, every one.
     // DoT ticks die fast (they recur forever; a long tail is spam), kills hold
     // longest (the one number worth reading after the fight moves on).
-    static constexpr float DamageDoTLifetime = 0.35f;
+    // Must outlive the DoT merge window or the window cannot be used: at 0.35s
+    // against a 0.5s Bleed tick, each tick's number was already dead when its
+    // successor arrived, so one Bleed printed six numbers across its 3.0s life.
+    // Derived from the window rather than set beside it, so the two cannot
+    // drift back apart.
+    static constexpr float DamageDoTLifetime = BreakerDamageFeed::MinimumDoTLifetime;
     static constexpr float DamageKillLifetime = 0.85f;
     // Two non-DoT numbers born this close together on DIFFERENT targets are
     // one trigger pull spilling over — chain, ricochet, AoE. The later ones
@@ -2393,16 +2400,30 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     // Crit and weak point do NOT merge into a body hit: those are the reads the
     // whole damage-number system exists to make legible, and averaging them
     // into a plain number would be the same as not showing them.
+    // The predicate and both windows live in UI/BreakerDamageFeed.h, world-free
+    // and unit-tested. It used to be four inline comparisons and one shared
+    // constant here, which is why three of the rule's four clauses were wrong
+    // and nothing could see it.
+    BreakerDamageFeed::FMergeKey IncomingKey;
+    IncomingKey.Target = Hit.Target.Get();
+    IncomingKey.bCritical = Hit.Result.bCritical;
+    IncomingKey.bWeakPoint = bWeak;
+    IncomingKey.bFromDoT = Hit.bFromDoT;
+
     for (FBreakerHUDDamageNumber& Existing : DamageNumbers)
     {
-        if (Existing.Target != Hit.Target) continue;
-        if (Existing.bCritical != Hit.Result.bCritical) continue;
-        if (Existing.bWeakPoint != bWeak) continue;
-        if (Existing.bFromDoT != Hit.bFromDoT) continue;
-        if (Now - Existing.Time > BreakerHUD::DamageNumberMergeWindow) continue;
+        BreakerDamageFeed::FMergeKey ExistingKey;
+        ExistingKey.Target = Existing.Target.Get();
+        ExistingKey.bCritical = Existing.bCritical;
+        ExistingKey.bWeakPoint = Existing.bWeakPoint;
+        ExistingKey.bFromDoT = Existing.bFromDoT;
+        if (!BreakerDamageFeed::ShouldMerge(ExistingKey, Existing.Time, IncomingKey, Now)) continue;
 
         Existing.Value += Shown;
-        Existing.Time = Now;
+        // DELIBERATELY NOT `Existing.Time = Now`. That refresh is what made the
+        // window slide, so a held trigger accumulated one number for a whole
+        // magazine. The stamp is the number's BIRTH and the window is measured
+        // from it.
         // A merged pellet that finished the target promotes the whole number
         // to a killing blow — the shot killed, whichever pellet landed last.
         if (Hit.Result.bKilled)
@@ -2467,13 +2488,27 @@ void ABreakerPlaytestHUD::PushDamageNumber(const FBreakerHUDDamageNumber& Number
     if (DamageNumbers.Num() < MaxDamageNumbers)
     {
         DamageNumbers.Add(Number);
-        NextDamageNumberIndex = DamageNumbers.Num() % MaxDamageNumbers;
+        return;
     }
-    else
+
+    // CULLS OLDEST-FIRST, which is what the spec says and what the write cursor
+    // did not do. The cursor evicted in INSERTION order, and a merge refreshed a
+    // number in place without moving its slot — so the busiest number on the
+    // player's primary target was the first thing thrown away once the ring
+    // filled. It also never reclaimed expired entries, so the array pinned at
+    // the cap forever after the first full pass and a quiet moment never
+    // cleared it.
+    TArray<double> Births;
+    TArray<double> Deaths;
+    Births.Reserve(DamageNumbers.Num());
+    Deaths.Reserve(DamageNumbers.Num());
+    for (const FBreakerHUDDamageNumber& Existing : DamageNumbers)
     {
-        DamageNumbers[NextDamageNumberIndex] = Number;
-        NextDamageNumberIndex = (NextDamageNumberIndex + 1) % MaxDamageNumbers;
+        Births.Add(Existing.Time);
+        Deaths.Add(Existing.Time + Existing.Lifetime);
     }
+    const int32 Evict = BreakerDamageFeed::IndexToEvict(Births, Deaths, Number.Time);
+    if (DamageNumbers.IsValidIndex(Evict)) DamageNumbers[Evict] = Number;
 }
 
 // --------------------------------------------------------------------------
