@@ -508,6 +508,9 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     // listening, and it treats Escape as cancel rather than as a binding.
     PlayerInputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ThisClass::MenuRebindKey).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ThisClass::ToggleInventoryMenu).bExecuteWhenPaused = true;
+    // C for the character sheet, the same shape as I for the loadout: a
+    // full-screen modal, toggled, and legal while paused.
+    PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ThisClass::ToggleCharacterSheet).bExecuteWhenPaused = true;
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
     PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
     // Raw-key ability fallbacks so the slice is playable before DA_PlayerInputConfig
@@ -1532,6 +1535,7 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     const FString Wanted = ScreenName.ToUpper();
     EBreakerMenuScreen Screen = EBreakerMenuScreen::Main;
     if (Wanted == TEXT("INVENTORY")) Screen = EBreakerMenuScreen::Inventory;
+    else if (Wanted == TEXT("CHARACTER") || Wanted == TEXT("SHEET")) Screen = EBreakerMenuScreen::CharacterSheet;
     else if (Wanted == TEXT("SKILLTREES") || Wanted == TEXT("SKILLS")) Screen = EBreakerMenuScreen::SkillTrees;
     // LOADOUT retired 2026-08-17 (equipment IS the loadout); the capture
     // string keeps working and photographs what replaced it.
@@ -1590,6 +1594,17 @@ void ABreakerCharacter::QuitFromMenu()
     {
         UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
     }
+}
+
+void ABreakerCharacter::ToggleCharacterSheet()
+{
+    if (MenuWidget.IsValid())
+    {
+        ResumeFromMenu();
+        return;
+    }
+    OpenMenu(false);
+    if (MenuWidget.IsValid()) MenuWidget->ShowCharacterSheet();
 }
 
 void ABreakerCharacter::ToggleInventoryMenu()

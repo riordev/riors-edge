@@ -42,6 +42,9 @@
 #include "Widgets/SCanvas.h"
 #include "UI/BreakerSkillProjection.h"
 #include "UI/BreakerUIStyle.h"
+#include "UI/BreakerCharacterSheetMath.h"
+#include "Combat/BreakerStatusComponent.h"
+#include "Weapons/BreakerWeaponDefinition.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Algo/Reverse.h"
@@ -788,6 +791,12 @@ void SBreakerMenu::ShowInventory()
     Rebuild(EBreakerMenuScreen::Inventory);
 }
 
+void SBreakerMenu::ShowCharacterSheet()
+{
+    RootScreen = EBreakerMenuScreen::Pause;
+    Rebuild(EBreakerMenuScreen::CharacterSheet);
+}
+
 void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
 {
     DialogueNPC = NPC;
@@ -1007,6 +1016,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Dialogue: ContentHost->SetContent(BuildDialogueScreen()); break;
         case EBreakerMenuScreen::Travel: ContentHost->SetContent(BuildTravelScreen()); break;
         case EBreakerMenuScreen::DevSandbox: ContentHost->SetContent(BuildDevSandboxScreen()); break;
+        case EBreakerMenuScreen::CharacterSheet: ContentHost->SetContent(BuildCharacterSheetScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 
@@ -8400,4 +8410,303 @@ FReply SBreakerMenu::GoBack()
 {
     Rebuild(RootScreen);
     return FReply::Handled();
+}
+
+// ==========================================================================
+// THE CHARACTER SHEET (C).
+//
+// Owner ask: a place to gauge current DPS by weapon or by ability, the
+// miscellaneous modifiers acting on a character, and the defensive picture --
+// effective health pool and what the character is currently afflicted by.
+//
+// EVERY DERIVED NUMBER ON THIS SCREEN COMES FROM BreakerSheet, which is
+// world-free and asserted by RiorsEdge.UI.CharacterSheet.Math. The builder
+// below reads components and formats strings; it computes nothing. A sheet
+// that prints a wrong number is worse than no sheet -- it is an instrument
+// returning a false negative, and the next reader files a bug against working
+// code.
+//
+// WHAT IS NOT HERE IS STATED, NOT OMITTED. Per-element resistance, block and
+// dodge are designed and are not attributes yet, so the defence panel says so
+// rather than printing a zero that reads as "you have none".
+// ==========================================================================
+TSharedRef<SWidget> SBreakerMenu::BuildCharacterSheetScreen()
+{
+    const ABreakerCharacter* Pawn = Character.Get();
+    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+
+    // THE WRAP WIDTH IS COMPUTED, NOT CHOSEN. art-and-ui bans auto-wrapping
+    // where the width matters and bans sizing a fixed box to its shortest
+    // label; the first pass of this screen broke both, clipping MODIFIERS to
+    // "MODIFIER", AFFLICTIONS to "AFFLICTIO" and two notes mid-word. This is
+    // BuildFrame's own arithmetic -- panel width, less the identity rail, less
+    // MakePlate's two margins -- so it cannot drift from the frame it sits in.
+    constexpr float SheetPanelWidth = 900.0f;
+    const float SheetContentWidth = SheetPanelWidth - BreakerUI::RailThickness - BreakerUI::Space24 * 2.0f;
+    auto WrapNote = [SheetContentWidth](const TSharedRef<STextBlock>& Text)
+    {
+        Text->SetWrapTextAt(SheetContentWidth);
+        return StaticCastSharedRef<SWidget>(Text);
+    };
+
+    // --- Panel picker -----------------------------------------------------
+    static const TCHAR* TabNames[] = { TEXT("OFFENCE"), TEXT("DEFENCE"), TEXT("MODIFIERS"), TEXT("AFFLICTIONS") };
+    TSharedRef<SHorizontalBox> Tabs = SNew(SHorizontalBox);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        const int32 Captured = Index;
+        const bool bActive = CharacterSheetTab == Index;
+        Tabs->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+        [
+            SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+            [
+                MakeButton(FText::FromString(TabNames[Index]),
+                    FOnClicked::CreateLambda([this, Captured]()
+                    {
+                        CharacterSheetTab = Captured;
+                        Rebuild(EBreakerMenuScreen::CharacterSheet);
+                        return FReply::Handled();
+                    }), bActive)
+            ]
+        ];
+    }
+    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)[Tabs];
+
+    // One row shape for the whole screen: label left, value right, muted
+    // caption underneath when the number needs a qualifier. Everything is a
+    // row, so nothing on this screen can invent its own alignment.
+    auto Row = [this, SheetContentWidth](const FString& Label, const FString& Value, const FLinearColor& ValueColor, const FString& Note)
+    {
+        TSharedRef<SVerticalBox> Cell = SNew(SVerticalBox);
+        Cell->AddSlot().AutoHeight()
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(Label), BreakerUI::TypeCaption, BreakerUI::TextSecondary, false)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                MenuText(FText::FromString(Value), BreakerUI::TypeBody, ValueColor, true)
+            ]
+        ];
+        if (!Note.IsEmpty())
+        {
+            TSharedRef<STextBlock> NoteText = MenuText(FText::FromString(Note), BreakerUI::TypeCaption, BreakerUI::TextMuted, false);
+            NoteText->SetWrapTextAt(SheetContentWidth);
+            Cell->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)[NoteText];
+        }
+        return StaticCastSharedRef<SWidget>(Cell);
+    };
+
+    if (!Pawn)
+    {
+        Body->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(TEXT("NO CHARACTER.")), BreakerUI::TypeBody, BreakerUI::Orange, true)
+        ];
+        return BuildFrame(FText::FromString(TEXT("CHARACTER")),
+            FText::FromString(TEXT("WHAT THIS BUILD IS ACTUALLY DOING")), Body, 900.0f);
+    }
+
+    const UBreakerAttributeSet* Attributes = Pawn->GetAttributes();
+    const UBreakerWeaponComponent* Weapon = Pawn->GetWeapon();
+    // Pellets, magazine and reload are the DEFINITION's, not the component's:
+    // the component reports live state, the definition reports the weapon.
+    const UBreakerWeaponDefinition* WeaponDef = Weapon ? Weapon->GetActiveDefinition() : nullptr;
+
+    // ---------------------------------------------------------------- OFFENCE
+    if (CharacterSheetTab == 0)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("WEAPON"))];
+        if (Weapon && Attributes)
+        {
+            const float Base = Weapon->GetScaledBaseDamage();
+            const int32 Pellets = WeaponDef ? FMath::Max(1, WeaponDef->PelletsPerShot) : 1;
+            const float Increased = Attributes->GetDamageMultiplier();
+            const float Rpm = Weapon->GetEffectiveRoundsPerMinute(WeaponDef);
+            const float CritChance = Attributes->GetCriticalChance() * 0.01f;
+            const float CritMulti = Attributes->GetCriticalMultiplier();
+            const float Shot = BreakerSheet::ShotDamage(Base, Pellets, Increased);
+            const float Crit = BreakerSheet::CritFactor(CritChance, CritMulti);
+            const float Burst = BreakerSheet::BurstDps(Shot, Crit, Rpm);
+            const int32 Magazine = FMath::Max(1, Weapon->GetEffectiveMagazineSize());
+            const float Sustained = BreakerSheet::SustainedDps(Shot, Crit, Rpm, Magazine,
+                WeaponDef ? WeaponDef->ReloadDuration : 0.0f);
+
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                Row(TEXT("SUSTAINED DPS"), BreakerUI::FormatDamage(Sustained), BreakerUI::Gold,
+                    TEXT("A magazine, then a reload, forever. This is the one that describes play."))
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                Row(TEXT("BURST DPS"), BreakerUI::FormatDamage(Burst), BreakerUI::TextPrimary,
+                    TEXT("The gun never stops firing. Flatters the build; kept beside sustained so it cannot be mistaken for it."))
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(*Weapon->GetArchetypeName().ToUpper(),
+                    FString::Printf(TEXT("i%d"), Weapon->GetEquippedItemLevel()), BreakerUI::TextSecondary, FString())
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("DAMAGE PER SHOT"),
+                    Pellets > 1
+                        ? FString::Printf(TEXT("%s  (%d x %s)"), *BreakerUI::FormatDamage(Shot), Pellets, *BreakerUI::FormatDamage(Base * Increased))
+                        : BreakerUI::FormatDamage(Shot),
+                    BreakerUI::TextPrimary, FString())
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("ROUNDS PER MINUTE"), FString::Printf(TEXT("%.0f"), Rpm), BreakerUI::TextPrimary, FString())
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("CRITICAL"),
+                    FString::Printf(TEXT("%.1f%%  x%.2f"), Attributes->GetCriticalChance(), CritMulti),
+                    BreakerUI::TextPrimary,
+                    FString::Printf(TEXT("Expected contribution x%.3f. Every DPS figure above is the EXPECTATION, never the crit."), Crit))
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+            [
+                Row(TEXT("INCREASED WEAPON DAMAGE"), FString::Printf(TEXT("x%.3f"), Increased), BreakerUI::TextPrimary, FString())
+            ];
+        }
+        else
+        {
+            Body->AddSlot().AutoHeight()[MenuText(FText::FromString(TEXT("NO WEAPON EQUIPPED.")), BreakerUI::TypeCaption, BreakerUI::TextMuted, true)];
+        }
+
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("ABILITY"))];
+        if (Attributes)
+        {
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("INCREASED ABILITY DAMAGE"),
+                    FString::Printf(TEXT("x%.3f"), Attributes->GetAbilityDamageMultiplier()), BreakerUI::TextPrimary,
+                    TEXT("Abilities compose their own additive pool plus the shared one, and ride gear depth through the equipped weapon's item level."))
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("DAMAGE OVER TIME"),
+                    FString::Printf(TEXT("x%.3f"), Attributes->GetDamageOverTimeMultiplier()), BreakerUI::TextPrimary, FString())
+            ];
+            // A per-ability DPS row needs each ability to publish a base and a
+            // cadence, which no ability does today. Recorded rather than faked:
+            // a plausible number here would be the exact false negative this
+            // screen exists to prevent.
+            Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+            [
+                WrapNote(MenuText(FText::FromString(TEXT("PER-ABILITY DPS IS NOT BUILT. No ability publishes a base damage and a cadence, so a number here would be invented. The multipliers above are real.")),
+                    BreakerUI::TypeCaption, BreakerUI::Orange, false))
+            ];
+        }
+    }
+    // ---------------------------------------------------------------- DEFENCE
+    else if (CharacterSheetTab == 1)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("EFFECTIVE HEALTH"))];
+        if (Attributes)
+        {
+            const float Armor = Attributes->GetArmor();
+            const float Mitigation = BreakerSheet::ArmourMitigation(Armor);
+            const float Health = Attributes->GetHealth();
+            const float Shield = Attributes->GetShield();
+            const float Ehp = BreakerSheet::EffectiveHealthPool(Health, Shield, Mitigation);
+
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                Row(TEXT("EFFECTIVE HEALTH POOL"), BreakerUI::FormatDamage(Ehp), BreakerUI::Cyan,
+                    TEXT("Raw incoming damage the pool absorbs once armour is applied. Health plus shield, both behind the same mitigation step."))
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("HEALTH"), FString::Printf(TEXT("%s / %s"), *BreakerUI::FormatTicker(Health), *BreakerUI::FormatTicker(Attributes->GetMaxHealth())), BreakerUI::RarityStandard, FString())
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(TEXT("SHIELD"), FString::Printf(TEXT("%s / %s"), *BreakerUI::FormatTicker(Shield), *BreakerUI::FormatTicker(Attributes->GetMaxShield())), BreakerUI::Cyan, FString())
+            ];
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+            [
+                Row(TEXT("ARMOUR"), FString::Printf(TEXT("%.0f   %.1f%%"), Armor, Mitigation * 100.0f), BreakerUI::TextPrimary,
+                    TEXT("Mitigation is capped at 80%. Facing selects the base value, so a rear arc reads differently from a frontal one."))
+            ];
+        }
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("NOT BUILT"))];
+        Body->AddSlot().AutoHeight()
+        [
+            WrapNote(MenuText(FText::FromString(TEXT("Per-element resistance, ailment avoidance, passive block and passive dodge are designed and are not attributes yet. They are named here rather than printed as zero, because a zero on this screen reads as \"you have none\" instead of \"this does not exist\".")),
+                BreakerUI::TypeCaption, BreakerUI::Orange, false))
+        ];
+    }
+    // -------------------------------------------------------------- MODIFIERS
+    else if (CharacterSheetTab == 2)
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("EVERYTHING ELSE ACTING ON THIS CHARACTER"))];
+        if (Attributes)
+        {
+            struct FModRow { const TCHAR* Label; float Value; bool bMultiplier; };
+            const FModRow Rows[] = {
+                { TEXT("MOVE SPEED"),            Attributes->GetMoveSpeed(),              false },
+                { TEXT("SLIDE SPEED"),           Attributes->GetSlideSpeedMultiplier(),   true  },
+                { TEXT("AIR CONTROL"),           Attributes->GetAirControlMultiplier(),   true  },
+                { TEXT("DASH COOLDOWN REDUCTION"), Attributes->GetDashCooldownReduction(), false },
+                { TEXT("FIRE RATE"),             Attributes->GetFireRateMultiplier(),     true  },
+                { TEXT("RESOURCE COST"),         Attributes->GetResourceCostMultiplier(), true  },
+                { TEXT("RESOURCE REGEN"),        Attributes->GetClassResourceRegen(),     false },
+                { TEXT("MAX CLASS RESOURCE"),    Attributes->GetMaxClassResource(),       false },
+            };
+            for (const FModRow& Mod : Rows)
+            {
+                // A multiplier at exactly 1.000 is doing nothing, and saying so
+                // is the point of the panel: the owner's question is "what is
+                // affecting this character", and an inert line answers it.
+                const bool bInert = Mod.bMultiplier && FMath::IsNearlyEqual(Mod.Value, 1.0f, 0.0005f);
+                Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                [
+                    Row(Mod.Label,
+                        Mod.bMultiplier ? FString::Printf(TEXT("x%.3f"), Mod.Value) : FString::Printf(TEXT("%.1f"), Mod.Value),
+                        bInert ? BreakerUI::TextMuted : BreakerUI::TextPrimary,
+                        bInert ? FString(TEXT("inert")) : FString())
+                ];
+            }
+        }
+    }
+    // ------------------------------------------------------------ AFFLICTIONS
+    else
+    {
+        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[SettingsSectionHeader(TEXT("ACTIVE ON THIS CHARACTER"))];
+        const UBreakerStatusComponent* Status = Pawn->FindComponentByClass<UBreakerStatusComponent>();
+        const TArray<FBreakerActiveStatus> Empty;
+        const TArray<FBreakerActiveStatus>& Active = Status ? Status->GetActiveStatuses() : Empty;
+        if (Active.Num() == 0)
+        {
+            Body->AddSlot().AutoHeight()
+            [
+                MenuText(FText::FromString(TEXT("NOTHING. The character is carrying no statuses.")),
+                    BreakerUI::TypeCaption, BreakerUI::TextMuted, true)
+            ];
+        }
+        for (const FBreakerActiveStatus& Entry : Active)
+        {
+            FString Name = Entry.Spec.StatusTag.IsValid() ? Entry.Spec.StatusTag.GetTagName().ToString() : TEXT("STATUS");
+            int32 Separator = INDEX_NONE;
+            if (Name.FindLastChar(TEXT('.'), Separator)) Name = Name.RightChop(Separator + 1);
+            Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                Row(*Name.ToUpper(),
+                    FString::Printf(TEXT("%d  %.1fs"), Entry.Stacks, FMath::Max(Entry.RemainingDuration, 0.0f)),
+                    BreakerUI::Harm, FString())
+            ];
+        }
+    }
+
+    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+    [
+        MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)
+    ];
+    return BuildFrame(FText::FromString(TEXT("CHARACTER")),
+        FText::FromString(TEXT("WHAT THIS BUILD IS ACTUALLY DOING")), Body, SheetPanelWidth);
 }

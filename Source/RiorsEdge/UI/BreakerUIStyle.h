@@ -147,6 +147,10 @@ namespace BreakerUI
     // names a 12px interior pad it says so itself and uses HudClusterPad.
     inline constexpr float Space4 = 4.0f;
     inline constexpr float Space8 = 8.0f;
+    // 12 IS A TOKEN. art-and-ui states the scale as 4/8/12/16/24/40/64 and
+    // this file did not carry it: 8 to 16 is too coarse for a dense row gap,
+    // and a scale the declaring file does not declare is not a scale.
+    inline constexpr float Space12 = 12.0f;
     inline constexpr float Space16 = 16.0f;
     inline constexpr float Space24 = 24.0f;
     inline constexpr float Space40 = 40.0f;

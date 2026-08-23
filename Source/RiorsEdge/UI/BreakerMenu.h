@@ -73,7 +73,14 @@ enum class EBreakerMenuScreen : uint8
     // (AwardExperience, DevForceClass, GrantPlaytestPoints, seeded RollItem),
     // never a place where new game rules live. Appended last, same rule as
     // Travel above.
-    DevSandbox
+    DevSandbox,
+    // The character sheet, opened with C from the field. Owner: "a lot of
+    // information is bloated or overwhelming" -- so the numbers a build is
+    // actually made of move OFF the HUD and onto a screen the player opens
+    // deliberately. A peer rather than a mode of Inventory: it reads the
+    // COMPOSED character where Inventory reads the items, and the two answer
+    // different questions. Appended last, same rule as Travel and DevSandbox.
+    CharacterSheet
 };
 
 // ---------------------------------------------------------------------------
@@ -395,6 +402,7 @@ public:
     void ShowMainMenu();
     void ShowPauseMenu();
     void ShowInventory();
+    void ShowCharacterSheet();
     void ShowDialogue(class ABreakerNPC* NPC);
     // The travel picker's front door, in the same shape as ShowDialogue: the
     // caller has already opened the menu (OpenMenu(false)) and hands us the
@@ -495,6 +503,10 @@ private:
     // character screens live behind it so the I-key flow reaches any of them
     // in one click.
     TSharedRef<SWidget> BuildScreenTabs(EBreakerMenuScreen ActiveScreen);
+    TSharedRef<SWidget> BuildCharacterSheetScreen();
+    // Which of the four panels is open. A member rather than a screen value:
+    // switching panels must not change the back target.
+    int32 CharacterSheetTab = 0;
     TSharedRef<SWidget> BuildFrame(const FText& Title, const FText& Subtitle, const TSharedRef<SWidget>& Body, float PanelWidth = 720.0f) const;
     // Zoned screen shell for the two wide screens (Loadout / Skill matrix):
     // an 88px header band at bg/raised carrying the title, the meta line and

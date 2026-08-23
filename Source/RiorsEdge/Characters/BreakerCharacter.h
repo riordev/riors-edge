@@ -303,6 +303,7 @@ private:
     // listening. Inert otherwise - see SBreakerMenu::HandleRebindKey.
     void MenuRebindKey(FKey Key);
     void ToggleInventoryMenu();
+    void ToggleCharacterSheet();
     void InteractWithNearbyNPC();
     UFUNCTION(Server, Reliable) void ServerPickupLoot(ABreakerLootPickup* Pickup);
     void StartWave();
