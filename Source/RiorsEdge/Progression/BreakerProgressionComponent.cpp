@@ -12,6 +12,8 @@ static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttribu
 #include "AbilitySystemInterface.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerGritComponent.h"
+#include "Progression/BreakerWorldPoints.h"
+#include "Save/BreakerQuestJournal.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Game/BreakerGameInstance.h"
 #include "Progression/BreakerClassDefinition.h"
@@ -561,6 +563,26 @@ float UBreakerProgressionComponent::GetLevelProgressFraction() const
 int32 UBreakerProgressionComponent::GetXpToNextLevel() const
 {
     return UBreakerExperienceLibrary::XpToNextLevel(State.CharacterLevel, ExperienceCurve);
+}
+
+bool UBreakerProgressionComponent::GrantWorldPoint(FName SourceId, UBreakerQuestJournal* Journal)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return false;
+    if (!Journal) return false;
+
+    // An unknown id is refused rather than paid. The fifteen are canon (O7) and
+    // a typo that silently granted a sixteenth point would inflate the budget
+    // the whole Core Tree is sized against — 65 is the number two constellations
+    // and a bit were validated at, and it is not a number to lose by accident.
+    if (!UBreakerWorldPointLibrary::IsKnownSource(SourceId)) return false;
+
+    const FName Flag = UBreakerWorldPointLibrary::FlagForSource(SourceId);
+    if (Journal->HasFlag(Flag)) return false;   // already claimed; one-time and permanent
+
+    Journal->SetFlag(Flag);
+    State.UnspentCorePoints = FMath::Max(0, State.UnspentCorePoints + 1);
+    OnProgressionChanged.Broadcast();
+    return true;
 }
 
 void UBreakerProgressionComponent::GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints)

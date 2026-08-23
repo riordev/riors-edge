@@ -618,6 +618,13 @@ EMITTED_BY_TEST = [
     # that no rewrite LOWERS a build's damage, which is the lower edge.
     ("rewrite-impact", "Worst single rewrite step on an optimized build", CEILING,
      "RiorsEdge.Progression.RuleBandImpact"),
+    # THE CAMPAIGN'S PAYOUT GAP, as a number. O7 rules fifteen world Core Points
+    # canon and eight of the twenty-eight authored missions pay one as their
+    # entire reward, so a source whose trigger does not exist is a mission with
+    # nothing to give. A ceiling driving to zero: it can only fall, and it falls
+    # by wiring a trigger rather than by editing this file.
+    ("world-points-unwired", "World Core Point sources with no trigger", CEILING,
+     "RiorsEdge.Progression.WorldPoints.SoloReachable"),
 ]
 
 

@@ -177,6 +177,24 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|Playtest")
     void GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints);
 
+    // ---- The fifteen world Core Points (O7) -----------------------------
+    // The other half of a character's sixty-five, and until this existed the
+    // only things that ever moved UnspentCorePoints were the level entitlement
+    // and the playtest hook above — so fifteen canon points were unreachable
+    // and the eight campaign missions paying one had nothing to pay with.
+    //
+    // IDEMPOTENCE IS NOT KEPT HERE. It is a quest flag, because a world point
+    // is one-time and permanent (design rule 1) and the flag set is already
+    // presence-only, monotonic, per-character and saved on the change — which
+    // is that requirement exactly, built and tested. A second bespoke "already
+    // claimed" set would be a second source of truth for the same fact, and
+    // the one that does not survive a reload is always the new one.
+    //
+    // Returns true only when the point was actually granted, so a caller can
+    // fire a tell without having to ask twice.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|WorldPoints")
+    bool GrantWorldPoint(FName SourceId, class UBreakerQuestJournal* Journal);
+
     // ---- The XP loop (O40b) --------------------------------------------
     // Awards XP and re-derives the level. Returns the number of levels gained
     // so the caller can fire a level-up tell — a silent level-up is the
