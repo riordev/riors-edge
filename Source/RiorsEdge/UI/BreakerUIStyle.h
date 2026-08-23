@@ -183,7 +183,7 @@ namespace BreakerUI
     inline constexpr float HudClusterPad = 12.0f;
     inline constexpr float HudClusterRowGap = 10.0f;
     inline constexpr float HudAbilitySquare = 56.0f;
-    inline constexpr float HudAbilityGap = 12.0f;
+    inline constexpr float HudAbilityGap = 8.0f;    // HUD v2
     inline constexpr float HudAbilityRadius = 4.0f;
     inline constexpr float HudVitalsWidth = 420.0f;
     inline constexpr float HudShieldBarHeight = 11.0f;
@@ -192,6 +192,41 @@ namespace BreakerUI
     inline constexpr float HudArmorChipWidth = 18.0f;
     inline constexpr float HudArmorChipHeight = 5.0f;
     inline constexpr float HudMomentumTrackHeight = 12.0f;
+    // --- HUD v2 (Assets/ui-reference/HUD v2.dc.html) -----------------------
+    // What the player CONTROLS sits bottom-left in a 340 stack; what the player
+    // IS sits centred at the bottom. Neither carries a plate: on a moving image
+    // the readouts are the shapes and the housing only added weight.
+    inline constexpr float HudV2StackWidth = 340.0f;
+    inline constexpr float HudV2StackRowGap = 10.0f;
+    inline constexpr float HudV2StatusDot = 9.0f;
+    inline constexpr float HudV2StatusRowGap = 5.0f;
+    inline constexpr float HudV2StatusPixels = 12.0f;
+    // 3px is the ONLY rail weight in this corner, and it is the momentum state
+    // indicator as well as chrome -- a 2px line here would be a fifth border
+    // weight carrying no meaning.
+    inline constexpr float HudV2MomentumTrack = 7.0f;
+    inline constexpr float HudV2MomentumRail = 3.0f;
+    inline constexpr float HudV2MomentumRailGap = 10.0f;
+    inline constexpr float HudV2MomentumWordPixels = 16.0f;
+    // 58 + 12 + 232 + 12 + 58 = 372. Neither value carries a max or a label.
+    inline constexpr float HudV2VitalsWidth = 372.0f;
+    inline constexpr float HudV2VitalsBar = 232.0f;
+    inline constexpr float HudV2VitalsValueColumn = 58.0f;
+    inline constexpr float HudV2VitalsGap = 12.0f;
+    inline constexpr float HudV2VitalsValuePixels = 17.0f;
+    inline constexpr float HudV2ShieldBar = 9.0f;
+    inline constexpr float HudV2HealthBar = 6.0f;
+    inline constexpr float HudV2VitalsBarGap = 3.0f;
+    inline constexpr float HudV2VitalsBottom = 56.0f;
+    // Armour is the one readout that could be mistaken for the momentum track,
+    // so it is a single outlined three-cell meter in shield cyan rather than
+    // loose gold blocks -- nothing else in this corner uses gold.
+    inline constexpr float HudV2ArmorWidth = 88.0f;
+    inline constexpr float HudV2ArmorHeight = 11.0f;
+    inline constexpr float HudV2XpHeight = 4.0f;
+    inline constexpr float HudV2WaveUnderline = 2.0f;
+    inline constexpr float HudV2WaveWidth = 280.0f;
+
     inline constexpr float HudEnemyBarWidth = 180.0f;
     inline constexpr float HudEnemyBarHeight = 8.0f;
     // --- Combat cluster type sizes ----------------------------------------

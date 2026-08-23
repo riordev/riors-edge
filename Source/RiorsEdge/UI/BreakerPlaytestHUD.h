@@ -117,9 +117,11 @@ private:
     // Solid fills only — FIELDPLATE has no gradients, so the "vignette" is
     // two nested full-bleed frames, and urgency is a blink, not a fade.
     void DrawLowHealthCue(const ABreakerCharacter* Character);
-    void DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY);
-    void DrawVitalsPlate(const ABreakerCharacter* Character, float X, float BottomY);
-    void DrawCombatCluster(const ABreakerCharacter* Character, float X, float Y, float Width, float Height);
+    // Returns the height it consumed, so the stack above it knows where it ends.
+    float DrawStatusReadout(const ABreakerCharacter* Character, float X, float BottomY, float Width);
+    void DrawVitalsCentred(const ABreakerCharacter* Character);
+    // Returns the stack's top edge, so ability windows can sit above it.
+    float DrawFieldStack(const ABreakerCharacter* Character, float X, float BottomY, float Width);
     // §2's class-resource slot, in two halves: which resource this character
     // has (one component read, no lookup, no iteration) and how the resolved
     // row is painted into the fixed 12px track.
