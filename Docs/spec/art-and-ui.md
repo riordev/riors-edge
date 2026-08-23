@@ -246,7 +246,7 @@ test:
   better is the failure this spec opens with, and it is only observable here.
 - **Skill-tree node detail panels** — the card that appears on selection,
   carrying the node's description, its per-rank effects and the before/after
-  projection. Three shipped node descriptions leaked internal authoring notes
+  projection. Six shipped node descriptions leaked internal authoring notes
   into player-facing text for a milestone precisely because nothing looks here.
 - **Tree pan and zoom** — whether a constellation is legible at the zoom the
   player actually uses, and whether the reachable area is reachable by drag.
