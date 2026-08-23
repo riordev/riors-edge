@@ -154,7 +154,29 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Momentum") FBreakerMomentumStateChanged OnMomentumStateChanged;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundThresholdSpeed = 750.0f;   // O2 PLACEHOLDER
+    // O92: the generation threshold was a trap and it moves. It was 750
+    // against a WalkSpeed of 700, so walking paid nothing and — the part that
+    // made it a trap rather than a choice — EVERY aimed state fell under the
+    // bar, because aiming multiplies move speed by 0.45 to 0.92. A Swift who
+    // aimed disabled their own resource, on a permanent class, and the most
+    // natural way to play the projectile class is down the sights.
+    //
+    // THIS EXACT BUG IS ALREADY FIXED ONCE, THREE FILES AWAY:
+    // BreakerCharacterMovementComponent's WallRideMinimumSpeed carries the note
+    // "OLD: 700.0f (== WalkSpeed, unreachable)" and was lowered to 450. Same
+    // shape, same file family, caught once and missed here.
+    //
+    // 450 is that same gate, so the three movement floors now agree — wall ride
+    // 450, slide entry 550, this. It was chosen rather than tuned because
+    // LOWERING ALONE CANNOT KEEP WALKING FREE: the worst aimed sprint is
+    // 1100 x 0.45 = 495, so any threshold an aimed sprint clears is already
+    // below the 700 walk speed. Walking therefore generates, at the floor rate
+    // of 6/s against a sprint's 9.25/s, and the rate curve is what separates
+    // committed movement from ambling. If walking paying at all turns out to be
+    // wrong in a playtest, the other half of O92 is the answer — exempt aimed
+    // states and put the threshold back above the walk ceiling — and that is a
+    // change to what is measured, not to this number.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundThresholdSpeed = 450.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundUpperSpeed = 1250.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundRateAtThreshold = 6.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundRateAtUpperSpeed = 10.0f;   // O2 PLACEHOLDER

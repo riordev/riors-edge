@@ -7,6 +7,55 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 
+// ---------------------------------------------------------------------------
+// THE GENERATION THRESHOLD IS REACHABLE WHILE AIMING (O92)
+// ---------------------------------------------------------------------------
+// Written in the shape of RiorsEdge.Movement.WallRideEntry, which exists
+// because the wall-ride gate shipped set to exactly WalkSpeed and could not be
+// satisfied. This is the same bug in the same file family: the momentum gate
+// sat at 750 against a 700 walk speed, and aiming multiplies move speed by 0.45
+// to 0.92, so every aimed state fell under it and a Swift who aimed switched
+// their own resource off. The wall-ride fix was found by a person; this one was
+// found by reading that comment. These assertions are so neither recurs.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumThresholdReachableTest,
+    "RiorsEdge.Classes.MomentumThresholdReachable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumThresholdReachableTest::RunTest(const FString& Parameters)
+{
+    const UBreakerMomentumComponent* Momentum = GetDefault<UBreakerMomentumComponent>();
+    const UBreakerCharacterMovementComponent* Movement = GetDefault<UBreakerCharacterMovementComponent>();
+    if (!TestNotNull(TEXT("Momentum has a default object"), Momentum)) return false;
+    if (!TestNotNull(TEXT("Movement has a default object"), Movement)) return false;
+
+    // The worst aim penalty in the archetype table. Read as a constant rather
+    // than swept, because the assertion is about the FLOOR of the range and the
+    // floor is what a gate has to clear.
+    constexpr float WorstAimMoveSpeedMultiplier = 0.45f;   // the machinegun
+    const float AimedSprint = Movement->SprintSpeed * WorstAimMoveSpeedMultiplier;
+
+    TestTrue(*FString::Printf(
+        TEXT("A sprint under the worst aim penalty (%.0f) still clears the momentum gate (%.0f)"),
+        AimedSprint, Momentum->GroundThresholdSpeed),
+        AimedSprint > Momentum->GroundThresholdSpeed);
+
+    // The wall-ride lesson stated directly: a gate at or above the ceiling it
+    // is measured against is not a gate, it is an off switch.
+    TestTrue(*FString::Printf(
+        TEXT("The momentum gate (%.0f) sits strictly below the sprint speed it is measured against (%.0f)"),
+        Momentum->GroundThresholdSpeed, Movement->SprintSpeed),
+        Momentum->GroundThresholdSpeed < Movement->SprintSpeed);
+
+    // And the generation band still has room to discriminate, so lowering the
+    // floor did not flatten the curve into a single rate.
+    TestTrue(TEXT("The generation band is a band, not a point"),
+        Momentum->GroundUpperSpeed > Momentum->GroundThresholdSpeed);
+    TestTrue(TEXT("Moving faster still pays more"),
+        Momentum->GroundRateAtUpperSpeed > Momentum->GroundRateAtThreshold);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerMomentumStateTest,
     "RiorsEdge.Classes.MomentumStates",
