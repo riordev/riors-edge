@@ -4,6 +4,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
 #include "Items/BreakerLootPickup.h"
+#include "UI/BreakerUIStyle.h"
 
 namespace
 {
@@ -66,12 +67,36 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerLootPickupRarityColorTest::RunTest(const FString& Parameters)
 {
-    // Beam chroma must match the UI rarity colours exactly, including the
-    // reserved teal that only rift-class objects (Anomalous) may use.
-    TestTrue(TEXT("Uncommon is blue"), ABreakerLootPickup::ColorForRarity(EBreakerItemRarity::Uncommon).Equals(FLinearColor(0.25f, 0.55f, 1.0f)));
-    TestTrue(TEXT("Exceptional is purple"), ABreakerLootPickup::ColorForRarity(EBreakerItemRarity::Exceptional).Equals(FLinearColor(0.72f, 0.4f, 1.0f)));
-    TestTrue(TEXT("Aberrant is red"), ABreakerLootPickup::ColorForRarity(EBreakerItemRarity::Aberrant).Equals(FLinearColor(1.0f, 0.25f, 0.25f)));
-    TestTrue(TEXT("Anomalous keeps rift teal"), ABreakerLootPickup::ColorForRarity(EBreakerItemRarity::Anomalous).Equals(FLinearColor(0.15f, 0.95f, 0.85f)));
+    // THIS TEST SAID THE RIGHT THING AND CHECKED THE WRONG ONE. Its stated
+    // claim -- "beam chroma must match the UI rarity colours exactly" -- was
+    // correct and was never tested: it compared against four TRANSCRIBED
+    // literals which were themselves the bug, each the matching BreakerUI
+    // token's sRGB triple passed to a linear constructor. So it was green while
+    // asserting the opposite of the truth, for exactly as long as it existed.
+    // A test that copies a value cannot notice that the value is wrong.
+    //
+    // It now reads the token instead of restating it. That is tautological
+    // TODAY, because ColorForRarity delegates -- and it is still the invariant
+    // worth holding, because it is what fails the moment someone re-adds a
+    // local ramp. The second assertion is the one with teeth: the beam must not
+    // be the token's sRGB triple misread as linear, which is the specific
+    // mistake that was made here, at BreakerGameMode's pylon light, and in
+    // bSaturatedTeal's thresholds. The misread is DERIVED from the token rather
+    // than typed, so it cannot drift out of agreement with it either.
+    for (const EBreakerItemRarity Rarity : { EBreakerItemRarity::Standard, EBreakerItemRarity::Uncommon,
+                                             EBreakerItemRarity::Exceptional, EBreakerItemRarity::Aberrant,
+                                             EBreakerItemRarity::Anomalous })
+    {
+        const FLinearColor Token = BreakerUI::RarityColor(Rarity);
+        const FLinearColor Beam = ABreakerLootPickup::ColorForRarity(Rarity);
+        TestTrue(*FString::Printf(TEXT("Rarity %d: the beam is the UI token"), static_cast<int32>(Rarity)),
+            Beam.Equals(Token));
+
+        const FColor Srgb = Token.ToFColor(true);
+        const FLinearColor Misread(Srgb.R / 255.0f, Srgb.G / 255.0f, Srgb.B / 255.0f);
+        TestFalse(*FString::Printf(TEXT("Rarity %d: the beam is not the sRGB triple read as linear"),
+            static_cast<int32>(Rarity)), Beam.Equals(Misread));
+    }
     return true;
 }
 

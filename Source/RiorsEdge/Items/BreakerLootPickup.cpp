@@ -9,6 +9,9 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "UI/BreakerGlowMaterial.h"
+// The rarity ramp itself, so the drop beam and the inventory frame cannot
+// disagree: both now read BreakerUI::RarityColor.
+#include "UI/BreakerUIStyle.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -129,18 +132,22 @@ void ABreakerLootPickup::SetItem(const FBreakerItemInstance& NewItem)
 
 void ABreakerLootPickup::OnRep_Item() { ApplyRarityVisuals(); }
 
+// THE RAMP IS THE UI'S RAMP, and this used to be a second copy of it in the
+// WRONG COLOUR SPACE. Four of the five entries were the matching BreakerUI
+// token's sRGB triple handed to a LINEAR FLinearColor constructor, so every
+// beam rendered as a paler wash of the rarity it names and no drop matched its
+// own inventory frame: Uncommon (0.25,0.55,1.00) against the token's linear
+// (0.051,0.262,1.000), Aberrant (1.00,0.25,0.25) against (1.000,0.051,0.051),
+// Anomalous (0.15,0.95,0.85) against (0.019,0.888,0.694). The Anomalous line
+// even claimed in a comment to be "the reserved teal" while being a colour the
+// reserved-teal predicate does not recognise.
+//
+// Delegating rather than correcting the five values is the point: a second copy
+// of a ramp drifts again the next time one is retuned, and it drifted silently
+// here because nothing compares a world colour to a UI colour.
 FLinearColor ABreakerLootPickup::ColorForRarity(EBreakerItemRarity Rarity)
 {
-    switch (Rarity)
-    {
-    case EBreakerItemRarity::Uncommon:    return FLinearColor(0.25f, 0.55f, 1.00f);
-    case EBreakerItemRarity::Exceptional: return FLinearColor(0.72f, 0.40f, 1.00f);
-    case EBreakerItemRarity::Aberrant:    return FLinearColor(1.00f, 0.25f, 0.25f);
-    // Anomalous is a rift-class object, so it earns the reserved teal.
-    case EBreakerItemRarity::Anomalous:   return FLinearColor(0.15f, 0.95f, 0.85f);
-    case EBreakerItemRarity::Standard:
-    default:                              return FLinearColor(0.90f, 0.90f, 0.90f);
-    }
+    return BreakerUI::RarityColor(Rarity);
 }
 
 int32 ABreakerLootPickup::TierForRarity(EBreakerItemRarity Rarity)
