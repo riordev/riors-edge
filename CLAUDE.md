@@ -100,7 +100,7 @@ timer**, because opening a menu pauses the world.
 | `-BreakerCaptureMenu=<SCREEN>` | string | `INVENTORY`, `SKILLTREES`/`SKILLS`, `SETTINGS`, `CLASS`/`CLASSSELECT`, `PAUSE`, `CHARACTERSELECT`, `CHARACTERCREATE`, `DEVSANDBOX`/`SANDBOX`. Anything else **silently** falls back to the main screen. |
 | `-BreakerCaptureBoard=<BOARD>` | string, not a bare flag | `CORE`, `COMPARE`, `BRANCH<n>`. Also the back door to FORGE/ABILITIES when combined with `-BreakerCaptureMenu=INVENTORY`. |
 | `-BreakerCaptureTour` | flag | Eight authored field vantages instead of the player's eyes. |
-| `-BreakerCaptureHUD` | flag | Fabricates the HUD events a headless run cannot reach. |
+| `-BreakerCaptureHUD` | flag | Fabricates the HUD events a headless run cannot reach. **Returns a false negative on damage-number aggregation** — see below. |
 | `-BreakerCycleWeapons=<seconds>` | float > 0 | Walks the viewmodel through the archetypes. |
 | `-BreakerBossOnStart` | flag | Spawns the Field Marshal during the gym build. |
 
@@ -108,6 +108,23 @@ Two permanent limits: the harness **cannot move a mouse**, so every hover state
 and every zoom/pan gesture is structurally unverifiable by it; and a vantage set
 is a hypothesis about what can go wrong — the ground-tearing defect was
 invisible from all seven existing vantages and needed an eighth.
+
+**`-BreakerCaptureHUD` photographs damage-number aggregation as BROKEN, and it
+is not.** Every fabricated hit carries a null target, and the merge predicate
+refuses a null target because an expired weak pointer is not a target — so the
+numbers that would collapse into one in play stay separate in the capture. The
+switch photographs the damage-number HIERARCHY faithfully (colour carries kind,
+size carries weight) and cannot photograph its AGGREGATION at all. **An
+instrument that returns a false negative is worse than one that returns
+nothing**, because the next reader files a bug against working code. Read the
+merge through `RiorsEdge.UI.Damage.Aggregation`; read the capture for layout.
+
+**Perturb an instrument to find out whether it is lying.** The overlap that
+exposed this got worse when the damage-over-time lifetime was raised — a change
+to the SUBJECT moved an artifact that belonged to the INSTRUMENT, which is the
+tell. When a measurement looks wrong, change something the measurement should be
+insensitive to and see whether the defect moves with it. This was found by
+accident once and is worth doing on purpose.
 
 ### Machines
 
