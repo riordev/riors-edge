@@ -68,6 +68,26 @@ namespace BreakerUI
     inline const FLinearColor TealHardware = Hex(0x08B8A8);
     inline const FLinearColor TealAnomalous = Hex(0x26F2D9);
 
+    // TEAL IS A NOUN, NEVER AN ADJECTIVE, and this is the predicate a teal
+    // assertion is written against. It does not make the LAW asserted: a
+    // predicate is not coverage, and UI.Teal.ObjectLaw -- teal on no interface
+    // element anywhere -- has no test. Its only caller today is
+    // UI.Teal.SealedCluster, which walks one widget pair. The reserved band is
+    // permitted on rift geometry, suppression hardware, and the top rarity's
+    // frames, beams and name text; it is forbidden on buttons, borders, rails,
+    // focus rings, tab underlines, progress tracks and tooltips.
+    //
+    // The distinction is what the pixel DESCRIBES, not what the panel is about.
+    // The skill screen's Elements cluster painted its rail and border teal on
+    // the reasoning that a rift is a world object — but the rail is chrome
+    // describing a panel, which is the adjectival use the law exists to forbid.
+    // The cluster already says SEALED in words, so the colour was carrying
+    // nothing the screen did not already state.
+    inline bool IsReservedTeal(const FLinearColor& Colour)
+    {
+        return Colour.Equals(TealHardware, 0.001f) || Colour.Equals(TealAnomalous, 0.001f);
+    }
+
     // --- Rarity ramp -------------------------------------------------------
     inline const FLinearColor RarityStandard = Hex(0xDCE4EE);
     inline const FLinearColor RarityUncommon = Hex(0x408CFF);

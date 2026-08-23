@@ -254,7 +254,8 @@ namespace BreakerHUD
             case EBreakerItemRarity::Uncommon:    return TEXT("UNCOMMON");
             case EBreakerItemRarity::Exceptional: return TEXT("EXCEPTIONAL");
             case EBreakerItemRarity::Aberrant:    return TEXT("ABERRANT");
-            case EBreakerItemRarity::Anomalous:   return TEXT("ANOMALOUS");
+            // O50: display name only. The enumerator is serialized and stays.
+            case EBreakerItemRarity::Anomalous:   return TEXT("UNWRITTEN");
             default:                              return TEXT("STANDARD");
         }
     }

@@ -2453,7 +2453,12 @@ namespace
             case EBreakerItemRarity::Uncommon: return TEXT("UNCOMMON");
             case EBreakerItemRarity::Exceptional: return TEXT("EXCEPTIONAL");
             case EBreakerItemRarity::Aberrant: return TEXT("ABERRANT");
-            case EBreakerItemRarity::Anomalous: return TEXT("ANOMALOUS");
+            // O50: the DISPLAY name is Unwritten. O49 gave "Anomalies" to the
+            // endgame content type, so the rarity gave up the word. The
+            // ENUMERATOR stays Anomalous and must never move -- it is
+            // serialized, and CLAUDE.md's append-only rule protects it
+            // independently of this rename.
+            case EBreakerItemRarity::Anomalous: return TEXT("UNWRITTEN");
             default: return TEXT("STANDARD");
         }
     }
@@ -3583,7 +3588,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
     [
-        MakeLimitChip(TEXT("ANOMALOUS"), AnomalousEquipped, AnomalousLimit, BreakerUI::RarityAnomalous, true)
+        MakeLimitChip(TEXT("UNWRITTEN"), AnomalousEquipped, AnomalousLimit, BreakerUI::RarityAnomalous, true)
     ];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[CleanupRow];
     HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
@@ -6402,11 +6407,14 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                 ];
             }
 
-            // Elements is sealed, and reads in suppression teal: the one place
-            // teal is legal on this screen, because a rift is a world object,
-            // not chrome.
-            const FLinearColor Rail = Cluster.bSealed ? BreakerUI::TealHardware : (Cluster.bHub ? Cyan : BorderEmphasis);
-            const FLinearColor Border = Cluster.bSealed ? BreakerUI::TealHardware : BreakerUI::BorderRest;
+            // These both returned suppression teal for the sealed cluster, on the
+            // reasoning that a rift is a world object. The reasoning is the
+            // adjectival use the teal law forbids: a rail and a border are chrome
+            // describing a panel, and both are named on the forbidden list
+            // whatever the panel is about. The word SEALED below is the carrier,
+            // and it was already there — the tint was saying nothing twice.
+            const FLinearColor Rail = BreakerInventoryLayout::SkillClusterRailColour(Cluster.bSealed, Cluster.bHub);
+            const FLinearColor Border = BreakerInventoryLayout::SkillClusterBorderColour(Cluster.bSealed);
 
             TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
             Inner->AddSlot().AutoHeight()
@@ -6434,7 +6442,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
             {
                 Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(TEXT("SEALED")), BreakerUI::TypeCaption, BreakerUI::TealHardware, true)
+                    MenuText(FText::FromString(TEXT("SEALED")), BreakerUI::TypeCaption,
+                        BreakerInventoryLayout::SkillClusterSealedLabelColour(), true)
                 ];
                 Inner->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
                 [

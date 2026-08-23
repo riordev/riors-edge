@@ -488,4 +488,67 @@ bool FBreakerNoItemScoreTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// TEAL IS A NOUN, NEVER AN ADJECTIVE -- ON ONE WIDGET PAIR
+// ---------------------------------------------------------------------------
+// art-and-ui reserves one chroma band for rift-origin things and forbids it on
+// buttons, borders, rails, focus rings, tab underlines, progress tracks and
+// tooltips. The skill screen's Elements cluster painted its rail, its border
+// and its SEALED label in suppression teal, arguing a rift is a world object.
+// A rail and a border are chrome describing a panel, and SEALED is an
+// ADJECTIVE -- all three are the adjectival use the law exists to forbid.
+//
+// THE LAW IS ABOUT REFERENT, NOT SURFACE, and that is what reconciles the two
+// lists: the permitted list allows top-rarity item FRAMES while the forbidden
+// list forbids BORDERS, and a frame is a border. What separates them is whether
+// the pixel names a thing that exists in the world. So the cluster's NAME keeps
+// its teal -- name text is permitted and ELEMENTS names a class of world object
+// -- while the label one line below it does not.
+//
+// THIS TEST IS NAMED FOR WHAT IT COVERS. It walks one widget pair over its
+// whole input domain; it is not UI.Teal.ObjectLaw, which asserts teal appears
+// on no interface element ANYWHERE and stays unimplemented. Filing this under
+// that name would have retired a whole-UI invariant on the strength of one
+// panel, and dropped the untested-invariant ceiling by one for free.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTealSealedClusterTest,
+    "RiorsEdge.UI.Teal.SealedCluster",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTealSealedClusterTest::RunTest(const FString& Parameters)
+{
+    // The whole input domain, not a sample: two booleans is four cases, so this
+    // is exhaustive rather than representative.
+    for (const bool bSealed : {false, true})
+    {
+        for (const bool bHub : {false, true})
+        {
+            const FLinearColor Rail = BreakerInventoryLayout::SkillClusterRailColour(bSealed, bHub);
+            const FLinearColor Border = BreakerInventoryLayout::SkillClusterBorderColour(bSealed);
+            TestFalse(*FString::Printf(
+                TEXT("A cluster rail is never reserved teal (sealed=%d hub=%d)"), bSealed, bHub),
+                BreakerUI::IsReservedTeal(Rail));
+            TestFalse(*FString::Printf(
+                TEXT("A cluster border is never reserved teal (sealed=%d)"), bSealed),
+                BreakerUI::IsReservedTeal(Border));
+        }
+    }
+
+    // The SEALED label, which is drawn only in the sealed state and so carries
+    // no input to walk. Asserted anyway: it was teal until this commit, and a
+    // neutralised site with no test is one an editor re-tints next quarter.
+    TestFalse(TEXT("The SEALED label is never reserved teal"),
+        BreakerUI::IsReservedTeal(BreakerInventoryLayout::SkillClusterSealedLabelColour()));
+
+    // The predicate has to be able to say yes, or the assertions above pass by
+    // never recognising teal at all.
+    TestTrue(TEXT("Suppression teal is recognised as reserved"),
+        BreakerUI::IsReservedTeal(BreakerUI::TealHardware));
+    TestTrue(TEXT("Top-rarity teal is recognised as reserved"),
+        BreakerUI::IsReservedTeal(BreakerUI::TealAnomalous));
+    TestFalse(TEXT("The system accent is not reserved teal"),
+        BreakerUI::IsReservedTeal(BreakerUI::Cyan));
+    return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

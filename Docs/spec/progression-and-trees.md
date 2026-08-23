@@ -159,9 +159,15 @@ Gateway (1)
                                        TOTAL   = 26
 ```
 
-Against a budget of roughly 65: two complete constellations plus thirteen
-points in a third. Thirteen cannot reach a third keystone, which costs its
-18-point gate plus five. **That is where the two-keystone cap comes from.**
+Against a budget of roughly 65, a keystone costs 23 all-in: its 18-point gate
+plus the five it charges. Three of them is 69, which the pool cannot pay, and
+two is 46 — seventy-one percent of the character spent on two decisions.
+**That is where the two-keystone cap comes from**, and it is arithmetic on the
+POOL rather than on what is left after two constellations. Stated the older
+way it read as a consequence of constellation size, which stopped being true
+the moment the pool also had to fund a doctrine: with 26 gone there is no
+"thirteen points in a third" left to reason from, and the cap holds anyway
+because 69 is still more than 65.
 Twenty-point constellations would buy three keystones and collapse the choice;
 thirty-two-point ones would make the third constellation meaningless.
 

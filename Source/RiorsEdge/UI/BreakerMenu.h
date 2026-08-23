@@ -180,6 +180,38 @@ namespace BreakerInventoryLayout
     {
         return static_cast<float>(Characters) * CaptionAdvance;
     }
+    // THE SKILL SCREEN'S CLUSTER CHROME, extracted so the teal object law can be
+    // asserted over every input rather than read off one call site. Both used to
+    // return suppression teal for the sealed Elements cluster, and a rail and a
+    // border are both on the law's forbidden list whatever the panel is about.
+    // The cluster states SEALED in words, so nothing was lost by neutralising
+    // them. RiorsEdge.UI.Teal.SealedCluster walks the whole 2x2 domain of THIS
+    // widget pair, and is named for it. It is NOT the whole-UI law:
+    // UI.Teal.ObjectLaw asserts teal appears on no interface element anywhere,
+    // and remains unimplemented -- a test covering one pair must not be filed
+    // under a name that claims the screen.
+    inline FLinearColor SkillClusterRailColour(bool bSealed, bool bHub)
+    {
+        if (bSealed) return BreakerUI::BorderEmphasis;
+        return bHub ? BreakerUI::Cyan : BreakerUI::BorderEmphasis;
+    }
+
+    inline FLinearColor SkillClusterBorderColour(bool bSealed)
+    {
+        return bSealed ? BreakerUI::BorderEmphasis : BreakerUI::BorderRest;
+    }
+
+    // THE SEALED LABEL. Teal is a NOUN, never an adjective, and SEALED is an
+    // adjective: it describes the panel's state rather than naming a thing that
+    // exists in the world. The constellation's NAME is the other case and keeps
+    // its colour -- name text is on the permitted list, and ELEMENTS names a
+    // class of world object. The two text runs sat one line apart and are not
+    // one finding.
+    inline FLinearColor SkillClusterSealedLabelColour()
+    {
+        return BreakerUI::TextSecondary;
+    }
+
     // THE LOADOUT SUBTITLE, and it is a function so that its ABSENCE of an item
     // score can be asserted. It read "BREAKER · SWIFT · LV 1 · GEAR SCORE 1",
     // and art-and-ui says no screen prints an aggregate item score — the rule

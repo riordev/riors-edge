@@ -73,9 +73,12 @@ inventory management.
 **No item score, anywhere, ever.** A single number telling the player which
 item is better deletes the decision the whole endgame is made of.
 
-**Class tree and Core tree are tabs, never a merged view.** One stops at thirty
-and the other runs to fifty; merging them invites the player to treat two
-budgets as one.
+**The Core tree and the doctrine board are tabs, never a merged view.** The
+reason is no longer two budgets — there is one pool of sixty-five and the
+boards spend it together — it is that they are two different reading models:
+the Core tree is tier bands where a node's row is its rank, and the board is an
+adjacency lattice where size is the type. Merged, the player has to hold both
+grammars at once on one surface.
 
 **Tooltip order is signatures, then prefixes, then suffixes, never
 interleaved**, with tier badges in a fixed column so the eye can scan one axis.
@@ -140,11 +143,22 @@ Flat fills only. **Depth comes from border value, never from gradient.**
 
 Three background steps, three panel steps, four text weights. Four function
 accent families — player and system, weapon and heat, reward and weak point,
-harm — and one accent is permitted on chrome. Rarity colours appear on a card's
-left rail, the item name, and the world drop beam, and nowhere else: card faces
+harm — and one accent is permitted on chrome.
+
+**Rarity colour appears once per item per view, and never as the only carrier
+of the fact.** A second carrier is a mark, a number, or a word — never a second
+tint of the same hue. A key is not an instance: a legend swatch, a filter chip
+and the colour helper's own definition name the ramp rather than wearing it.
+Where a card carries the rail, the name goes to text/primary; where a beam
+carries the colour, its height and profile carry the tier as well. Card faces
 stay neutral at every rarity so a wall of loot does not become a wall of
-colour. The top rarity is the single exception, because it is the only tier
-that is also a class of world object.
+colour, and the top rarity keeps its full border as the single exception,
+because it is the only tier that is also a class of world object.
+
+This replaces an enumeration of sites, and the replacement is the point: a list
+had already lost sixteen sites to three without anyone deciding to breach it,
+and a screen invented next quarter needed an amendment before it could be
+judged. A principle counts its own sites.
 
 **Three faces, all open-licensed:** a condensed display face, always uppercase,
 for titles and names; a body face for prose and affix lines; and a **monospaced
@@ -162,9 +176,12 @@ Geometry also survives the shipping faces arriving, where a glyph has to be
 revisited; the one place a character is worth restoring afterwards says so at
 its own site.
 
-**An eight-pixel grid, and nothing lands off it.** A spacing scale of
-4/8/16/24/40/64 with no values between. Radii of zero for structural zones, two
-for panels and cards, four for icon tiles, and never more.
+**An eight-pixel grid, and the scale is 4/8/12/16/24/40/64.** 12 is a token —
+8 to 16 is too coarse for a dense row gap, and a scale the declaring file
+violates four times over is not a scale. 32 is not a token. Radii of zero for
+structural zones, two for panels and cards, four for icon tiles, never more.
+The 44px minimum hit target is a stated exception to the grid, not a value on
+the scale: a control the thumb has to find is sized by the thumb.
 
 **The left accent rail is identity** — which system owns this panel. The top
 rail is transient status. One rail per panel: a panel with two rails means
