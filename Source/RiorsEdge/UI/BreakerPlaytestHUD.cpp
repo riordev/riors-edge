@@ -171,8 +171,6 @@ namespace BreakerHUD
 
     // Ability feedback timings. All cosmetic: nothing here gates a rule.
     static constexpr float AbilityFlashSeconds = 0.3f;
-    static constexpr float AbilityCalloutSeconds = 1.4f;
-    static constexpr int32 AbilityCalloutMaxShows = 3;
     static constexpr float SkimBurstSeconds = 0.25f;
     static constexpr float MarkHeadroomCm = 160.0f;
 
@@ -473,7 +471,6 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawSkimBurst(Center);
     DrawExperienceRail(Character);
     DrawLevelUpBanner(Center);
-    DrawAbilityCallout(Center);
     DrawDefenseFeedback(Center);
     if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
     {
@@ -2032,28 +2029,6 @@ void ABreakerPlaytestHUD::HandleAbilityActivated(EBreakerAbilitySlot Slot)
         }
     }
 
-    // The teaching callout retires itself. After three casts the player knows
-    // what the key does, and a permanent banner would be noise. The ONE
-    // exception is a rewrite the player has not been told about yet: a keystone
-    // is bought long after the third cast, so gating it on the show count alone
-    // would mean the ultimate silently becomes a different ability. A newly
-    // resolved variant name re-opens the callout exactly once.
-    const bool bVariantIsNew = !VariantName.IsEmpty() && VariantName != SlotLastVariantName[Index];
-    if (!bVariantIsNew)
-    {
-        SlotLastVariantName[Index] = VariantName;
-        if (SlotActivationCount[Index] > BreakerHUD::AbilityCalloutMaxShows) return;
-    }
-    SlotLastVariantName[Index] = VariantName;
-
-    // The variant name already reads as "Overdrive — Terminal Velocity", so it
-    // replaces the plain display name rather than appending to it.
-    const FString Name = !VariantName.IsEmpty()
-        ? VariantName
-        : (Definition->DisplayName.IsEmpty() ? FText::FromName(Definition->AbilityId) : Definition->DisplayName).ToString();
-    const FString Blurb = BreakerHUD::FirstSentence(Definition->Description.ToString()).TrimStartAndEnd();
-    CalloutText = Blurb.IsEmpty() ? Name.ToUpper() : FString::Printf(TEXT("%s — %s"), *Name.ToUpper(), *Blurb);
-    CalloutTime = Now;
 }
 
 const UBreakerAbilityStateComponent* ABreakerPlaytestHUD::GetAbilityState(const ABreakerCharacter* Character)
@@ -2100,15 +2075,6 @@ void ABreakerPlaytestHUD::DrawAbilityWindows(const ABreakerCharacter* Character,
 // Centre-low teaching callout. Fades over its lifetime and never repeats past
 // the first few casts of each ability.
 // --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawAbilityCallout(const FVector2D& Center)
-{
-    if (CalloutText.IsEmpty()) return;
-    const double Age = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - CalloutTime;
-    if (Age < 0.0 || Age >= BreakerHUD::AbilityCalloutSeconds) return;
-
-    const float Fade = 1.0f - static_cast<float>(Age) / BreakerHUD::AbilityCalloutSeconds;
-    DrawSpecTextCentered(CalloutText, Center.X, Center.Y + S(132.0f), BreakerUI::TextPrimary, 14.0f, Fade);
-}
 
 // --------------------------------------------------------------------------
 // §5 — ultimate treatment. A 3px violet frame inset 8px, 120px violet bands on

@@ -207,9 +207,19 @@ namespace BreakerHUD
     // shot as a separate event and two of them would show nothing.
     inline int32 TracerRoundsPerTracer(float RoundsPerMinute)
     {
-        // 300 RPM = five rounds a second. Above that, individual rounds stop
-        // being individually readable anyway. O2 PLACEHOLDER.
-        return RoundsPerMinute >= 300.0f ? 3 : 1;
+        // EVERY ROUND LEAVES A STREAK. This returned 3 above 300 RPM on the
+        // reasoning that individual rounds stop being individually readable at
+        // five a second -- true, but it made the wrong trade: two rounds in
+        // three drew nothing at all, so the rifle read as a weapon that
+        // produces impacts without ever firing anything. An unreadable streak
+        // still says a round went out; an absent one says nothing did.
+        //
+        // The cost this bought is real and is now unpaid: held automatic fire
+        // reads as one continuous beam. That is a LOOK problem -- thickness,
+        // lifetime, head/trail falloff -- and thinning the cadence was fixing
+        // it in the wrong place, by deleting rounds rather than by making a
+        // dense stream read as a stream. O2 PLACEHOLDER.
+        return 1;
     }
 
     // Which rounds of a burst get a streak. RoundIndex counts every round the

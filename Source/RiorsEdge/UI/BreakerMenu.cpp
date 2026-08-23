@@ -4418,9 +4418,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         { EBreakerClassId::Support,  TEXT("SUPPORT"),  TEXT("CHARGE"),   TEXT("Medic / Conductor / Warden"),           TEXT("Amplify, sustain, control — solo viable.") },
     };
 
-    bool bDevClassSwap = false;
-    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevClassSwap, GGameUserSettingsIni);
-
     TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     // D13: a refused class lock renders its reason here instead of the screen
     // rebuilding as if nothing happened.
@@ -4451,15 +4448,19 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
     for (const FClassEntry& Entry : Classes)
     {
         const bool bImplemented = ClassHasImplementedKit(Entry.ClassId);
-        // O39: outside dev mode a class with no kit is LOCKED — choosing it
-        // would permanently strand a character on nothing, since class
-        // selection is one-way. Dev mode bypasses this the same way it
-        // already bypasses the already-chosen-class lock below.
-        const bool bDesignLocked = !bImplemented && !bDevClassSwap;
+        // O39: a class with no kit is LOCKED — choosing it would permanently
+        // strand a character on nothing, since class selection is one-way.
+        // There is no longer a dev bypass: the swap tool that used to open both
+        // this gate and the already-chosen lock is gone, so this screen now
+        // states one rule and obeys it. Testing another class is a new
+        // character, which is the route the create carousel already offers.
+        // UBreakerProgressionComponent::DevForceClass survives as an API --
+        // several components document their broadcast behaviour against it --
+        // it simply has no button any more.
+        const bool bDesignLocked = !bImplemented;
         const bool bIsCurrent = Entry.ClassId == CurrentClass;
-        const bool bSelectable = !bDesignLocked && (CurrentClass == EBreakerClassId::None || bDevClassSwap);
+        const bool bSelectable = !bDesignLocked && CurrentClass == EBreakerClassId::None;
         const EBreakerClassId CapturedClass = Entry.ClassId;
-        const bool bCapturedDevSwap = bDevClassSwap;
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
             BorderWrap(
@@ -4473,19 +4474,18 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
             // strips the accent entirely — never lowers opacity". So the
             // unavailable state is painted, and the click is refused here.
             .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
-            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bCapturedDevSwap, bSelectable]()
+            .OnClicked(FOnClicked::CreateLambda([this, CapturedClass, bSelectable]()
             {
                 if (!bSelectable) return FReply::Handled();
                 if (Character.IsValid() && Character->GetProgression())
                 {
                     UBreakerProgressionComponent* Progression = Character->GetProgression();
-                    if (bCapturedDevSwap) Progression->DevForceClass(CapturedClass);
                     // D13 FIX: the return is CHECKED and a refusal is
                     // SURFACED. Before this the screen ignored the result and
                     // rebuilt silently, so a refused lock (O39, or any future
                     // refusal reason) was indistinguishable from a successful
                     // one — the exact silent-rebuild the fix names.
-                    if (bCapturedDevSwap || Progression->ChoosePermanentClassById(CapturedClass))
+                    if (Progression->ChoosePermanentClassById(CapturedClass))
                     {
                         CharacterScreenStatus = FText::GetEmpty();
                         Character->SaveGameState();
@@ -4531,20 +4531,6 @@ TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()
         ];
     }
 
-    Body->AddSlot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 10.0f)
-    [
-        SNew(SCheckBox)
-        .IsChecked(bDevClassSwap ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
-        .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
-        {
-            GConfig->SetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), State == ECheckBoxState::Checked, GGameUserSettingsIni);
-            GConfig->Flush(false, GGameUserSettingsIni);
-            Rebuild(EBreakerMenuScreen::ClassSelect);
-        })
-        [
-            MenuText(FText::FromString(TEXT("DEV MODE — allow class swap (playtest only)")), 11, SoftText, true)
-        ]
-    ];
     Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 0.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)];
     return BuildFrame(FText::FromString(TEXT("BREAKER CLASS")), FText::FromString(TEXT("PERMANENT SELECTION / FIVE DISCIPLINES")), Body, 860.0f);
 }
@@ -8168,30 +8154,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
         }
         Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[ClassRow];
     }
-    // The DEV MODE class-swap checkbox, moved to a screen a player can reach.
-    // It used to live only on BuildClassSelectScreen, which nothing links to,
-    // so the one switch that unlocks class swapping was reachable only from a
-    // capture run. Same GConfig key, same semantics: the class-select and
-    // skill screens read it as their dev-tools gate.
-    bool bDevClassSwap = false;
-    GConfig->GetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), bDevClassSwap, GGameUserSettingsIni);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-    [
-        SNew(SCheckBox)
-        .IsChecked(bDevClassSwap ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
-        .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
-        {
-            GConfig->SetBool(TEXT("RiorsEdge.Playtest"), TEXT("DevClassSwap"), State == ECheckBoxState::Checked, GGameUserSettingsIni);
-            GConfig->Flush(false, GGameUserSettingsIni);
-            Rebuild(EBreakerMenuScreen::DevSandbox);
-        })
-        [
-            SNew(SBox).Padding(FMargin(BreakerUI::Space8, 0.0f, 0.0f, 0.0f))
-            [
-                MenuText(FText::FromString(TEXT("DEV MODE — allow class swap elsewhere (playtest only)")), BreakerUI::TypeCaption, SoftText, true)
-            ]
-        ]
-    ];
+    // The class-swap toggle used to live here. It is gone: class selection is
+    // permanent per character, the class screen now states that rule without an
+    // exception, and testing another class is a new character. The GConfig key
+    // survives because two OTHER dev affordances still read it -- the gear
+    // grants below and the skill screen's point-recovery row -- so its name is
+    // now historical rather than descriptive.
 
     // ---- 4. Seeded gear --------------------------------------------------
     Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[SettingsSectionHeader(TEXT("SEEDED GEAR"))];

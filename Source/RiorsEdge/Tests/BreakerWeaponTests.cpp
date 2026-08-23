@@ -753,13 +753,15 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
         FMath::IsNearlyEqual(FarerThickness / FarThickness, 2.0f, 0.01f));
 
     // --- Cadence ------------------------------------------------------------
-    // Every round used to leave a streak, which is what made held automatic
-    // fire read as one continuous beam. Fast weapons now trace one in three;
-    // slow ones trace every round, because a bolt-action that skipped two
-    // shots in three would read as broken rather than as restrained.
+    // EVERY ROUND LEAVES A STREAK, at every fire rate. The cadence used to thin
+    // fast weapons to one round in three so that held automatic fire did not
+    // read as a continuous beam; the owner reports the result reads as a rifle
+    // that lands impacts without firing anything, which is the worse of the two
+    // failures. A dense stream reading as a stream is a LOOK problem and is
+    // solved in thickness and lifetime, not by deleting two rounds in three.
     const int32 RifleCadence = BreakerHUD::TracerRoundsPerTracer(600.0f);
     const int32 SniperCadence = BreakerHUD::TracerRoundsPerTracer(55.0f);
-    TestTrue(TEXT("A fast weapon traces a fraction of its rounds"), RifleCadence > 1);
+    TestEqual(TEXT("A fast weapon traces every round"), RifleCadence, 1);
     TestEqual(TEXT("A slow weapon traces every round"), SniperCadence, 1);
 
     int32 Traced = 0;
@@ -767,7 +769,7 @@ bool FBreakerTracerFlightTest::RunTest(const FString& Parameters)
     {
         if (BreakerHUD::ShouldTraceRound(Round, RifleCadence)) ++Traced;
     }
-    TestEqual(TEXT("Thirty rifle rounds leave ten streaks"), Traced, 10);
+    TestEqual(TEXT("Thirty rifle rounds leave thirty streaks"), Traced, 30);
     TestTrue(TEXT("The first round of a burst always traces"),
         BreakerHUD::ShouldTraceRound(0, RifleCadence));
 

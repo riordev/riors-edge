@@ -163,7 +163,6 @@ private:
     // upward from BottomY so the cluster below never moves.
     void DrawAbilityWindows(const ABreakerCharacter* Character, float X, float BottomY, float Width);
     // The teaching callout: first few casts of each ability only.
-    void DrawAbilityCallout(const FVector2D& Center);
     // FIELDPLATE HUD §5: violet frame, edge bands, title plate, step-down.
     void DrawUltimateTreatment(const ABreakerCharacter* Character);
     void DrawSkimBurst(const FVector2D& Center);
@@ -201,8 +200,6 @@ private:
     // Which slot was cast last, and what to say about it. Resolved at
     // activation because the definition lookup is not worth repeating per frame.
     int32 LastActivatedSlotIndex = INDEX_NONE;
-    FString CalloutText;
-    double CalloutTime = -1000.0;
     // The keystone variant last announced for each slot. A keystone rewrite is
     // bought long after the teaching callout has retired itself, so without
     // this the rewrite would announce itself NEVER — the player's build would
