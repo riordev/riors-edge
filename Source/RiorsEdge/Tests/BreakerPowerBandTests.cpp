@@ -588,20 +588,32 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     // .PowerBand itself, so the (then single) band assertion was not
     // enumerated for the whole time the collision existed. Found while
     // measuring O29's effect on the band.
+    //
+    // AND THE OTHER HALF OF NAMING, which costs more than the collision did:
+    // A TEST COVERING PART OF AN INVARIANT IS NAMED FOR THE PART.
+    // `make status` credits an asserted invariant when a test of that NAME
+    // exists. Nothing checks that the test's SCOPE matches the invariant's, so
+    // a partial test filed under the full name retires the whole invariant and
+    // the ceiling falls for free. Twice in two days: UI.Teal.ObjectLaw asserts
+    // teal on no interface element ANYWHERE and was nearly claimed by a test of
+    // one widget pair (it is now UI.Teal.SealedCluster), and this test claimed
+    // "rewrite impact stays under its PER-BAND ceiling" while measuring one
+    // band. Two bands are asserted, so two bands are measured below.
     "RiorsEdge.Progression.RuleBandImpact",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 {
     // Worst step any single rewrite is worth on an optimized build — the one
-    // figure `make status` tracks for this section.
+    // figure `make status` tracks for this section. It stays the ENDGAME
+    // figure: `rewrite-impact` is pinned against a ceiling derived there, and
+    // emitting a max across two bands would move a pinned number sideways
+    // without anyone ruling it. The at-cap band is asserted here and reported
+    // in the log; whether it earns its own status row is an open question.
     float WorstRuleStep = 0.0f;
     using namespace BreakerPowerBandTest;
 
     const FBreakerBuildConditionState State = MeasurementState();
-    const FComposedBuild Baseline = Compose(BaselineLoadout(EndgameItemLevel, BaselineTierFor(EndgameItemLevel)), BaselineRanks(), State);
-    const FComposedBuild Optimized = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), State);
-    const float PlainBand = Optimized.Total / Baseline.Total;
 
     // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
     // one Anomalous rewrite is the top of the rarity ladder, so it has to be a
@@ -619,6 +631,52 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     // old 1.35x ceiling). Every OTHER rollable rewrite stays at 1.35x.
     constexpr float MaximumProlificRuleStep = 1.5f;   // O36, O2 PLACEHOLDER seed
 
+    // THE AT-CAP CEILINGS, RE-ANCHORED. power-and-scaling says "rewrite-impact
+    // ceilings re-anchor per band" and then authors one pair; 1.35 and 1.5 were
+    // both derived at the endgame fixture. A ceiling is a share of the band it
+    // sits in, and the two bands are not the same size, so carrying the endgame
+    // pair down to level 50 would assert nothing there.
+    //
+    // O2 PLACEHOLDER, AND SO IS THE DERIVATION LAW ITSELF, which is the part
+    // that wants a ruling rather than a number. A step is multiplicative and so
+    // is a band, so the share is taken in LOG space: the endgame ceiling is
+    // log(1.35)/log(16) of its band, and the same share of the at-cap band is
+    // 9^(that). Anchored to the AUTHORED bands — 12-20x and 8-10x, at their
+    // midpoints — never to the measurements, because the at-cap measurement is
+    // itself out of band and expected-red, and anchoring a ceiling to a number
+    // that is already wrong bakes the error in twice.
+    //
+    // The arithmetic-share reading (1 + 0.35 * 9/16 = 1.197) is the other
+    // candidate and is stated so the choice is visible rather than implied.
+    constexpr float EndgameBandMid = 16.0f;   // O36 authored 12-20x
+    constexpr float AtCapBandMid = 9.0f;      // O36 authored 8-10x
+    const float BandShare = FMath::Loge(AtCapBandMid) / FMath::Loge(EndgameBandMid);
+    const float MaximumRuleStepAtCap = FMath::Pow(MaximumRuleStep, BandShare);
+    const float MaximumProlificRuleStepAtCap = FMath::Pow(MaximumProlificRuleStep, BandShare);
+
+    struct FRuleBandFixture
+    {
+        const TCHAR* Label;
+        int32 ItemLevel;
+        float Ceiling;
+        float ProlificCeiling;
+        bool bEmitStatus;
+    };
+    const FRuleBandFixture Fixtures[] = {
+        { TEXT("ENDGAME"), EndgameItemLevel, MaximumRuleStep, MaximumProlificRuleStep, true },
+        { TEXT("AT CAP"), AtCapItemLevel, MaximumRuleStepAtCap, MaximumProlificRuleStepAtCap, false },
+    };
+
+    AddInfo(FString::Printf(TEXT("CEILINGS  endgame x%.3f / prolific x%.3f  |  at cap x%.3f / prolific x%.3f (band share %.4f)"),
+        MaximumRuleStep, MaximumProlificRuleStep, MaximumRuleStepAtCap, MaximumProlificRuleStepAtCap, BandShare));
+
+    for (const FRuleBandFixture& Fixture : Fixtures)
+    {
+    const int32 BandItemLevel = Fixture.ItemLevel;
+    const FComposedBuild Baseline = Compose(BaselineLoadout(BandItemLevel, BaselineTierFor(BandItemLevel)), BaselineRanks(), State);
+    const FComposedBuild Optimized = Compose(OptimizedLoadout(BandItemLevel, OptimizedTierFor(BandItemLevel)), OptimizedRanks(), State);
+    const float PlainBand = Optimized.Total / Baseline.Total;
+
     for (const FBreakerItemRuleDefinition& Definition : UBreakerItemRuleLibrary::GetRuleDefinitions())
     {
         if (!Definition.bRollable) continue;   // legendaries have their own tests
@@ -626,7 +684,7 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // The rewrite lands on ONE piece, because the equip cap is one
         // Anomalous. Helmet: it carries damage, crit and a conditional line, so
         // every rollable rewrite has something on it to bite on.
-        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
+        TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(BandItemLevel, OptimizedTierFor(BandItemLevel));
         WithRule[0].Rule = Definition.Rule;
         const FComposedBuild Ruled = Compose(WithRule, OptimizedRanks(), State);
 
@@ -640,31 +698,37 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         // measured somewhere its conditions are false, or the report says it is
         // worthless when it is the largest rewrite in the table.
         const FBreakerBuildConditionState Grounded;
-        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), Grounded);
+        const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(BandItemLevel, OptimizedTierFor(BandItemLevel)), OptimizedRanks(), Grounded);
         const FComposedBuild GroundedRuled = Compose(WithRule, OptimizedRanks(), Grounded);
         const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
 
-        const float StepCeiling = Definition.Rule == EBreakerItemRule::Prolific ? MaximumProlificRuleStep : MaximumRuleStep;
-        WorstRuleStep = FMath::Max(WorstRuleStep, Step);
+        const float StepCeiling = Definition.Rule == EBreakerItemRule::Prolific ? Fixture.ProlificCeiling : Fixture.Ceiling;
+        if (Fixture.bEmitStatus)
+        {
+            WorstRuleStep = FMath::Max(WorstRuleStep, Step);
+        }
 
-        AddInfo(FString::Printf(TEXT("RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx) | ceiling x%.2f"),
-            *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand, StepCeiling));
-        TestTrue(*FString::Printf(TEXT("%s never lowers a grounded build either"),
-            *Definition.DisplayName.ToString()), GroundedStep >= 1.0f - UE_KINDA_SMALL_NUMBER);
+        AddInfo(FString::Printf(TEXT("[%-7s] RULE %-12s step x%.3f in rotation | x%.3f standing still | band %.2fx (plain %.2fx) | ceiling x%.3f"),
+            Fixture.Label, *Definition.DisplayName.ToString(), Step, GroundedStep, RuledBand, PlainBand, StepCeiling));
+        TestTrue(*FString::Printf(TEXT("[%s] %s never lowers a grounded build either"),
+            Fixture.Label, *Definition.DisplayName.ToString()), GroundedStep >= 1.0f - UE_KINDA_SMALL_NUMBER);
 
-        TestTrue(*FString::Printf(TEXT("%s never LOWERS an optimized build's damage"),
-            *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
-        TestTrue(*FString::Printf(TEXT("%s is worth at most x%.2f on top of an optimized build (measured x%.3f)"),
-            *Definition.DisplayName.ToString(), StepCeiling, Step), Step <= StepCeiling);
+        TestTrue(*FString::Printf(TEXT("[%s] %s never LOWERS an optimized build's damage"),
+            Fixture.Label, *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
+        TestTrue(*FString::Printf(TEXT("[%s] %s is worth at most x%.3f on top of an optimized build (measured x%.3f)"),
+            Fixture.Label, *Definition.DisplayName.ToString(), StepCeiling, Step), Step <= StepCeiling);
         // ...and it must not be the whole build. A rewrite that outweighs the
         // endgame band would make every other decision a rounding error.
-        TestTrue(*FString::Printf(TEXT("%s is smaller than the band it lives in"),
-            *Definition.DisplayName.ToString()), Step < PlainBand);
+        TestTrue(*FString::Printf(TEXT("[%s] %s is smaller than the band it lives in"),
+            Fixture.Label, *Definition.DisplayName.ToString()), Step < PlainBand);
+    }
     }
 
     // The pass's own claim, asserted: an item with no rewrite composes exactly
     // as it did before rules existed. If this ever fails, a rewrite has leaked
     // out of its item and become a property of rarity.
+    const FComposedBuild EndgameBaseline = Compose(BaselineLoadout(EndgameItemLevel, BaselineTierFor(EndgameItemLevel)), BaselineRanks(), State);
+    const FComposedBuild EndgameOptimized = Compose(OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel)), OptimizedRanks(), State);
     TArray<FBreakerItemInstance> Untouched = OptimizedLoadout(EndgameItemLevel, OptimizedTierFor(EndgameItemLevel));
     for (const FBreakerItemInstance& Item : Untouched)
     {
@@ -672,7 +736,8 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
             static_cast<int32>(Item.Rule), static_cast<int32>(EBreakerItemRule::None));
     }
     TestEqual(TEXT("The measured band is untouched by the rarity pass"),
-        Compose(Untouched, OptimizedRanks(), State).Total / Baseline.Total, PlainBand, 0.0001f);
+        Compose(Untouched, OptimizedRanks(), State).Total / EndgameBaseline.Total,
+        EndgameOptimized.Total / EndgameBaseline.Total, 0.0001f);
     BreakerStatus::Emit(TEXT("rewrite-impact"), WorstRuleStep);
     return true;
 }
