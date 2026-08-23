@@ -629,8 +629,11 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     // class already being chosen no longer disqualifies it; only real spending
     // or a non-empty pool does. That is what left owner saves stuck on
     // "CLASS 0 | CORE 0 UNSPENT" with a locked class and nothing to spend.
-    const bool bFresh = State.ClassNodeRanks.Num() == 0 && State.CoreNodeRanks.Num() == 0
-        && State.DoctrineNodeRanks.Num() == 0
+    // The two LIVE pools. It also tested the retired rank array, which is
+    // correct only while the migration has already zeroed it -- the reasoning
+    // ProgressionTypes.h rules out at that field's own declaration. The retired
+    // WALLET stays, because a v5 payload can still carry a non-zero one.
+    const bool bFresh = State.CoreNodeRanks.Num() == 0 && State.DoctrineNodeRanks.Num() == 0
         && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0
         && State.UnspentDoctrinePoints == 0;
     if (!bFresh) return;
@@ -707,10 +710,8 @@ void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
         }
         return Total;
     };
-    // The retired pool is still summed: a v5 save being migrated still carries
-    // class ranks when this runs, and a running total that silently skipped
-    // them would disagree with the array it is meant to describe.
-    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints_Retired);
+    // Two live pools. The retired one has no rank storage left to sum.
+    CachedSpentClassPoints = 0;
     CachedSpentDoctrinePoints = SumFor(EBreakerPointCurrency::DoctrinePoints);
     CachedSpentCorePoints = SumFor(EBreakerPointCurrency::CorePoints);
 }
@@ -857,7 +858,7 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     if (bDefinitionDescribesCurrentClass
         && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StarterAbilityIds.Contains(AbilityId))) return true;
     if (State.UnlockedAbilityIds.Contains(AbilityId)) return true;
-    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints_Retired, EBreakerPointCurrency::CorePoints, EBreakerPointCurrency::DoctrinePoints})
+    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::CorePoints, EBreakerPointCurrency::DoctrinePoints})
     {
         TArray<const UBreakerProgressionNode*> Nodes;
         CollectKnownNodes(Nodes, Currency);
@@ -1296,8 +1297,7 @@ float UBreakerProgressionComponent::GetSpentPoints() const
     // rank x CostPerRank, which is exactly what a respec hands back — so a
     // 3-point Convergence node is worth three times a 1-point minor here, and
     // the total can never disagree with what the player was charged.
-    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints_Retired)
-        + GetRefundValue(EBreakerPointCurrency::CorePoints)
+    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::CorePoints)
         + GetRefundValue(EBreakerPointCurrency::DoctrinePoints));
 }
 
@@ -1309,7 +1309,6 @@ float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
 void UBreakerProgressionComponent::RecalculateStats()
 {
     TArray<const UBreakerProgressionNode*> Nodes;
-    CollectKnownNodes(Nodes, EBreakerPointCurrency::ClassPoints_Retired);
     CollectKnownNodes(Nodes, EBreakerPointCurrency::DoctrinePoints);
     CollectKnownNodes(Nodes, EBreakerPointCurrency::CorePoints);
 
@@ -1319,8 +1318,7 @@ void UBreakerProgressionComponent::RecalculateStats()
     // purchase -- the node buys, the rank records, and the effect never reaches
     // the aggregator. The retired pool stays in the list because a v5 save
     // still carries ranks in it until the migration runs.
-    TArray<FBreakerNodeRank> Ranks = State.ClassNodeRanks;
-    Ranks.Append(State.CoreNodeRanks);
+    TArray<FBreakerNodeRank> Ranks = State.CoreNodeRanks;
     Ranks.Append(State.DoctrineNodeRanks);
 
     CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution, ActiveConditions);
@@ -1432,11 +1430,29 @@ void UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem()
     PublishedNodeTags = Desired;
 }
 
+namespace
+{
+    // Storage for a currency that has none. Shared, never written by any live
+    // path, and deliberately not a reference into real state -- see RanksFor.
+    TArray<FBreakerNodeRank>& BreakerRetiredRanks()
+    {
+        static TArray<FBreakerNodeRank> Empty;
+        Empty.Reset();
+        return Empty;
+    }
+}
+
 TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency)
 {
     switch (Currency)
     {
-    case EBreakerPointCurrency::ClassPoints_Retired: return State.ClassNodeRanks;
+    // THE RETIRED CURRENCY RESOLVES TO NOTHING, NOT TO ANOTHER POOL. Falling
+    // through to Core would make a stray call operate on the wrong pool's ranks
+    // silently, which is a corruption rather than a no-op; returning the retired
+    // array would keep alive a read that is correct only because the migration
+    // zeroed it. Nothing on a live path passes this value, and this arm is what
+    // makes that fact unnecessary to rely on.
+    case EBreakerPointCurrency::ClassPoints_Retired: return BreakerRetiredRanks();
     case EBreakerPointCurrency::DoctrinePoints:      return State.DoctrineNodeRanks;
     default:                                         return State.CoreNodeRanks;
     }
@@ -1446,7 +1462,13 @@ const TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerP
 {
     switch (Currency)
     {
-    case EBreakerPointCurrency::ClassPoints_Retired: return State.ClassNodeRanks;
+    // THE RETIRED CURRENCY RESOLVES TO NOTHING, NOT TO ANOTHER POOL. Falling
+    // through to Core would make a stray call operate on the wrong pool's ranks
+    // silently, which is a corruption rather than a no-op; returning the retired
+    // array would keep alive a read that is correct only because the migration
+    // zeroed it. Nothing on a live path passes this value, and this arm is what
+    // makes that fact unnecessary to rely on.
+    case EBreakerPointCurrency::ClassPoints_Retired: return BreakerRetiredRanks();
     case EBreakerPointCurrency::DoctrinePoints:      return State.DoctrineNodeRanks;
     default:                                         return State.CoreNodeRanks;
     }

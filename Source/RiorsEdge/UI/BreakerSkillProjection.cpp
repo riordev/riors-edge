@@ -235,8 +235,20 @@ FBreakerSkillSnapshot BreakerSkillProjection::MakeSnapshot(const UBreakerProgres
     for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees()) AddTree(Tree);
 
     const FBreakerProgressionState& State = Progression->GetProgressionState();
-    Snapshot.Ranks = State.ClassNodeRanks;
-    Snapshot.Ranks.Append(State.CoreNodeRanks);
+    // EVERY LIVE POOL. This read the retired class array and Core, and never
+    // Doctrine -- so once the retired array was permanently empty, every
+    // projection on the skill screen (CurrentTotals, Project, ProjectPurchase)
+    // was computed from Core ranks alone. A character with doctrine points saw
+    // totals that ignored them, and the before/after delta for a doctrine
+    // purchase was wrong by however much doctrine they already owned. On the
+    // screen the permanent choice is made on.
+    //
+    // RiorsEdge.Progression.PointPools.EveryPoolIsRouted enumerates the
+    // currency and asserts each live one reaches both this snapshot and the
+    // aggregator, because this was the SECOND seam with the same omission and
+    // the first was only found through eighteen unrelated failures.
+    Snapshot.Ranks = State.CoreNodeRanks;
+    Snapshot.Ranks.Append(State.DoctrineNodeRanks);
     Snapshot.IncreasedDamagePerSpentPoint = Progression->IncreasedDamagePerSpentPoint;
 
     if (Attributes && Attributes->HasCapturedAttributeBases())
