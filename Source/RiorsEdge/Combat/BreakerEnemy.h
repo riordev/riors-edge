@@ -110,6 +110,11 @@ public:
     // Subclasses override it — ABreakerRangedEnemy sets 0 — so a caller must
     // pick the class it means rather than reading "the enemy".
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackCooldown() const { return AttackCooldown; }
+    // The authored chassis block, for the same reason: an archetype that
+    // overrides a chassis value — the ranged one overrides base damage — is
+    // stating a RATIO to the melee default, and a ratio nothing can read is a
+    // ratio nothing can assert.
+    const FBreakerMonsterChassisParams& GetChassisParams() const { return Chassis; }
     // The same read-only-view discipline as the two above, extended to the two
     // movement tunables an archetype is most likely to retune. Added because a
     // subclass's tests could otherwise only assert them by being granted access

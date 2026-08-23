@@ -25,13 +25,13 @@ measurement without judging it.
 | Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
 | Ability lane throughput against weapon lane, at cap | band | 0.65 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.39 | no pin — measurement only | — |
-| Monster damage growth against gear defence growth | ceiling | 3.76 | ceiling 1.0 | **OUT** |
+| Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 
 ## Tests
 
-- passing: 411
-- expected red: 5
+- passing: 414
+- expected red: 2
 - **unexpected red: 0**
 - asserted invariants with no test: 46
 
@@ -40,9 +40,6 @@ A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
-- `RiorsEdge.Combat.Chassis.DamageBelowHealth`
-- `RiorsEdge.Combat.DefenseCurve.HitsToDie`
-- `RiorsEdge.Combat.DefenseCurve.TimeToDieBare`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 

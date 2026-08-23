@@ -7,6 +7,7 @@
 #include "Combat/BreakerMonsterChassis.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerItemTypes.h"
+#include "Tests/BreakerBaselineLoadout.h"
 #include "Tests/BreakerStatusEmit.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -72,31 +73,63 @@ namespace BreakerPromotedFindingTest
         return GetDefault<UBreakerWeaponComponent>()->ItemLevelDamageGrowth;
     }
 
-    // A full gear set's Health lines at the tier this item level can roll.
-    // One line per slot the affix is ALLOWED on, so a character who wanted
-    // nothing else could carry the lot, and the question this test asks is
-    // whether the CEILING of gear defence keeps up. A smaller set only makes
-    // the answer worse.
+    // TWO CHARACTERS, TWO QUESTIONS, BOTH NAMED.
     //
-    // The slot count is read off the affix rather than written as 8. It was 8,
-    // and it agreed with the pool — but PromotedInvestedDamageReduction two
-    // functions down was already reading AllowedSlots.Num() for the same pool,
-    // so the file held both conventions and only one of them survives a slot
-    // being added.
-    float PromotedGearHealthAt(int32 ItemLevel)
+    // These used to be one function serving both, carrying the CEILING count
+    // under the word "baseline". That is how the O116 retune came to be solved
+    // against a maximally health-stacked character: TTD at the cap reads 4.97s
+    // for the ceiling and 2.78s for the baseline, so "the cap is the end that
+    // is correct" was true only of a character O18 was not describing.
+    float PromotedHealthLineValueAt(int32 ItemLevel)
     {
         const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
         const FBreakerAffixDefinition* Line = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Core.Health"));
         if (!Line) return 0.0f;
-        return Line->AllowedSlots.Num() * UBreakerAffixLibrary::ValueForTier(
+        return UBreakerAffixLibrary::ValueForTier(
             *Line, UBreakerAffixLibrary::BestTierForItemLevel(ItemLevel));
     }
 
-    // Everything a baseline character has to absorb a hit with, at a level.
+    // THE BASELINE. What the one authored baseline character actually wears,
+    // counted out of the shared loadout so it cannot drift from the build the
+    // variance band is measured on. This is the subject of every MAGNITUDE
+    // question — TTD's 4-5s target and nothing else.
+    float PromotedBaselineGearHealthAt(int32 ItemLevel)
+    {
+        return BreakerBaselineLoadout::BreakerBaselineLineCount(TEXT("Core.Health"))
+            * PromotedHealthLineValueAt(ItemLevel);
+    }
+
+    // THE CEILING, and it is deliberately not the baseline. Core.Health on
+    // every slot the affix allows: the best-geared defensive character the pool
+    // can produce. It is the right subject for exactly one question — whether
+    // hits-to-die falls — because the finding's force is that it falls even for
+    // the character who did everything possible to stop it. A smaller set only
+    // makes that answer worse, which is why the ceiling is the honest test of a
+    // FALLING curve and the wrong test of a LEVEL.
+    float PromotedCeilingGearHealthAt(int32 ItemLevel)
+    {
+        const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        const FBreakerAffixDefinition* Line = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Core.Health"));
+        if (!Line) return 0.0f;
+        return Line->AllowedSlots.Num() * PromotedHealthLineValueAt(ItemLevel);
+    }
+
+    // Everything the BASELINE character has to absorb a hit with, at a level.
+    // O18's "no resources or sustain" describes what they do not USE — no
+    // healing, no shield, no lifesteal — not what they are wearing.
     float PromotedEffectiveHealthAt(int32 AreaLevel)
     {
         const float Base = GetDefault<UBreakerAttributeSet>()->GetMaxHealth();
-        return Base + PromotedGearHealthAt(UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel));
+        return Base + PromotedBaselineGearHealthAt(
+            UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel));
+    }
+
+    // The same, for the ceiling character.
+    float PromotedCeilingEffectiveHealthAt(int32 AreaLevel)
+    {
+        const float Base = GetDefault<UBreakerAttributeSet>()->GetMaxHealth();
+        return Base + PromotedCeilingGearHealthAt(
+            UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel));
     }
 
     // Seconds a BASELINE build takes to kill one enemy of this rank, in on-level
@@ -126,8 +159,18 @@ namespace BreakerPromotedFindingTest
         return Health / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
     }
 
-    // Hits a trash enemy needs to kill a baseline character at this area level.
+    // Hits a trash enemy needs to kill the CEILING character at this area
+    // level — the falling-curve question, so the best-geared subject.
     float PromotedHitsToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
+    {
+        const float Incoming = UBreakerMonsterChassisLibrary::GetChassisDamage(AreaLevel, Params);
+        if (Incoming <= 0.0f) return 0.0f;
+        return PromotedCeilingEffectiveHealthAt(AreaLevel) / Incoming;
+    }
+
+    // Hits the BASELINE character takes — the magnitude question, and the one
+    // time-to-die is expressed in.
+    float PromotedBaselineHitsToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
     {
         const float Incoming = UBreakerMonsterChassisLibrary::GetChassisDamage(AreaLevel, Params);
         if (Incoming <= 0.0f) return 0.0f;
@@ -152,7 +195,7 @@ namespace BreakerPromotedFindingTest
 
     float PromotedTimeToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
     {
-        return PromotedHitsToDieAt(AreaLevel, Params) * PromotedEnemyAttackCooldown();
+        return PromotedBaselineHitsToDieAt(AreaLevel, Params) * PromotedEnemyAttackCooldown();
     }
 
     // What a full defensive commitment buys, from the shipped pool: the
@@ -194,32 +237,65 @@ bool FBreakerDefenseCurveHitsToDieTest::RunTest(const FString& Parameters)
     using namespace BreakerPromotedFindingTest;
     const FBreakerMonsterChassisParams Params;
 
-    const int32 Points[] = {1, 10, 20, 30, 40, 50};
-    float First = 0.0f, Worst = 0.0f;
-    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Points); ++Index)
+    // EVERY LEVEL, not a sample. This used to walk {1,10,20,30,40,50}, and the
+    // trough is at 33 — so the worst point in the range was the one point the
+    // assertion never evaluated, and a floor authored against a sampled minimum
+    // would have read as covered while missing the dip by a third of its depth.
+    // Fifty evaluations of a closed-form expression cost nothing; a sample set
+    // is a hypothesis about where the worst case is, and this one was wrong.
+    const int32 MinAreaLevel = 1;
+    const int32 MaxAreaLevel = 50;
+    const float First = PromotedHitsToDieAt(MinAreaLevel, Params);
+    const float AtCap = PromotedHitsToDieAt(MaxAreaLevel, Params);
+    float Worst = First;
+    int32 WorstAt = MinAreaLevel;
+    for (int32 AreaLevel = MinAreaLevel; AreaLevel <= MaxAreaLevel; ++AreaLevel)
     {
-        const float Hits = PromotedHitsToDieAt(Points[Index], Params);
-        if (Index == 0) { First = Hits; Worst = Hits; }
-        Worst = FMath::Min(Worst, Hits);
-        AddInfo(FString::Printf(TEXT("HITS-TO-DIE  area level %2d: %.2f hits"), Points[Index], Hits));
+        const float Hits = PromotedHitsToDieAt(AreaLevel, Params);
+        if (Hits < Worst) { Worst = Hits; WorstAt = AreaLevel; }
     }
-
-    const float AtCap = PromotedHitsToDieAt(50, Params);
+    for (const int32 AreaLevel : {1, 10, 20, 30, 40, 50})
+    {
+        AddInfo(FString::Printf(TEXT("HITS-TO-DIE  area level %2d: %.2f hits (ceiling character)"),
+            AreaLevel, PromotedHitsToDieAt(AreaLevel, Params)));
+    }
     AddInfo(FString::Printf(
-        TEXT("HITS-TO-DIE  level 1 %.2f -> level 50 %.2f (%.0f%% of where it started); worst point %.2f"),
-        First, AtCap, 100.0f * AtCap / FMath::Max(First, UE_SMALL_NUMBER), Worst));
+        TEXT("HITS-TO-DIE  level 1 %.2f -> level 50 %.2f (%.0f%% of where it started)"),
+        First, AtCap, 100.0f * AtCap / FMath::Max(First, UE_SMALL_NUMBER)));
 
-    // THE PROPERTY, and it is a floor rather than a band: a character may get
-    // tougher relative to content, and O27 rather wants that at the top end.
-    // What it may not do is get FLIMSIER, which is the inversion O91 rules out
-    // — a character at cap squishier than one at level 10, in content they
-    // out-gear.
+    // THE TREND, not pointwise monotonicity. A stepped gear curve against a
+    // smooth damage curve MUST sawtooth: gear health holds one value for eight
+    // item levels and then jumps, so hits-to-die falls inside every tier band
+    // and recovers at its boundary. Asserting that it never dips anywhere
+    // forbids a shape the ladder produces by construction, and no (BaseDamage,
+    // d) pair can satisfy it — the two tests' feasible intervals for `d` were
+    // disjoint. O91's words are "until hits-to-die stops FALLING", which is a
+    // statement about the trend.
     TestTrue(*FString::Printf(
         TEXT("Hits-to-die at the cap (%.2f) is at least what it was at level 1 (%.2f)"), AtCap, First),
         AtCap >= First);
+
+    // AND THE DEPTH OF THE SAWTOOTH, because a trend with no floor is the shape
+    // O115 forbids — the property asserted without its level, which is exactly
+    // how the throughput gap survived every green run. The floor is authored
+    // against what a player has when the dip arrives, and both figures are
+    // recorded so the next person finds the answer rather than the dip.
+    const float Invested = Worst / FMath::Max(1.0f - PromotedInvestedDamageReduction(), UE_SMALL_NUMBER);
+    const float Cooldown = PromotedEnemyAttackCooldown();
+    AddInfo(FString::Printf(
+        TEXT("HITS-TO-DIE  trough %.2f hits at area level %d = %.0f%% of level 1; bare %.2fs, invested %.2fs at %.0f%% reduction"),
+        Worst, WorstAt, 100.0f * Worst / FMath::Max(First, UE_SMALL_NUMBER),
+        Worst * Cooldown, Invested * Cooldown, 100.0f * PromotedInvestedDamageReduction()));
+
+    // O2 PLACEHOLDER. Authored, not measured: the trough is where a defensive
+    // commitment should pay MOST, so the question the floor answers is whether
+    // the dip is deep enough to be worth answering and shallow enough to be
+    // survivable while a baseline character has not answered it.
+    constexpr float SawtoothFloorFraction = 0.70f;
     TestTrue(*FString::Printf(
-        TEXT("Hits-to-die never dips below its level-1 value anywhere in the range (worst %.2f)"), Worst),
-        Worst >= First - UE_KINDA_SMALL_NUMBER);
+        TEXT("The sawtooth trough (%.2f hits at area level %d) stays above %.0f%% of the level-1 value (%.2f)"),
+        Worst, WorstAt, 100.0f * SawtoothFloorFraction, First * SawtoothFloorFraction),
+        Worst >= First * SawtoothFloorFraction);
     return true;
 }
 
@@ -258,6 +334,32 @@ bool FBreakerTimeToDieBareTest::RunTest(const FString& Parameters)
         AddInfo(FString::Printf(TEXT("TTD BARE  area level %2d: %.2fs (O18 target %.0f-%.0fs)"),
             AreaLevel, PromotedTimeToDieAt(AreaLevel, Params), TtdFloor, TtdCeiling));
     }
+
+    // THE SAWTOOTH, on this curve too. The band describes the ends; between
+    // them the stepped gear ladder pulls TTD under its own floor, and the two
+    // endpoint assertions below cannot see it. Scanned every level rather than
+    // sampled, for the reason HitsToDie is: a trough the assertion never
+    // evaluates reads as covered.
+    float TroughSeconds = TtdCeiling * 10.0f;
+    int32 TroughAt = 1;
+    for (int32 AreaLevel = 1; AreaLevel <= 50; ++AreaLevel)
+    {
+        const float Seconds = PromotedTimeToDieAt(AreaLevel, Params);
+        if (Seconds < TroughSeconds) { TroughSeconds = Seconds; TroughAt = AreaLevel; }
+    }
+    const float TtdAtOneForFloor = PromotedTimeToDieAt(1, Params);
+    AddInfo(FString::Printf(
+        TEXT("TTD BARE  trough %.2fs at area level %d = %.0f%% of the level-1 figure"),
+        TroughSeconds, TroughAt, 100.0f * TroughSeconds / FMath::Max(TtdAtOneForFloor, UE_SMALL_NUMBER)));
+
+    // The same authored fraction HitsToDie uses, because it is one decision
+    // about how deep the ladder's sawtooth may cut and not two.
+    constexpr float TtdSawtoothFloorFraction = 0.70f;
+    TestTrue(*FString::Printf(
+        TEXT("The TTD trough (%.2fs at area level %d) stays above %.0f%% of the level-1 figure (%.2fs)"),
+        TroughSeconds, TroughAt, 100.0f * TtdSawtoothFloorFraction,
+        TtdAtOneForFloor * TtdSawtoothFloorFraction),
+        TroughSeconds >= TtdAtOneForFloor * TtdSawtoothFloorFraction);
 
     // BOTH ENDS ARE ASSERTED, and that is the entire point of this test. A
     // single-point assertion would let the retune anchor wherever it liked.

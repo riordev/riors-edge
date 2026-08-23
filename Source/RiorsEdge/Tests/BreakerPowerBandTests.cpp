@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Tests/BreakerBaselineLoadout.h"
 #include "Tests/BreakerStatusEmit.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Items/BreakerAffixLibrary.h"
@@ -277,18 +278,19 @@ namespace BreakerPowerBandTest
     // all — so no More multiplier. O27's "hitting 50 must be satisfying with
     // decent power" is what this build is. ItemLevel/Tier are the caller's:
     // O36 measures this same character at two different gear depths.
+    // Built from the ONE authored baseline in Tests/BreakerBaselineLoadout.h,
+    // which BreakerPromotedFindingTests reads for the same character. The list
+    // used to live here, and time-to-die was measured against a different
+    // character in the other file — eight Health lines against this four — so
+    // the two disagreed by 1.79x on whether the cap met O18.
     TArray<FBreakerItemInstance> BaselineLoadout(int32 ItemLevel, int32 Tier)
     {
-        return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.WeaponDamage"), TEXT("Core.Health"), TEXT("Core.PhysicalDR")}},
-            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
-            {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AirborneDamage"), TEXT("Core.MoveSpeed")}},
-            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.WeaponDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
-            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.WeaponDamage"), TEXT("Offense.AddedDamage"), TEXT("Core.MaxResource")}},
-            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.WeaponDamage"), TEXT("Core.ResourceRegen"), TEXT("Core.Health")}},
-        }, ItemLevel);
+        TArray<FPiece> Pieces;
+        for (const BreakerBaselineLoadout::FSlotAffixes& Slot : BreakerBaselineLoadout::BreakerBaselineSlots())
+        {
+            Pieces.Add({Slot.Slot, Tier, Slot.AffixIds});
+        }
+        return MakeLoadout(Pieces, ItemLevel);
     }
 
     TArray<FBreakerNodeRank> BaselineRanks()

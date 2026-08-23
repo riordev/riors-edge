@@ -130,9 +130,9 @@ the two hold.
 | Constant | Value | Note |
 |---|---|---|
 | `BaseHealth` | 220 | Area level 1 is the chassis that was actually measured |
-| `BaseDamage` | 14 melee / 16 ranged | Authored per archetype at area level 1 |
+| `BaseDamage` | 51.1 melee / 58.4 ranged | Per archetype at area level 1; the ratio is the authored thing |
 | `g` health growth | 0.09 | x68 over 50 levels |
-| `d` damage growth | 0.055 | x14 over 50 levels |
+| `d` damage growth | 0.0173 | x2.32, against what a baseline's gear buys, x2.33 |
 | `w` weapon growth | 0.09 | Equal to `g` by design, not by coincidence |
 
 Item level 1 is the anchor: the scalar is exactly 1.0 there, so the curve is

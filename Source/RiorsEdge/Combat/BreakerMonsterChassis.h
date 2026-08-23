@@ -60,9 +60,18 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
     float BaseHealth = 220.0f;   // O2 PLACEHOLDER
 
     // Damage of one TRASH attack in an area-level-1 area. The melee archetype's
-    // authored 14 (the ranged archetype authors its own 16).
+    // authored figure (the ranged archetype authors its own, and the two move
+    // together — see BreakerRangedEnemy).
+    //
+    // O116 RETUNE. Was 14 with `d` at 0.055, which put time-to-die at 16.4s at
+    // area level 1 against O18's 4-5s: early content could not kill anybody,
+    // and hits-to-die then fell the whole way to the cap. Solved for TTD inside
+    // the band at BOTH ends against the one authored baseline character, which
+    // is what fixes the pair — anchoring on either end alone sends the other to
+    // five times its target, and anchoring on the CEILING character (the bug
+    // this retune was nearly built on) puts base damage 50% higher than this.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis", meta=(ClampMin="0"))
-    float BaseDamage = 14.0f;   // O2 PLACEHOLDER
+    float BaseDamage = 51.1f;   // O2 PLACEHOLDER
 
     // g. 9% per level is x66.8 over 50 levels — Power-Curve.md's stated shape.
     // Geometric, not linear: linear scaling makes early levels identical and
@@ -72,10 +81,18 @@ struct RIORSEDGE_API FBreakerMonsterChassisParams
 
     // d. MUST stay materially below g. If incoming damage scales as fast as
     // monster health then defence has to grow as fast as offence and every
-    // build becomes a defensive build. 5.5% is x14 over 50 levels against
-    // health's x67.
+    // build becomes a defensive build.
+    //
+    // O116 RETUNE, 0.055 -> 0.0173: x2.32 over 50 levels against health's x67
+    // and against what a baseline character's gear actually buys, x2.33. That
+    // second number is the one this solves against and the reason the old value
+    // was wrong — 0.055 grew incoming damage x13.8 while carried health grew
+    // x2.33, so hits-to-die fell by 5.9x across the levelling range and a
+    // character at the cap was flimsier than one at level 1 in content they
+    // out-geared. It is set BY that property, per the rule above the table, and
+    // Combat.DefenseCurve.HitsToDie is the test that holds it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Chassis", meta=(ClampMin="0", ClampMax="1"))
-    float DamageGrowthPerLevel = 0.055f;   // O2 PLACEHOLDER
+    float DamageGrowthPerLevel = 0.0173f;   // O2 PLACEHOLDER
 
     // --- Rank table (Power-Curve.md §2) ------------------------------------
     // These are RATIOS to trash at the SAME area level, which is what makes

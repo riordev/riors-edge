@@ -222,6 +222,20 @@ bool FBreakerRangedFairnessTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Holding station still moves — it is not a turret"),
         Defaults->StrafeSpeedMultiplier > 0.0f);
 
+    // THE RATIO TO MELEE, which is the authored thing and had nothing holding
+    // it. The ranged archetype overrides the chassis base damage — 16 against
+    // the melee 14, a deliberate 1.14x for the enemy that hits you from cover.
+    // The O116 retune moved the melee base and the override had to move with
+    // it; had it not, the pair would have inverted to 0.31x and the ranged
+    // enemy would have become the safe one with a green suite. A ratio nothing
+    // asserts is a ratio that survives exactly as long as nobody edits either
+    // half. Band rather than a point because both figures are O2 placeholders.
+    const float MeleeBase = FBreakerMonsterChassisParams().BaseDamage;
+    const float Ratio = Defaults->GetChassisParams().BaseDamage / FMath::Max(MeleeBase, UE_SMALL_NUMBER);
+    TestTrue(*FString::Printf(
+        TEXT("Ranged hits harder than melee at area level 1, and not by a lot (x%.2f)"), Ratio),
+        Ratio > 1.05f && Ratio < 1.30f);
+
     // Flight time at the closest legal shot is the tightest reaction budget
     // the archetype can present.
     const float NearFlight = Defaults->MinEngagementDistance / Defaults->ProjectileSpeed;

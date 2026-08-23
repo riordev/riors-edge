@@ -43,7 +43,14 @@ ABreakerRangedEnemy::ABreakerRangedEnemy()
     MoveSpeed = 320.0f;
     ArchetypeHealthMultiplier = 1.6f;   // O2 PLACEHOLDER, Encounter-Design §2.2
     // Damage at area level 1; the curve and the rank table take it from here.
-    Chassis.BaseDamage = 16.0f;   // O2 PLACEHOLDER, carried by the projectile
+    //
+    // MOVES WITH THE MELEE BASE, and the ratio is the authored thing. This was
+    // 16 against a melee 14, a deliberate 1.143x for the enemy that hits you
+    // from cover. The O116 retune raised the melee base to 51.1, and leaving
+    // this at 16 would have inverted the pair to 0.31x — the ranged enemy
+    // quietly becoming the safe one — without any test noticing, because
+    // nothing asserts the relationship. 51.1 x 1.143 = 58.4.
+    Chassis.BaseDamage = 58.4f;   // O2 PLACEHOLDER, carried by the projectile
     AttackRange = 0.0f;         // no contact attack — the base melee path is disabled
     AttackCooldown = 0.0f;
 
