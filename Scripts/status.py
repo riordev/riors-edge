@@ -235,7 +235,16 @@ def parse_conditions(text):
 
 
 def parse_declared_tags(lib_text):
-    return re.findall(r'UE_DEFINE_GAMEPLAY_TAG\((\w+),', lib_text)
+    """{identifier: "Progression.Node...."} for every declared node tag.
+
+    THE STRING IS HALF THE ANSWER. A consumer may name the identifier, or it may
+    request the tag by its full string through an accessor --
+    BreakerOverpenetrationTag() is
+    RequestGameplayTag("Progression.Node.Swift.Marksman.Overpenetration"), and
+    nothing in that file mentions Node_Overpenetration at all. Matching only the
+    identifier reported two genuinely-consumed tags as dead.
+    """
+    return dict(re.findall(r'UE_DEFINE_GAMEPLAY_TAG\((\w+),\s*"([^"]+)"', lib_text))
 
 
 # --------------------------------------------------------------------------
@@ -247,13 +256,91 @@ def parse_declared_tags(lib_text):
 # live nodes dead, which is how a previous audit reached "86 of 94 tags have no
 # consumer" and overstated the problem.
 
+def strip_cpp_comments(text):
+    """C++ source with comments removed and string literals kept.
+
+    THE INDEX MUST NOT READ PROSE. Consumer detection is a text search over
+    production sources, and it was searching comments too -- so a tag named in a
+    WAITING-ON roster counted as consumed, and a node whose payload nothing
+    reads reported as live. Six independent per-tree audits put the real silent
+    count higher than this report did, in the optimistic direction, which is the
+    worst direction for a number nobody re-derives.
+
+    String literals are preserved deliberately: id_consumed matches quoted node
+    ids, and the tag search below matches the full "Progression.Node..." string
+    an accessor requests. Stripping those would trade one blind spot for
+    another. Comments become a single space so two tokens either side of one
+    cannot merge into a third that matches nothing.
+    """
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"' or c == "'":
+            quote = c
+            out.append(c)
+            i += 1
+            while i < n:
+                out.append(text[i])
+                if text[i] == '\\' and i + 1 < n:
+                    out.append(text[i + 1])
+                    i += 2
+                    continue
+                if text[i] == quote:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            while i < n and text[i] != '\n':
+                i += 1
+            out.append(' ')
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            i += 2
+            while i + 1 < n and not (text[i] == '*' and text[i + 1] == '/'):
+                i += 1
+            i += 2
+            out.append(' ')
+            continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+
+def stripped_sources(sources, **kwargs):
+    """non_test_sources with every comment removed. See strip_cpp_comments."""
+    return {rel: strip_cpp_comments(text)
+            for rel, text in non_test_sources(sources, **kwargs).items()}
+
+
 def build_consumer_index(sources):
-    prod = non_test_sources(sources, exclude_substrings=("Progression/BreakerProgressionLibrary",))
+    """The text every "does anything read this?" question is answered against.
+
+    WHAT IT CAN SEE: production source outside the node library, comments
+    stripped, string literals kept. So a tag reaches it as the identifier
+    (BreakerNodeTags::Node_X) or as the full "Progression.Node..." string an
+    accessor requests, and a node id reaches it quoted or through a
+    Breaker<Name>NodeId constant.
+
+    WHAT IT CANNOT SEE, and these are the ways it still says yes when the answer
+    is no: a read that is compiled out, a read behind a branch nothing takes, a
+    tag mentioned in a disabled block, and any consumer that lives in a Data
+    Asset rather than in source. It is a text search, not a call graph. Treat
+    every number it feeds as an UPPER bound on how much is alive.
+
+    It also cannot see the library itself, deliberately: the file that DECLARES
+    every tag would otherwise consume all of them.
+    """
+    prod = stripped_sources(sources, exclude_substrings=("Progression/BreakerProgressionLibrary",))
     return "\n".join(prod.values())
 
 
-def tag_consumed(index, tag):
-    return re.search(r'\b' + re.escape(tag) + r'\b', index) is not None
+def tag_consumed(index, tag, tag_string=None):
+    """Either spelling counts: the identifier, or the full tag string."""
+    if re.search(r'\b' + re.escape(tag) + r'\b', index):
+        return True
+    return bool(tag_string) and ('"' + tag_string + '"') in index
 
 
 def id_consumed(index, node_id):
@@ -493,7 +580,7 @@ def build_sections(sources):
     silent = []
     for n in nodes:
         pays = any(e in paid for e in n["effects"])
-        heard = any(tag_consumed(index, t) for t in n["tags"]) or id_consumed(index, n["id"])
+        heard = any(tag_consumed(index, t, declared_tags.get(t)) for t in n["tags"]) or id_consumed(index, n["id"])
         if not pays and not heard:
             silent.append(n)
     per_tree = defaultdict(int)
@@ -537,7 +624,7 @@ def build_sections(sources):
     })
 
     # --- dead tags --------------------------------------------------------
-    dead_tags = [t for t in declared_tags if not tag_consumed(index, t)]
+    dead_tags = [t for t in declared_tags if not tag_consumed(index, t, declared_tags[t])]
     sections.append({
         "key": "dead-tags", "title": "Node tags with no consumer", "direction": CEILING,
         "value": len(dead_tags), "unit": f"of {len(declared_tags)} declared",
@@ -560,15 +647,18 @@ def build_sections(sources):
     })
 
     # --- uncalled generation ---------------------------------------------
+    # Comments stripped here for the same reason as the consumer index: a
+    # Notify name mentioned in a comment is not a caller.
     notifies = []
-    for rel, text in non_test_sources(sources).items():
+    stripped = stripped_sources(sources)
+    for rel, text in stripped.items():
         if not rel.startswith("Classes/") or not rel.endswith(".h"):
             continue
         for m in re.finditer(r'\bvoid (Notify\w+)\s*\(', text):
             notifies.append((rel, m.group(1)))
     uncalled = []
     for rel, fn in notifies:
-        callers = [r for r, t in non_test_sources(sources).items()
+        callers = [r for r, t in stripped.items()
                    if r != rel and re.search(r'\b' + fn + r'\s*\(', t)]
         if not callers:
             uncalled.append(f"{rel}::{fn}")
@@ -637,7 +727,7 @@ def build_sections(sources):
     # wiring problem where this is an authoring one.
     all_nopay = sum(1 for n in nodes
                     if not n["effects"] and not n["conditions"]
-                    and not any(tag_consumed(index, t) for t in n["tags"])
+                    and not any(tag_consumed(index, t, declared_tags.get(t)) for t in n["tags"])
                     and not id_consumed(index, n["id"]))
     sections.append({
         "key": "node-shape-composition", "title": "Node-shape composition, per tree",
@@ -653,6 +743,23 @@ def build_sections(sources):
                 "raw percentages to affixes outright, so the authored 55-65 target "
                 "cannot be reached without breaking another rule. Until it is "
                 "re-derived this section reports and judges nothing.",
+    })
+
+    # --- scaffolding, pinned on its own -----------------------------------
+    # SPLIT OUT OF THE NOTE ABOVE because O112 unpinned the composition BAND and
+    # took this number down with it -- a count that judges nothing is a count
+    # nobody defends. The band is genuinely unresolved; the scaffolding count is
+    # not, and it is the one Phase 4 writes a test against. A node with no stat
+    # line, no condition and no rule anything reads is an authoring failure at
+    # any composition target.
+    sections.append({
+        "key": "scaffolding-nodes", "title": "Scaffolding nodes",
+        "direction": CEILING, "value": all_nopay, "unit": f"of {len(nodes)} authored",
+        "detail": [],
+        "note": "No stat line, no condition, and no rule anything reads. A STRICT "
+                "SUBSET of the silent nodes: the difference is the silent nodes that "
+                "ARE shaped and merely point at an unpaid target, which is a wiring "
+                "problem where this is an authoring one.",
     })
 
     return sections, asserted

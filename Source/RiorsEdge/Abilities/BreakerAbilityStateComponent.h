@@ -21,64 +21,28 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerWindowEnded, FName, WindowKe
 // window names. The signatures are otherwise the spec's; swapping the key type
 // later is a mechanical change confined to this file and its callers.
 // ---------------------------------------------------------------------------
-// NODE-TAG CONSUMPTION AUDIT
+// NODE-TAG CONSUMPTION: the report owns this, not a comment.
 // ---------------------------------------------------------------------------
-// Every fallback tree node in Progression/BreakerProgressionLibrary.cpp that
-// authors no stat effect ships as a GrantedTag and is worth exactly nothing
-// until some system reads it. This is the ledger of which ones are read. Kept
-// here because Abilities/ is where most of the readers land; move it if a
-// better home appears. Query path in all cases:
-//   UBreakerProgressionComponent::HasNodeTag(BreakerNodeTags::Node_X.GetTag()).
+// A fallback-tree node that authors no stat effect ships as a GrantedTag and is
+// worth nothing until some system reads it. Which ones are read is measured by
+// `make status` -- the "Node tags with no consumer" and "Silent nodes" sections.
 //
-// CONSUMED
-//   Node_SkimDiscipline  Abilities/BreakerAbility_Skim.cpp — with the node
-//                        owned, Skim aimed steeply down becomes Hard Stop
-//                        (all velocity cancelled, 0.6s protective window via
-//                        the incoming-damage chain) and the airborne-use
-//                        ceiling rises from one to two per airtime (2026-08-16;
-//                        the counter lives on the ability instance, reset off
-//                        LandedDelegate).
-//   Node_SpendToLive     Abilities/BreakerAbility_Skim.cpp — Hard Stop's
-//                        window becomes immunity (chain multiplier 0.0) and
-//                        its committed cost doubles (2026-08-16).
-//   Node_MomentumShield  Classes/BreakerMomentumComponent.cpp — at Redline,
-//                        grounded, the loop holds a keyed incoming-damage
-//                        reduction; the fraction is an O2 PLACEHOLDER for the
-//                        still-missing Damage Reduction While Airborne affix
-//                        (2026-08-16).
-//   Node_SecondWind      Abilities/BreakerAbility_CadenceBreak.cpp — the
-//                        stack survives target swaps and misses; only a full
-//                        second without a hit resets it (2026-08-16).
-//   Node_PhantomStep     Classes/BreakerMomentumComponent.cpp — a passive
-//                        dodge proc opens a 0.5s guaranteed-dodge window on a
-//                        2.0s internal cooldown. PARTIAL: guaranteed dodge is
-//                        the nearest primitive Combat/ already owns; real
-//                        invulnerability needs a damage-immunity flag there.
-//   Node_SB_Blink        Abilities/BreakerAbility_Closequarter.cpp — with the
-//                        node owned, Closequarter cast with no target blinks
-//                        the full 12 m along the aim direction (SB7).
+// A HAND-MAINTAINED LEDGER USED TO LIVE HERE AND IT WAS WORSE THAN NOTHING.
+// It went stale in both directions -- tags it called inert had gained readers,
+// tags it called consumed never had one -- and because the report's consumer
+// index was a text scan of production source INCLUDING COMMENTS, every tag this
+// block named counted as its own consumer. The ledger made the report agree
+// with the ledger. Correcting the scan moved silent nodes 47 -> 54 and dead
+// tags 118 -> 143; deleting the ledger moves neither, because the scan no
+// longer reads it. It is deleted because a status list in a header is the
+// annotation genre the working rules ban, and because what a specific node is
+// waiting on belongs at that node's own site, where it already is.
 //
-// STILL INERT (tag granted, nothing reads it)
-//   Core:   Node_Fixate (needs the More bucket), Node_TunnelVision,
-//           Node_TriggerDiscipline, Node_Cyclic, Node_LastRound,
-//           Node_OpenWound, Node_SetStance, Node_Read (needs Parry),
-//           Node_Loft (needs Air Jump), Verb_Parry, Verb_AirJump
-//           — all Weapons/ or Combat/ readers.
-//   Kinetic: Node_ReadTheRoom, Node_Contact, Node_Carry, Node_Landing
-//           (Momentum loop knobs: cheap, all in Classes/, none done here),
-//           Node_Redirect (needs a cooldown-reduction path into GAS),
-//           Node_EvadeConversion (loop knob), Node_AirWork (affix tier read).
-//   Marksman: Node_LongLens,
-//           Node_Lead (second simultaneous mark — needs a mark *list* here,
-//           not a single MarkTarget).
-//   CONSUMED since this list was written (2026-08-16 consumer waves — the
-//   readers live in Weapons/BreakerWeaponComponent + BreakerWeaponMath):
-//           Node_Steady, Node_Ledger, Node_MarkEconomy (weapon-kill jump
-//           half; DoT/ally deaths still wait on UBreakerMarkComponent),
-//           Node_Angle, Node_PierceDiscipline, Node_Sightline,
-//           Node_TriggerDiscipline (Frenzy's), Node_TunnelVision and
-//           Node_OpenWound (target riders), Node_Redirect, Node_NoGround,
-//           Node_Reserve, Node_NoSafety (loop valve).
+// Query path, which is the one line here that was ever instruction rather than
+// status:
+//   UBreakerProgressionComponent::HasNodeTag(BreakerNodeTags::Node_X.GetTag())
+// or, equivalently and just as visible to the report, by the tag's full string
+// through an accessor -- RequestGameplayTag("Progression.Node....").
 // ---------------------------------------------------------------------------
 UCLASS(ClassGroup=Abilities, BlueprintType, meta=(BlueprintSpawnableComponent))
 class RIORSEDGE_API UBreakerAbilityStateComponent : public UActorComponent

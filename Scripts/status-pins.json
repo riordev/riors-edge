@@ -34,7 +34,6 @@
     "reason a person read and accepted. The test is not the size of the move, it",
     "is whether the reason was examined before the pin followed it."
   ],
-
   "_expected_red_comment": [
     "Deliberate reds, enumerated. A red test not on this list is a regression.",
     "ADD THE ENTRY IN THE SAME COMMIT THAT ADDS THE TEST. Otherwise the build",
@@ -60,38 +59,101 @@
     "Progression.PowerBand.AbilityLane :: Ability parity measures 0.647x at the cap against O99's ruled 0.85-1.15x, and 0.388x at endgame where the section is unpinned. An ability-geared build's ability lane composes to 65% of a weapon-geared build's weapon lane at the same gear depth, and the deficit WIDENS with gear depth rather than diluting - a lane with more lines compounds harder up a back-loaded ladder. Crit and More cancel exactly; the shortfall is flat 1.000 against 1.154 and increased 3.35 against 4.49. DELETE THIS ENTRY WHEN: ability affix breadth is authored, the flat-half question is answered, and the cap measurement reaches the band. Do not close it by widening the band, and do not close it by letting ability hits read the weapon pool - that is the partition deleted, not the gap closed.",
     "Progression.PowerBand.AtCap :: The at-cap band measures 6.53x against an authored 8-10x, on a baseline definition corrected 2026-08-22 (a realistically decent roll two tiers below what item level allows, derived identically at both measurement points; it was previously the theoretical worst roll, which made the number uninterpretable). DELETE THIS ENTRY WHEN: the owner rules on the band targets against the corrected basis — either the authored 8-10x moves, or content retunes until the measurement reaches it. Do not widen the assertion to make it pass."
   ],
-
-  "silent-nodes":            { "max": 47,  "kind": "measurement",
-    "why": "Drive this down regardless. A node a player spends a point on and gets nothing from is a broken promise, and it is the failure this project has shipped four times." },
-  "dead-tags":               { "max": 118, "kind": "measurement",
-    "why": "118 of 202 looks alarming and is not all rot. Some is deliberate reserve ahead of consumers, which O72 now makes the required order: widen the vocabulary first, then author to it. The rest is the real backlog. Nobody has separated the two, and until someone does, this pin only stops the number growing." },
-  "dead-conditions":         { "max": 12,  "kind": "measurement" },
-  "unmapped-stat-targets":   { "max": 6,   "kind": "measurement",
-    "why": "Lowered 7 -> 6 by wiring DashCooldown, which was never blocked on anything: the comment recording it as unwireable claimed EBreakerAggregatedAttribute had no dash entry, and it had one when that was written. Before that, lowered 8 -> 7 when the section stopped counting rider-delivered targets as unmapped: O98 rules MeleeDamage a tag-keyed slice of the weapon pool, so it will never have a lane and counting it made a ratcheting ceiling that could not reach zero. Before that, lowered 10 -> 8 by the O54 pool split, which wired WeaponDamage and AbilityDamage. They were the only entries ever blocked on something larger than a line of aggregation: there was ONE damage bucket and a partition needs two. A ceiling that does not fall after a real drop has stopped being a ratchet." },
-  "empty-lanes":             { "max": 9,   "kind": "measurement",
-    "why": "Raised 8 -> 9 by wiring DashCooldown. Worth stating because it was predicted NOT to move, on the reasoning that gear already bids into DashCooldownReduction: this section counts NODE authors, not bidders, so a lane gear bids into still reads empty until a node reaches it. That is the section working — the tree is the layer it measures. Before that, raised 6 -> 8, and this is the one shape of increase the pin file permits: O72 orders the work as vocabulary first, then authoring, so a newly wired lane necessarily lands here for exactly as long as it takes content to reach it. WeaponDamage and AbilityDamage have lanes, gear affixes and a measured parity figure; no NODE authors them yet. If this number is still 8 after a tree pass, the pass skipped the lanes it was waiting for." },
-  "uncalled-generation":     { "max": 0,   "kind": "measurement",
-    "why": "Already zero. Pinned so it stays that way." },
-  "unexpected-red":          { "max": 0,   "kind": "measurement" },
-
-  "unimplemented-invariants": { "max": 42, "target": 20, "kind": "target",
-    "why": "Re-pinned 43 -> 42: UI.NoItemScore got its test, and it was VIOLATED at the time -- the loadout subtitle printed the sum of equipped item levels as a gear score, on the most-used screen in the game, under an invariant asserting no screen prints one. Third worked example in a week for this target. THE WORKED EXAMPLE THIS TARGET EXISTS FOR is UI.Damage.Aggregation and UI.Damage.Cap. Two named invariants, no tests, and the feature they describe was ALREADY BUILT -- so it looked done, and three of the rule's four clauses were wrong in the shipped tuning for as long as nobody measured them: a damage-over-time effect that could never merge with itself, two deliberate shots that merged into one, a window that slid so a held trigger accumulated a whole magazine, and a cap that evicted the busiest number first. An untested invariant is not a gap in coverage, it is a claim nobody has checked, and the more finished the feature looks the longer it survives. That is the argument for 43 -> 20. Re-pinned 45 -> 43: UI.Damage.Aggregation and UI.Damage.Cap got their tests. Both described behaviour that already EXISTED and was wrong in three of its four clauses, which is the state an untested invariant is worst in -- it looks asserted, the feature looks built, and nothing is watching the tuning. Before that, re-pinned 46 -> 45: Progression.WorldPoints.SoloReachable got its test, and it could not have had one before -- O7 rules fifteen world Core Points canon and they had no representation in code at all, so there was nothing to assert over. A ceiling that does not fall after a real drop has stopped being a ratchet. Before that, re-pinned 48 -> 46 as two of the three promoted findings got their tests — HitsToDie and BossBand, both red on purpose and both enumerated above. ArchetypeSpread is the third and is still owed. Before that, re-pinned 51 -> 48: PowerBand.AbilityLane was written by the O54 pool split, and the split added two invariants to power-and-scaling that landed WITH their tests rather than ahead of them. Pinned so it cannot grow, targeted so it does not sit there for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe." },
-
-  "loot-per-hour":           { "min": 110, "max": 160, "kind": "measurement",
-    "why": "The reference figure the drop pipeline is tuned against, at the reference area level. Band rather than ceiling: too few items is as wrong as too many." },
-  "power-band-atcap":        { "source": { "min": "AtCapBandMinimum", "max": "AtCapBandMaximum" }, "kind": "target",
-    "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered." },
-  "power-band-ability":      { "source": { "min": "AbilityParityBandMinimum", "max": "AbilityParityBandMaximum" }, "kind": "target",
-    "why": "O99. Measures 0.647x at the cap. THE BAND CLOSES BY AUTHORING CONTENT, NOT BY TOUCHING THE COMPOSITION. The two builds hold an identical More product and identical crit lines, so both cancel exactly and parity is the flat ratio times the increased ratio - and both are short, in two different ways. INCREASED, 3.35 against 4.49: the ability pool is one seeded line per slot at placeholder values where the weapon pool is that line plus added damage, fire rate, five conditional lines and the projectile family. That half is unauthored content. FLAT, 1.000 against 1.154: the ability lane has no flat line at all, because Added Damage bids Flat into the weapon lane only and O54 names three INCREASED pools without settling the flat half. That half is an unanswered design question and is in the open list. Anyone reading this as a plumbing problem will 'fix' it by folding the weapon pool back into ability hits, which deletes the partition rather than closing the gap. Target, not measurement: 0.647x pinned would enshrine abilities as a second-class lane, the same mistake as pinning the defence inversion at 3.76." },
-  "power-band-endgame":      { "source": { "min": "EndgameBandMinimum", "max": "EndgameBandMaximum" }, "kind": "measurement",
-    "why": "Measures 15.40x, comfortably inside. Now meaningful, because both bands finally compute their baseline the same way." },
-  "damage-vs-defence-growth": { "max": 1.0, "kind": "target",
-    "why": "LANDED at 0.63 by the O116 retune: monster damage now grows x2.32 across the levelling range against gear health's x3.67, so hits-to-die rises rather than falls. Was 3.76, and pinned as a TARGET because pinning at 3.76 would have enshrined the inversion. It is a measurement ratchet now: the ceiling stays at 1.0, which is the property O91 rules rather than the number measured, so a future retune that pushes damage growth back past what defence buys fails here." },
-  "world-points-unwired":    { "max": 14, "target": 0, "kind": "target",
-    "why": "14 of the 15 canon world Core Points have no trigger in the build. Only the Forge interaction does, because Kess ships with dialogue and a registered flag. This is the campaign's payout gap as a number: eight of the twenty-eight authored missions pay one of these as their entire reward, so a third of the mission list has nothing to give. Pinned at the current value so it cannot grow and targeted at zero so it does not sit here for a year. Two of the fourteen are the grouped archetype first-clears (O117), and they are narrower than they look: the eight archetypes are AUTHORED -- Clear, Sever, Hold, Hunt, Escort, Carry, Collapse, Silence, sited across missions A1-4 to A2-7 -- so the vocabulary exists and simply has no C++ representation yet. What is actually missing is ONE rift completion event to fire on. That is a different and much smaller job than authoring a vocabulary, and worth stating precisely, because 'no vocabulary exists' reads as a design gap when it is a plumbing gap." },
-  "rewrite-impact":          { "source": { "max": "MaximumProlificRuleStep" }, "kind": "measurement",
-    "why": "Worst single rewrite step on an optimized build, 1.46x. Ceiling rather than band: a rewrite worth nothing is a design problem, not a build-breaking one." },
-
-  "offered-to-spendable":    { "min": 3.0, "kind": "target",
-    "why": "0.63x on the worst tree. The largest gap in the report." }
+  "silent-nodes": {
+    "max": 54,
+    "kind": "measurement",
+    "why": "RE-PINNED 47 -> 54 AS A CORRECTION, NOT A WIDENING. The consumer index was a raw text scan of production source INCLUDING COMMENTS, so a tag named in a WAITING-ON roster counted as a consumer and its node reported live. Six independent per-tree audits read the CONSUMERS rather than the report: Core.Slice 3 -> 5 silent, Swift Kinetic/Marksman/Frenzy 1/2/2 -> 3/1/1, Gunsmith Armory/FieldTech/Tinkerer 2/1/2 -> 3/0/1. The scan now strips comments and keeps string literals, and it also resolves a tag through the full \"Progression.Node...\" string an accessor requests, which moved two tags the other way. 47 was never a real 47. Drive this down regardless: a node a player spends a point on and gets nothing from is a broken promise, and it is the failure this project has shipped four times."
+  },
+  "dead-tags": {
+    "max": 143,
+    "kind": "measurement",
+    "why": "RE-PINNED 118 -> 143 AS A CORRECTION. Same cause as silent-nodes: the index read comments, so every tag listed in a WAITING-ON roster counted as consumed. It also ran the other way -- Node_Overpenetration and Node_MarksmanCalledShot ARE consumed, at BreakerWeaponComponent.cpp:1811 and :1417, through accessors that request the tag by its full string and never name the identifier. Both directions are now matched. 143 of 202 is not all rot: some is deliberate reserve ahead of consumers, which O72 makes the required order. Nobody has separated reserve from backlog, and until someone does this pin only stops the number growing."
+  },
+  "dead-conditions": {
+    "max": 12,
+    "kind": "measurement"
+  },
+  "unmapped-stat-targets": {
+    "max": 6,
+    "kind": "measurement",
+    "why": "Lowered 7 -> 6 by wiring DashCooldown, which was never blocked on anything: the comment recording it as unwireable claimed EBreakerAggregatedAttribute had no dash entry, and it had one when that was written. Before that, lowered 8 -> 7 when the section stopped counting rider-delivered targets as unmapped: O98 rules MeleeDamage a tag-keyed slice of the weapon pool, so it will never have a lane and counting it made a ratcheting ceiling that could not reach zero. Before that, lowered 10 -> 8 by the O54 pool split, which wired WeaponDamage and AbilityDamage. They were the only entries ever blocked on something larger than a line of aggregation: there was ONE damage bucket and a partition needs two. A ceiling that does not fall after a real drop has stopped being a ratchet."
+  },
+  "empty-lanes": {
+    "max": 9,
+    "kind": "measurement",
+    "why": "Raised 8 -> 9 by wiring DashCooldown. Worth stating because it was predicted NOT to move, on the reasoning that gear already bids into DashCooldownReduction: this section counts NODE authors, not bidders, so a lane gear bids into still reads empty until a node reaches it. That is the section working — the tree is the layer it measures. Before that, raised 6 -> 8, and this is the one shape of increase the pin file permits: O72 orders the work as vocabulary first, then authoring, so a newly wired lane necessarily lands here for exactly as long as it takes content to reach it. WeaponDamage and AbilityDamage have lanes, gear affixes and a measured parity figure; no NODE authors them yet. If this number is still 8 after a tree pass, the pass skipped the lanes it was waiting for."
+  },
+  "uncalled-generation": {
+    "max": 0,
+    "kind": "measurement",
+    "why": "Already zero, pinned so it stays that way. Its caller search now strips comments too, for the same reason the consumer index does -- a Notify name mentioned in a comment is not a caller. The number did not move, which is the answer worth recording: this section was not relying on prose."
+  },
+  "unexpected-red": {
+    "max": 0,
+    "kind": "measurement"
+  },
+  "unimplemented-invariants": {
+    "max": 42,
+    "target": 20,
+    "kind": "target",
+    "why": "Re-pinned 43 -> 42: UI.NoItemScore got its test, and it was VIOLATED at the time -- the loadout subtitle printed the sum of equipped item levels as a gear score, on the most-used screen in the game, under an invariant asserting no screen prints one. Third worked example in a week for this target. THE WORKED EXAMPLE THIS TARGET EXISTS FOR is UI.Damage.Aggregation and UI.Damage.Cap. Two named invariants, no tests, and the feature they describe was ALREADY BUILT -- so it looked done, and three of the rule's four clauses were wrong in the shipped tuning for as long as nobody measured them: a damage-over-time effect that could never merge with itself, two deliberate shots that merged into one, a window that slid so a held trigger accumulated a whole magazine, and a cap that evicted the busiest number first. An untested invariant is not a gap in coverage, it is a claim nobody has checked, and the more finished the feature looks the longer it survives. That is the argument for 43 -> 20. Re-pinned 45 -> 43: UI.Damage.Aggregation and UI.Damage.Cap got their tests. Both described behaviour that already EXISTED and was wrong in three of its four clauses, which is the state an untested invariant is worst in -- it looks asserted, the feature looks built, and nothing is watching the tuning. Before that, re-pinned 46 -> 45: Progression.WorldPoints.SoloReachable got its test, and it could not have had one before -- O7 rules fifteen world Core Points canon and they had no representation in code at all, so there was nothing to assert over. A ceiling that does not fall after a real drop has stopped being a ratchet. Before that, re-pinned 48 -> 46 as two of the three promoted findings got their tests — HitsToDie and BossBand, both red on purpose and both enumerated above. ArchetypeSpread is the third and is still owed. Before that, re-pinned 51 -> 48: PowerBand.AbilityLane was written by the O54 pool split, and the split added two invariants to power-and-scaling that landed WITH their tests rather than ahead of them. Pinned so it cannot grow, targeted so it does not sit there for a year. Order: the four promoted findings first; then anything guarding a newly written and therefore unenforced rule — the three-pool model, the rewrite caps, the axis-overlap prohibition, equip caps at save load; then the rest, with the systems they describe."
+  },
+  "loot-per-hour": {
+    "min": 110,
+    "max": 160,
+    "kind": "measurement",
+    "why": "The reference figure the drop pipeline is tuned against, at the reference area level. Band rather than ceiling: too few items is as wrong as too many."
+  },
+  "power-band-atcap": {
+    "source": {
+      "min": "AtCapBandMinimum",
+      "max": "AtCapBandMaximum"
+    },
+    "kind": "target",
+    "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered."
+  },
+  "power-band-ability": {
+    "source": {
+      "min": "AbilityParityBandMinimum",
+      "max": "AbilityParityBandMaximum"
+    },
+    "kind": "target",
+    "why": "O99. Measures 0.647x at the cap. THE BAND CLOSES BY AUTHORING CONTENT, NOT BY TOUCHING THE COMPOSITION. The two builds hold an identical More product and identical crit lines, so both cancel exactly and parity is the flat ratio times the increased ratio - and both are short, in two different ways. INCREASED, 3.35 against 4.49: the ability pool is one seeded line per slot at placeholder values where the weapon pool is that line plus added damage, fire rate, five conditional lines and the projectile family. That half is unauthored content. FLAT, 1.000 against 1.154: the ability lane has no flat line at all, because Added Damage bids Flat into the weapon lane only and O54 names three INCREASED pools without settling the flat half. That half is an unanswered design question and is in the open list. Anyone reading this as a plumbing problem will 'fix' it by folding the weapon pool back into ability hits, which deletes the partition rather than closing the gap. Target, not measurement: 0.647x pinned would enshrine abilities as a second-class lane, the same mistake as pinning the defence inversion at 3.76."
+  },
+  "power-band-endgame": {
+    "source": {
+      "min": "EndgameBandMinimum",
+      "max": "EndgameBandMaximum"
+    },
+    "kind": "measurement",
+    "why": "Measures 15.40x, comfortably inside. Now meaningful, because both bands finally compute their baseline the same way."
+  },
+  "damage-vs-defence-growth": {
+    "max": 1.0,
+    "kind": "target",
+    "why": "LANDED at 0.63 by the O116 retune: monster damage now grows x2.32 across the levelling range against gear health's x3.67, so hits-to-die rises rather than falls. Was 3.76, and pinned as a TARGET because pinning at 3.76 would have enshrined the inversion. It is a measurement ratchet now: the ceiling stays at 1.0, which is the property O91 rules rather than the number measured, so a future retune that pushes damage growth back past what defence buys fails here."
+  },
+  "world-points-unwired": {
+    "max": 14,
+    "target": 0,
+    "kind": "target",
+    "why": "14 of the 15 canon world Core Points have no trigger in the build. Only the Forge interaction does, because Kess ships with dialogue and a registered flag. This is the campaign's payout gap as a number: eight of the twenty-eight authored missions pay one of these as their entire reward, so a third of the mission list has nothing to give. Pinned at the current value so it cannot grow and targeted at zero so it does not sit here for a year. Two of the fourteen are the grouped archetype first-clears (O117), and they are narrower than they look: the eight archetypes are AUTHORED -- Clear, Sever, Hold, Hunt, Escort, Carry, Collapse, Silence, sited across missions A1-4 to A2-7 -- so the vocabulary exists and simply has no C++ representation yet. What is actually missing is ONE rift completion event to fire on. That is a different and much smaller job than authoring a vocabulary, and worth stating precisely, because 'no vocabulary exists' reads as a design gap when it is a plumbing gap."
+  },
+  "rewrite-impact": {
+    "source": {
+      "max": "MaximumProlificRuleStep"
+    },
+    "kind": "measurement",
+    "why": "Worst single rewrite step on an optimized build, 1.46x. Ceiling rather than band: a rewrite worth nothing is a design problem, not a build-breaking one."
+  },
+  "offered-to-spendable": {
+    "min": 3.0,
+    "kind": "target",
+    "why": "0.63x on the worst tree. The largest gap in the report."
+  },
+  "scaffolding-nodes": {
+    "max": 50,
+    "kind": "measurement",
+    "why": "NEW SECTION, split out of node-shape-composition's note. O112 unpinned that BAND for a real reason -- 60% ranked minors means 60% unconditional stat lines and O76 gives those to affixes -- but unpinning the band took this count down with it, and a number that judges nothing is a number nobody defends. The band is genuinely unresolved; this is not. A node with no stat line, no condition and no rule anything reads is an authoring failure at any composition target, and it is the count Phase 4 writes a test against. Pinned at the first honest reading, after the comment-stripping fix."
+  }
 }
