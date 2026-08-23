@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; padding:32px; font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:32px; align-items:flex-start; width:max-content;">
+
+ <div style="width:1920px; height:1080px; background:#0A111C; color:#E6EDF5; display:flex; flex-direction:column; overflow:hidden; border:1px solid #1F3047; flex-shrink:0;">
+
+  <div style="height:88px; flex-shrink:0; border-bottom:1px solid #1F3047; display:flex; align-items:center; padding:0 40px; gap:32px;">
+    <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:30px; margin:0; text-transform:uppercase; letter-spacing:0.02em; line-height:1;">Doctrine</h1>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">SWIFT · {{ boardName }} COMMITTED · ADJACENCY, NO GATES</div>
+    <div style="margin-left:auto; display:flex; gap:24px; align-items:center;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:28px; line-height:1; color:#4FD8F5;">{{ pts }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">SKILL POINTS · {{ spent }} OF 65 SPENT</div>
+      </div>
+      <div onClick="{{ respec }}" style="padding:10px 18px; border:1px solid #C22A2A; color:#FF4040; font-family:'Archivo',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;" style-hover="background:#2A1414;">Respec all</div>
+    </div>
+  </div>
+
+  <div style="flex:1; display:flex; min-height:0;">
+
+    <div style="width:280px; flex-shrink:0; border-right:1px solid #1F3047; display:flex; flex-direction:column; min-height:0;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 24px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; border-bottom:1px solid #131E2E;">SWIFT DOCTRINES</div>
+      <sc-for list="{{ rail }}" as="row" hint-placeholder-count="3">
+        <div onClick="{{ row.select }}" style="{{ row.style }}">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; line-height:1; color:{{ row.nameColor }};">{{ row.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:{{ row.countColor }};">{{ row.count }}</div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.1em; color:#63768C;">{{ row.thesis }}</div>
+          <div style="height:3px; background:#1F3047; display:flex;">
+            <div style="width:{{ row.pct }}; background:{{ row.barColor }};"></div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="flex-shrink:0; margin-top:auto; padding:24px; border-top:1px solid #131E2E; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">EVERY DOCTRINE · 26 PTS OFFERED</div>
+        <div style="display:flex; align-items:center; gap:12px;"><div style="width:16px; height:16px; border:2px solid #63768C; border-radius:2px; flex-shrink:0;"></div><span style="font-size:13px; color:#9FB0C4;">2 stat · 1 pt each</span></div>
+        <div style="display:flex; align-items:center; gap:12px;"><div style="width:26px; height:26px; border:2px solid #63768C; border-radius:2px; flex-shrink:0;"></div><span style="font-size:13px; color:#9FB0C4;">5 rule · 2 pt, +2 to upgrade</span></div>
+        <div style="display:flex; align-items:center; gap:12px;"><div style="width:34px; height:34px; border:2px solid #63768C; border-radius:2px; flex-shrink:0; display:flex; align-items:center; justify-content:center;"><div style="width:14px; height:14px; border:2px solid #63768C; border-radius:1px;"></div></div><span style="font-size:13px; color:#9FB0C4;">1 keystone · 4 pt</span></div>
+        <div style="font-size:13px; color:#63768C; line-height:1.5;">Size is the type. Both stat nodes are open on commit — committing grants the doctrine, not a node.</div>
+      </div>
+    </div>
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 24px; gap:16px; border-bottom:1px solid #131E2E;">
+        <div style="font-family:'Archivo',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">{{ boardName }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">{{ boardMeta }}</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FFC64A;">{{ boardBuyable }}</div>
+      </div>
+      <div style="flex:1; min-height:0; position:relative; overflow:hidden;">
+        <svg width="100%" height="100%" viewBox="0 0 1260 892" fill="none" preserveAspectRatio="none" style="position:absolute; inset:0;">
+          <sc-for list="{{ links }}" as="l" hint-placeholder-count="8">
+            <path d="{{ l.d }}" stroke="{{ l.color }}" stroke-width="{{ l.w }}"></path>
+          </sc-for>
+        </svg>
+        <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="8">
+          <div onClick="{{ n.buy }}" style="{{ n.wrapStyle }}">
+            <div style="{{ n.markStyle }}">
+              <div style="{{ n.innerStyle }}"></div>
+            </div>
+            <div style="{{ n.labelStyle }}">
+              <div style="display:flex; align-items:baseline; gap:8px; justify-content:{{ n.justify }};">
+                <div style="font-family:'Archivo',sans-serif; font-size:{{ n.nameSize }}; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; line-height:1.1; color:{{ n.nameColor }};">{{ n.name }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.1em; color:{{ n.costColor }};">{{ n.cost }}</div>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.4; color:{{ n.bodyColor }};">{{ n.body }}</div>
+              <div style="display:flex; align-items:center; gap:8px; justify-content:{{ n.justify }};">
+                <sc-if value="{{ n.hasRanks }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; gap:2px; width:44px;">
+                    <div style="{{ n.pip1 }}"></div>
+                    <div style="{{ n.pip2 }}"></div>
+                  </div>
+                </sc-if>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:{{ n.stateColor }};">{{ n.state }}</div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="width:380px; flex-shrink:0; border-left:1px solid #1F3047; display:flex; flex-direction:column;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 24px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; border-bottom:1px solid #131E2E;">FRONTIER</div>
+      <div style="padding:24px; display:flex; flex-direction:column; gap:16px; flex:1; min-height:0;">
+        <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">{{ frontierNote }}</div>
+        <sc-for list="{{ frontier }}" as="f" hint-placeholder-count="3">
+          <div onClick="{{ f.buy }}" style="{{ f.style }}">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+              <div style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:{{ f.nameColor }};">{{ f.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:{{ f.costColor }};">{{ f.cost }}</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4; line-height:1.5;">{{ f.body }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#63768C;">{{ f.via }}</div>
+          </div>
+        </sc-for>
+        <div style="margin-top:auto; display:flex; flex-direction:column; gap:9px; border-top:1px solid #131E2E; padding-top:18px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">IN FORCE</div>
+          <sc-for list="{{ inForce }}" as="r" hint-placeholder-count="2">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:{{ r.color }}; line-height:1.5;">{{ r.text }}</div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:56px; flex-shrink:0; border-top:1px solid #1F3047; display:flex; align-items:center; padding:0 40px; gap:32px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; letter-spacing:0.1em;">
+    <div><span style="color:#E6EDF5;">LMB</span> BUY OR UPGRADE</div>
+    <div><span style="color:#E6EDF5;">HOVER</span> FULL DETAIL</div>
+    <div><span style="color:#E6EDF5;">TAB</span> CORE TREE</div>
+    <div style="margin-left:auto; color:#FFC64A;">{{ footer }}</div>
+  </div>
+ </div>
+
+ <div style="width:1920px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; color:#E6EDF5;">
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">The shape of adjacency</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Eight nodes on a three-column, three-row lattice, and every link is a horizontal or vertical run — where two nodes do not share an axis the route takes exactly one right angle, never a diagonal. The two stat nodes sit at the left edge and are open on commit, so the board has two entry points rather than a granted node. Links go cyan when both ends are owned, so the owned set reads as a lit run; a half-owned link goes gold, which is the frontier drawn rather than annotated.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Pricing on the board</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">26 points offered per doctrine: 2 stat at 1, 5 rule at 2 with a further 2 to upgrade, keystone at 4. Cost sits beside the name at every state, so the board is priced before anything is clicked. Rule nodes carry two rank pips — the second rank is a purchase on the board, not a hidden tier — and their state line reads RANK 1 OF 2 while the upgrade is still open. Nothing is gated by points invested; price is the only cost.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">One pool, one counter</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">The header shows a single skill-point balance against the 65-point lifetime pool, shared with the Core tree, and one respec that clears everything. There is no doctrine currency and no class currency. The rail's per-doctrine bar is spend, not a second budget — it reports where the shared pool went. Zones: header 88, rail 280, board 1260×892 on its own coordinate space, frontier 380, footer 56. Columns 260 / 630 / 1000, rows 190 / 446 / 702.</div>
+   </div>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1984,&quot;height&quot;:1400}}">
+class Component extends DCLogic {
+  state = {
+    doctrine: 0,
+    // id -> ranks owned (rule nodes go to 2, others to 1)
+    owned: { 0: { s1: 1, a1: 1 }, 1: {}, 2: {} },
+    pool: 65
+  };
+
+  COST = { stat: 1, node: 2, key: 4 };
+  MAXRANK = { stat: 1, node: 2, key: 1 };
+
+  board() {
+    const layout = [
+      { id:'s1', x:260,  y:190, type:'stat' },
+      { id:'s2', x:260,  y:702, type:'stat' },
+      { id:'a1', x:630,  y:190, type:'node' },
+      { id:'a2', x:1000, y:190, type:'node' },
+      { id:'a3', x:630,  y:702, type:'node' },
+      { id:'a4', x:1000, y:702, type:'node' },
+      { id:'a5', x:630,  y:446, type:'node' },
+      { id:'k',  x:1000, y:446, type:'key' }
+    ];
+    const links = [
+      ['s1','a1'], ['a1','a2'], ['s2','a3'], ['a3','a4'],
+      ['a1','a5'], ['a3','a5'], ['a5','k'], ['a2','k'], ['a4','k']
+    ];
+    const text = [
+      { name:'Skimline', thesis:'MOMENTUM NEVER SETTLES', nodes: {
+        s1:{ name:'Glide', body:'+18% air acceleration' },
+        s2:{ name:'Trim', body:'+12% air turn rate' },
+        a1:{ name:'Dead Air', body:'Air control no longer decays.', up:'Wall contact refunds an air dash.' },
+        a2:{ name:'Carry The Line', body:'Slide speed survives a jump.', up:'Landing also refunds the slide.' },
+        a3:{ name:'No Brakes', body:'Cannot slow below 6 m/s. Standing still doubles damage taken.', up:'Floor rises to 9 m/s.' },
+        a4:{ name:'Second Skin', body:'Shields recharge only above 12 m/s, at triple rate.', up:'Recharge ignores the delay.' },
+        a5:{ name:'Skip', body:'Every wall contact adds 8% speed, to 40%.', up:'Cap rises to 70%.' },
+        k:{ name:'Terminal', body:'No speed cap. All damage taken +40%. Momentum never decays.' } } },
+      { name:'Ricochet', thesis:'THE ROOM IS THE WEAPON', nodes: {
+        s1:{ name:'Angle', body:'+16% projectile speed' },
+        s2:{ name:'Rebound', body:'+14% ricochet damage' },
+        a1:{ name:'Off The Wall', body:'Shots that bounce cannot miss.', up:'Bounces also pierce.' },
+        a2:{ name:'Cross Fire', body:'A bounced shot marks whatever it passes.', up:'Marks last 4s longer.' },
+        a3:{ name:'Hard Surface', body:'Bounces gain 25% damage per surface, to three.', up:'Cap rises to five.' },
+        a4:{ name:'Enfilade', body:'Bounced kills refund the magazine cost.', up:'Refund becomes the full magazine.' },
+        a5:{ name:'Skim Shot', body:'Firing while sliding adds one bounce.', up:'Adds two.' },
+        k:{ name:'Crossroads', body:'Every shot bounces once, always. Direct hits deal 30% less.' } } },
+      { name:'Deadfall', thesis:'HEIGHT IS A LOADED WEAPON', nodes: {
+        s1:{ name:'Drop', body:'+20% fall damage dealt' },
+        s2:{ name:'Brace', body:'+15% impact radius' },
+        a1:{ name:'Anvil', body:'Landings shock the ground for 4 m.', up:'Radius rises to 7 m.' },
+        a2:{ name:'Dead Weight', body:'Falling ignores air control. Impact doubles.', up:'Impact triples.' },
+        a3:{ name:'Long Drop', body:'Damage scales with fall height without cap.', up:'Scaling rate +50%.' },
+        a4:{ name:'Crater', body:'Impacts leave difficult ground for 6s.', up:'Ground also burns.' },
+        a5:{ name:'Step Off', body:'Ledges grant a free downward dash.', up:'Dash also staggers.' },
+        k:{ name:'Ground Zero', body:'Impacts stagger everything in 8 m. You take fall damage twice.' } } }
+    ];
+    return { layout, links, text };
+  }
+
+  renderVals() {
+    const { layout, links, text } = this.board();
+    const di = this.state.doctrine;
+    const copy = text[di];
+    const held = this.state.owned[di] || {};
+    const rank = id => held[id] || 0;
+    const nbr = id => links.filter(l => l.indexOf(id) >= 0).map(l => l[0] === id ? l[1] : l[0]);
+    const type = id => (layout.find(n => n.id === id) || {}).type;
+    const seed = id => type(id) === 'stat';
+    const linked = id => seed(id) || nbr(id).some(o => rank(o) > 0);
+    const maxed = id => rank(id) >= this.MAXRANK[type(id)];
+    const canBuy = id => !maxed(id) && linked(id) && this.state.pool >= this.COST[type(id)];
+
+    const buy = id => () => this.setState(s => {
+      if (maxed(id) || !linked(id)) return {};
+      const o = Object.assign({}, s.owned);
+      const d = Object.assign({}, o[di] || {});
+      d[id] = (d[id] || 0) + 1;
+      o[di] = d;
+      return { owned: o, pool: Math.max(0, s.pool - this.COST[type(id)]) };
+    });
+
+    const SIZE = { stat: 26, node: 40, key: 56 };
+    const KIND = { stat: 'STAT', node: 'RULE', key: 'KEYSTONE' };
+    const SX = 1260, SY = 892;
+
+    const spentHere = layout.reduce((t, n) => t + rank(n.id) * this.COST[n.type], 0);
+
+    const nodes = layout.map(n => {
+      const r = rank(n.id), own = r > 0, can = canBuy(n.id), full = maxed(n.id);
+      const accent = own ? '#4FD8F5' : (can ? '#FFC64A' : '#2A3E58');
+      const d = SIZE[n.type];
+      const right = n.type === 'key';
+      const c = copy.nodes[n.id];
+      const isRule = n.type === 'node';
+      const pip = i => 'flex:1; height:3px; background:' + (i <= r ? '#4FD8F5' : '#1F3047') + ';';
+      return {
+        name: c.name,
+        body: isRule && r >= 2 ? c.body + ' ' + c.up : c.body,
+        cost: full ? '' : (isRule && own ? '+2 PT' : this.COST[n.type] + ' PT'),
+        costColor: can ? '#FFC64A' : '#3E4C5E',
+        nameSize: n.type === 'key' ? '18px' : '15px',
+        nameColor: own || can ? '#E6EDF5' : '#63768C',
+        bodyColor: own || can ? '#9FB0C4' : '#63768C',
+        hasRanks: isRule,
+        pip1: pip(1), pip2: pip(2),
+        state: full ? (isRule ? 'RANK 2 OF 2 · ' + KIND[n.type] : 'OWNED · ' + KIND[n.type])
+          : (own ? 'RANK 1 OF 2 · UPGRADE OPEN'
+            : (can ? (seed(n.id) ? 'OPEN ON COMMIT' : 'LINKED · ' + KIND[n.type]) : 'NOT LINKED · ' + KIND[n.type])),
+        stateColor: full ? '#4FD8F5' : (own ? '#FFC64A' : (can ? '#FFC64A' : '#3E4C5E')),
+        justify: right ? 'flex-start' : 'center',
+        wrapStyle: 'position:absolute; z-index:2; left:' + (100 * n.x / SX) + '%; top:' + (100 * n.y / SY)
+          + '%; width:0; height:0; display:flex; align-items:center; justify-content:center; cursor:' + (can ? 'pointer' : 'default') + ';',
+        markStyle: 'position:absolute; width:' + d + 'px; height:' + d + 'px; margin-left:' + (-d / 2) + 'px; margin-top:' + (-d / 2)
+          + 'px; border-radius:2px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; background:'
+          + (own ? '#18263A' : '#0A111C') + '; border:' + (own || can ? '2px' : '1px') + ' ' + (own || can ? 'solid' : 'dashed') + ' ' + accent + ';',
+        innerStyle: n.type === 'key'
+          ? 'width:' + (d - 22) + 'px; height:' + (d - 22) + 'px; border-radius:1px; box-sizing:border-box; border:2px solid ' + accent + ';'
+          : (own ? 'width:' + Math.max(6, d - 20) + 'px; height:' + Math.max(6, d - 20) + 'px; border-radius:1px; background:' + accent + ';' : 'display:none;'),
+        labelStyle: 'position:absolute; z-index:2; background:#0A111C; padding:6px 10px; '
+          + (right
+            ? 'left:' + (d / 2 + 16) + 'px; top:-46px; width:210px; display:flex; flex-direction:column; gap:5px; text-align:left;'
+            : 'left:-115px; top:' + (d / 2 + 10) + 'px; width:210px; display:flex; flex-direction:column; gap:5px; align-items:center; text-align:center;'),
+        buy: can ? buy(n.id) : (() => {})
+      };
+    });
+
+    const pos = {};
+    layout.forEach(n => { pos[n.id] = n; });
+    const linkVals = links.map(([a, b]) => {
+      const lit = rank(a) > 0 && rank(b) > 0, half = rank(a) > 0 || rank(b) > 0;
+      const A = pos[a], B = pos[b];
+      return {
+        d: (A.x === B.x || A.y === B.y)
+          ? 'M' + A.x + ' ' + A.y + ' L' + B.x + ' ' + B.y
+          : 'M' + A.x + ' ' + A.y + ' H' + B.x + ' V' + B.y,
+        color: lit ? '#4FD8F5' : (half ? '#FFC64A' : '#1F3047'),
+        w: lit ? 3 : 2
+      };
+    });
+
+    const frontier = layout.filter(n => canBuy(n.id)).map(n => {
+      const isUp = rank(n.id) > 0;
+      const c = copy.nodes[n.id];
+      return {
+        name: c.name,
+        cost: (isUp ? '+2' : this.COST[n.type]) + ' PT',
+        body: isUp ? c.up : c.body,
+        nameColor: '#E6EDF5', costColor: '#FFC64A',
+        via: isUp ? 'UPGRADE · RANK 2 OF 2'
+          : (seed(n.id) ? 'OPEN ON COMMIT'
+            : 'LINKED TO ' + nbr(n.id).filter(o => rank(o) > 0).map(o => copy.nodes[o].name.toUpperCase()).join(', ')),
+        style: 'background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:12px 16px; display:flex; flex-direction:column; gap:6px; cursor:pointer;',
+        buy: buy(n.id)
+      };
+    });
+
+    const rail = text.map((t, i) => {
+      const on = i === di;
+      const h = this.state.owned[i] || {};
+      const spent = layout.reduce((tot, n) => tot + (h[n.id] || 0) * this.COST[n.type], 0);
+      return {
+        name: t.name, thesis: t.thesis, count: spent + '/26',
+        pct: Math.round(100 * spent / 26) + '%',
+        barColor: spent ? '#4FD8F5' : '#1F3047',
+        nameColor: on ? '#E6EDF5' : '#9FB0C4',
+        countColor: on ? '#4FD8F5' : '#63768C',
+        style: 'padding:16px 24px; display:flex; flex-direction:column; gap:8px; cursor:pointer; border-bottom:1px solid #131E2E; border-left:3px solid '
+          + (on ? '#4FD8F5' : '#1F3047') + '; background:' + (on ? '#131E2E' : 'transparent') + ';',
+        select: () => this.setState({ doctrine: i })
+      };
+    });
+
+    const inForce = layout.filter(n => n.type !== 'stat' && rank(n.id) > 0).map(n => ({
+      text: copy.nodes[n.id].body + (rank(n.id) >= 2 ? ' ' + copy.nodes[n.id].up : ''),
+      color: '#4FD8F5'
+    }));
+    if (!inForce.length) inForce.push({ text: 'No rules rewritten yet.', color: '#63768C' });
+
+    return {
+      nodes, links: linkVals, frontier, rail, inForce,
+      pts: this.state.pool,
+      spent: 65 - this.state.pool,
+      boardName: copy.name,
+      boardMeta: spentHere + ' OF 26 PT SPENT HERE · 2 STAT, 5 RULE, 1 KEYSTONE',
+      boardBuyable: frontier.length + ' BUYABLE NOW',
+      frontierNote: 'Everything one link from what you own, plus every rule still holding an upgrade. Adjacency means the frontier is the whole plan — there is no tier to save for.',
+      footer: frontier.length + ' NODES ON THE FRONTIER',
+      respec: () => this.setState({ owned: { 0: {}, 1: {}, 2: {} }, pool: 65 })
+    };
+  }
+}
+</script>
+</body>
+</html>

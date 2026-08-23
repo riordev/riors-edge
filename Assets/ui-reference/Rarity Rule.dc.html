@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; color:#E6EDF5; font-family:'IBM Plex Sans',sans-serif; padding:56px 64px 96px;">
+ <div style="max-width:1360px; margin:0 auto; display:flex; flex-direction:column; gap:56px;">
+
+  <header style="display:flex; flex-direction:column; gap:12px; border-bottom:2px solid #1F3047; padding-bottom:28px;">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.22em; color:#63768C;">FIELDPLATE / RARITY</div>
+    <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:56px; line-height:0.98; margin:0; text-transform:uppercase; letter-spacing:0.01em;">The rarity rule, and its second carrier</h1>
+    <p style="margin:6px 0 0; font-size:17px; line-height:1.6; color:#9FB0C4; max-width:900px; text-wrap:pretty;">The enumeration is replaced by a principle, and the principle creates work: if colour can no longer be the only carrier, every rarity needs a mark. Five marks follow, drawn twice — once for a card in a grid, once for a beam seen at distance while moving.</p>
+  </header>
+
+  <section style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">01</div>
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:30px; margin:0; text-transform:uppercase; letter-spacing:0.02em;">Replacement wording</h2>
+      <div style="font-size:14px; color:#63768C;">Drop-in, present tense, no site list.</div>
+    </div>
+
+    <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:32px; display:flex; flex-direction:column; gap:18px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FFC64A;">RARITY LAW</div>
+      <div style="font-size:20px; line-height:1.6; color:#E6EDF5; max-width:940px;">Rarity colour appears once per item per view, and never as the only carrier of the fact. A second carrier is a mark, a number, or a word — never a second tint of the same hue.</div>
+      <div style="font-size:16px; line-height:1.7; color:#9FB0C4; max-width:940px;">A key is not an instance: a legend swatch, a filter chip, and the colour helper's own definition name the ramp rather than wearing it, and are always legal. Where a card carries the rail, the name goes to text/primary. Where a beam carries the colour, its height and profile carry the tier as well. Anomalous keeps its full border as the top-rarity exception, because it is also a world object class.</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#63768C; border-top:1px solid #1F3047; padding-top:16px; line-height:1.7;">TEST · UI.Rarity.OnceEach — for each item in a rendered view, count the sites painting its rarity hue; a count above one fails, and a site list is never edited to make it pass.<br>TEST · UI.Rarity.SecondCarrier — desaturate the view; every rarity still identifiable fails nothing, any rarity that vanishes fails.</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#4FD8F5;">FALLS OUT AS LEGAL</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">A card with a coloured rail and a primary-white name. A beam alone in the world. A legend swatch beside its label. A filter chip naming a tier. The Anomalous border. A tooltip that states the tier as a word with no tint at all.</div>
+      </div>
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF4040;">FALLS OUT AS ILLEGAL</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">A coloured beam under a coloured label. A coloured rail plus a coloured name on one card. A rarity told only by hue, anywhere. Five beams at one height. A screen invented next quarter needs no amendment to be judged: it counts its own sites.</div>
+      </div>
+    </div>
+
+    <div style="background:#0A111C; border:1px solid #1F3047; padding:22px; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">THE SAME FAILURE ELSEWHERE</div>
+      <div style="font-size:15px; line-height:1.7; color:#9FB0C4; max-width:1100px;">The four function accents, equip-limit state, and refusal warnings are all bare colour with no second carrier, and they will fail the desaturation test on sight. Each needs the same shape of rule rather than its own list: <span style="color:#E6EDF5;">a function accent names a system, and the system is always also named in words or geometry at the same size.</span> Equip limits already carry a fraction — 3/3 is the second carrier, so the rule is satisfied the moment the fraction is mandatory rather than optional. Refusals need a mark; red alone is not a refusal, a struck cost glyph is.</div>
+    </div>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">02</div>
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:30px; margin:0; text-transform:uppercase; letter-spacing:0.02em;">Five marks, card scale</h2>
+      <div style="font-size:14px; color:#63768C;">14×14 box · drawn geometry · no glyph, no font dependency</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:24px;">
+      <sc-for list="{{ marks }}" as="m" hint-placeholder-count="5">
+        <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid {{ m.color }}; padding:20px; display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:34px; height:34px; border:1px solid #2A3E58; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="28" height="28" viewBox="0 0 14 14" fill="none" stroke="{{ m.color }}" stroke-width="1.4">
+                <path d="{{ m.d }}"></path>
+              </svg>
+            </div>
+            <div style="width:20px; height:20px; border:1px solid #2A3E58; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="{{ m.color }}" stroke-width="1.4">
+                <path d="{{ m.d }}"></path>
+              </svg>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:{{ m.color }};">{{ m.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#63768C;">{{ m.hex }}</div>
+          </div>
+          <div style="font-size:14px; line-height:1.6; color:#9FB0C4;">{{ m.note }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:19px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Why counting, then cutting</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">The first three marks are strokes counted — one, two, three — because count is the only distinction that survives at 14px without any curve to resolve. The top two stop counting and change silhouette instead: Aberrant loses a corner, Anomalous opens a ring. A grid of loot is read by density in the first glance and by shape only where the player has already stopped to look, which is exactly where the top two tiers matter.</div>
+      </div>
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:19px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Construction rules</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">One stroke weight, 1.4px on a 14px box, butt caps, no fill. Strokes sit on whole pixels at 14 and 28; the ring's gap is 4 units wide so it survives to 10px. Marks never rotate, never carry a second hue, and never scale below 12px — below that the rail alone carries the tier and the mark is dropped rather than blurred.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">03</div>
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:30px; margin:0; text-transform:uppercase; letter-spacing:0.02em;">Five beams, distance scale</h2>
+      <div style="font-size:14px; color:#63768C;">Read while moving, at range, off-centre. Height is the first carrier, profile the second.</div>
+    </div>
+
+    <div style="background:#0A111C; border:1px solid #1F3047; padding:32px; display:flex; align-items:flex-end; justify-content:space-around; gap:24px; height:520px;">
+      <sc-for list="{{ beams }}" as="b" hint-placeholder-count="5">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:14px; justify-content:flex-end; height:100%;">
+          <div style="position:relative; width:56px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:{{ b.px }};">
+            <div style="{{ b.capStyle }}"></div>
+            <div style="{{ b.gapStyle }}"></div>
+            <div style="{{ b.colStyle }}"></div>
+            <div style="{{ b.collarStyle }}"></div>
+            <div style="width:30px; height:3px; background:{{ b.color }};"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
+            <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:{{ b.color }};">{{ b.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#63768C;">{{ b.h }} CM</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:19px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Heights</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">95 / 130 / 175 / 235 / 295 cm, replacing the single 180. Each step is roughly 1.35× the last, so adjacent tiers stay separable at a distance where absolute height is unjudgeable and only the ratio between two beams in view can be read. The ramp tops out at 295 — under the 300 standard interior clearance — so no tier clips indoors, which is the one place the cue cannot afford to be the tallest thing in the room.</div>
+      </div>
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:19px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Profiles</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Standard is a plain column. Uncommon adds one collar at half height, Exceptional two. Aberrant breaks: the upper third offsets sideways by its own width. Anomalous separates entirely — a floating cap above a clear gap, the only beam that is not one connected object, which is the same statement its rarity makes.</div>
+      </div>
+      <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:22px; display:flex; flex-direction:column; gap:12px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:19px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Two jobs, one language</div>
+        <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">The card mark and the beam profile are not the same drawing, and should not be: one is read still at 14px, the other moving at 30 m. They share their logic instead — count for the low three, broken silhouette for the top two — so a player who learns one has already learned the other. Beam width stays 30 cm at every tier; only height and profile move.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:24px; display:flex; flex-direction:column; gap:12px;">
+    <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; color:#FF4040;">Two corrections in the mocks I shipped</div>
+    <div style="font-size:15px; line-height:1.7; color:#9FB0C4; max-width:1100px;">The inventory masthead carried GEAR SCORE, against the invariant — removed. The affix delta column used triangle glyphs for up and down, which the drawn-geometry rule now forbids and the engine's face could not have rendered anyway — replaced with 6×5 drawn triangles at the same baseline. Both are fixed in the files rather than noted.</div>
+  </section>
+
+  <footer style="border-top:2px solid #1F3047; padding-top:24px; display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#3E4C5E;">
+    <div>FIELDPLATE / RARITY LAW + MARKS</div>
+    <div>ONCE PER ITEM PER VIEW</div>
+  </footer>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  renderVals() {
+    const marks = [
+      { name:'Standard', hex:'#DCE4EE', color:'#DCE4EE', d:'M1 7 H13', note:'One stroke. The baseline the other four are counted against.' },
+      { name:'Uncommon', hex:'#408CFF', color:'#408CFF', d:'M1 5 H13 M1 9 H13', note:'Two strokes, 4 apart. Reads as a pair at 12px, never as a thick line.' },
+      { name:'Exceptional', hex:'#B866FF', color:'#B866FF', d:'M1 3 H13 M1 7 H13 M1 11 H13', note:'Three strokes filling the box. The last tier that counts.' },
+      { name:'Aberrant', hex:'#FF4040', color:'#FF4040', d:'M1 1 H9 L13 5 V13 H1 Z', note:'A box with a corner cut away. Silhouette, not count — something has been taken.' },
+      { name:'Anomalous', hex:'#26F2D9', color:'#26F2D9', d:'M5 1 H1 V13 H13 V1 H9', note:'A ring open at the top, gap 4 wide. The only unclosed mark in the set.' }
+    ];
+    const spec = [
+      { name:'Standard', color:'#DCE4EE', h:95, collars:0, broken:false, split:false },
+      { name:'Uncommon', color:'#408CFF', h:130, collars:1, broken:false, split:false },
+      { name:'Exceptional', color:'#B866FF', h:175, collars:2, broken:false, split:false },
+      { name:'Aberrant', color:'#FF4040', h:235, collars:0, broken:true, split:false },
+      { name:'Anomalous', color:'#26F2D9', h:295, collars:0, broken:false, split:true }
+    ];
+    const beams = spec.map(b => {
+      const px = Math.round(b.h * 1.28);
+      const colH = b.split ? px - 70 : (b.broken ? px - 60 : px);
+      return {
+        name: b.name, color: b.color, h: b.h, px: px + 'px',
+        capStyle: b.split
+          ? 'width:12px; height:34px; background:' + b.color + ';'
+          : (b.broken ? 'width:12px; height:' + Math.round(px * 0.34) + 'px; background:' + b.color + '; margin-left:16px;' : 'display:none;'),
+        gapStyle: b.split ? 'width:1px; height:26px;' : (b.broken ? 'width:1px; height:0px;' : 'display:none;'),
+        colStyle: 'width:12px; height:' + Math.max(24, colH) + 'px; background:' + b.color + ';',
+        collarStyle: b.collars
+          ? 'position:absolute; bottom:' + Math.round(px * 0.5) + 'px; width:26px; height:' + (b.collars === 1 ? 3 : 3) + 'px; background:' + b.color
+            + (b.collars === 2 ? '; box-shadow:0 12px 0 ' + b.color : '') + ';'
+          : 'display:none;'
+      };
+    });
+    return { marks, beams };
+  }
+}
+</script>
+</body>
+</html>

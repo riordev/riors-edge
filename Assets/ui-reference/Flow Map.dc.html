@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; padding:32px; font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:24px; align-items:flex-start; width:max-content;">
+
+ <div style="width:2560px; display:flex; align-items:flex-end; gap:32px;">
+   <div style="display:flex; flex-direction:column; gap:8px;">
+     <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.22em; color:#63768C;">FIELDPLATE / SHELL</div>
+     <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:44px; margin:0; text-transform:uppercase; letter-spacing:0.01em; line-height:1; color:#E6EDF5;">Flow map</h1>
+   </div>
+   <div style="display:flex; gap:12px; align-items:center; margin-left:auto;">
+     <div onClick="{{ cycleClass }}" style="{{ btn }}">Class select: {{ classWhere }}</div>
+     <div onClick="{{ togglePause }}" style="{{ btn }}">Pause: {{ pauseMode }}</div>
+     <div onClick="{{ toggleAnchor }}" style="{{ btn }}">Anchors: {{ anchorMode }}</div>
+     <div onClick="{{ toggleTravel }}" style="{{ btn }}">Fast travel: {{ travelMode }}</div>
+   </div>
+ </div>
+
+ <div style="width:2560px; height:1500px; background:#0A111C; border:1px solid #1F3047; position:relative; overflow:hidden; flex-shrink:0;">
+
+  <svg width="2560" height="1500" viewBox="0 0 2560 1500" fill="none" style="position:absolute; inset:0;">
+    <sc-for list="{{ edges }}" as="e" hint-placeholder-count="20">
+      <path d="{{ e.d }}" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-dasharray="{{ e.dash }}"></path>
+    </sc-for>
+    <sc-for list="{{ heads }}" as="h" hint-placeholder-count="20">
+      <path d="{{ h.d }}" fill="{{ h.color }}"></path>
+    </sc-for>
+  </svg>
+
+  <div style="position:absolute; left:40px; top:24px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.18em; color:#3E4C5E;">SHELL — FULL-SCREEN REPLACE</div>
+  <div style="position:absolute; left:40px; top:604px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.18em; color:#3E4C5E;">THE ANCHOR — ORDERED, NOT INSTANCED</div>
+  <div style="position:absolute; left:40px; top:1064px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.18em; color:#3E4C5E;">REACHABLE FROM ANYWHERE — MODAL OVER THE WORLD</div>
+  <div style="position:absolute; left:0; right:0; top:580px; height:1px; background:#131E2E;"></div>
+  <div style="position:absolute; left:0; right:0; top:1040px; height:1px; background:#131E2E;"></div>
+
+  <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="24">
+    <div style="{{ n.style }}">
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; line-height:1.1; color:{{ n.nameColor }};">{{ n.name }}</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.12em; color:{{ n.tagColor }}; flex-shrink:0;">{{ n.tag }}</div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; line-height:1.5; color:{{ n.bodyColor }};">{{ n.body }}</div>
+      <sc-if value="{{ n.hasNote }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; color:{{ n.noteColor }}; border-top:1px solid #1F3047; padding-top:6px;">{{ n.note }}</div>
+      </sc-if>
+    </div>
+  </sc-for>
+
+  <div style="position:absolute; left:40px; bottom:40px; width:420px; background:#0F1826; border:1px solid #1F3047; padding:20px; display:flex; flex-direction:column; gap:12px;">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">EDGE TYPES</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <svg width="52" height="8" viewBox="0 0 52 8"><path d="M0 4 H52" stroke="#4FD8F5" stroke-width="3"></path></svg>
+      <span style="font-size:13px; color:#9FB0C4;">Full-screen replace</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <svg width="52" height="8" viewBox="0 0 52 8"><path d="M0 4 H52" stroke="#B866FF" stroke-width="3" stroke-dasharray="7 5"></path></svg>
+      <span style="font-size:13px; color:#9FB0C4;">Modal over the world · dismiss returns</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <svg width="52" height="8" viewBox="0 0 52 8"><path d="M0 4 H52" stroke="#FFC64A" stroke-width="3"></path></svg>
+      <span style="font-size:13px; color:#9FB0C4;">Dialogue-gated · no tab, no hotkey</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <svg width="52" height="8" viewBox="0 0 52 8"><path d="M0 4 H52" stroke="#2A3E58" stroke-width="2" stroke-dasharray="3 6"></path></svg>
+      <span style="font-size:13px; color:#9FB0C4;">Physical walk · player moves, no screen</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; border-top:1px solid #1F3047; padding-top:12px;">
+      <div style="width:18px; height:12px; border:1px dashed #FFC64A; flex-shrink:0;"></div>
+      <span style="font-size:13px; color:#9FB0C4;">Open ruling — position is a state, not a decision</span>
+    </div>
+  </div>
+ </div>
+
+ <div style="width:2560px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; color:#E6EDF5;">
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">What the edges say</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Four edge types, and the type is the whole argument. Cyan solid replaces the screen and has a back affordance. Violet dashed is a modal over a live world — inventory, Core, doctrines — dismissed with the same key that opened it, never with a Back button. Gold is dialogue-gated: the Forge and the Quartermaster have no tab, no hotkey, and no entry that is not a conversation. Grey dotted is not a transition at all, it is the player walking, and it is drawn because the Anchor's order is enforced by distance rather than by UI.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Why the flow felt bad</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Every stop was the same kind of thing — a tab. A tab bar flattens a settlement into a menu, so arriving carried no order and leaving carried no cost. Here the Anchor is a walk with four stops, and each stop is a different kind of edge: stash is a station you use standing at it, the Forge and Quartermaster are people you talk to, Command is a screen at the gate. The player reads the order from the floor plan, and the UI stops being the thing they navigate.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Pause, and what it may not hold</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Pause offers exactly four things: inventory, the trees, settings, quit. It may not offer Forge, Quartermaster, stash, Command, or respec — every one of those is a place, and a menu that reaches a place deletes the place. The listen-server question stays open on the map: in HALT the panel is opaque and the world is frozen; in LIVE the panel keeps a 3px orange top rail and the header reads WORLD LIVE, because a menu that lies about whether you can be shot is worse than no menu. Both states are drawn; neither is chosen here.</div>
+   </div>
+   <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:14px;">
+     <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FFC64A;">SHELL LAW</div>
+     <div style="font-size:19px; line-height:1.55; color:#E6EDF5;">A menu that reaches a place deletes the place.</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">This is the general rule, and every future request for a shortcut is an instance of it. If a thing is somewhere — the Forge, the Quartermaster, the stash, Command — then reaching it from a menu removes the reason it was somewhere, and the walk that gave the Anchor its order becomes dead space. Test before granting any shortcut: if the new entry point would make the physical location optional, the entry point is the bug. The corollary is the grey edge on this map — grey dotted is not a transition at all, it is the player walking, and it is the only edge type the UI does not own.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">The floor plan is a UX constraint</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Order enforced by distance makes stash → Forge → Quartermaster → Command → gate a level-design requirement, not a menu one, and whoever authors the Anchor inherits it. The stash sits at the arrival boundary so a full player empties before walking anywhere. Kess's room is deeper in because it is where minutes get spent. The Quartermaster is a counter on the way out. Command is at the gate, because choosing what to run before choosing the build to run it with is backwards. A floor plan that lets a player reach the gate without passing the stash breaks the flow as surely as a pause-menu shortcut would, and no UI change compensates for it.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">One comparison surface</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Inventory owns the composed-delta view — weapon damage and ability damage as separate rows, effective health against physical — because it is the only surface reachable at the moment an equip decision is made, and the one place the candidate and the equipped piece are already both on screen. The stash keeps triage instead: item level, affix count, and one better-or-worse chip against the equipped piece, which is enough to decide keep or dump across hundreds of rows and cheap enough to compute at that scale. Two comparison surfaces would be two answers to one question, and the stash is the copy that cannot be trusted mid-run, because a run cannot mutate it.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Rulings held open</div>
+     <div style="font-size:15px; line-height:1.7; color:#9FB0C4;">Four switches at the top move the map instead of resolving it. Class select has four placements and the map opens on the one already on record: end of the prologue, first camp return, roughly level 3, after an induction range where five loaner kits are fired for thirty seconds each. The other three place the choice before a shot has been fired, so the node marks them as contradicting the record rather than as neutral alternatives. Anchors are one settlement or a network. Fast travel has a before and an after, so the map draws both. Each switch changes edges only; no box moves without an edge moving with it.</div>
+   </div>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:2624,&quot;height&quot;:2000}}">
+class Component extends DCLogic {
+  state = { classAt: 3, pause: 'HALT', anchors: 'ONE', travel: 'AFTER' };
+
+  layout() {
+    const W = 250;
+    const HH = { boot:120, title:136, select:148, create:136, classsel:156, load:120, world:120,
+      arrive:136, stash:168, kess:148, forge:148, qmtalk:136, qm:148, command:168, gate:120, travel:148,
+      pause:156, range:148, inv:136, core:130, doct:130, set:156, death:136 };
+    // id, x, y, kind, name, body, tag, note
+    const n = [
+      ['boot',   80,   70, 'shell', 'Cold boot', 'Legal, engine warm-up, no input.', 'AUTO', ''],
+      ['title',  380,  70, 'shell', 'Title / main menu', 'Continue · Characters · Settings · Quit. One background plate, no carousel.', 'SCREEN', ''],
+      ['select', 700,  70, 'shell', 'Character select', 'Rows read as builds: class, doctrine, level, keystones held. Gear is account-wide, so no slot owns it.', 'SCREEN', ''],
+      ['create', 1020, 70, 'shell', 'Character create', 'Body, face, voice, Human or Effigy. Four decisions, one screen, no tabs.', 'SCREEN', ''],
+      ['classsel', 1340, 70, 'ruling', 'Class select', 'Five classes, five resources. Permanent. Cannot be completed in four seconds — commit is a second confirm naming the resource.', 'PERMANENT', ''],
+      ['load',   1680, 70, 'shell', 'Loading', 'Area name and area level only. No tips.', 'AUTO', ''],
+      ['range',  1340, 300, 'ruling', 'Induction range', 'Five loaner kits, thirty seconds each. The player has fired every resource before choosing one.', 'PROLOGUE', ''],
+      ['world',  2000, 70, 'world', 'In world', 'HUD only. Every menu below is entered from here.', 'PLAY', ''],
+
+      ['arrive', 120,  660, 'anchor', 'Arrive at the boundary', 'Shared, not instanced. Player arrives full.', 'PLACE', ''],
+      ['stash',  460,  660, 'anchor', 'Stash', 'Account-wide bulk triage: dump, sort, filter. Shows keep-or-dump only \u2014 item level, affix count, and a better/worse chip against the equipped piece.', 'STATION', 'NO DELTA PANEL HERE \u00b7 CLOSED MID-RUN'],
+      ['kess',   800,  660, 'talk',   'Kess · dialogue', 'The only door to the Forge. Speaker, line, choices, and choices visible but unavailable.', 'DIALOGUE', ''],
+      ['forge',  800,  880, 'anchor', 'The Forge', 'Temper · Reforge · Attune. Riftglass, account-wide. Respec lives here and nowhere else.', 'ROOM', 'REFUSED CRAFT COSTS NOTHING'],
+      ['qmtalk', 1140, 660, 'talk',   'Quartermaster · dialogue', 'The only door to ability unlocks.', 'DIALOGUE', ''],
+      ['qm',     1140, 880, 'anchor', 'Quartermaster', 'One-time tokens, one spend, refusals disclosed: no tokens, already unlocked, not in this class.', 'COUNTER', ''],
+      ['command',1480, 660, 'anchor', 'Command post', 'Area level 1–100 is the only content axis. Campaign: short clamped list. Endgame: tier ladder. Group forming.', 'SCREEN', 'ITEM LEVEL 101–120 COMES FROM HERE ALONE'],
+      ['gate',   1820, 660, 'anchor', 'The gate', 'Last thing before a run. Build is already chosen.', 'PLACE', ''],
+      ['travel', 2160, 660, 'anchor', 'Fast travel / map', 'Anchor · Local Rifts · The Breach · Erased Earths · Rior\u2019s Frontier.', 'SCREEN', ''],
+
+      ['pause',  380,  1120, 'modal', 'Pause', 'Inventory · Trees · Settings · Quit. Nothing else, ever.', 'MODAL', 'NO FORGE · NO VENDOR · NO RESPEC'],
+      ['inv',    720,  1120, 'modal', 'Inventory / equipment', 'Paper doll, gear totals, backpack. Owns the composed-delta view.', 'MODAL', 'SOLE COMPARISON SURFACE'],
+      ['core',   1060, 1120, 'modal', 'Core tree', 'Five constellations live, Elements sealed as the sixth. One pool of 65, shared.', 'MODAL', ''],
+      ['doct',   1400, 1120, 'modal', 'Doctrine board', 'Three per class, eight nodes, adjacency. 26 pts offered.', 'MODAL', ''],
+      ['set',    1740, 1120, 'modal', 'Settings', 'Slider · toggle · dropdown · keybind. Reachable from title and from pause; identical either way.', 'MODAL', ''],
+      ['death',  2080, 1120, 'modal', 'Death / respawn', 'Allowance remaining as a count, not a verdict. Solo fixed, party scales.', 'MODAL', '']
+    ];
+    return n.map(a => ({ id:a[0], x:a[1], y:a[2], kind:a[3], name:a[4], body:a[5], tag:a[6], note:a[7], w:W, h:HH[a[0]] || 136 }));
+  }
+
+  renderVals() {
+    const nodes = this.layout();
+    const P = {};
+    nodes.forEach(n => { P[n.id] = n; });
+    const PLACE = ['AFTER CREATE', 'FIRST WORLD ENTRY', 'FIRST ANCHOR', 'END OF PROLOGUE \u00b7 LV 3'];
+    const classAt = PLACE[this.state.classAt];
+    const onRecord = this.state.classAt === 3;
+
+    // edges: [from, to, type, side]  type: shell | modal | talk | walk
+    const E = [
+      ['boot','title','shell'], ['title','select','shell'], ['select','create','shell'],
+      ['load','world','shell'],
+      ['world','arrive','walk'], ['arrive','stash','walk'], ['stash','kess','walk'],
+      ['kess','forge','talk'], ['kess','qmtalk','walk'], ['qmtalk','qm','talk'],
+      ['qmtalk','command','walk'], ['command','gate','walk'],
+      ['world','pause','modal'], ['world','inv','modal'], ['world','core','modal'],
+      ['world','doct','modal'], ['world','death','modal'],
+      ['pause','inv','modal'], ['pause','core','modal'], ['pause','doct','modal'], ['pause','set','modal'],
+      ['title','set','shell'], ['forge','core','modal']
+    ];
+    if (this.state.classAt === 0) E.push(['create','classsel','shell'], ['classsel','load','shell']);
+    if (this.state.classAt === 1) { E.push(['create','load','shell'], ['world','classsel','modal']); }
+    if (this.state.classAt === 2) { E.push(['create','load','shell'], ['arrive','classsel','modal']); }
+    if (this.state.classAt === 3) { E.push(['create','load','shell'], ['world','range','walk'], ['range','classsel','shell']); }
+    if (this.state.travel === 'AFTER') E.push(['gate','travel','walk']);
+
+    const COL = { shell:'#4FD8F5', modal:'#B866FF', talk:'#FFC64A', walk:'#2A3E58' };
+    const DASH = { shell:'0', modal:'7 5', talk:'0', walk:'3 6' };
+    const edges = [], heads = [];
+    E.forEach(([a, b, t]) => {
+      const A = P[a], B = P[b];
+      if (!A || !B) return;
+      const ac = { x: A.x + A.w / 2, y: A.y + A.h / 2 };
+      const bc = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
+      let s, e, d;
+      const sameRow = Math.abs(A.y - B.y) < 40;
+      const adjacent = sameRow && Math.abs(bc.x - ac.x) <= A.w + 120;
+      if (sameRow && !adjacent) {
+        // fan-out: drop to a bus below the row, run across, stub up into the target
+        const bus = A.y + A.h + 110;
+        s = { x: ac.x, y: A.y + A.h };
+        e = { x: bc.x, y: B.y + B.h };
+        d = 'M' + s.x + ' ' + s.y + ' V' + bus + ' H' + e.x + ' V' + e.y;
+        edges.push({ d, color: COL[t], w: t === 'walk' ? 2 : 3, dash: DASH[t] });
+        const kk = 7;
+        heads.push({ d: 'M' + e.x + ' ' + e.y + ' L' + (e.x - kk) + ' ' + (e.y + kk * 1.6) + ' L' + (e.x + kk) + ' ' + (e.y + kk * 1.6) + ' Z', color: COL[t] });
+        return;
+      }
+      if (sameRow) {
+        const rightward = B.x > A.x;
+        s = { x: rightward ? A.x + A.w : A.x, y: ac.y };
+        e = { x: rightward ? B.x : B.x + B.w, y: bc.y };
+        d = 'M' + s.x + ' ' + s.y + ' H' + e.x;
+      } else {
+        const down = B.y > A.y;
+        s = { x: ac.x, y: down ? A.y + A.h : A.y };
+        e = { x: bc.x, y: down ? B.y : B.y + B.h };
+        // bus sits in the empty band immediately outside the TARGET row, so a stub
+        // never crosses the row of boxes between source and target
+        const bus = down ? B.y - 45 : B.y + B.h + 45;
+        d = 'M' + s.x + ' ' + s.y + ' V' + bus + ' H' + e.x + ' V' + e.y;
+      }
+      edges.push({ d, color: COL[t], w: t === 'walk' ? 2 : 3, dash: DASH[t] });
+      const k = 7;
+      let head;
+      if (Math.abs(A.y - B.y) < 40) {
+        const dir = B.x > A.x ? -1 : 1;
+        head = 'M' + e.x + ' ' + e.y + ' L' + (e.x + dir * k * 1.6) + ' ' + (e.y - k) + ' L' + (e.x + dir * k * 1.6) + ' ' + (e.y + k) + ' Z';
+      } else {
+        const dir = B.y > A.y ? -1 : 1;
+        head = 'M' + e.x + ' ' + e.y + ' L' + (e.x - k) + ' ' + (e.y + dir * k * 1.6) + ' L' + (e.x + k) + ' ' + (e.y + dir * k * 1.6) + ' Z';
+      }
+      heads.push({ d: head, color: COL[t] });
+    });
+
+    const KIND = {
+      shell: { bg:'#131E2E', bd:'1px solid #2A3E58', rail:'#4FD8F5' },
+      world: { bg:'#18263A', bd:'2px solid #4FD8F5', rail:'#4FD8F5' },
+      anchor:{ bg:'#131E2E', bd:'1px solid #2A3E58', rail:'#FFC64A' },
+      talk:  { bg:'#0F1826', bd:'1px solid #B98212', rail:'#FFC64A' },
+      modal: { bg:'#0F1826', bd:'1px solid #2A3E58', rail:'#B866FF' },
+      ruling:{ bg:'#0F1826', bd:'1px dashed #FFC64A', rail:'#FFC64A' }
+    };
+
+    const out = nodes.filter(n => n.id !== 'range' || onRecord).map(n => {
+      const k = KIND[n.kind];
+      let body = n.body, note = n.note, tag = n.tag;
+      if (n.id === 'classsel') {
+        note = onRecord ? 'ON RECORD \u00b7 AFTER THE INDUCTION RANGE' : 'PLACED: ' + classAt + ' \u00b7 CONTRADICTS THE RECORD';
+        body = onRecord
+          ? 'Five classes, five resources. Permanent. Chosen after firing all five, so the commit confirms a resource the player has held.'
+          : 'Five classes, five resources. Permanent. Chosen before a shot is fired \u2014 the recommendation on record rejects this.';
+      }
+      if (n.id === 'pause') {
+        note = 'UNRESOLVED \u00b7 PREVIEWING ' + this.state.pause + ' OF HALT / LIVE';
+        tag = 'MODAL';
+        body = this.state.pause === 'HALT'
+          ? 'Inventory \u00b7 Trees \u00b7 Settings \u00b7 Quit. HALT draws it opaque with the world frozen.'
+          : 'Inventory \u00b7 Trees \u00b7 Settings \u00b7 Quit. LIVE keeps a 3px orange top rail and the header reads WORLD LIVE.';
+      }
+      if (n.id === 'arrive') body = this.state.anchors === 'ONE'
+        ? 'Shared, not instanced. One settlement for the whole game.'
+        : 'Shared, not instanced. A network — each Erased Earth has its own, stash follows the account.';
+      if (n.id === 'travel') {
+        body = this.state.travel === 'AFTER'
+          ? 'Anchor \u00b7 Local Rifts \u00b7 The Breach \u00b7 Erased Earths \u00b7 Rior\u2019s Frontier.'
+          : 'Not yet granted. Locations exist but the screen has no entry \u2014 the gate is the only way out.';
+        tag = this.state.travel === 'AFTER' ? 'SCREEN' : 'LOCKED';
+      }
+      const dim = (n.id === 'travel' && this.state.travel === 'BEFORE');
+      if (n.id === 'classsel' && !onRecord) note = note;
+      return {
+        name: n.name, body, tag,
+        note, hasNote: !!note,
+        nameColor: dim ? '#63768C' : '#E6EDF5',
+        bodyColor: dim ? '#3E4C5E' : '#9FB0C4',
+        tagColor: dim ? '#3E4C5E' : (n.kind === 'talk' || n.kind === 'ruling' ? '#FFC64A' : '#63768C'),
+        noteColor: n.id === 'classsel' && !onRecord ? '#FF4040' : (n.id === 'pause' ? '#FFC64A' : (n.kind === 'ruling' ? '#FFC64A' : '#63768C')),
+        style: 'position:absolute; left:' + n.x + 'px; top:' + n.y + 'px; width:' + n.w + 'px; height:' + n.h
+          + 'px; box-sizing:border-box; z-index:2; background:' + k.bg + '; border:' + (dim ? '1px dashed #1F3047' : k.bd)
+          + '; border-left:3px solid ' + (dim ? '#1F3047' : k.rail) + '; padding:12px 14px; display:flex; flex-direction:column; gap:6px;'
+      };
+    });
+
+    const btn = "padding:9px 14px; border:1px solid #2A3E58; color:#9FB0C4; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; background:#0F1826;";
+    return {
+      nodes: out, edges, heads, btn,
+      classWhere: classAt,
+      pauseMode: this.state.pause,
+      anchorMode: this.state.anchors,
+      travelMode: this.state.travel,
+      cycleClass: () => this.setState(s => ({ classAt: (s.classAt + 1) % 4 })),
+      togglePause: () => this.setState(s => ({ pause: s.pause === 'HALT' ? 'LIVE' : 'HALT' })),
+      toggleAnchor: () => this.setState(s => ({ anchors: s.anchors === 'ONE' ? 'NETWORK' : 'ONE' })),
+      toggleTravel: () => this.setState(s => ({ travel: s.travel === 'AFTER' ? 'BEFORE' : 'AFTER' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

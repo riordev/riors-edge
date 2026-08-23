@@ -8,28 +8,28 @@
 <body>
 <x-dc>
 <helmet>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   body { margin:0; background:#060B12; }
   a { color:#4FD8F5; text-decoration:none; }
   a:hover { color:#A8FBFF; }
 </style>
 </helmet>
-<div style="background:#060B12; padding:32px; font-family:Barlow,sans-serif; display:flex; flex-direction:column; gap:32px; align-items:center;">
+<div style="background:#060B12; padding:32px; font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:32px; align-items:flex-start; width:max-content;">
 
  <div style="width:1920px; height:1080px; background:#0A111C; color:#E6EDF5; display:flex; flex-direction:column; overflow:hidden; border:1px solid #1F3047; flex-shrink:0; position:relative;">
 
   <div style="height:88px; flex-shrink:0; background:#0F1826; border-bottom:1px solid #1F3047; display:flex; align-items:center; padding:0 40px; gap:32px;">
-    <h1 style="font-family:'Saira Condensed',sans-serif; font-weight:700; font-size:34px; margin:0; text-transform:uppercase; letter-spacing:0.04em; line-height:1;">Loadout</h1>
-    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BREAKER · SWIFT · LV 42 · GEAR SCORE <span style="color:#E6EDF5;">1 284</span></div>
+    <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:34px; margin:0; text-transform:uppercase; letter-spacing:0.04em; line-height:1;">Loadout</h1>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BREAKER · SWIFT · LV 42</div>
     <div style="margin-left:auto; display:flex; gap:16px; align-items:center;">
       <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:8px 14px; display:flex; align-items:center; gap:10px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ABERRANT</div>
-        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#FF4040;">3/3</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ABERRANT</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#FF4040;">3/3</div>
       </div>
       <div style="background:#18263A; border:1px solid #26F2D9; border-left:3px solid #26F2D9; padding:8px 14px; display:flex; align-items:center; gap:10px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ANOMALOUS</div>
-        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#26F2D9;">1/1</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">ANOMALOUS</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#26F2D9;">1/1</div>
       </div>
       <div onClick="{{ armBulk }}" style="{{ bulkStyle }}">{{ bulkLabel }}</div>
     </div>
@@ -51,126 +51,127 @@
           <path d="M318 168 L376 260 L360 330" fill="none" stroke="#2A3E58" stroke-width="2"></path>
           <path d="M242 168 L184 260 L200 330" fill="none" stroke="#2A3E58" stroke-width="2"></path>
         </svg>
-        <div style="position:absolute; bottom:24px; left:0; right:0; text-align:center; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">FULL-BODY RENDER SLOT · 560×660 · SILHOUETTE PLACEHOLDER</div>
+        <div style="position:absolute; bottom:24px; left:0; right:0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">FULL-BODY RENDER SLOT · 560×660 · SILHOUETTE PLACEHOLDER</div>
       </div>
 
       <div style="flex-shrink:0; border-top:1px solid #1F3047; background:#0A111C; padding:20px 24px; display:flex; flex-direction:column; gap:12px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">GEAR TOTALS</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">GEAR TOTALS</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px;">
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">HEALTH</span><span>2 480</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">SHIELD</span><span style="color:#4FD8F5;">1 120</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">CRIT CHANCE</span><span>28.5%</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">CRIT DAMAGE</span><span>×2.4</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">MOVE</span><span>×1.18</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">SLIDE</span><span style="color:#FFC64A;">×1.62</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">AIR</span><span>×1.24</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">WEAPON DMG</span><span style="color:#FF8A3D;">+42%</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px;"><span style="color:#63768C;">DROP CHANCE</span><span style="color:#FFC64A;">+16%</span></div>
-          <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:14px;"><span style="color:#63768C;">RIFT RESIST</span><span>+9%</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">HEALTH</span><span>2 480</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">SHIELD</span><span style="color:#4FD8F5;">1 120</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">CRIT CHANCE</span><span>28.5%</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">CRIT DAMAGE</span><span>×2.4</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">MOVE</span><span>×1.18</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">SLIDE</span><span style="color:#FFC64A;">×1.62</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">AIR</span><span>×1.24</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:6px;"><span style="color:#63768C;">WEAPON DMG</span><span style="color:#FF8A3D;">+42%</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px;"><span style="color:#63768C;">DROP CHANCE</span><span style="color:#FFC64A;">+16%</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px;"><span style="color:#63768C;">ABILITY DMG</span><span style="color:#B866FF;">+27%</span></div>
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:14px;"><span style="color:#63768C;">RIFT RESIST</span><span>+9%</span></div>
         </div>
       </div>
     </div>
 
     <div style="width:400px; flex-shrink:0; border-right:1px solid #1F3047; background:#0A111C; padding:24px; display:flex; flex-direction:column; gap:12px;">
-      <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">EQUIPPED · 8 SLOTS · CLICK TO UNEQUIP</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">EQUIPPED · 8 SLOTS · CLICK TO UNEQUIP</div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #B866FF; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #B866FF; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">HELMET</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#B866FF; line-height:1;">Fern-Cut Visor</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">HELMET</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#B866FF; line-height:1;">Fern-Cut Visor</div>
         </div>
-        <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i62</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i62</div>
       </div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #FF4040; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #FF4040; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BODY ARMOUR</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#FF4040; line-height:1;">Rootbound Carapace</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BODY ARMOUR</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#FF4040; line-height:1;">Rootbound Carapace</div>
         </div>
         <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i64</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i64</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
         </div>
       </div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #408CFF; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #408CFF; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">GLOVES</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#408CFF; line-height:1;">Militia Wraps</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">GLOVES</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#408CFF; line-height:1;">Militia Wraps</div>
         </div>
-        <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i58</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i58</div>
       </div>
 
       <div style="background:#18263A; border:2px solid #FFC64A; border-left:3px solid #26F2D9; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #26F2D9; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BOOTS</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#26F2D9; line-height:1;">Skimwalkers</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BOOTS</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#26F2D9; line-height:1;">Skimwalkers</div>
         </div>
         <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i66</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#26F2D9;">ANOMALOUS</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i66</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#26F2D9;">ANOMALOUS</div>
         </div>
       </div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #FF4040; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #FF4040; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">NECKLACE</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#FF4040; line-height:1;">Ashline Pendant</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">NECKLACE</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#FF4040; line-height:1;">Ashline Pendant</div>
         </div>
         <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i61</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i61</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
         </div>
       </div>
 
       <div style="background:#131E2E; border:1px dashed #2A3E58; border-left:3px solid #2A3E58; padding:12px 14px; display:flex; align-items:center; gap:14px;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px dashed #2A3E58; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">WAIST</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#3E4C5E; line-height:1;">Empty</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">WAIST</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#3E4C5E; line-height:1;">Empty</div>
         </div>
       </div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #FF4040; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #FF8A3D; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF8A3D;">PRIMARY</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#FF4040; line-height:1;">Blight Carbine</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF8A3D;">PRIMARY</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#FF4040; line-height:1;">Blight Carbine</div>
         </div>
         <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i65</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i65</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#FF4040;">ABERRANT</div>
         </div>
       </div>
 
       <div style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #DCE4EE; padding:12px 14px; display:flex; align-items:center; gap:14px; cursor:pointer;" style-hover="background:#1F3047;">
         <div style="width:44px; height:44px; background:#0F1826; border:1px solid #FF8A3D; border-radius:2px; flex-shrink:0;"></div>
         <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF8A3D;">SECONDARY</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; color:#DCE4EE; line-height:1;">Issue Sidearm</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF8A3D;">SECONDARY</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#DCE4EE; line-height:1;">Issue Sidearm</div>
         </div>
-        <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">i44</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">i44</div>
       </div>
 
       <div style="margin-top:auto; background:#0F1826; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:14px; display:flex; flex-direction:column; gap:6px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">EQUIP LIMIT REACHED</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">EQUIP LIMIT REACHED</div>
         <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Aberrant 3/3 and Anomalous 1/1. Equipping another swaps the lowest item level of that rarity — the card it will replace is outlined in red on hover.</div>
       </div>
     </div>
 
     <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
       <div style="height:64px; flex-shrink:0; border-bottom:1px solid #1F3047; display:flex; align-items:center; padding:0 24px; gap:10px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; margin-right:8px;">BACKPACK 38/60</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; margin-right:8px;">BACKPACK 38/60</div>
         <div onClick="{{ setAll }}" style="{{ chipAll }}">All</div>
         <div onClick="{{ setArmour }}" style="{{ chipArmour }}">Armour</div>
         <div onClick="{{ setWeapons }}" style="{{ chipWeapons }}">Weapons</div>
         <div onClick="{{ setTrinkets }}" style="{{ chipTrinkets }}">Trinkets</div>
-        <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">RMB / X DISCARD · LMB EQUIP</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">RMB / X DISCARD · LMB EQUIP</div>
       </div>
 
       <div style="flex:1; padding:24px; display:grid; grid-template-columns:repeat(3,1fr); grid-auto-rows:min-content; gap:16px; overflow:hidden; align-content:start;">
@@ -178,96 +179,96 @@
         <div onClick="{{ pick }}" style="background:#18263A; border:2px solid #FFC64A; border-left:3px solid #26F2D9; padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;" style-hover="background:#1F3047;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
-              <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#26F2D9; line-height:1;">Riftstep Greaves</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#26F2D9;">ANOMALOUS · BOOTS</div>
+              <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#26F2D9; line-height:1;">Riftstep Greaves</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#26F2D9;">ANOMALOUS · BOOTS</div>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i68</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i68</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">
-            <div>+22% slide speed <span style="color:#4FD8F5;">▲ +4%</span></div>
-            <div>+14% air accel <span style="color:#4FD8F5;">▲ +6%</span></div>
-            <div>+180 shield <span style="color:#FF4040;">▼ −40</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">
+            <div>+22% slide speed <span style="color:#4FD8F5;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-bottom:5px solid #4FD8F5; vertical-align:middle; margin-right:3px;"></span>+4%</span></div>
+            <div>+14% air accel <span style="color:#4FD8F5;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-bottom:5px solid #4FD8F5; vertical-align:middle; margin-right:3px;"></span>+6%</span></div>
+            <div>+180 shield <span style="color:#FF4040;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-top:5px solid #FF4040; vertical-align:middle; margin-right:3px;"></span>−40</span></div>
             <div style="color:#26F2D9;">Rift transit leaves a suppression trail</div>
           </div>
           <div style="border-top:1px solid #2A3E58; padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FFC64A;">EQUIP · REPLACES SKIMWALKERS</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#26F2D9;">LIMIT 1/1</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FFC64A;">EQUIP · REPLACES SKIMWALKERS</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#26F2D9;">LIMIT 1/1</div>
           </div>
         </div>
 
         <div onClick="{{ pick }}" style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #B866FF; padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;" style-hover="background:#1F3047;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
-              <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#B866FF; line-height:1;">Vinewrap Cuirass</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">EXCEPTIONAL · BODY ARMOUR</div>
+              <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#B866FF; line-height:1;">Vinewrap Cuirass</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">EXCEPTIONAL · BODY ARMOUR</div>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i63</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i63</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">
-            <div>+420 health <span style="color:#4FD8F5;">▲ +60</span></div>
-            <div>+9% rift resist <span style="color:#63768C;">= 0</span></div>
-            <div>+6% crit chance <span style="color:#FF4040;">▼ −2%</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">
+            <div>+420 health <span style="color:#4FD8F5;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-bottom:5px solid #4FD8F5; vertical-align:middle; margin-right:3px;"></span>+60</span></div>
+            <div>+9% rift resist <span style="color:#63768C;">NO CHANGE</span></div>
+            <div>+6% crit chance <span style="color:#FF4040;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-top:5px solid #FF4040; vertical-align:middle; margin-right:3px;"></span>−2%</span></div>
           </div>
-          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">EQUIP · REPLACES ROOTBOUND CARAPACE</div>
+          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">EQUIP · REPLACES ROOTBOUND CARAPACE</div>
         </div>
 
         <div onClick="{{ pick }}" style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #FF4040; padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;" style-hover="background:#1F3047;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
-              <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#FF4040; line-height:1;">Sporeburst Repeater</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">ABERRANT · PRIMARY</div>
+              <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#FF4040; line-height:1;">Sporeburst Repeater</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">ABERRANT · PRIMARY</div>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i67</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i67</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">
-            <div>318 damage <span style="color:#4FD8F5;">▲ +26</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">
+            <div>318 damage <span style="color:#4FD8F5;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-bottom:5px solid #4FD8F5; vertical-align:middle; margin-right:3px;"></span>+26</span></div>
             <div>+31% entropy damage</div>
             <div style="color:#FF4040;">−12% max health</div>
           </div>
           <div style="border-top:1px solid #2A3E58; padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">LIMIT FULL 3/3</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#FFC64A;">SWAPS ASHLINE PENDANT</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FF4040;">LIMIT FULL 3/3</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#FFC64A;">SWAPS ASHLINE PENDANT</div>
           </div>
         </div>
 
         <div onClick="{{ pick }}" style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #408CFF; padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;" style-hover="background:#1F3047;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
-              <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#408CFF; line-height:1;">Scout Sling</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">UNCOMMON · WAIST</div>
+              <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#408CFF; line-height:1;">Scout Sling</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">UNCOMMON · WAIST</div>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i52</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#E6EDF5;">i52</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">
             <div>+90 shield</div>
             <div>+4% move speed</div>
           </div>
-          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#4FD8F5;">EQUIP · SLOT EMPTY</div>
+          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#4FD8F5;">EQUIP · SLOT EMPTY</div>
         </div>
 
         <div onClick="{{ pick }}" style="background:#18263A; border:1px solid #2A3E58; border-left:3px solid #DCE4EE; padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;" style-hover="background:#1F3047;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:2px;">
-              <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#DCE4EE; line-height:1;">Salvage Gauntlets</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">STANDARD · GLOVES</div>
+              <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#DCE4EE; line-height:1;">Salvage Gauntlets</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">STANDARD · GLOVES</div>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:#63768C;">i31</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:18px; color:#63768C;">i31</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#63768C;">
-            <div>+40 health <span style="color:#FF4040;">▼ −180</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#63768C;">
+            <div>+40 health <span style="color:#FF4040;"><span style="display:inline-block; width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-top:5px solid #FF4040; vertical-align:middle; margin-right:3px;"></span>−180</span></div>
           </div>
-          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">DOWNGRADE · IN BULK DISCARD SET</div>
+          <div style="border-top:1px solid #2A3E58; padding-top:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">DOWNGRADE · IN BULK DISCARD SET</div>
         </div>
 
         <div style="background:#131E2E; border:1px dashed #2A3E58; padding:14px; display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; min-height:150px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#3E4C5E;">Nothing here</div>
-          <div style="font-size:14px; color:#63768C; text-align:center; line-height:1.5; max-width:220px;">Rift drops land with a rarity beam. Follow the colour you need.</div>
-          <div style="display:flex; gap:6px; margin-top:4px;">
-            <div style="width:4px; height:32px; background:#DCE4EE;"></div>
-            <div style="width:4px; height:32px; background:#408CFF;"></div>
-            <div style="width:4px; height:32px; background:#B866FF;"></div>
-            <div style="width:4px; height:32px; background:#FF4040;"></div>
-            <div style="width:4px; height:32px; background:#26F2D9;"></div>
+          <div style="font-family:'Archivo',sans-serif; font-size:17px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#3E4C5E;">Nothing here</div>
+          <div style="font-size:14px; color:#63768C; text-align:center; line-height:1.5; max-width:220px;">Rift drops land with a rarity beam. Height and profile say the tier; colour never says it alone.</div>
+          <div style="display:flex; gap:10px; margin-top:6px; align-items:flex-end;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="width:4px; height:16px; background:#DCE4EE;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C;">STD</div></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="width:4px; height:22px; background:#408CFF;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C;">UNC</div></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="width:4px; height:29px; background:#B866FF;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C;">EXC</div></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="width:4px; height:39px; background:#FF4040;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C;">ABR</div></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:5px;"><div style="width:4px; height:49px; background:#26F2D9;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C;">ANO</div></div>
           </div>
         </div>
       </div>
@@ -277,11 +278,11 @@
   <sc-if value="{{ confirming }}" hint-placeholder-val="{{ false }}">
   <div style="position:absolute; inset:0; background:#060B12; opacity:0.82;"></div>
   <div style="position:absolute; left:50%; top:50%; width:520px; margin-left:-260px; margin-top:-120px; background:#131E2E; border:1px solid #2A3E58; border-top:3px solid #FF4040; padding:28px; display:flex; flex-direction:column; gap:16px;">
-    <div style="font-family:'Saira Condensed',sans-serif; font-size:28px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; line-height:1;">Discard below Exceptional</div>
+    <div style="font-family:'Archivo',sans-serif; font-size:28px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; line-height:1;">Discard below Exceptional</div>
     <div style="font-size:15px; color:#9FB0C4; line-height:1.6;">14 items will be destroyed. Equipped gear and anything Aberrant or Anomalous is never included. This cannot be undone.</div>
     <div style="display:flex; gap:12px;">
-      <div onClick="{{ cancelBulk }}" style="flex:1; padding:12px; border:1px solid #2A3E58; text-align:center; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; color:#9FB0C4; cursor:pointer;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Cancel</div>
-      <div onClick="{{ cancelBulk }}" style="flex:1; padding:12px; border:1px solid #FF4040; background:#2A1414; text-align:center; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; color:#FF4040; cursor:pointer;" style-hover="background:#3A1A1A;">Destroy 14</div>
+      <div onClick="{{ cancelBulk }}" style="flex:1; padding:12px; border:1px solid #2A3E58; text-align:center; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; color:#9FB0C4; cursor:pointer;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Cancel</div>
+      <div onClick="{{ cancelBulk }}" style="flex:1; padding:12px; border:1px solid #FF4040; background:#2A1414; text-align:center; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; color:#FF4040; cursor:pointer;" style-hover="background:#3A1A1A;">Destroy 14</div>
     </div>
   </div>
   </sc-if>
@@ -289,20 +290,20 @@
 
  <div style="width:1920px; display:grid; grid-template-columns:repeat(4,1fr); gap:24px; color:#E6EDF5;">
    <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
-     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Zones</div>
-     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Header 1920×88. Character column 560 wide: render slot on top, gear totals pinned beneath it at 20 rows so the numbers are always on screen with the doll. Equipment column 400 wide, eight slots as full-width rows in wear order — head to foot, then trinkets, then weapons. Backpack takes the remaining 960: filter bar 64 tall, then a 3-across card grid at 16px gaps. Footer is absent by design; input hints live in the backpack bar.</div>
+     <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Zones</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Header 1920×88. Character column 560 wide: render slot on top, gear totals pinned beneath it so the numbers are always on screen with the doll. Damage prints as two rows — weapon and ability, never one DAMAGE line — because they draw from separate pools; the shared pool prints as neither, since it is already inside both. Equipment column 400 wide, eight slots as full-width rows in wear order — head to foot, then trinkets, then weapons. Backpack takes the remaining 960: filter bar 64 tall, then a 3-across card grid at 16px gaps. Footer is absent by design; input hints live in the backpack bar.</div>
    </div>
    <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:12px;">
-     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Card anatomy</div>
-     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Rarity lives on the 3px left rail and the name only; every face stays panel/10. Line one is name plus item level in mono at 18px — the two things scanned first. Line two is rarity and slot. Then the affix list at 13px mono, each affix carrying its delta against the equipped piece: cyan ▲, red ▼, muted = for parity. The footer line states the consequence of clicking: which item it replaces, or that the slot is empty.</div>
+     <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Card anatomy</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Rarity lives on the 3px left rail and the name only; every face stays panel/10. Line one is name plus item level in mono at 18px — the two things scanned first. Line two is rarity and slot. Then the affix list at 13px mono, each affix carrying its delta against the equipped piece: a 6×5 drawn triangle, cyan up or red down, and the words NO CHANGE for parity — no glyphs anywhere in the column, since the engine face has no Geometric Shapes block. The footer line states the consequence of clicking: which item it replaces, or that the slot is empty.</div>
    </div>
    <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:24px; display:flex; flex-direction:column; gap:12px;">
-     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Limit tells</div>
+     <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Limit tells</div>
      <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Two counters sit in the header permanently, so the constraint is never a surprise at click time. On an equipped card the rarity tag repeats under the item level. On a backpack card that would exceed the limit, the footer reads LIMIT FULL 3/3 next to the name of the piece the swap will eject, and hovering outlines that piece in red in the equipment column. The action is never blocked — it is disclosed.</div>
    </div>
    <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
-     <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Empty &amp; bulk</div>
-     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Empty slots keep full geometry with a dashed border and the slot name — the doll never looks broken, only unfinished. An empty backpack shows the five rarity beams as vertical bars with one line tying the screen to the world: loot is found by colour. Bulk discard is a two-step arm — the header button turns gold and reads CONFIRM, then a modal states the count, the exclusions, and the destructive label.</div>
+     <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;">Empty &amp; bulk</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Empty slots keep full geometry with a dashed border and the slot name — the doll never looks broken, only unfinished. An empty backpack shows the five rarity beams stepped by height with each tier named beside it, tying the screen to the world drop: the ramp is read by height and profile first, with colour as the second carrier and never the only one. Bulk discard is a two-step arm — the header button turns gold and reads CONFIRM, then a modal states the count, the exclusions, and the destructive label.</div>
    </div>
  </div>
 </div>
@@ -312,7 +313,7 @@ class Component extends DCLogic {
   state = { filter: 'All', armed: false, confirming: false };
   chip(name) {
     const on = this.state.filter === name;
-    return "padding:8px 16px; border-radius:2px; font-family:'Saira Condensed',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;"
+    return "padding:8px 16px; border-radius:2px; font-family:'Archivo',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;"
       + (on ? "background:#1F3047; border:1px solid #4FD8F5; color:#E6EDF5;" : "background:transparent; border:1px solid #2A3E58; color:#63768C;");
   }
   renderVals() {
@@ -326,7 +327,7 @@ class Component extends DCLogic {
       confirming: this.state.confirming,
       pick: () => {},
       bulkLabel: armed ? 'Confirm discard' : 'Discard below Exceptional',
-      bulkStyle: "padding:10px 18px; font-family:'Saira Condensed',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;"
+      bulkStyle: "padding:10px 18px; font-family:'Archivo',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;"
         + (armed ? "border:1px solid #FFC64A; background:#2A2416; color:#FFC64A;" : "border:1px solid #C22A2A; color:#FF4040;"),
       armBulk: () => armed ? this.setState({ confirming: true }) : this.setState({ armed: true }),
       cancelBulk: () => this.setState({ confirming: false, armed: false })

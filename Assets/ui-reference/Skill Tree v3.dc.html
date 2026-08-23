@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; padding:32px; font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:32px; align-items:flex-start; width:max-content;">
+
+ <div style="width:1920px; height:1080px; background:#0A111C; color:#E6EDF5; display:flex; flex-direction:column; overflow:hidden; border:1px solid #1F3047; flex-shrink:0;">
+
+  <div style="height:88px; flex-shrink:0; border-bottom:1px solid #1F3047; display:flex; align-items:center; padding:0 40px; gap:32px;">
+    <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:30px; margin:0; text-transform:uppercase; letter-spacing:0.02em; line-height:1;">Core</h1>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">UNIVERSAL · ONE POOL, SHARED WITH DOCTRINE</div>
+    <div style="margin-left:auto; display:flex; gap:24px; align-items:center;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:28px; line-height:1; color:#4FD8F5;">{{ pool }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">SKILL POINTS · {{ spent }} OF 65 SPENT</div>
+      </div>
+      <div onClick="{{ respec }}" style="padding:10px 18px; border:1px solid #C22A2A; color:#FF4040; font-family:'Archivo',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;" style-hover="background:#2A1414;">Respec all</div>
+    </div>
+  </div>
+
+  <div style="flex:1; display:flex; min-height:0;">
+
+    <div style="width:300px; flex-shrink:0; border-right:1px solid #1F3047; display:flex; flex-direction:column;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 24px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; border-bottom:1px solid #131E2E;">{{ railLabel }}</div>
+      <sc-for list="{{ rail }}" as="row" hint-placeholder-count="3">
+        <div onClick="{{ row.select }}" style="{{ row.style }}">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+            <div style="font-family:'Archivo',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; line-height:1; color:{{ row.nameColor }};">{{ row.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:{{ row.investColor }};">{{ row.invested }}</div>
+          </div>
+          <div style="height:3px; background:#18263A; display:flex;">
+            <div style="width:{{ row.pct }}; background:{{ row.barColor }};"></div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:{{ row.metaColor }};">{{ row.meta }}</div>
+        </div>
+      </sc-for>
+      <div style="margin-top:auto; padding:24px; border-top:1px solid #131E2E; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">NODE TYPES</div>
+        <div style="display:flex; align-items:center; gap:10px;"><div style="width:14px; height:14px; border:1px solid #63768C;"></div><span style="font-size:14px; color:#9FB0C4;">Minor · multi-rank</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><div style="width:12px; height:12px; border:1px solid #63768C; transform:rotate(45deg); margin:1px;"></div><span style="font-size:14px; color:#9FB0C4;">Notable · one rank</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><div style="width:14px; height:14px; border:2px solid #63768C;"></div><span style="font-size:14px; color:#9FB0C4;">Convergence</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><div style="width:12px; height:12px; border:2px solid #63768C; transform:rotate(45deg); margin:1px;"></div><span style="font-size:14px; color:#9FB0C4;">Keystone · one active</span></div>
+      </div>
+    </div>
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 32px; gap:16px; border-bottom:1px solid #131E2E;">
+        <div style="font-family:'Archivo',sans-serif; font-size:18px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">{{ boardTitle }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">{{ boardMeta }}</div>
+        <div style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#FFC64A;">{{ boardBuyable }}</div>
+      </div>
+
+      <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+        <sc-for list="{{ bands }}" as="band" hint-placeholder-count="4">
+          <div style="{{ band.style }}">
+            <div style="width:104px; flex-shrink:0; display:flex; flex-direction:column; gap:4px; padding-top:2px;">
+              <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:{{ band.labelColor }}; line-height:1;">{{ band.label }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:{{ band.gateColor }};">{{ band.gate }}</div>
+            </div>
+            <div style="flex:1; display:flex; gap:16px; min-width:0;">
+              <sc-for list="{{ band.nodes }}" as="n" hint-placeholder-count="2">
+                <div onClick="{{ n.buy }}" style="{{ n.style }}">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="{{ n.markStyle }}"></div>
+                    <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; line-height:1.1; color:{{ n.nameColor }};">{{ n.name }}</div>
+                  </div>
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.45; color:{{ n.effectColor }};">{{ n.effect }}</div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:auto;">
+                    <div style="flex:1; display:flex; gap:2px;">
+                      <sc-for list="{{ n.pips }}" as="pip" hint-placeholder-count="5">
+                        <div style="{{ pip.style }}"></div>
+                      </sc-for>
+                    </div>
+                    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:{{ n.captionColor }};">{{ n.caption }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="width:400px; flex-shrink:0; border-left:1px solid #1F3047; display:flex; flex-direction:column;">
+      <div style="height:44px; flex-shrink:0; display:flex; align-items:center; padding:0 24px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C; border-bottom:1px solid #131E2E;">SELECTED</div>
+      <div style="padding:24px; display:flex; flex-direction:column; gap:24px; flex:1;">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:{{ detailKindColor }};">{{ detailKind }}</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:26px; font-weight:700; text-transform:uppercase; letter-spacing:0.01em; line-height:1.05;">{{ detailName }}</div>
+          <div style="font-size:15px; color:#9FB0C4; line-height:1.6;">{{ detailDesc }}</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <sc-for list="{{ detailRows }}" as="row" hint-placeholder-count="3">
+            <div style="display:flex; justify-content:space-between; gap:16px; font-family:'IBM Plex Mono',monospace; font-size:14px; border-bottom:1px solid #131E2E; padding-bottom:8px;"><span style="color:#63768C;">{{ row.label }}</span><span style="color:{{ row.color }}; text-align:right;">{{ row.value }}</span></div>
+          </sc-for>
+        </div>
+        <div onClick="{{ buyOne }}" style="{{ detailBtnStyle }}">{{ detailBtnLabel }}</div>
+
+        <div style="margin-top:auto; display:flex; flex-direction:column; gap:9px; border-top:1px solid #131E2E; padding-top:20px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">{{ totalsLabel }}</div>
+          <sc-for list="{{ totals }}" as="row" hint-placeholder-count="4">
+            <div style="display:flex; justify-content:space-between; gap:16px; font-family:'IBM Plex Mono',monospace; font-size:14px;"><span style="color:#63768C;">{{ row.label }}</span><span style="color:{{ row.color }};">{{ row.value }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:56px; flex-shrink:0; border-top:1px solid #1F3047; display:flex; align-items:center; padding:0 40px; gap:32px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; letter-spacing:0.1em;">
+    <div><span style="color:#E6EDF5;">LMB</span> BUY 1 RANK</div>
+    <div><span style="color:#E6EDF5;">SHIFT+LMB</span> BUY TO MAX</div>
+    <div><span style="color:#E6EDF5;">HOVER</span> FULL DETAIL</div>
+    <div><span style="color:#E6EDF5;">TAB</span> DOCTRINE BOARD</div>
+    <div style="margin-left:auto; color:#FFC64A;">{{ footerBuyable }}</div>
+  </div>
+ </div>
+
+ <div style="width:1920px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; color:#E6EDF5;">
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Why this layout</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">One constellation on the board at a time. The 300px rail carries all six with their invested count, ring progress, and purchasable count, so switching costs one click and nothing is hidden. The class half of this screen is gone — doctrines replaced branches, tiers and investment gates, and they have their own board. Structure comes from horizontal tier bands, not from lines: a node's row IS its tier, and prerequisites are named in the node itself. Zones are 300 / 1220 / 400 with a 44px sub-header on each.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Node anatomy</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">One chip, four lines, 260 wide. Line one is a 14px type marker plus the name — square Minor, diamond Notable, 2px square Convergence, 2px diamond Keystone, so type is a shape and never a word. Line two is the effect as a number. The base row is rank pips on the left and state on the right, so scanning down a band gives every rank at once. Purchasable is a 2px gold border and gold caption; owned cyan; available neutral 1px; locked drops the fill to bg and dashes the border, with the reason as the caption.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">Constellations</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Six constellations in the rail, their node bands on the board — one reading model, no second one to learn. Kinesis is drawn as the hub that gates the others, which is a ruling still open rather than a settled layout: a hub privileges one axis, and if that privilege goes, the rail loses its hub tag and the Ring 2 link node becomes an ordinary Convergence. Nothing else changes. Elements stays sealed in suppression teal, the only legal teal on this screen because a rift is an object. Bands divide the 892px board equally rather than carrying a fixed height, so a constellation is always exactly as tall as the screen: 446 at two rings — Volley, Affliction, Bulwark — and 297 at three, which is Precision, Kinesis, and the sealed Elements. Locked bands drop to bg/void with their gate stated in the gutter, so the shape of what is left to buy is visible without hovering.</div>
+   </div>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1984,&quot;height&quot;:1400}}">
+class Component extends DCLogic {
+  state = { constellation: 0, pool: 44 };
+
+  data() {
+    const CORE = [
+      { name: 'Precision', invested: 7, cap: 14, meta: '2 BUYABLE', buyable: 2,
+        bands: [
+          { label: 'RING 1', gate: 'OPEN', open: true, nodes: [
+            { type:'minor', state:'owned', name:'Fine Bore', effect:'+3% crit chance / rank', rank:4, max:4, caption:'MAXED' },
+            { type:'minor', state:'buy', name:'Tight Group', effect:'+4% crit damage / rank', rank:3, max:5, caption:'1 PT → 4' } ] },
+          { label: 'RING 2', gate: '6 PTS', open: true, nodes: [
+            { type:'notable', state:'buy', name:'Exposed Seam', effect:'Weak points +12% damage', rank:0, max:1, caption:'1 PT' } ] },
+          { label: 'RING 3', gate: '12 PTS', open: false, nodes: [
+            { type:'conv', state:'locked', name:'Called Precision', effect:'Crits refresh marks', rank:0, max:1, caption:'GATE 7 / 12' } ] }
+        ] },
+      { name: 'Volley', invested: 4, cap: 12, meta: '1 BUYABLE', buyable: 1,
+        bands: [
+          { label: 'RING 1', gate: 'OPEN', open: true, nodes: [
+            { type:'minor', state:'owned', name:'Cadence', effect:'+4% fire rate / rank', rank:2, max:2, caption:'MAXED' },
+            { type:'minor', state:'buy', name:'Deep Pockets', effect:'+8% reserves / rank', rank:2, max:5, caption:'1 PT → 3' } ] },
+          { label: 'RING 2', gate: '6 PTS', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Sustained Fire', effect:'+15% damage after 8 hits', rank:0, max:1, caption:'GATE 4 / 6' } ] }
+        ] },
+      { name: 'Affliction', invested: 2, cap: 12, meta: '1 BUYABLE', buyable: 1,
+        bands: [
+          { label: 'RING 1', gate: 'OPEN', open: true, nodes: [
+            { type:'minor', state:'owned', name:'Lingering', effect:'+10% status duration / rank', rank:2, max:4, caption:'1 PT → 3' },
+            { type:'minor', state:'buy', name:'Corrosive', effect:'+6% entropy damage / rank', rank:0, max:5, caption:'1 PT → 1' } ] },
+          { label: 'RING 2', gate: '6 PTS', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Spread', effect:'Statuses jump 4 m on death', rank:0, max:1, caption:'GATE 2 / 6' } ] }
+        ] },
+      { name: 'Bulwark', invested: 0, cap: 12, meta: 'UNTOUCHED', buyable: 1,
+        bands: [
+          { label: 'RING 1', gate: 'OPEN', open: true, nodes: [
+            { type:'minor', state:'buy', name:'Hardpoint', effect:'+50 shield / rank', rank:0, max:5, caption:'1 PT → 1' } ] },
+          { label: 'RING 2', gate: '6 PTS', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Anchored', effect:'−20% damage while sliding', rank:0, max:1, caption:'GATE 0 / 6' } ] }
+        ] },
+      { name: 'Kinesis', invested: 8, cap: 14, meta: 'HUB · 1 BUYABLE', buyable: 1, hub: true,
+        bands: [
+          { label: 'RING 1', gate: 'OPEN', open: true, nodes: [
+            { type:'minor', state:'owned', name:'Carry Over', effect:'+6% momentum retention / rank', rank:5, max:5, caption:'MAXED' },
+            { type:'minor', state:'buy', name:'Redirect', effect:'+5% air turn / rank', rank:3, max:5, caption:'1 PT → 4' } ] },
+          { label: 'RING 2', gate: '6 PTS', open: true, nodes: [
+            { type:'conv', state:'open', name:'Constellation Link', effect:'Opens adjacent constellations', rank:0, max:1, caption:'1 PT' } ] },
+          { label: 'RING 3', gate: '12 PTS', open: false, nodes: [
+            { type:'key', state:'locked', name:'Perpetual', effect:'Momentum never decays. Shields never recharge.', rank:0, max:1, caption:'GATE 8 / 12' } ] }
+        ] },
+      { name: 'Elements', invested: 0, cap: 18, meta: 'SEALED', buyable: 0, sealed: true,
+        bands: [
+          { label: 'RIFT', gate: 'SEALED', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Rift Attunement', effect:'Unlocks Rift damage conversion', rank:0, max:1, caption:'CLOSE ONE RIFT' } ] },
+          { label: 'ENTROPY', gate: 'SEALED', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Entropy Attunement', effect:'Unlocks Entropy damage conversion', rank:0, max:1, caption:'CLOSE ONE RIFT' } ] },
+          { label: 'VOID', gate: 'SEALED', open: false, nodes: [
+            { type:'notable', state:'locked', name:'Void Attunement', effect:'Unlocks Void damage conversion', rank:0, max:1, caption:'CLOSE ONE RIFT' } ] }
+        ] }
+    ];
+    return CORE;
+  }
+
+  nodeVals(n, sealed) {
+    const C = { owned:'#4FD8F5', buy:'#FFC64A', open:'#2A3E58', locked:'#2A3E58' };
+    const accent = sealed ? '#08B8A8' : C[n.state];
+    const locked = n.state === 'locked';
+    const border = locked ? '1px dashed ' + accent : (n.state === 'buy' ? '2px solid ' + accent : '1px solid ' + accent);
+    const pad = n.state === 'buy' ? '13px 15px' : '14px 16px';
+    const markW = (n.type === 'conv' || n.type === 'key') ? 2 : 1;
+    const rot = (n.type === 'notable' || n.type === 'key') ? ' transform:rotate(45deg);' : '';
+    const markColor = locked ? '#3E4C5E' : (sealed ? '#26F2D9' : accent);
+    const pips = [];
+    if (n.max > 1) for (let i = 0; i < n.max; i++)
+      pips.push({ style: 'flex:1; height:3px; background:' + (i < n.rank ? (locked ? '#3E4C5E' : accent) : '#1F3047') + ';' });
+    return {
+      name: n.name, effect: n.effect, caption: n.caption, pips,
+      nameColor: locked ? '#63768C' : (sealed ? '#26F2D9' : '#E6EDF5'),
+      effectColor: locked ? '#63768C' : '#E6EDF5',
+      captionColor: locked ? '#FF4040' : (n.state === 'buy' ? '#FFC64A' : (n.state === 'owned' ? '#4FD8F5' : '#9FB0C4')),
+      markStyle: 'width:' + (rot ? 12 : 14) + 'px; height:' + (rot ? 12 : 14) + 'px; flex-shrink:0; border:' + markW + 'px solid ' + markColor + ';' + rot,
+      style: 'width:260px; flex-shrink:0; background:' + (locked ? '#0A111C' : '#131E2E') + '; border:' + border
+        + '; border-radius:2px; padding:' + pad + '; display:flex; flex-direction:column; gap:9px; cursor:' + (locked ? 'default' : 'pointer') + ';',
+      buy: locked ? (() => {}) : (() => this.setState(s => ({ pool: Math.max(0, s.pool - 1) })))
+    };
+  }
+
+  renderVals() {
+    const list = this.data();
+    const idx = this.state.constellation;
+    const sel = list[idx] || list[0];
+
+    const rail = list.map((b, i) => {
+      const on = i === idx;
+      const accent = b.sealed ? '#08B8A8' : (on ? '#4FD8F5' : '#1F3047');
+      return {
+        name: b.name, invested: b.invested + '/' + b.cap, meta: b.meta,
+        pct: Math.round(100 * b.invested / b.cap) + '%',
+        nameColor: b.sealed ? '#26F2D9' : (on ? '#E6EDF5' : '#9FB0C4'),
+        investColor: on ? '#4FD8F5' : '#63768C',
+        barColor: b.sealed ? '#08B8A8' : (b.invested ? '#4FD8F5' : '#1F3047'),
+        metaColor: b.buyable ? '#FFC64A' : '#63768C',
+        style: 'padding:16px 24px; display:flex; flex-direction:column; gap:9px; cursor:pointer; border-left:3px solid ' + accent
+          + '; background:' + (on ? '#131E2E' : 'transparent') + '; border-bottom:1px solid #131E2E;',
+        select: () => this.setState({ constellation: i })
+      };
+    });
+
+    const bands = sel.bands.map(b => ({
+      label: b.label, gate: b.gate,
+      labelColor: b.open ? '#E6EDF5' : '#63768C',
+      gateColor: b.open ? '#63768C' : '#FF4040',
+      nodes: b.nodes.map(n => this.nodeVals(n, sel.sealed)),
+      style: 'flex:1; min-height:0; box-sizing:border-box; display:flex; align-items:flex-start; gap:24px; padding:20px 32px; border-bottom:1px solid #131E2E; background:'
+        + (b.open ? 'transparent' : '#060B12') + ';'
+    }));
+
+    const flat = [];
+    sel.bands.forEach(b => b.nodes.forEach(n => flat.push({ n, b })));
+    const hit = flat.find(x => x.n.state === 'buy') || flat.find(x => x.n.state === 'owned') || flat[0];
+    const dn = hit.n, db = hit.b;
+    const KIND = { minor: 'MINOR', notable: 'NOTABLE', conv: 'CONVERGENCE', key: 'KEYSTONE' };
+    const dLocked = dn.state === 'locked';
+    const dBuy = dn.state === 'buy' || dn.state === 'open';
+    const currency = 'SKILL POINT';
+    const detailRows = [
+      { label: 'EFFECT', value: dn.effect, color: '#E6EDF5' },
+      { label: dn.max > 1 ? 'RANK' : 'TYPE', value: dn.max > 1 ? dn.rank + ' / ' + dn.max : KIND[dn.type], color: '#E6EDF5' },
+      { label: dLocked ? 'REQUIRES' : 'COST', value: dLocked ? dn.caption : '1 ' + currency, color: dLocked ? '#FF4040' : '#FFC64A' }
+    ];
+    const totals = [
+      { label:'CRIT CHANCE', value:'+12%', color:'#FFC64A' }, { label:'CRIT DAMAGE', value:'+16%', color:'#FFC64A' },
+      { label:'STATUS DURATION', value:'+20%', color:'#FFC64A' }, { label:'CONSTELLATIONS', value:'5 OF 6', color:'#63768C' } ];
+
+    return {
+      detailKind: KIND[dn.type] + ' · ' + sel.name.toUpperCase() + ' ' + db.label,
+      detailKindColor: dLocked ? '#FF4040' : (dn.state === 'owned' ? '#4FD8F5' : '#FFC64A'),
+      detailName: dn.name,
+      detailDesc: dn.effect + (dn.max > 1 ? ' Ranks stack additively up to ' + dn.max + '.' : ' Single rank, active as soon as it is bought.'),
+      detailRows, totals,
+      totalsLabel: 'BUILD TOTALS · CORE',
+      detailBtnLabel: dLocked ? 'Locked' : (dn.state === 'owned' ? 'Owned' : 'Purchase rank ' + (dn.rank + 1)),
+      detailBtnStyle: 'padding:13px; text-align:center; font-family:\'Archivo\',sans-serif; font-size:15px; text-transform:uppercase; letter-spacing:0.04em; '
+        + (dLocked ? 'border:1px dashed #2A3E58; color:#3E4C5E; cursor:not-allowed;'
+          : (dBuy ? 'border:1px solid #FFC64A; color:#FFC64A; cursor:pointer;' : 'border:1px solid #2A3E58; color:#4FD8F5; cursor:default;')),
+      pool: this.state.pool,
+      spent: 65 - this.state.pool,
+      respec: () => this.setState({ pool: 65 }),
+      buyOne: () => this.setState(s => ({ pool: Math.max(0, s.pool - 1) })),
+      railLabel: 'CONSTELLATIONS · 5 OF 6',
+      rail, bands,
+      boardTitle: sel.name,
+      boardMeta: sel.invested + ' INVESTED OF ' + sel.cap + (sel.hub ? ' · HUB' : (sel.sealed ? ' · SEALED' : '')),
+      boardBuyable: sel.buyable ? sel.buyable + ' PURCHASABLE HERE' : 'NOTHING PURCHASABLE HERE',
+      footerBuyable: list.reduce((a, b) => a + b.buyable, 0) + ' NODES PURCHASABLE ACROSS CORE'
+    };
+  }
+}
+</script>
+</body>
+</html>

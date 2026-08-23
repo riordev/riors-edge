@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#060B12; }
+  a { color:#4FD8F5; text-decoration:none; }
+  a:hover { color:#A8FBFF; }
+</style>
+</helmet>
+<div style="background:#060B12; padding:32px; font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:32px; align-items:flex-start; width:max-content;">
+
+ <div style="width:1920px; display:flex; gap:16px; align-items:center;">
+   <div onClick="{{ toggleUlt }}" style="{{ ultBtn }}">{{ ultLabel }}</div>
+   <div onClick="{{ cycleMo }}" style="padding:10px 18px; border:1px solid #2A3E58; color:#9FB0C4; font-family:'Archivo',sans-serif; font-size:15px; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Momentum: {{ moName }}</div>
+   <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">1920×1080 · BOTTOM-LEFT 340 WIDE · CENTRED VITALS 372 · XP 4PX</div>
+ </div>
+
+ <div style="width:1920px; height:1080px; background:#0F1826; position:relative; overflow:hidden; border:1px solid #1F3047; flex-shrink:0;">
+
+  <svg width="1920" height="1080" style="position:absolute; inset:0;">
+    <defs>
+      <pattern id="vh2" width="10" height="10" patternTransform="rotate(35)" patternUnits="userSpaceOnUse">
+        <line x1="0" y1="0" x2="0" y2="10" stroke="#131E2E" stroke-width="5"></line>
+      </pattern>
+    </defs>
+    <rect width="1920" height="1080" fill="url(#vh2)"></rect>
+    <text x="1300" y="1010" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="11" letter-spacing="4" fill="#2A3E58">GAMEPLAY VIEW PLACEHOLDER</text>
+  </svg>
+
+  <div style="{{ ultFrameStyle }}"></div>
+  <sc-if value="{{ ultOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; left:0; right:0; top:0; height:120px; background:#B866FF; opacity:0.10;"></div>
+    <div style="position:absolute; left:0; right:0; bottom:0; height:120px; background:#B866FF; opacity:0.10;"></div>
+  </sc-if>
+
+  <div style="position:absolute; left:50%; top:48px; margin-left:-140px; width:280px; display:flex; align-items:center; justify-content:center; gap:16px; border-bottom:2px solid #FF8A3D; padding-bottom:8px;">
+    <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; line-height:1;">Wave 07</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:14px; color:#FF8A3D;">14 HOSTILE</div>
+  </div>
+
+  <div style="position:absolute; left:50%; top:50%; margin-left:-40px; margin-top:-40px; width:80px; height:80px;">
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#E6EDF5" stroke-width="2">
+      <path d="M40 22 L40 32"></path>
+      <path d="M40 48 L40 58"></path>
+      <path d="M22 40 L32 40"></path>
+      <path d="M48 40 L58 40"></path>
+      <circle cx="40" cy="40" r="1.5" fill="#E6EDF5" stroke="none"></circle>
+      <path d="M26 26 L32 32" stroke="#FFC64A"></path>
+      <path d="M54 26 L48 32" stroke="#FFC64A"></path>
+      <path d="M26 54 L32 48" stroke="#FFC64A"></path>
+      <path d="M54 54 L48 48" stroke="#FFC64A"></path>
+    </svg>
+  </div>
+
+  <div style="position:absolute; left:1080px; top:300px; display:flex; flex-direction:column; align-items:center; gap:4px;">
+    <div style="width:180px; height:6px; background:#0A111C; border:1px solid #2A3E58; display:flex; padding:1px;">
+      <div style="width:34%; background:#FF4040;"></div>
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#9FB0C4;">HUSK REVENANT · LV 44</div>
+  </div>
+
+  <div style="position:absolute; left:1140px; top:200px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:64px; color:#FFC64A; -webkit-text-stroke:2px #14100A; letter-spacing:-0.02em;">1 842</div>
+  <div style="position:absolute; left:1372px; top:392px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:80px; color:#FF8A3D; -webkit-text-stroke:2px #16090A; letter-spacing:-0.03em;">3 204</div>
+  <div style="position:absolute; left:990px; top:250px; font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:40px; color:#DCE4EE; -webkit-text-stroke:2px #0A111C; letter-spacing:-0.01em;">612</div>
+  <div style="position:absolute; left:1180px; top:496px; font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:40px; color:#A8FBFF; -webkit-text-stroke:2px #08131A; letter-spacing:-0.01em;">744</div>
+
+  <div style="position:absolute; left:820px; top:640px; display:flex; align-items:center; gap:10px;">
+    <div style="width:3px; height:26px; background:#26F2D9;"></div>
+    <div style="display:flex; flex-direction:column;">
+      <div style="font-family:'Archivo',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.01em; color:#26F2D9; line-height:1.1;">Riftstep Greaves</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#63768C;">i68 · <span style="color:#E6EDF5;">F</span> TAKE</div>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:50%; bottom:56px; margin-left:-186px; width:372px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:17px; color:#4FD8F5; width:58px; text-align:right;">806</div>
+      <div style="width:232px; display:flex; flex-direction:column; gap:3px;">
+        <div style="height:9px; background:#18263A; display:flex;"><div style="width:72%; background:#4FD8F5;"></div></div>
+        <div style="height:6px; background:#18263A; display:flex;"><div style="width:88%; background:#DCE4EE;"></div></div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:17px; color:#DCE4EE; width:58px;">2182</div>
+    </div>
+    <div style="display:flex; box-sizing:border-box; border:1px solid #2A3E58; width:88px; height:11px; padding:1px; gap:1px;">
+      <div style="flex:1; background:#4FD8F5;"></div>
+      <div style="flex:1; background:#4FD8F5;"></div>
+      <div style="flex:1; background:#0F1826;"></div>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding-bottom:10px;">
+    <div style="display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#63768C;">
+      <span style="color:#E6EDF5;">LV 42</span>
+      <span>68 400 / 92 000</span>
+    </div>
+    <div style="width:100%; height:4px; background:#131E2E; display:flex;">
+      <div style="width:74%; background:#FFC64A;"></div>
+    </div>
+  </div>
+
+  <div style="position:absolute; left:48px; bottom:48px; width:340px; display:flex; flex-direction:column; gap:10px;">
+
+    <div style="display:flex; flex-direction:column; gap:5px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:9px; height:9px; background:#4FD8F5;"></div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; color:#4FD8F5;">OVERCLOCK 8.0</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:9px; height:9px; background:#FF8A3D;"></div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; color:#FF8A3D;">SCORCH 4.2</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:9px; height:9px; background:#B866FF;"></div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; color:#B866FF;">VOID 2</div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:4px; border-left:3px solid {{ moColor }}; padding-left:10px;">
+      <div style="height:7px; background:#18263A; display:flex; position:relative;">
+        <div style="{{ moFillStyle }}"></div>
+        <div style="position:absolute; left:33%; top:0; bottom:0; width:2px; background:#0F1826;"></div>
+        <div style="position:absolute; left:66%; top:0; bottom:0; width:2px; background:#0F1826;"></div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <div style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:{{ moColor }}; line-height:1;">{{ moName }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">{{ moSpeed }} M/S</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:flex-end; gap:8px;">
+      <div style="width:56px; height:56px; background:#18263A; border:2px solid #4FD8F5; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center;">
+        <svg width="42" height="42" viewBox="0 0 52 52" fill="none" stroke="#4FD8F5" stroke-width="2.5"><path d="M8 38 L26 38 L42 16"></path><path d="M34 16 L42 16 L42 25"></path></svg>
+        <div style="position:absolute; bottom:1px; right:3px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#4FD8F5;">E</div>
+      </div>
+      <div style="width:56px; height:56px; background:#0F1826; border:1px solid #1F3047; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+        <svg width="42" height="42" viewBox="0 0 52 52" fill="none" stroke="#3E4C5E" stroke-width="2.5"><path d="M6 40 L20 33"></path><path d="M36 12 L46 18 L40 28 L30 22 Z"></path></svg>
+        <div style="position:absolute; left:0; right:0; bottom:0; height:58%; background:#060B12; opacity:0.75;"></div>
+        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:16px; color:#9FB0C4;">4.6</div>
+        <div style="position:absolute; bottom:1px; right:3px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#63768C;">T</div>
+      </div>
+      <div style="{{ ultSquareStyle }}">
+        <svg width="42" height="42" viewBox="0 0 52 52" fill="none" stroke="#B866FF" stroke-width="2.5">
+          <path d="M8 34 L8 42 L34 42 L34 34"></path>
+          <path d="M8 38 L26 38" stroke-width="5"></path>
+          <path d="M30 38 L38 38" stroke-width="5"></path>
+          <path d="M22 28 L28 16 L34 28"></path>
+        </svg>
+        <div style="position:absolute; bottom:1px; right:3px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#B866FF;">G</div>
+      </div>
+      <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:1px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.1em; color:#FF4040;">BLIGHT CARBINE</div>
+        <div style="display:flex; align-items:baseline; gap:3px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:56px; line-height:0.9; color:#E6EDF5; letter-spacing:-0.02em;">24</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:22px; color:#63768C;">/108</div>
+        </div>
+      </div>
+    </div>
+  </div>
+ </div>
+
+ <div style="width:1920px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; color:#E6EDF5;">
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF8A3D; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">1 · One corner, no chrome</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">What the player controls sits in a 340-wide stack at 48px from the left and bottom edge; what the player IS sits centred at the bottom of the screen. Height on both is intrinsic rather than fixed — the left stack grows upward from its bottom anchor as effects arrive. The panel plate is gone — no fill, no border, no rail around the group. On a moving gameplay image the readouts themselves are the shapes, so the housing was doing nothing but adding weight. Three rows, 10px apart: the buff and debuff stack on top, momentum, then weapon and abilities at the base nearest the hand. Effects read downward, one per line, newest at the bottom — a vertical column of 8px dot plus 11px value can be counted at a glance, where a horizontal run had to be read.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">2 · What was cut</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Bottom-right cluster, removed entirely. Shield and health leave the corner entirely: a 232px double bar centred at 56px from the bottom in a 372-wide row (58 + 12 + 232 + 12 + 58), shield 9px over health 6px, with the current value flanking it left and right at 17px in fixed 58px columns and the armour meter centred beneath. Neither carries a max or a label. Levelling sits lower still — a full-width 4px gold rule pinned to the very bottom edge with the level and the raw numbers above it at 12px, so progress is visible without ever competing for the corner. Momentum keeps a 7px track and its state word at 14px, and drops its own panel for a 3px state-coloured rail on the left — 3px is the only rail weight, so a 2px line here would be a fifth border weight with no meaning. Armour is the one place where the vitals block could be mistaken for that track, so it is drawn as a single 88×11 border-box outlined three-cell meter in shield cyan (84×7 interior plus 1px padding and 1px border, box-sizing border-box) rather than loose gold blocks — nothing else in the corner uses gold. Weapon name falls to an 11px mono line above the magazine. Ability squares 56px with 8px gaps — the one ability-square size in the project — and the magazine at 56px, which is number-large, the token named for it. Status effects become a dot and a value on one line.</div>
+   </div>
+   <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:24px; display:flex; flex-direction:column; gap:12px;">
+     <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em;">3 · What holds</div>
+     <div style="font-size:15px; color:#9FB0C4; line-height:1.7;">Momentum still reports through three channels — colour, fill, and block texture — so the state is peripheral, not read. Ability states are still geometric: 2px accent border ready, hard wedge on cooldown, red struck cost when unaffordable. The 3px momentum rail is the one piece of chrome kept, because it is also the state indicator. Centred vitals sit clear of the crosshair by 400px of dead space, and the XP rule is thin enough at 4px to stay out of the read entirely until it moves. Damage numbers, crosshair, enemy bars, wave banner, and loot popups are unchanged; the banner loses its plate for a single 2px orange underline.</div>
+   </div>
+ </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1984,&quot;height&quot;:1400}}">
+class Component extends DCLogic {
+  state = { mo: 1, ult: false };
+  renderVals() {
+    const states = [
+      { name: 'Settled', color: '#4FD8F5', width: '22%', speed: '4.2' },
+      { name: 'Running', color: '#FFC64A', width: '54%', speed: '11.8' },
+      { name: 'Redline', color: '#FF8A3D', width: '92%', speed: '19.4' }
+    ];
+    const i = this.state.mo, s = states[i], ult = this.state.ult;
+    const block = i === 0 ? 0 : (i === 1 ? 8 : 14);
+    let fill = "height:100%; width:" + s.width + "; background:" + s.color + ";";
+    if (block) fill = "height:100%; width:" + s.width + "; background:repeating-linear-gradient(90deg," + s.color + " 0 " + block + "px, #18263A " + block + "px " + (block + 3) + "px);";
+    return {
+      moName: s.name, moColor: s.color, moSpeed: s.speed, moFillStyle: fill,
+      cycleMo: () => this.setState(st => ({ mo: (st.mo + 1) % 3 })),
+      ultOn: ult,
+      toggleUlt: () => this.setState(st => ({ ult: !st.ult })),
+      ultLabel: ult ? 'Ultimate: active' : 'Ultimate: off',
+      ultBtn: "padding:10px 18px; font-family:'Archivo',sans-serif; font-size:15px; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;"
+        + (ult ? "border:1px solid #B866FF; background:#1C1428; color:#B866FF;" : "border:1px solid #2A3E58; color:#9FB0C4;"),
+      ultFrameStyle: "position:absolute; inset:8px; pointer-events:none; transition:border-color 180ms ease-out;"
+        + (ult ? "border:3px solid #B866FF;" : "border:3px solid transparent;"),
+      ultSquareStyle: "width:56px; height:56px; border-radius:4px; position:relative; display:flex; align-items:center; justify-content:center;"
+        + (ult ? "background:#1F3047; border:2px solid #B866FF;" : "background:#18263A; border:2px solid #B866FF;")
+    };
+  }
+}
+</script>
+</body>
+</html>

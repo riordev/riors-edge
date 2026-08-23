@@ -11,7 +11,7 @@
 <meta name="design_doc_mode" content="canvas">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   body { margin:0; background:#060B12; }
   a { color:#4FD8F5; text-decoration:none; }
@@ -24,11 +24,11 @@
 
     <header style="display:flex; align-items:flex-end; justify-content:space-between; gap:48px; border-bottom:2px solid #1F3047; padding-bottom:28px;">
       <div style="display:flex; flex-direction:column; gap:10px; max-width:820px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.22em; color:#63768C; text-transform:uppercase;">RIOR'S EDGE / UI SPECIFICATION / V1.0</div>
-        <h1 style="font-family:'Saira Condensed',sans-serif; font-weight:700; font-size:76px; line-height:0.92; letter-spacing:0.01em; margin:0; text-transform:uppercase;">FIELDPLATE</h1>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.22em; color:#63768C; text-transform:uppercase;">RIOR'S EDGE / UI SPECIFICATION / V1.0</div>
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:76px; line-height:0.92; letter-spacing:0.01em; margin:0; text-transform:uppercase;">FIELDPLATE</h1>
         <p style="margin:8px 0 0; font-size:17px; line-height:1.55; color:#9FB0C4; text-wrap:pretty;">The Breaker interface is stamped sheet metal, not glass. Every panel reads as a plate bolted to a chassis that has been carried through wet ruin — square shoulders, hard edges, a single accent rail marking function the way paint marks equipment in a motor pool. Rift technology never softens that: it is quarantined into thin instrument lines and object-marking teal, so the ominous part of the screen is always the part that belongs to the anomaly, never the housing around it.</p>
       </div>
-      <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; flex-shrink:0;">
+      <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; flex-shrink:0;">
         <div>BASE <span style="color:#E6EDF5;">#0A111C</span></div>
         <div>GRID <span style="color:#E6EDF5;">8px</span></div>
         <div>RADIUS <span style="color:#E6EDF5;">2px</span></div>
@@ -38,123 +38,129 @@
 
     <section style="display:flex; flex-direction:column; gap:24px;">
       <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">01</div>
-        <h2 style="font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Color system</h2>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">01</div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Color system</h2>
         <div style="font-size:14px; color:#63768C;">Flat fills only. Depth comes from border value, never from gradient.</div>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:24px;">
         <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:20px; display:flex; flex-direction:column; gap:14px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">BACKGROUND RAMP</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">BACKGROUND RAMP</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#060B12; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#060B12</div><div style="font-size:13px; color:#63768C;">bg/void — screen field, modal scrim base</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#0A111C; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#0A111C</div><div style="font-size:13px; color:#63768C;">bg/base — default screen ground</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#0F1826; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#0F1826</div><div style="font-size:13px; color:#63768C;">bg/raised — zone separation, gutters</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#060B12; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#060B12</div><div style="font-size:13px; color:#63768C;">bg/void — screen field, modal scrim base</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#0A111C; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#0A111C</div><div style="font-size:13px; color:#63768C;">bg/base — default screen ground</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#0F1826; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#0F1826</div><div style="font-size:13px; color:#63768C;">bg/raised — zone separation, gutters</div></div></div>
           </div>
         </div>
 
         <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:20px; display:flex; flex-direction:column; gap:14px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">PANEL RAMP</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">PANEL RAMP</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#131E2E; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#131E2E</div><div style="font-size:13px; color:#63768C;">panel/00 — plate face</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#18263A; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#18263A</div><div style="font-size:13px; color:#63768C;">panel/10 — cards, list rows, slots</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#1F3047; border:1px solid #2A3E58;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px;">#1F3047</div><div style="font-size:13px; color:#63768C;">panel/20 — hover, headers, dividers</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#131E2E; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#131E2E</div><div style="font-size:13px; color:#63768C;">panel/00 — plate face</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#18263A; border:1px solid #1F3047;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#18263A</div><div style="font-size:13px; color:#63768C;">panel/10 — cards, list rows, slots</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#1F3047; border:1px solid #2A3E58;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px;">#1F3047</div><div style="font-size:13px; color:#63768C;">panel/20 — hover, headers, dividers</div></div></div>
           </div>
         </div>
 
         <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:20px; display:flex; flex-direction:column; gap:14px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">TEXT HIERARCHY</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">TEXT HIERARCHY</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#E6EDF5;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#E6EDF5;">#E6EDF5</div><div style="font-size:13px; color:#63768C;">text/primary — names, values, headers</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#9FB0C4;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">#9FB0C4</div><div style="font-size:13px; color:#63768C;">text/secondary — body, affix lines</div></div></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#63768C;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#63768C;">#63768C</div><div style="font-size:13px; color:#63768C;">text/muted — labels, keycaps, meta</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#E6EDF5;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#E6EDF5;">#E6EDF5</div><div style="font-size:13px; color:#63768C;">text/primary — names, values, headers</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#9FB0C4;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">#9FB0C4</div><div style="font-size:13px; color:#63768C;">text/secondary — body, affix lines</div></div></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:56px; height:40px; background:#63768C;"></div><div style="display:flex; flex-direction:column;"><div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#63768C;">#63768C</div><div style="font-size:13px; color:#63768C;">text/muted — labels, keycaps, meta</div></div></div>
           </div>
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:24px;">
+      <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:24px;">
         <div style="background:#131E2E; border:1px solid #1F3047; border-top:3px solid #4FD8F5; padding:18px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#4FD8F5;">Player / System</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:14px;">#4FD8F5</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#4FD8F5;">Player / System</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px;">#4FD8F5</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Shields, class resource, focus rings, selected state, headers. The only accent allowed on chrome.</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">RIFT DAMAGE <span style="color:#A8FBFF;">#A8FBFF</span> — hotter, whiter, damage-only</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">RIFT DAMAGE <span style="color:#A8FBFF;">#A8FBFF</span> — hotter, whiter, damage-only</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; border-top:3px solid #FF8A3D; padding:18px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FF8A3D;">Weapon / Heat</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:14px;">#FF8A3D</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FF8A3D;">Weapon / Heat</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px;">#FF8A3D</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Magazine, reload, heat, weapon stat deltas, crit damage numbers.</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#C25A1E;">#C25A1E</span> — pressed / track fill</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#C25A1E;">#C25A1E</span> — pressed / track fill</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; border-top:3px solid #FFC64A; padding:18px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FFC64A;">Reward / Weak point</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:14px;">#FFC64A</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FFC64A;">Reward / Weak point</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px;">#FFC64A</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Currency, weak-point hits, unspent points, purchase confirm.</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#B98212;">#B98212</span> — pressed / track fill</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#B98212;">#B98212</span> — pressed / track fill</div>
+        </div>
+        <div style="background:#131E2E; border:1px solid #1F3047; border-top:3px solid #B866FF; padding:18px; display:flex; flex-direction:column; gap:10px;">
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; color:#B866FF;">Ultimate</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px;">#B866FF</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Ultimate charge, the ultimate-active screen treatment, and the modal edge in the flow map. Nothing else: Void damage uses its element colour, Exceptional uses the rarity ramp.</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">SHARES ITS HUE WITH EXCEPTIONAL BY RAMP, NOT BY ROLE</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; border-top:3px solid #FF4040; padding:18px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FF4040;">Harm</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:14px;">#FF4040</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#FF4040;">Harm</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px;">#FF4040</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.5;">Health loss, incoming threat, destructive actions, negative deltas. Shares hue with Aberrant rarity by design.</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#C22A2A;">#C22A2A</span> — pressed / track fill</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; border-top:1px solid #1F3047; padding-top:10px;">DEEP <span style="color:#C22A2A;">#C22A2A</span> — pressed / track fill</div>
         </div>
       </div>
 
       <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #26F2D9; padding:22px; display:flex; flex-direction:column; gap:16px;">
         <div style="display:flex; align-items:baseline; gap:14px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#26F2D9;">Teal object law</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:22px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:#26F2D9;">Teal object law</div>
           <div style="font-size:14px; color:#9FB0C4;">Teal is a noun, never an adjective.</div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:22px;">
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#26F2D9;">PERMITTED</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#26F2D9;">PERMITTED</div>
             <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Rift geometry and rift VFX. Suppression hardware (charges, anchors, lances) and their readouts. Anomalous-rarity item frames, beams, and name text. Nothing else.</div>
             <div style="display:flex; gap:10px; margin-top:4px;">
-              <div style="font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 10px; background:#0F1826; border:1px solid #08B8A8; color:#26F2D9;">#08B8A8 hardware</div>
-              <div style="font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 10px; background:#0F1826; border:1px solid #26F2D9; color:#26F2D9;">#26F2D9 anomalous</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 10px; background:#0F1826; border:1px solid #08B8A8; color:#26F2D9;">#08B8A8 hardware</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 10px; background:#0F1826; border:1px solid #26F2D9; color:#26F2D9;">#26F2D9 anomalous</div>
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF4040;">FORBIDDEN</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FF4040;">FORBIDDEN</div>
             <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Damage numbers of any element. Buttons, borders, rails, focus rings, tab underlines, progress tracks, tooltips, icons for non-rift abilities. If a teal pixel is not describing a thing that exists in the world, it is a bug.</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C; margin-top:4px;">Rift-element damage uses #A8FBFF. Generic system accent uses #4FD8F5.</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C; margin-top:4px;">Rift-element damage uses #A8FBFF. Generic system accent uses #4FD8F5.</div>
           </div>
         </div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">RARITY RAMP</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">RARITY RAMP</div>
         <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:16px;">
           <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #DCE4EE; padding:14px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#DCE4EE;">Standard</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">#DCE4EE</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#DCE4EE;">Standard</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">#DCE4EE</div>
           </div>
           <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #408CFF; padding:14px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#408CFF;">Uncommon</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">#408CFF</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#408CFF;">Uncommon</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">#408CFF</div>
           </div>
           <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #B866FF; padding:14px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#B866FF;">Exceptional</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">#B866FF</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#B866FF;">Exceptional</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">#B866FF</div>
           </div>
           <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:14px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#FF4040;">Aberrant</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">#FF4040 · max 3 equipped</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#FF4040;">Aberrant</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">#FF4040 · max 3 equipped</div>
           </div>
           <div style="background:#18263A; border:1px solid #26F2D9; border-left:3px solid #26F2D9; padding:14px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#26F2D9;">Anomalous</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">#26F2D9 · max 1 equipped</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; color:#26F2D9;">Anomalous</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">#26F2D9 · max 1 equipped</div>
           </div>
         </div>
         <div style="font-size:14px; color:#63768C; line-height:1.6;">Rarity colour appears on: the card's left rail (3px), the item name text, the world-drop beam, and nothing else. Card faces stay panel/10 at every rarity so a wall of loot does not become a wall of colour. Anomalous is the single exception: it also gets a full 1px border, because it is the only tier that is also a world object class.</div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">INTERACTION STATES — hover the row to test</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#9FB0C4;">INTERACTION STATES — hover the row to test</div>
         <div style="background:#131E2E; border:1px solid #1F3047; padding:20px; display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
-          <div style="padding:12px 22px; background:#1F3047; border:1px solid #4FD8F5; color:#E6EDF5; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:background 120ms ease-out, border-color 120ms ease-out;" style-hover="background:#2A3E58; border-color:#A8FBFF;" style-active="background:#0F1826; border-color:#4FD8F5;">Primary action</div>
-          <div style="padding:12px 22px; background:transparent; border:1px solid #2A3E58; color:#9FB0C4; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:border-color 120ms ease-out, color 120ms ease-out;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Secondary</div>
-          <div style="padding:12px 22px; background:transparent; border:1px solid #C22A2A; color:#FF4040; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:background 120ms ease-out;" style-hover="background:#2A1414; border-color:#FF4040;">Discard</div>
-          <div style="padding:12px 22px; background:#0F1826; border:1px solid #1F3047; color:#3E4C5E; font-family:'Saira Condensed',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:not-allowed;">Disabled</div>
+          <div style="padding:12px 22px; background:#1F3047; border:1px solid #4FD8F5; color:#E6EDF5; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:background 120ms ease-out, border-color 120ms ease-out;" style-hover="background:#2A3E58; border-color:#A8FBFF;" style-active="background:#0F1826; border-color:#4FD8F5;">Primary action</div>
+          <div style="padding:12px 22px; background:transparent; border:1px solid #2A3E58; color:#9FB0C4; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:border-color 120ms ease-out, color 120ms ease-out;" style-hover="border-color:#4FD8F5; color:#E6EDF5;">Secondary</div>
+          <div style="padding:12px 22px; background:transparent; border:1px solid #C22A2A; color:#FF4040; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:background 120ms ease-out;" style-hover="background:#2A1414; border-color:#FF4040;">Discard</div>
+          <div style="padding:12px 22px; background:#0F1826; border:1px solid #1F3047; color:#3E4C5E; font-family:'Archivo',sans-serif; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; cursor:not-allowed;">Disabled</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6; max-width:420px;">Hover raises the fill one panel step and shifts the accent one step brighter. Pressed drops the fill one step below rest and holds the accent. Disabled keeps geometry, drops text to #3E4C5E, strips the accent entirely — never lowers opacity, which would reveal the plate seams behind it.</div>
         </div>
       </div>
@@ -162,138 +168,139 @@
 
     <section style="display:flex; flex-direction:column; gap:24px;">
       <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">02</div>
-        <h2 style="font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Typography</h2>
-        <div style="font-size:14px; color:#63768C;">Three faces. All SIL Open Font License.</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">02</div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Typography</h2>
+        <div style="font-size:14px; color:#63768C;">Three faces, two families. All SIL Open Font License.</div>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
         <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:22px; display:flex; flex-direction:column; gap:12px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">DISPLAY</div>
-          <div style="font-family:'Saira Condensed',sans-serif; font-weight:700; font-size:44px; line-height:0.95; text-transform:uppercase;">Saira Condensed</div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Weights 600 / 700, always uppercase, tracking +0.04em. Industrial condensed with flat terminals — reads as stencilled equipment marking, not a sci-fi logotype. Screen titles, panel headers, item names, buttons.</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">DISPLAY</div>
+          <div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:44px; line-height:0.95; text-transform:uppercase;">Archivo</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Weights 600 / 700, always uppercase, tracking +0.01em. A wide industrial grotesque with flat terminals and square corners — closer to stencilled crate lettering than to a console typeface, and it holds its weight at small caption sizes. Screen titles, panel headers, item names, buttons.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:22px; display:flex; flex-direction:column; gap:12px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BODY</div>
-          <div style="font-family:Barlow,sans-serif; font-weight:600; font-size:40px; line-height:1;">Barlow</div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Weights 400 / 500 / 600, sentence case. Low-contrast grotesque built for signage; open apertures hold at 11px on dark. Affix lines, tooltips, descriptions, all prose.</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">BODY</div>
+          <div style="font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:40px; line-height:1;">IBM Plex Sans</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Weights 400 / 500 / 600, sentence case. Engineered for technical documentation, so it stays plain at length and keeps open apertures at 11px on dark. Affix lines, tooltips, descriptions, all prose.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #2A3E58; padding:22px; display:flex; flex-direction:column; gap:12px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">NUMERIC / MONO</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:34px; line-height:1;">0123456789</div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">JetBrains Mono, tabular by default. Every number that ticks — magazine, damage, stat values, timers, hex codes, keycaps. Fixed advance means counters never reflow mid-fight.</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">NUMERIC / MONO</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:34px; line-height:1;">0123456789</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">IBM Plex Mono, tabular by default, same skeleton as the body face so numbers and prose never look borrowed from different kits. Every number that ticks — magazine, damage, stat values, timers, hex codes, keycaps. Fixed advance means counters never reflow mid-fight.</div>
         </div>
       </div>
       <div style="background:#0A111C; border:1px solid #1F3047; padding:0; overflow:hidden;">
-        <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; background:#1F3047; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#9FB0C4;">
+        <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; background:#1F3047; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; color:#9FB0C4;">
           <div style="padding:12px 16px;">TOKEN</div><div style="padding:12px 16px;">SPECIMEN</div><div style="padding:12px 16px;">SIZE / LH</div><div style="padding:12px 16px;">WEIGHT</div><div style="padding:12px 16px;">USE</div>
         </div>
         <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; border-bottom:1px solid #1F3047; align-items:center;">
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">h1</div>
-          <div style="padding:14px 16px; font-family:'Saira Condensed',sans-serif; font-weight:700; font-size:34px; text-transform:uppercase; letter-spacing:0.04em;">Skill matrix</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">34 / 36</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">700</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">h1</div>
+          <div style="padding:14px 16px; font-family:'Archivo',sans-serif; font-weight:700; font-size:34px; text-transform:uppercase; letter-spacing:0.01em;">Skill matrix</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">34 / 36</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">700</div>
           <div style="padding:14px 16px; font-size:14px; color:#63768C;">Screen title, one per screen, top-left of header zone</div>
         </div>
         <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; border-bottom:1px solid #1F3047; align-items:center;">
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">h2</div>
-          <div style="padding:14px 16px; font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:20px; text-transform:uppercase; letter-spacing:0.05em;">Gear totals</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">20 / 24</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">600</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">h2</div>
+          <div style="padding:14px 16px; font-family:'Archivo',sans-serif; font-weight:600; font-size:20px; text-transform:uppercase; letter-spacing:0.02em;">Gear totals</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">20 / 24</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">600</div>
           <div style="padding:14px 16px; font-size:14px; color:#63768C;">Panel headers, item names, tab labels</div>
         </div>
         <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; border-bottom:1px solid #1F3047; align-items:center;">
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">body</div>
-          <div style="padding:14px 16px; font-family:Barlow,sans-serif; font-size:14px; color:#9FB0C4;">+12% slide speed per rank while Momentum is Running.</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">14 / 20</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">400</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">body</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Sans',sans-serif; font-size:14px; color:#9FB0C4;">+12% slide speed per rank while Momentum is Running.</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">14 / 20</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">400</div>
           <div style="padding:14px 16px; font-size:14px; color:#63768C;">Affix lines, node descriptions, tooltips</div>
         </div>
         <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; border-bottom:1px solid #1F3047; align-items:center;">
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">caption</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">TIER 3 · LOCKED</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">11 / 14</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">500</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">caption</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">TIER 3 · LOCKED</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">11 / 14</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">500</div>
           <div style="padding:14px 16px; font-size:14px; color:#63768C;">Labels, states, keycaps, meta. Uppercase, +0.16em tracking. Never below 11px.</div>
         </div>
         <div style="display:grid; grid-template-columns:150px 1fr 120px 120px 1fr; align-items:center;">
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">number-large</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:56px; line-height:1;">24<span style="font-size:22px; color:#63768C;">/108</span></div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">56 / 56</div>
-          <div style="padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#9FB0C4;">700</div>
-          <div style="padding:14px 16px; font-size:14px; color:#63768C;">Magazine count, HUD hero numbers. Reserve at 22 / 400, text/muted.</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">number-large</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:56px; line-height:1;">24<span style="font-size:22px; color:#63768C;">/108</span></div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">56 / 56</div>
+          <div style="padding:14px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9FB0C4;">700</div>
+          <div style="padding:14px 16px; font-size:14px; color:#63768C;">Magazine count and HUD hero numbers, at 56 in the HUD as well as here. Reserve at 22 / 400, text/muted.</div>
         </div>
       </div>
     </section>
 
     <section style="display:flex; flex-direction:column; gap:24px;">
       <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">03</div>
-        <h2 style="font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Shape &amp; space</h2>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">03</div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Shape &amp; space</h2>
         <div style="font-size:14px; color:#63768C;">8px base grid. Nothing lands off it.</div>
       </div>
       <div style="display:grid; grid-template-columns:1.1fr 1fr 1fr; gap:24px;">
         <div style="background:#131E2E; border:1px solid #1F3047; padding:22px; display:flex; flex-direction:column; gap:16px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">ACCENT RAIL — the signature</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">ACCENT RAIL — the signature</div>
           <div style="background:#18263A; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:16px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Kinetic surge</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Kinetic surge</div>
             <div style="font-size:14px; color:#9FB0C4;">Left rail: identity. Which system owns this panel.</div>
           </div>
           <div style="background:#18263A; border:1px solid #1F3047; border-top:3px solid #FFC64A; padding:16px; display:flex; flex-direction:column; gap:6px;">
-            <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Purchase confirmed</div>
+            <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Purchase confirmed</div>
             <div style="font-size:14px; color:#9FB0C4;">Top rail: transient status. Reserved for events and alerts.</div>
           </div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Rail is 3px, full-bleed to the panel's edge, no inset, no radius on the rail itself. One rail per panel — a panel with two rails has no meaning. Nested panels do not repeat the parent's rail colour.</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Rail is 3px, full-bleed to the panel's edge, no inset, no radius on the rail itself, and 3px is the only rail weight — a 2px accent line is a border, not a rail, and carries no state meaning. One rail per panel — a panel with two rails has no meaning. Nested panels do not repeat the parent's rail colour.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; padding:22px; display:flex; flex-direction:column; gap:16px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">RADII &amp; BORDERS</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">RADII &amp; BORDERS</div>
           <div style="display:flex; gap:14px; align-items:flex-end;">
-            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:0; display:flex; align-items:flex-end; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">0px</div>
-            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:2px; display:flex; align-items:flex-end; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">2px</div>
-            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:4px; display:flex; align-items:flex-end; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">4px</div>
+            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:0; display:flex; align-items:flex-end; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">0px</div>
+            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:2px; display:flex; align-items:flex-end; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">2px</div>
+            <div style="width:64px; height:64px; background:#18263A; border:1px solid #2A3E58; border-radius:4px; display:flex; align-items:flex-end; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#63768C; padding-bottom:6px;">4px</div>
           </div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">0px for structural zones and grid cells. 2px default — panels, cards, buttons, slots. 4px only on ability squares and squircle icon tiles, where the eye expects a bevelled plate. Never above 4px.<br><br>Borders: 1px #1F3047 at rest, 1px #2A3E58 for emphasis, 2px accent for selected, 3px for the rail. There is no 2px neutral border.</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">0px for structural zones and grid cells. 2px default — panels, cards, buttons, slots. 4px only on the 56px ability square and squircle icon tiles, where the eye expects a bevelled plate. Never above 4px.<br><br>Borders: 1px #1F3047 at rest, 1px #2A3E58 for emphasis, 2px accent for selected, 3px for the rail. There is no 2px neutral border.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; padding:22px; display:flex; flex-direction:column; gap:16px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">SPACING GRID</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">SPACING GRID</div>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:4px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">4 — icon to label, inside chips</span></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:8px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">8 — stacked text lines, grid gutter</span></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:16px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">16 — card padding, sibling cards</span></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:24px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">24 — panel padding, panel to panel</span></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:40px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">40 — zone separation</span></div>
-            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:64px; background:#4FD8F5;"></div><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9FB0C4;">64 — screen margin at 1920</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:4px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">4 — icon to label, inside chips</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:8px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">8 — stacked text lines, grid gutter</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:12px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">12 — dense row padding, chip interiors</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:16px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">16 — card padding, sibling cards</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:24px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">24 — panel padding, panel to panel</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:40px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">40 — zone separation</span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="height:14px; width:64px; background:#4FD8F5;"></div><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#9FB0C4;">64 — screen margin at 1920</span></div>
           </div>
-          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Scale is 4 / 8 / 16 / 24 / 40 / 64. 12 and 32 are not tokens. Minimum hit target 44px; HUD ability squares 64px.</div>
+          <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Scale is 4 / 8 / 12 / 16 / 24 / 40 / 64. 32 is not a token. Minimum hit target 44px. The ability square is 56px in every context — HUD, tree, icon sheet — and no other size exists.</div>
         </div>
       </div>
     </section>
 
     <section style="display:flex; flex-direction:column; gap:24px;">
       <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #4FD8F5; padding-left:14px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#4FD8F5;">04</div>
-        <h2 style="font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Motion</h2>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4FD8F5;">04</div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em;">Motion</h2>
         <div style="font-size:14px; color:#63768C;">Click a card to fire it.</div>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:24px;">
         <div onClick="{{ firePanel }}" style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #4FD8F5; padding:22px; display:flex; flex-direction:column; gap:14px; cursor:pointer; min-height:230px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">PANEL TRANSITION</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#E6EDF5;">180ms · cubic-bezier(0.16,1,0.3,1)</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">PANEL TRANSITION</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#E6EDF5;">180ms · cubic-bezier(0.16,1,0.3,1)</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Panels slide 16px along their rail axis and fade 0→1. Out is 120ms linear, no travel — equipment closes faster than it opens. No scale, ever: plates do not grow.</div>
           <div style="height:56px; background:#0A111C; border:1px solid #1F3047; overflow:hidden; display:flex; align-items:center;">
             <div style="{{ panelDemoStyle }}">PLATE ONLINE</div>
           </div>
         </div>
         <div onClick="{{ fireBuy }}" style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:22px; display:flex; flex-direction:column; gap:14px; cursor:pointer; min-height:230px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">PURCHASE CONFIRM</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#E6EDF5;">90ms in · 260ms out · ease-out</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">PURCHASE CONFIRM</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#E6EDF5;">90ms in · 260ms out · ease-out</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Border snaps to gold on frame one — no ease in, the commit must feel mechanical. Rank pip fills, then gold decays back to the owned colour over 260ms. Total 350ms, never queued: spam-buying reads as a stutter of snaps.</div>
           <div style="height:56px; background:#0A111C; border:1px solid #1F3047; display:flex; align-items:center; justify-content:center;">
             <div style="{{ buyDemoStyle }}">RANK 3 / 5</div>
           </div>
         </div>
         <div onClick="{{ fireHit }}" style="background:#131E2E; border:1px solid #1F3047; border-left:3px solid #FF4040; padding:22px; display:flex; flex-direction:column; gap:14px; cursor:pointer; min-height:230px;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">DAMAGE FEEDBACK</div>
-          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#E6EDF5;">40ms pop · 520ms rise · ease-out</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#63768C;">DAMAGE FEEDBACK</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#E6EDF5;">40ms pop · 520ms rise · ease-out</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Numbers spawn at 115% for 40ms, settle to 100%, rise 40px and fade over the last 200ms. Crits spawn at 140% and hold 60ms. Health-loss bars use 0ms drain and 400ms ease-out chip recovery — harm is instant, relief is slow.</div>
           <div style="height:56px; background:#0A111C; border:1px solid #1F3047; display:flex; align-items:center; justify-content:center; overflow:hidden;">
             <div style="{{ hitDemoStyle }}">1 284</div>
@@ -305,25 +312,25 @@
     <sc-if value="{{ showWear }}" hint-placeholder-val="{{ true }}">
     <section style="display:flex; flex-direction:column; gap:24px;">
       <div style="display:flex; align-items:baseline; gap:16px; border-left:3px solid #63768C; padding-left:14px;">
-        <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#63768C;">05</div>
-        <h2 style="font-family:'Saira Condensed',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em; color:#9FB0C4;">Texture &amp; wear</h2>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FFC64A; border:1px solid #B98212; padding:4px 10px;">OPTIONAL — POST V1</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#63768C;">05</div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:32px; margin:0; text-transform:uppercase; letter-spacing:0.04em; color:#9FB0C4;">Texture &amp; wear</h2>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FFC64A; border:1px solid #B98212; padding:4px 10px;">OPTIONAL — POST V1</div>
       </div>
       <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:24px;">
         <div style="background:#131E2E; border:1px solid #1F3047; padding:20px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Scratches</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Scratches</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">A single tiling plate-wear texture, additive, 6% opacity max, applied only to panel/00 faces. Never crosses a text bounding box: reserve a 16px clear margin inside every panel. Scratches follow one diagonal for the whole game — mixed directions read as noise.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; padding:20px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Grime</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Grime</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Corner-weighted darkening, 8% max, inside the panel border only. Lives in corners and along the rail seam where a real plate collects dirt. Nothing in the centre third of a panel.</div>
         </div>
         <div style="background:#131E2E; border:1px solid #1F3047; padding:20px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Vegetation shadow</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Vegetation shadow</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Leaf-silhouette shadow entering from one screen corner, 10% black, drifting 2–3px over 8s. Menu screens only — never the combat HUD, where movement in peripheral vision is a threat signal.</div>
         </div>
         <div style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #26F2D9; padding:20px; display:flex; flex-direction:column; gap:10px;">
-          <div style="font-family:'Saira Condensed',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#26F2D9;">Rift static</div>
+          <div style="font-family:'Archivo',sans-serif; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#26F2D9;">Rift static</div>
           <div style="font-size:14px; color:#9FB0C4; line-height:1.6;">Reserved. Only on panels describing an open rift, suppression hardware, or an Anomalous item: 1px teal scanline jitter along the rail, 2-frame flicker every 3–5s. It is a warning, so it must stay rare enough to still be one.</div>
         </div>
       </div>
@@ -331,7 +338,14 @@
     </section>
     </sc-if>
 
-    <footer style="border-top:2px solid #1F3047; padding-top:24px; display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#3E4C5E;">
+    <section style="background:#0A111C; border:1px solid #1F3047; border-left:3px solid #FFC64A; padding:28px; display:flex; flex-direction:column; gap:16px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#FFC64A;">SHELL LAW</div>
+      <div style="font-size:20px; line-height:1.55; color:#E6EDF5; max-width:940px;">A menu that reaches a place deletes the place.</div>
+      <div style="font-size:16px; line-height:1.7; color:#9FB0C4; max-width:940px;">Anything that exists as a location in the world — the Forge, the Quartermaster, the stash, Command — is reached by going there and by nothing else. A menu entry removes the reason the location existed and turns the walk that gave it order into dead space. Test before granting any shortcut: if the new entry point would make the physical location optional, the entry point is the bug, not the walk.</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#63768C; border-top:1px solid #1F3047; padding-top:16px; line-height:1.7;">Full-screen modals are exempt, because they are not places: inventory, equipment, and the trees are state the player carries, and they open anywhere. Pause may offer those and settings and quit, and nothing else.</div>
+    </section>
+
+    <footer style="border-top:2px solid #1F3047; padding-top:24px; display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#3E4C5E;">
       <div>FIELDPLATE / RIOR'S EDGE UI</div>
       <div>FLAT FILLS · 1–2PX BORDERS · TEXT ONLY</div>
     </footer>
@@ -347,7 +361,7 @@ class Component extends DCLogic {
     this['t_' + key] = setTimeout(() => this.setState({ [key]: 0 }), ms);
   }
   renderVals() {
-    const mono = "font-family:'JetBrains Mono',monospace; font-weight:700;";
+    const mono = "font-family:'IBM Plex Mono',monospace; font-weight:700;";
     const p = this.state.panel;
     const b = this.state.buy;
     const h = this.state.hit;
