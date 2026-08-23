@@ -328,17 +328,47 @@ def expected_red_names(entries):
 
 
 def parse_suite_log(expected_red):
+    """Read the suite log, and REFUSE a log that does not reconcile.
+
+    THE COUNT MUST BALANCE, and this is here because it did not. Every result
+    below is scraped from a `Test Completed` line, so a test that STARTS and
+    never completes is invisible to this function, to the log grep in the
+    working-rules file, and to anybody reading either — it is not counted as
+    passing, not counted as failing, and not counted as missing. For a while the
+    run quit with a forced exit that killed the process before the last test's
+    completion line was flushed, so the alphabetically-final test was
+    unverifiable by construction: had it been red, every report said clean.
+
+    Fixing that race was one word. It is not the durable fix, because the next
+    race will arrive in a different shape — a crash mid-test, a hang, a worker
+    that drops a message — and all of them look identical from here. A count
+    that RECONCILES cannot be beaten by any of them: started must equal
+    completed, and a mismatch refuses the report rather than printing a number
+    that is quietly short. That is also how this was found — a total that was
+    one below what the test files contained.
+    """
     if not os.path.isfile(LOG):
         return None
     expected_red = expected_red_names(expected_red)
     text = read(LOG)
+    started = set(re.findall(r'Test Started\. Name=\{[^}]*\} Path=\{([^}]+)\}', text))
     passed = set(re.findall(r'Result=\{Success\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))
     failed = set(re.findall(r'Result=\{Fail\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))
+
+    unfinished = started - passed - failed
+    if unfinished:
+        raise ParseError(
+            "the suite log does not reconcile: %d test(s) started and never completed — "
+            % len(unfinished) + ", ".join(sorted(unfinished))
+            + ". A test with no result is counted nowhere, so every total in this report "
+              "would be silently short. Re-run the suite; if it recurs, the run is being "
+              "killed before it finishes rather than finishing.")
+
     exp = {t for t in failed if normalise_test(t) in expected_red}
     unexp = failed - exp
     missing_red = {t for t in expected_red if "RiorsEdge." + t in passed}
-    return {"passed": passed, "expected_red": exp,
-            "unexpected_red": unexp, "no_longer_red": missing_red}
+    return {"passed": passed, "expected_red": exp, "unexpected_red": unexp,
+            "no_longer_red": missing_red, "started": started}
 
 
 # --------------------------------------------------------------------------
@@ -888,7 +918,13 @@ def main():
         sys.stderr.write("status: PIN FAILURE - " + str(e) + os.linesep)
         return 2
     expected_red = set(pins.get("_expected_red", []))
-    suite = parse_suite_log(expected_red)
+    try:
+        suite = parse_suite_log(expected_red)
+    except ParseError as e:
+        sys.stderr.write("status: SUITE LOG FAILURE - " + str(e) + os.linesep)
+        sys.stderr.write("status: refusing to emit a report whose test totals would be "
+                         "short by an unknown amount." + os.linesep)
+        return 2
     emitted, unknown_emitted = parse_emitted({k for k, _, _, _ in EMITTED_BY_TEST})
     text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted)
 

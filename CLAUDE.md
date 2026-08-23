@@ -66,19 +66,33 @@ Build:
 "C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" RiorsEdgeEditor Win64 Development -Project="C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -WaitMutex
 ```
 
-Suite — headless, no RHI. **Results do not reach stdout**; grep the log file:
+Suite — headless, no RHI. **Results do not reach stdout**; the log file is the
+only record. **`SoftQuit`, never `Quit`:**
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; Quit" -unattended -nop4 -nosplash -nullrhi
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; SoftQuit" -unattended -nop4 -nosplash -nullrhi
 ```
+
+`Quit` calls `RequestExitWithStatus` with force set, which kills the process
+before the last test's completion line is flushed — so the alphabetically final
+test had no result in the log and was **counted nowhere**: not passing, not
+failing, not missing. Had it been red, every run reported clean. `SoftQuit`
+exits gracefully and the log completes.
+
+**Read the result through `make status`, not through a grep.** The grep that
+used to live here counted `Result={Fail}` lines, which is exactly the count that
+cannot see a test with no result at all:
 
 ```bash
-grep -c "Result={Fail}" Saved/Logs/riors_edge.log
+python Scripts/status.py
 ```
 
-A count *below* the previous passing total means tests went missing, which is
-itself the regression. `make status` reports the current total; do not pin it
-here.
+It reconciles **started against completed** and refuses the report at exit 2 if
+they disagree, naming the tests. That guard is the durable fix and the one-word
+`SoftQuit` is not: the next race arrives as a crash mid-test, a hang, or a
+dropped worker message, and all of them look identical to a results grep. A
+count that has to balance catches every shape of it. A number that only ever
+goes up cannot tell you it is short.
 
 Standalone game:
 
