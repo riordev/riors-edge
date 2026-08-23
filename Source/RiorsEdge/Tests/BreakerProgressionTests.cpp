@@ -47,15 +47,19 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     FBreakerProgressionState Initial;
     Initial.PermanentClass = EBreakerClassId::Swift;
     Initial.UnspentClassPoints = 3;
-    Initial.ClassNodeRanks.Add({TEXT("KineticEntry"), 2});
+    Initial.DoctrineNodeRanks.Add({TEXT("KineticEntry"), 2});
     Progression->LoadProgressionState(Initial);
 
     FText Failure;
-    TestFalse(TEXT("Respec away from Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, false, Failure));
-    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::ClassPoints), 2);
-    TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
-    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::ClassPoints), 0);
-    TestEqual(TEXT("Forge respec refunds ranks when definitions are unavailable"), Progression->GetProgressionState().UnspentClassPoints, 5);
+    TestFalse(TEXT("Respec away from Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, false, Failure));
+    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 2);
+    TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
+    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 0);
+    // O111: A DOCTRINE RESPEC IS NOT A REFUND. The eight are tied to the
+    // commitment this call clears, so the wallet goes to zero rather than
+    // gaining the ranks back -- and the retired class wallet is never credited.
+    TestEqual(TEXT("The doctrine wallet is zeroed, not refunded"), Progression->GetProgressionState().UnspentDoctrinePoints, 0);
+    TestEqual(TEXT("The retired wallet is never credited"), Progression->GetProgressionState().UnspentClassPoints, 3);
     return true;
 }
 

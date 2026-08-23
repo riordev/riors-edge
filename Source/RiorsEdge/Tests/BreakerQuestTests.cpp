@@ -153,4 +153,76 @@ bool FBreakerSaveMigrationTest::RunTest(const FString& Parameters)
     return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// O111 - the v5 -> v6 class-currency step.
+//
+// It refunds nothing and reads nothing, so what has to be asserted is what it
+// CLEARS and what it LEAVES ALONE. The second half is the one a migration gets
+// wrong: a step that reaches past the fifteen ids it knows about would clear a
+// commitment it has no business touching, and there is no way to tell
+// afterwards.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSaveMigrationV5ToV6Test,
+    "RiorsEdge.Save.Migration.V5ToV6",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSaveMigrationV5ToV6Test::RunTest(const FString& Parameters)
+{
+    // A faithful v5 payload: a class build the player paid for, an unspent
+    // class wallet, and a commitment naming one of the fifteen retiring ids.
+    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    if (!Save) { AddError(TEXT("Could not create a save object")); return false; }
+    Save->SaveVersion = 5;
+    Save->Progression.PermanentClass = EBreakerClassId::Swift;
+    Save->Progression.ClassNodeRanks.Add({TEXT("Swift.Kinetic.Carry"), 2});
+    Save->Progression.ClassNodeRanks.Add({TEXT("Swift.Marksman.Steady"), 1});
+    Save->Progression.UnspentClassPoints = 7;
+    Save->Progression.LevelClassPointsGranted = 30;
+    Save->Progression.CommittedBranch = TEXT("Swift.Kinetic");
+    // Core state is NOT this step's business and is asserted untouched below.
+    Save->Progression.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});
+    Save->Progression.UnspentCorePoints = 11;
+
+    FString Note;
+    TestTrue(TEXT("A v5 save loads"), UBreakerSaveGame::MigrateToCurrent(*Save, Note));
+    TestEqual(TEXT("It is stamped current"), Save->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
+    TestFalse(TEXT("The migration reports itself"), Note.IsEmpty());
+
+    TestEqual(TEXT("The class rank array is cleared"), Save->Progression.ClassNodeRanks.Num(), 0);
+    TestEqual(TEXT("The class wallet is zeroed"), Save->Progression.UnspentClassPoints, 0);
+    TestEqual(TEXT("The class granted-counter is zeroed"), Save->Progression.LevelClassPointsGranted, 0);
+    TestEqual(TEXT("A commitment naming a retiring branch is cleared"),
+        Save->Progression.CommittedBranch, FName(NAME_None));
+
+    // NOTHING IS REFUNDED. O27 deletes the freed points rather than folding
+    // them, so a migrated character opens with an empty doctrine wallet and is
+    // paid its eight when it re-commits at the Forge.
+    TestEqual(TEXT("The doctrine wallet is seeded empty, not with eight"),
+        Save->Progression.UnspentDoctrinePoints, 0);
+    TestEqual(TEXT("No doctrine ranks are invented"), Save->Progression.DoctrineNodeRanks.Num(), 0);
+
+    // Core is another pool's business.
+    TestEqual(TEXT("Core ranks survive untouched"), Save->Progression.CoreNodeRanks.Num(), 1);
+    TestEqual(TEXT("The core wallet survives untouched"), Save->Progression.UnspentCorePoints, 11);
+
+    // Idempotent: a save already at v6 is not stepped again.
+    FString SecondNote;
+    TestTrue(TEXT("A current save loads"), UBreakerSaveGame::MigrateToCurrent(*Save, SecondNote));
+    TestTrue(TEXT("A current save reports no migration"), SecondNote.IsEmpty());
+    TestEqual(TEXT("The core wallet is still untouched"), Save->Progression.UnspentCorePoints, 11);
+
+    // A commitment naming anything OUTSIDE the frozen fifteen is left alone.
+    // This is the half that cannot be recovered if it is wrong: the step must
+    // not reach past the ids it knows about.
+    UBreakerSaveGame* Foreign = Cast<UBreakerSaveGame>(UGameplayStatics::CreateSaveGameObject(UBreakerSaveGame::StaticClass()));
+    Foreign->SaveVersion = 5;
+    Foreign->Progression.CommittedBranch = TEXT("Mod.SomeOtherBranch");
+    TestTrue(TEXT("A v5 save with a foreign commitment loads"), UBreakerSaveGame::MigrateToCurrent(*Foreign, Note));
+    TestEqual(TEXT("A commitment outside the fifteen is untouched"),
+        Foreign->Progression.CommittedBranch, FName(TEXT("Mod.SomeOtherBranch")));
+    return true;
+}
+
 #endif

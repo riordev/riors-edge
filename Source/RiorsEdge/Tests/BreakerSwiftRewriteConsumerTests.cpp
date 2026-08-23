@@ -93,7 +93,7 @@ bool FBreakerMomentumShieldLoopTest::RunTest(const FString& Parameters)
     Progression->BindAttributes(Attributes);
     FBreakerProgressionState State;
     State.PermanentClass = EBreakerClassId::Swift;
-    State.ClassNodeRanks.Add({FName(TEXT("Swift.Kinetic.MomentumShield")), 1});
+    State.DoctrineNodeRanks.Add({FName(TEXT("Swift.Kinetic.MomentumShield")), 1});
     Progression->LoadProgressionState(State);
     Combat->BindAttributes(Attributes);
     Attributes->ApplyClassResource(90.0f);

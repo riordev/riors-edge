@@ -69,7 +69,7 @@ Numbers are permanent and never reused.
 
 **O42** — The authored Anchor map eventually replaces the runtime hub builder; runtime lighting stands in the interim and any authored light supersedes it.
 
-**O43** — One Class Point per level through 30, one Core Point per level through 50. The slice's opening grant is an advance on that entitlement, not a separate pool.
+**O43** — One Core Point per level through 50, and no other per-level point. The slice's opening grant is an advance on that entitlement, not a separate pool. Doctrine Points are not on a ladder at all: all eight arrive at commitment, at the Forge.
 
 **O45** — All five classes ship playable.
 
@@ -206,7 +206,7 @@ Numbers are permanent and never reused.
 ## Open
 
 
-**O111** — The class-currency migration refunds nothing and reads nothing. Class Points are one per level to 30, so spent plus unspent is derivable from the payload alone, and O27 deletes the freed points rather than folding them: v5 to v6 clears the class rank array, zeroes the class wallet, clears any commitment naming one of the fifteen retiring branch ids from a frozen list, and stamps. No cost table and no node library.
+**O111** — Class Points are deleted and there are two pools: Core 65 and Doctrine 8. The migration refunds nothing and reads nothing — spent plus unspent was derivable from the payload alone, and O27 deletes the freed points rather than folding them into either pool: v5 to v6 clears the class rank array, zeroes the class wallet, clears any commitment naming one of the fifteen retiring branch ids from a frozen list, seeds the doctrine wallet at zero because it also clears the commitment that pays it, and stamps. No cost table and no node library. The retired enumerator is never removed and never reused.
 
 **O112** — The node-shape band is unpinned pending re-derivation. Sixty percent ranked minors means sixty percent unconditional stat lines, which O76 gives to affixes outright, so the authored target cannot be met without breaking another rule. The measured fourteen percent is honest and must not drive authoring until a band is derived for a tree whose percentages live on gear.
 

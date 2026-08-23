@@ -68,7 +68,7 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
 
     UBreakerProgressionTree* Frenzy = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
     if (!TestNotNull(TEXT("Frenzy tree exists"), Frenzy)) return false;
-    TestEqual(TEXT("Frenzy is a Swift class-point branch"), Frenzy->Currency, EBreakerPointCurrency::ClassPoints);
+    TestEqual(TEXT("Frenzy is a Swift class-point branch"), Frenzy->Currency, EBreakerPointCurrency::DoctrinePoints);
     TestEqual(TEXT("Frenzy belongs to Swift"), Frenzy->RequiredClass, EBreakerClassId::Swift);
 
     // FRENZY'S SHAPE, RE-PINNED DELIBERATELY (was {3, 4, 3} across tiers 1-3,
@@ -188,7 +188,7 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
         TestEqual(*(Node->NodeId.ToString() + TEXT(" reached its maximum rank")),
-            Progression->GetNodeRank(Node->NodeId, EBreakerPointCurrency::ClassPoints), Node->MaxRank);
+            Progression->GetNodeRank(Node->NodeId, EBreakerPointCurrency::DoctrinePoints), Node->MaxRank);
     }
 
     // Unconditional lines reach the attribute set. Feed is +45 health over two
@@ -239,7 +239,7 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
 
     // --- Respec restores exactly -------------------------------------------
     FText Failure;
-    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Respec restores health exactly"), Attributes->GetMaxHealth(), BaseHealth, 0.0001f);
     TestEqual(TEXT("Respec restores crit chance exactly"), Attributes->GetCriticalChance(), BaseCritChance, 0.0001f);
     TestEqual(TEXT("Respec restores crit damage exactly"), Attributes->GetCriticalMultiplier(), BaseCritMultiplier, 0.0001f);

@@ -200,7 +200,8 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
 
     Progression->ApplySliceDefaultsIfFresh();
     TestEqual(TEXT("Slice defaults lock Swift"), Progression->GetProgressionState().PermanentClass, EBreakerClassId::Swift);
-    TestEqual(TEXT("Slice defaults grant 10 class points"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 10);
+    TestEqual(TEXT("The retired class pool is empty"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
+    TestEqual(TEXT("An uncommitted character holds no doctrine points"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
     TestEqual(TEXT("Slice defaults grant 12 core points"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
     TestTrue(TEXT("Available trees include the core tree and both Swift branches"), Progression->GetAvailableTrees().Num() >= 3);
 
@@ -224,9 +225,24 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Crit chance aggregates from Sightline"), Progression->GetNodeStats().CriticalChanceBonus, 0.07f, 0.0001f);
     TestEqual(TEXT("Crit damage aggregates from Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
 
-    // Class points are a separate wallet with its own tree.
-    TestTrue(TEXT("Class node purchases from class points"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
-    TestEqual(TEXT("Class points are spent, core points untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 9);
+    // O111: THE DOCTRINE WALLET IS FILLED BY COMMITMENT, NOT BY LEVELLING.
+    // A doctrine node is unaffordable until the Forge pays the eight, and that
+    // ordering is the ruling rather than a rig detail -- so the purchase is
+    // asserted to FAIL first, then to succeed once committed.
+    FText CommitFailure;
+    TestFalse(TEXT("A doctrine node is unaffordable before commitment"),
+        Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
+    TestTrue(TEXT("Committing to Kinetic succeeds"),
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
+    TestEqual(TEXT("Commitment pays the whole doctrine budget at once"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant);
+
+    const int32 CoreBeforeDoctrine = Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints);
+    TestTrue(TEXT("A doctrine node purchases from doctrine points"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
+    TestEqual(TEXT("Doctrine points are spent"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant - 1);
+    TestEqual(TEXT("...and core points are untouched"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), CoreBeforeDoctrine);
     TestEqual(TEXT("Slide speed reflects the class node"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
     // Respec clears effects and refunds every point of that currency.
@@ -237,9 +253,17 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Core effects are cleared"), Progression->GetNodeStats().CriticalChanceBonus, 0.0f, 0.0001f);
     TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
-    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
-    TestEqual(TEXT("Class points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 10);
-    TestEqual(TEXT("Class effects are cleared"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
+    // A doctrine respec is not a refund: the eight are tied to the commitment
+    // it clears, so the wallet goes to zero and re-committing pays them again.
+    TestTrue(TEXT("Doctrine respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
+    TestEqual(TEXT("The doctrine wallet is zeroed, not refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("The commitment is cleared with it"), Progression->GetProgressionState().CommittedBranch, FName(NAME_None));
+    TestEqual(TEXT("Doctrine effects are cleared"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
+    TestTrue(TEXT("Re-committing pays the eight again"),
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
+    TestEqual(TEXT("...and exactly eight, never sixteen"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant);
     return true;
 }
 

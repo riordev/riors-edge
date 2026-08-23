@@ -32,7 +32,7 @@ namespace BreakerTankAbilityLocal
     int32 BreakerTankNodeRank(const ABreakerCharacter* Character, const TCHAR* NodeId)
     {
         const UBreakerProgressionComponent* Progression = Character ? Character->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-        return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::ClassPoints) : 0;
+        return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::DoctrinePoints) : 0;
     }
 
     bool BreakerTankHasNode(const ABreakerCharacter* Character, const FGameplayTag& Tag)

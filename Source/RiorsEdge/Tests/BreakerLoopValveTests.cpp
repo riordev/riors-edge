@@ -242,7 +242,7 @@ bool FBreakerLoopValveBridgeTest::RunTest(const FString& Parameters)
 
     // A respec pops the override rather than leaving a stale 1.0 entry.
     FText Failure;
-    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Respec pops the valve override"), Momentum->GetActiveLoopOverrideCount(), 0);
     TestEqual(TEXT("Decay is back to authored after respec"), Momentum->GetDecayRateMultiplier(), 1.0f, 0.0001f);
     return true;
@@ -319,7 +319,7 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Edge widens Cleave's swing to the full sweep"), Cleave->ComputeEffectiveArcDegrees(Owner), 180.0f, 0.0001f);
 
     FText Failure;
-    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Respec narrows the swing back"), Cleave->ComputeEffectiveArcDegrees(Owner), 120.0f, 0.0001f);
     TestEqual(TEXT("Respec shortens the zone back"), Rot->ComputeEffectiveDurationSeconds(Owner), 6.0f, 0.0001f);
     return true;

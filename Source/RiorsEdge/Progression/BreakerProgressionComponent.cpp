@@ -258,7 +258,7 @@ bool UBreakerProgressionComponent::PurchaseNode(const UBreakerProgressionTree* T
     if (Existing) ++Existing->Rank;
     else Ranks.Add({NodeId, 1});
 
-    int32& AvailablePoints = Node->Currency == EBreakerPointCurrency::ClassPoints ? State.UnspentClassPoints : State.UnspentCorePoints;
+    int32& AvailablePoints = WalletFor(Node->Currency);
     AvailablePoints -= Node->CostPerRank;
     // Running total maintained here instead of recomputed by walking node
     // definitions inside GetSpentPoints/GetRefundValue on every
@@ -314,9 +314,19 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     // The running total this currency was tracking is refunded in full and
     // starts back at zero (audit item 6).
     SpentPointsFor(Currency) = 0;
-    if (Currency == EBreakerPointCurrency::ClassPoints) State.UnspentClassPoints += Refunded;
+    // O111: A DOCTRINE RESPEC IS NOT A REFUND. The eight are tied to the
+    // commitment, and this call clears the commitment, so the wallet goes to
+    // zero and re-committing pays them again. Refunding them here instead would
+    // leave a character holding eight points with no doctrine to spend them in,
+    // and respec-then-recommit would mint eight more.
+    if (Currency == EBreakerPointCurrency::DoctrinePoints) State.UnspentDoctrinePoints = 0;
+    else if (Currency == EBreakerPointCurrency::ClassPoints_Retired) State.UnspentClassPoints += Refunded;
     else State.UnspentCorePoints += Refunded;
-    if (Currency == EBreakerPointCurrency::ClassPoints)
+    // The commitment clear moved off the retired currency with the nodes it
+    // governs. Left where it was it would be unreachable -- nothing calls a
+    // respec of a pool nothing spends -- and a committed character could never
+    // un-commit, sealing the Forge's one escape hatch.
+    if (Currency == EBreakerPointCurrency::DoctrinePoints)
     {
         State.AbilityLoadout.ClassAbilityOne = ClassDefinition && ClassDefinition->StarterAbilityIds.Num() > 0
             ? ClassDefinition->StarterAbilityIds[0] : NAME_None;
@@ -379,6 +389,19 @@ bool UBreakerProgressionComponent::CommitToBranch(FName BranchTreeId, FText& Out
         return false;
     }
     State.CommittedBranch = BranchTreeId;
+    // O111: THE EIGHT ARRIVE HERE, WHOLE. Commitment is the grant event, so a
+    // character carries no doctrine points until they have a doctrine to spend
+    // them in -- which is also why a doctrine respec zeroes the wallet rather
+    // than refunding it.
+    //
+    // ADDED, NOT ASSIGNED, and the farm is still closed. Assignment looks safer
+    // and is not: a second commitment is refused outright, so the only route to
+    // this line twice is through a respec, and the respec zeroes the wallet
+    // first. The zeroing is what makes re-committing pay eight rather than
+    // sixteen. Assignment additionally CLOBBERS anything already in the wallet
+    // -- a dev grant, or any future source -- which is a silent subtraction
+    // wearing a grant's clothes.
+    State.UnspentDoctrinePoints += UBreakerProgressionLibrary::DoctrinePointGrant;
     OutFailureReason = FText::GetEmpty();
     OnProgressionChanged.Broadcast();
     return true;
@@ -392,7 +415,7 @@ int32 UBreakerProgressionComponent::GetNodeRank(FName NodeId, EBreakerPointCurre
 
 int32 UBreakerProgressionComponent::GetUnspentPoints(EBreakerPointCurrency Currency) const
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.UnspentClassPoints : State.UnspentCorePoints;
+    return WalletFor(Currency);
 }
 
 void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressionState& NewState)
@@ -530,16 +553,15 @@ void UBreakerProgressionComponent::GrantLevelPointEntitlement()
     // grants ("+1 on each level-up") cannot survive the rederived-level rule —
     // a curve retune that jumps a character three levels would need to
     // remember how many events it owes, which is exactly this counter.
-    const int32 ClassEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::ClassPointCapLevel);
+    // O111: NO LEVEL PAYS A CLASS POINT, and no level pays a Doctrine Point
+    // either -- the doctrine pool is granted whole at commitment, so it has no
+    // entitlement to settle up. Core is the only per-level currency left.
+    // UnspentClassPoints and LevelClassPointsGranted survive as save fields
+    // because they are serialized; the v5 -> v6 step zeroes them and nothing
+    // writes them again.
     const int32 CoreEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::CorePointCapLevel);
-    const int32 ClassOwed = ClassEntitled - State.LevelClassPointsGranted;
     const int32 CoreOwed = CoreEntitled - State.LevelCorePointsGranted;
-    if (ClassOwed <= 0 && CoreOwed <= 0) return;
-    if (ClassOwed > 0)
-    {
-        State.UnspentClassPoints += ClassOwed;
-        State.LevelClassPointsGranted = ClassEntitled;
-    }
+    if (CoreOwed <= 0) return;
     if (CoreOwed > 0)
     {
         State.UnspentCorePoints += CoreOwed;
@@ -585,10 +607,15 @@ bool UBreakerProgressionComponent::GrantWorldPoint(FName SourceId, UBreakerQuest
     return true;
 }
 
-void UBreakerProgressionComponent::GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints)
+void UBreakerProgressionComponent::GrantPlaytestPoints(int32 DoctrinePoints, int32 CorePoints)
 {
     if (GetOwner() && !GetOwner()->HasAuthority()) return;
-    State.UnspentClassPoints = FMath::Max(0, State.UnspentClassPoints + ClassPoints);
+    // O111: THE FIRST ARGUMENT FOLLOWED ITS NODES. It granted Class Points to
+    // buy class-tree nodes; those trees are doctrines now, so it grants
+    // Doctrine Points to buy the same nodes. The retired wallet is never
+    // credited again -- a dev grant into a pool nothing spends is a rig that
+    // reports success and buys nothing.
+    State.UnspentDoctrinePoints = FMath::Max(0, State.UnspentDoctrinePoints + DoctrinePoints);
     State.UnspentCorePoints = FMath::Max(0, State.UnspentCorePoints + CorePoints);
     OnProgressionChanged.Broadcast();
 }
@@ -603,7 +630,9 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     // or a non-empty pool does. That is what left owner saves stuck on
     // "CLASS 0 | CORE 0 UNSPENT" with a locked class and nothing to spend.
     const bool bFresh = State.ClassNodeRanks.Num() == 0 && State.CoreNodeRanks.Num() == 0
-        && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0;
+        && State.DoctrineNodeRanks.Num() == 0
+        && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0
+        && State.UnspentDoctrinePoints == 0;
     if (!bFresh) return;
     // Only pick a class for a character that has none; a chosen class is
     // kept. Gated on bAutoLockSwiftIfFresh (O39): default true keeps this
@@ -654,7 +683,12 @@ int32 UBreakerProgressionComponent::GetRefundValue(EBreakerPointCurrency Currenc
     // array from scratch on every single call (CollectKnownNodes, itself
     // O(N^2) via TArray::AddUnique) — O(ranks x N^2) on GetSpentPoints's path,
     // which RecalculateStats calls on every movement-state transition.
-    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return CachedSpentClassPoints;
+    case EBreakerPointCurrency::DoctrinePoints:      return CachedSpentDoctrinePoints;
+    default:                                         return CachedSpentCorePoints;
+    }
 }
 
 void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
@@ -673,13 +707,42 @@ void UBreakerProgressionComponent::RecomputeSpentPointsFromState()
         }
         return Total;
     };
-    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints);
+    // The retired pool is still summed: a v5 save being migrated still carries
+    // class ranks when this runs, and a running total that silently skipped
+    // them would disagree with the array it is meant to describe.
+    CachedSpentClassPoints = SumFor(EBreakerPointCurrency::ClassPoints_Retired);
+    CachedSpentDoctrinePoints = SumFor(EBreakerPointCurrency::DoctrinePoints);
     CachedSpentCorePoints = SumFor(EBreakerPointCurrency::CorePoints);
 }
 
 int32& UBreakerProgressionComponent::SpentPointsFor(EBreakerPointCurrency Currency)
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? CachedSpentClassPoints : CachedSpentCorePoints;
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return CachedSpentClassPoints;
+    case EBreakerPointCurrency::DoctrinePoints:      return CachedSpentDoctrinePoints;
+    default:                                         return CachedSpentCorePoints;
+    }
+}
+
+int32& UBreakerProgressionComponent::WalletFor(EBreakerPointCurrency Currency)
+{
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return State.UnspentClassPoints;
+    case EBreakerPointCurrency::DoctrinePoints:      return State.UnspentDoctrinePoints;
+    default:                                         return State.UnspentCorePoints;
+    }
+}
+
+int32 UBreakerProgressionComponent::WalletFor(EBreakerPointCurrency Currency) const
+{
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return State.UnspentClassPoints;
+    case EBreakerPointCurrency::DoctrinePoints:      return State.UnspentDoctrinePoints;
+    default:                                         return State.UnspentCorePoints;
+    }
 }
 
 void UBreakerProgressionComponent::CollectKnownNodes(TArray<const UBreakerProgressionNode*>& OutNodes, EBreakerPointCurrency Currency) const
@@ -794,7 +857,7 @@ bool UBreakerProgressionComponent::IsAbilityUnlocked(FName AbilityId) const
     if (bDefinitionDescribesCurrentClass
         && (ClassDefinition->BaseUltimateId == AbilityId || ClassDefinition->StarterAbilityIds.Contains(AbilityId))) return true;
     if (State.UnlockedAbilityIds.Contains(AbilityId)) return true;
-    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints, EBreakerPointCurrency::CorePoints})
+    for (const EBreakerPointCurrency Currency : {EBreakerPointCurrency::ClassPoints_Retired, EBreakerPointCurrency::CorePoints, EBreakerPointCurrency::DoctrinePoints})
     {
         TArray<const UBreakerProgressionNode*> Nodes;
         CollectKnownNodes(Nodes, Currency);
@@ -1233,7 +1296,9 @@ float UBreakerProgressionComponent::GetSpentPoints() const
     // rank x CostPerRank, which is exactly what a respec hands back — so a
     // 3-point Convergence node is worth three times a 1-point minor here, and
     // the total can never disagree with what the player was charged.
-    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints) + GetRefundValue(EBreakerPointCurrency::CorePoints));
+    return static_cast<float>(GetRefundValue(EBreakerPointCurrency::ClassPoints_Retired)
+        + GetRefundValue(EBreakerPointCurrency::CorePoints)
+        + GetRefundValue(EBreakerPointCurrency::DoctrinePoints));
 }
 
 float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
@@ -1244,11 +1309,19 @@ float UBreakerProgressionComponent::GetPointSpendDamagePercent() const
 void UBreakerProgressionComponent::RecalculateStats()
 {
     TArray<const UBreakerProgressionNode*> Nodes;
-    CollectKnownNodes(Nodes, EBreakerPointCurrency::ClassPoints);
+    CollectKnownNodes(Nodes, EBreakerPointCurrency::ClassPoints_Retired);
+    CollectKnownNodes(Nodes, EBreakerPointCurrency::DoctrinePoints);
     CollectKnownNodes(Nodes, EBreakerPointCurrency::CorePoints);
 
+    // EVERY POOL, AND THE OMISSION HERE IS SILENT. This built the aggregation
+    // input from two arrays; adding a third pool without adding it here made
+    // every doctrine node pay exactly nothing, with no warning and no failed
+    // purchase -- the node buys, the rank records, and the effect never reaches
+    // the aggregator. The retired pool stays in the list because a v5 save
+    // still carries ranks in it until the migration runs.
     TArray<FBreakerNodeRank> Ranks = State.ClassNodeRanks;
     Ranks.Append(State.CoreNodeRanks);
+    Ranks.Append(State.DoctrineNodeRanks);
 
     CachedStats = AggregateStats(Nodes, Ranks, &CachedContribution, ActiveConditions);
     // Stage 6: the rider table rides the same recalculation, so purchases,
@@ -1361,12 +1434,22 @@ void UBreakerProgressionComponent::PublishNodeTagsToAbilitySystem()
 
 TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency)
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.ClassNodeRanks : State.CoreNodeRanks;
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return State.ClassNodeRanks;
+    case EBreakerPointCurrency::DoctrinePoints:      return State.DoctrineNodeRanks;
+    default:                                         return State.CoreNodeRanks;
+    }
 }
 
 const TArray<FBreakerNodeRank>& UBreakerProgressionComponent::RanksFor(EBreakerPointCurrency Currency) const
 {
-    return Currency == EBreakerPointCurrency::ClassPoints ? State.ClassNodeRanks : State.CoreNodeRanks;
+    switch (Currency)
+    {
+    case EBreakerPointCurrency::ClassPoints_Retired: return State.ClassNodeRanks;
+    case EBreakerPointCurrency::DoctrinePoints:      return State.DoctrineNodeRanks;
+    default:                                         return State.CoreNodeRanks;
+    }
 }
 
 #undef LOCTEXT_NAMESPACE

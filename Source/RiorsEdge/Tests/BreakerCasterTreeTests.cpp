@@ -75,7 +75,7 @@ bool FBreakerCasterTreesRegisteredTest::RunTest(const FString& Parameters)
         if (!TestNotNull(TEXT("Caster branch tree exists"), Tree)) continue;
         TestTrue(*(Tree->TreeId.ToString() + TEXT(" is in GetAllFallbackTrees()")), AllTrees.Contains(Tree));
         TestEqual(*(Tree->TreeId.ToString() + TEXT(" is required by Caster")), Tree->RequiredClass, EBreakerClassId::Caster);
-        TestEqual(*(Tree->TreeId.ToString() + TEXT(" spends class points")), Tree->Currency, EBreakerPointCurrency::ClassPoints);
+        TestEqual(*(Tree->TreeId.ToString() + TEXT(" spends class points")), Tree->Currency, EBreakerPointCurrency::DoctrinePoints);
         TestTrue(*(Tree->TreeId.ToString() + TEXT(" has nodes")), Tree->Nodes.Num() > 0);
     }
 

@@ -247,10 +247,15 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
         TestFalse(*FString::Printf(TEXT("%s is locked before it is bought"), *AbilityId.ToString()),
             Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityOne, AbilityId, EarlyFailure));
 
-        // Level to the last schedule entry through the shipped curve, which
-        // pays every token this class is owed.
+        // Level to the last entry of the TOKEN schedule, read from the token
+        // schedule. It used to read ClassPointCapLevel, which was a different
+        // system's constant that happened to share the number 30 -- so when
+        // O111 retired that constant to zero this test silently levelled to
+        // zero and every unlock failed for want of tokens. A test that borrows
+        // another system's number is asserting a coincidence.
         Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
-            UBreakerProgressionLibrary::ClassPointCapLevel, Progression->ExperienceCurve));
+            UBreakerProgressionLibrary::AbilityTokenLevels[UE_ARRAY_COUNT(UBreakerProgressionLibrary::AbilityTokenLevels) - 1],
+            Progression->ExperienceCurve));
 
         FText Failure;
         TestTrue(*FString::Printf(TEXT("%s can be bought at the shipped entitlement (%s)"), *AbilityId.ToString(), *Failure.ToString()),
@@ -351,15 +356,20 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Tunnel Vision purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));  // cost 2, Core
     TestEqual(TEXT("Core spend tracks three purchases"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
 
-    TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));               // cost 1, Class
-    TestEqual(TEXT("Class spend adds on top of core spend"), Progression->GetSpentPoints(), 5.0f, 0.0001f);
+    // O111: a doctrine node needs the doctrine wallet, and the wallet is filled
+    // by commitment. Granted at exactly the shipped budget rather than an
+    // inflated rig figure.
+    Progression->GrantPlaytestPoints(UBreakerProgressionLibrary::DoctrinePointGrant, 0);
+    TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));               // cost 1, Doctrine
+    TestEqual(TEXT("Doctrine spend adds on top of core spend"), Progression->GetSpentPoints(), 5.0f, 0.0001f);
 
     // Respec one currency: its running total resets to zero and the other is
     // untouched.
     TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    // Still two pools, so a Core respec still leaves the doctrine total alone.
     TestEqual(TEXT("Core respec zeroes only the core running total"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
 
-    TestTrue(TEXT("Class respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Doctrine respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Both running totals are zero after both respecs"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
     // A LOADED state carrying a stale/unknown node id: the running total is
@@ -369,7 +379,7 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     FBreakerProgressionState Loaded;
     Loaded.PermanentClass = EBreakerClassId::Swift;
     Loaded.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});    // real, cost 1
-    Loaded.ClassNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown, fallback cost 1 x 3
+    Loaded.DoctrineNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown, fallback cost 1 x 3
     Progression->LoadProgressionState(Loaded);
     TestEqual(TEXT("A freshly loaded state recomputes both totals correctly"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
     return true;
@@ -394,6 +404,8 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
 
     UBreakerProgressionTree* Kinetic = UBreakerProgressionLibrary::GetSwiftKineticTree();
     FText Failure;
+    // O111: doctrine nodes spend the doctrine wallet, at the shipped budget.
+    Progression->GrantPlaytestPoints(UBreakerProgressionLibrary::DoctrinePointGrant, 0);
     TestTrue(TEXT("Carry purchases as Swift"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
     TestEqual(TEXT("Carry's slide speed is live for Swift"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
@@ -405,7 +417,7 @@ bool FBreakerClassSwapStopsOldRanksPayingTest::RunTest(const FString& Parameters
 
     // The rank itself is not deleted -- only its contribution stops. Swapping
     // back to Swift resumes it with no re-purchase.
-    TestEqual(TEXT("The rank itself survives the swap"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Carry"), EBreakerPointCurrency::ClassPoints), 1);
+    TestEqual(TEXT("The rank itself survives the swap"), Progression->GetNodeRank(TEXT("Swift.Kinetic.Carry"), EBreakerPointCurrency::DoctrinePoints), 1);
     Progression->DevForceClass(EBreakerClassId::Swift);
     TestEqual(TEXT("Swapping back resumes the contribution"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
     return true;
@@ -471,12 +483,12 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
 
     // --- ONE-WAY SEMANTICS --------------------------------------------------
     FText CommitFailure;
-    TestTrue(TEXT("Committing to Frenzy succeeds"), Progression->CommitToBranch(TEXT("Swift.Frenzy"), CommitFailure));
-    TestEqual(TEXT("The commitment is recorded"), Progression->GetProgressionState().CommittedBranch, FName(TEXT("Swift.Frenzy")));
+    TestTrue(TEXT("Committing to Frenzy succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Swift.Frenzy"), CommitFailure));
+    TestEqual(TEXT("The commitment is recorded"), Progression->GetProgressionState().CommittedBranch, FName(TEXT("Doctrine.Swift.Frenzy")));
     TestFalse(TEXT("A second commitment is refused, even to the SAME branch"),
-        Progression->CommitToBranch(TEXT("Swift.Frenzy"), CommitFailure));
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Frenzy"), CommitFailure));
     TestFalse(TEXT("A second commitment to a DIFFERENT branch is also refused"),
-        Progression->CommitToBranch(TEXT("Swift.Kinetic"), CommitFailure));
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
     TestFalse(TEXT("The refusal carries a reason"), CommitFailure.IsEmpty());
 
     // --- THE KEYSTONE GATE OPENS for its own branch -------------------------
@@ -491,12 +503,12 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
         Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
 
     // --- RESPEC CLEARS -------------------------------------------------------
-    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::ClassPoints, true, Failure));
+    TestTrue(TEXT("Class respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Respec clears the commitment"), Progression->GetProgressionState().CommittedBranch, FName(NAME_None));
-    TestEqual(TEXT("Respec also clears Bloodrhythm's rank"), Progression->GetNodeRank(TEXT("Swift.Frenzy.Bloodrhythm"), EBreakerPointCurrency::ClassPoints), 0);
+    TestEqual(TEXT("Respec also clears Bloodrhythm's rank"), Progression->GetNodeRank(TEXT("Swift.Frenzy.Bloodrhythm"), EBreakerPointCurrency::DoctrinePoints), 0);
 
     // A fresh commitment is possible again after the Forge visit.
-    TestTrue(TEXT("A new commitment succeeds after the respec"), Progression->CommitToBranch(TEXT("Swift.Kinetic"), CommitFailure));
+    TestTrue(TEXT("A new commitment succeeds after the respec"), Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
     return true;
 }
 
@@ -518,7 +530,7 @@ bool FBreakerAutoLockGateTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Default behaviour: a fresh character still auto-locks Swift"),
         DefaultProgression->GetProgressionState().PermanentClass, EBreakerClassId::Swift);
     TestEqual(TEXT("...and still receives the slice point grant"),
-        DefaultProgression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), UBreakerProgressionLibrary::SliceClassPointGrant);
+        DefaultProgression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), UBreakerProgressionLibrary::SliceCorePointGrant);
 
     // O39: turned off, a fresh character reaches the class screen with no
     // class chosen, so the screen is actually exercised instead of every
@@ -532,7 +544,7 @@ bool FBreakerAutoLockGateTest::RunTest(const FString& Parameters)
     // class choice, so it still arrives -- the class screen has something to
     // spend against once a class is picked.
     TestEqual(TEXT("...but the slice point grant is unaffected"),
-        GatedProgression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), UBreakerProgressionLibrary::SliceClassPointGrant);
+        GatedProgression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), UBreakerProgressionLibrary::SliceCorePointGrant);
 
     // A character that already chose a class is never touched by the flag
     // either way -- "only pick a class for a character that has none" is

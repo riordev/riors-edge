@@ -28,7 +28,7 @@ namespace BreakerGunsmithAbilityLocal
     int32 BreakerOwnerNodeRank(const AActor* OwnerActor, const TCHAR* NodeId)
     {
         const UBreakerProgressionComponent* Progression = BreakerOwnerProgression(OwnerActor);
-        return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::ClassPoints) : 0;
+        return Progression ? Progression->GetNodeRank(FName(NodeId), EBreakerPointCurrency::DoctrinePoints) : 0;
     }
     bool BreakerOwnerHasTag(const AActor* OwnerActor, const FGameplayTag& Tag)
     {

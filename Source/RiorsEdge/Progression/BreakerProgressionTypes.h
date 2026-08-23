@@ -25,8 +25,20 @@ enum class EBreakerClassId : uint8
 UENUM(BlueprintType)
 enum class EBreakerPointCurrency : uint8
 {
-    ClassPoints,
-    CorePoints
+    // RETIRED (O111). Class Points are deleted; the fifteen branch trees became
+    // doctrines and fund from DoctrinePoints below.
+    //
+    // THE VALUE STAYS AND IS NEVER REUSED. This enum is serialized by value into
+    // saves AND into Data Assets, so removing the enumerator would not delete
+    // the data -- it would leave every stored 0 meaning whatever moved into its
+    // place. Nothing may be inserted above it for the same reason, which is why
+    // DoctrinePoints is APPENDED rather than slotted in where it belongs
+    // conceptually. The v5 -> v6 migration clears the state that used it.
+    ClassPoints_Retired,
+    CorePoints,
+    // O111: the second and last pool. Eight points, paid in full at commitment
+    // and only at the Forge, so there is no per-level entitlement to track.
+    DoctrinePoints
 };
 
 UENUM(BlueprintType)
@@ -632,6 +644,14 @@ struct RIORSEDGE_API FBreakerProgressionState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelCorePointsGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> ClassNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> CoreNodeRanks;
+    // O111: the doctrine pool. NEW FIELDS rather than the retired class ones --
+    // reusing ClassNodeRanks would work only because the migration zeroes it
+    // first, and would silently reinterpret a v5 save's class build as a
+    // doctrine build if that order ever moved. There is deliberately no
+    // LevelDoctrinePointsGranted: the eight arrive whole at commitment, so
+    // there is no cumulative entitlement to settle up against.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentDoctrinePoints = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FBreakerNodeRank> DoctrineNodeRanks;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FBreakerAbilityLoadout AbilityLoadout;
     // O37: subclass commitment. None until UBreakerProgressionComponent::
     // CommitToBranch is called; that call is one-way (refuses once this is

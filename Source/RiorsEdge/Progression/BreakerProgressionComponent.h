@@ -175,7 +175,7 @@ public:
     // Playtest hook: hands the gym the slice point budget so trees can be
     // exercised without an XP loop. O2 PLACEHOLDER budget (XP §9).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|Playtest")
-    void GrantPlaytestPoints(int32 ClassPoints, int32 CorePoints);
+    void GrantPlaytestPoints(int32 DoctrinePoints, int32 CorePoints);
 
     // ---- The fifteen world Core Points (O7) -----------------------------
     // The other half of a character's sixty-five, and until this existed the
@@ -310,6 +310,7 @@ private:
     // GetRefundValue's comment for the complexity this replaced.
     int32 CachedSpentClassPoints = 0;
     int32 CachedSpentCorePoints = 0;
+    int32 CachedSpentDoctrinePoints = 0;
 
     // Conditional node effects are live state, so the offer they belong to has
     // to be rebuilt on a transition. Called from the tick; only recalculates
@@ -321,6 +322,13 @@ private:
     TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency);
     const TArray<FBreakerNodeRank>& RanksFor(EBreakerPointCurrency Currency) const;
     int32& SpentPointsFor(EBreakerPointCurrency Currency);
+    // THE THREE-WAY SEAM. Every currency switch in this class routes through
+    // one of these, so a fourth pool -- if one is ever ruled -- is three
+    // functions rather than eight ternaries scattered across the file. The
+    // retired class arm is kept live rather than removed: a v5 save being
+    // migrated still has ranks in it when the migration reads them.
+    int32& WalletFor(EBreakerPointCurrency Currency);
+    int32 WalletFor(EBreakerPointCurrency Currency) const;
     // Rebuilds both running totals from State's current rank arrays. O(ranks x
     // N^2) like the per-call path it replaces on the hot path, but this is
     // called only when ranks are bulk-replaced (LoadProgressionState) rather

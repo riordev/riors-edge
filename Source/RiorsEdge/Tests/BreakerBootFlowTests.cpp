@@ -184,49 +184,54 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerLevelPointEntitlementTest::RunTest(const FString& Parameters)
 {
-    // XP-And-Pacing §4 as SHIPPED: 1 Class Point per level to 30, 1 Core
-    // Point per level to 50, with the slice lump (10/12) as an ADVANCE on the
-    // entitlement rather than a bonus beside it. Run at the shipped grants,
-    // never at an inflated test budget — granting 30 points in a rig is
-    // exactly how the keystone budget contradiction stayed invisible.
+    // O111: ONE PER-LEVEL CURRENCY. 1 Core Point per level to 50, with the
+    // slice lump (12) as an ADVANCE on that entitlement rather than a bonus
+    // beside it. The Class Point ladder is gone and the pool it filled is
+    // asserted at ZERO below -- that assertion is what stops it coming back,
+    // and it is why these rows were rewritten rather than deleted. The doctrine
+    // pool has no ladder at all: its eight arrive whole at commitment, which
+    // Progression.SubclassCommitment covers. Run at the shipped grants, never
+    // at an inflated test budget -- granting 30 points in a rig is exactly how
+    // the keystone budget contradiction stayed invisible.
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     Progression->ApplySliceDefaultsIfFresh();
 
-    TestEqual(TEXT("A fresh character holds exactly the slice budget"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints),
-        UBreakerProgressionLibrary::SliceClassPointGrant);
+    TestEqual(TEXT("A fresh character holds exactly the slice Core budget"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints),
+        UBreakerProgressionLibrary::SliceCorePointGrant);
+    TestEqual(TEXT("The retired class pool is empty on a fresh character"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
+    TestEqual(TEXT("An uncommitted character holds no doctrine points"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
 
     // Levels 2..10 are pre-paid by the lump: no extra points may arrive.
     const FBreakerExperienceCurve Curve;
     Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(10, Curve));
     TestEqual(TEXT("Level 10 still holds the slice budget (lump = advance, not bonus)"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints),
-        UBreakerProgressionLibrary::SliceClassPointGrant);
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints),
+        UBreakerProgressionLibrary::SliceCorePointGrant);
 
-    // Level 11 pays the 11th Class Point — and 11 is the first level a branch
-    // keystone is affordable through play (investment gate 8 + keystone cost
-    // 3), which resolves the A2 budget contradiction by levelling rather than
-    // by moving either O2-frozen number.
+    // Level 13 is the first level past the lump: the entitlement is
+    // min(Level, 50) and 12 are already advanced, so the 13th level pays the
+    // 13th point. This used to be the level-11 keystone beat, which was
+    // arithmetic on a Class Point budget that no longer exists -- the keystone
+    // question moved to the doctrine pool, where eight arrive at once.
     Progression->AwardExperience(
-        UBreakerExperienceLibrary::TotalXpToReachLevel(11, Curve) - Progression->GetTotalExperience());
-    TestEqual(TEXT("Level 11 holds 11 Class Points"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 11);
-    TestTrue(TEXT("A keystone (gate 8 + cost 3) is affordable at level 11 in play"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints) >= 8 + 3);
+        UBreakerExperienceLibrary::TotalXpToReachLevel(13, Curve) - Progression->GetTotalExperience());
+    TestEqual(TEXT("Level 13 holds 13 Core Points"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 13);
 
-    // The exhaustion beats land exactly where the act structure puts them:
-    // Class Points stop at 30, Core Points run to 50.
-    Progression->AwardExperience(
-        UBreakerExperienceLibrary::TotalXpToReachLevel(30, Curve) - Progression->GetTotalExperience());
-    TestEqual(TEXT("Level 30 holds 30 Class Points (exhausted)"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 30);
-
+    // The one exhaustion beat left: Core Points run to 50 and stop.
     Progression->AwardExperience(
         UBreakerExperienceLibrary::TotalXpToReachLevel(50, Curve) - Progression->GetTotalExperience());
-    TestEqual(TEXT("Level 50 (cap) still holds 30 Class Points"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints), 30);
     TestEqual(TEXT("Level 50 holds 50 Core Points"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 50);
+    // THE RULING, ASSERTED. No level, no lump and no settle-up may put a point
+    // back in the retired pool, and levelling alone never pays a doctrine point.
+    TestEqual(TEXT("The retired class pool is still empty at the cap"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
+    TestEqual(TEXT("Levelling alone never pays a doctrine point"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
     return true;
 }
 
@@ -293,8 +298,8 @@ bool FBreakerCreatedCharacterKeepsItsClassTest::RunTest(const FString& Parameter
     }
 
     // And the economy still seeds: a created character must arrive spendable.
-    TestEqual(TEXT("A created Caster arrives with the slice Class Point budget"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints),
-        UBreakerProgressionLibrary::SliceClassPointGrant);
+    TestEqual(TEXT("A created Caster arrives with the slice Core Point budget"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints),
+        UBreakerProgressionLibrary::SliceCorePointGrant);
     return true;
 }

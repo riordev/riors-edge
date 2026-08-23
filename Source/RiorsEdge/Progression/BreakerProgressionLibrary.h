@@ -339,14 +339,27 @@ public:
     // Class Point. At the doc's own milestones the totals agree exactly:
     // 10 Class at slice cap 10, 30 Class at 30, 50 Core at 50 (the Core
     // advance's extra 2 stands in for §7's first world-content grants).
-    static constexpr int32 SliceClassPointGrant = 10;
+    // RETIRED TO ZERO (O111). The slice lump advanced 10 Class Points against
+    // the levelling entitlement; there is no Class Point to advance. It is NOT
+    // folded into SliceCorePointGrant -- O27 moves power into node choices
+    // rather than into a larger budget. The symbol stays because three call
+    // sites seed retired save counters from it and zero is correct for all
+    // three.
+    static constexpr int32 SliceClassPointGrant = 0;
     static constexpr int32 SliceCorePointGrant = 12;
 
     // XP-And-Pacing §4: one Class Point per level, exhausted at 30; one Core
     // Point per level, exhausted at 50. Transcribed from the doc (the doc's
     // values, not invented here); O2 PLACEHOLDER only in the sense that §8.9
     // wants them read from a Data Asset eventually.
-    static constexpr int32 ClassPointCapLevel = 30;
+    // RETIRED (O111). No level pays a Class Point any more. The symbol is kept
+    // so a reader searching for the old entitlement finds why it is gone rather
+    // than finding nothing.
+    static constexpr int32 ClassPointCapLevel = 0;
+    // O111: the doctrine pool, paid WHOLE at commitment and only at the Forge.
+    // Not a per-level entitlement, which is why no granted-counter exists for
+    // it -- there is nothing to settle up against and nothing to double-pay.
+    static constexpr int32 DoctrinePointGrant = 8;
     static constexpr int32 CorePointCapLevel = 50;
 
     // O100: ABILITY UNLOCK TOKENS. One token per unlockable ability, paid on an

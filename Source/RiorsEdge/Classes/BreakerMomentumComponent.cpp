@@ -273,7 +273,7 @@ int32 UBreakerMomentumComponent::GetFrenzyNodeRank(FName NodeId) const
     {
         Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     }
-    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::ClassPoints) : 0;
+    return Progression ? Progression->GetNodeRank(NodeId, EBreakerPointCurrency::DoctrinePoints) : 0;
 }
 
 bool UBreakerMomentumComponent::WeakPointPostureSatisfied(bool bRequiresAirborneOrSlide, bool bAirborneOrSliding, int32 TriggerDisciplineRank)
