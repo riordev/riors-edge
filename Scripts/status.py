@@ -648,6 +648,40 @@ def parse_emitted(section_keys):
 # Pins and rendering
 # --------------------------------------------------------------------------
 
+BAND_SOURCE = os.path.join(ROOT, "Source", "RiorsEdge", "Tests", "BreakerPowerBandTests.cpp")
+
+
+def parse_band_edges():
+    """The authored band edges, read out of the test that asserts them.
+
+    THE NUMBER HAS ONE HOME AND IT IS THE ASSERTION. Seven of these edges used
+    to exist twice — once as a constexpr in the test that fails on them, once as
+    a number in the pin file that reports on them — and the two could disagree
+    silently. That is not hypothetical: the at-cap pin's own entry anticipates
+    its band moving ("either the authored 8-10x moves, or content retunes until
+    the measurement reaches it"), and moving it would have left the test
+    asserting the old edges, so the report would have gone green while the suite
+    stayed red on a target nobody held any more.
+
+    The direction follows the lane register above, which lives in the C++ header
+    and is parsed here for the reason stated at its own site: a list in this
+    file would be a second place to update and the first one to rot. The script
+    is a reporter, and a reporter must not be an authority.
+
+    What does NOT move is the `why` prose, which stays in the pin file. The two
+    are different artefacts. The pin file records the DECISION — who looked,
+    when, and why a number was allowed to move — which is what the
+    re-pinning-is-not-widening rule at the top of that file is about. The number
+    itself is an assertion and belongs beside the code making it.
+    """
+    text = read(BAND_SOURCE)
+    edges = {m.group(1): float(m.group(2)) for m in re.finditer(
+        r"constexpr\s+float\s+(\w+)\s*=\s*(-?\d+(?:\.\d+)?)f\s*;", text)}
+    if not edges:
+        raise ParseError(f"{BAND_SOURCE}: no constexpr float band edges parsed.")
+    return edges
+
+
 def load_pins(section_directions):
     """Read the pin file, and refuse a pin that cannot do its job.
 
@@ -677,6 +711,24 @@ def load_pins(section_directions):
             "pin file names sections that do not exist: " + ", ".join(sorted(unknown))
             + ". A pin matching no section is silently inert — fix the key or "
               "delete the pin.")
+    # Resolve every `source` edge before the shape check, so a pin whose symbol
+    # has been renamed or deleted is REFUSED rather than silently losing an
+    # edge. Same discipline as the unknown-key check above: a pin that cannot do
+    # its job stops the report instead of quietly doing nothing.
+    edges = None
+    for key, pin in pins.items():
+        if key.startswith("_") or "source" not in pin:
+            continue
+        if edges is None:
+            edges = parse_band_edges()
+        for bound, symbol in pin["source"].items():
+            if symbol not in edges:
+                raise ParseError(
+                    f"pin '{key}' sources its {bound} from '{symbol}', which is not a "
+                    f"constexpr float in {os.path.relpath(BAND_SOURCE, ROOT)}. The edge "
+                    "would be unset and never checked — fix the symbol or inline the number.")
+            pin[bound] = edges[symbol]
+
     for key, pin in pins.items():
         if key.startswith("_"):
             continue
