@@ -3508,6 +3508,22 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
     // The empty backpack is the one place the screen teaches the world: the
     // five rarity beams as vertical bars, and the single line that ties them
     // to what the player sees on the ground.
+    //
+    // THAT LINE READ "LOOT IS FOUND BY COLOUR", in H2, directly under five bare
+    // colour swatches. art-and-ui's rule is "never signal state by colour
+    // alone" and UI.Rarity.NonColourCue asserts every rarity is distinguishable
+    // without it — so the one screen whose job is to teach the loot vocabulary
+    // was teaching the behaviour the invariant exists to forbid, in the largest
+    // type on the panel.
+    //
+    // The copy now describes what the panel actually shows: five rarities in
+    // ramp order, each named. The NAME is the non-colour distinction here and
+    // it is a reading cue rather than a glance cue, which is honest but is not
+    // yet the invariant satisfied. THE BEAMS ARE STILL FIVE IDENTICAL 180px
+    // BARS — varying their height is the cheapest real cue on this screen and
+    // it is deliberately not done in this pass, because the cue has to be one
+    // decision taken across every rarity site at once rather than five
+    // different marks arrived at one screen at a time.
     TSharedRef<SWidget> EmptyBackpack =
         SNew(SVerticalBox)
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space40, 0.0f, 0.0f)
@@ -3516,7 +3532,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildInventoryScreen()
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
         [
-            MenuText(FText::FromString(TEXT("LOOT IS FOUND BY COLOUR")), BreakerUI::TypeH2, Primary, true)
+            MenuText(FText::FromString(TEXT("FIVE RARITIES, WORST TO BEST")), BreakerUI::TypeH2, Primary, true)
         ]
         + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
         [

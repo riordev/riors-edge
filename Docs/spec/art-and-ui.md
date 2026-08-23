@@ -151,6 +151,17 @@ for titles and names; a body face for prose and affix lines; and a **monospaced
 numeric face, tabular by default, for every number that ticks** — fixed advance
 means counters never reflow mid-fight.
 
+**Every non-alphanumeric mark is drawn geometry, never a glyph.** Pips, arrows,
+triangles, chevrons, tally cells, state dots: a rectangle or a path, not a
+character in a string. This is a measured constraint rather than a preference —
+the engine's fallback face carries 878 codepoints and no Geometric Shapes
+block, so a comparison triangle renders as tofu on the most-scanned line of the
+screen. It binds every mark this interface still owes: the rarity cue, locked
+ability indicators, equip-limit state, refusal warnings, comparison arrows.
+Geometry also survives the shipping faces arriving, where a glyph has to be
+revisited; the one place a character is worth restoring afterwards says so at
+its own site.
+
 **An eight-pixel grid, and nothing lands off it.** A spacing scale of
 4/8/16/24/40/64 with no values between. Radii of zero for structural zones, two
 for panels and cards, four for icon tiles, and never more.
