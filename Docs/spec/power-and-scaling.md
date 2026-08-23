@@ -148,10 +148,10 @@ unequipped weapon is item level 1 for the same reason.
 | Modifier-bearing | x2.5, +0.35 per modifier beyond the first | x1.25 |
 | Boss | x75 | x2.0 |
 
-The ratios are derived from the targets rather than guessed. Trash under a
-second against elite at three seconds *is* an elite health ratio of three — and
-the same derivation on a 20–45s boss gives **x22–50**, which the authored x75 is
-not. That row is the one the rule does not produce.
+Ratios are derived from the targets, and a rank composes with the actor's
+archetype rather than standing alone: elite at three seconds over trash at one
+*is* a ratio of three; the boss's x75 on the Field Marshal's x0.35 is the
+**x26.25** a 24s kill needs. Against rank alone, archetype reads as a table error.
 
 ### Targets
 

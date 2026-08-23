@@ -2,9 +2,11 @@
 
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerItemTypes.h"
 #include "Tests/BreakerStatusEmit.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -29,10 +31,25 @@ namespace BreakerPromotedFindingTest
     // Distinctively named for the unity build, per the twice-shipped rule about
     // anonymous-namespace collisions.
 
-    // The rifle at item level 1, as authored. The archetype constant cancels
-    // out of every ratio here; it survives only in the absolute boss figure,
-    // which is why that one is a seed rather than a derivation.
-    constexpr float PromotedArchetypeBase = 13.0f;
+    // The rifle at item level 1, READ rather than transcribed.
+    //
+    // This was `constexpr float PromotedArchetypeBase = 13.0f` with a comment
+    // calling it "the rifle, as authored". 13 is the SMG's damage. The rifle
+    // is the prototype factory's `default:` case — it authors a DisplayName
+    // and inherits every number from this CDO, where Damage is 24 — so the
+    // transcription described no weapon in the table, and it had never been
+    // right: Damage has been 24 since the commit that added the weapon.
+    //
+    // The comment above it said the constant "cancels out of every ratio",
+    // which is true in BreakerCurveCompositionTests where it was first written
+    // and FALSE here, because PromotedBaselineSecondsToKill returns seconds.
+    // Every trash, elite and boss figure was inflated 24/13 = 1.85x, and that
+    // ratio was read as a throughput shortfall in the game and ruled on twice.
+    // Read it, so the next retune of the rifle moves this with it.
+    float PromotedArchetypeBase()
+    {
+        return GetDefault<UBreakerWeaponDefinition>()->Damage;
+    }
 
     float PromotedWeaponGrowth()
     {
@@ -40,18 +57,22 @@ namespace BreakerPromotedFindingTest
     }
 
     // A full gear set's Health lines at the tier this item level can roll.
-    // EIGHT slots, one line each: the affix pool puts Core.Health on every
-    // slot, so a character who wanted nothing else could carry eight, and the
-    // question this test asks is whether the CEILING of gear defence keeps up.
-    // A smaller set only makes the answer worse.
-    constexpr int32 PromotedHealthLineCount = 8;
-
+    // One line per slot the affix is ALLOWED on, so a character who wanted
+    // nothing else could carry the lot, and the question this test asks is
+    // whether the CEILING of gear defence keeps up. A smaller set only makes
+    // the answer worse.
+    //
+    // The slot count is read off the affix rather than written as 8. It was 8,
+    // and it agreed with the pool — but PromotedInvestedDamageReduction two
+    // functions down was already reading AllowedSlots.Num() for the same pool,
+    // so the file held both conventions and only one of them survives a slot
+    // being added.
     float PromotedGearHealthAt(int32 ItemLevel)
     {
         const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
         const FBreakerAffixDefinition* Line = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Core.Health"));
         if (!Line) return 0.0f;
-        return PromotedHealthLineCount * UBreakerAffixLibrary::ValueForTier(
+        return Line->AllowedSlots.Num() * UBreakerAffixLibrary::ValueForTier(
             *Line, UBreakerAffixLibrary::BestTierForItemLevel(ItemLevel));
     }
 
@@ -63,19 +84,27 @@ namespace BreakerPromotedFindingTest
     }
 
     // Seconds a BASELINE build takes to kill one enemy of this rank, in on-level
-    // content. Absolute rather than relative, so it needs a cadence and an
-    // archetype; both come from the shipped definitions. A baseline carries no
+    // content. Absolute rather than relative, so it needs a cadence and both
+    // archetypes — the weapon's and the ENEMY's. A baseline carries no
     // multiplier band by construction, which is what makes it the baseline.
+    //
+    // EnemyArchetypeMultiplier is the caller's, because it is a property of the
+    // actor rather than of the rank: GetMonsterHealth composes rank x archetype
+    // and defaults the second to 1.0. This test called the defaulting overload
+    // and so measured a boss rank on a trash archetype, which the game never
+    // fields. That is the same mistake as the weapon constant above, in the
+    // other direction — the enemy granted more than the game grants.
     float PromotedBaselineSecondsToKill(int32 AreaLevel, EBreakerMonsterRank Rank,
-        const FBreakerMonsterChassisParams& Params)
+        const FBreakerMonsterChassisParams& Params, float EnemyArchetypeMultiplier = 1.0f)
     {
         const UBreakerWeaponDefinition* Definition = GetDefault<UBreakerWeaponDefinition>();
         const float RoundsPerMinute = Definition ? Definition->RoundsPerMinute : 600.0f;
         const int32 ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
         const float PerShot = FBreakerWeaponMath::WeaponBaseDamage(
-            PromotedArchetypeBase, ItemLevel, PromotedWeaponGrowth());
+            PromotedArchetypeBase(), ItemLevel, PromotedWeaponGrowth());
         const float DamagePerSecond = PerShot * RoundsPerMinute / 60.0f;
-        const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(AreaLevel, Rank, Params);
+        const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+            AreaLevel, Rank, Params, EnemyArchetypeMultiplier);
         return Health / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
     }
 
@@ -91,16 +120,21 @@ namespace BreakerPromotedFindingTest
     // the shipped cadence — a pack kills faster, and a target written for a
     // pack would have to say so.
     //
-    // The cooldown is protected on ABreakerEnemy, so it is transcribed here
-    // rather than read. That is a SECOND SOURCE and it is the kind this project
-    // has been bitten by, so it is named: if the enemy default moves and this
-    // does not, the TTD figures drift silently. The honest fix is an accessor
-    // on the enemy; until there is one, this constant is the seam.
-    constexpr float PromotedEnemyAttackCooldown = 1.15f;   // ABreakerEnemy::AttackCooldown
+    // The cadence was transcribed here as 1.15f because AttackCooldown is
+    // protected on ABreakerEnemy. It agreed with the shipped default, so it
+    // never produced a wrong figure — but the constant it sat beside did, and
+    // the accessor it said it was waiting for cost one line. ABreakerEnemy is
+    // the MELEE base and that is deliberate: ABreakerRangedEnemy sets the
+    // cooldown to 0 and fires on its own timer, so "the enemy" has no single
+    // cadence and this test means the melee one.
+    float PromotedEnemyAttackCooldown()
+    {
+        return GetDefault<ABreakerEnemy>()->GetAttackCooldown();
+    }
 
     float PromotedTimeToDieAt(int32 AreaLevel, const FBreakerMonsterChassisParams& Params)
     {
-        return PromotedHitsToDieAt(AreaLevel, Params) * PromotedEnemyAttackCooldown;
+        return PromotedHitsToDieAt(AreaLevel, Params) * PromotedEnemyAttackCooldown();
     }
 
     // What a full defensive commitment buys, from the shipped pool: the
@@ -114,7 +148,13 @@ namespace BreakerPromotedFindingTest
         const float Per = UBreakerAffixLibrary::ValueForTier(
             *Line, UBreakerAffixLibrary::BestTierForItemLevel(50));
         const int32 Slots = Line->AllowedSlots.Num();
-        return FMath::Min(Slots * Per / 100.0f, 0.60f);   // the pool's authored cap
+        // The cap is the equipment layer's own, read rather than transcribed:
+        // it was 0.60f here with a comment calling it "the pool's authored
+        // cap", and the authored cap lives on FBreakerEquipmentStats. It is
+        // also not fixed — BreakerItemRules raises it to 80 for a rewrite — so
+        // a copy here would report a defensive ceiling the game does not have.
+        const float Cap = FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap / 100.0f;
+        return FMath::Min(Slots * Per / 100.0f, Cap);
     }
 }
 
@@ -321,10 +361,21 @@ bool FBreakerEliteTtkTest::RunTest(const FString& Parameters)
 // the wrong character.
 //
 // This is the one figure here that cannot be a ratio: seconds are absolute, so
-// it needs a cadence and an archetype. Both are read from the shipped
-// definitions rather than assumed, and the number they produce is a SEED — the
-// chassis solves backwards from it, per the spec's own rule that TTK is an
-// output and never an input.
+// it needs a cadence and two archetypes — the weapon's and the boss's. All
+// three are read from the shipped definitions rather than assumed, and the
+// number they produce is a SEED — the chassis solves backwards from it, per the
+// spec's own rule that TTK is an output and never an input.
+//
+// That sentence used to say "both are read" while the weapon archetype was
+// transcribed as the wrong gun and the enemy archetype was not read at all, and
+// the resulting 126.9s was ruled on as two chassis errors. THE RANK ROW WAS
+// NEVER WRONG. The spec derives a rank multiplier as the ratio of its TTK
+// target to trash's, and that ratio lands on rank TIMES archetype, not on rank:
+// the fielded Field Marshal is x75 rank on a x0.35 archetype, a net x26.25 over
+// trash, and 26.25 x the 0.917s trash kill is 24.06s inside O18's 20-45s. Rank
+// alone matches the ratio only for an archetype of 1.0, which no boss is. O59
+// stands, and the identity is asserted below so nobody re-derives the table a
+// third time.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBossBandTest,
     "RiorsEdge.Combat.PowerCurve.BossBand",
@@ -340,27 +391,35 @@ bool FBreakerBossBandTest::RunTest(const FString& Parameters)
     constexpr float BossSecondsCeiling = 45.0f;
 
     constexpr int32 AreaLevel = 50;
-    const float Seconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Boss, Params);
-    const float TrashSeconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params);
-    const float TrashTarget = 0.9f;
-    const float Shortfall = TrashSeconds / TrashTarget;
 
-    // TWO ERRORS, REPORTED SEPARATELY, because closing either one alone looks
-    // like progress and is not. The rank multiplier is half of this figure; the
-    // other half is a throughput shortfall that trash and elite carry too, and
-    // moving boss health to cover both would hide it on the enemies a player
-    // meets most.
+    // The boss the game FIELDS, not a boss-rank trash archetype. Read off the
+    // shipped actor's class default object, which is world-free.
+    const float BossArchetype = GetDefault<ABreakerBossEnemy>()->GetArchetypeHealthMultiplier();
+
+    const float Seconds = PromotedBaselineSecondsToKill(
+        AreaLevel, EBreakerMonsterRank::Boss, Params, BossArchetype);
+    const float TrashSeconds = PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params);
+    const float RankTimesArchetype =
+        UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params) * BossArchetype;
+
     AddInfo(FString::Printf(TEXT("BOSS BAND  area level %d: %.1fs (O18 target %.0f-%.0fs)"),
         AreaLevel, Seconds, BossSecondsFloor, BossSecondsCeiling));
     AddInfo(FString::Printf(
-        TEXT("BOSS BAND  error 1, throughput: trash takes %.2fs against a %.1fs target, so the baseline is %.2fx short before a boss is involved"),
-        TrashSeconds, TrashTarget, Shortfall));
+        TEXT("BOSS BAND  the fielded boss is rank x%.0f on archetype x%.2f = x%.2f over trash"),
+        UBreakerMonsterChassisLibrary::GetRankHealthMultiplier(EBreakerMonsterRank::Boss, Params),
+        BossArchetype, RankTimesArchetype));
     AddInfo(FString::Printf(
-        TEXT("BOSS BAND  error 2, rank: x75 authored, against x%.0f-%.0f derived from this band over the trash target"),
-        BossSecondsFloor / TrashTarget, BossSecondsCeiling / TrashTarget));
-    AddInfo(FString::Printf(
-        TEXT("BOSS BAND  throughput alone gives %.1fs, rank alone gives %.1fs, both together land the band"),
-        Seconds / Shortfall, Seconds * (BossSecondsCeiling / TrashTarget) / 75.0f));
+        TEXT("BOSS BAND  trash kills in %.2fs, so the derivation predicts %.2fs and measures %.2fs"),
+        TrashSeconds, TrashSeconds * RankTimesArchetype, Seconds));
+
+    // THE DERIVATION IDENTITY, asserted rather than restated in prose. The
+    // spec's rule is that a rank multiplier IS the ratio of its TTK target to
+    // trash's. Composed with the actor's archetype it reproduces the measured
+    // kill exactly, which is what proves the rank table was never the error.
+    TestTrue(*FString::Printf(
+        TEXT("Boss TTK (%.4fs) is trash TTK (%.4fs) times rank x archetype (x%.4f)"),
+        Seconds, TrashSeconds, RankTimesArchetype),
+        FMath::IsNearlyEqual(Seconds, TrashSeconds * RankTimesArchetype, 0.01f));
 
     // A BASELINE build carries no multiplier band by construction — that is
     // what makes it the baseline — so this is weapon base against boss health

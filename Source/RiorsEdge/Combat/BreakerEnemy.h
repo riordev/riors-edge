@@ -102,6 +102,14 @@ public:
     // SHIPS with, without opening the tuning itself for writing.
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeHealthMultiplier() const { return ArchetypeHealthMultiplier; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArchetypeDamageMultiplier() const { return ArchetypeDamageMultiplier; }
+    // The attack cadence, exposed for the same reason and added late for a
+    // specific one: every time-to-die figure in the suite is hits-to-die times
+    // this number, and with no accessor the promoted-findings test transcribed
+    // it. A transcription in the same file transcribed the wrong weapon and
+    // cost three false findings, so the cadence is read now rather than copied.
+    // Subclasses override it — ABreakerRangedEnemy sets 0 — so a caller must
+    // pick the class it means rather than reading "the enemy".
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackCooldown() const { return AttackCooldown; }
     // The same read-only-view discipline as the two above, extended to the two
     // movement tunables an archetype is most likely to retune. Added because a
     // subclass's tests could otherwise only assert them by being granted access

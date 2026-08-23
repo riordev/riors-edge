@@ -30,8 +30,8 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 408
-- expected red: 8
+- passing: 411
+- expected red: 5
 - **unexpected red: 0**
 - asserted invariants with no test: 46
 
@@ -43,9 +43,6 @@ A test that was never written is the worst of the three: it looks asserted.
 - `RiorsEdge.Combat.Chassis.DamageBelowHealth`
 - `RiorsEdge.Combat.DefenseCurve.HitsToDie`
 - `RiorsEdge.Combat.DefenseCurve.TimeToDieBare`
-- `RiorsEdge.Combat.PowerCurve.BossBand`
-- `RiorsEdge.Combat.PowerCurve.EliteTtk`
-- `RiorsEdge.Combat.PowerCurve.TrashTtk`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
