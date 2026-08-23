@@ -151,7 +151,7 @@ unequipped weapon is item level 1 for the same reason.
 Ratios are derived from the targets, and a rank composes with the actor's
 archetype rather than standing alone: elite at three seconds over trash at one
 *is* a ratio of three; the boss's x75 on the Field Marshal's x0.35 is the
-**x26.25** a 24s kill needs. Against rank alone, archetype reads as a table error.
+**x26.25** a 24s kill needs. Against rank alone, an archetype reads as an error.
 
 ### Targets
 
@@ -163,12 +163,12 @@ archetype rather than standing alone: elite at three seconds over trash at one
 | TTD, no resources or sustain | 4–5s |
 | Optimized, and invested | substantially past the baseline figure, asserted separately |
 
-These describe a **baseline build in on-level content**. An optimized character
-roughly forty hours past 50 deletes trash on contact.
+These describe a **baseline build in on-level content at archetype x1.0**; other
+archetypes multiply the target, so a Warden mob at x3.2 kills in 2.9s on target.
+An optimized character forty hours past 50 deletes trash on contact.
 
-**Bosses are meant to die fast to a comfortable build.** A fast optimized kill is
-the system working, so the two cases are asserted separately — a single target
-measured against an optimized build is measuring the wrong character.
+**Bosses are meant to die fast to a comfortable build**, so baseline and optimized
+are asserted separately — one target for both measures the wrong character.
 
 ### The affix tier ladder
 

@@ -31,25 +31,41 @@ namespace BreakerPromotedFindingTest
     // Distinctively named for the unity build, per the twice-shipped rule about
     // anonymous-namespace collisions.
 
-    // The rifle at item level 1, READ rather than transcribed.
+    // The weapon a baseline character actually carries, READ rather than
+    // transcribed and rather than named.
     //
-    // This was `constexpr float PromotedArchetypeBase = 13.0f` with a comment
-    // calling it "the rifle, as authored". 13 is the SMG's damage. The rifle
-    // is the prototype factory's `default:` case — it authors a DisplayName
-    // and inherits every number from this CDO, where Damage is 24 — so the
-    // transcription described no weapon in the table, and it had never been
-    // right: Damage has been 24 since the commit that added the weapon.
+    // This was `constexpr float PromotedArchetypeBase = 13.0f` under a comment
+    // calling it "the rifle, as authored". 13 is the SMG's damage. The rifle is
+    // the prototype factory's `default:` case — it authors a DisplayName and
+    // inherits every number from the definition CDO, where Damage is 24 — so
+    // the transcription described no weapon in the table, and it had never been
+    // right: Damage has been 24 since the commit that added the weapon. The
+    // comment it carried, that the constant "cancels out of every ratio", is
+    // true in BreakerCurveCompositionTests where it was written and FALSE here,
+    // because this file returns seconds. Every trash, elite and boss figure was
+    // inflated 24/13 = 1.85x and the ratio was ruled on twice as a shortfall in
+    // the game.
     //
-    // The comment above it said the constant "cancels out of every ratio",
-    // which is true in BreakerCurveCompositionTests where it was first written
-    // and FALSE here, because PromotedBaselineSecondsToKill returns seconds.
-    // Every trash, elite and boss figure was inflated 24/13 = 1.85x, and that
-    // ratio was read as a throughput shortfall in the game and ruled on twice.
-    // Read it, so the next retune of the rifle moves this with it.
-    float PromotedArchetypeBase()
+    // It is not enough to read the CDO. That gives the right number today only
+    // because the Rifle has no factory case, so "the CDO" and "the rifle" are
+    // the same object by accident; give the Rifle a case and a CDO read keeps
+    // measuring the CDO. And it is not enough to name the Rifle either, because
+    // that is a CHOICE of representative, which is the same defect wearing a
+    // different hat. Ask the component which archetype slot one ships holding
+    // and resolve THAT, so the baseline follows the loadout.
+    const UBreakerWeaponDefinition* PromotedBaselineWeapon()
     {
-        return GetDefault<UBreakerWeaponDefinition>()->Damage;
+        UBreakerWeaponComponent* Weapon = NewObject<UBreakerWeaponComponent>();
+        Weapon->EquipArchetype(Weapon->GetSlotArchetype(1));
+        return Weapon->GetActiveDefinition();
     }
+
+    // THE REFERENCE ARCHETYPE. O18's seed targets describe the enemy archetype
+    // multiplier of 1.0 and nothing else; every other archetype's band is that
+    // target times its own multiplier, derived rather than authored. Named here
+    // so a TTK figure below says what it is a target FOR — a Warden trash mob
+    // at x3.2 kills in 2.9s and that is on target, not 3x adrift.
+    constexpr float PromotedReferenceArchetype = 1.0f;
 
     float PromotedWeaponGrowth()
     {
@@ -95,14 +111,16 @@ namespace BreakerPromotedFindingTest
     // fields. That is the same mistake as the weapon constant above, in the
     // other direction — the enemy granted more than the game grants.
     float PromotedBaselineSecondsToKill(int32 AreaLevel, EBreakerMonsterRank Rank,
-        const FBreakerMonsterChassisParams& Params, float EnemyArchetypeMultiplier = 1.0f)
+        const FBreakerMonsterChassisParams& Params,
+        float EnemyArchetypeMultiplier = PromotedReferenceArchetype)
     {
-        const UBreakerWeaponDefinition* Definition = GetDefault<UBreakerWeaponDefinition>();
-        const float RoundsPerMinute = Definition ? Definition->RoundsPerMinute : 600.0f;
+        const UBreakerWeaponDefinition* Definition = PromotedBaselineWeapon();
+        if (!Definition) return 0.0f;
         const int32 ItemLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel);
         const float PerShot = FBreakerWeaponMath::WeaponBaseDamage(
-            PromotedArchetypeBase(), ItemLevel, PromotedWeaponGrowth());
-        const float DamagePerSecond = PerShot * RoundsPerMinute / 60.0f;
+            Definition->Damage, ItemLevel, PromotedWeaponGrowth())
+            * FMath::Max(1, Definition->PelletsPerShot);
+        const float DamagePerSecond = PerShot * Definition->RoundsPerMinute / 60.0f;
         const float Health = UBreakerMonsterChassisLibrary::GetMonsterHealth(
             AreaLevel, Rank, Params, EnemyArchetypeMultiplier);
         return Health / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
@@ -312,11 +330,14 @@ bool FBreakerTrashTtkTest::RunTest(const FString& Parameters)
     // faster than the seed is not a defect.
     constexpr float TrashSecondsCeiling = 1.0f;
 
+    // O18 names the reference archetype, so this figure does too. A fielded
+    // trash mob multiplies it: the Warden's x3.2 is a 2.9s kill on target.
     for (const int32 AreaLevel : {1, 25, 50})
     {
-        AddInfo(FString::Printf(TEXT("TRASH TTK  area level %2d: %.2fs (O18 target under %.1fs)"),
+        AddInfo(FString::Printf(
+            TEXT("TRASH TTK  area level %2d: %.2fs at archetype x%.2f (O18 target under %.1fs)"),
             AreaLevel, PromotedBaselineSecondsToKill(AreaLevel, EBreakerMonsterRank::Trash, Params),
-            TrashSecondsCeiling));
+            PromotedReferenceArchetype, TrashSecondsCeiling));
     }
 
     const float AtCap = PromotedBaselineSecondsToKill(50, EBreakerMonsterRank::Trash, Params);
@@ -342,8 +363,9 @@ bool FBreakerEliteTtkTest::RunTest(const FString& Parameters)
     constexpr float EliteSecondsCeiling = 4.0f;
 
     const float AtCap = PromotedBaselineSecondsToKill(50, EBreakerMonsterRank::Elite, Params);
-    AddInfo(FString::Printf(TEXT("ELITE TTK  area level 50: %.2fs (O18 target ~3s, band %.0f-%.0fs)"),
-        AtCap, EliteSecondsFloor, EliteSecondsCeiling));
+    AddInfo(FString::Printf(
+        TEXT("ELITE TTK  area level 50: %.2fs at archetype x%.2f (O18 target ~3s, band %.0f-%.0fs)"),
+        AtCap, PromotedReferenceArchetype, EliteSecondsFloor, EliteSecondsCeiling));
 
     TestTrue(*FString::Printf(TEXT("A baseline kills an on-level elite in at least %.0fs (measured %.2fs)"),
         EliteSecondsFloor, AtCap), AtCap >= EliteSecondsFloor);

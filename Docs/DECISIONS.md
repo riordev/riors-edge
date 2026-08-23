@@ -33,7 +33,7 @@ Numbers are permanent and never reused.
 
 **O17** — The stash is account-wide. Characters are builds; gear is an account asset.
 
-**O18** — Seed targets: trash a little under a second, elite around three, boss twenty to forty-five unless a special enemy claims the exception; time-to-die four to five seconds bare, substantially higher invested.
+**O18** — Seed targets, stated at the reference archetype of x1.0: trash a little under a second, elite around three, boss twenty to forty-five unless a special enemy claims the exception; time-to-die four to five seconds bare, substantially higher invested. Every other archetype's band is the reference target times its own multiplier, derived and never authored — a Warden trash mob at x3.2 is a 2.9s kill and that is on target, not three times adrift. The boss row already reads this way: 20-45s describes the fielded Field Marshal, x75 rank on a x0.35 archetype. An archetype multiplier is therefore a stated deviation from the reference and the only question it raises is whether the deviation is wanted; a TTK figure that does not name its archetype is not asserting anything.
 
 **O19** — The elements are Rift, Entropy and Void. Rift-element damage takes a hotter, whiter cyan: saturated teal is a property of objects, not of damage.
 
