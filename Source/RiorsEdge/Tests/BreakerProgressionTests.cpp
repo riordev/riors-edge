@@ -47,7 +47,7 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     FBreakerProgressionState Initial;
     Initial.PermanentClass = EBreakerClassId::Swift;
     Initial.UnspentClassPoints = 3;
-    Initial.ClassNodeRanks.Add({TEXT("KineticEntry"), 2});
+    Initial.CoreNodeRanks.Add({TEXT("KineticEntry"), 2});
     Progression->LoadProgressionState(Initial);
 
     FText Failure;
@@ -55,7 +55,12 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::CorePoints), 2);
     TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::CorePoints), 0);
-    TestEqual(TEXT("Forge respec refunds ranks when definitions are unavailable"), Progression->GetProgressionState().UnspentClassPoints, 5);
+    // O111: the refund lands in CORE, not in the retired wallet. The two
+    // ranks were seeded straight into the state with no definition to price
+    // them, so the refund is the rank count -- and it must arrive somewhere the
+    // player can spend it.
+    TestEqual(TEXT("Forge respec refunds ranks into the one pool"), Progression->GetProgressionState().UnspentCorePoints, 2);
+    TestEqual(TEXT("The retired wallet is never credited"), Progression->GetProgressionState().UnspentClassPoints, 3);
     return true;
 }
 

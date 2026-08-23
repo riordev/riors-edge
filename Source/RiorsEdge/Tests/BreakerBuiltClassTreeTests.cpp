@@ -349,7 +349,7 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     TestTrue(TEXT("Choosing Gunsmith succeeds"), Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith));
     // Exactly the level-11 Class Point budget. Not one more.
-    Progression->GrantPlaytestPoints(11, 0);
+    Progression->GrantPlaytestPoints(0, 11);
 
     FText Failure;
     // Machinist's prerequisite chain: Chambered (T1) -> Cold Barrel (T2).
@@ -372,7 +372,7 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     TestFalse(TEXT("The refusal carries a reason"), Failure.IsEmpty());
 
     FText CommitFailure;
-    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Gunsmith.Armory"), CommitFailure));
+    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), CommitFailure));
     TestTrue(TEXT("Machinist purchases on the last three points of the level-11 budget"),
         Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
     TestEqual(TEXT("The level-11 budget is spent to exactly zero"),

@@ -338,7 +338,7 @@ bool FBreakerTargetRiderLibraryAuthoringTest::RunTest(const FString& Parameters)
     State.PermanentClass = EBreakerClassId::Swift;
     State.CoreNodeRanks.Add({TEXT("Core.Affliction.OpenWound"), 1});
     State.CoreNodeRanks.Add({TEXT("Core.Precision.TunnelVision"), 1});
-    State.ClassNodeRanks.Add({TEXT("Swift.Marksman.Culling"), 1});
+    State.CoreNodeRanks.Add({TEXT("Swift.Marksman.Culling"), 1});
     Progression->LoadProgressionState(State);
 
     const TArray<FBreakerTargetConditionRider>& Riders = Progression->GetTargetConditionRiders();

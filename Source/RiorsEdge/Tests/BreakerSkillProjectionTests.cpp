@@ -32,7 +32,7 @@ namespace BreakerSkillProjectionTestHelpers
         Rig.Progression = NewObject<UBreakerProgressionComponent>(Rig.Owner);
         Rig.Progression->BindAttributes(Rig.Attributes);
         Rig.Progression->ChoosePermanentClassById(EBreakerClassId::Swift);
-        Rig.Progression->GrantPlaytestPoints(ClassPoints, CorePoints);
+        Rig.Progression->GrantPlaytestPoints(0, ClassPoints + CorePoints);
         return Rig;
     }
 

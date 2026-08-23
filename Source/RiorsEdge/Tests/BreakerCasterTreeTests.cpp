@@ -285,7 +285,7 @@ bool FBreakerCasterTreesMoreCeilingTest::RunTest(const FString& Parameters)
     Progression->ChoosePermanentClassById(EBreakerClassId::Caster);
     // A full Void Whisperer branch is well under 30; grant generously so every
     // rank of every node purchases with room to spare.
-    Progression->GrantPlaytestPoints(40, 0);
+    Progression->GrantPlaytestPoints(0, 40);
 
     FText CommitFailure;
     TestTrue(*FString::Printf(TEXT("Committing to Void Whisperer succeeds (%s)"), *CommitFailure.ToString()),

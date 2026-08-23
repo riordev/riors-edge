@@ -314,9 +314,19 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     // The running total this currency was tracking is refunded in full and
     // starts back at zero (audit item 6).
     SpentPointsFor(Currency) = 0;
-    if (Currency == EBreakerPointCurrency::ClassPoints_Retired) State.UnspentClassPoints += Refunded;
-    else State.UnspentCorePoints += Refunded;
-    if (Currency == EBreakerPointCurrency::ClassPoints_Retired)
+    // O111: the retired pool is never credited again. A respec of it refunds
+    // into Core, because Core is where its nodes moved -- and because crediting
+    // a wallet the player can no longer spend from would be a silent loss
+    // wearing a refund's clothes.
+    State.UnspentCorePoints += Refunded;
+    // THE DOCTRINE RESPEC IS THE CORE RESPEC NOW, and this branch moved with
+    // the currency rather than staying where it was written. Commitment is a
+    // doctrine choice and doctrine nodes are Core-funded, so the respec that
+    // clears their ranks is the one that must release the commitment. Left on
+    // the retired currency it would have been unreachable: nothing calls a
+    // respec of a pool nothing spends, so a committed character could never
+    // un-commit and the Forge's one escape hatch would be sealed shut.
+    if (Currency == EBreakerPointCurrency::CorePoints)
     {
         State.AbilityLoadout.ClassAbilityOne = ClassDefinition && ClassDefinition->StarterAbilityIds.Num() > 0
             ? ClassDefinition->StarterAbilityIds[0] : NAME_None;

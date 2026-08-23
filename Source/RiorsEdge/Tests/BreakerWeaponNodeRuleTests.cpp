@@ -38,7 +38,7 @@ namespace BreakerWeaponNodeRuleTest
         Rig.Owner = NewObject<AActor>();
         Rig.Progression = NewObject<UBreakerProgressionComponent>(Rig.Owner);
         Rig.Progression->ChoosePermanentClassById(ClassId);
-        Rig.Progression->GrantPlaytestPoints(ClassPointBudget, 0);
+        Rig.Progression->GrantPlaytestPoints(0, ClassPointBudget);
         Rig.Weapon = NewObject<UBreakerWeaponComponent>(Rig.Owner);
         return Rig;
     }

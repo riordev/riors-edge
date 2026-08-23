@@ -168,7 +168,7 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     Progression->ApplySliceDefaultsIfFresh();
     // A full Frenzy branch is 27 class points (was 21, before F9-F11 added
     // three single-rank nodes at 2 points each); the slice grant is 10.
-    Progression->GrantPlaytestPoints(40, 0);
+    Progression->GrantPlaytestPoints(0, 40);
 
     const float BaseHealth = Attributes->GetMaxHealth();
     const float BaseCritChance = Attributes->GetCriticalChance();

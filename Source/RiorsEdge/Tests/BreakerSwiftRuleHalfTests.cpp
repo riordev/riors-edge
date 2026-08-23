@@ -55,7 +55,7 @@ namespace BreakerSwiftRuleTest
         State.PermanentClass = EBreakerClassId::Swift;
         for (const TPair<FName, int32>& Pair : ClassRanks)
         {
-            State.ClassNodeRanks.Add({Pair.Key, Pair.Value});
+            State.CoreNodeRanks.Add({Pair.Key, Pair.Value});
         }
         Rig.Progression->LoadProgressionState(State);
         // BindAttributes runs HandleProgressionChanged, which finds the

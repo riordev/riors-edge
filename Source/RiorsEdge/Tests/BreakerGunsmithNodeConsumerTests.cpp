@@ -40,7 +40,7 @@ namespace BreakerGunsmithNodeConsumerTest
         Rig.Progression = NewObject<UBreakerProgressionComponent>(Rig.Owner);
         Rig.Attributes = NewObject<UBreakerAttributeSet>();
         Rig.Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith);
-        Rig.Progression->GrantPlaytestPoints(ClassPointBudget, 0);
+        Rig.Progression->GrantPlaytestPoints(0, ClassPointBudget);
         Rig.Scrap = NewObject<UBreakerScrapComponent>(Rig.Owner);
         Rig.Scrap->BindAttributes(Rig.Attributes);
         return Rig;

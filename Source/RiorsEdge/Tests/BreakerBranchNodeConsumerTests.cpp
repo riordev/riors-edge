@@ -42,7 +42,7 @@ namespace BreakerBranchNodeTest
         State.PermanentClass = ClassId;
         for (const TPair<const TCHAR*, int32>& Pair : NodeRanks)
         {
-            State.ClassNodeRanks.Add({FName(Pair.Key), Pair.Value});
+            State.CoreNodeRanks.Add({FName(Pair.Key), Pair.Value});
         }
         Rig.Progression->LoadProgressionState(State);
         return Rig;

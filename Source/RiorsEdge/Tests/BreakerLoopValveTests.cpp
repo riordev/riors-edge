@@ -215,7 +215,7 @@ bool FBreakerLoopValveBridgeTest::RunTest(const FString& Parameters)
     Momentum->BindAttributes(Attributes);
     TestTrue(TEXT("The Momentum loop runs for this rig"), Momentum->IsActiveForOwner());
 
-    Progression->GrantPlaytestPoints(40, 0);
+    Progression->GrantPlaytestPoints(0, 40);
     UBreakerProgressionTree* Frenzy = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
 
     // The tier-4 gate is 6 points of branch investment plus the Short Leash
@@ -292,7 +292,7 @@ bool FBreakerAbilityGeometrySeamTest::RunTest(const FString& Parameters)
     Progression->IncreasedDamagePerSpentPoint = 0.0f;
     Progression->BindAttributes(Attributes);
     Progression->DevForceClass(EBreakerClassId::Caster);
-    Progression->GrantPlaytestPoints(40, 0);
+    Progression->GrantPlaytestPoints(0, 40);
 
     UBreakerAbility_Rot* Rot = NewObject<UBreakerAbility_Rot>();
     UBreakerAbility_Cleave* Cleave = NewObject<UBreakerAbility_Cleave>();

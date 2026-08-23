@@ -354,13 +354,17 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));               // cost 1, Class
     TestEqual(TEXT("Class spend adds on top of core spend"), Progression->GetSpentPoints(), 5.0f, 0.0001f);
 
-    // Respec one currency: its running total resets to zero and the other is
-    // untouched.
+    // O111: THERE IS ONE RUNNING TOTAL BECAUSE THERE IS ONE POOL. This used to
+    // respec each currency in turn and assert the other survived; a doctrine
+    // node and a constellation node now live in the same array, so the first
+    // respec takes both. That is the ruling working, not a regression -- and
+    // the second respec asserting zero is what proves it is idempotent rather
+    // than merely destructive.
     TestTrue(TEXT("Core respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
-    TestEqual(TEXT("Core respec zeroes only the core running total"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
+    TestEqual(TEXT("One respec zeroes the one running total"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
-    TestTrue(TEXT("Class respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
-    TestEqual(TEXT("Both running totals are zero after both respecs"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
+    TestTrue(TEXT("A second respec succeeds and changes nothing"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
+    TestEqual(TEXT("Still zero after the second respec"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
     // A LOADED state carrying a stale/unknown node id: the running total is
     // rebuilt from scratch (RecomputeSpentPointsFromState), using the same
@@ -369,7 +373,7 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     FBreakerProgressionState Loaded;
     Loaded.PermanentClass = EBreakerClassId::Swift;
     Loaded.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});    // real, cost 1
-    Loaded.ClassNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown, fallback cost 1 x 3
+    Loaded.CoreNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown, fallback cost 1 x 3
     Progression->LoadProgressionState(Loaded);
     TestEqual(TEXT("A freshly loaded state recomputes both totals correctly"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
     return true;
@@ -435,7 +439,7 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
     // the nodes it is testing. But any test asserting that content is
     // REACHABLE must run on the shipped entitlement, never on a grant, or it
     // proves the rule against a character the game cannot produce.
-    Progression->GrantPlaytestPoints(30, 0);        // headroom for this playthrough's purchases
+    Progression->GrantPlaytestPoints(0, 30);        // headroom for this playthrough's purchases
     UBreakerProgressionTree* Frenzy = UBreakerProgressionLibrary::GetSwiftFrenzyTree();
     UBreakerProgressionTree* Kinetic = UBreakerProgressionLibrary::GetSwiftKineticTree();
     FText Failure;
@@ -471,12 +475,12 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
 
     // --- ONE-WAY SEMANTICS --------------------------------------------------
     FText CommitFailure;
-    TestTrue(TEXT("Committing to Frenzy succeeds"), Progression->CommitToBranch(TEXT("Swift.Frenzy"), CommitFailure));
-    TestEqual(TEXT("The commitment is recorded"), Progression->GetProgressionState().CommittedBranch, FName(TEXT("Swift.Frenzy")));
+    TestTrue(TEXT("Committing to Frenzy succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Swift.Frenzy"), CommitFailure));
+    TestEqual(TEXT("The commitment is recorded"), Progression->GetProgressionState().CommittedBranch, FName(TEXT("Doctrine.Swift.Frenzy")));
     TestFalse(TEXT("A second commitment is refused, even to the SAME branch"),
-        Progression->CommitToBranch(TEXT("Swift.Frenzy"), CommitFailure));
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Frenzy"), CommitFailure));
     TestFalse(TEXT("A second commitment to a DIFFERENT branch is also refused"),
-        Progression->CommitToBranch(TEXT("Swift.Kinetic"), CommitFailure));
+        Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
     TestFalse(TEXT("The refusal carries a reason"), CommitFailure.IsEmpty());
 
     // --- THE KEYSTONE GATE OPENS for its own branch -------------------------
@@ -496,7 +500,7 @@ bool FBreakerSubclassCommitmentTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Respec also clears Bloodrhythm's rank"), Progression->GetNodeRank(TEXT("Swift.Frenzy.Bloodrhythm"), EBreakerPointCurrency::CorePoints), 0);
 
     // A fresh commitment is possible again after the Forge visit.
-    TestTrue(TEXT("A new commitment succeeds after the respec"), Progression->CommitToBranch(TEXT("Swift.Kinetic"), CommitFailure));
+    TestTrue(TEXT("A new commitment succeeds after the respec"), Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
     return true;
 }
 
