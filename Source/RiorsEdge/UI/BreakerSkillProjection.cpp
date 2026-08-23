@@ -18,7 +18,18 @@ namespace
     // what row 3 is. Order is the reading order on the rail.
     enum class EStatRow : uint8
     {
-        Damage,
+        // TWO DELIVERY LANES, NOT ONE. O54 partitioned damage into weapon-
+        // delivered and ability-delivered pools and the aggregator carries both
+        // — DamageMultiplier and AbilityDamageMultiplier — but this table bound
+        // a single DAMAGE row to the first of them and never read the second.
+        // So the skill screen priced every ability build at its weapon lane:
+        // a node that moved abilities alone printed no change, and a node that
+        // moved weapons alone printed a gain an ability build would never see.
+        // The parity measurement makes the size of that lie concrete — the two
+        // lanes sit at 0.647x of each other at the cap and 0.388x at endgame,
+        // so one row could not have been within a third of right for anybody.
+        WeaponDamage,
+        AbilityDamage,
         CriticalChance,
         CriticalDamage,
         MaxHealth,
@@ -43,7 +54,11 @@ namespace
 
     const FStatRowDescriptor StatRows[] =
     {
-        { TEXT("DAMAGE"),        EBreakerStatFormat::Multiplier,    false },
+        // Named for the LANE, not for the source. "DAMAGE" was accurate when
+        // there was one bucket and became a claim about both the moment there
+        // were two.
+        { TEXT("WEAPON DAMAGE"), EBreakerStatFormat::Multiplier,    false },
+        { TEXT("ABILITY DAMAGE"),EBreakerStatFormat::Multiplier,    false },
         { TEXT("CRIT CHANCE"),   EBreakerStatFormat::PercentPoints, false },
         { TEXT("CRIT DAMAGE"),   EBreakerStatFormat::Multiplier,    false },
         { TEXT("MAX HEALTH"),    EBreakerStatFormat::Absolute,      false },
@@ -74,9 +89,15 @@ namespace
     {
         const bool bComposed = Snapshot.bHasComposedAttributes;
 
-        OutValues[static_cast<int32>(EStatRow::Damage)] = bComposed
+        OutValues[static_cast<int32>(EStatRow::WeaponDamage)] = bComposed
             ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::DamageMultiplier)
             : Stats.DamageMultiplier;
+        // The shared pool needs no row: O54 puts it inside BOTH lanes by
+        // construction, so a third row would print the same percentage twice
+        // and invite the player to add it to itself.
+        OutValues[static_cast<int32>(EStatRow::AbilityDamage)] = bComposed
+            ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::AbilityDamageMultiplier)
+            : Stats.AbilityDamageMultiplier;
         OutValues[static_cast<int32>(EStatRow::CriticalChance)] = bComposed
             ? ComposeWithOffer(Snapshot, Offer, EBreakerAggregatedAttribute::CriticalChance)
             : Stats.CriticalChanceBonus;
@@ -101,6 +122,11 @@ namespace
         OutValues[static_cast<int32>(EStatRow::DodgeChance)] = Stats.DodgeChanceBonus;
         OutValues[static_cast<int32>(EStatRow::BlockChance)] = Stats.BlockChanceBonus;
     }
+}
+
+int32 BreakerSkillProjection::StatRowCount()
+{
+    return static_cast<int32>(EStatRow::Count);
 }
 
 FBreakerSkillSnapshot BreakerSkillProjection::MakeSnapshot(const UBreakerProgressionComponent* Progression, const UBreakerAttributeSet* Attributes)

@@ -100,6 +100,13 @@ namespace BreakerSkillProjection
     RIORSEDGE_API FBreakerNodeStats BuildOffer(const FBreakerSkillSnapshot& Snapshot,
         const TArray<FBreakerNodeRank>& Ranks, FBreakerAttributeContribution& OutOffer);
 
+    // How many rows every projection produces. Exported because two tests
+    // transcribed it as 10, so adding the ability-damage lane broke them both
+    // with an arithmetic complaint rather than a design one — a row count
+    // written down beside the row table is the same second source as any other,
+    // and this one had already gone stale by the time anybody read it.
+    RIORSEDGE_API int32 StatRowCount();
+
     // Every readable row, valued at Snapshot.Ranks in Before and at AfterRanks
     // in After. Rows are always produced in the same order, so callers may
     // index them.

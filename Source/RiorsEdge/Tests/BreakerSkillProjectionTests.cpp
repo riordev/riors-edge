@@ -85,8 +85,8 @@ bool FBreakerSkillProjectionMirrorTest::RunTest(const FString& Parameters)
     // And the totals row the rail prints is the attribute the game actually
     // rolls damage against.
     const TArray<FBreakerStatLine> Totals = BreakerSkillProjection::CurrentTotals(Snapshot);
-    TestEqual(TEXT("Totals produce one row per stat"), Totals.Num(), 10);
-    TestEqual(TEXT("The damage row is the composed DamageMultiplier attribute"),
+    TestEqual(TEXT("Totals produce one row per stat"), Totals.Num(), BreakerSkillProjection::StatRowCount());
+    TestEqual(TEXT("The weapon damage row is the composed DamageMultiplier attribute"),
         Totals[0].Before, Rig.Attributes->GetDamageMultiplier(), 0.0001f);
     TestFalse(TEXT("A totals row never claims a purchase"), Totals[0].Changed());
     return true;
@@ -223,7 +223,7 @@ bool FBreakerSkillProjectionGuardTest::RunTest(const FString& Parameters)
     const FBreakerSkillSnapshot Empty = BreakerSkillProjection::MakeSnapshot(nullptr, nullptr);
     TestFalse(TEXT("An empty snapshot claims no composed attributes"), Empty.bHasComposedAttributes);
     const TArray<FBreakerStatLine> Totals = BreakerSkillProjection::CurrentTotals(Empty);
-    TestEqual(TEXT("An empty snapshot still produces every row"), Totals.Num(), 10);
+    TestEqual(TEXT("An empty snapshot still produces every row"), Totals.Num(), BreakerSkillProjection::StatRowCount());
     for (const FBreakerStatLine& Line : Totals)
     {
         TestFalse(TEXT("No row claims a change"), Line.Changed());
