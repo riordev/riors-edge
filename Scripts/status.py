@@ -51,7 +51,13 @@ SRC = os.path.join(ROOT, "Source", "RiorsEdge")
 SPEC = os.path.join(ROOT, "Docs", "spec")
 PINS = os.path.join(ROOT, "Scripts", "status-pins.json")
 OUT = os.path.join(ROOT, "Docs", "STATE.md")
-LOG = os.path.join(ROOT, "Saved", "Logs", "riors_edge.log")
+# THE SUITE GETS ITS OWN FILE, and this is PREVENTION rather than detection.
+# riors_edge.log is the project's default log name, so the interactive editor, a
+# standalone run and the capture harness all open it and rotate whatever was
+# there into a backup. Opening the editor therefore DESTROYED the suite record,
+# and this report then read the editor's log and found no tests in it. The suite
+# is run with -abslog pointing here, so the collision cannot happen at all.
+LOG = os.path.join(ROOT, "Saved", "Logs", "suite.log")
 
 CEILING, FLOOR, BAND = "ceiling", "floor", "band"
 
@@ -296,14 +302,33 @@ def parse_spec_invariants():
     return out
 
 
+# A // comment to end-of-line, inside a macro head. Built from chr(10) so the
+# pattern survives being edited through a shell heredoc, which silently turned
+# the escape into a real newline once already.
+COMMENT_RE = '//[^' + chr(10) + ']*'
+
+
 def parse_declared_tests(sources):
+    """Every automation test name the source tree declares.
+
+    THIS SET IS THE REFERENCE the suite log is reconciled against, so a name it
+    cannot see is a test that can vanish from a run unnoticed. The old pattern
+    required the name to follow the class directly, and one macro carries a
+    comment between the two — RiorsEdge.Progression.RuleBandImpact, which has a
+    passing test and was reported as an UNIMPLEMENTED INVARIANT the whole time,
+    because this parse is also what the invariant section matches against. The
+    macro head is stripped of comments before the name is read.
+    """
     names = set()
     for path, text in sources.items():
         if "Tests" not in path:
             continue
         for m in re.finditer(
-                r'IMPLEMENT_\w*AUTOMATION_TEST\(\s*\w+\s*,\s*"([^"]+)"', text, re.S):
-            names.add(m.group(1))
+                r'IMPLEMENT_\w*AUTOMATION_TEST\s*\((.*?)\)\s*$', text, re.S | re.M):
+            head = re.sub(COMMENT_RE, '', m.group(1))
+            q = re.search(r'"([^"]+)"', head)
+            if q:
+                names.add(q.group(1))
     if not names:
         raise ParseError("No automation tests found. The IMPLEMENT_ macro shape changed.")
     return names
@@ -327,7 +352,7 @@ def expected_red_names(entries):
     return {e.split("::", 1)[0].strip() for e in entries}
 
 
-def parse_suite_log(expected_red):
+def parse_suite_log(expected_red, declared):
     """Read the suite log, and REFUSE a log that does not reconcile.
 
     THE COUNT MUST BALANCE, and this is here because it did not. Every result
@@ -346,6 +371,22 @@ def parse_suite_log(expected_red):
     completed, and a mismatch refuses the report rather than printing a number
     that is quietly short. That is also how this was found — a total that was
     one below what the test files contained.
+
+    STARTED AGAINST COMPLETED IS STILL AN INTERNAL CHECK, and an internal check
+    cannot see an EMPTY log: zero balances zero. A log clobbered by another run
+    returned zero started, zero passed and zero unexpected red without raising,
+    and the report printed "unexpected red: 0" -- the exact line the discipline
+    reads -- off a file containing no suite at all. A count checked only against
+    itself cannot tell you it is short.
+
+    The outer check is against something the RUN does not get to author: the
+    test names declared in the source tree. Every declared test must have
+    started. That one comparison catches empty, clobbered, partial, filtered and
+    killed runs, because each leaves a declared test with no start line.
+
+    It is deliberately NOT a pinned minimum count. A pin would be a second copy
+    of the passing total, hand-maintained, wrong the first time a test is added,
+    and a number that only ever goes up cannot tell you it is short either.
     """
     if not os.path.isfile(LOG):
         return None
@@ -354,6 +395,19 @@ def parse_suite_log(expected_red):
     started = set(re.findall(r'Test Started\. Name=\{[^}]*\} Path=\{([^}]+)\}', text))
     passed = set(re.findall(r'Result=\{Success\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))
     failed = set(re.findall(r'Result=\{Fail\} Name=\{[^}]*\} Path=\{([^}]+)\}', text))
+
+    never_started = declared - started
+    if never_started:
+        shown = sorted(never_started)
+        raise ParseError(
+            "the suite log does not reconcile: %d declared test(s) never started - "
+            % len(never_started) + ", ".join(shown[:12])
+            + (" (and %d more)" % (len(shown) - 12) if len(shown) > 12 else "")
+            + ". Every test the source tree declares must appear in the run. A log "
+              "missing them is empty, clobbered by another run writing the same file, "
+              "filtered to a subset, or killed part way, and all four report a total "
+              "that is silently short. Re-run the suite with "
+              "-abslog=<repo>/Saved/Logs/suite.log.")
 
     unfinished = started - passed - failed
     if unfinished:
@@ -919,7 +973,7 @@ def main():
         return 2
     expected_red = set(pins.get("_expected_red", []))
     try:
-        suite = parse_suite_log(expected_red)
+        suite = parse_suite_log(expected_red, parse_declared_tests(sources))
     except ParseError as e:
         sys.stderr.write("status: SUITE LOG FAILURE - " + str(e) + os.linesep)
         sys.stderr.write("status: refusing to emit a report whose test totals would be "

@@ -17,7 +17,7 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 118 of 202 declared | ceiling 118 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 42 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Asserted invariants with no test | ceiling | 41 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
@@ -31,10 +31,10 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 422
+- passing: 423
 - expected red: 2
 - **unexpected red: 0**
-- asserted invariants with no test: 42
+- asserted invariants with no test: 41
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -171,7 +171,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 42 of 104 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 41 of 104 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -210,12 +210,12 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.RuleBandImpact.MinorStack  —  items-and-crafting.md
 - Progression.RuleBandImpact.Major  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
-- Progression.RuleBandImpact  —  power-and-scaling.md
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md
 - Progression.PowerBand.ArchetypeSpread  —  power-and-scaling.md
 - Progression.AxisOverlap  —  progression-and-trees.md
 - Progression.BranchCommitment  —  progression-and-trees.md
-- …and 2 more
+- Progression.TreeDensity.Offered  —  progression-and-trees.md
+- …and 1 more
 
 ## Offered-to-spendable ratio, per tree
 

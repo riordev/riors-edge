@@ -95,9 +95,19 @@ bool FBreakerQuestFlagRoundTripTest::RunTest(const FString& Parameters)
 
 // A player's existing BreakerSave0 must still load. Version 1 is what shipped;
 // this proves the v1 -> v2 step is a migration rather than a silent misread.
+//
+// THE NAME IS FLAT ON PURPOSE, and it was not: as "RiorsEdge.Save.Migration" it
+// was a strict PREFIX of RiorsEdge.Save.Migration.V4ToV5, so UE's automation
+// tree read it as a parent NODE of that test rather than as a test, and it was
+// never enumerated and never ran. It compiled, it was declared, and every
+// count balanced -- 424 declared against 424 started -- because a second defect
+// hid one name on the other side of the comparison. This is the SECOND instance
+// of the collision in this suite; the first is recorded at
+// FBreakerRuleBandImpactTest, which was renamed off PowerBand.RuleImpact for
+// exactly this. Never name a test as a prefix of another test.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSaveMigrationTest,
-    "RiorsEdge.Save.Migration",
+    "RiorsEdge.Save.MigrationV1ToV2",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerSaveMigrationTest::RunTest(const FString& Parameters)

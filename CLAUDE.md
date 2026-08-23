@@ -58,7 +58,8 @@ where an `&&` was meant breaks the chain so the next command runs regardless —
 which is how a `git push` reported success after the `git merge` before it had
 failed. Neither printed anything alarming. Reading a reassuring result out of
 the wrong file is the same failure: suite results are in
-`Saved/Logs/riors_edge.log`, never stdout.
+`Saved/Logs/suite.log`, never stdout, and never `riors_edge.log` -- that is the
+project default every other run overwrites.
 
 Build:
 
@@ -70,7 +71,7 @@ Suite — headless, no RHI. **Results do not reach stdout**; the log file is the
 only record. **`SoftQuit`, never `Quit`:**
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; SoftQuit" -unattended -nop4 -nosplash -nullrhi
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "C:/Users/rior/Documents/GitHub/riors-edge/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; SoftQuit" -unattended -nop4 -nosplash -nullrhi -abslog="C:/Users/rior/Documents/GitHub/riors-edge/Saved/Logs/suite.log"
 ```
 
 `Quit` calls `RequestExitWithStatus` with force set, which kills the process
@@ -87,12 +88,24 @@ cannot see a test with no result at all:
 python Scripts/status.py
 ```
 
-It reconciles **started against completed** and refuses the report at exit 2 if
-they disagree, naming the tests. That guard is the durable fix and the one-word
-`SoftQuit` is not: the next race arrives as a crash mid-test, a hang, or a
-dropped worker message, and all of them look identical to a results grep. A
-count that has to balance catches every shape of it. A number that only ever
-goes up cannot tell you it is short.
+It refuses the report at exit 2 on two reconciliations, and names what is
+missing. **Every DECLARED test must have started** — the outer check, against
+the test names in the source tree, which the run does not get to author. Then
+**started must equal completed** — the inner check, against the run itself.
+
+The inner one alone was not enough, and the gap is why `-abslog` is above.
+`riors_edge.log` is the project default, so the editor, a standalone run and the
+capture harness all open it and rotate the suite record away. Reading that
+clobbered file, the inner check found zero started and zero completed, balanced
+them, raised nothing, and the report printed **`unexpected red: 0`** — the one
+line this whole cycle is read for — off a log with no suite in it. Zero balances
+zero. A count checked only against itself cannot tell you it is short.
+
+The outer check catches empty, clobbered, partial, filtered and killed runs with
+one comparison, because every one of them leaves a declared test with no start
+line. **Do not replace it with a pinned minimum count**: that is a second copy of
+the passing total, hand-maintained, wrong the first time a test is added, and a
+number that only ever goes up cannot tell you it is short either.
 
 Standalone game:
 
