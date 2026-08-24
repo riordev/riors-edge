@@ -330,16 +330,40 @@ def parse_point_budgets():
     literal and hide the drift, which is the whole failure being prevented.
     """
     text = read(os.path.join(SRC, "Progression", "BreakerProgressionLibrary.h"))
-    found = {}
-    for name in ("CorePointCapLevel", "CoreWorldPointGrant", "DoctrinePointGrant"):
+
+    def literal(name):
         m = re.search(r"constexpr\s+int32\s+" + name + r"\s*=\s*(\d+)\s*;", text)
         if not m:
             raise ParseError(
                 "cannot read %s from BreakerProgressionLibrary.h - the point budgets "
                 "are parsed from the game, not restated here, so a renamed or deleted "
                 "constant must be fixed rather than defaulted around" % name)
-        found[name] = int(m.group(1))
-    return found["CorePointCapLevel"] + found["CoreWorldPointGrant"], found["DoctrinePointGrant"]
+        return int(m.group(1))
+
+    # THE DOCTRINE GRANT IS DERIVED IN C++ AND SO IT IS DERIVED HERE.
+    #
+    # It was `= 8;` and is now `= UE_ARRAY_COUNT(DoctrineBenchmarkLevels) *
+    # DoctrinePointsPerBenchmark`, because the pool stopped being a lump and
+    # became four benchmarks paying two each. This parser refused outright when
+    # the literal disappeared -- which is the behaviour it was written for, and
+    # is why the change was caught in the same run that made it rather than by a
+    # report quietly falling back to a stale 8.
+    #
+    # Recomputed the same way the header computes it: count the milestones,
+    # multiply by the payout. A hard-coded 8 here would be the transcription
+    # defect this function exists to prevent, one level further down.
+    m = re.search(r"DoctrineBenchmarkLevels\[\]\s*=\s*{([^}]*)}", text)
+    if not m:
+        raise ParseError(
+            "cannot read DoctrineBenchmarkLevels from BreakerProgressionLibrary.h - "
+            "the doctrine grant is derived from the milestone table, so the table "
+            "must be readable rather than the total restated here")
+    benchmarks = [v for v in re.findall(r"\d+", m.group(1))]
+    if not benchmarks:
+        raise ParseError("DoctrineBenchmarkLevels is empty - a pool with no milestone pays nothing")
+    doctrine = len(benchmarks) * literal("DoctrinePointsPerBenchmark")
+
+    return literal("CorePointCapLevel") + literal("CoreWorldPointGrant"), doctrine
 
 
 

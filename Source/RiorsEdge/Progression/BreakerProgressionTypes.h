@@ -36,8 +36,9 @@ enum class EBreakerPointCurrency : uint8
     // conceptually. The v5 -> v6 migration clears the state that used it.
     ClassPoints_Retired,
     CorePoints,
-    // O111: the second and last pool. Eight points, paid in full at commitment
-    // and only at the Forge, so there is no per-level entitlement to track.
+    // O111: the second and last pool. Eight points of its own, paid two at a
+    // time at four benchmarks -- one per act plus the finale -- and settled
+    // against LevelDoctrinePointsGranted like every other entitlement.
     DoctrinePoints
 };
 
@@ -682,6 +683,15 @@ struct RIORSEDGE_API FBreakerProgressionState
     // retune that LOWERS the entitlement claws nothing back.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 UnspentAbilityTokens = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 AbilityTokensGranted = 0;
+    // O111's doctrine points, settled the same way as the two counters above.
+    //
+    // IT WAS DELIBERATELY ABSENT UNTIL NOW, and the reason it is here is that
+    // the ruling changed underneath it: the pool used to be paid WHOLE at
+    // commitment, which is an event with nothing to settle against. It is now
+    // two points at each of four benchmarks, which is an entitlement -- and an
+    // entitlement without a cumulative counter cannot survive a curve retune
+    // that moves a character past two benchmarks at once.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 LevelDoctrinePointsGranted = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SaveVersion = 1;
 };
 

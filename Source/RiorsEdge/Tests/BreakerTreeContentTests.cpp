@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -248,7 +249,17 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
         Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));
     TestTrue(TEXT("Committing to Kinetic succeeds"),
         Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
-    TestEqual(TEXT("Commitment pays the whole doctrine budget at once"),
+    // COMMITMENT PAYS NOTHING. It used to hand over the whole eight; the pool
+    // is now earned at four benchmarks, so committing chooses WHERE points go
+    // and the benchmarks decide WHEN they exist. This fixture reaches the
+    // points by levelling to the cap rather than by committing.
+    TestEqual(TEXT("Committing pays no points by itself"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    // Reach the last benchmark the way the game does -- XP, not a setter.
+    const FBreakerExperienceCurve BenchmarkCurve;
+    Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
+        UBreakerProgressionLibrary::CorePointCapLevel, BenchmarkCurve) - Progression->GetTotalExperience());
+    TestEqual(TEXT("Reaching the last benchmark pays the whole pool"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant);
 
@@ -262,20 +273,32 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     // Respec clears effects and refunds every point of that currency.
     TestFalse(TEXT("Respec away from a Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, false, Failure));
     TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
-    TestEqual(TEXT("Core points are fully refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 12);
+    // Fifty, not the slice's twelve: this fixture now levels to the cap to
+    // reach the doctrine benchmarks, and Core pays one per level on the way.
+    TestEqual(TEXT("Core points are fully refunded"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints),
+        UBreakerProgressionLibrary::CorePointCapLevel);
     TestEqual(TEXT("Core ranks are cleared"), Progression->GetNodeRank(TEXT("Core.Precision.Sightline"), EBreakerPointCurrency::CorePoints), 0);
     TestEqual(TEXT("Core effects are cleared"), Progression->GetNodeStats().CriticalChanceBonus, 0.0f, 0.0001f);
     TestEqual(TEXT("Class allocation survives a core respec"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.12f, 0.0001f);
 
-    // A doctrine respec is not a refund: the eight are tied to the commitment
-    // it clears, so the wallet goes to zero and re-committing pays them again.
+    // A DOCTRINE RESPEC IS NOW A REFUND, AND IT USED TO ZERO THE WALLET. That
+    // was right while commitment paid the eight -- they belonged to the
+    // commitment being cleared. They are earned at benchmarks now, so zeroing
+    // would delete points a player was paid for reaching level 40, and nothing
+    // would ever hand them back.
     TestTrue(TEXT("Doctrine respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
-    TestEqual(TEXT("The doctrine wallet is zeroed, not refunded"), Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("The doctrine wallet is refunded in full"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant);
     TestEqual(TEXT("The commitment is cleared with it"), Progression->GetProgressionState().CommittedBranch, FName(NAME_None));
     TestEqual(TEXT("Doctrine effects are cleared"), Progression->GetNodeStats().SlideSpeedMultiplier, 1.0f, 0.0001f);
-    TestTrue(TEXT("Re-committing pays the eight again"),
+    // AND THE FARM STAYS CLOSED, which is the half worth keeping from the old
+    // rule. Re-committing pays nothing, so respec-then-recommit cannot mint: the
+    // grant is a function of level settled against a counter, not an event.
+    TestTrue(TEXT("Re-committing succeeds"),
         Progression->CommitToBranch(TEXT("Doctrine.Swift.Kinetic"), CommitFailure));
-    TestEqual(TEXT("...and exactly eight, never sixteen"),
+    TestEqual(TEXT("...and pays nothing, so eight never becomes sixteen"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant);
     return true;

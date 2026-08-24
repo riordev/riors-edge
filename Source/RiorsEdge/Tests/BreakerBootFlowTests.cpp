@@ -227,11 +227,25 @@ bool FBreakerLevelPointEntitlementTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Level 50 holds 50 Core Points"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::CorePoints), 50);
     // THE RULING, ASSERTED. No level, no lump and no settle-up may put a point
-    // back in the retired pool, and levelling alone never pays a doctrine point.
+    // back in the retired pool.
     TestEqual(TEXT("The retired class pool is still empty at the cap"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
-    TestEqual(TEXT("Levelling alone never pays a doctrine point"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+
+    // AND LEVELLING NOW PAYS THE DOCTRINE POOL, WHICH IT USED NOT TO. This read
+    // "levelling alone never pays a doctrine point", which was the commitment-
+    // lump rule: eight points arrived at the Forge and levels paid nothing. The
+    // pool is now an entitlement -- two points at each of four benchmarks -- so
+    // a character at the cap has passed all four and holds the whole eight
+    // WITHOUT having committed to anything. That is deliberate: the points are
+    // the character's, and commitment only decides which board can spend them.
+    TestEqual(TEXT("A capped character has passed every doctrine benchmark"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant);
+    // Paid ONCE. The counter is the whole reason the entitlement can be a
+    // function of level rather than an event, so it is asserted beside it.
+    TestEqual(TEXT("...and the counter says so, so no benchmark can pay twice"),
+        Progression->GetProgressionState().LevelDoctrinePointsGranted,
+        UBreakerProgressionLibrary::DoctrinePointGrant);
     return true;
 }
 

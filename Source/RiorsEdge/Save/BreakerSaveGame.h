@@ -52,7 +52,7 @@ public:
     // unlockables (O100); the step hands every pre-v5 character the kit it
     // could already reach and stamps its token counter so it is not paid
     // retroactively for abilities it already has.
-    static constexpr int32 CurrentSaveVersion = 6;
+    static constexpr int32 CurrentSaveVersion = 7;
 
     UPROPERTY() int32 SaveVersion = 1;
 
@@ -63,6 +63,7 @@ public:
     // O111. Refunds nothing and reads nothing -- see the definition for why the
     // fifteen retiring branch ids are frozen literals rather than a library call.
     static void MigrateClassCurrencyV5ToV6(FBreakerProgressionState& Progression);
+    static void MigrateDoctrineEntitlementV6ToV7(FBreakerProgressionState& Progression);
 
     // Brings a deserialized payload up to CurrentSaveVersion IN MEMORY, in
     // version order, one step at a time (Save-Architecture 5.2 — never a switch

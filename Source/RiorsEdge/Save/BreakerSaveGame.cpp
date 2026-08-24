@@ -174,6 +174,14 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // is read -- see MigrateClassCurrencyV5ToV6.
             MigrateClassCurrencyV5ToV6(Save.Progression);
             break;
+        case 6:
+            // O111's doctrine pool stopped being paid whole at commitment and
+            // became an entitlement settled against a counter. A v6 save was
+            // paid its eight AT COMMITMENT and has no counter, so loading it
+            // under the new rule would pay the level entitlement again on top.
+            // Seeding the counter is what makes the change cost nothing.
+            MigrateDoctrineEntitlementV6ToV7(Save.Progression);
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its
@@ -216,6 +224,27 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
 // library call. It is not duplication; it is the historical record the live
 // library deliberately no longer keeps.
 // ---------------------------------------------------------------------------
+void UBreakerSaveGame::MigrateDoctrineEntitlementV6ToV7(FBreakerProgressionState& Progression)
+{
+    // A COMMITTED v6 CHARACTER WAS ALREADY PAID IN FULL. Commitment handed over
+    // the whole eight, so the counter is seeded to the whole grant and the
+    // level entitlement finds nothing owed. Without this the character is paid
+    // a second time at every benchmark they have already passed.
+    //
+    // AN UNCOMMITTED v6 CHARACTER WAS PAID NOTHING, so its counter is zero and
+    // it is paid its benchmarks normally on the next level grant. That is the
+    // correct outcome and not a windfall: under the old rule it would have been
+    // paid on commitment instead.
+    //
+    // FROZEN LITERAL, deliberately. This reads DoctrinePointGrant today and
+    // would keep reading it if the grant were later retuned -- at which point
+    // this step would migrate old saves to a number that was never true for
+    // them. The v6 grant was eight; it is written as eight.
+    constexpr int32 V6CommitmentGrant = 8;
+    Progression.LevelDoctrinePointsGranted =
+        (Progression.CommittedBranch != NAME_None) ? V6CommitmentGrant : 0;
+}
+
 void UBreakerSaveGame::MigrateClassCurrencyV5ToV6(FBreakerProgressionState& Progression)
 {
     static const FName RetiringBranches[] = {

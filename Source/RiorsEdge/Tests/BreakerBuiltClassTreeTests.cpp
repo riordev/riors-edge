@@ -7,6 +7,7 @@
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 
@@ -392,7 +393,18 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
 
     FText CommitFailure;
     TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), CommitFailure));
-    TestEqual(TEXT("Committing pays the whole doctrine grant, at once"),
+    // COMMITMENT PAYS NOTHING NOW. The grant moved off this event and onto
+    // four benchmarks, so the walk levels to the cap to hold the pool it is
+    // about to spend. Still exactly the grant and not one point more -- that
+    // was the whole point of this fixture when it granted eleven by hand, and
+    // it stays the point now that the number comes from the game.
+    TestEqual(TEXT("Committing pays no points by itself"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    // Reach the last benchmark the way the game does -- XP, not a setter.
+    const FBreakerExperienceCurve BenchmarkCurve;
+    Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
+        UBreakerProgressionLibrary::CorePointCapLevel, BenchmarkCurve) - Progression->GetTotalExperience());
+    TestEqual(TEXT("Every benchmark passed pays exactly the grant"),
         Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
         UBreakerProgressionLibrary::DoctrinePointGrant);
 

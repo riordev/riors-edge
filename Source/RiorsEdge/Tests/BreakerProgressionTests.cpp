@@ -55,10 +55,13 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 2);
     TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 0);
-    // O111: A DOCTRINE RESPEC IS NOT A REFUND. The eight are tied to the
-    // commitment this call clears, so the wallet goes to zero rather than
-    // gaining the ranks back -- and the retired class wallet is never credited.
-    TestEqual(TEXT("The doctrine wallet is zeroed, not refunded"), Progression->GetProgressionState().UnspentDoctrinePoints, 0);
+    // O111: A DOCTRINE RESPEC REFUNDS, AND IT USED TO ZERO. Zeroing was right
+    // while the pool arrived whole at commitment -- the points belonged to the
+    // commitment being cleared. They are earned at four benchmarks now, so
+    // zeroing would delete progression the character was paid for levelling to
+    // reach, with nothing left able to hand it back. The ranks come back as
+    // points; the retired class wallet is still never credited.
+    TestEqual(TEXT("The doctrine wallet is refunded, not zeroed"), Progression->GetProgressionState().UnspentDoctrinePoints, 2);
     TestEqual(TEXT("The retired wallet is never credited"), Progression->GetProgressionState().UnspentClassPoints, 3);
     return true;
 }

@@ -314,12 +314,20 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
     // The running total this currency was tracking is refunded in full and
     // starts back at zero (audit item 6).
     SpentPointsFor(Currency) = 0;
-    // O111: A DOCTRINE RESPEC IS NOT A REFUND. The eight are tied to the
-    // commitment, and this call clears the commitment, so the wallet goes to
-    // zero and re-committing pays them again. Refunding them here instead would
-    // leave a character holding eight points with no doctrine to spend them in,
-    // and respec-then-recommit would mint eight more.
-    if (Currency == EBreakerPointCurrency::DoctrinePoints) State.UnspentDoctrinePoints = 0;
+    // O111: A DOCTRINE RESPEC IS A REFUND, AND IT USED NOT TO BE. While the
+    // pool arrived whole at commitment, zeroing was right: the eight belonged
+    // to the commitment this call clears, and refunding them would have left a
+    // character holding points with no doctrine to spend them in while
+    // respec-then-recommit minted eight more.
+    //
+    // The points are now EARNED, two at a time at four benchmarks, and they are
+    // the character's rather than the commitment's. Zeroing them would delete
+    // progression a player was paid for reaching level 40 -- and because
+    // commitment no longer pays, nothing would ever give them back. The mint
+    // this used to guard against is closed at the other end now: the grant is a
+    // function of level settled against a counter, so there is no event to
+    // repeat.
+    if (Currency == EBreakerPointCurrency::DoctrinePoints) State.UnspentDoctrinePoints += Refunded;
     else if (Currency == EBreakerPointCurrency::ClassPoints_Retired) State.UnspentClassPoints += Refunded;
     else State.UnspentCorePoints += Refunded;
     // The commitment clear moved off the retired currency with the nodes it
@@ -394,14 +402,16 @@ bool UBreakerProgressionComponent::CommitToBranch(FName BranchTreeId, FText& Out
     // them in -- which is also why a doctrine respec zeroes the wallet rather
     // than refunding it.
     //
-    // ADDED, NOT ASSIGNED, and the farm is still closed. Assignment looks safer
-    // and is not: a second commitment is refused outright, so the only route to
-    // this line twice is through a respec, and the respec zeroes the wallet
-    // first. The zeroing is what makes re-committing pay eight rather than
-    // sixteen. Assignment additionally CLOBBERS anything already in the wallet
-    // -- a dev grant, or any future source -- which is a silent subtraction
-    // wearing a grant's clothes.
-    State.UnspentDoctrinePoints += UBreakerProgressionLibrary::DoctrinePointGrant;
+    // COMMITTING PAYS NOTHING NOW, and that is the ruling rather than an
+    // oversight. The pool used to arrive whole at this line; it now arrives two
+    // points at a time at four benchmarks, so commitment chooses WHERE the
+    // points go and the benchmarks decide WHEN they exist.
+    //
+    // That also closes a hole this line needed a paragraph to defend. While
+    // commitment paid, the only thing standing between a player and unlimited
+    // points was that a respec zeroed the wallet before re-committing; the
+    // grant is no longer an event anything can repeat, so there is nothing to
+    // farm and nothing to zero.
     OutFailureReason = FText::GetEmpty();
     OnProgressionChanged.Broadcast();
     return true;
@@ -553,20 +563,40 @@ void UBreakerProgressionComponent::GrantLevelPointEntitlement()
     // grants ("+1 on each level-up") cannot survive the rederived-level rule —
     // a curve retune that jumps a character three levels would need to
     // remember how many events it owes, which is exactly this counter.
-    // O111: NO LEVEL PAYS A CLASS POINT, and no level pays a Doctrine Point
-    // either -- the doctrine pool is granted whole at commitment, so it has no
-    // entitlement to settle up. Core is the only per-level currency left.
-    // UnspentClassPoints and LevelClassPointsGranted survive as save fields
-    // because they are serialized; the v5 -> v6 step zeroes them and nothing
-    // writes them again.
+    // O111: NO LEVEL PAYS A CLASS POINT. UnspentClassPoints and
+    // LevelClassPointsGranted survive as save fields because they are
+    // serialized; the v5 -> v6 step zeroes them and nothing writes them again.
     const int32 CoreEntitled = FMath::Min(State.CharacterLevel, UBreakerProgressionLibrary::CorePointCapLevel);
     const int32 CoreOwed = CoreEntitled - State.LevelCorePointsGranted;
-    if (CoreOwed <= 0) return;
+    bool bPaid = false;
     if (CoreOwed > 0)
     {
         State.UnspentCorePoints += CoreOwed;
         State.LevelCorePointsGranted = CoreEntitled;
+        bPaid = true;
     }
+
+    // O111's doctrine points, on the same cumulative shape and for the same
+    // reason. Paid whether or not a doctrine is committed: the points are the
+    // character's, the commitment only decides which board can spend them, and
+    // withholding them until commitment would make the benchmark a thing that
+    // silently did nothing for a player who had not chosen yet.
+    //
+    // THE ONE ORDERING TRAP HERE. This runs before the doctrine is necessarily
+    // chosen, so a character can hold doctrine points with no committed branch.
+    // That is correct and is what the Forge screen shows; what must never
+    // happen is the reverse -- a committed character who was paid twice -- and
+    // the counter is what rules that out, not this ordering.
+    const int32 DoctrineEntitled = UBreakerProgressionLibrary::DoctrinePointEntitlement(State.CharacterLevel);
+    const int32 DoctrineOwed = DoctrineEntitled - State.LevelDoctrinePointsGranted;
+    if (DoctrineOwed > 0)
+    {
+        State.UnspentDoctrinePoints += DoctrineOwed;
+        State.LevelDoctrinePointsGranted = DoctrineEntitled;
+        bPaid = true;
+    }
+
+    if (!bPaid) return;
     OnProgressionChanged.Broadcast();
 }
 

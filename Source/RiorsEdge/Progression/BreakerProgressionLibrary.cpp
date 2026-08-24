@@ -376,6 +376,20 @@ namespace
 }
 
 // Node stat magnitudes below are gym-perceptibility tuning; wave-mode re-anchors.
+int32 UBreakerProgressionLibrary::MilestoneEntitlement(int32 CharacterLevel, const int32* Levels, int32 Count, int32 PerMilestone)
+{
+    // The shared half of the advance-on-milestones pattern; see the block above
+    // DoctrineBenchmarkLevels for what the pattern is and why it has three
+    // parts. This is only the first: milestones reached, times the payout.
+    if (!Levels || Count <= 0 || PerMilestone <= 0) return 0;
+    int32 Reached = 0;
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        if (CharacterLevel >= Levels[Index]) ++Reached;
+    }
+    return Reached * PerMilestone;
+}
+
 int32 UBreakerProgressionLibrary::AbilityTokenEntitlement(int32 CharacterLevel, int32 UnlockableCount)
 {
     // Count the schedule entries the character has reached, then clamp to what
@@ -383,12 +397,17 @@ int32 UBreakerProgressionLibrary::AbilityTokenEntitlement(int32 CharacterLevel, 
     // UnlockableCount at all: a token that cannot buy anything is not a
     // reward, it is a counter the player watches and cannot use.
     const int32 Capped = FMath::Clamp(UnlockableCount, 0, UE_ARRAY_COUNT(AbilityTokenLevels));
-    int32 Earned = 0;
-    for (int32 Index = 0; Index < Capped; ++Index)
-    {
-        if (CharacterLevel >= AbilityTokenLevels[Index]) ++Earned;
-    }
-    return Earned;
+    return MilestoneEntitlement(CharacterLevel, AbilityTokenLevels, Capped, 1);
+}
+
+int32 UBreakerProgressionLibrary::DoctrinePointEntitlement(int32 CharacterLevel)
+{
+    // No clamp against content, unlike the tokens: every class has exactly
+    // three doctrines and every doctrine offers more than eight points, so a
+    // doctrine point can always be spent. The token clamp exists because Swift
+    // has one unlockable ability and would otherwise strand three tokens.
+    return MilestoneEntitlement(CharacterLevel, DoctrineBenchmarkLevels,
+        UE_ARRAY_COUNT(DoctrineBenchmarkLevels), DoctrinePointsPerBenchmark);
 }
 
 UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
