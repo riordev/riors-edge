@@ -4,6 +4,7 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
+#include "Progression/BreakerBuildConditions.h"
 #include "Progression/BreakerProgressionTree.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -100,9 +101,11 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // nodes on purpose and said so in this diff.
     //
     // Tier 5 is STILL excluded, and that is not an oversight either — §0.2's
-    // fifth tier is the keystone tier, and all three Swift keystones already
-    // shipped at tier 3 under the slice's compressed ladder. See the block
-    // comment above GetSwiftKineticTree for that recorded inversion.
+    // fifth tier is the keystone tier, and the compressed ladder has no fifth
+    // tier at all. The keystone used to sit at tier 3, BELOW the rewrites, and
+    // now sits at tier 4 beside them: the doctrine wallet is 8 and the keystone
+    // costs 2 behind a gate of 6, so it is the last of four picks rather than a
+    // rung on the way up. See the block comment above GetSwiftKineticTree.
     TestEqual(TEXT("Frenzy ships thirteen nodes: ten, plus F9-F11"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
     TestEqual(TEXT("Kinetic ships fourteen nodes: eleven, plus K9-K11"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 14);
     TestEqual(TEXT("Marksman ships thirteen nodes: ten, plus M9-M11"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
@@ -114,7 +117,16 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
         {
             const FString Context = Node->NodeId.ToString();
             TestTrue(TEXT("Swift branch node is tier 1-4"), Node->Tier >= 1 && Node->Tier <= 4);
-            if (Node->Tier != 4) continue;
+            // TIER 4 NO LONGER MEANS "REWRITE". The keystone moved up into this
+            // tier when its cornerstone gate was removed, so the tier holds two
+            // KINDS of node with different grammars: three rewrites at one rank
+            // for two points authoring only loop-economy lines, and one
+            // cornerstone whose whole job is a stat line on the doctrine's own
+            // axis. Every assertion below is about the rewrite grammar, so the
+            // cornerstone is excluded here rather than exempted individually --
+            // an exemption per assertion is how a keystone quietly acquires a
+            // rewrite's restrictions or loses its own.
+            if (Node->Tier != 4 || Node->bCornerstone) continue;
             ++TierFourCount;
 
             // The rewrite tier's grammar, stated as an assertion rather than a
@@ -150,6 +162,8 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
             // the same tree and sit at or below this node's tier.
             TestTrue(*(Context + TEXT(" tier-4 rewrite builds on an earlier node")), Node->Prerequisites.Num() > 0);
         }
+        // Three REWRITES, counted excluding the cornerstone that now shares
+        // their tier. Four tier-4 nodes, three of them rewrites.
         TestEqual(TEXT("Each Swift branch ships exactly three tier-4 rewrites"), TierFourCount, 3);
     }
 
@@ -297,8 +311,20 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.36f, 0.0001f);
-    // Sightline's +4% and Long Lens's +3% per rank over two ranks, one bucket.
-    TestEqual(TEXT("Increased damage stacks additively across nodes and ranks"), Stats.DamageMultiplier, 1.10f, 0.0001f);
+    // SIGHTLINE ALONE, because Long Lens's damage line is now gated on Aiming
+    // (Progression.AxisOverlap: a doctrine may not author a magnitude on a
+    // generic damage pool unconditionally). Standing there not aiming, Core's
+    // +4% is the whole of it.
+    TestEqual(TEXT("An unaimed build gets only Core's unconditional damage line"), Stats.DamageMultiplier, 1.04f, 0.0001f);
+    // AND THE ADDITIVITY THIS ASSERTION EXISTS FOR, which changing the number
+    // alone would have quietly dropped: down sights, Sightline's +4% and Long
+    // Lens's +3% across two ranks land in ONE bucket -- 4 + 3 + 3 = 10, not
+    // 1.04 x 1.03 x 1.03. Across nodes AND across ranks, which is the whole
+    // claim, and it needs both lines live to be worth making.
+    FBreakerBuildConditionState Aiming;
+    Aiming.Set(EBreakerBuildCondition::Aiming, true);
+    const FBreakerNodeStats Aimed = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks, nullptr, Aiming);
+    TestEqual(TEXT("Increased damage stacks additively across nodes and ranks"), Aimed.DamageMultiplier, 1.10f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
     // Rule-rewrite and verb nodes publish tags instead of stats.

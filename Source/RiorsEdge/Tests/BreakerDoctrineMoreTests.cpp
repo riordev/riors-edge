@@ -88,6 +88,8 @@ bool FBreakerDoctrineKeystonesPayTest::RunTest(const FString& Parameters)
     Sliding.Set(EBreakerBuildCondition::Sliding, true);
     FBreakerBuildConditionState Redline;
     Redline.Set(EBreakerBuildCondition::Redline, true);
+    FBreakerBuildConditionState Aiming;
+    Aiming.Set(EBreakerBuildCondition::Aiming, true);
     const FBreakerBuildConditionState Idle;
 
     // Overpressure -- x1.20 while Sliding became "momentum stops decaying while
@@ -106,28 +108,31 @@ bool FBreakerDoctrineKeystonesPayTest::RunTest(const FString& Parameters)
             WhileSliding.DamageMoreMultiplier, 1.0f, 0.0001f);
     }
 
-    // Culling -- x1.18 unconditional became +18% WeaponDamage, and this was the
-    // awkward one. The other three were conditional, so a replacement could
-    // ride the same condition; Culling was the layer only UNCONDITIONAL More,
-    // deliberately, because it is the keystone for the build that refuses to
-    // organise around a movement state. So the replacement is unconditional
-    // too, and it lands on the WEAPON pool rather than the shared one -- Core
-    // authors shared Damage across three constellations, and authoring it here
-    // is the overlap Progression.AxisOverlap forbids.
+    // Culling -- x1.18 unconditional became +18% WeaponDamage, and then took a
+    // second ruling. The unconditional replacement was measured moving two
+    // Core-level metrics on its own (at-cap 6.53x -> 6.79x, parity 0.647 ->
+    // 0.622), which is a doctrine doing Core's job. A doctrine magnitude is
+    // conditional on the doctrine's own axis, and Marksman's axis is aimed
+    // fire, so the line pays down sights and nowhere else.
     {
-        FBreakerAttributeContribution Contribution;
-        const FBreakerNodeStats Stats = Compose(TEXT("Swift.Marksman.Culling"), Idle, Contribution);
-        TestEqual(TEXT("Culling: the weapon lane moves with no condition met"),
-            Stats.DamageMultiplier, 1.18f, 0.0001f);
+        FBreakerAttributeContribution Rest, Live;
+        const FBreakerNodeStats Hip = Compose(TEXT("Swift.Marksman.Culling"), Idle, Rest);
+        const FBreakerNodeStats Ads = Compose(TEXT("Swift.Marksman.Culling"), Aiming, Live);
+        // The half that makes this a ruling rather than a rename: firing from
+        // the hip, the keystone's weapon line pays NOTHING.
+        TestEqual(TEXT("Culling: the weapon lane is untouched from the hip"),
+            Hip.DamageMultiplier, 1.0f, 0.0001f);
+        TestEqual(TEXT("Culling: and moves down sights"),
+            Ads.DamageMultiplier, 1.18f, 0.0001f);
         // The narrow lane, not the shared one. The ability lane must NOT move:
         // that is the difference between WeaponDamage and Damage, and it is
         // invisible in the weapon figure above.
-        TestEqual(TEXT("Culling: and the ability lane does not move with it"),
-            Stats.AbilityDamageMultiplier, 1.0f, 0.0001f);
+        TestEqual(TEXT("Culling: the ability lane does not move with it"),
+            Ads.AbilityDamageMultiplier, 1.0f, 0.0001f);
         TestEqual(TEXT("Culling: it reaches the weapon attribute as Increased"),
-            Contribution.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier), 18.0f, 0.0001f);
+            Live.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier), 18.0f, 0.0001f);
         TestEqual(TEXT("Culling: and not as a More"),
-            Contribution.GetMore(EBreakerAggregatedAttribute::DamageMultiplier), 1.0f, 0.0001f);
+            Live.GetMore(EBreakerAggregatedAttribute::DamageMultiplier), 1.0f, 0.0001f);
     }
 
     // Bloodrhythm -- x1.20 at Redline became +20% fire rate at Redline, which

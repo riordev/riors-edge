@@ -352,6 +352,24 @@ namespace
         Tree->DisplayName = FText::FromString(DisplayName);
         Tree->Currency = Currency;
         Tree->RequiredClass = RequiredClass;
+        // THE CORNERSTONE GATE IS A CORE-ONLY CONCEPT NOW (owner ruling).
+        //
+        // It was 8 points spent in the tree, authored when a class tree drew on
+        // a per-level budget where 8 + the keystone's 3 was affordable. O111 set
+        // the doctrine wallet to 8 and did not move the gate, so all fifteen
+        // doctrine keystones needed 11 out of 8 and not one of them could be
+        // bought. That is the second time this project has shipped an
+        // unpurchasable keystone from exactly this cause.
+        //
+        // Zeroed HERE rather than on fifteen trees on purpose. Fifteen
+        // assignments are fifteen chances for the sixteenth doctrine to be
+        // authored without one, and a gate that has to be remembered is the
+        // thing that failed. A doctrine's depth is its tier gates, which are
+        // derived from the budget by GateForTier rather than pinned beside it.
+        if (Currency == EBreakerPointCurrency::DoctrinePoints)
+        {
+            Tree->CornerstoneInvestmentGate = 0;
+        }
         return Tree;
     }
 }
@@ -957,7 +975,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     // The keystone's rewrite half was always the live part: it grants
     // Keystone.Swift.TerminalVelocity and Overdrive resolves that row.
     Node = MakeNode(TEXT("Swift.Kinetic.Overpressure"), TEXT("Overpressure"),
-        TEXT("Branch keystone. Momentum stops decaying entirely while you are sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Momentum stops decaying entirely while you are sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Carry"));
     AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
     // O37: every branch keystone is a cornerstone, so commitment gates all
@@ -995,9 +1013,15 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // Core-Tree-Redesign flags: these two lines restate Precision's).
     // WAITING ON: a range-gated weak-point generation credit.
     UBreakerProgressionNode* Node = MakeNode(TEXT("Swift.Marksman.LongLens"), TEXT("Long Lens"),
-        TEXT("Distant weak-point hits generate Momentum and land harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
+        TEXT("Distant weak-point hits generate Momentum, and down sights everything lands harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 2, 1);
+    // The crit line stays unconditional: CriticalDamage is not a generic damage
+    // pool, so it is the second half of the rule -- a stat target Core's wheels
+    // do not own outright -- rather than the conditional half.
     AddEffect(Node, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    // AIMING, and it used to be unconditional. The node is called Long Lens and
+    // its own text has always said "distant weak-point hits"; the shared Damage
+    // line was the one part of it that paid from the hip.
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_LongLens.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1066,8 +1090,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
         TEXT("Shots punch through one more enemy per rank, and every target pierced pays Momentum, up to three."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Marksman.Steady"));
     AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER (authored count)
+    // Pierce and CriticalChance stay unconditional -- neither is a generic
+    // damage pool, and pierce is Marksman's alone.
     AddEffect(Node, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 6.0f); // O2 PLACEHOLDER
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    // AIMING, and it used to be unconditional. Punching through a line of
+    // targets is an aimed shot; the shared Damage line paid whether or not the
+    // player was doing the thing the node is about.
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1172,35 +1201,44 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MarksmanCalledShot.GetTag());
     Tree->Nodes.Add(Node);
 
-    // Marksman's branch keystone: the only unconditional More outside Core, and
-    // the pick for a build that refuses to organise itself around a movement
-    // state. It is the smallest unconditional More for exactly that reason.
+    // Marksman's branch keystone, and the node that took two rulings to settle.
     //
-    // TARGET RIDER (Stage 6, first authoring pass): the node is NAMED Culling
-    // and until now nothing about it culled — the execute the name promises
-    // is authorable the moment TargetLowHealth exists. Increased-bucket and
-    // additive per the §4a rider canon (a target-conditional More is
-    // forbidden by rule), so the keystone's unconditional 1.18x More below is
-    // THE MORE IS GONE (O95), AND THIS ONE WAS THE AWKWARD REMOVAL. The other
-    // three were conditional, so a replacement could ride the same condition.
-    // Culling's was the class layer's only UNCONDITIONAL More, deliberately --
-    // it is the keystone authored for the build that refuses to organise around
-    // a movement state, so a replacement that only pays while moving would
-    // change what the node is for rather than what it is worth.
+    // It began as the only UNCONDITIONAL More outside Core, deliberately: the
+    // pick for a build that refuses to organise itself around a movement state.
+    // O95 removed every doctrine More, and the replacement written then was an
+    // unconditional +18% WeaponDamage — same reasoning, same shape, one bucket
+    // down. That was wrong, and the measurement said so before anyone ruled:
+    // the at-cap band moved 6.53x -> 6.79x and weapon/ability parity 0.647 ->
+    // 0.622 on that single edit. A doctrine node moving two Core-level metrics
+    // is a doctrine doing Core's job.
     //
-    // So the replacement is unconditional too, and it lands on the WEAPON pool
-    // rather than the shared one. That is not a detail: Core authors Damage (the
-    // shared pool) across Precision, Volley and Velocity, and authoring Damage
-    // here would be the forbidden form Progression.AxisOverlap asserts against.
-    // WeaponDamage composes at BreakerProgressionComponent.cpp:1151 and is the
-    // O54 pool every weapon hit draws. The TargetLowHealth rider below is
-    // untouched, and the rewrite half -- Overdrive's Standing Wave row -- was
-    // always the live part.
+    // THE RULING (owner, and it is the general form): a doctrine may not author
+    // a magnitude on a generic damage pool. Where a doctrine's rule carries a
+    // magnitude it is conditional on THE DOCTRINE'S OWN AXIS, or it sits on a
+    // stat target no Core wheel authors. Generic Increased Damage is Core's, and
+    // a doctrine spending any of eight points on it has spent its identity on
+    // what Core does with 222.
+    //
+    // AIMING IS MARKSMAN'S AXIS, and it is the honest condition here rather than
+    // a movement state the node was written to avoid: aimed fire IS what this
+    // doctrine is about, so the line pays exactly when the build is doing the
+    // thing it is built for. It is live — BreakerBuildConditions.cpp:250 sets it
+    // from the weapon's own ADS state, not from a flag nothing writes — and
+    // Swift.Marksman.Reserve already authors against it, so this is the tree's
+    // existing vocabulary rather than a new one. Core authors nothing on Aiming.
+    //
+    // The lane stays WeaponDamage rather than the shared Damage pool, which is
+    // the second half of the rule and the reason Progression.AxisOverlap reads
+    // buckets and not just conditions.
+    //
+    // TARGET RIDER (Stage 6): the node is NAMED Culling and until TargetLowHealth
+    // existed nothing about it culled. Increased-bucket and additive per the §4a
+    // rider canon, because a target-conditional More is forbidden by rule.
     Node = MakeNode(TEXT("Swift.Marksman.Culling"), TEXT("Culling"),
-        TEXT("Branch keystone. Everything your weapon does hits harder, with no condition attached — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Aiming down sights, your weapon hits considerably harder — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 15.0f, EBreakerBuildCondition::TargetLowHealth); // O2 PLACEHOLDER — execute window is the narrowest target condition, priced at the top of the conditional band
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
-    AddEffect(Node, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 18.0f); // O2 PLACEHOLDER
+    AddEffect(Node, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 18.0f, EBreakerBuildCondition::Aiming); // O2 PLACEHOLDER
     Node->bCornerstone = true; // O37: keystone tier requires branch commitment
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
     // REACHABILITY (O40c) — the Marksman half of the same fork recorded in
@@ -1343,9 +1381,21 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // the branch's kill-to-fire-again loop.
     // WAITING ON: the on-kill ammunition return crediting Momentum.
     Node = MakeNode(TEXT("Swift.Frenzy.AmmunitionEconomy"), TEXT("Ammunition Economy"),
-        TEXT("Ammunition returned on a kill also pays Momentum. The branch's one unconditional increase to damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Ammunition returned on a kill also pays Momentum, and at Redline your shots land harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.DryFire"));
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f); // O2 PLACEHOLDER
+    // AT REDLINE, and it used to be unconditional -- the description even said
+    // so: "the branch's one unconditional increase to damage". A doctrine may
+    // not author a magnitude on a generic damage pool without a condition on
+    // its own axis (Progression.AxisOverlap), and Frenzy's axis is Redline,
+    // which Loaded, Dry Fire and Overrev already author against.
+    //
+    // NOT RecentlyKilled, which is what the node's own fantasy suggests and
+    // would have been the wrong answer: the whole Recently* family has no
+    // recorder, and BreakerBuildConditions.cpp:135 returns false for every one
+    // of them unconditionally. A line gated on it would pay nothing forever --
+    // silent content wearing a condition, which is worse than the unconditional
+    // line it replaced because it would look fixed.
+    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 5.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AmmunitionEconomy.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1409,7 +1459,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // keystone at 4; the implemented branch grammar uses 3 (Overpressure,
     // Culling) and the cost curve is kept internally consistent instead.
     Node = MakeNode(TEXT("Swift.Frenzy.Bloodrhythm"), TEXT("Bloodrhythm"),
-        TEXT("Branch keystone. Your rate of fire climbs at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Your rate of fire climbs at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
     // THE MORE IS GONE (O95). Frenzy's identity is Redline uptime and sustained
     // fire, so the replacement is FireRate rather than damage: it composes into
@@ -1577,7 +1627,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     // still exists, is still a cornerstone, and still grants the ability
     // layer's tag so Unmake's Edgework row resolves.
     Node = MakeNode(TEXT("Caster.Spellblade.Edgework"), TEXT("Edgework"),
-        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edgework.GetTag());
@@ -1684,7 +1734,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // doctrine authors no multiplier, so the argument goes with the number.
     // What that leaves behind is recorded at the lane it leaves behind.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
-        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Everything you leave on the ground lasts longer."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Everything you leave on the ground lasts longer."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
     // THE MORE IS GONE (O95), and it was the largest of the four at x1.30 as
     // well as the only one that never went through AddDamageMore -- it targeted
@@ -1801,7 +1851,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // one additive bucket while it holds. Same trigger, same magnitude
     // number, honest bucket. Caster's third More SLOT stays unspent.
     Node = MakeNode(TEXT("Caster.Multispell.Cascade"), TEXT("Cascade"),
-        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: every status application during it also applies the next cycle status at proc coefficient 0. Damage is Increased by 25% against targets carrying 3 or more distinct status types."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Multispell.Sequence"));
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f, EBreakerBuildCondition::TargetMultiStatus); // O2 PLACEHOLDER — owner ruling 2026-08-16: MS12's 1.25x More re-authored as a target-rider Increased line
     Node->bCornerstone = true;
@@ -1825,14 +1875,23 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // (3 nodes, 1 rank, cost 2, gate 10), T5 keystone (1 node, cost 4, gate 16).
 // The library compresses that onto the shape every built class already uses:
 // doc tiers 1-4 keep their tier numbers (gates via GateForTier: 0/2/4/6, not
-// the doc's 0/3/6/10), and the keystone lands at TIER 3, COST 3, bCornerstone
-// — exactly where Bloodrhythm, Overpressure, Culling, Edgework, Long Dark and
-// Cascade sit. That keeps the keystone affordable at the shipped level-11
-// budget (CornerstoneInvestmentGate 8 + cost 3 = 11, the
-// RiorsEdge.Progression.LevelPointEntitlement math, which now applies to all
-// five classes) and inherits the recorded keystone-before-rewrites tier
-// inversion documented above GetSwiftKineticTree. Same shape, same recorded
-// cost.
+// the doc's 0/3/6/10), and the keystone is AN ORDINARY TIER-4 NODE: cost 2,
+// gate 6 via GateForTier, still flagged bCornerstone because that flag is what
+// makes it the ultimate's rewrite site and what O37 gates on commitment.
+//
+// It used to be tier 3, cost 3, behind an 8-point CornerstoneInvestmentGate,
+// and that arithmetic was written against a per-level class budget where 11
+// was affordable. Against O111's 8-point doctrine wallet it was not, and every
+// keystone in this file was unbuyable. The gate is gone (see MakeTree) and the
+// cost is 2, which makes EVERY doctrine node cost two points to max — so the
+// wallet divides into exactly FOUR picks with nothing stranded, where a 3-point
+// keystone left one point that could buy nothing. A doctrine is four 2-point
+// picks, one of which rewrites the ultimate.
+//
+// The recorded keystone-before-rewrites tier inversion above GetSwiftKineticTree
+// goes with it: the keystone now sits in the same tier as the rewrites it used
+// to precede, and competes with them for the last pick rather than preceding
+// them.
 //
 // EVERY NON-KEYSTONE NODE SHIPS AS ITS TREATMENT RULE, VERBATIM, AS A TAG
 // WITH NO STAT EFFECT — the Caster posture (see the block comment above
@@ -2001,7 +2060,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithArmoryTree()
     // condition exists and WeaponDamage has no composed More lane. The
     // keystone tag is live — Field Assembly's Machinist row resolves.
     Node = MakeNode(TEXT("Gunsmith.Armory.Machinist"), TEXT("Machinist"),
-        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Gunsmith.Armory.ColdBarrel"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Machinist.GetTag());
@@ -2119,7 +2178,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithFieldTechTree()
     // and no other partition can carry "the machines hit harder" honestly.
     // Field Assembly's Foundry row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Foundry"), TEXT("Foundry"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Tithe"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Foundry.GetTag());
@@ -2239,7 +2298,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithTinkererTree()
     // NOT OWED (O95) — both conditions are deployable state the vocabulary cannot
     // say. Field Assembly's Minefield row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.Tinkerer.Minefield"), TEXT("Minefield"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.AttritionField"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Minefield.GetTag());
@@ -2362,7 +2421,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankLeechTree()
     // treatment says the double tax IS the design, so an unconditional
     // stand-in would be strictly wrong. Hold's Vein row resolves off the tag.
     Node = MakeNode(TEXT("Tank.Leech.Vein"), TEXT("Vein"),
-        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Leech.Transfusion"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Vein.GetTag());
@@ -2496,7 +2555,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankBastionTree()
     // uptime, and stripping the position strips the tax. Hold's Wall row
     // resolves off the tag below.
     Node = MakeNode(TEXT("Tank.Bastion.Wall"), TEXT("Wall"),
-        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Bastion.HeldGround"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Wall.GetTag());
@@ -2626,7 +2685,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     // point-blank — dies if authored unconditional. Hold's Detonation row
     // resolves off the tag below. Tank's three Mores stay reserved, not spent.
     Node = MakeNode(TEXT("Tank.Demolitionist.Detonation"), TEXT("Detonation"),
-        TEXT("Branch keystone. Rewrites Hold for the Tank who fights inside their own blast radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold for the Tank who fights inside their own blast radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Fragmentation"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Detonation.GetTag());
@@ -2758,7 +2817,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     // evaluable besides) and WeaponDamage has no composed More lane.
     // Conduit's Triage row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Medic.Triage"), TEXT("Triage"),
-        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Medic.SteadyHands"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Triage.GetTag());
@@ -2891,7 +2950,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     // dropping it would change the node's meaning, not its number. Conduit's
     // Downbeat row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Conductor.Downbeat"), TEXT("Downbeat"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Downbeat.GetTag());
@@ -3024,7 +3083,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportWardenTree()
     // the one requirement the solo loop is built around. Conduit's Blackout
     // row resolves off the tag below. Support's three Mores stay reserved.
     Node = MakeNode(TEXT("Support.Warden.Blackout"), TEXT("Blackout"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Support.Warden.Handoff"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Blackout.GetTag());

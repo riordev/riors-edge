@@ -361,6 +361,19 @@ public:
     // it -- there is nothing to settle up against and nothing to double-pay.
     static constexpr int32 DoctrinePointGrant = 8;
     static constexpr int32 CorePointCapLevel = 50;
+    // O111's Core pool, WHOLE: one point per level to CorePointCapLevel, plus
+    // the world-content grants. This is the number every Core tree is measured
+    // against — the offered-to-spendable floor, the atlas's own size, and
+    // RiorsEdge.Progression.TreeDepthIsReachable.
+    //
+    // IT EXISTED ONLY AS A LITERAL IN Scripts/status.py UNTIL NOW, which is the
+    // same shape as the defect that made this constant necessary: a gate and
+    // the budget it gates against are one number in two places, and the two
+    // drift the moment one of them is ruled on. status.py parses this
+    // declaration rather than restating it, so the report and the game cannot
+    // disagree about how many points a character has.
+    static constexpr int32 CoreWorldPointGrant = 15;
+    static constexpr int32 CorePointBudget = CorePointCapLevel + CoreWorldPointGrant;
 
     // O100: ABILITY UNLOCK TOKENS. One token per unlockable ability, paid on an
     // authored level schedule.

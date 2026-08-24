@@ -17,14 +17,14 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 143 of 202 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 40 of 103 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Asserted invariants with no test | ceiling | 39 of 103 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.05 worst tree | floor 3.0 | **OUT** |
-| Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
+| Node-shape composition, per tree | band | 13 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 50 of 205 authored | ceiling 50 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 6.79 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 15.69 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.62 | band 0.85–1.15 | **OUT** |
+| Build variance band, at cap | band | 6.54 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 15.47 | band 12.0–20.0 | ok |
+| Ability lane throughput against weapon lane, at cap | band | 0.64 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.38 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
@@ -32,17 +32,16 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 427
-- expected red: 3
+- passing: 429
+- expected red: 2
 - **unexpected red: 0**
-- asserted invariants with no test: 40
+- asserted invariants with no test: 39
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
-- `RiorsEdge.Progression.Doctrine.KeystoneIsReachable`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
@@ -171,7 +170,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 40 of 103 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 39 of 103 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -211,7 +210,6 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md
 - Progression.PowerBand.ArchetypeSpread  —  power-and-scaling.md
-- Progression.AxisOverlap  —  progression-and-trees.md
 - Progression.BranchCommitment  —  progression-and-trees.md
 - Progression.TreeDensity.Offered  —  progression-and-trees.md
 - Progression.TreeDensity.Composition  —  progression-and-trees.md
@@ -222,26 +220,26 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it.
 
-- GetCasterMultispellTree: 9 nodes, 19 points offered, 2.38x budget
-- GetCasterSpellbladeTree: 9 nodes, 19 points offered, 2.38x budget
-- GetCasterVoidWhispererTree: 9 nodes, 19 points offered, 2.38x budget
+- GetCasterMultispellTree: 9 nodes, 18 points offered, 2.25x budget
+- GetCasterSpellbladeTree: 9 nodes, 18 points offered, 2.25x budget
+- GetCasterVoidWhispererTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCoreSliceTree: 30 nodes, 68 points offered, 1.05x budget
-- GetGunsmithArmoryTree: 12 nodes, 25 points offered, 3.12x budget
-- GetGunsmithFieldTechTree: 12 nodes, 25 points offered, 3.12x budget
-- GetGunsmithTinkererTree: 12 nodes, 25 points offered, 3.12x budget
-- GetSupportConductorTree: 12 nodes, 25 points offered, 3.12x budget
-- GetSupportMedicTree: 12 nodes, 25 points offered, 3.12x budget
-- GetSupportWardenTree: 12 nodes, 25 points offered, 3.12x budget
-- GetSwiftFrenzyTree: 13 nodes, 27 points offered, 3.38x budget
-- GetSwiftKineticTree: 14 nodes, 29 points offered, 3.62x budget
-- GetSwiftMarksmanTree: 13 nodes, 27 points offered, 3.38x budget
-- GetTankBastionTree: 12 nodes, 25 points offered, 3.12x budget
-- GetTankDemolitionistTree: 12 nodes, 25 points offered, 3.12x budget
-- GetTankLeechTree: 12 nodes, 25 points offered, 3.12x budget
+- GetGunsmithArmoryTree: 12 nodes, 24 points offered, 3.0x budget
+- GetGunsmithFieldTechTree: 12 nodes, 24 points offered, 3.0x budget
+- GetGunsmithTinkererTree: 12 nodes, 24 points offered, 3.0x budget
+- GetSupportConductorTree: 12 nodes, 24 points offered, 3.0x budget
+- GetSupportMedicTree: 12 nodes, 24 points offered, 3.0x budget
+- GetSupportWardenTree: 12 nodes, 24 points offered, 3.0x budget
+- GetSwiftFrenzyTree: 13 nodes, 26 points offered, 3.25x budget
+- GetSwiftKineticTree: 14 nodes, 28 points offered, 3.5x budget
+- GetSwiftMarksmanTree: 13 nodes, 26 points offered, 3.25x budget
+- GetTankBastionTree: 12 nodes, 24 points offered, 3.0x budget
+- GetTankDemolitionistTree: 12 nodes, 24 points offered, 3.0x budget
+- GetTankLeechTree: 12 nodes, 24 points offered, 3.0x budget
 
 ## Node-shape composition, per tree
 
-**band** · 14 % ranked minors, all trees · no pin — measurement only
+**band** · 13 % ranked minors, all trees · no pin — measurement only
 
 A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 50 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
@@ -255,9 +253,9 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 - GetSupportConductorTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSupportMedicTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSupportWardenTree: 0% ranked minor, 92% notable, 8% convergence/keystone
-- GetSwiftFrenzyTree: 54% ranked minor, 38% notable, 8% convergence/keystone
+- GetSwiftFrenzyTree: 46% ranked minor, 46% notable, 8% convergence/keystone
 - GetSwiftKineticTree: 14% ranked minor, 79% notable, 7% convergence/keystone
-- GetSwiftMarksmanTree: 38% ranked minor, 54% notable, 8% convergence/keystone
+- GetSwiftMarksmanTree: 23% ranked minor, 69% notable, 8% convergence/keystone
 - GetTankBastionTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetTankDemolitionistTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetTankLeechTree: 0% ranked minor, 92% notable, 8% convergence/keystone

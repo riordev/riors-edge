@@ -214,8 +214,17 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
             if (Node->bCornerstone)
             {
                 ++CornerstoneCount;
-                TestEqual(*(Context + TEXT(" cornerstone sits at the compressed keystone tier")), Node->Tier, 3);
-                TestEqual(*(Context + TEXT(" cornerstone costs 3")), Node->CostPerRank, 3);
+                // TIER 4, COST 2 -- and it used to be tier 3, cost 3, behind
+                // an 8-point CornerstoneInvestmentGate. That arithmetic was
+                // written against a per-level class budget where 8 + 3 = 11 was
+                // affordable; against O111's 8-point doctrine wallet it was
+                // not, and every keystone in the game was unbuyable. The gate
+                // is gone and the cost is 2, which makes EVERY doctrine node
+                // cost two points to max -- so the wallet divides into exactly
+                // four picks with nothing stranded, where 3 left a point that
+                // could buy nothing.
+                TestEqual(*(Context + TEXT(" cornerstone sits at the rewrite tier")), Node->Tier, 4);
+                TestEqual(*(Context + TEXT(" cornerstone costs 2, like every other doctrine pick")), Node->CostPerRank, 2);
             }
 
             // THE WHOLE LAYER IS RULES-AS-TAGS. A stat effect appearing here
@@ -230,8 +239,11 @@ bool FBreakerBuiltClassTreesShapeTest::RunTest(const FString& Parameters)
 
         TestEqual(*(TreeName + TEXT(" has three tier-1 entry nodes")), TierCounts[1], 3);
         TestEqual(*(TreeName + TEXT(" has three tier-2 loop nodes")), TierCounts[2], 3);
-        TestEqual(*(TreeName + TEXT(" has three tier-3 nodes (two rewrites plus the keystone)")), TierCounts[3], 3);
-        TestEqual(*(TreeName + TEXT(" has three tier-4 rewrite nodes")), TierCounts[4], 3);
+        // The keystone moved from tier 3 to tier 4, so one node crossed
+        // between these two counts. Their SUM is unchanged at six, which is the
+        // part that matters: no node was added or lost, one was repriced.
+        TestEqual(*(TreeName + TEXT(" has two tier-3 ability nodes")), TierCounts[3], 2);
+        TestEqual(*(TreeName + TEXT(" has four tier-4 nodes: three rewrites and the keystone")), TierCounts[4], 4);
         TestEqual(*(TreeName + TEXT(" has exactly one cornerstone")), CornerstoneCount, 1);
     }
     return true;
@@ -328,13 +340,34 @@ bool FBreakerBuiltClassTreesPrerequisitesResolveTest::RunTest(const FString& Par
 }
 
 // ---------------------------------------------------------------------------
-// The shipped budget walk: a Gunsmith at the level-11 economy (the 10-point
-// slice advance plus level 11's point — RiorsEdge.Progression.
-// LevelPointEntitlement) reaches its branch keystone with NOTHING to spare:
-// CornerstoneInvestmentGate 8 + keystone cost 3 = 11. Run at exactly that
-// grant, and through the real commitment gate, so the affordability math the
-// entitlement test states now holds for a class other than Swift by
-// construction rather than by symmetry argument.
+// The shipped budget walk: a Gunsmith reaches its branch keystone on the
+// doctrine grant and NOTHING ELSE, through the real commitment gate.
+//
+// IT USED TO GRANT ITSELF ELEVEN. The comment said "run at exactly that grant"
+// and the arithmetic was CornerstoneInvestmentGate 8 + keystone cost 3 = 11 —
+// correct against the per-level class budget it was written for, and three more
+// than O111's doctrine wallet ever pays. So the one test whose whole purpose
+// was to prove affordability was proving it with points the game does not
+// grant, which is the exact failure CLAUDE.md names, sitting inside the test
+// written to prevent it.
+//
+// The grant is now read from the library rather than typed here, so a ruling
+// that moves the wallet moves this walk in the same commit.
+//
+// THE ORDER ALSO CHANGED, and finding out why was the interesting part.
+// The walk used to buy six points of Armory and THEN commit, so it could
+// assert the keystone refusing with its gate open and no commitment. Under
+// O111 that sequence cannot happen: doctrine points arrive AT commitment
+// and nowhere else, so a character with points has already committed and a
+// character without them cannot buy the six. The old middle step was
+// testing a state the game no longer has.
+//
+// O37's check is still live, and this walk still proves it — just on the
+// tree it can actually fire for. Commitment is per-doctrine, ordinary nodes
+// need none (O15), so a Gunsmith committed to Armory can spend Armory's
+// grant inside Tinkerer and still be refused Tinkerer's keystone. That is
+// the refusal a player can actually reach, and the commitment check runs
+// before the investment gate, so it is the reason reported.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerBuiltClassTreesKeystoneBudgetTest,
@@ -346,12 +379,30 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     UBreakerProgressionTree* Armory = UBreakerProgressionLibrary::GetGunsmithArmoryTree();
     if (!TestNotNull(TEXT("Armory tree exists"), Armory)) return false;
 
+    UBreakerProgressionTree* Tinkerer = UBreakerProgressionLibrary::GetGunsmithTinkererTree();
+    if (!TestNotNull(TEXT("Tinkerer tree exists"), Tinkerer)) return false;
+
     UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>();
     TestTrue(TEXT("Choosing Gunsmith succeeds"), Progression->ChoosePermanentClassById(EBreakerClassId::Gunsmith));
-    // Exactly the level-11 Class Point budget. Not one more.
-    Progression->GrantPlaytestPoints(11, 0);
+
+    // NOTHING IS GRANTED HERE. The commitment pays, which is the whole of O111's
+    // doctrine economy: a fresh Gunsmith holds no doctrine points at all.
+    TestEqual(TEXT("A Gunsmith holds no doctrine points before committing"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+
+    FText CommitFailure;
+    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), CommitFailure));
+    TestEqual(TEXT("Committing pays the whole doctrine grant, at once"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints),
+        UBreakerProgressionLibrary::DoctrinePointGrant);
 
     FText Failure;
+    // O37, on the tree it can still fire for: committed to Armory, refused
+    // Tinkerer's keystone. The points are in hand, so this is the commitment
+    // check answering and not the wallet.
+    TestFalse(TEXT("A keystone in an uncommitted doctrine refuses"),
+        Progression->CanPurchaseNode(Tinkerer, TEXT("Gunsmith.Tinkerer.Minefield"), Failure));
+    TestFalse(TEXT("The refusal carries a reason"), Failure.IsEmpty());
     // Machinist's prerequisite chain: Chambered (T1) -> Cold Barrel (T2).
     // ORDER MATTERS: each purchase clears its own tier's investment gate at
     // the moment it is bought (tier 2 needs 2 points already in the tree).
@@ -361,22 +412,25 @@ bool FBreakerBuiltClassTreesKeystoneBudgetTest::RunTest(const FString& Parameter
     TestTrue(TEXT("Cold Barrel rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.ColdBarrel"), Failure));
     TestTrue(TEXT("Field Stripping rank 1 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.FieldStripping"), Failure));
     TestTrue(TEXT("Field Stripping rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.FieldStripping"), Failure));
-    TestTrue(TEXT("Working Stock rank 1 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.WorkingStock"), Failure));
-    TestTrue(TEXT("Working Stock rank 2 purchases"), Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.WorkingStock"), Failure));
-    TestEqual(TEXT("Armory investment reaches the cornerstone gate"), Progression->GetTreeInvestment(Armory), 8);
+    // Six invested is the tier-4 gate, and Working Stock is deliberately NOT
+    // bought: the walk that used to end here spent eight to open an 8-point
+    // cornerstone gate and then needed three more. Six and two is the whole
+    // wallet, which is the point — four 2-point picks, the last one the
+    // keystone.
+    TestEqual(TEXT("Armory investment reaches the tier-4 gate"), Progression->GetTreeInvestment(Armory), 6);
+    TestEqual(TEXT("...with exactly the keystone's cost left"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 2);
 
-    // O37 holds for the new classes too: gate open, prerequisite met, and the
-    // keystone still refuses without a branch commitment.
-    TestFalse(TEXT("Machinist refuses with the gate open but no commitment"),
-        Progression->CanPurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
-    TestFalse(TEXT("The refusal carries a reason"), Failure.IsEmpty());
-
-    FText CommitFailure;
-    TestTrue(TEXT("Committing to Armory succeeds"), Progression->CommitToBranch(TEXT("Doctrine.Gunsmith.Armory"), CommitFailure));
-    TestTrue(TEXT("Machinist purchases on the last three points of the level-11 budget"),
+    TestTrue(TEXT("Machinist purchases on the last two points of the grant"),
         Progression->PurchaseNode(Armory, TEXT("Gunsmith.Armory.Machinist"), Failure));
-    TestEqual(TEXT("The level-11 budget is spent to exactly zero"),
-        Progression->GetUnspentPoints(EBreakerPointCurrency::ClassPoints_Retired), 0);
+    // THE LIVE WALLET. This read ClassPoints_Retired, which has no storage and
+    // answers zero to everything — so the assertion that the budget was "spent
+    // to exactly zero" was true before the walk started and would have stayed
+    // true if every purchase above had failed.
+    TestEqual(TEXT("The doctrine grant is spent to exactly zero"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("...and all of it went into this one tree"),
+        Progression->GetTreeInvestment(Armory), UBreakerProgressionLibrary::DoctrinePointGrant);
 
     // The purchase is not decorative: the branch identity tag and the
     // ultimate's keystone tag both reach the aggregate, so Field Assembly's

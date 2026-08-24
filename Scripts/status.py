@@ -314,6 +314,34 @@ def stripped_sources(sources, **kwargs):
             for rel, text in non_test_sources(sources, **kwargs).items()}
 
 
+def parse_point_budgets():
+    """(core_budget, doctrine_budget), READ FROM THE GAME rather than restated.
+
+    These were literals here: `core_budget, doctrine_budget = 65, 8`. That is
+    the same shape as the defect that made this function necessary -- a budget
+    and the thing keyed to it living in two places, drifting the moment one is
+    ruled on. All fifteen doctrine keystones were unbuyable for exactly that
+    reason, and this report measured density against a 65 that no C++ symbol
+    held at all.
+
+    Parsed off the constexpr declarations in BreakerProgressionLibrary.h, so a
+    ruling that moves a budget moves this report in the same commit. Raises
+    rather than falling back to a default: a silent fallback would restore the
+    literal and hide the drift, which is the whole failure being prevented.
+    """
+    text = read(os.path.join(SRC, "Progression", "BreakerProgressionLibrary.h"))
+    found = {}
+    for name in ("CorePointCapLevel", "CoreWorldPointGrant", "DoctrinePointGrant"):
+        m = re.search(r"constexpr\s+int32\s+" + name + r"\s*=\s*(\d+)\s*;", text)
+        if not m:
+            raise ParseError(
+                "cannot read %s from BreakerProgressionLibrary.h - the point budgets "
+                "are parsed from the game, not restated here, so a renamed or deleted "
+                "constant must be fixed rather than defaulted around" % name)
+        found[name] = int(m.group(1))
+    return found["CorePointCapLevel"] + found["CoreWorldPointGrant"], found["DoctrinePointGrant"]
+
+
 def build_consumer_index(sources):
     """The text every "does anything read this?" question is answered against.
 
@@ -689,10 +717,11 @@ def build_sections(sources):
     })
 
     # --- tree density: offered-to-spendable (FLOOR) -----------------------
-    # O111: two pools. Core 65, Doctrine 8. The doctrine figure is not a
-    # per-level entitlement -- all eight arrive at commitment -- so it is the
-    # whole budget a doctrine is ever measured against, not a cap it climbs to.
-    core_budget, doctrine_budget = 65, 8
+    # O111: two pools. The doctrine figure is not a per-level entitlement --
+    # all of it arrives at commitment -- so it is the whole budget a doctrine is
+    # ever measured against, not a cap it climbs to. Both are READ from the
+    # library rather than written here; see parse_point_budgets.
+    core_budget, doctrine_budget = parse_point_budgets()
     by_tree = defaultdict(list)
     for n in nodes:
         by_tree[n["tree"]].append(n)

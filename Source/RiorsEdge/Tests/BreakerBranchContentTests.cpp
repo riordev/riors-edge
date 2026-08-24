@@ -76,12 +76,15 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     //
     // The old counts pinned a branch that stopped at tier 3 because the slice
     // dropped every Tier-4 rewrite node in Class-Kits §1.3 — F9 Second Wind,
-    // F10 Redline Trigger, F11 No Safety. All three are now authored, so the
-    // shape is {3, 4, 3, 3}: three entry nodes, four loop nodes, three
-    // ability-tier nodes INCLUDING the keystone (which the slice sites at tier
-    // 3, not §0.2's tier 5), and three rewrites. The pin caught this change
-    // because it was supposed to; it is re-set, not deleted, and the tier-4
-    // count below is a new pin of the same kind guarding the new content.
+    // F10 Redline Trigger, F11 No Safety. All three are now authored.
+    //
+    // RE-SET AGAIN when the keystone left tier 3: the shape is {3, 4, 2, 4} —
+    // three entry nodes, four loop nodes, two ability-tier nodes, and four
+    // tier-4 nodes of which three are rewrites and one is Bloodrhythm. The
+    // keystone moved because its 8-point cornerstone gate plus its 3-point cost
+    // needed 11 against a doctrine wallet of 8, so no character could buy it.
+    // The SUM across tiers 3 and 4 is unchanged at six: one node was repriced,
+    // none was added or lost, and that is the part worth reading.
     int32 TierCounts[5] = {};
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
@@ -90,13 +93,14 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("Frenzy has three tier-1 entry nodes"), TierCounts[1], 3);
     TestEqual(TEXT("Frenzy has four tier-2 loop nodes"), TierCounts[2], 4);
-    TestEqual(TEXT("Frenzy has three tier-3 nodes"), TierCounts[3], 3);
-    TestEqual(TEXT("Frenzy has three tier-4 rewrite nodes (F9-F11)"), TierCounts[4], 3);
+    TestEqual(TEXT("Frenzy has two tier-3 nodes (the keystone moved to tier 4)"), TierCounts[3], 2);
+    TestEqual(TEXT("Frenzy has four tier-4 nodes (F9-F11 plus Bloodrhythm)"), TierCounts[4], 4);
 
     // Cost and rank curve must match the two branches already shipped, or the
     // board teaches the player two different grammars. Tier 3 and tier 4 share
-    // one rule here — single rank, 2 or 3 points — because §0.2 prices tier-4
-    // rewrites at 2 and the slice's keystones at 3.
+    // one rule here — single rank, two points — because §0.2 prices tier-4
+    // rewrites at 2 and the keystone now costs the same, which is what makes
+    // the 8-point wallet divide into four picks with nothing stranded.
     for (const UBreakerProgressionNode* Node : Frenzy->Nodes)
     {
         const FString Context = Node->NodeId.ToString();
@@ -108,7 +112,7 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
         else
         {
             TestEqual(*(Context + TEXT(" tier-3/4 node is single rank")), Node->MaxRank, 1);
-            TestTrue(*(Context + TEXT(" tier-3/4 node costs 2 or 3")), Node->CostPerRank == 2 || Node->CostPerRank == 3);
+            TestEqual(*(Context + TEXT(" tier-3/4 node costs 2")), Node->CostPerRank, 2);
         }
         // O27: no node may be purely decorative.
         TestTrue(*(Context + TEXT(" grants an effect or a tag")), Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0);
@@ -197,17 +201,21 @@ bool FBreakerFrenzyBranchTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Feed's health reaches the attribute set"), Attributes->GetMaxHealth() - BaseHealth, 90.0f, 0.001f);
     TestEqual(TEXT("Frenzy's crit chance reaches the attribute set"), Attributes->GetCriticalChance() - BaseCritChance, 0.12f, 0.0001f);
     TestEqual(TEXT("Slipcut Mastery's crit damage reaches the attribute set"), Attributes->GetCriticalMultiplier() - BaseCritMultiplier, 0.20f, 0.0001f);
-    // Ammunition Economy is Frenzy's only unconditional +5% damage. Everything
-    // else in the branch is Redline-gated and must pay NOTHING standing still —
-    // that is the whole point of the branch under O27.
-    TestEqual(TEXT("Standing still, only the unconditional damage line pays"), Attributes->GetDamageMultiplier() - BaseDamage, 0.05f, 0.0001f);
+    // NOTHING. Ammunition Economy used to be Frenzy's one unconditional +5%
+    // damage and is now Redline-gated like the rest, so a full Frenzy standing
+    // still adds no damage at all — which is a stronger statement of the same
+    // O27 point the old 0.05 was making around the edge of. A doctrine may not
+    // author a magnitude on a generic damage pool without a condition on its
+    // own axis (Progression.AxisOverlap), and Frenzy's axis is Redline.
+    TestEqual(TEXT("Standing still, a full Frenzy adds no damage whatsoever"), Attributes->GetDamageMultiplier() - BaseDamage, 0.0f, 0.0001f);
     TestEqual(TEXT("Short Leash's move speed composes"), Progression->GetNodeStats().MoveSpeedMultiplier, 1.10f, 0.0001f);
 
-    // Conditional damage is real, and it is worth substantially more than the
-    // unconditional line — Loaded 12 + Dry Fire 10 + Overrev 24 = 46% at Redline.
+    // Conditional damage is now the branch's WHOLE damage contribution —
+    // Loaded 12 + Dry Fire 10 + Overrev 24 + Ammunition Economy 5 = 51% at
+    // Redline, where it used to be 46 conditional plus 5 that paid anywhere.
     const FBreakerNodeStats& Stats = Progression->GetNodeStats();
     TestEqual(TEXT("Nothing conditional is live while standing still"), Stats.ActiveConditionalDamagePercent, 0.0f, 0.0001f);
-    TestEqual(TEXT("Redline is worth 46% increased damage to a full Frenzy"), Stats.PotentialConditionalDamagePercent, 46.0f, 0.0001f);
+    TestEqual(TEXT("Redline is worth 51% increased damage to a full Frenzy"), Stats.PotentialConditionalDamagePercent, 51.0f, 0.0001f);
 
     // THE TIER-4 PINS ABOVE ARE ABOUT SHAPE; THESE TWO ARE ABOUT POWER.
     //

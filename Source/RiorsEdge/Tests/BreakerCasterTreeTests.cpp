@@ -248,8 +248,19 @@ bool FBreakerCasterTreesLegalEffectsTest::RunTest(const FString& Parameters)
             // Frenzy/Kinetic/Marksman use, no second grammar invented.
             const bool bCostInGrammar = Node->CostPerRank == 1 || Node->CostPerRank == 2 || Node->CostPerRank == 3;
             TestTrue(*(Context + TEXT(" cost is in the 1/2/3 grammar")), bCostInGrammar);
-            TestTrue(*(Context + TEXT(" tier is 1-3, matching the slice cut every other branch uses")),
-                Node->Tier >= 1 && Node->Tier <= 3);
+            // TIER 1-4, AND IT USED TO SAY 1-3. The bound was not a rule about
+            // Caster: it recorded that Caster's tier-4 rewrite trios had never
+            // been authored, which is the same gap that left these trees at 19
+            // offered points against every other class's 25. Asserting the gap
+            // as a rule is how a missing tier becomes a permanent one, so the
+            // bound moves with the authoring rather than after it.
+            //
+            // Tier 4 is also where the keystone now sits: gate 6 via
+            // GateForTier, cost 2, no cornerstone gate. On an 8-point wallet
+            // that is the fourth and last pick, so the rewrites and the
+            // keystone compete for one slot instead of stacking.
+            TestTrue(*(Context + TEXT(" tier is 1-4, the same grammar every other doctrine uses")),
+                Node->Tier >= 1 && Node->Tier <= 4);
         }
     }
     return true;
