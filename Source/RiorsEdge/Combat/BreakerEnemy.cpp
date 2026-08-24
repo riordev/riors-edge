@@ -1094,7 +1094,11 @@ void ABreakerEnemy::GrantAmmo()
         ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
     if (UBreakerWeaponComponent* Weapon = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
     {
-        Weapon->AddReserveAmmoFraction(IsElite() ? EliteKillFraction : NormalKillFraction);
+        // ELITE OR BETTER. The third site found reading the narrow predicate for
+        // a reward, and the same defect: a three-modifier champion and the Field
+        // Marshal both returned the NORMAL 15% rather than the elite 50%, so the
+        // two hardest things in the game fed the gun least.
+        Weapon->AddReserveAmmoFraction(IsEliteOrBetter() ? EliteKillFraction : NormalKillFraction);
     }
 }
 
