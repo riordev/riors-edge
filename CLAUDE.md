@@ -2,31 +2,48 @@
 
 ## Current work
 
-The documentation rewrite is complete. `Docs/` is ten files: `VISION.md`,
-`DECISIONS.md`, seven specs under `spec/`, and a generated `STATE.md`. The
-corpus that preceded it is recoverable at the `pre-corpus-deletion` tag.
+The two-pool rebuild is at the end of Phase 3. Core 65 and Doctrine 8 are ruled
+(O111); the Class Point currency is retired, not removed, and the migration is
+`Save.Migration.V5ToV6`. `Docs/` is ten files and the corpus that preceded it is
+recoverable at the `pre-corpus-deletion` tag — Class-Kits included, which is
+where Caster's nine tier-4 rows were recovered from rather than invented.
 
-Open: 29 items in `DECISIONS.md`. Four `make status` sections sit out of band and
-every one is a target. 46 asserted invariants have no test.
+THE FINDING THIS PHASE TURNED ON, now ruled as O118: a gate and the budget it
+gates against are one number in two places. `CornerstoneInvestmentGate` was 8
+points spent in the tree against a wallet of 8, so all fifteen doctrine
+keystones needed 11 and none could be bought — the second time this project has
+shipped unpurchasable keystones from that exact cause. Doctrine trees now carry
+no gate at all, the keystone is an ordinary tier-4 node at cost 2, and every
+doctrine node costs two points to max so the wallet divides into four clean
+picks. `Progression.TreeDepthIsReachable` walks every tree against its own grant
+and exists before Core's atlas does, on purpose.
 
-The chassis has four live findings and they constrain each other. THE O91 RETUNE
-ANCHORS AT THE CAP, NOT LEVEL 1 (O116): time-to-die is 4.97s at the cap against
-a 4-5s target and 24.64s at level 1, so the low end comes down rather than the
-high end up — base monster damage from 16 toward ~79 and `d` from 0.055 to
-~0.021. Reading O91's "damage growth comes down" literally, anchored at level 1,
-would take cap TTD to five times its target. The boss band is two errors (O114)
-and closing either alone leaves it out of band. Hits-to-die is the authoritative
-inversion figure (O113); the 32% between it and the damage-vs-defence proxy is
-entirely the flat base max health, now flagged at its declaration.
+A doctrine may not author a magnitude on a generic damage pool unless it is
+conditional on that doctrine's own axis. `Progression.AxisOverlap` states that
+over Damage/WeaponDamage/AbilityDamage — deliberately not against Core's
+Constellation field, which Phase 4 deletes. It found three violations, all
+fixed, so it is green rather than enumerated. The at-cap band and weapon/ability
+parity both returned exactly when Culling's unconditional weapon line was gated
+on Aiming, then moved to 6.54 and 0.641 on the other three fixes; the asymmetry
+is that Redline is one of the fixture's three measurement conditions and Aiming
+is not.
 
-Next, in order: `Progression.PowerBand.ArchetypeSpread`, the last promoted
-finding and the only remaining route to the 20 target; then the ~400 stale doc
-citations in `Source/`; then the Class Points delete, which is fully ruled
-(O111) and which the Kinetic doctrine waits on.
+BLOCKED ON ONE RULING, and it is the next thing: branch `phase3-caster-trios`
+holds Caster's nine tier-4 rewrites, which close the last recorded branch-content
+gap and put every doctrine on the same twelve-node, 24-point shape. They are
+rules-as-tags, because Mana-loop rewrites have no representation on
+`EBreakerNodeStatTarget` — and nine tag-only nodes move `silent-nodes` 52 -> 61,
+`dead-tags` 143 -> 152 and `scaffolding-nodes` 50 -> 59. A ceiling falls and
+never rises. Either three ceilings are re-pinned with the reason, or the rules
+get their plumbing; three of the nine are already named by the systems that
+would read them (MS9 in `BreakerStatusConsumption.h`, SB10 in Closequarter's
+header, MS10 in `BreakerManaComponent`).
 
-Waiting on a ruling rather than on work: the flat side of the damage pools —
-the ability lane has no flat line at all, and it is the half of the parity
-deficit that degrades fastest with depth.
+Then Phase 4, the Core atlas: twelve wheels offering 222 against 65. Core is
+still the worst tree at 1.05x and is the whole of why `offered-to-spendable` is
+out of band; every doctrine is at 3.00x or better. Watch `scaffolding-nodes`
+during that pass — it is the number that can go the wrong way while every other
+section on the page improves.
 
 Update this section as the last step of each session.
 
