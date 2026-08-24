@@ -1734,7 +1734,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     // rule is real, the enum gap is the same one the block comment above
     // names.
     Node = MakeNode(TEXT("Caster.Multispell.Reservoir"), TEXT("Reservoir"),
-        TEXT("Maximum Mana rises. Class-Kits' own flagged exception: the one intentional stat node in the Caster kit, and the enum has no Maximum Resource target to carry it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
+        TEXT("Your Mana pool deepens."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Reservoir.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -2614,7 +2614,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     // to 3", so the rule rides the tag. WAITING ON: the explosive damage path
     // stamping blast timestamps per target.
     Node = MakeNode(TEXT("Tank.Demolitionist.ChainReaction"), TEXT("Chain Reaction"),
-        TEXT("Explosives landing within 1.5s on one target add stacking flat damage to the later blast. Three stacks, flat bucket, hard cap."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
+        TEXT("Explosives landing within 1.5s on one target add damage to the later blast, stacking three times."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Demolition"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_ChainReaction.GetTag());
     Tree->Nodes.Add(Node);
