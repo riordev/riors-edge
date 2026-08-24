@@ -112,6 +112,9 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Blink, "Progression.Node.Caster.Spellblade.Blink");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edge, "Progression.Node.Caster.Spellblade.Edge");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edgework, "Progression.Node.Caster.Spellblade.Edgework");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Reprisal, "Progression.Node.Caster.Spellblade.Reprisal");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_NoDistance, "Progression.Node.Caster.Spellblade.NoDistance");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_Overreach, "Progression.Node.Caster.Spellblade.Overreach");
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Seep, "Progression.Node.Caster.VoidWhisperer.Seep");
@@ -123,6 +126,9 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Zonework, "Progression.Node.Caster.VoidWhisperer.Zonework");
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Wellspring, "Progression.Node.Caster.VoidWhisperer.Wellspring");
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_LongDark, "Progression.Node.Caster.VoidWhisperer.LongDark");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_SnapshotDiscipline, "Progression.Node.Caster.VoidWhisperer.SnapshotDiscipline");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_Terminal, "Progression.Node.Caster.VoidWhisperer.Terminal");
+    UE_DEFINE_GAMEPLAY_TAG(Node_VW_LongDebt, "Progression.Node.Caster.VoidWhisperer.LongDebt");
 
     // Caster / MULTISPELL (Class-Kits §2.5).
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Variance, "Progression.Node.Caster.Multispell.Variance");
@@ -134,6 +140,9 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Fracture, "Progression.Node.Caster.Multispell.Fracture");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Resonance, "Progression.Node.Caster.Multispell.Resonance");
     UE_DEFINE_GAMEPLAY_TAG(Node_MS_Cascade, "Progression.Node.Caster.Multispell.Cascade");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Interference, "Progression.Node.Caster.Multispell.Interference");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_Prepared, "Progression.Node.Caster.Multispell.Prepared");
+    UE_DEFINE_GAMEPLAY_TAG(Node_MS_ConductorsRule, "Progression.Node.Caster.Multispell.ConductorsRule");
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). AR5's DISPLAY name, "Last
     // Round", collides with Core.Volley.LastRound and nothing else, and AR10's
@@ -1501,7 +1510,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
 // was written and is not any more — Swift's nine Tier-4 rewrites (F9-F11,
 // K9-K11, M9-M11) have since been authored, so SB9-SB11 / VW9-VW11 /
 // MS9-MS11 are now the only branch content Class-Kits specifies and the
-// library omits. Recorded here rather than silently left reading as parity.
+// library omits.
+//
+// CLOSED 2026-08-24. All nine are authored at the bottom of their trees, so
+// Caster's doctrines now offer 24 points across twelve nodes -- the same shape
+// every other doctrine ships. The paragraph below still holds and is the reason
+// they are tags rather than stat lines.
 //
 // THE ENUM GAP THIS BRANCH SET EXPOSES, STATED ONCE RATHER THAN PER NODE.
 // Swift's nodes are legible against EBreakerNodeStatTarget because Momentum
@@ -1634,6 +1648,51 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
     Tree->Nodes.Add(Node);
 
+    
+    // ---- THE TIER-4 REWRITE TRIO (SB9-SB11) -------------------------------
+    // Authored 2026-08-24, closing the gap this file has recorded since Swift's
+    // trios landed: these nine were the only branch content the design
+    // specified and the library omitted, and their absence is why Caster's
+    // three doctrines offered 18 points against every other doctrine's 24.
+    //
+    // Rules-as-tags, like the rest of this class, and for the reason stated at
+    // the top of the Caster block rather than re-argued here: Mana-loop and
+    // ability-behaviour rewrites have no representation on EBreakerNodeStatTarget.
+    // Authoring an unconditional stand-in magnitude to make them "pay" would be
+    // an invented number under the O2 freeze AND a doctrine authoring on a
+    // generic pool, which Progression.AxisOverlap forbids outright.
+
+    // SB9. Reads the passive defensive layer as a resource source, which is the
+    // one thing in this trio that needs no new vocabulary -- the block proc
+    // already exists and this node spends it. Its uptime is RNG-driven, so it is
+    // a variance question a wave-mode measurement answers rather than a tuning
+    // one (O2).
+    Node = MakeNode(TEXT("Caster.Spellblade.Reprisal"), TEXT("Reprisal"),
+        TEXT("When a block lands, your next Cleave within two seconds is free."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Reprisal.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // SB10. Reshapes Closequarter from an execute tool into a traversal tool:
+    // the refund threshold moves from 40% health to 100% and the cost rises to
+    // 50. Both halves are ability-behaviour rewrites -- BreakerAbility_Closequarter
+    // already names this node at the refund gate it moves.
+    Node = MakeNode(TEXT("Caster.Spellblade.NoDistance"), TEXT("No Distance"),
+        TEXT("Closequarter refunds Mana at any health instead of only when you are hurt, and costs far more to cast."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Close"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_NoDistance.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // SB11. The full Overcast commitment: free casts against a damage-taken
+    // penalty rising from 15% to 30%. The penalty half is the reason this is a
+    // rewrite and not an upgrade, and neither half is expressible as a stat
+    // line -- "while Mana is negative" is not in the condition vocabulary.
+    Node = MakeNode(TEXT("Caster.Spellblade.Overreach"), TEXT("Overreach"),
+        TEXT("While your Mana is in debt, every Caster ability is free — and everything hits you far harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Overreach.GetTag());
+    Tree->Nodes.Add(Node);
+
     return Tree;
 }
 
@@ -1752,6 +1811,50 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());
     Tree->Nodes.Add(Node);
 
+    
+    // ---- THE TIER-4 REWRITE TRIO (VW9-VW11) -------------------------------
+    // Authored 2026-08-24, closing the gap this file has recorded since Swift's
+    // trios landed: these nine were the only branch content the design
+    // specified and the library omitted, and their absence is why Caster's
+    // three doctrines offered 18 points against every other doctrine's 24.
+    //
+    // Rules-as-tags, like the rest of this class, and for the reason stated at
+    // the top of the Caster block rather than re-argued here: Mana-loop and
+    // ability-behaviour rewrites have no representation on EBreakerNodeStatTarget.
+    // Authoring an unconditional stand-in magnitude to make them "pay" would be
+    // an invented number under the O2 freeze AND a doctrine authoring on a
+    // generic pool, which Progression.AxisOverlap forbids outright.
+
+    // VW9. Reads the snapshot contract directly rather than creating a second
+    // multiplier -- it raises Critical Chance at application time, which is the
+    // sanctioned stat, not a parallel roll beside it. Not authored as a stat
+    // effect because "standing inside your own zone" has no condition in the
+    // vocabulary; the +25 lives in the rule the tag names.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.SnapshotDiscipline"), TEXT("Snapshot Discipline"),
+        TEXT("Damage over time you apply while standing in your own zone lands as though your critical chance were far higher, and keeps it for its whole duration."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Zonework"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_SnapshotDiscipline.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // VW10. Below 25% health a DoT this Caster applied persists until death or
+    // cleanse. A lifetime rule on the status layer, not a magnitude.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.Terminal"), TEXT("Terminal"),
+        TEXT("Your damage over time never expires on a target near death. It runs until they do."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Terminal.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // VW11. Tick interval is snapshotted in discrete steps, so this applies at
+    // APPLICATION time only: a DoT applied while Overcast keeps its double
+    // frequency for its whole life even after the bar recovers. That is the
+    // resolution the design records, and it is why the node is a rule rather
+    // than a rate multiplier.
+    Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDebt"), TEXT("Long Debt"),
+        TEXT("While your Mana is in debt, your damage over time ticks twice as fast — and you take more damage for it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Drain"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_LongDebt.GetTag());
+    Tree->Nodes.Add(Node);
+
     return Tree;
 }
 
@@ -1857,6 +1960,54 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cascade.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Cascade.GetTag());
+    Tree->Nodes.Add(Node);
+
+    
+    // ---- THE TIER-4 REWRITE TRIO (MS9-MS11) -------------------------------
+    // Authored 2026-08-24, closing the gap this file has recorded since Swift's
+    // trios landed: these nine were the only branch content the design
+    // specified and the library omitted, and their absence is why Caster's
+    // three doctrines offered 18 points against every other doctrine's 24.
+    //
+    // Rules-as-tags, like the rest of this class, and for the reason stated at
+    // the top of the Caster block rather than re-argued here: Mana-loop and
+    // ability-behaviour rewrites have no representation on EBreakerNodeStatTarget.
+    // Authoring an unconditional stand-in magnitude to make them "pay" would be
+    // an invented number under the O2 freeze AND a doctrine authoring on a
+    // generic pool, which Progression.AxisOverlap forbids outright.
+
+    // MS9. The anti-explosion rewrite, deliberately shaped AWAY from a count
+    // multiplier: fixed value per status plus a flat bonus at 3+. This is the
+    // one node in the trio whose arithmetic is already built --
+    // Combat/BreakerStatusConsumption.h implements exactly this shape and names
+    // MS9 while doing it -- so the node is the missing purchase, not the missing
+    // rule.
+    Node = MakeNode(TEXT("Caster.Multispell.Interference"), TEXT("Interference"),
+        TEXT("Resonance stops scaling with how many statuses a target carries and pays a fixed amount for each, with a bonus at three."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Resonance"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Interference.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // MS10. Two halves: Overcast's doubled generation extends to Multispell's
+    // status-application bonuses, and the negative floor drops to -35.
+    // BreakerManaComponent already names this node at the floor it moves.
+    Node = MakeNode(TEXT("Caster.Multispell.Prepared"), TEXT("Prepared"),
+        TEXT("Overcast's doubled generation also feeds your status application, and your Mana can run deeper into debt."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Reservoir"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Prepared.GetTag());
+    Tree->Nodes.Add(Node);
+
+    // MS11. Turns an architecture requirement -- the same application must not
+    // trigger multiple reactions -- into something the player is paid for
+    // instead of an invisible clamp. RECORDED, because it is the one row in this
+    // trio the design flags as needing re-siting: the compensation half is
+    // conditional income against the Mana cap, so the consolation for a
+    // suppressed reaction is smaller than it was written to be. The clamp
+    // itself is unaffected and is the half that matters architecturally.
+    Node = MakeNode(TEXT("Caster.Multispell.ConductorsRule"), TEXT("Conductor's Rule"),
+        TEXT("Only one reaction can trigger on a target at a time. Reactions that would have fired pay you Mana instead."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+    AddPrerequisite(Node, TEXT("Caster.Multispell.Chain"));
+    Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_ConductorsRule.GetTag());
     Tree->Nodes.Add(Node);
 
     return Tree;

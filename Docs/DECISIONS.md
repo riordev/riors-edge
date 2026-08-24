@@ -203,6 +203,8 @@ Numbers are permanent and never reused.
 **O109** — Out of combat a resource may CONVERGE on a midpoint, draining from above and regenerating from below. Decay is barred in safe states — the menu, the Forge, the Anchor — which is what the enumeration always said; "combat-state gated" over-generalised it. Convergence changes where the bar rests, never how fast fighting pays it.
 
 **O110** — A doctrine's self-targeted duplication is additive. "Twice at full value" is one bucket counted twice, never a multiplier: a doubled multiplicative buff is an unbudgeted More arriving through a doctrine, which O95 forbids, and the global clamp would silently eat it — leaving the keystone doing nothing for the solo player it was written for.
+**O118** — A gate and the budget it gates against are ONE NUMBER IN TWO PLACES. Every investment gate states the budget it was priced against, and a ruling that moves a budget moves every gate keyed to it in the same commit. Twice a budget moved and the gate did not, and both times the result was content no player could buy behind a green suite: six branch keystones, then all fifteen doctrine keystones needing 11 against a wallet of 8. Doctrine trees therefore carry NO gate — picking a smaller number only re-arms it for the next budget change — and their depth is the per-tier gate, which is derived rather than pinned. `Progression.TreeDepthIsReachable` walks every tree against its own grant and is the standing check; it exists before Core's atlas does, on purpose.
+
 ## Open
 
 

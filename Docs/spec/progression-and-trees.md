@@ -57,14 +57,25 @@ unlocks that branch's keystone tier and its identity presentation; ordinary
 nodes of every branch stay freely purchasable. One commitment per character,
 changed only at the Forge. There are no mutually exclusive tiers anywhere.
 
-**A character holds at most two Core keystones and one class keystone, ever.**
-This is the structural decision the point budgets exist to produce, and it is a
-property of constellation size against the keystone gate rather than a rule
-written on top.
+**A character holds at most two Core keystones and one doctrine keystone,
+ever.** This is the structural decision the point budgets exist to produce. On
+the Core side it is arithmetic on the pool: a third keystone costs more than the
+pool holds. On the doctrine side it is the shape of the wallet — eight points,
+four picks of two, and the keystone is one of them.
 
-**More multipliers: one per constellation, on its Convergence or Keystone only;
-one per class branch, on its keystone only.** Composed cap of three across the
-build. Two tree Mores plus one item-layer slot is the intended composition.
+**More multipliers are Core's alone: one per constellation, on its Convergence
+or Keystone only.** Composed cap of three across the build. Two Core Mores plus
+one item-layer slot is the intended composition. A doctrine authors none — its
+keystone earns its place by rewriting the ultimate, not by multiplying a number,
+and a doctrine spending one of eight points on a multiplier would be buying what
+Core already sells.
+
+**A doctrine may not author a magnitude on a generic damage pool unless it is
+conditional on that doctrine's own axis.** Increased Damage, Weapon Damage and
+Ability Damage are Core's. Where a doctrine's rule carries a magnitude, that
+magnitude is conditional on the axis the doctrine is about, or it sits on a stat
+target no Core wheel authors. A doctrine spending any of its eight points on
+generic damage has spent its identity on what Core does with two hundred.
 
 **Adding a stat target does not make it pay.** A target needs an aggregation
 lane, and the register of which targets have one is hand-maintained on purpose
@@ -159,15 +170,21 @@ Gateway (1)
                                        TOTAL   = 26
 ```
 
-Against a budget of roughly 65, a keystone costs 23 all-in: its 18-point gate
-plus the five it charges. Three of them is 69, which the pool cannot pay, and
-two is 46 — seventy-one percent of the character spent on two decisions.
-**That is where the two-keystone cap comes from**, and it is arithmetic on the
-POOL rather than on what is left after two constellations. Stated the older
-way it read as a consequence of constellation size, which stopped being true
-the moment the pool also had to fund a doctrine: with 26 gone there is no
-"thirteen points in a third" left to reason from, and the cap holds anyway
-because 69 is still more than 65.
+**A Core keystone is expensive enough that two is a character and three is not
+a choice.** That is the intent, and it is arithmetic on the POOL: whatever a
+keystone's gate and charge come to, three must exceed 65, and two must leave
+enough that the character is still playing a build rather than servicing two
+decisions.
+
+Stated as the shape rather than the sum on purpose. The cap used to be derived
+from one specific gate against one specific constellation, which made a rule out
+of numbers that are being replaced — and a derivation like that rots silently,
+because the argument still reads fine after the structure under it is gone.
+
+The gate that enforces it is Core's alone. Doctrines have none: theirs was
+priced against a budget that no longer exists and made every keystone in the
+game unbuyable, which is what a gate does when the budget it is keyed to moves
+without it.
 Twenty-point constellations would buy three keystones and collapse the choice;
 thirty-two-point ones would make the third constellation meaningless.
 

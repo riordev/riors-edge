@@ -87,10 +87,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Penetrance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_ReactionChain);
 
-    // Caster / SPELLBLADE (Class-Kits §2.3). Tiers 1-3 only — SB9-SB11's
-    // tier-4 rewrites are not authored. This WAS the same cut Swift used; it
-    // no longer is, since Swift's nine tier-4 rewrites have since landed. The
-    // Caster trio is the remaining half of that gap, not a settled shape.
+    // Caster / SPELLBLADE (Class-Kits §2.3). Complete: tiers 1-4, with SB9-SB11
+    // authored 2026-08-24. Those nine were the last branch content the design
+    // specified and the library omitted, and their absence is the whole reason
+    // Caster's doctrines offered 18 points where every other doctrine offered 24.
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_ContactCharge);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_FollowThrough);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Close);
@@ -100,6 +100,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Blink);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edge);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edgework);
+    // The tier-4 rewrite trio (SB9-SB11), authored 2026-08-24.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Reprisal);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_NoDistance);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Overreach);
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Seep);
@@ -111,6 +115,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Zonework);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Wellspring);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_LongDark);
+    // The tier-4 rewrite trio (VW9-VW11), authored 2026-08-24.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_SnapshotDiscipline);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Terminal);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_LongDebt);
 
     // Caster / MULTISPELL (Class-Kits §2.5).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Variance);
@@ -122,6 +130,10 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Fracture);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Resonance);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Cascade);
+    // The tier-4 rewrite trio (MS9-MS11), authored 2026-08-24.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Interference);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_Prepared);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_MS_ConductorsRule);
 
     // Gunsmith / ARMORY (Class-Kits-Gunsmith §4.1). Authored 2026-08-16 under
     // the owner's "do all 5 classes" ruling — the branch layer the kits-playable
