@@ -176,8 +176,11 @@ void ABreakerEnemy::ApplyChassis()
     //
     // That is the same failure shape as the third jump: a rule that was correct
     // one layer up and dead where the game actually reads it.
+    // ELITE OR BETTER. This read IsElite(), which is exactly the Elite rank, so
+    // a ModifierBearing champion and a Boss both took the plain item level --
+    // the two ranks ABOVE the one the bonus was written for got less than it.
     EnemyLevel = UBreakerMonsterChassisLibrary::GetDropItemLevel(AreaLevel)
-        + (IsElite() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
+        + (IsEliteOrBetter() ? FMath::Max(EliteDropItemLevelBonus, 0) : 0);
     EnemyLevel = FMath::Clamp(EnemyLevel, 1, UBreakerAffixLibrary::MaxItemLevel);
 
     AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
@@ -1050,7 +1053,10 @@ void ABreakerEnemy::GrantLoot()
     // already decided to drop, not a second drop chance, so it composes with
     // the gates rather than competing with them: an elite in a level-3 area
     // still cannot exceed what its item level unlocks.
-    if (IsElite() && Rarity < EBreakerItemRarity::Exceptional
+    // ELITE OR BETTER, for the same reason as the item-level bonus above: a
+    // three-modifier champion is an elite with modifiers on it, and it was
+    // getting no rarity floor at all.
+    if (IsEliteOrBetter() && Rarity < EBreakerItemRarity::Exceptional
         && UBreakerDropTableLibrary::IsRarityUnlocked(EBreakerItemRarity::Exceptional, EnemyLevel, MonsterRank, DropTable))
     {
         Rarity = EBreakerItemRarity::Exceptional;

@@ -51,7 +51,29 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy") int32 GetEnemyLevel() const { return EnemyLevel; }
     UFUNCTION(BlueprintPure, Category="Enemy") EBreakerMonsterRank GetMonsterRank() const { return MonsterRank; }
     // Rank IS the elite flag now; there is no separate bool to drift from it.
+    //
+    // EXACTLY Elite, AND THAT IS THE POINT OF THE PAIR. This one answers "is
+    // this rank the Elite rank", which is what the telemetry buckets want: a
+    // kill-time sample must not average a three-modifier champion in with an
+    // ordinary elite, and BreakerKillBuckets.h records that reading at length.
     UFUNCTION(BlueprintPure, Category="Enemy") bool IsElite() const { return MonsterRank == EBreakerMonsterRank::Elite; }
+
+    // Elite OR BETTER, which is the question every REWARD site was actually
+    // asking and none of them was spelling.
+    //
+    // ModifierBearing is, by definition, a modifier-bearing elite. IsElite()
+    // answers false for it, so both loot sites below it -- the rarity floor and
+    // the item-level bonus -- skipped it entirely: a three-modifier champion
+    // dropped with no floor and no bonus, strictly worse treatment than the
+    // ordinary elite it is an upgrade of. Boss was skipped the same way.
+    //
+    // This is a predicate bug rather than a tuning question, and it is wrong
+    // under every possible ranking of the reward ladder, which is why it is
+    // fixed here rather than waiting behind the ruling on what those rewards
+    // should be. Ordering by rank is safe because EBreakerMonsterRank is
+    // authored in ascending difficulty (Trash, Elite, ModifierBearing, Boss)
+    // and is serialized by value, so the order cannot be rearranged.
+    UFUNCTION(BlueprintPure, Category="Enemy") bool IsEliteOrBetter() const { return MonsterRank >= EBreakerMonsterRank::Elite; }
     // Telemetry bucket, not behaviour: a ranged archetype is fought across a
     // band rather than in contact, so its kill time measures something else
     // and must not be averaged into the melee trash sample the O18 re-anchor

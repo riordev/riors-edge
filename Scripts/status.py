@@ -342,6 +342,30 @@ def parse_point_budgets():
     return found["CorePointCapLevel"] + found["CoreWorldPointGrant"], found["DoctrinePointGrant"]
 
 
+
+def pinned_field(key, field):
+    """One pinned field, read straight from the pin file.
+
+    build_sections runs BEFORE load_pins, so a section that needs to compare
+    itself against its own pin cannot reach the loaded table. Reading the file
+    again is cheaper than threading the pins through every section, and it keeps
+    the floor in ONE place -- the alternative is a second copy of 3.0 in Python,
+    which is the transcription defect this report has already been bitten by
+    twice.
+
+    Returns None when the pin or the field is absent, and the caller drops its
+    section rather than inventing a default: a margin measured against a floor
+    nobody set would be a number with no meaning.
+    """
+    try:
+        with open(PINS, "rb") as f:
+            data = json.loads(f.read().decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+    entry = data.get(key)
+    return entry.get(field) if isinstance(entry, dict) else None
+
+
 def build_consumer_index(sources):
     """The text every "does anything read this?" question is answered against.
 
@@ -754,14 +778,48 @@ def build_sections(sources):
         budget = core_budget if "Core" in tree else doctrine_budget
         ratios.append((tree, len(ns), offered, round(offered / budget, 2)))
     worst = min((r[3] for r in ratios), default=0)
+    floor_pin = pinned_field("offered-to-spendable", "min")
     sections.append({
         "key": "offered-to-spendable", "title": "Offered-to-spendable ratio, per tree",
         "direction": FLOOR, "value": worst, "unit": "worst tree",
         "detail": [f"{t}: {n} nodes, {o} points offered, {r}x budget"
                    for t, n, o, r in ratios],
         "note": "Most of a build should be refusal. A CEILING here would lock the trees "
-                "at their current size and report green while doing it.",
+                "at their current size and report green while doing it. READ IT BESIDE "
+                "the no-margin count below: for a doctrine built to the standard shape "
+                "this ratio is fixed by construction and reports nothing about authoring.",
     })
+
+    # --- trees with no margin above the floor (CEILING) -------------------
+    # A FLOOR THAT CLEARS BY IDENTITY REPORTS ONE BIT. This is the second number
+    # that makes it two.
+    #
+    # The standard doctrine shape is twelve nodes and every one of them costs two
+    # points to reach its last rank: three tier-1 at two ranks of one, three
+    # tier-2 the same, two tier-3 at one rank of two, three tier-4 rewrites and
+    # the keystone. Twelve twos is 24, and 24 / 8 is exactly 3.00 -- for EVERY
+    # tree built to that shape, forever, whatever any individual node does. For
+    # those trees the ratio has stopped measuring authoring and started reporting
+    # the shape spec back at the reader, and it clears the floor by identity.
+    #
+    # It is also a cliff rather than a trend. A tree sitting at exactly the floor
+    # goes red on the change that prices one node at 1, or drops a node, with no
+    # warning on any run before it. So the count of trees ON the floor is pinned
+    # separately: it moves BEFORE the failure instead of with it.
+    if floor_pin is not None:
+        no_margin = [f"{name}: {ratio}x, exactly the floor"
+                     for name, _, _, ratio in ratios
+                     if abs(ratio - floor_pin) < 0.005]
+        sections.append({
+            "key": "offered-to-spendable-margin",
+            "title": "Trees sitting exactly on the offered-to-spendable floor",
+            "direction": CEILING, "value": len(no_margin), "unit": f"of {len(ratios)}",
+            "detail": no_margin,
+            "note": "A tree here is one node-price change away from red, and the floor "
+                    "section reports ok until the run it fails on. This falls when a "
+                    "tree is authored above its shape's arithmetic, never by moving a "
+                    "pin.",
+        })
 
     # --- tree density: composition (BAND) ---------------------------------
     comp_rows = []

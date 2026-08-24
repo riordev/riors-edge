@@ -209,6 +209,8 @@ Numbers are permanent and never reused.
 
 ## Open
 
+- **Was the offered-to-spendable floor of 3.0 derived, or seeded?** The same question DECISIONS already carries against the at-cap band's 8-10x, and it deserves the same standing rather than an inherited assumption. VISION says a tree offers far more than any budget can buy; 3.00x means a character buys a third of one tree. Nine doctrines sit at exactly 3.00 today and twelve will once the Caster trios merge, so whatever the answer is, it is load-bearing across most of the register. Note that the figure clears by identity for any tree built to the twelve-node shape, so raising the floor without changing the shape would put every conforming doctrine red at once, and lowering it would make the section unfalsifiable.
+
 
 **O111** — Class Points are deleted and there are two pools: Core 65 and Doctrine 8. The migration refunds nothing and reads nothing — spent plus unspent was derivable from the payload alone, and O27 deletes the freed points rather than folding them into either pool: v5 to v6 clears the class rank array, zeroes the class wallet, clears any commitment naming one of the fifteen retiring branch ids from a frozen list, seeds the doctrine wallet at zero because it also clears the commitment that pays it, and stamps. No cost table and no node library. The retired enumerator is never removed and never reused.
 

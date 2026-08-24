@@ -19,6 +19,7 @@ measurement without judging it.
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 39 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.05 worst tree | floor 3.0 | **OUT** |
+| Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 13 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 50 of 205 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
@@ -33,7 +34,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 430
+- passing: 431
 - expected red: 2
 - **unexpected red: 0**
 - asserted invariants with no test: 39
@@ -223,7 +224,7 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 **floor** · 1.05 worst tree · floor 3.0  ·  **OUT**
 
-Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it.
+Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it. READ IT BESIDE the no-margin count below: for a doctrine built to the standard shape this ratio is fixed by construction and reports nothing about authoring.
 
 - GetCasterMultispellTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCasterSpellbladeTree: 9 nodes, 18 points offered, 2.25x budget
@@ -241,6 +242,22 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - GetTankBastionTree: 12 nodes, 24 points offered, 3.0x budget
 - GetTankDemolitionistTree: 12 nodes, 24 points offered, 3.0x budget
 - GetTankLeechTree: 12 nodes, 24 points offered, 3.0x budget
+
+## Trees sitting exactly on the offered-to-spendable floor
+
+**ceiling** · 9 of 16 · no pin — measurement only
+
+A tree here is one node-price change away from red, and the floor section reports ok until the run it fails on. This falls when a tree is authored above its shape's arithmetic, never by moving a pin.
+
+- GetGunsmithArmoryTree: 3.0x, exactly the floor
+- GetGunsmithFieldTechTree: 3.0x, exactly the floor
+- GetGunsmithTinkererTree: 3.0x, exactly the floor
+- GetSupportConductorTree: 3.0x, exactly the floor
+- GetSupportMedicTree: 3.0x, exactly the floor
+- GetSupportWardenTree: 3.0x, exactly the floor
+- GetTankBastionTree: 3.0x, exactly the floor
+- GetTankDemolitionistTree: 3.0x, exactly the floor
+- GetTankLeechTree: 3.0x, exactly the floor
 
 ## Node-shape composition, per tree
 
