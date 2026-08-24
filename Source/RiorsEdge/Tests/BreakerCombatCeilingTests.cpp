@@ -391,8 +391,10 @@ bool FBreakerCeilingDotWindowSnapshotTest::RunTest(const FString& Parameters)
 // A4 (owner ruling 2026-08-16): DoT ticks share ONE additive Increased
 // bucket. Increased Damage and Increased DoT fold additively for ticks —
 // +50% Damage and +40% DoT is a x1.9 tick, never 1.5 x 1.4 = 2.1 — and the
-// DoT More lane (VW12 / Long Dark) multiplies on top inside the one O34
-// ceiling.
+// DoT More lane multiplies on top inside the one O34 ceiling. That lane has
+// no author in the progression content since O95 took Long Dark's multiplier
+// away, so this test is now the only thing exercising it -- which is a reason
+// to keep it, not to delete it: an Anomalous rewrite is still permitted one.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCeilingDotAdditiveBucketTest,
     "RiorsEdge.Combat.Ceiling.DotAdditiveBucket",
@@ -422,7 +424,8 @@ bool FBreakerCeilingDotAdditiveBucketTest::RunTest(const FString& Parameters)
         FBreakerAttributeContribution Offer;
         Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, 50.0f);
         Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, 40.0f);
-        // Long Dark's shape: a 1.30x More on the DoT lane.
+        // A DoT More at the per-source ceiling. This was Long Dark's shape
+        // before O95; it is fabricated here because no node authors one now.
         Offer.ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, FBreakerAttributeAggregator::SingleMoreCeiling);
         Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Offer);
 

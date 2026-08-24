@@ -134,7 +134,9 @@ enum class EBreakerNodeStatTarget : uint8
     // shape problem as AbilityArea; the same 2026-08-16 accessor seam
     // (AbilityDurationMultiplierFor) answers it, consumed by Rot's zone
     // duration today. Window durations on definitions adopt it as their
-    // abilities are touched; LongDark stays waiting on the owner's A4 ruling.
+    // abilities are touched. LongDark was waiting on the A4 ruling for a DoT
+    // More; under O95 it authors THIS target instead, so the lane it was
+    // merely named by is now the lane it pays into.
     AbilityDuration,
     // The delivery-method partition's other half. WeaponDamage is O30's GUNS
     // axis; MeleeDamage is what Caster.Spellblade.Edgework's reserved More is

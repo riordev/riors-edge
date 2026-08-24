@@ -948,12 +948,18 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_NoGround.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The branch keystone O3 permits. Sliding is the state Kinetic can hold
-    // most reliably, so its More is the smallest of the four conditional ones.
+    // THE MORE IS GONE (O95): a doctrine authors none, every slot lives in Core.
+    // What replaces it is a CONDITION CHANGE on the loop the doctrine is built
+    // around -- momentum stops decaying while sliding -- which is the shape O95
+    // names, and it pays through ClassResourceDecay: composed at
+    // BreakerProgressionComponent.cpp:1109, bridged to the resource component at
+    // :1356, consumed by BreakerMomentumComponent.cpp:640. Sliding is evaluated.
+    // The keystone's rewrite half was always the live part: it grants
+    // Keystone.Swift.TerminalVelocity and Overdrive resolves that row.
     Node = MakeNode(TEXT("Swift.Kinetic.Overpressure"), TEXT("Overpressure"),
-        TEXT("Branch keystone. A MORE multiplier to all damage dealt while sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Momentum stops decaying entirely while you are sliding."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Carry"));
-    AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER: x1.20
+    AddEffect(Node, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
     // O37: every branch keystone is a cornerstone, so commitment gates all
     // three of Swift's branches identically (Bloodrhythm alone was flagged
     // first because its unset bit was a recorded content gap).
@@ -1175,21 +1181,33 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     // is authorable the moment TargetLowHealth exists. Increased-bucket and
     // additive per the §4a rider canon (a target-conditional More is
     // forbidden by rule), so the keystone's unconditional 1.18x More below is
-    // untouched and stays the branch's whole More budget; the rider is an
-    // ordinary Increased line that happens to live on the same purchase.
+    // THE MORE IS GONE (O95), AND THIS ONE WAS THE AWKWARD REMOVAL. The other
+    // three were conditional, so a replacement could ride the same condition.
+    // Culling's was the class layer's only UNCONDITIONAL More, deliberately --
+    // it is the keystone authored for the build that refuses to organise around
+    // a movement state, so a replacement that only pays while moving would
+    // change what the node is for rather than what it is worth.
+    //
+    // So the replacement is unconditional too, and it lands on the WEAPON pool
+    // rather than the shared one. That is not a detail: Core authors Damage (the
+    // shared pool) across Precision, Volley and Velocity, and authoring Damage
+    // here would be the forbidden form Progression.AxisOverlap asserts against.
+    // WeaponDamage composes at BreakerProgressionComponent.cpp:1151 and is the
+    // O54 pool every weapon hit draws. The TargetLowHealth rider below is
+    // untouched, and the rewrite half -- Overdrive's Standing Wave row -- was
+    // always the live part.
     Node = MakeNode(TEXT("Swift.Marksman.Culling"), TEXT("Culling"),
-        TEXT("Branch keystone. A MORE multiplier to all damage dealt, with no condition attached — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Everything your weapon does hits harder, with no condition attached — and the cull itself: targets already near death take increased damage."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
     AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 15.0f, EBreakerBuildCondition::TargetLowHealth); // O2 PLACEHOLDER — execute window is the narrowest target condition, priced at the top of the conditional band
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
-    AddDamageMore(Node, 18.0f); // O2 PLACEHOLDER: x1.18
+    AddEffect(Node, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 18.0f); // O2 PLACEHOLDER
     Node->bCornerstone = true; // O37: keystone tier requires branch commitment
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Culling.GetTag());
     // REACHABILITY (O40c) — the Marksman half of the same fork recorded in
     // Class-Kits §6.1.1. Standing Wave is "the stationary Swift ultimate", and
     // Culling is the branch keystone authored for the build that refuses to
     // organise around a movement state, so the adoption is not merely
-    // mechanical: the two say the same thing about the branch. Culling's
-    // unconditional 1.18x More is untouched.
+    // mechanical: the two say the same thing about the branch.
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Swift_StandingWave.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1391,9 +1409,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftFrenzyTree()
     // keystone at 4; the implemented branch grammar uses 3 (Overpressure,
     // Culling) and the cost curve is kept internally consistent instead.
     Node = MakeNode(TEXT("Swift.Frenzy.Bloodrhythm"), TEXT("Bloodrhythm"),
-        TEXT("Branch keystone. A MORE multiplier to all damage dealt at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
+        TEXT("Branch keystone. Your rate of fire climbs at Redline, and Overdrive refunds Momentum on every hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Swift.Frenzy.Overrev"));
-    AddDamageMore(Node, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
+    // THE MORE IS GONE (O95). Frenzy's identity is Redline uptime and sustained
+    // fire, so the replacement is FireRate rather than damage: it composes into
+    // the FireRateMultiplier attribute and UBreakerWeaponComponent's
+    // GetEffectiveRoundsPerMinute reads it, so the doctrine changes the WEAPON'S
+    // BEHAVIOUR rather than a number behind it. Deliberately NOT AbilityCost,
+    // which would have been the obvious economy rule: that lane composes but
+    // only Caster abilities read it at cast -- the base ApplyCost pays the raw
+    // definition cost -- so a Swift node authored against it would pay nothing.
+    // Redline is evaluated. The rewrite half, Overdrive's Bloodrhythm row and
+    // its per-hit Momentum refund, was always the live part.
+    AddEffect(Node, EBreakerNodeStatTarget::FireRate, EBreakerNodeStatBucket::IncreasedPercent, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
     // RECORDED GAP FIXED (audit item 9): bCornerstone was never set here, so
     // UI/BreakerMenu.cpp's ClassifyNode fell through to "single-rank costing
     // 3+" and drew Swift's first working keystone as an ordinary Convergence
@@ -1532,7 +1560,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     // target half is Cleave's base behaviour already (every swept target takes
     // the 100%-chance Bleed).
     Node = MakeNode(TEXT("Caster.Spellblade.Edge"), TEXT("Edge"),
-        TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit. Rule change; no damage percentage (Class-Kits SB8 is explicit)."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
+        TEXT("Cleave's arc widens to a full sweep and its Bleed applies to every target hit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Bloodprice"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
@@ -1587,7 +1615,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     // a different node than the one that was priced. O2 holds the magnitude.
     // WAITING ON: a recently-fired recorder, and the regen path reading it.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.Patience"), TEXT("Patience"),
-        TEXT("Passive Mana regeneration doubles while the caster has not fired a weapon recently. Flagged NEEDS-RE-SITING under the Mana inversion (Class-Kits §2.1.1) -- it now doubles the PRIMARY income, not a trickle bonus; O2 freeze holds its magnitude regardless."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
+        TEXT("Passive Mana regeneration doubles while the caster has not fired a weapon recently."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Patience.GetTag());
     Tree->Nodes.Add(Node);
 
@@ -1649,22 +1677,26 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterVoidWhispererTree(
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_Wellspring.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The branch keystone O3 permits (2 of 3 for Caster). Class-Kits VW12,
-    // and the A4 question is now ANSWERED (owner ruling 2026-08-16): DoT
-    // ticks share ONE additive Increased bucket, and the DamageOverTime More
-    // lane exists. VW12's canon text is a DoT More SPECIFICALLY ("More
-    // multiplier (2 of 3): damage over time is multiplied by 1.30" — §2.4
-    // VW12), NOT a damage-More, so it stays authored as DamageOverTime +
-    // MorePercent and now COMPOSES: AggregateStats selects it with the Damage
-    // Mores (one O34 budget, strongest three, per-source 1.30 ceiling),
-    // carries it on the DamageOverTimeMultiplier attribute's More product,
-    // and UBreakerCombatComponent::ComposeDotSourcePower multiplies it into
-    // the tick's More side under the single O34 ceiling. Direct hits never
-    // see it — DoT only is the tax, exactly as the canon prices it.
+    // The branch keystone. It carried Class-Kits VW12's canon text verbatim —
+    // "damage over time is multiplied by 1.30", a DoT More specifically — and
+    // the paragraph that used to sit here argued for exactly that, at length,
+    // from the A4 ruling that built the lane for it. O95 supersedes it: a
+    // doctrine authors no multiplier, so the argument goes with the number.
+    // What that leaves behind is recorded at the lane it leaves behind.
     Node = MakeNode(TEXT("Caster.VoidWhisperer.LongDark"), TEXT("Long Dark"),
-        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Damage over time is multiplied by 1.30 -- a MORE multiplier, DoT ticks only, inside the one O34 More budget."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: duration extends to 12s at 50% cost instead of free, and zones placed during it do not expire. Everything you leave on the ground lasts longer."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Caster.VoidWhisperer.Attrition"));
-    AddEffect(Node, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30 per Class-Kits VW12; LIVE under A4 (owner ruling 2026-08-16)
+    // THE MORE IS GONE (O95), and it was the largest of the four at x1.30 as
+    // well as the only one that never went through AddDamageMore -- it targeted
+    // the DamageOverTime pool directly, which is why a search for the helper
+    // found three keystones rather than four.
+    //
+    // AbilityDuration replaces it, which is the doctrine's own axis rather than
+    // a substitute for a multiplier: Void Whisperer is zones that keep working
+    // after you have looked away, and the keystone's own rewrite already extends
+    // Unmake. The lane composes and UBreakerAbility_Rot reads it through
+    // ComputeEffectiveDurationSeconds on both spawn and refresh.
+    AddEffect(Node, EBreakerNodeStatTarget::AbilityDuration, EBreakerNodeStatBucket::IncreasedPercent, 30.0f); // O2 PLACEHOLDER LIVE under A4 (owner ruling 2026-08-16)
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_VW_LongDark.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag());

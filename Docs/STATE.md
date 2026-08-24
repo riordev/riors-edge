@@ -11,9 +11,9 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 54 of 205 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 52 of 205 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 6 of 33 | ceiling 6 | ok |
-| Aggregation lanes carrying nothing | ceiling | 9 of 26 lanes | ceiling 9 | ok |
+| Aggregation lanes carrying nothing | ceiling | 7 of 26 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 143 of 202 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
@@ -22,18 +22,18 @@ measurement without judging it.
 | Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 50 of 205 authored | ceiling 50 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 6.53 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 15.4 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.65 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.39 | no pin — measurement only | — |
+| Build variance band, at cap | band | 6.79 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 15.69 | band 12.0–20.0 | ok |
+| Ability lane throughput against weapon lane, at cap | band | 0.62 | band 0.85–1.15 | **OUT** |
+| Ability lane throughput against weapon lane, endgame | band | 0.38 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
 
 ## Tests
 
-- passing: 426
-- expected red: 2
+- passing: 427
+- expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 40
 
@@ -42,12 +42,13 @@ A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
+- `RiorsEdge.Progression.Doctrine.KeystoneIsReachable`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 
 ## Silent nodes
 
-**ceiling** · 54 of 205 authored · ceiling 54
+**ceiling** · 52 of 205 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
@@ -55,13 +56,13 @@ Authored, purchasable, costs a point, and produces no observable change. Counted
 - GetCasterMultispellTree: 8
 - GetCasterSpellbladeTree: 7
 - GetCasterVoidWhispererTree: 7
-- GetSwiftKineticTree: 4
 - GetSupportConductorTree: 4
+- GetSwiftKineticTree: 3
 - GetTankDemolitionistTree: 3
-- GetSwiftFrenzyTree: 2
 - GetGunsmithTinkererTree: 2
 - GetSupportWardenTree: 2
 - GetSwiftMarksmanTree: 1
+- GetSwiftFrenzyTree: 1
 - GetGunsmithArmoryTree: 1
 - GetGunsmithFieldTechTree: 1
 - GetTankLeechTree: 1
@@ -83,17 +84,15 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 9 of 26 lanes · ceiling 9
+**ceiling** · 7 of 26 lanes · ceiling 9
 
 Plumbing with no author. Not harmful, but not free either.
 
 - AbilityDamage
 - AbilityArea
-- WeaponDamage
 - Armor
 - MaxClassResource
 - ClassResourceRegen
-- FireRate
 - DashCooldown
 - ChainCount
 

@@ -976,7 +976,8 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
                 // validator that keeps it so, and this Min against rank 1 is
                 // the belt-and-braces guard behind it.
                 // A4 (owner ruling 2026-08-16): DamageOverTime joined Damage
-                // as a composable More lane — VW12 / Long Dark now pays.
+                // as a composable More lane. Long Dark was what it was built
+                // for and O95 removed that multiplier; see the lane itself.
                 // O54: and the two delivery lanes joined it, with the shared
                 // pool as a fourth kind that multiplies both of them from one
                 // source. Still ONE budget of three (O74) — see the selection.
@@ -1194,6 +1195,15 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
         // ComposeDotSourcePower divides it back out of the composed attribute
         // to keep the Increased half additive, then multiplies it into the
         // tick's More side under the one O34 ceiling. Direct hits never see it.
+        //
+        // NOTHING IN THE PROGRESSION CONTENT AUTHORS THIS LANE. It was built
+        // for Caster.VoidWhisperer.LongDark, which was its only author, and
+        // O95 took that node's multiplier away — so this branch is currently
+        // unreachable from the tree. It is not dead: the mechanism is exercised
+        // by RiorsEdge.Combat.Ceiling.DotAdditiveBucket and stays available to
+        // an Anomalous rewrite, which is the layer O3 still permits a More on.
+        // But a lane waiting for an author is not a lane in service, and this
+        // is the one place a reader can learn that without a grep.
         if (!FMath::IsNearlyEqual(DotMoreProduct, 1.0f))
         {
             OutContribution->ComposeMore(EBreakerAggregatedAttribute::DamageOverTimeMultiplier, DotMoreProduct);

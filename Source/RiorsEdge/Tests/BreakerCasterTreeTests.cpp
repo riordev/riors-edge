@@ -256,14 +256,16 @@ bool FBreakerCasterTreesLegalEffectsTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// O3/O34 budget: the greediest legal single-branch Caster build (a full
-// Void Whisperer walk, the only Caster branch that authors a MorePercent
-// effect at all) must not push the composed More product past the ceiling.
-// A4 (owner ruling 2026-08-16): the DoT More lane EXISTS now — Long Dark's
-// DamageOverTime-targeted 1.30x composes onto the DamageOverTimeMultiplier
-// attribute's More product, counts as one source in the shared O34 budget,
-// and never touches the direct-hit Damage More product. This test is the
-// pin the old comment promised would change when the lane landed.
+// O95, through the wiring: the greediest legal single-doctrine Caster build —
+// a FULL Void Whisperer walk, every node bought — holds no More source at all.
+//
+// This test used to assert the opposite, that Long Dark's DamageOverTime 1.30x
+// composed onto the DoT lane as one source in the shared O34 budget. Buying the
+// whole doctrine is what makes it worth keeping now that the answer inverted:
+// "the keystone stopped authoring one" is a claim about a line of code, while
+// "a character who owns the entire doctrine holds none" is a claim about the
+// game, and only the second one closes O95. The pure-maths half is
+// RiorsEdge.Progression.Doctrine.KeystonesPayWithoutMores.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerCasterTreesMoreCeilingTest,
@@ -299,20 +301,36 @@ bool FBreakerCasterTreesMoreCeilingTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Long Dark's keystone tag is live once bought"),
         Stats.GrantedTags.HasTag(BreakerAbilityTags::Keystone_Caster_LongDark.GetTag()));
 
-    // A4: Long Dark PAYS. It counts as one held More source in the shared
-    // budget, lands on the DoT lane's More product, and leaves the direct-hit
-    // Damage More product neutral — DoT only is the tax the canon prices.
-    TestEqual(TEXT("Long Dark counts as one More source in the shared O34 budget (A4)"), Stats.DamageMoreSourceCount, 1);
-    TestEqual(TEXT("Long Dark leaves the direct-hit Damage More product neutral (DoT only)"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
-    TestEqual(TEXT("Long Dark's 1.30x rides the DoT lane's More product (A4)"),
-        Attributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.30f, 0.0001f);
-    // And it reaches an actual tick: the whole-tick multiplier composed for a
-    // DoT application carries the 1.30x (times whatever Increased the walk
-    // bought, additively — the A4 bucket rule).
+    // O95: LONG DARK PAYS, AND NOT WITH A MULTIPLIER. This asserted a 1.30x on
+    // the DoT lane, which was the largest of the four doctrine Mores and the
+    // only one that never went through AddDamageMore — it targeted the
+    // DamageOverTime pool directly, which is why a search for the helper found
+    // three keystones and the true figure was four.
+    //
+    // The whole point of buying EVERY node in the doctrine here is that this is
+    // the strongest statement of O95 available: not "the keystone stopped
+    // authoring one" but "a character who owns the entire doctrine holds no
+    // More source at all". The pure-maths half is next door in
+    // RiorsEdge.Progression.Doctrine.KeystonesPayWithoutMores; this is the same
+    // rule through the component, the attribute set and a real tick.
+    TestEqual(TEXT("A full doctrine holds no More source in the shared O34 budget (O95)"), Stats.DamageMoreSourceCount, 0);
+    TestEqual(TEXT("...so the direct-hit Damage More product is neutral"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("...and so is the DoT lane's, which is where the 1.30x used to land"),
+        Attributes->GetAttributeAggregator().ComposedMoreProduct(EBreakerAggregatedAttribute::DamageOverTimeMultiplier), 1.0f, 0.0001f);
+    // The tick that used to carry the 1.30x. Increased lines the walk bought
+    // still move it, so this is not asserted at exactly 1.0 — what is asserted
+    // is that no MULTIPLIER rides it, read from the lane above.
     // Ability-delivered: a Void Whisperer's ticks come from Caster abilities, so
     // the lane the tick folds beside the DoT bucket is the ability pool (O55).
-    TestTrue(TEXT("A full Void Whisperer's DoT tick pays the Long Dark More"),
-        UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Ability) >= 1.30f - UE_KINDA_SMALL_NUMBER);
+    TestTrue(TEXT("A full Void Whisperer's DoT tick still pays its Increased lines"),
+        UBreakerCombatComponent::ComposeDotSourcePower(Attributes, nullptr, EBreakerDamageDelivery::Ability) >= 1.0f - UE_KINDA_SMALL_NUMBER);
+
+    // What replaced it, asserted here rather than only in the pure test because
+    // a keystone that pays in isolation and is swamped by its own tree is still
+    // a dead keystone. +30% ability duration, on the axis the doctrine is named
+    // for: zones that keep working after you have looked away.
+    TestTrue(TEXT("Long Dark lengthens what the doctrine leaves on the ground"),
+        Stats.AbilityDurationMultiplier >= 1.30f - UE_KINDA_SMALL_NUMBER);
 
     // A hard, content-independent ceiling check regardless: whatever the
     // product is, it must never exceed the O3-cap composed against the

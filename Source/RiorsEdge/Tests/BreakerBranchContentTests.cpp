@@ -372,17 +372,28 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 unconditional
     Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne
     Ranks.Add({TEXT("Core.Velocity.RedlineDoctrine"), 1});    // x1.20 at Redline
-    Ranks.Add({TEXT("Swift.Kinetic.Overpressure"), 1});       // x1.20 sliding
-    Ranks.Add({TEXT("Swift.Marksman.Culling"), 1});           // x1.18 unconditional
-    Ranks.Add({TEXT("Swift.Frenzy.Bloodrhythm"), 1});         // x1.20 at Redline
+    // O95: these three author no More any more. They stay in the fixture
+    // deliberately -- owning every doctrine keystone must not change the
+    // multiplier layer at all, and that is asserted below.
+    Ranks.Add({TEXT("Swift.Kinetic.Overpressure"), 1});       // decay rule, no More
+    Ranks.Add({TEXT("Swift.Marksman.Culling"), 1});           // weapon pool, no More
+    Ranks.Add({TEXT("Swift.Frenzy.Bloodrhythm"), 1});         // fire rate, no More
 
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(
         Nodes, Ranks, nullptr, FBreakerBuildConditionState::All());
 
-    TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 7);
+    // FOUR, AND IT USED TO SAY SEVEN. Seven was four Core plus the three
+    // doctrine keystones that went through AddDamageMore -- it never counted
+    // Caster.VoidWhisperer.LongDark, which authored a x1.30 on the
+    // DamageOverTime pool directly and so was invisible to a search for the
+    // helper. The real figure before O95 was eight; this test asserted seven
+    // and passed. Now every More is Core's and the number is four.
+    TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 4);
     TestTrue(TEXT("More options outnumber the O3 cap, so holding three is a choice"),
         Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
-    // Strongest three only: 1.30 x 1.22 x 1.22.
+    // Strongest three of the four Core Convergences: 1.30 x 1.22 x 1.22. The
+    // doctrine keystones in this fixture contribute nothing to it, which is the
+    // point of leaving them in.
     TestEqual(TEXT("Only the strongest three More multipliers compose"), Stats.DamageMoreMultiplier, 1.30f * 1.22f * 1.22f, 0.0001f);
     // A hard upper bound stated independently of the content, so a future node
     // authored above the ceiling fails here rather than in a playtest.
@@ -395,10 +406,21 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     TArray<FBreakerNodeRank> RedlineOnly;
     RedlineOnly.Add({TEXT("Swift.Frenzy.Bloodrhythm"), 1});
     const FBreakerNodeStats Idle = UBreakerProgressionComponent::AggregateStats(Nodes, RedlineOnly);
-    TestEqual(TEXT("A Redline More pays nothing off Redline"), Idle.DamageMoreMultiplier, 1.0f, 0.0001f);
+    TestEqual(TEXT("A doctrine keystone composes no More off Redline"), Idle.DamageMoreMultiplier, 1.0f, 0.0001f);
     const FBreakerNodeStats Live = UBreakerProgressionComponent::AggregateStats(
         Nodes, RedlineOnly, nullptr, FBreakerBuildConditionState::All());
-    TestEqual(TEXT("A Redline More pays x1.20 at Redline"), Live.DamageMoreMultiplier, 1.20f, 0.0001f);
+    // O95: NOR AT REDLINE. The condition was never what made this node's
+    // multiplier legal; a doctrine authors none in any state. What the
+    // condition still gates is the replacement -- a fire-rate line that pays at
+    // Redline and nowhere else -- so the shape of the node is unchanged and
+    // only the lane it lands in has moved.
+    TestEqual(TEXT("...and none at Redline either"), Live.DamageMoreMultiplier, 1.0f, 0.0001f);
+    // That the REPLACEMENT pays is asserted next door, in
+    // RiorsEdge.Progression.Doctrine.KeystonesPayWithoutMores, because this
+    // fixture composes every More node at once and cannot attribute a lane to
+    // one of them. FireRate in particular has no FBreakerNodeStats field at
+    // all — it reaches only the attribute contribution — so a fixture reading
+    // node stats is structurally blind to Bloodrhythm's replacement.
 
     // --- The ceiling against the TIER-4 REWRITES (F9-F11, K9-K11, M9-M11) ---
     //

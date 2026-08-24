@@ -368,7 +368,11 @@ bool FBreakerTargetRiderLibraryAuthoringTest::RunTest(const FString& Parameters)
     // is ADDITIVE authoring, not a re-route of what the nodes already did.
     const FBreakerNodeStats& Stats = Progression->GetNodeStats();
     TestTrue(TEXT("Tunnel Vision's flat crit-damage line still aggregates"), Stats.CriticalMultiplierBonus > 0.0f);
-    TestEqual(TEXT("Culling's unconditional More still composes at its authored value"), Stats.DamageMoreMultiplier, 1.18f, 0.0001f);
+    // O95: Culling authors no More at all now -- a doctrine authors none, and
+    // every slot lives in Core. This build holds NO Core node, so the composed
+    // More product is exactly 1.0 and that is the assertion: the doctrine
+    // contributes nothing to the multiplier layer, by rule.
+    TestEqual(TEXT("A doctrine-only build composes no More at all (O95)"), Stats.DamageMoreMultiplier, 1.0f, 0.0001f);
 
     // A build without the nodes publishes no rows at all — the whole
     // pre-existing population is untouched by the authoring pass.
