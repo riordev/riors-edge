@@ -1635,20 +1635,30 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edge.GetTag());
     Tree->Nodes.Add(Node);
 
-    // The branch keystone O3 permits (1 of 3 for Caster). Class-Kits SB12
-    // prices its More at melee damage only — "melee-only is the tax" — and
-    // EBreakerBuildCondition is movement-only (O30): there is no way to key a
-    // MorePercent effect to "this hit was melee" without inventing an enum
-    // value, which is out of scope here. Authoring it unconditional would not
-    // be a placeholder magnitude, it would be a STRONGER node than designed
-    // (a free generalist where the doc taxes a delivery method), which is the
-    // exact kind of invention O2 forbids. So, like Core's Reaction Chain
-    // (E10) before it: the More slot is EMPTY BY RULE (O95). The keystone
-    // still exists, is still a cornerstone, and still grants the ability
-    // layer's tag so Unmake's Edgework row resolves.
+    // The branch keystone, and THE FIRST TAG RIDER IN THE CONTENT.
+    //
+    // This comment used to say there was "no way to key an effect to 'this hit
+    // was melee' without inventing an enum value, which is out of scope here",
+    // and concluded the slot was empty by rule. The first half stopped being
+    // true when O98 landed: MeleeDamage is RIDER-DELIVERED, keyed on the native
+    // Damage.Melee tag the request already carries, and
+    // RiorsEdge.Combat.TargetRiders.SourceTagMelee has proved the slice for a
+    // synthetic node ever since. No shipped node used it. A mechanism built,
+    // tested, and authored against by nothing is the same shape as a lane with
+    // no author -- and the paragraph asserting it could not be done is what
+    // kept it that way, which is the second time in this pass a justification
+    // outliving its cause has acted as a wall.
+    //
+    // WHAT IS AUTHORED IS AN INCREASED LINE, NOT A MORE. O95's prohibition is
+    // untouched: the More slot stays empty by rule and the keystone earns its
+    // place by rewriting the ultimate. The tag is the gate, which is what makes
+    // an unconditional-looking line honest here -- it pays only on a hit that
+    // says it IS melee, exactly the delivery tax Class-Kits SB12 prices, and
+    // never on the generic pools Progression.AxisOverlap reserves for Core.
     Node = MakeNode(TEXT("Caster.Spellblade.Edgework"), TEXT("Edgework"),
-        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
+        TEXT("Branch keystone. Your melee strikes land considerably harder. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 4, 1, 2);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
+    AddEffect(Node, EBreakerNodeStatTarget::MeleeDamage, EBreakerNodeStatBucket::IncreasedPercent, 25.0f); // O2 PLACEHOLDER -- melee-only is the tax, so it prices above the unconditional lanes
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edgework.GetTag());
     Node->GrantedTags.AddTag(BreakerAbilityTags::Keystone_Caster_Edgework.GetTag());
