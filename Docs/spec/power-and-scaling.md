@@ -242,8 +242,8 @@ retunes the whole game. No rested experience, no death penalty, party-neutral,
 and an account-wide flat catch-up for alts — the one sanctioned exception to the
 additive bucket, and there is not a second.
 
-Points: one Class Point per level to 30, one Core Point per level to 50, plus
-fifteen from world content.
+Points: one Core Point per level to 50 plus fifteen from world content — the
+only per-level point — and a doctrine's eight, paid whole at commitment.
 
 **There is no experience at cap.** A currency drops instead — a conversion
 would be a post-cap progression track wearing a currency's clothes.

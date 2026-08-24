@@ -174,19 +174,27 @@ thirty-two-point ones would make the third constellation meaningless.
 Links exist so a player can reach a second lane's notable without completing
 the first lane — the only way to build a two-notable splash with no keystone.
 
-### The class trees
+### The doctrines
 
-Three branches per class. As shipped, a branch is **12 nodes** with tier gates
-at 0 / 2 / 4 / 6 invested, and a keystone gated at 8 invested costing 3, so the
-first keystone becomes affordable through play at level 11.
+Three doctrines per class, one committed to per character, changed only at the
+Forge. A doctrine is the subclass: committing grants a visible identity as well
+as mechanics. As shipped, a doctrine is **12 nodes** with tier gates at
+0 / 2 / 4 / 6 invested, and a keystone gated at 8 invested costing 3.
 
-**The target shape is a five-tier branch of 12 nodes totalling 26 points**,
-gated at 0 / 3 / 6 / 10 / 16, which against 30 Class Points produces three
-distinct build shapes — one branch complete plus a splash, two branches to the
-rewrite tier, or three branches to the ability tier with breadth deliberately
-the thinnest. **That shape is not ruled.** It moves authored gates and breaks a
-pinned investment assertion, and it is entangled with the density question
-above, so the shipped shape stands until both are decided together.
+**A doctrine's whole budget is eight points, and it arrives at once.** That is
+what makes the board a set of refusals rather than a ladder: eight against
+roughly twenty-six offered means most of a doctrine is declined, and the
+declining happens in one sitting rather than being spread across thirty levels.
+
+**The old five-tier target shape is withdrawn rather than renumbered.** It
+argued three distinct build shapes from a thirty-point class budget — one branch
+complete plus a splash, two to the rewrite tier, three to the ability tier — and
+that budget no longer exists. An eight-point pool cannot complete a branch and
+splash, so the argument does not survive its premise; what replaces it has to be
+derived against eight, and has not been. The shipped gating stands.
+
+**A doctrine authors no More multiplier.** All three slots live in Core. A
+doctrine pays in rules: conversion, condition change, rule rewrite.
 
 
 ### The axes
@@ -205,11 +213,14 @@ tags, and splitting them makes a single weapon carry an entire axis alone.
 
 ### Points
 
-One Class Point per level to 30. One Core Point per level to 50. Roughly
-fifteen more Core Points from world content, distributed across the campaign.
-The slice's opening grant is an advance on that entitlement rather than a
-separate pool, so no frozen number has to move for a keystone to become
-reachable through play.
+Two pools and no third. **Core is 65**: one Core Point per level to 50, plus
+roughly fifteen from world content across the campaign. The slice's opening
+grant is an advance on that entitlement rather than a separate pool.
+
+**Doctrine is 8**, paid whole at commitment and only at the Forge. It has no
+per-level entitlement to advance against and no counter to settle up, which is
+why a respec zeroes the wallet rather than refunding it — the points belong to
+the commitment, not to the character.
 
 ## Boundaries
 

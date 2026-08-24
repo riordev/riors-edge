@@ -1545,11 +1545,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterSpellbladeTree()
     // be a placeholder magnitude, it would be a STRONGER node than designed
     // (a free generalist where the doc taxes a delivery method), which is the
     // exact kind of invention O2 forbids. So, like Core's Reaction Chain
-    // (E10) before it: the More slot is RESERVED, not spent. The keystone
+    // (E10) before it: the More slot is EMPTY BY RULE (O95). The keystone
     // still exists, is still a cornerstone, and still grants the ability
     // layer's tag so Unmake's Edgework row resolves.
     Node = MakeNode(TEXT("Caster.Spellblade.Edgework"), TEXT("Edgework"),
-        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit. Melee damage's 1.30x More is a recorded gap — see the code comment; no condition exists to tax it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Unmake: during it, Cleave has no animation lock and Closequarter loses its range limit."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Caster.Spellblade.Debt"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_SB_Edgework.GetTag());
@@ -1820,21 +1820,24 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
 // the tag and the WAITING ON comment names the consumer. Not a shortfall; the
 // honest reading of "a node may only author effects the enum can express."
 //
-// THE NINE KEYSTONE MORES ARE RESERVED, NOT SPENT — the Edgework/Cascade
-// pattern, nine times. Every one of them is conditioned on state the
-// condition vocabulary cannot express (no deployables active; inside your own
-// Disruptor field; Leech shield active; within 4 m of your own Anchor Point;
-// the blast's inner plateau; within 4 s of a heal; a Conductor buff live on
-// yourself; a target marked by you) and several also target partitions with
-// no composed More lane (WeaponDamage, MeleeDamage, deployable damage,
-// explosive damage — AggregateStats composes MorePercent only for Damage).
-// Authoring any of them unconditional would hand out a free generalist where
-// the treatment taxes a delivery method. So each keystone ships as a
-// cornerstone that grants its branch identity tag AND its Keystone.* tag —
-// the nine ultimate variant rows in BreakerAbilityDefinition.cpp resolve from
-// the day the node is bought — and the More slot stays empty until the
-// vocabulary can say the tax. O3's class budgets remain three reserved per
-// class, zero spent.
+// THE KEYSTONE MORES ARE NOT OWED. O95 rules that a doctrine authors NO More
+// multiplier at all: every one of the three slots lives in Core, where a
+// convergence behind a deep investment gate makes reaching one genuinely
+// expensive, and a doctrine pays in RULES instead — conversion, condition
+// change, rule rewrite.
+//
+// So the empty More slot on every keystone below is CORRECT rather than
+// pending, and the comments at each site say so. They used to read "RESERVED,
+// not spent", which was honest about the code and wrong about the design: it
+// described a debt the ledger has since cancelled. Nothing here is waiting for
+// a condition vocabulary wide enough to say "while no deployable is active" or
+// "within 4 m of your own Anchor Point" — even with that vocabulary the
+// multiplier would still be forbidden.
+//
+// What each keystone DOES pay is its rule, and the rule is live: each grants
+// its branch identity tag AND its Keystone.* tag, and the ultimate variant rows
+// in BreakerAbilityDefinition.cpp resolve from the day the node is bought.
+// That is the whole payload by design, not the surviving half of one.
 //
 // "GRANTS X" TIER-3 NODES DO NOT RE-AUTHOR ABILITY GRANTS. All seven ability
 // ids per class are partitioned across StarterAbilityIds, UnlockableAbilityIds
@@ -1962,11 +1965,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithArmoryTree()
 
     // AR12 MACHINIST — the branch keystone, compressed to tier 3 / cost 3
     // (block comment above). Its 1.25x weapon-damage More "while you have no
-    // deployables active" is RESERVED, not spent: no deployable-state
+    // deployables active" is NOT OWED (O95 bars a doctrine More): no deployable-state
     // condition exists and WeaponDamage has no composed More lane. The
     // keystone tag is live — Field Assembly's Machinist row resolves.
     Node = MakeNode(TEXT("Gunsmith.Armory.Machinist"), TEXT("Machinist"),
-        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing. Its no-deployables 1.25x weapon More is a recorded gap — see the code comment; no condition exists to tax it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly: the ultimate becomes a personal buff for the Gunsmith who placed nothing."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Gunsmith.Armory.ColdBarrel"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_AR_Machinist.GetTag());
@@ -2080,11 +2083,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithFieldTechTree()
     Tree->Nodes.Add(Node);
 
     // FT12 FOUNDRY — keystone, tier-3/cost-3 compression. Its 1.30x More on
-    // DEPLOYABLE damage is RESERVED: no deployable-damage stat target exists
+    // DEPLOYABLE damage is NOT OWED (O95): no deployable-damage stat target exists
     // and no other partition can carry "the machines hit harder" honestly.
     // Field Assembly's Foundry row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.FieldTech.Foundry"), TEXT("Foundry"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines. Its deployable-damage 1.30x More is a recorded gap — see the code comment; no deployable-damage lane exists to carry it."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly for the builder who spends their whole loadout on machines."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Gunsmith.FieldTech.Tithe"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_FT_Foundry.GetTag());
@@ -2201,10 +2204,10 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetGunsmithTinkererTree()
 
     // TK12 MINEFIELD — keystone, tier-3/cost-3 compression. Its 1.20x More
     // ("inside one of your Disruptor fields, or by a 10s-patient mine") is
-    // RESERVED — both conditions are deployable state the vocabulary cannot
+    // NOT OWED (O95) — both conditions are deployable state the vocabulary cannot
     // say. Field Assembly's Minefield row resolves off the tag below.
     Node = MakeNode(TEXT("Gunsmith.Tinkerer.Minefield"), TEXT("Minefield"),
-        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be. Its in-field 1.20x More is a recorded gap — see the code comment; no deployable-state condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Field Assembly for the player who was right about where the enemy would be."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Gunsmith, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Gunsmith.Tinkerer.AttritionField"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_TK_Minefield.GetTag());
@@ -2322,12 +2325,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankLeechTree()
     Tree->Nodes.Add(Node);
 
     // L12 VEIN — keystone, tier-3/cost-3 compression. Its 1.25x MELEE More
-    // while Leech shield is active is RESERVED twice over: MeleeDamage has no
+    // while Leech shield is active is NOT OWED (O95), and was blocked twice over: MeleeDamage has no
     // composed More lane, and no shield-state condition exists — and the
     // treatment says the double tax IS the design, so an unconditional
     // stand-in would be strictly wrong. Hold's Vein row resolves off the tag.
     Node = MakeNode(TEXT("Tank.Leech.Vein"), TEXT("Vein"),
-        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity. Its shield-gated 1.25x melee More is a recorded gap — see the code comment."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold: the cap comes off and incoming damage converts to healing at a damped rate — attrition, not immunity."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Tank.Leech.Transfusion"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_L_Vein.GetTag());
@@ -2455,13 +2458,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankBastionTree()
     Tree->Nodes.Add(Node);
 
     // B12 WALL — keystone, tier-3/cost-3 compression. Its 1.20x all-damage
-    // More within 4 m of your own Anchor Point is RESERVED: the tax is
+    // More within 4 m of your own Anchor Point is NOT OWED (O95): the tax is
     // positional and no anchor-proximity condition exists. Deliberately NOT
     // authored unconditional — the ability's cooldown and lifetime bound its
     // uptime, and stripping the position strips the tax. Hold's Wall row
     // resolves off the tag below.
     Node = MakeNode(TEXT("Tank.Bastion.Wall"), TEXT("Wall"),
-        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone. Its near-anchor 1.20x More is a recorded gap — see the code comment; no positional condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold: your per-hit cap extends to allies, and doubles when you are alone."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Tank.Bastion.HeldGround"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_B_Wall.GetTag());
@@ -2585,13 +2588,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetTankDemolitionistTree()
     Tree->Nodes.Add(Node);
 
     // D12 DETONATION — keystone, tier-3/cost-3 compression. Its 1.30x More on
-    // EXPLOSIVE damage inside D1's inner plateau is RESERVED: no explosive
+    // EXPLOSIVE damage inside D1's inner plateau is NOT OWED (O95): no explosive
     // partition target and no blast-geometry condition exist, and the
     // treatment's point — a point-blank multiplier on a class that must be
     // point-blank — dies if authored unconditional. Hold's Detonation row
     // resolves off the tag below. Tank's three Mores stay reserved, not spent.
     Node = MakeNode(TEXT("Tank.Demolitionist.Detonation"), TEXT("Detonation"),
-        TEXT("Branch keystone. Rewrites Hold for the Tank who fights inside their own blast radius. Its inner-plateau 1.30x explosive More is a recorded gap — see the code comment; no blast-geometry condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Hold for the Tank who fights inside their own blast radius."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Tank, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Tank.Demolitionist.Fragmentation"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_D_Detonation.GetTag());
@@ -2718,12 +2721,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportMedicTree()
     Tree->Nodes.Add(Node);
 
     // MD12 TRIAGE — keystone, tier-3/cost-3 compression. Its 1.20x WEAPON
-    // More for 4s after any heal is RESERVED: no RecentlyHealed condition
+    // More for 4s after any heal is NOT OWED (O95): no RecentlyHealed condition
     // exists (the Recently* family has no healed entry and is not yet
     // evaluable besides) and WeaponDamage has no composed More lane.
     // Conduit's Triage row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Medic.Triage"), TEXT("Triage"),
-        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts. Its after-heal 1.20x weapon More is a recorded gap — see the code comment; no recently-healed condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit: a continuous healing field with one lethal-hit save per target, and no free casts."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Support.Medic.SteadyHands"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MD_Triage.GetTag());
@@ -2850,13 +2853,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportConductorTree()
     Tree->Nodes.Add(Node);
 
     // CO12 DOWNBEAT — keystone, tier-3/cost-3 compression. Its 1.25x WEAPON
-    // More while a self-authored Conductor buff is live on YOU is RESERVED:
+    // More while a self-authored Conductor buff is live on YOU is NOT OWED (O95):
     // no buff-state condition exists and WeaponDamage has no composed More
     // lane. "On yourself" is the deliberate solo-satisfiable condition, and
     // dropping it would change the node's meaning, not its number. Conduit's
     // Downbeat row resolves off the tag below.
     Node = MakeNode(TEXT("Support.Conductor.Downbeat"), TEXT("Downbeat"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves. Its self-buffed 1.25x weapon More is a recorded gap — see the code comment; no buff-state condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit for the Support whose first instrument is themselves."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Support.Conductor.Rehearsal"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_CO_Downbeat.GetTag());
@@ -2982,14 +2985,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSupportWardenTree()
     Tree->Nodes.Add(Node);
 
     // WA12 BLACKOUT — keystone, tier-3/cost-3 compression. Its 1.30x More
-    // against targets marked by you is RESERVED: no target-marked condition
+    // against targets marked by you is NOT OWED (O95): no target-marked condition
     // exists (a mark is ability state, not a Status.* tag, so TargetAiling
     // cannot stand in). The condition being self-supplied at level 1 by a
     // starter is exactly why unconditional would be wrong — it would delete
     // the one requirement the solo loop is built around. Conduit's Blackout
     // row resolves off the tag below. Support's three Mores stay reserved.
     Node = MakeNode(TEXT("Support.Warden.Blackout"), TEXT("Blackout"),
-        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally. Its marked-target 1.30x More is a recorded gap — see the code comment; no target-marked condition exists to key it honestly."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
+        TEXT("Branch keystone. Rewrites Conduit for the Support who plays the enemy, not the ally."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Support, 3, 1, 3);
     AddPrerequisite(Node, TEXT("Support.Warden.Handoff"));
     Node->bCornerstone = true;
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_WA_Blackout.GetTag());

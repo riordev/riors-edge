@@ -17,8 +17,8 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 143 of 202 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 41 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
-| Offered-to-spendable ratio, per tree | floor | 0.63 worst tree | floor 3.0 | **OUT** |
+| Asserted invariants with no test | ceiling | 40 of 103 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Offered-to-spendable ratio, per tree | floor | 1.05 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 14 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 50 of 205 authored | ceiling 50 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
@@ -35,7 +35,7 @@ measurement without judging it.
 - passing: 426
 - expected red: 2
 - **unexpected red: 0**
-- asserted invariants with no test: 41
+- asserted invariants with no test: 40
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -172,7 +172,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 41 of 104 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 40 of 103 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -189,7 +189,6 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Abilities.OvercastRefuses  —  classes-and-abilities.md
 - Classes.GenerationCaps  —  classes-and-abilities.md
 - Classes.SoloGeneration  —  classes-and-abilities.md
-- Progression.AxisOverlap  —  classes-and-abilities.md
 - Progression.ConditionVocabulary.ResourceDepleted  —  classes-and-abilities.md
 - Classes.GenerationReachability  —  classes-and-abilities.md
 - Combat.Armor.Floor  —  combat.md
@@ -216,30 +215,30 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Progression.AxisOverlap  —  progression-and-trees.md
 - Progression.BranchCommitment  —  progression-and-trees.md
 - Progression.TreeDensity.Offered  —  progression-and-trees.md
-- …and 1 more
+- Progression.TreeDensity.Composition  —  progression-and-trees.md
 
 ## Offered-to-spendable ratio, per tree
 
-**floor** · 0.63 worst tree · floor 3.0  ·  **OUT**
+**floor** · 1.05 worst tree · floor 3.0  ·  **OUT**
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it.
 
-- GetCasterMultispellTree: 9 nodes, 19 points offered, 0.63x budget
-- GetCasterSpellbladeTree: 9 nodes, 19 points offered, 0.63x budget
-- GetCasterVoidWhispererTree: 9 nodes, 19 points offered, 0.63x budget
+- GetCasterMultispellTree: 9 nodes, 19 points offered, 2.38x budget
+- GetCasterSpellbladeTree: 9 nodes, 19 points offered, 2.38x budget
+- GetCasterVoidWhispererTree: 9 nodes, 19 points offered, 2.38x budget
 - GetCoreSliceTree: 30 nodes, 68 points offered, 1.05x budget
-- GetGunsmithArmoryTree: 12 nodes, 25 points offered, 0.83x budget
-- GetGunsmithFieldTechTree: 12 nodes, 25 points offered, 0.83x budget
-- GetGunsmithTinkererTree: 12 nodes, 25 points offered, 0.83x budget
-- GetSupportConductorTree: 12 nodes, 25 points offered, 0.83x budget
-- GetSupportMedicTree: 12 nodes, 25 points offered, 0.83x budget
-- GetSupportWardenTree: 12 nodes, 25 points offered, 0.83x budget
-- GetSwiftFrenzyTree: 13 nodes, 27 points offered, 0.9x budget
-- GetSwiftKineticTree: 14 nodes, 29 points offered, 0.97x budget
-- GetSwiftMarksmanTree: 13 nodes, 27 points offered, 0.9x budget
-- GetTankBastionTree: 12 nodes, 25 points offered, 0.83x budget
-- GetTankDemolitionistTree: 12 nodes, 25 points offered, 0.83x budget
-- GetTankLeechTree: 12 nodes, 25 points offered, 0.83x budget
+- GetGunsmithArmoryTree: 12 nodes, 25 points offered, 3.12x budget
+- GetGunsmithFieldTechTree: 12 nodes, 25 points offered, 3.12x budget
+- GetGunsmithTinkererTree: 12 nodes, 25 points offered, 3.12x budget
+- GetSupportConductorTree: 12 nodes, 25 points offered, 3.12x budget
+- GetSupportMedicTree: 12 nodes, 25 points offered, 3.12x budget
+- GetSupportWardenTree: 12 nodes, 25 points offered, 3.12x budget
+- GetSwiftFrenzyTree: 13 nodes, 27 points offered, 3.38x budget
+- GetSwiftKineticTree: 14 nodes, 29 points offered, 3.62x budget
+- GetSwiftMarksmanTree: 13 nodes, 27 points offered, 3.38x budget
+- GetTankBastionTree: 12 nodes, 25 points offered, 3.12x budget
+- GetTankDemolitionistTree: 12 nodes, 25 points offered, 3.12x budget
+- GetTankLeechTree: 12 nodes, 25 points offered, 3.12x budget
 
 ## Node-shape composition, per tree
 

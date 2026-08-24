@@ -174,7 +174,6 @@ own:
 | A cast that would breach the resource floor is refused, not truncated | `Abilities.OvercastRefuses` |
 | Per-source generation caps hold under a maximal farming rotation | `Classes.GenerationCaps` |
 | Every class reaches its ultimate solo, against solo content | `Classes.SoloGeneration` |
-| No class node authors a stat target a Core node on the same axis authors | `Progression.AxisOverlap` |
 | A resource-depleted condition cannot be satisfied by a loop that has never been spent | `Progression.ConditionVocabulary.ResourceDepleted` |
 | Every class's resource generates in every state that class is expected to fight in | `Classes.GenerationReachability` |
 | Starters, unlockables and the ultimate partition the class's registered abilities exactly | `Abilities.Catalogue.Partition` |

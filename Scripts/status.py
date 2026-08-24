@@ -689,14 +689,17 @@ def build_sections(sources):
     })
 
     # --- tree density: offered-to-spendable (FLOOR) -----------------------
-    core_budget, class_budget = 65, 30
+    # O111: two pools. Core 65, Doctrine 8. The doctrine figure is not a
+    # per-level entitlement -- all eight arrive at commitment -- so it is the
+    # whole budget a doctrine is ever measured against, not a cap it climbs to.
+    core_budget, doctrine_budget = 65, 8
     by_tree = defaultdict(list)
     for n in nodes:
         by_tree[n["tree"]].append(n)
     ratios = []
     for tree, ns in sorted(by_tree.items()):
         offered = sum(n["cost"] * max(1, n["ranks"]) for n in ns)
-        budget = core_budget if "Core" in tree else class_budget
+        budget = core_budget if "Core" in tree else doctrine_budget
         ratios.append((tree, len(ns), offered, round(offered / budget, 2)))
     worst = min((r[3] for r in ratios), default=0)
     sections.append({
