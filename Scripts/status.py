@@ -1043,6 +1043,7 @@ def parse_band_edges():
     # a C++ expression evaluator and must not grow into one: anything more
     # complicated than one operator belongs in the test as an assertion, where a
     # person reads it, rather than in a parser nobody reads.
+    derived = set()
     for m in re.finditer(r"constexpr\s+float\s+(\w+)\s*=\s*(\w+)\s*/\s*(\w+)\s*;", text):
         name, num, den = m.group(1), m.group(2), m.group(3)
         if name in edges or num not in edges or den not in edges:
@@ -1050,6 +1051,30 @@ def parse_band_edges():
         if edges[den] == 0.0:
             raise ParseError(f"{BAND_SOURCE}: {name} divides by {den}, which is zero.")
         edges[name] = edges[num] / edges[den]
+        derived.add(name)
+
+    # THE ONE CHECK NO RUNTIME ASSERTION CAN MAKE.
+    #
+    # RewriteLayerCeilingValue must be DECLARED as a quotient of two band edges,
+    # not written as its result. The suite cannot tell the difference: 1.25f and
+    # EndgameBandMaximum / EndgameBandMid are the same float, so a test
+    # comparing them passes either way. A transcription is only wrong LATER,
+    # when an edge moves and the copy stays -- and by then the ceiling silently
+    # describes a band that no longer exists.
+    #
+    # That is not hypothetical for this constant. Its first derivation was a
+    # standalone number with no tie to the band it claimed a share of, and it
+    # was wrong by 1.55x while every assertion around it passed.
+    #
+    # Named explicitly rather than inferred. A general rule would need to guess
+    # which constants are meant to be derived, and guessing is what this guard
+    # exists to stop; one symbol earns one line because it went wrong once.
+    if "RewriteLayerCeilingValue" in edges and "RewriteLayerCeilingValue" not in derived:
+        raise ParseError(
+            f"{BAND_SOURCE}: RewriteLayerCeilingValue is declared as a literal, not as a "
+            "quotient of two band edges. It is the headroom the authored band leaves above "
+            "its centre and must move when a band edge moves; written as a number it stops "
+            "doing that silently, and no test can see the difference.")
     return edges
 
 

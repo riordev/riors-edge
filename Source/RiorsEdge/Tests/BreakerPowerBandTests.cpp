@@ -413,6 +413,28 @@ namespace BreakerPowerBandTest
     // on content working exactly as designed (measured ~1.462x against the
     // old 1.35x ceiling). Every OTHER rollable rewrite stays at 1.35x.
     constexpr float MaximumProlificRuleStep = 1.5f;   // O36, O2 PLACEHOLDER seed
+    // MEASURED, NOT CHANGED: 16.0 is the ARITHMETIC mean of 12-20, in a file
+    // that treats the band multiplicatively everywhere else -- the at-cap
+    // derivation immediately below is Loge(AtCapBandMid) / Loge(EndgameBandMid),
+    // i.e. log-space. The geometric mean of 12-20 is 15.4919.
+    //
+    // The measured no-rewrite build is 15.4720: 0.13% under the geometric mean
+    // and 3.30% under this one. Whether that closeness is structural was asked
+    // and answered NO in mechanism: nothing in BaselineLoadout, OptimizedLoadout,
+    // BaselineRanks, OptimizedRanks or Compose reads a band edge, so no code
+    // path pulls the measurement toward either centre -- it is the product of
+    // four independently authored layers (1.30 x 2.71 x 1.93 x 2.27). But it is
+    // not surprising either: a ratio of two multiplicatively composed builds,
+    // tuned by feel to sit mid-band, lands near the GEOMETRIC centre, because
+    // that is what "the middle" means for a product. Coincidence in mechanism,
+    // a real tendency in kind.
+    //
+    // WHAT IT WOULD CHANGE, so the owner can rule on it with the numbers in
+    // hand: a geometric mid puts the rewrite layer ceiling at 1.2910 rather
+    // than 1.2500. Prolific breaches by 13.4% instead of 17.1%, and the
+    // authored major-plus-stack of 1.2384 still fits. The red stands either
+    // way, which is why this is a measurement and not an edit -- a band edge or
+    // its centre is the owner's number.
     constexpr float EndgameBandMid = 16.0f;   // O36 authored 12-20x
     constexpr float AtCapBandMid = 9.0f;      // O36 authored 8-10x
 
@@ -914,13 +936,27 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
     // minor-stack spans it exactly. If either equality breaks, somebody
     // edited one constant without re-deriving the pair — which is the
     // authoring-before-deriving failure O96 exists to forbid.
-    // The layer is what the authored band has left once the other avenues have
-    // produced its midpoint. This fails if either band edge moves, which is the
-    // point -- the ceiling is a function of the band and not a number beside it.
-    TestEqual(TEXT("the rewrite layer ceiling is the endgame band's headroom above its midpoint"),
-        RewriteLayerCeiling(), EndgameBandMaximum / EndgameBandMid, 0.0001f);
+    // THERE IS NO ASSERTION HERE THAT THE LAYER CEILING EQUALS THE BAND
+    // HEADROOM, AND THAT IS DELIBERATE. There was one, and it was the same
+    // tautology as the partition it replaced: RewriteLayerCeilingValue IS
+    // EndgameBandMaximum / EndgameBandMid, so asserting the two are equal is
+    // A/B == A/B -- true for every value of both edges, with a comment claiming
+    // it would fail if an edge moved. Both sides move together.
+    //
+    // It also could not catch the case it was written for. Replace the
+    // declaration with a literal 1.25f and it still passes, because 1.25 really
+    // does equal 20/16 -- and a transcribed constant is only wrong LATER, when
+    // an edge moves and the copy does not. No runtime assertion can distinguish
+    // a derivation from a correct transcription of its result, because at
+    // runtime they are the same float.
+    //
+    // So the guard for that lives where the two forms ARE distinguishable: in
+    // the source. Scripts/status.py's parse_band_edges refuses the report if
+    // this constant is not declared as a quotient of two named edges. What is
+    // asserted here instead is the thing a runtime check can actually see --
+    // that what the layer permits FITS, below.
 
-    // AND THIS ONE CAN FAIL, WHICH THE VERSION BEFORE IT COULD NOT. It asserted
+    // THIS ONE CAN FAIL, WHICH THE VERSION BEFORE IT COULD NOT. It asserted
     // major x stack == layer while the stack was DEFINED as layer / major --
     // x * (k/x) == k, true for every x, a partition asserting itself. Now all
     // three are independent and the claim is that they FIT: raise either

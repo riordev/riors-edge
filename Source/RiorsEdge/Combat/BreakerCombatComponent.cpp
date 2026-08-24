@@ -69,6 +69,30 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // the day elemental incoming lands (O5/O38) the gear line pays with no
     // further wiring — and until then the branch is simply never taken,
     // because no request arrives carrying the family.
+    // THE LOOKUP IS GEAR-SHAPED, AND THAT IS THE REAL BLOCKER ON ENEMY
+    // RESISTANCE -- recorded, not built.
+    //
+    // Only ABreakerCharacter constructs a UBreakerEquipmentComponent, so an
+    // enemy finds nothing here and takes no reduction of either family. That is
+    // why Core.Elements.Penetrance still has nothing to penetrate. The obvious
+    // fix -- give enemies the component -- is WRONG and was rejected: its
+    // BeginPlay calls EnsureStarterKit, so every enemy would spawn holding an
+    // Issue Rifle, and it also brings bCanEverTick, SetIsReplicatedByDefault
+    // and BindCombatEvents per spawn. Six other sites look this component up
+    // off an arbitrary owner and would all start finding one.
+    //
+    // THE SHAPE, when it is built: GetIncomingReduction(Family) on this
+    // component -- equipment when there is one, the owner's chassis otherwise,
+    // zero by default. The seam goes live without anything else moving, and
+    // enemy resistance then sits on the CHASSIS beside ModifierHealthMultiplier,
+    // which is where it belongs: effective health is HP x 1/(1-R), the chassis
+    // already owns the other lever, and two independent tables producing one
+    // quantity is the failure the reward ladders are already an instance of.
+    //
+    // NOT YET, and O116 is why. Time-to-die is solved at 4.50s and 4.53s
+    // against one baseline character at both ends; a resistance term multiplies
+    // it directly, so a non-zero value has to be folded into that derivation
+    // rather than added on top of it.
     if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
         if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
