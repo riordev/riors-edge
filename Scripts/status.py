@@ -477,7 +477,7 @@ def parse_declared_tests(sources):
     THIS SET IS THE REFERENCE the suite log is reconciled against, so a name it
     cannot see is a test that can vanish from a run unnoticed. The old pattern
     required the name to follow the class directly, and one macro carries a
-    comment between the two — RiorsEdge.Progression.RuleBandImpact, which has a
+    comment between the two — RiorsEdge.Progression.RuleBandImpact.Step, which has a
     passing test and was reported as an UNIMPLEMENTED INVARIANT the whole time,
     because this parse is also what the invariant section matches against. The
     macro head is stripped of comments before the name is read.
@@ -960,7 +960,7 @@ EMITTED_BY_TEST = [
     # notice, not a build to stop shipping. The test already asserts separately
     # that no rewrite LOWERS a build's damage, which is the lower edge.
     ("rewrite-impact", "Worst single rewrite step on an optimized build", CEILING,
-     "RiorsEdge.Progression.RuleBandImpact"),
+     "RiorsEdge.Progression.RuleBandImpact.Step"),
     # THE CAMPAIGN'S PAYOUT GAP, as a number. O7 rules fifteen world Core Points
     # canon and eight of the twenty-eight authored missions pay one as their
     # entire reward, so a source whose trigger does not exist is a mission with

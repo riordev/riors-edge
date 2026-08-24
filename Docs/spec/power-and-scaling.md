@@ -274,7 +274,7 @@ does not own:
 | Weapon base tracks item level; archetype ordering survives scaling | `Weapons.ItemLevelCurve`, `Weapons.ItemLevelTracksMonsterHealth` |
 | The at-cap band lands in 8–10x | `Progression.PowerBand.AtCap` |
 | The endgame band lands in 12–20x | `Progression.PowerBand.Endgame` |
-| Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact` |
+| Rewrite impact stays under its per-band ceiling | `Progression.RuleBandImpact.Step` |
 | The composed More product never exceeds the ceiling, from any combination of layers | `Items.Rules.NeverAuthorsAMore` |
 | An ability-lane More counts inside the same ceiling as a weapon-lane one | `Progression.PowerBand.AbilityLaneMore` |
 | A hit whose weak-point gate was removed does not also take crit | `Combat.Ceiling.GateRemoval` |

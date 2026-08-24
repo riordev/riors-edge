@@ -393,6 +393,82 @@ namespace BreakerPowerBandTest
             OptimizedLoadout(AtCapItemLevel, OptimizedTierFor(AtCapItemLevel)), OptimizedRanks(), State);
         return Optimized.Total / Baseline.Total;
     }
+
+    // -----------------------------------------------------------------------
+    // THE REWRITE CEILINGS, all of them in one place, consumed by the
+    // RuleBandImpact tests below.
+    // -----------------------------------------------------------------------
+    // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
+    // one Anomalous rewrite is the top of the rarity ladder, so it has to be a
+    // real step. It must NOT be so large that finding the right Anomalous is
+    // worth more than the whole optimized loadout, which is what "choices beat
+    // accumulation" (O27) would look like inverted.
+    constexpr float MaximumRuleStep = 1.35f;
+    // O36's re-anchor: PROLIFIC gets its OWN, HIGHER ceiling at the endgame
+    // fixture. Its whole value IS the size of the T1->T0 tier step (it
+    // resolves an affix one tier better), and O29 re-sited that spike from
+    // x1.4 to x2.2 -- PROLIFIC got materially stronger without anybody editing
+    // it, which is a real and expected consequence of the wider ladder, not a
+    // balance regression. Re-using the generic 1.35x ceiling here would fail
+    // on content working exactly as designed (measured ~1.462x against the
+    // old 1.35x ceiling). Every OTHER rollable rewrite stays at 1.35x.
+    constexpr float MaximumProlificRuleStep = 1.5f;   // O36, O2 PLACEHOLDER seed
+    constexpr float EndgameBandMid = 16.0f;   // O36 authored 12-20x
+    constexpr float AtCapBandMid = 9.0f;      // O36 authored 8-10x
+
+    // A ceiling is a share of the band it sits in, and the two bands are not
+    // the same size, so an endgame ceiling carried down to level 50 would
+    // assert nothing there. The share is taken in LOG space because a step is
+    // multiplicative and so is a band. O2 PLACEHOLDER, AND SO IS THIS LAW
+    // ITSELF, which is the part that wants a ruling rather than a number; the
+    // arithmetic-share reading (1 + 0.35 * 9/16 = 1.197) is the other
+    // candidate and is stated so the choice is visible rather than implied.
+    // Anchored to the AUTHORED bands at their midpoints — never to the
+    // measurements, because the at-cap measurement is itself out of band and
+    // expected-red, and anchoring a ceiling to a number that is already wrong
+    // bakes the error in twice.
+    inline float AtCapCeilingFor(float EndgameCeiling)
+    {
+        return FMath::Pow(EndgameCeiling, FMath::Loge(AtCapBandMid) / FMath::Loge(EndgameBandMid));
+    }
+
+    // ---- O96: the two rewrite-impact ceilings, derived before authoring ----
+    // The restructure (O63/O68) makes the worst-case rewrite layer THREE
+    // minors plus ONE major, and O96 orders both ceilings derived before any
+    // rewrite is authored against them. The derivation:
+    //
+    // The LAYER: identity has four independently expandable avenues (O33 —
+    // class, Core axes, gear affixes, rule rewrites) and no avenue may be the
+    // trunk, so the rewrite avenue takes an equal LOG share of the authored
+    // endgame band midpoint: 16^(1/4) = 2.0. Everything below is arithmetic;
+    // this equal-share law is the one seed that wants a ruling (O2).
+    //
+    // The PARTITION: the major slot inherits the ruled top single step. 1.5 is
+    // what O36 already allows at the top of the ladder, the legendary pair
+    // already lives under it, and it is 97% spent (the 1.46 the
+    // `rewrite-impact` pin tracks) — deriving a different major ceiling would
+    // re-price shipped content as a side effect. The three-minor stack gets
+    // what is left: 2.0 / 1.5 = 4/3. A full stack of three minors is worth
+    // less than one major, which is O65's distinction priced — a minor changes
+    // the terms of a rule, a major changes the shape of what happens on
+    // screen.
+    //
+    // What this prices TODAY: the stack ceiling implies (4/3)^(1/3) = 1.101
+    // per minor. When O63 reclassifies the four rolled rewrites as Aberrant's
+    // minor pool, any of them worth more than ~1.10 on an optimized build
+    // must come down or stay major-slot content — that is the breach O96
+    // predicted, now a number instead of a surprise.
+    //
+    // MinorStack deliberately has NO measuring test: no minor classification
+    // exists and the equip caps admit one rule today, so a three-minor stack
+    // cannot be composed, and a derivation-only test filed under
+    // Progression.RuleBandImpact.MinorStack would retire that invariant
+    // without measuring a stack — the exact partial-test-under-full-name
+    // failure the naming comment on the Step test records. The ceiling
+    // precedes the content; the measurement arrives with the content.
+    constexpr float MaximumMajorStep = MaximumProlificRuleStep;
+    inline float RewriteLayerCeiling() { return FMath::Pow(EndgameBandMid, 1.0f / 4.0f); }   // = 2.0 exactly
+    inline float MaximumMinorStackStep() { return RewriteLayerCeiling() / MaximumMajorStep; }   // = 4/3
 }
 
 // ---------------------------------------------------------------------------
@@ -620,7 +696,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     // one widget pair (it is now UI.Teal.SealedCluster), and this test claimed
     // "rewrite impact stays under its PER-BAND ceiling" while measuring one
     // band. Two bands are asserted, so two bands are measured below.
-    "RiorsEdge.Progression.RuleBandImpact",
+    //
+    // RENAMED AGAIN — ".Step" — for the FIRST reason: O96's ceilings brought a
+    // sibling (RuleBandImpact.Major below, MinorStack to follow when a stack
+    // exists), and a test named for the bare prefix swallows its own children
+    // in UE's automation tree exactly as PowerBand.RuleImpact once swallowed
+    // this one. The name now says what it measures: the STEP of one rollable
+    // rewrite on one piece, per band.
+    "RiorsEdge.Progression.RuleBandImpact.Step",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
@@ -636,44 +719,12 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
 
     const FBreakerBuildConditionState State = MeasurementState();
 
-    // O2 PLACEHOLDER, and the reason it is stated here rather than felt later:
-    // one Anomalous rewrite is the top of the rarity ladder, so it has to be a
-    // real step. It must NOT be so large that finding the right Anomalous is
-    // worth more than the whole optimized loadout, which is what "choices beat
-    // accumulation" (O27) would look like inverted.
-    constexpr float MaximumRuleStep = 1.35f;
-    // O36's re-anchor: PROLIFIC gets its OWN, HIGHER ceiling at the endgame
-    // fixture. Its whole value IS the size of the T1->T0 tier step (it
-    // resolves an affix one tier better), and O29 re-sited that spike from
-    // x1.4 to x2.2 -- PROLIFIC got materially stronger without anybody editing
-    // it, which is a real and expected consequence of the wider ladder, not a
-    // balance regression. Re-using the generic 1.35x ceiling here would fail
-    // on content working exactly as designed (measured ~1.462x against the
-    // old 1.35x ceiling). Every OTHER rollable rewrite stays at 1.35x.
-    constexpr float MaximumProlificRuleStep = 1.5f;   // O36, O2 PLACEHOLDER seed
-
-    // THE AT-CAP CEILINGS, RE-ANCHORED. power-and-scaling says "rewrite-impact
-    // ceilings re-anchor per band" and then authors one pair; 1.35 and 1.5 were
-    // both derived at the endgame fixture. A ceiling is a share of the band it
-    // sits in, and the two bands are not the same size, so carrying the endgame
-    // pair down to level 50 would assert nothing there.
-    //
-    // O2 PLACEHOLDER, AND SO IS THE DERIVATION LAW ITSELF, which is the part
-    // that wants a ruling rather than a number. A step is multiplicative and so
-    // is a band, so the share is taken in LOG space: the endgame ceiling is
-    // log(1.35)/log(16) of its band, and the same share of the at-cap band is
-    // 9^(that). Anchored to the AUTHORED bands — 12-20x and 8-10x, at their
-    // midpoints — never to the measurements, because the at-cap measurement is
-    // itself out of band and expected-red, and anchoring a ceiling to a number
-    // that is already wrong bakes the error in twice.
-    //
-    // The arithmetic-share reading (1 + 0.35 * 9/16 = 1.197) is the other
-    // candidate and is stated so the choice is visible rather than implied.
-    constexpr float EndgameBandMid = 16.0f;   // O36 authored 12-20x
-    constexpr float AtCapBandMid = 9.0f;      // O36 authored 8-10x
+    // The ceilings live in the fixture namespace above, beside the O96 pair
+    // they now share a derivation block with; the at-cap variants come from
+    // AtCapCeilingFor, the log-space band-share law recorded there.
+    const float MaximumRuleStepAtCap = AtCapCeilingFor(MaximumRuleStep);
+    const float MaximumProlificRuleStepAtCap = AtCapCeilingFor(MaximumProlificRuleStep);
     const float BandShare = FMath::Loge(AtCapBandMid) / FMath::Loge(EndgameBandMid);
-    const float MaximumRuleStepAtCap = FMath::Pow(MaximumRuleStep, BandShare);
-    const float MaximumProlificRuleStepAtCap = FMath::Pow(MaximumProlificRuleStep, BandShare);
 
     struct FRuleBandFixture
     {
@@ -760,6 +811,106 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
         Compose(Untouched, OptimizedRanks(), State).Total / EndgameBaseline.Total,
         EndgameOptimized.Total / EndgameBaseline.Total, 0.0001f);
     BreakerStatus::Emit(TEXT("rewrite-impact"), WorstRuleStep);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O96/O68 — the MAJOR ceiling, asserted against its full current population.
+// No rolled major exists (O63's minor/major classification is unbuilt), and
+// O68 rules that a legendary's authored pair OCCUPIES the major slot rather
+// than sitting beside it — so today the legendaries ARE the majors, and a
+// test that waited for rolled majors would leave the ceiling asserted by
+// nothing while three legendaries ship against it. The step method is the
+// Step test's: the rule lands on the optimized helmet and the measurement is
+// what it adds on top of a build that already did everything else right. The
+// PAIR's other half — a legendary's generic affixes (O87) — is the power
+// band's own subject, not this ceiling's: the ceiling governs the rewrite.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRuleBandImpactMajorTest,
+    "RiorsEdge.Progression.RuleBandImpact.Major",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    // The O96 derivation, asserted where it is consumed: the layer is the
+    // O33 four-avenue log share of the authored band, and major times
+    // minor-stack spans it exactly. If either equality breaks, somebody
+    // edited one constant without re-deriving the pair — which is the
+    // authoring-before-deriving failure O96 exists to forbid.
+    TestEqual(TEXT("the rewrite layer ceiling is the O33 four-avenue share of the endgame band (2.0)"),
+        RewriteLayerCeiling(), 2.0f, 0.0001f);
+    TestEqual(TEXT("major x minor-stack spans the layer exactly (O96's two ceilings partition one budget)"),
+        MaximumMajorStep * MaximumMinorStackStep(), RewriteLayerCeiling(), 0.0001f);
+
+    const FBreakerBuildConditionState State = MeasurementState();
+
+    struct FMajorFixture
+    {
+        const TCHAR* Label;
+        int32 ItemLevel;
+        float Ceiling;
+    };
+    const FMajorFixture Fixtures[] = {
+        { TEXT("ENDGAME"), EndgameItemLevel, MaximumMajorStep },
+        { TEXT("AT CAP"), AtCapItemLevel, AtCapCeilingFor(MaximumMajorStep) },
+    };
+
+    // COVERAGE IS THE WHOLE RULE TABLE, split two ways with no remainder:
+    // every rollable definition is the Step test's, every non-rollable one is
+    // measured here. A future rule kind cannot fall between the two loops —
+    // a new enum entry needs a definition, and a definition is one or the
+    // other.
+    int32 MajorCount = 0;
+    for (const FMajorFixture& Fixture : Fixtures)
+    {
+        const FComposedBuild Baseline = Compose(BaselineLoadout(Fixture.ItemLevel, BaselineTierFor(Fixture.ItemLevel)), BaselineRanks(), State);
+        const FComposedBuild Optimized = Compose(OptimizedLoadout(Fixture.ItemLevel, OptimizedTierFor(Fixture.ItemLevel)), OptimizedRanks(), State);
+        const float PlainBand = Optimized.Total / Baseline.Total;
+
+        for (const FBreakerItemRuleDefinition& Definition : UBreakerItemRuleLibrary::GetRuleDefinitions())
+        {
+            if (Definition.bRollable) continue;   // the Step test's population
+
+            TArray<FBreakerItemInstance> WithRule = OptimizedLoadout(Fixture.ItemLevel, OptimizedTierFor(Fixture.ItemLevel));
+            WithRule[0].Rule = Definition.Rule;
+            const FComposedBuild Ruled = Compose(WithRule, OptimizedRanks(), State);
+            const float Step = Ruled.Total / Optimized.Total;
+
+            // Grounded as well, for the same reason the Step test measures it:
+            // the rotation state is the one state a condition-bending rule
+            // (Deadfall) is worth nothing in, and a ceiling only ever checked
+            // where the subject is inert asserts nothing.
+            const FBreakerBuildConditionState Grounded;
+            const FComposedBuild GroundedPlain = Compose(OptimizedLoadout(Fixture.ItemLevel, OptimizedTierFor(Fixture.ItemLevel)), OptimizedRanks(), Grounded);
+            const FComposedBuild GroundedRuled = Compose(WithRule, OptimizedRanks(), Grounded);
+            const float GroundedStep = GroundedRuled.Total / GroundedPlain.Total;
+
+            AddInfo(FString::Printf(TEXT("[%-7s] MAJOR %-10s step x%.3f in rotation | x%.3f standing still | ceiling x%.3f"),
+                Fixture.Label, *Definition.DisplayName.ToString(), Step, GroundedStep, Fixture.Ceiling));
+
+            // Today every authored forfeit is non-damage (air control, the
+            // slot, regen), so a legendary rule never lowers the damage
+            // total. A major whose FORFEIT is damage would legitimately break
+            // this pair of floors — re-scope them when one is authored, do
+            // not delete the ceiling above.
+            TestTrue(*FString::Printf(TEXT("[%s] %s never lowers an optimized build"),
+                Fixture.Label, *Definition.DisplayName.ToString()), Step >= 1.0f - UE_KINDA_SMALL_NUMBER);
+            TestTrue(*FString::Printf(TEXT("[%s] %s never lowers a grounded build"),
+                Fixture.Label, *Definition.DisplayName.ToString()), GroundedStep >= 1.0f - UE_KINDA_SMALL_NUMBER);
+            TestTrue(*FString::Printf(TEXT("[%s] %s lands inside the major ceiling x%.3f (measured x%.3f)"),
+                Fixture.Label, *Definition.DisplayName.ToString(), Fixture.Ceiling, Step),
+                Step <= Fixture.Ceiling);
+            TestTrue(*FString::Printf(TEXT("[%s] %s grounded step also lands inside the major ceiling"),
+                Fixture.Label, *Definition.DisplayName.ToString()), GroundedStep <= Fixture.Ceiling);
+            ++MajorCount;
+        }
+    }
+    // Three legendaries, two fixtures. A fourth legendary joins the loop by
+    // existing; a shrink here means a definition vanished from the table.
+    TestEqual(TEXT("the major population is every non-rollable rule, both bands"), MajorCount, 6);
     return true;
 }
 

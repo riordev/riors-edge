@@ -104,7 +104,8 @@ bool FBreakerQuestFlagRoundTripTest::RunTest(const FString& Parameters)
 // hid one name on the other side of the comparison. This is the SECOND instance
 // of the collision in this suite; the first is recorded at
 // FBreakerRuleBandImpactTest, which was renamed off PowerBand.RuleImpact for
-// exactly this. Never name a test as a prefix of another test.
+// exactly this — and renamed again to RuleBandImpact.Step when O96's ceilings
+// brought it siblings. Never name a test as a prefix of another test.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSaveMigrationTest,
     "RiorsEdge.Save.MigrationV1ToV2",

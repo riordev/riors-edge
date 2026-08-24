@@ -232,7 +232,7 @@ bool FBreakerItemRuleProlificTest::RunTest(const FString& Parameters)
     // the game reachable without the Forge. O29 re-sited the spike from 1.4x to
     // 2.2x, so PROLIFIC got materially stronger without anybody editing it —
     // its whole value IS the size of a tier step, and the steps grew. That
-    // consequence is measured in RiorsEdge.Progression.RuleBandImpact and is a
+    // consequence is measured in RiorsEdge.Progression.RuleBandImpact.Step and is a
     // reported finding, not a silent retune here.
     TestEqual(TEXT("A T1 line resolves at T0's authored spike"),
         ProlificPercent, PlainPercent * UBreakerAffixLibrary::TierSpikeT0Multiplier, 0.01f);
