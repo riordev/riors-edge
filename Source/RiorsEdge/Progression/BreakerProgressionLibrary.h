@@ -100,6 +100,14 @@ namespace BreakerNodeTags
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Blink);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edge);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_Edgework);
+    // SB10 "No Distance". DECLARED AHEAD OF ITS NODE, DELIBERATELY, and this is
+    // the ordering the whole Caster tier-4 trio waits on: a reader landing
+    // first means the node lands with its tag already consumed, so it is never
+    // counted silent and no ceiling has to move to admit it. A tag declared
+    // with a reader and no node is honest -- the rule works, nothing grants it
+    // yet. A node granting a tag nothing reads is the failure this project has
+    // shipped four times.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_SB_NoDistance);
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_VW_Seep);

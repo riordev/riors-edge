@@ -55,6 +55,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Closequarter")
     static bool ShouldRefund(float TargetHealthFraction, float Threshold);
 
+    // Pure rule: SB10 "No Distance" moves the refund gate to 100% target
+    // health. A pure static rather than a branch at the call site for the same
+    // reason as everything else in this header -- the rule is provable with no
+    // world, and a reader that can only be exercised by activating an ability
+    // is a reader nothing will test.
+    UFUNCTION(BlueprintPure, Category="Closequarter")
+    static float EffectiveRefundGate(bool bHasNoDistance, float BaseThreshold);
+
     // Pure rule, SB7: an untargeted cast is legal only when nothing was under
     // the crosshair AND the Blink node is owned. With a target the targeted
     // path always wins — the node adds a fallback, it never replaces the verb.

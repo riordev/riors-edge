@@ -112,6 +112,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Blink, "Progression.Node.Caster.Spellblade.Blink");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edge, "Progression.Node.Caster.Spellblade.Edge");
     UE_DEFINE_GAMEPLAY_TAG(Node_SB_Edgework, "Progression.Node.Caster.Spellblade.Edgework");
+    UE_DEFINE_GAMEPLAY_TAG(Node_SB_NoDistance, "Progression.Node.Caster.Spellblade.NoDistance");
 
     // Caster / VOID WHISPERER (Class-Kits §2.4).
     UE_DEFINE_GAMEPLAY_TAG(Node_VW_Seep, "Progression.Node.Caster.VoidWhisperer.Seep");

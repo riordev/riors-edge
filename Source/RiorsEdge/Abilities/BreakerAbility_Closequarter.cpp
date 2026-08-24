@@ -42,6 +42,15 @@ FVector UBreakerAbility_Closequarter::ArrivalPoint(const FVector& CasterLocation
     return CasterLocation + Approach * (Distance - Standoff);
 }
 
+float UBreakerAbility_Closequarter::EffectiveRefundGate(bool bHasNoDistance, float BaseThreshold)
+{
+    // 100% means "always", because a health fraction cannot exceed one. Stated
+    // as the gate rather than as a bool so the caller keeps ONE code path and
+    // the node is a data change, exactly as this ability's header has promised
+    // since it was written.
+    return bHasNoDistance ? 1.0f : BaseThreshold;
+}
+
 bool UBreakerAbility_Closequarter::ShouldRefund(float TargetHealthFraction, float Threshold)
 {
     // "at or below" — the boundary refunds.
@@ -184,7 +193,21 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         }
     }
 
-    if (ShouldRefund(HealthFraction, RefundHealthFraction))
+    // SB10 "No Distance", the rule half: the refund gate moves from 40% target
+    // health to 100%, which turns Closequarter from an execute tool into a
+    // traversal tool -- every cast pays back, so the blink is affordable as
+    // movement rather than only as a finisher. The header has described this as
+    // "a data change to RefundHealthFraction, not a branch" since the ability
+    // was written; this is that data change, and it is the first of the Caster
+    // tier-4 rules to have a reader.
+    //
+    // The cost half rides with it. A gate that always opens and a cost that
+    // never rises would be a straight upgrade, and SB10 is authored as a
+    // rewrite: the refund is universal and the cast is expensive.
+    const UBreakerProgressionComponent* RefundProgression = Character->FindComponentByClass<UBreakerProgressionComponent>();
+    const bool bNoDistance = RefundProgression && RefundProgression->HasNodeTag(BreakerNodeTags::Node_SB_NoDistance.GetTag());
+
+    if (ShouldRefund(HealthFraction, EffectiveRefundGate(bNoDistance, RefundHealthFraction)))
     {
         if (UBreakerManaComponent* Mana = GetManaComponent())
         {

@@ -14,7 +14,7 @@ measurement without judging it.
 | Silent nodes | ceiling | 52 of 205 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 6 of 33 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 7 of 26 lanes | ceiling 9 | ok |
-| Node tags with no consumer | ceiling | 143 of 202 declared | ceiling 143 | ok |
+| Node tags with no consumer | ceiling | 143 of 203 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
 | Asserted invariants with no test | ceiling | 39 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
@@ -98,7 +98,7 @@ Plumbing with no author. Not harmful, but not free either.
 
 ## Node tags with no consumer
 
-**ceiling** · 143 of 202 declared · ceiling 143
+**ceiling** · 143 of 203 declared · ceiling 143
 
 A tag nothing reads. Some are legitimately reserved; most are a promise the game does not keep.
 

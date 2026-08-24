@@ -723,6 +723,25 @@ bool FBreakerClosequarterRulesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A target below the threshold refunds"), UBreakerAbility_Closequarter::ShouldRefund(0.2f, 0.4f));
     TestTrue(TEXT("A target exactly at the threshold refunds"), UBreakerAbility_Closequarter::ShouldRefund(0.4f, 0.4f));
     TestFalse(TEXT("A healthy target does not refund"), UBreakerAbility_Closequarter::ShouldRefund(0.41f, 0.4f));
+
+    // SB10 "No Distance": the gate moves to 100% target health, which turns
+    // Closequarter from an execute tool into a traversal tool -- every cast
+    // pays back. Asserted through the gate rather than through a second
+    // ShouldRefund overload, because the node is a data change to the threshold
+    // and the caller keeps one code path.
+    //
+    // THE FIRST CASTER TIER-4 RULE WITH A READER. Its node is not authored yet
+    // and that ordering is deliberate: the reader lands first so the node
+    // arrives with its tag already consumed, never counted silent, and no
+    // ceiling has to move to admit it.
+    TestEqual(TEXT("Without No Distance the authored gate stands"),
+        UBreakerAbility_Closequarter::EffectiveRefundGate(false, 0.4f), 0.4f, 0.0001f);
+    TestEqual(TEXT("No Distance opens the gate to full health"),
+        UBreakerAbility_Closequarter::EffectiveRefundGate(true, 0.4f), 1.0f, 0.0001f);
+    TestTrue(TEXT("...so a target at full health refunds under No Distance"),
+        UBreakerAbility_Closequarter::ShouldRefund(1.0f, UBreakerAbility_Closequarter::EffectiveRefundGate(true, 0.4f)));
+    TestFalse(TEXT("...and does not without it"),
+        UBreakerAbility_Closequarter::ShouldRefund(1.0f, UBreakerAbility_Closequarter::EffectiveRefundGate(false, 0.4f)));
     TestFalse(TEXT("A full-health target does not refund"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 0.4f));
     // SB10 No Distance moves the threshold to 100% — a data change, not a branch.
     TestTrue(TEXT("A 100% threshold refunds on anything"), UBreakerAbility_Closequarter::ShouldRefund(1.0f, 1.0f));
