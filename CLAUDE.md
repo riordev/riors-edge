@@ -39,11 +39,27 @@ get their plumbing; three of the nine are already named by the systems that
 would read them (MS9 in `BreakerStatusConsumption.h`, SB10 in Closequarter's
 header, MS10 in `BreakerManaComponent`).
 
+READERS FIRST IS THE ORDER, AND IT MEASURES. SB10's reader landed with its tag
+declared ahead of its node: declared tags went 202 -> 203 and `dead-tags` held,
+because the tag arrived consumed. Merge the trios first and three ceilings move
+by nine each; land the readers first and none move. Same nine nodes, opposite
+outcome, decided by which half goes first. Eight readers remain.
+
+THREE AUDIT FINDINGS, ALL VERIFIED REAL AT HEAD, two closed:
+`uncalled-generation` counted a hook's own definition as its caller and was
+structurally pinned at zero — it reads 3 of 18 now and stays OUT until three
+hooks are wired, never by re-pinning. O104 never reached the weapon path: a
+Lead-granted weak point took the weak-point multiplier AND a live crit roll,
+guarded by a test that hand-set the one field the game never set. Open:
+ModifierBearing pays more than Elite in XP and loot while being weaker on the
+chassis — two independently-pinned reward sites justified by a difficulty ladder
+that does not exist.
+
 Then Phase 4, the Core atlas: twelve wheels offering 222 against 65. Core is
 still the worst tree at 1.05x and is the whole of why `offered-to-spendable` is
-out of band; every doctrine is at 3.00x or better. Watch `scaffolding-nodes`
-during that pass — it is the number that can go the wrong way while every other
-section on the page improves.
+out of band; every doctrine is at 3.00x, exactly, with no margin. Watch
+`scaffolding-nodes` during that pass — it is the number that can go the wrong
+way while every other section on the page improves.
 
 Update this section as the last step of each session.
 
