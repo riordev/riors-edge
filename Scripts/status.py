@@ -1032,6 +1032,37 @@ def parse_band_edges():
     return edges
 
 
+GATE_MARKER_RE = re.compile(r"gated on `([a-z0-9_-]+)`")
+RULING_RE = re.compile(r"^\*\*(O\d+)\*\*\s*—\s*(.*)$")
+
+
+def parse_gated_rulings(text=None):
+    """Rulings that gate on a measurement, by the section key they name.
+
+    The convention (owner, 2026-08-24): a ruling that gates on a measurement
+    writes "gated on `section-key`" in its one line. This exists because a
+    ruling whose gate has opened reads as a block forever unless somebody
+    happens to re-read it against the report — O71 sat stale after O112, O77
+    after O95, the tree spec's More split after O95, and O106 after the O91
+    retune landed. Four misses of one shape; the cross-reference below turns
+    the shape into a line of output.
+
+    A key that matches no section is REFUSED in main, not skipped — the same
+    discipline as a pin whose symbol was renamed: a typo here would disarm
+    the check with no signal at all.
+    """
+    if text is None:
+        text = read(os.path.join(ROOT, "Docs", "DECISIONS.md"))
+    out = []
+    for line in text.splitlines():
+        m = RULING_RE.match(line)
+        if not m:
+            continue
+        for key in GATE_MARKER_RE.findall(m.group(2)):
+            out.append((m.group(1), key))
+    return out
+
+
 def load_pins(section_directions):
     """Read the pin file, and refuse a pin that cannot do its job.
 
@@ -1114,7 +1145,7 @@ def judge(section, pin):
     return ("ok" if lo <= v <= hi else "violated"), f"band {lo}–{hi}{tgt}"
 
 
-def render(sections, asserted, suite, pins, emitted, unknown_emitted):
+def render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates=()):
     L = []
     a = L.append
     a("# State")
@@ -1192,6 +1223,17 @@ def render(sections, asserted, suite, pins, emitted, unknown_emitted):
         a("No suite log found. Run the suite, then regenerate.")
         a("")
 
+    if open_gates:
+        a("## Rulings whose named gate is open")
+        a("")
+        a("A ruling that gates on a measurement names its section key, and these")
+        a("keys are currently in band — each ruling below is due a rewrite, not")
+        a("still a block.")
+        a("")
+        for r, k in open_gates:
+            a(f"- {r} — gated on `{k}`")
+        a("")
+
     for s in sections:
         state, pintext = judge(s, pins.get(s["key"]))
         a(f"## {s['title']}")
@@ -1239,12 +1281,35 @@ def main():
                          "short by an unknown amount." + os.linesep)
         return 2
     emitted, unknown_emitted = parse_emitted({k for k, _, _, _ in EMITTED_BY_TEST})
-    text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted)
+
+    # Rulings that gate on a measurement: refuse an unknown key, then list
+    # every ruling whose named gate is currently satisfied — it is due a
+    # rewrite, not still a block.
+    gated = parse_gated_rulings()
+    known_keys = {s["key"] for s in sections} | {k for k, _, _, _ in EMITTED_BY_TEST}
+    unknown_gates = [(r, k) for r, k in gated if k not in known_keys]
+    if unknown_gates:
+        sys.stderr.write("status: GATE FAILURE - " + "; ".join(
+            f"{r} gates on '{k}', which is not a section key" for r, k in unknown_gates)
+            + ". The gate would never be checked - fix the key." + os.linesep)
+        return 2
+    states = {s["key"]: judge(s, pins.get(s["key"]))[0] for s in sections}
+    for key, _, direction, _ in EMITTED_BY_TEST:
+        if key in emitted:
+            states[key] = judge({"value": round(emitted[key], 2), "direction": direction},
+                                pins.get(key))[0]
+    open_gates = [(r, k) for r, k in gated if states.get(k) == "ok"]
+
+    text, violations = render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates)
 
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
 
     print(f"status: wrote {os.path.relpath(OUT, ROOT)}")
+    if open_gates:
+        print("status: GATE OPEN — " + ", ".join(
+            f"{r} (gated on {k})" for r, k in open_gates)
+            + ". Each ruling is due a rewrite, not still a block.")
     if not pins:
         print("status: NO PINS. Every section is measurement-only until pins are "
               "authored in Scripts/status-pins.json.")

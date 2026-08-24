@@ -194,7 +194,7 @@ Numbers are permanent and never reused.
 
 **O105** — A keystone's forfeit may move from the verb to the resource. Momentum never decays airborne and drains on the ground: buildable on the wired decay lane with the existing sign convention, and it deletes both a primitive and a tile-authoring requirement.
 
-**O106** — Shield magnitude is affix-owned and the defence triad becomes a quartet. The affix does not ship until the damage-versus-defence retune lands, because a new defensive line while that ratio is 3.76 is defence scaling up to meet damage, which O91 forbids. Until then a shield doctrine pays in rules.
+**O106** — Shield magnitude is affix-owned and the defence triad becomes a quartet. The retune this gated on has landed, so the affix ships; a shield doctrine is no longer confined to paying in rules.
 
 **O107** — Multishot, pierce, chain and ricochet live in the rule tier, so they need no doctrine axis and no rename. The commit that deletes a class's branch trees lands their replacement rule nodes in the same commit.
 

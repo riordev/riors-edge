@@ -55,6 +55,22 @@ ModifierBearing pays more than Elite in XP and loot while being weaker on the
 chassis — two independently-pinned reward sites justified by a difficulty ladder
 that does not exist.
 
+THE OWNER'S ORDERED PASSES, all three landed this session: the tag-rider
+consumer exists end to end — MeleeDamage rows key on `Damage.Melee` and pay
+the weapon lane's additive bucket only on tagged hits
+(`Combat.TargetRiders.SourceTagMelee`), one switch to add the next tag, one
+function to name its lane — and generalising it is the gate on Phase 4's
+rule-only inner nodes. O96's two ceilings are derived ahead of authoring:
+layer 2.0 (O33's four avenues, equal log shares of the endgame band), major
+1.5, three-minor stack 4/3, which prices a minor at ~1.10 and says three of
+the four rolled rewrites come down or stay major-slot when O63 reclassifies
+them; `RuleBandImpact.Major` pins the major ceiling on its full current
+population (the three legendaries) and MinorStack stays honestly untested
+until a stack can exist. O106 is rewritten — the shield affix ships — and a
+ruling that gates on a measurement now names its section key, which `make
+status` cross-references and reports as GATE OPEN (dormant until the next
+gated ruling).
+
 Then Phase 4, the Core atlas: twelve wheels offering 222 against 65. Core is
 still the worst tree at 1.05x and is the whole of why `offered-to-spendable` is
 out of band; every doctrine is at 3.00x, exactly, with no margin. Watch
@@ -274,7 +290,11 @@ report. If you feel the need for one, the corpus has already failed.
 
 **Rulings live in DECISIONS.md, one line each, live only.**
 Superseded rulings are deleted. Git has them. A ruling that needs a paragraph
-of context to understand is not yet a ruling.
+of context to understand is not yet a ruling. A ruling that gates on a
+measurement names that measurement's section key — ``gated on `section-key```
+— and `make status` lists every ruling whose named gate is currently in band.
+Four rulings went stale from exactly this shape (O71, O77, the More split,
+O106); a gate nobody can enumerate is a gate nobody reopens.
 
 **Build state is generated, never written.**
 `make status` — or `python Scripts/status.py` — writes `Docs/STATE.md`. Every
