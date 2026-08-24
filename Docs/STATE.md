@@ -17,10 +17,11 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 143 of 202 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
-| Asserted invariants with no test | ceiling | 39 of 103 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Asserted invariants with no test | ceiling | 39 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.05 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 13 % ranked minors, all trees | no pin — measurement only | — |
 | Scaffolding nodes | ceiling | 50 of 205 authored | ceiling 50 | ok |
+| Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.54 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 15.47 | band 12.0–20.0 | ok |
@@ -32,7 +33,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 429
+- passing: 430
 - expected red: 2
 - **unexpected red: 0**
 - asserted invariants with no test: 39
@@ -170,7 +171,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever.
 
 ## Asserted invariants with no test
 
-**ceiling** · 39 of 103 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 39 of 104 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 

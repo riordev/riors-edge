@@ -808,6 +808,21 @@ def build_sections(sources):
 # rather than inventing one.
 
 EMITTED_BY_TEST = [
+    # THE OPPOSITE OF dead-conditions, AND THE MORE DANGEROUS ONE. A dead
+    # condition is vocabulary nothing uses. This is vocabulary that reads as
+    # ordinary, autocompletes, can be authored against -- and is wired to a
+    # recorder that does not exist, so it answers false on every frame forever.
+    # A line gated on one pays nothing while LOOKING like a conditional line,
+    # which is why it is a ceiling of its own rather than a footnote on the
+    # other section.
+    #
+    # Emitted rather than computed here: the answer belongs to
+    # FBreakerBuildConditionState::IsSelfEvaluable, and a second implementation
+    # of it in Python would be a second source of truth for a number whose whole
+    # value is having one. The test that emits it also asserts that no authored
+    # effect is gated on one, which is the half that catches the mistake.
+    ("unevaluable-conditions", "Conditions that can never be true", CEILING,
+     "RiorsEdge.Progression.ConditionVocabulary.Unevaluable"),
     ("loot-per-hour", "Items dropped per hour, at the reference area level", BAND,
      "RiorsEdge.Items.Drops.LootPerHour"),
     ("power-band-atcap", "Build variance band, at cap", BAND,

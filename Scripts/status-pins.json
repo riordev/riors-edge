@@ -110,7 +110,7 @@
       "max": "AtCapBandMaximum"
     },
     "kind": "target",
-    "why": "Measures 6.53x on the corrected baseline. Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered."
+    "why": "Whether 8-10x was ever derived or seeded is an open question; the pin holds the authored target until it is answered. THE MEASUREMENT IS NOT RESTATED HERE, on purpose: this why-text used to open \"Measures 6.53x on the corrected baseline\", and that was a third hand-typed copy of a number the suite emits every run. It went stale beside a transcription in BossOptimized that had gone stale the same way, and a pin whose prose disagrees with the value beside it in the same table teaches a reader to trust the prose. The live figure is in Docs/STATE.md, computed by BreakerPowerBandTest::AtCapBand and emitted as power-band-atcap."
   },
   "power-band-ability": {
     "source": {
@@ -155,5 +155,11 @@
     "max": 50,
     "kind": "measurement",
     "why": "NEW SECTION, split out of node-shape-composition's note. O112 unpinned that BAND for a real reason -- 60% ranked minors means 60% unconditional stat lines and O76 gives those to affixes -- but unpinning the band took this count down with it, and a number that judges nothing is a number nobody defends. The band is genuinely unresolved; this is not. A node with no stat line, no condition and no rule anything reads is an authoring failure at any composition target, and it is the count Phase 4 writes a test against. Pinned at the first honest reading, after the comment-stripping fix."
+  },
+  "unevaluable-conditions": {
+    "max": 4,
+    "target": 0,
+    "kind": "target",
+    "why": "The whole Recently* family: RecentlyKilled, RecentlyTookDamage, RecentlyCastAbility, RecentlyAppliedStatus. Each needs a recorder that binds the combat and ability events and stores a world time, the way UBreakerCharacterMovementComponent::GetLastDashTime already does for RecentlyDashed -- the working template, and the only one of the five that is live. Pinned at the current four so it can only fall; the TARGET is zero, reached by four recorders or by four enumerators deleted. This is not closable by widening the pin. Note also that the number falling is not the point: the assertion that no authored effect is gated on one of these is the half that catches the defect, and it exists because a node was nearly authored against RecentlyKilled by accident during the O95 pass."
   }
 }

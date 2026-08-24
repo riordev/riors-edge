@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/BreakerBaselineLoadout.h"
 #include "Tests/BreakerStatusEmit.h"
+#include "Tests/BreakerPowerBandFixture.h"
 #include "Attributes/BreakerAttributeAggregation.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -376,6 +377,22 @@ namespace BreakerPowerBandTest
         State.Set(EBreakerBuildCondition::Redline, true);
         return State;
     }
+
+    // THE BAND ITSELF, so that nothing has to transcribe it. Declared in
+    // BreakerPowerBandFixture.h and used by two tests: PowerBand.AtCap emits
+    // what this returns, and Combat.PowerCurve.BossOptimized divides by what
+    // this returns. Neither keeps a copy, which is the whole point -- the copy
+    // that used to live in BossOptimized went stale the first time the band
+    // moved and claimed in a comment that it could not.
+    float AtCapBand()
+    {
+        const FBreakerBuildConditionState State = MeasurementState();
+        const FComposedBuild Baseline = Compose(
+            BaselineLoadout(AtCapItemLevel, BaselineTierFor(AtCapItemLevel)), BaselineRanks(), State);
+        const FComposedBuild Optimized = Compose(
+            OptimizedLoadout(AtCapItemLevel, OptimizedTierFor(AtCapItemLevel)), OptimizedRanks(), State);
+        return Optimized.Total / Baseline.Total;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +444,11 @@ bool FBreakerPowerBandAtCapTest::RunTest(const FString& Parameters)
         AtCapItemLevel, OptimizedTier, Optimized.FlatLayer, Optimized.IncreasedLayer, Optimized.MoreLayer, Optimized.EffectiveCrit,
         Optimized.CriticalChance * 100.0f, Optimized.CriticalMultiplier, Optimized.Total));
 
-    const float Ratio = Optimized.Total / Baseline.Total;
+    // THE SAME FUNCTION BossOptimized READS. Composed identically from the
+    // same fixtures a few lines above -- the pair above stays because the
+    // layer-by-layer report needs both halves, but the NUMBER this test emits
+    // comes from the one place that number is defined.
+    const float Ratio = AtCapBand();
     AddInfo(FString::Printf(TEXT("AT-CAP BAND      flat %.2fx | increased %.2fx | more %.2fx | crit %.2fx => COMPOSED %.2fx (O36 target %.0f-%.0fx)"),
         Optimized.FlatLayer / Baseline.FlatLayer,
         Optimized.IncreasedLayer / Baseline.IncreasedLayer,

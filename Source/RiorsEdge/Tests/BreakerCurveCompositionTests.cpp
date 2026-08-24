@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Tests/BreakerStatusEmit.h"
+#include "Tests/BreakerPowerBandFixture.h"
 #include "Combat/BreakerMonsterChassis.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponMath.h"
@@ -352,9 +353,15 @@ bool FBreakerBossOptimizedTest::RunTest(const FString& Parameters)
 
     // The band measured at cap IS the ratio between the two characters, so the
     // optimized build's boss kill is the baseline's divided by it. Reading the
-    // band rather than rebuilding two characters keeps one source of truth:
-    // if the band moves, this moves with it.
-    constexpr float MeasuredAtCapBand = 6.53f;      // emitted by PowerBand.AtCap
+    // band rather than rebuilding two characters keeps one source of truth --
+    // and it now actually does.
+    //
+    // THIS WAS `constexpr float MeasuredAtCapBand = 6.53f;` with the comment
+    // above claiming "if the band moves, this moves with it". It was a hand-typed
+    // copy and it did not move: the band went to 6.54 and this stayed at 6.53,
+    // so two instruments reported one quantity with no way to notice they had
+    // diverged. Precision against a stale reference reads exactly like accuracy.
+    const float MeasuredAtCapBand = BreakerPowerBandTest::AtCapBand();
     constexpr float BaselineBossSecondsFloor = 20.0f;
     constexpr float OptimizedMustBeatBy = 2.0f;     // "substantially", O94
 

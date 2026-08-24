@@ -196,7 +196,14 @@ the first lane — the only way to build a two-notable splash with no keystone.
 Three doctrines per class, one committed to per character, changed only at the
 Forge. A doctrine is the subclass: committing grants a visible identity as well
 as mechanics. As shipped, a doctrine is **12 nodes** with tier gates at
-0 / 2 / 4 / 6 invested, and a keystone gated at 8 invested costing 3.
+0 / 2 / 4 / 6 invested. The keystone is an ordinary tier-4 node: gated at 6
+invested, costing 2, with no cornerstone gate of its own.
+
+**Every doctrine node costs two points to reach its last rank**, so eight
+divides into exactly four picks and nothing is stranded. That is the shape the
+budget is for, and it is why the keystone costs what every other pick costs: it
+competes with the tier-4 rewrites for the last of the four rather than sitting
+above them.
 
 **A doctrine's whole budget is eight points, and it arrives at once.** That is
 what makes the board a set of refusals rather than a ladder: eight against
@@ -262,8 +269,9 @@ It does not own:
 | Condition and stat-target enum values are pinned against reordering | `Progression.ConditionVocabulary.StatTargets` |
 | A dead condition or unpaid target warns rather than failing silently | `Progression.ConditionVocabulary.Evaluability` |
 | Target-side conditions resolve in the additive bucket and never as a More | `Combat.TargetRiders.*` |
-| No class node authors a stat target a Core node on the same axis authors | `Progression.AxisOverlap` |
+| No doctrine node authors an unconditional magnitude on a generic damage pool | `Progression.AxisOverlap` |
 | Commitment unlocks the keystone tier and leaves ordinary nodes free | `Progression.BranchCommitment` |
+| Every tree's deepest node is purchasable on that tree's own shipped grant | `Progression.TreeDepthIsReachable` |
 | A Forge respec restores the pre-purchase composition exactly | `Progression.RespecRestoresAttributes` |
 | Offered-to-spendable ratio per tree stays inside its band | `Progression.TreeDensity.Offered` |
 | Node-shape composition per tree stays inside its band | `Progression.TreeDensity.Composition` |
