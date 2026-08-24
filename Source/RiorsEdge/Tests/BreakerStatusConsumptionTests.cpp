@@ -183,6 +183,29 @@ bool FBreakerDetonationCurveTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("MS9 honours the 2.2x bound"), MS9Ratio <= 2.2f);
     TestTrue(TEXT("The bound is not honoured by making the curve flat"), LinearRatio > 1.0f);
 
+    // ---- THE RELATIONSHIP, NOT JUST THE CEILING ---------------------------
+    // O115, one system over, and the fourth instance of flatness-without-
+    // magnitude. Both curves clear the 2.2x bound, so the two assertions above
+    // pass and say nothing about whether MS9 does its job -- and it does not.
+    // The enum header calls FixedPlusThreshold the anti-explosion rewrite,
+    // "deliberately re-shaped AWAY from a count multiplier", while the
+    // arithmetic is the LINEAR term plus a flat bonus at 3+: strictly additive
+    // on top, so its 2-to-6 ratio is 1.87 against Linear's 1.70. MS9 is
+    // STEEPER than the curve it exists to flatten, and a ceiling wide enough
+    // for both could never notice.
+    //
+    // EXPECTED RED, and the condition that deletes it is a ruling rather than a
+    // tuning pass: either FixedPlusThreshold stops reusing DamagePerDistinct-
+    // Status so the per-status term really is fixed, or Class-Kits MS9 is
+    // re-read and the header stops claiming a reshape the numbers do not do.
+    // Do not close this by widening the bound, and do not close it by deleting
+    // this assertion -- an anti-explosion rewrite that explodes faster than the
+    // baseline is the finding.
+    TestTrue(*FString::Printf(
+        TEXT("MS9 is FLATTER than the curve it reshapes (MS9 %.3f vs linear %.3f)"),
+        MS9Ratio, LinearRatio),
+        MS9Ratio < LinearRatio);
+
     // The counted statuses are capped, so a seventh status type added later
     // cannot silently inflate an already-bounded ability.
     TestEqual(TEXT("Distinct count is capped"),
