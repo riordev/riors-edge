@@ -1029,6 +1029,27 @@ def parse_band_edges():
         r"constexpr\s+float\s+(\w+)\s*=\s*(-?\d+(?:\.\d+)?)f\s*;", text)}
     if not edges:
         raise ParseError(f"{BAND_SOURCE}: no constexpr float band edges parsed.")
+
+    # A SECOND PASS FOR EDGES THAT ARE DERIVED FROM OTHER EDGES.
+    #
+    # The rewrite layer ceiling is EndgameBandMaximum / EndgameBandMid -- it is a
+    # FUNCTION of the band, not a number beside it, and that is deliberate: the
+    # first derivation of it was a standalone constant and went wrong precisely
+    # because nothing tied it to the band it was a share of. Writing the quotient
+    # here as a literal would restore the second copy this whole function exists
+    # to prevent, so the quotient is parsed instead.
+    #
+    # Deliberately only division of two ALREADY-PARSED literal edges. This is not
+    # a C++ expression evaluator and must not grow into one: anything more
+    # complicated than one operator belongs in the test as an assertion, where a
+    # person reads it, rather than in a parser nobody reads.
+    for m in re.finditer(r"constexpr\s+float\s+(\w+)\s*=\s*(\w+)\s*/\s*(\w+)\s*;", text):
+        name, num, den = m.group(1), m.group(2), m.group(3)
+        if name in edges or num not in edges or den not in edges:
+            continue
+        if edges[den] == 0.0:
+            raise ParseError(f"{BAND_SOURCE}: {name} divides by {den}, which is zero.")
+        edges[name] = edges[num] / edges[den]
     return edges
 
 

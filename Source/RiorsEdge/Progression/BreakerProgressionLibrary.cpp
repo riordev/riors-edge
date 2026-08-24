@@ -667,12 +667,25 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // explicit that Elements is "a designed-but-unshipped sixth, not a cut one".
     //
     // WHAT IS AND IS NOT AUTHORED HERE, and why. Elements' own grammar is
-    // buildup, thresholds and reactions, and NONE of those three quantities
-    // exists: there is no elemental resistance step in the damage order, no
-    // buildup track, and no reaction matrix. `ElementalDamageReduction` is
-    // still the one inert stat target in the project and is deliberately left
-    // alone. So every node below is authored in the constellation's PHYSICAL-
-    // ONLY pre-resistance form, exactly as §6 instructs ("no node requires an
+    // buildup, thresholds and reactions, and TWO of those three do not exist:
+    // there is no buildup track and no reaction matrix.
+    //
+    // THE THIRD CLAIM THIS PARAGRAPH USED TO MAKE WAS FALSE, and it is the
+    // third instance this pass of a justification outliving its cause. It said
+    // "there is no elemental resistance step in the damage order" and
+    // "`ElementalDamageReduction` is still the one inert stat target in the
+    // project". Both were answered by the 2026-08-16/17 defence-triad ruling
+    // and both are live: BreakerCombatComponent.cpp:74-79 branches on
+    // DamageFamily and reads Stats.ElementalResistancePercent, and
+    // BreakerEquipmentComponent.cpp:854-856 aggregates ElementalDamageReduction
+    // into it under a 60% cap. The affix library's own comment says so in as
+    // many words.
+    //
+    // THE CONCLUSION IS UNCHANGED, which is why the sentence is corrected and
+    // the constellation is not. What Elements still lacks is buildup,
+    // thresholds and reactions -- not resistance -- so authoring in the
+    // PHYSICAL-ONLY pre-resistance form remains right for exactly the reasons
+    // below. So every node below is authored in that form, exactly as §6 instructs ("no node requires an
     // element to function"): the elemental half of each node is carried as a
     // tag for the resistance model to pick up, and the half that pays TODAY is
     // authored against damage-over-time, critical chance and damage — all three
@@ -721,9 +734,21 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Catalyst->GrantedTags.AddTag(BreakerNodeTags::Node_Catalyst.GetTag());
     Tree->Nodes.Add(Catalyst);
 
-    // Penetrance is resistance penetration once a resistance exists. Until it
-    // does, the only honest expression of "your damage is resisted less" is
-    // Increased Damage, and the tag is what upgrades it in place later.
+    // Penetrance is resistance penetration, and the blocker MOVED without the
+    // conclusion moving -- worth stating precisely, because the next reader
+    // would otherwise repair the wrong half.
+    //
+    // It used to read "once a resistance exists. Until it does..." A resistance
+    // exists now: the damage order has an elemental branch and the equipment
+    // layer aggregates into it. What is missing is on the TARGET side. The
+    // reduction is read off a UBreakerEquipmentComponent found on the actor
+    // being hit, and no enemy constructs one -- ABreakerCharacter is the only
+    // class in the project that does. So an outgoing elemental hit meets no
+    // resistance at all, and there is still nothing to penetrate.
+    //
+    // Same conclusion, different cause: Increased Damage stays the only honest
+    // expression, and the tag is what upgrades it in place once enemies carry
+    // the component that resists.
     UBreakerProgressionNode* Penetrance = MakeNode(TEXT("Core.Elements.Penetrance"), TEXT("Penetrance"),
         TEXT("Lane C. Your damage is turned aside less. Becomes true elemental penetration when resistances exist."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Elements"));
     AddPrerequisite(Penetrance, TEXT("Core.Elements.Conductive"));

@@ -29,13 +29,13 @@ measurement without judging it.
 | Ability lane throughput against weapon lane, at cap | band | 0.64 | band 0.85–1.15 | **OUT** |
 | Ability lane throughput against weapon lane, endgame | band | 0.38 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
-| Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.5 | ok |
+| Worst single rewrite step on an optimized build | ceiling | 1.46 | ceiling 1.25 | **OUT** |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
 
 ## Tests
 
-- passing: 434
-- expected red: 3
+- passing: 433
+- expected red: 4
 - **unexpected red: 0**
 - asserted invariants with no test: 38
 
@@ -47,6 +47,7 @@ A test that was never written is the worst of the three: it looks asserted.
 - `RiorsEdge.Items.Drops.DropChanceReachesEveryRank`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
+- `RiorsEdge.Progression.RuleBandImpact.Step`
 
 ## Silent nodes
 

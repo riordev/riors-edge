@@ -466,9 +466,55 @@ namespace BreakerPowerBandTest
     // without measuring a stack — the exact partial-test-under-full-name
     // failure the naming comment on the Step test records. The ceiling
     // precedes the content; the measurement arrives with the content.
-    constexpr float MaximumMajorStep = MaximumProlificRuleStep;
-    inline float RewriteLayerCeiling() { return FMath::Pow(EndgameBandMid, 1.0f / 4.0f); }   // = 2.0 exactly
-    inline float MaximumMinorStackStep() { return RewriteLayerCeiling() / MaximumMajorStep; }   // = 4/3
+    // ---- RE-DERIVED, AND THE FIRST DERIVATION WAS WRONG TWICE ------------
+    //
+    // IT WAS: layer = EndgameBandMid^(1/4) = 2.0, on the reading that O33's four
+    // avenues take equal log shares of the endgame band; major inherited
+    // Prolific's 1.5 and the stack took the remainder. Both halves failed.
+    //
+    // WRONG BASIS. The endgame band is measured on a loadout carrying NO
+    // rewrite -- the endgame test asserts exactly that, piece by piece ("A
+    // power-band piece carries no rewrite despite being Anomalous"), and then
+    // asserts the measured band is untouched by the rarity pass. So 16x is what
+    // the OTHER avenues produce with the rewrite layer absent, and taking a
+    // quarter-share of it for rewrites shares a band that does not contain the
+    // thing being shared. A rewrite multiplies that band rather than living
+    // inside it.
+    //
+    // WHAT THE BAND ACTUALLY AFFORDS is the headroom between where the other
+    // avenues land and the top of the authored band: 20 / 16 = 1.25. Derived
+    // from the two authored edges, not from an invented log split, and stricter
+    // than the measured basis (20 / 15.47 = 1.29) because pinning against a
+    // measurement would let the ceiling drift with content.
+    //
+    // THE CONSEQUENCE IS ALREADY SHIPPED, and the first derivation hid it: at
+    // 15.47x measured, one Prolific at 1.4634 composes to 22.6x, outside the
+    // authored 12-20 band on its own. O96 predicted the restructure would cause
+    // a breach; the breach predates it. Progression.RuleBandImpact.LayerFit is
+    // the enumerated red that says so.
+    // DERIVED, AND WRITTEN AS A DERIVATION so the report can read it without
+    // transcribing it. status.py resolves this form; a literal 1.25 here would
+    // be the second copy of a number whose whole value is having one.
+    constexpr float RewriteLayerCeilingValue = EndgameBandMaximum / EndgameBandMid;
+    inline float RewriteLayerCeiling() { return RewriteLayerCeilingValue; }
+
+    // THE SPLIT IS AUTHORED, NOT DERIVED, AND THAT IS THE POINT.
+    //
+    // The first version defined the stack AS layer/major and then asserted
+    // major x stack == layer, which reduces to x * (k/x) == k and is true for
+    // every x. It could not fail. That is the defect this report has now found
+    // three times in other people's work and once in its own: a value fixed by
+    // construction cannot report a problem.
+    //
+    // All three numbers are independent now. The layer is derived from the band
+    // edges; the major and the per-minor are authored placeholders; and the
+    // assertion is that what they compose to FITS, which breaks the moment
+    // either is raised. O2 PLACEHOLDER on both magnitudes -- the ratio between
+    // a major and three minors is the owner's call, and what is not negotiable
+    // is that their product stays under the layer.
+    constexpr float MaximumMajorStep = 1.15f;   // O2 PLACEHOLDER
+    constexpr float MaximumMinorStep = 1.025f;  // O2 PLACEHOLDER, per minor
+    inline float MaximumMinorStackStep() { return FMath::Pow(MaximumMinorStep, 3.0f); }
 }
 
 // ---------------------------------------------------------------------------
@@ -810,6 +856,34 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The measured band is untouched by the rarity pass"),
         Compose(Untouched, OptimizedRanks(), State).Total / EndgameBaseline.Total,
         EndgameOptimized.Total / EndgameBaseline.Total, 0.0001f);
+    // ---- DOES THE LAYER FIT THE BAND IT MULTIPLIES? -----------------------
+    // The question O96 asks and nothing asked before. Every ceiling above
+    // bounds a rewrite against OTHER REWRITES; this bounds the composed result
+    // against the band the game actually promises. A rewrite multiplies the
+    // endgame band rather than living inside it, so the honest check is the
+    // band WITH the worst rewrite on it.
+    //
+    // EXPECTED RED, and it is red on shipped content rather than on anything
+    // the restructure adds: at 15.47x measured, one Prolific at 1.4634 composes
+    // to 22.6x against an authored 12-20x. O96 predicted the restructure would
+    // guarantee a breach. The breach predates it, and the first derivation of
+    // these ceilings hid it by giving the rewrite layer a quarter-share of a
+    // band measured without any rewrite in it -- a budget 1.55x larger than the
+    // headroom that exists.
+    const float BandWithWorstRewrite = (EndgameOptimized.Total / EndgameBaseline.Total) * WorstRuleStep;
+    AddInfo(FString::Printf(
+        TEXT("ENDGAME BAND with the worst rewrite: %.2fx x %.4f = %.2fx (authored %.0f-%.0fx, layer ceiling %.4f)"),
+        EndgameOptimized.Total / EndgameBaseline.Total, WorstRuleStep, BandWithWorstRewrite,
+        EndgameBandMinimum, EndgameBandMaximum, RewriteLayerCeiling()));
+    TestTrue(*FString::Printf(
+        TEXT("the worst rewrite leaves the endgame band inside its authored maximum (%.2fx vs %.0fx)"),
+        BandWithWorstRewrite, EndgameBandMaximum),
+        BandWithWorstRewrite <= EndgameBandMaximum);
+    TestTrue(*FString::Printf(
+        TEXT("...and the worst single rewrite fits the rewrite layer (%.4f vs %.4f)"),
+        WorstRuleStep, RewriteLayerCeiling()),
+        WorstRuleStep <= RewriteLayerCeiling() + 0.0001f);
+
     BreakerStatus::Emit(TEXT("rewrite-impact"), WorstRuleStep);
     return true;
 }
@@ -840,10 +914,22 @@ bool FBreakerRuleBandImpactMajorTest::RunTest(const FString& Parameters)
     // minor-stack spans it exactly. If either equality breaks, somebody
     // edited one constant without re-deriving the pair — which is the
     // authoring-before-deriving failure O96 exists to forbid.
-    TestEqual(TEXT("the rewrite layer ceiling is the O33 four-avenue share of the endgame band (2.0)"),
-        RewriteLayerCeiling(), 2.0f, 0.0001f);
-    TestEqual(TEXT("major x minor-stack spans the layer exactly (O96's two ceilings partition one budget)"),
-        MaximumMajorStep * MaximumMinorStackStep(), RewriteLayerCeiling(), 0.0001f);
+    // The layer is what the authored band has left once the other avenues have
+    // produced its midpoint. This fails if either band edge moves, which is the
+    // point -- the ceiling is a function of the band and not a number beside it.
+    TestEqual(TEXT("the rewrite layer ceiling is the endgame band's headroom above its midpoint"),
+        RewriteLayerCeiling(), EndgameBandMaximum / EndgameBandMid, 0.0001f);
+
+    // AND THIS ONE CAN FAIL, WHICH THE VERSION BEFORE IT COULD NOT. It asserted
+    // major x stack == layer while the stack was DEFINED as layer / major --
+    // x * (k/x) == k, true for every x, a partition asserting itself. Now all
+    // three are independent and the claim is that they FIT: raise either
+    // authored magnitude and this breaks.
+    TestTrue(*FString::Printf(
+        TEXT("a major plus a three-minor stack fits the rewrite layer (%.4f x %.4f = %.4f, layer %.4f)"),
+        MaximumMajorStep, MaximumMinorStackStep(),
+        MaximumMajorStep * MaximumMinorStackStep(), RewriteLayerCeiling()),
+        MaximumMajorStep * MaximumMinorStackStep() <= RewriteLayerCeiling() + 0.0001f);
 
     const FBreakerBuildConditionState State = MeasurementState();
 
