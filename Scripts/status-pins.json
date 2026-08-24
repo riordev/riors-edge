@@ -86,7 +86,7 @@
   "uncalled-generation": {
     "max": 0,
     "kind": "measurement",
-    "why": "Already zero, pinned so it stays that way. Its caller search now strips comments too, for the same reason the consumer index does -- a Notify name mentioned in a comment is not a caller. The number did not move, which is the answer worth recording: this section was not relying on prose."
+    "why": "THE ZERO THIS PIN RECORDED WAS NOT REAL. The check counted a hook's own DEFINITION as one of its callers -- hooks are harvested from Classes/*.h so the self-exclusion compared against the header, while the .cpp holding the body stayed in the search set and matched itself. Every one of the eighteen listed its own component .cpp as a caller, so the section reported zero and could not have reported anything else. The pin note used to read 'the number did not move, which is the answer worth recording'; it had not moved because it could not. Corrected, the true figure is THREE: BreakerChargeComponent::NotifyAssist, which has no caller anywhere including tests, and BreakerScrapComponent's NotifyAmmoPickupOverflow and NotifyAmmoReturnedOnKill, which are called only from the suite. THE CEILING STAYS AT ZERO on purpose -- it is the target, the section is legitimately out of band, and it closes by wiring three hooks to the events that should fire them, never by re-pinning to three."
   },
   "unexpected-red": {
     "max": 0,

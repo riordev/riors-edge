@@ -668,7 +668,12 @@ private:
     // apply to some of them and not others.
     FBreakerDamageResult SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, class UBreakerCombatComponent* TargetCombat,
         const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
-        float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed);
+        float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
+        // O104: a weak point GRANTED by a rule rather than earned by hitting one
+        // takes the weak-point multiplier instead of crit, not as well as it.
+        // Defaulted false so the legs that cannot carry a mark -- chain arcs --
+        // keep their existing behaviour without restating it.
+        bool bWeakPointIsGranted = false);
 
     // ---- Marksman / Frenzy rule-half state (Class-Kits §1.3 / §1.5) --------
     // Server-side timestamps of recent trigger pulls, pruned to Loaded's 2s

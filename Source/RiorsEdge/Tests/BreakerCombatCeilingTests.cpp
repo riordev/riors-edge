@@ -175,6 +175,46 @@ bool FBreakerCeilingGateRemovalTest::RunTest(const FString& Parameters)
     Earned.CriticalMultiplier = 2.0f;
     const FBreakerDamageResult Both = UBreakerDamageLibrary::ResolveDamage(Earned, Defense);
     TestTrue(TEXT("A skill-earned weak point may still crit"), Both.bCritical);
+
+    // ---- THE CALLER HALF, WHICH NOTHING ASSERTED --------------------------
+    // Everything above hands the library a request already in the right state
+    // and checks the library honours it. That proves the library half of O104
+    // and says nothing about whether any shipped path ever SETS bCanCritical --
+    // and none did: FBreakerDamageRequest defaults it to true, the weapon path
+    // never assigned it, so every Lead-granted weak point took the weak-point
+    // multiplier AND a live crit roll. The guard passed throughout, because the
+    // test supplied by hand the one field the game never supplied.
+    //
+    // The rule is now a function, so the decision itself is assertable rather
+    // than reachable only by firing a weapon.
+    TestFalse(TEXT("O104: a GRANTED weak point may not also crit"),
+        UBreakerDamageLibrary::CanCriticalOnWeakPoint(false, true));
+    TestTrue(TEXT("O104: an EARNED weak point may crit"),
+        UBreakerDamageLibrary::CanCriticalOnWeakPoint(true, false));
+    TestTrue(TEXT("O104: earning it wins when a mark would have granted it anyway"),
+        UBreakerDamageLibrary::CanCriticalOnWeakPoint(true, true));
+    TestTrue(TEXT("An ordinary hit is neither, and crits normally"),
+        UBreakerDamageLibrary::CanCriticalOnWeakPoint(false, false));
+
+    // And the composition it produces: a granted weak point at the ceiling
+    // multiplier, with a crit chance the shipped character actually carries,
+    // must compose to the weak-point multiplier alone. The old fixture set
+    // CriticalChance = 1.0 beside bCanCritical = false, which is a state no
+    // character has; this uses the real default so the assertion cannot pass
+    // by suppressing the thing it is checking.
+    {
+        FBreakerDamageRequest Granted;
+        Granted.BaseDamage = 100.0f;
+        Granted.bWeakPointHit = true;
+        Granted.WeakPointMultiplier = UBreakerDamageLibrary::WeakPointMultiplierCeiling;
+        Granted.CriticalChance = UBreakerAttributeSet::DefaultCriticalChance;
+        Granted.CriticalMultiplier = UBreakerAttributeSet::DefaultCriticalMultiplier;
+        Granted.bCanCritical = UBreakerDamageLibrary::CanCriticalOnWeakPoint(false, true);
+        const FBreakerDamageResult GrantedResult = UBreakerDamageLibrary::ResolveDamage(Granted, Defense);
+        TestFalse(TEXT("A granted weak point never crits at the shipped crit chance"), GrantedResult.bCritical);
+        TestEqual(TEXT("...and composes to the weak-point multiplier alone"),
+            GrantedResult.RawDamage, 100.0f * UBreakerDamageLibrary::WeakPointMultiplierCeiling, 0.01f);
+    }
     TestTrue(TEXT("And is worth more than the gate-removed hit"), Both.RawDamage > Result.RawDamage);
     return true;
 }

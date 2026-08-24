@@ -1750,7 +1750,8 @@ AActor* UBreakerWeaponComponent::FindNearestChainTarget(const FVector& Origin, f
 
 FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerWeaponDefinition* Definition, UBreakerCombatComponent* TargetCombat,
     const UBreakerAttributeSet* SourceAttributes, float BaseDamage, float DistanceFromMuzzle, bool bWeakPoint,
-    float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed)
+    float ArmorPenetrationOverride, const FVector& ImpactPoint, int32 DamageSeed,
+    bool bWeakPointIsGranted)
 {
     FBreakerDamageRequest Damage;
     // The multiplicand: archetype base carried up the item-level curve, then
@@ -1765,6 +1766,14 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     Damage.WeakPointMultiplier = Definition->WeakPointMultiplier;
     Damage.ArmorPenetration = ArmorPenetrationOverride;
     Damage.bWeakPointHit = bWeakPoint;
+    // O104. This was never set, and FBreakerDamageRequest defaults it to true,
+    // so a Lead-granted weak point took the weak-point multiplier AND a live
+    // crit roll on the same shot -- the composition the ruling names and
+    // forbids. The player path can never produce bCanCritical = false any other
+    // way: every existing false comes from enemy attacks, DoT ticks or
+    // self-damage.
+    Damage.bCanCritical = UBreakerDamageLibrary::CanCriticalOnWeakPoint(
+        bWeakPoint && !bWeakPointIsGranted, bWeakPointIsGranted);
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     // ONE number, and ONE place that derives it. Gear's Weapon Damage affix,
@@ -1898,9 +1907,15 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         // Distance for Lead's range gate is from the MUZZLE — a mark's payoff
         // must not be reachable by bouncing a round off a nearby wall.
         const float DistanceFromMuzzleCm = TravelledCm + Hit.Distance;
-        const bool bWeakPoint = ResolveWeakPointHit(Hit, SegmentStart, SegmentDirection)
-            || UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
+        // KEPT APART, because O104 prices them differently. These used to be
+        // one `||` expression, and by the time the bool reached the damage
+        // library there was no way to tell a round that struck a weak point
+        // from a round a mark handed one to.
+        const bool bEarnedWeakPoint = ResolveWeakPointHit(Hit, SegmentStart, SegmentDirection);
+        const bool bGrantedWeakPoint = !bEarnedWeakPoint
+            && UBreakerAbility_Lead::ShouldTreatAsWeakPoint(
                 MarkedTarget != nullptr && HitActor == MarkedTarget, DistanceFromMuzzleCm, LeadMinimumRangeCm);
+        const bool bWeakPoint = bEarnedWeakPoint || bGrantedWeakPoint;
         if (bIsFirstLeg)
         {
             Shot.bWeakPoint |= bWeakPoint;
@@ -1915,7 +1930,8 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
             : FBreakerWeaponMath::SecondaryShotSeed(OwnerHash, PelletSeed, BreakerPierceSalt, SecondarySeedIndex++);
         const float ArmorPenetration = (EnemiesStruck > 0 && bSightline) ? 1.0f : Definition->ArmorPenetration;
         const FBreakerDamageResult HitDamage = SubmitWeaponDamage(Definition, TargetCombat, SourceAttributes,
-            ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed);
+            ScaledBaseDamage * CurrentMultiplier, DistanceFromMuzzleCm, bWeakPoint, ArmorPenetration, Hit.ImpactPoint, DamageSeed,
+            bGrantedWeakPoint);
         Shot.DamageResult.RawDamage += HitDamage.RawDamage;
         Shot.DamageResult.MitigatedDamage += HitDamage.MitigatedDamage;
         Shot.DamageResult.ShieldDamage += HitDamage.ShieldDamage;

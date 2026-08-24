@@ -16,7 +16,7 @@ measurement without judging it.
 | Aggregation lanes carrying nothing | ceiling | 7 of 26 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 143 of 203 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
-| Resource generation entry points with no caller | ceiling | 0 of 18 | ceiling 0 | ok |
+| Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 39 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 1.05 worst tree | floor 3.0 | **OUT** |
 | Node-shape composition, per tree | band | 13 % ranked minors, all trees | no pin — measurement only | — |
@@ -165,9 +165,13 @@ Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of it
 
 ## Resource generation entry points with no caller
 
-**ceiling** · 0 of 18 · ceiling 0
+**ceiling** · 3 of 18 · ceiling 0  ·  **OUT**
 
-A generation hook nothing calls is a resource bar that sits at zero forever.
+A generation hook nothing calls is a resource bar that sits at zero forever. Test callers do not count: a hook exercised only by the suite is a hook the game never fires.
+
+- Classes/BreakerChargeComponent.h::NotifyAssist
+- Classes/BreakerScrapComponent.h::NotifyAmmoPickupOverflow
+- Classes/BreakerScrapComponent.h::NotifyAmmoReturnedOnKill
 
 ## Asserted invariants with no test
 

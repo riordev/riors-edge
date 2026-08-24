@@ -19,6 +19,32 @@ public:
     // [WeakPointMultiplierFloor, WeakPointMultiplierCeiling], and the resolve
     // site clamps to the same pair so an out-of-bounds author cannot ship.
     // The endpoints are the ruling's seed values. O2 PLACEHOLDER
+    // O104, AS A FUNCTION. "Removing a multiplier's gate is a canon event. The
+    // multiplier moves into the accounting its gate stood in for: a guaranteed
+    // weak point is a build multiplier, and crit does not also multiply on that
+    // hit."
+    //
+    // A weak point can arrive two ways and they are NOT the same event. EARNED
+    // means the round actually struck a weak-point primitive; GRANTED means a
+    // rule handed it over without one -- Swift.Marksman.Lead's mark, whose only
+    // gate is range. The ruling forbids crit on the granted kind and explicitly
+    // permits it on the earned kind.
+    //
+    // Both used to collapse into one bool at the call site before anything
+    // could tell them apart, and the weapon path never set bCanCritical at all
+    // -- the request struct defaults it to true, so every Lead-marked shot took
+    // the weak-point multiplier AND a live crit roll. The guard test passed
+    // because it hand-set bCanCritical = false and then checked the library
+    // honoured it: the library half of the rule, proved, with the caller half
+    // untested. That is the one this project keeps finding.
+    static bool CanCriticalOnWeakPoint(bool bEarnedWeakPoint, bool bGrantedWeakPoint)
+    {
+        // An ordinary hit is neither, and crits normally. Earning it always
+        // wins: a round that struck the weak point earned its crit even if a
+        // mark would have granted the same hit anyway.
+        return bEarnedWeakPoint || !bGrantedWeakPoint;
+    }
+
     static constexpr float WeakPointMultiplierFloor = 1.0f;
     static constexpr float WeakPointMultiplierCeiling = 2.0f;
 

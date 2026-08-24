@@ -686,15 +686,38 @@ def build_sections(sources):
             notifies.append((rel, m.group(1)))
     uncalled = []
     for rel, fn in notifies:
-        callers = [r for r, t in stripped.items()
-                   if r != rel and re.search(r'\b' + fn + r'\s*\(', t)]
+        # A HOOK'S OWN DEFINITION IS NOT ONE OF ITS CALLERS.
+        #
+        # This read `if r != rel and re.search(name + "(")`, and the `r != rel`
+        # looked like the self-exclusion. It is not: hooks are harvested from
+        # Classes/*.h, so `rel` is always the HEADER, and the .cpp holding the
+        # function BODY is a different path that stayed in the search set. The
+        # caller regex is a bare name plus "(" with no "::" anchor and no `void`
+        # exclusion, so `void UBreakerChargeComponent::NotifyAssist()` matched
+        # itself. Every one of the eighteen had its own component .cpp in its
+        # caller list, so the section reported zero and STRUCTURALLY COULD NOT
+        # REPORT ANYTHING ELSE.
+        #
+        # Zero balancing zero, in a new shape -- the same failure as the suite
+        # log that reconciled an empty run against itself. A check that cannot
+        # move cannot tell you it is short, and this one had a pin note reading
+        # "the number did not move, which is the answer worth recording".
+        #
+        # The definition signature is removed from each candidate before the
+        # search, so a file counts as a caller only if it names the hook
+        # somewhere OTHER than in the definition it may also hold.
+        defn = re.compile(r'\bvoid\s+\w+::' + fn + r'\s*\(')
+        callers = [r for r, txt in stripped.items()
+                   if r != rel and re.search(r'\b' + fn + r'\s*\(', defn.sub(' ', txt))]
         if not callers:
             uncalled.append(f"{rel}::{fn}")
     sections.append({
         "key": "uncalled-generation", "title": "Resource generation entry points with no caller",
         "direction": CEILING, "value": len(uncalled), "unit": f"of {len(notifies)}",
         "detail": uncalled,
-        "note": "A generation hook nothing calls is a resource bar that sits at zero forever.",
+        "note": "A generation hook nothing calls is a resource bar that sits at zero forever. "
+                "Test callers do not count: a hook exercised only by the suite is a hook the "
+                "game never fires.",
     })
 
     # --- unimplemented invariants ----------------------------------------
