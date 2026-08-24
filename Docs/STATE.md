@@ -34,8 +34,8 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 431
-- expected red: 4
+- passing: 432
+- expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 39
 
@@ -44,7 +44,6 @@ A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
-- `RiorsEdge.Combat.Status.DetonationCurve`
 - `RiorsEdge.Items.Drops.DropChanceReachesEveryRank`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`

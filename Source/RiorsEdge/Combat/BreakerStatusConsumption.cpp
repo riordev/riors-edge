@@ -5,8 +5,16 @@ float UBreakerStatusConsumption::DetonationDamage(int32 DistinctCount, const FBr
     const int32 Counted = FMath::Clamp(DistinctCount, 0, FMath::Max(1, Params.MaximumCountedStatuses));
     if (Counted <= 0) return 0.0f;
 
-    float Damage = Params.FlatDamageIfAny + Params.DamagePerDistinctStatus * static_cast<float>(Counted);
-    if (Curve == EBreakerDetonationCurve::FixedPlusThreshold && Counted >= FMath::Max(1, Params.ThresholdCount))
+    // MS9 USES ITS OWN PER-STATUS CONSTANT. This read DamagePerDistinctStatus
+    // for both curves and added the threshold bonus on top, so FixedPlusThreshold
+    // was the base curve plus a constant -- strictly steeper than the curve it
+    // is named for flattening. The reshape is the swapped term; the bonus alone
+    // was never one.
+    const bool bFixed = Curve == EBreakerDetonationCurve::FixedPlusThreshold;
+    const float PerStatus = bFixed ? Params.FixedDamagePerDistinctStatus : Params.DamagePerDistinctStatus;
+
+    float Damage = Params.FlatDamageIfAny + PerStatus * static_cast<float>(Counted);
+    if (bFixed && Counted >= FMath::Max(1, Params.ThresholdCount))
     {
         Damage += Params.ThresholdFlatBonus;
     }

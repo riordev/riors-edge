@@ -165,12 +165,24 @@ bool FBreakerDetonationCurveTest::RunTest(const FString& Parameters)
     const float Three = UBreakerStatusConsumption::DetonationDamage(3, Params, EBreakerDetonationCurve::Linear);
     TestTrue(TEXT("More distinct statuses detonate harder"), Three > Two);
 
-    // MS9 Interference adds a flat bonus at the threshold and nothing below it.
-    TestEqual(TEXT("Below the threshold MS9 matches the base curve"),
-        UBreakerStatusConsumption::DetonationDamage(2, Params, EBreakerDetonationCurve::FixedPlusThreshold), Two);
-    TestEqual(TEXT("At the threshold MS9 pays its flat bonus"),
+    // MS9 SWAPS THE PER-STATUS TERM AND PAYS A BONUS AT THE THRESHOLD. These
+    // two used to assert it matched the base curve below the threshold and the
+    // base curve PLUS a bonus at it -- which is what "steeper than the thing it
+    // flattens" looks like written down as an expectation. Its per-status term
+    // is its own constant now, so below the threshold MS9 is WEAKER, and the
+    // bonus buys the shape back at 3+.
+    const float MS9Two = UBreakerStatusConsumption::DetonationDamage(2, Params, EBreakerDetonationCurve::FixedPlusThreshold);
+    TestEqual(TEXT("Below the threshold MS9 uses its own, lower per-status term"),
+        MS9Two, Params.FlatDamageIfAny + Params.FixedDamagePerDistinctStatus * 2.0f);
+    TestTrue(TEXT("...which is strictly less than the base curve there"), MS9Two < Two);
+    TestEqual(TEXT("At the threshold MS9 pays its flat bonus on top of that term"),
         UBreakerStatusConsumption::DetonationDamage(3, Params, EBreakerDetonationCurve::FixedPlusThreshold),
-        Three + Params.ThresholdFlatBonus);
+        Params.FlatDamageIfAny + Params.FixedDamagePerDistinctStatus * 3.0f + Params.ThresholdFlatBonus);
+    // THE ORDER IS THE INVARIANT, not the two numbers. If the fixed term ever
+    // rises to or above the base term, MS9 stops being a reshape and the enum's
+    // name stops describing it.
+    TestTrue(TEXT("MS9's per-status term stays below the base curve's"),
+        Params.FixedDamagePerDistinctStatus < Params.DamagePerDistinctStatus);
 
     // Class-Kits §2.7.5, the BOUND this whole file exists to protect:
     // Resonance against 6 statuses is no more than 2.2x its damage against 2.

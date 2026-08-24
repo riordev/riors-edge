@@ -4867,11 +4867,21 @@ namespace
         // against UBreakerProgressionComponent::CanPurchaseNode, which does
         // check both. Promising a purchase and refusing it is worse than
         // showing it locked.
+        // AND THE LABEL SAYS "REQUIRES", NOT "UNLOCKS". It read "COMMIT TO THIS
+        // BRANCH TO UNLOCK ITS KEYSTONE", which promises that commitment opens
+        // the node -- and the comment directly above already knew better, in the
+        // same breath: "not told to invest more into a node that commitment
+        // alone will not open". Under O111's benchmark economy the gap is no
+        // longer a nuance. A keystone needs six invested plus its own two, the
+        // pool pays two points at each of four benchmarks, and eight points do
+        // not exist before the last one -- so commitment cannot open a keystone
+        // for the entire campaign, and a label saying it does is a promise the
+        // screen keeps for nobody below the cap.
         if (Node->bCornerstone && Progression->GetProgressionState().CommittedBranch != Tree->TreeId)
         {
             if (OutTierGated) *OutTierGated = true;
             return Fail(
-                TEXT("COMMIT TO THIS BRANCH TO UNLOCK ITS KEYSTONE"),
+                TEXT("THIS BRANCH'S KEYSTONE REQUIRES COMMITMENT"),
                 TEXT("COMMIT REQUIRED"));
         }
         // The component takes the MAX of the node's own investment requirement
@@ -6613,8 +6623,17 @@ TSharedRef<SWidget> SBreakerMenu::BuildSkillTreesScreen()
                     BorderWrap(
                         SNew(SBox).Padding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
                         [
+                            // "KEYSTONE TIER OPEN" WAS FALSE FOR EVERY CHARACTER
+                            // BELOW THE LEVEL CAP. Commitment clears the O37
+                            // check and nothing else; the keystone still wants
+                            // six invested plus two, and the benchmark schedule
+                            // does not produce eight points until the last one.
+                            // O86 splits what commitment delivers: the identity
+                            // arrives now, free and immediate, and the mechanics
+                            // unfold on the benchmarks. The chip says the half
+                            // that is true at the moment it is shown.
                             MenuText(FText::FromString(bThisBranch
-                                ? TEXT("COMMITTED — KEYSTONE TIER OPEN")
+                                ? TEXT("COMMITTED — THIS DOCTRINE IS YOURS")
                                 : FString::Printf(TEXT("COMMITTED ELSEWHERE: %s"), *Committed.ToString())),
                                 BreakerUI::TypeCaption, bThisBranch ? Cyan : Muted, true)
                         ],

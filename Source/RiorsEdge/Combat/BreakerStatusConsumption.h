@@ -24,9 +24,18 @@ enum class EBreakerDetonationCurve : uint8
     // Base row: flat per distinct status. Doubling the statuses doubles the
     // burst, which is exactly the shape MS9 exists to flatten.
     Linear,
-    // MS9 Interference: a fixed value per status plus one flat bonus at or
-    // above the threshold count. Deliberately re-shaped AWAY from a count
-    // multiplier — the anti-explosion rewrite named in Class-Kits MS9.
+    // MS9 Interference: a FIXED value per status -- its own, lower constant,
+    // not the base curve's -- plus one flat bonus at or above the threshold
+    // count. Deliberately re-shaped AWAY from a count multiplier: the
+    // anti-explosion rewrite named in Class-Kits MS9.
+    //
+    // IT USED TO REUSE DamagePerDistinctStatus AND ADD A BONUS ON TOP, which is
+    // not a reshape at all -- it is the base curve plus a constant, strictly
+    // steeper than the thing it exists to flatten (2-to-6 ratio 1.87 against
+    // 1.70). "A fixed value per status" is satisfied by a fixed value that is
+    // not the one the curve already used; if the term is the same constant, the
+    // node's name describes something it does not do. A threshold node exists
+    // to change SHAPE at the threshold.
     FixedPlusThreshold
 };
 
@@ -49,9 +58,22 @@ struct RIORSEDGE_API FBreakerDetonationParams
     // A flat base flattens the ratio without flattening the incentive to
     // diversify, which is the design goal MS9 states in words.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FlatDamageIfAny = 150.0f;   // O2 PLACEHOLDER
-    // MS9 only.
+    // MS9 only, all three.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 ThresholdCount = 3;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float ThresholdFlatBonus = 40.0f;   // O2 PLACEHOLDER
+    // THE FIXED PER-STATUS TERM, and the whole of what makes MS9 a reshape
+    // rather than a bonus. Lower than DamagePerDistinctStatus on purpose: the
+    // count term shrinks and the threshold bonus pays it back at 3+, so a
+    // Multispell that diversifies is rewarded at the step rather than on the
+    // slope. That is what flattens the 2-to-6 ratio below the base curve's,
+    // which RiorsEdge.Combat.Status.DetonationCurve asserts as a RELATIONSHIP
+    // and not as a ceiling -- both curves cleared the 2.2x bound while this one
+    // was steeper, and a bound wide enough for both could never have said so.
+    //
+    // O2 PLACEHOLDER: 22 against the base 40 is shape, not balance. What is not
+    // free to move is the ORDER -- this must stay below DamagePerDistinctStatus
+    // or the node stops doing the thing it is named for.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FixedDamagePerDistinctStatus = 22.0f;   // O2 PLACEHOLDER
     // Hard stop on how many distinct statuses can be paid for. Five elements
     // plus Bleed is six statuses today; the cap exists so a future seventh
     // status type cannot silently inflate an already-bounded ability.
