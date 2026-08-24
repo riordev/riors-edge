@@ -1797,14 +1797,22 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCasterMultispellTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Cycle.GetTag());
     Tree->Nodes.Add(Node);
 
-    // "The one intentional stat node" per Class-Kits MS3 -- and the one
-    // Caster node this pass genuinely cannot author even as a placeholder
-    // number, because EBreakerNodeStatTarget has no Maximum-Resource
-    // counterpart to gear's "Maximum Resource" affix. Ships as a tag; the
-    // rule is real, the enum gap is the same one the block comment above
-    // names.
+    // "The one intentional stat node" per Class-Kits MS3, AND IT NOW AUTHORS
+    // ONE. This comment used to say the node "genuinely cannot author even a
+    // placeholder number, because EBreakerNodeStatTarget has no
+    // Maximum-Resource counterpart to gear's Maximum Resource affix". That
+    // stopped being true when MaxClassResource landed: the target exists, the
+    // lane composes at BreakerProgressionComponent.cpp:1198, and every resource
+    // component reads GetMaxClassResource. Nothing was blocking it but this
+    // paragraph, which is why a justification outliving its cause is worse than
+    // no justification -- it reads like a decision and acts like a wall.
+    //
+    // Reservoir was the only silent node in the game whose lane was already
+    // finished end to end. It is also the first node anywhere to author
+    // MaxClassResource, which had a live lane and zero authors.
     Node = MakeNode(TEXT("Caster.Multispell.Reservoir"), TEXT("Reservoir"),
         TEXT("Your Mana pool deepens."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Caster, 1, 2, 1);
+    AddEffect(Node, EBreakerNodeStatTarget::MaxClassResource, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER -- Class-Kits MS3 gives +15/+25 flat; the lane is Increased, so this is the shape not the number
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_MS_Reservoir.GetTag());
     Tree->Nodes.Add(Node);
 
