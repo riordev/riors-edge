@@ -1001,6 +1001,15 @@ def parse_emitted(section_keys):
 BAND_SOURCE = os.path.join(ROOT, "Source", "RiorsEdge", "Tests", "BreakerPowerBandTests.cpp")
 
 
+# Band edges that must be DERIVED rather than written, and from exactly what.
+# Read by parse_band_edges (which enforces it) and by the pin check (which tells
+# a reader the right way to fix it). One table so the two cannot disagree — they
+# did, and the pin check's advice was to inline a number the parser refuses.
+DERIVED_BAND_EDGES = {
+    "RewriteLayerCeilingValue": ("EndgameBandMaximum", "EndgameBandMid"),
+}
+
+
 def parse_band_edges():
     """The authored band edges, read out of the test that asserts them.
 
@@ -1043,7 +1052,7 @@ def parse_band_edges():
     # a C++ expression evaluator and must not grow into one: anything more
     # complicated than one operator belongs in the test as an assertion, where a
     # person reads it, rather than in a parser nobody reads.
-    derived = set()
+    derived = {}
     for m in re.finditer(r"constexpr\s+float\s+(\w+)\s*=\s*(\w+)\s*/\s*(\w+)\s*;", text):
         name, num, den = m.group(1), m.group(2), m.group(3)
         if name in edges or num not in edges or den not in edges:
@@ -1051,7 +1060,7 @@ def parse_band_edges():
         if edges[den] == 0.0:
             raise ParseError(f"{BAND_SOURCE}: {name} divides by {den}, which is zero.")
         edges[name] = edges[num] / edges[den]
-        derived.add(name)
+        derived[name] = (num, den)
 
     # THE ONE CHECK NO RUNTIME ASSERTION CAN MAKE.
     #
@@ -1069,12 +1078,29 @@ def parse_band_edges():
     # Named explicitly rather than inferred. A general rule would need to guess
     # which constants are meant to be derived, and guessing is what this guard
     # exists to stop; one symbol earns one line because it went wrong once.
-    if "RewriteLayerCeilingValue" in edges and "RewriteLayerCeilingValue" not in derived:
-        raise ParseError(
-            f"{BAND_SOURCE}: RewriteLayerCeilingValue is declared as a literal, not as a "
-            "quotient of two band edges. It is the headroom the authored band leaves above "
-            "its centre and must move when a band edge moves; written as a number it stops "
-            "doing that silently, and no test can see the difference.")
+    # THE OPERANDS BY NAME, NOT JUST THE SHAPE. Checking only that the constant
+    # was a quotient of two known edges accepted
+    # EndgameBandMinimum / EndgameBandMid -- 12/16 = 0.75, below every authored
+    # magnitude in the file -- because both operands are edges and it lands in
+    # `derived` like any other. Form guarded, identity unguarded, and the
+    # difference is the whole value of the check.
+    #
+    # It was masked, too, which is the part worth recording: with the wrong
+    # quotient the row renders "not emitted" rather than wrong, because
+    # RuleBandImpact.Step is an expected red and an expected red emits nothing.
+    # A wrong ceiling reads as a missing measurement. It goes load-bearing the
+    # day that red closes, so the guard is fixed while it is still cheap.
+    for name, (num, den) in DERIVED_BAND_EDGES.items():
+        if name not in edges:
+            continue
+        if derived.get(name) != (num, den):
+            actual = derived.get(name)
+            shape = f"{actual[0]} / {actual[1]}" if actual else "a literal"
+            raise ParseError(
+                f"{BAND_SOURCE}: {name} is declared as {shape}, not as {num} / {den}. "
+                "It is a function of the band it bounds and must move when a band edge "
+                "moves; any other form stops doing that silently, and no runtime "
+                "assertion can see the difference because the values are the same float.")
     return edges
 
 
@@ -1150,10 +1176,24 @@ def load_pins(section_directions):
             edges = parse_band_edges()
         for bound, symbol in pin["source"].items():
             if symbol not in edges:
+                # THE ADVICE DEPENDS ON WHICH SYMBOL, because "inline the number"
+                # is exactly wrong for a derived one -- it is the transcription
+                # parse_band_edges refuses two functions above, and two guards
+                # sending a reader in opposite directions is worse than one
+                # guard. A derived edge is fixed by restoring its derivation.
+                if symbol in DERIVED_BAND_EDGES:
+                    num, den = DERIVED_BAND_EDGES[symbol]
+                    raise ParseError(
+                        f"pin '{key}' sources its {bound} from '{symbol}', which is a DERIVED "
+                        f"band edge and is not currently declared as {num} / {den} in "
+                        f"{os.path.relpath(BAND_SOURCE, ROOT)}. Restore the derivation — do "
+                        "NOT inline the number, which is the transcription parse_band_edges "
+                        "refuses.")
                 raise ParseError(
                     f"pin '{key}' sources its {bound} from '{symbol}', which is not a "
                     f"constexpr float in {os.path.relpath(BAND_SOURCE, ROOT)}. The edge "
-                    "would be unset and never checked — fix the symbol or inline the number.")
+                    "would be unset and never checked — fix the symbol, or pin a literal "
+                    "bound instead of sourcing one.")
             pin[bound] = edges[symbol]
 
     for key, pin in pins.items():

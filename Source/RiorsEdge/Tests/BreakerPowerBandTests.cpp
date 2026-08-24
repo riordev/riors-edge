@@ -436,6 +436,19 @@ namespace BreakerPowerBandTest
     // way, which is why this is a measurement and not an edit -- a band edge or
     // its centre is the owner's number.
     constexpr float EndgameBandMid = 16.0f;   // O36 authored 12-20x
+    // AND THE SAME INCONSISTENCY IS LIVE HERE, one line down. 9.0 is the
+    // arithmetic mean of 8-10; the geometric mean is 8.9443. Recording it
+    // beside the note above rather than only there, because a correction
+    // applied to one instance of a repeated shape while its neighbour keeps the
+    // shape is how this file got two tautologies and four stale justifications.
+    //
+    // BOTH mids feed the same expression -- Loge(AtCapBandMid) /
+    // Loge(EndgameBandMid) -- so switching one and not the other is not a
+    // smaller change, it is a wrong one. Consistently geometric:
+    // BandShare 0.79248 -> 0.79955 (+0.89%), and MaximumRuleStepAtCap
+    // 1.2685 -> 1.2712. No verdict moves: at-cap measures 6.54 against 8-10
+    // either way. So this is a note and not an edit, on the same standing rule
+    // as the endgame mid -- a band's centre is the owner's number.
     constexpr float AtCapBandMid = 9.0f;      // O36 authored 8-10x
 
     // A ceiling is a share of the band it sits in, and the two bands are not
