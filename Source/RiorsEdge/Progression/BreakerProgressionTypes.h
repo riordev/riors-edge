@@ -356,8 +356,11 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // MeleeDamage stays false, and not for want of a bucket. Melee is
     // weapon-DELIVERED under O55, so it is not a third pool — it is a narrower
     // slice of the weapon pool selected by the Damage_Melee source tag on the
-    // request, which is a tag-keyed rider rather than an attribute lane. It
-    // waits on that mechanism, not on this one.
+    // request, which is a tag-keyed rider rather than an attribute lane. That
+    // mechanism exists: BuildTargetConditionRiders publishes MeleeDamage rows
+    // carrying the tag, and ReceiveDamage pays them into the weapon lane's
+    // additive Increased bucket on tagged hits. An attribute lane here would
+    // be a SECOND payment of the same line.
     case EBreakerNodeStatTarget::WeaponDamage:
     case EBreakerNodeStatTarget::AbilityDamage:
     case EBreakerNodeStatTarget::DashCooldown:
@@ -416,6 +419,10 @@ inline EBreakerDamagePool BreakerDamagePoolFor(EBreakerNodeStatTarget Target)
 // "one lane away" three times — including once in a report that offered it as a
 // lane the doctrine pass would light up. A number that cannot go to zero teaches
 // people to stop reading it.
+//
+// The rider itself is live: a true return here routes the effect through
+// BuildTargetConditionRiders as a source-tag row (see RequiredSourceTag on the
+// rider struct) instead of leaving it to the aggregator's dead bucket.
 inline bool BreakerStatTargetIsRiderDelivered(EBreakerNodeStatTarget Target)
 {
     return Target == EBreakerNodeStatTarget::MeleeDamage;
@@ -433,6 +440,22 @@ inline bool BreakerIsDeliveredDamagePool(EBreakerNodeStatTarget Target)
     return Pool == EBreakerDamagePool::Weapon
         || Pool == EBreakerDamagePool::Ability
         || Pool == EBreakerDamagePool::Shared;
+}
+
+// The lane a RIDER ROW pays into. For a pool-targeted row this is the pool
+// itself; for a rider-delivered slice it is the pool the slice cuts —
+// MeleeDamage is weapon-delivered under O55/O98, so its rows ride the weapon
+// lane and pay only on weapon-delivered hits. The tag gate on the row is what
+// makes it a SLICE of that lane rather than the lane itself: without it this
+// mapping alone would quietly fold melee into the whole weapon pool, which is
+// exactly the fold the vocabulary tests pin against.
+inline EBreakerDamagePool BreakerRiderLanePoolFor(EBreakerNodeStatTarget Target)
+{
+    if (Target == EBreakerNodeStatTarget::MeleeDamage)
+    {
+        return EBreakerDamagePool::Weapon;
+    }
+    return BreakerDamagePoolFor(Target);
 }
 
 // Same aggregation law as equipment: flat values sum, then one additive

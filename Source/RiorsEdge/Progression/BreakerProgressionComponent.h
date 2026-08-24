@@ -42,6 +42,12 @@ struct RIORSEDGE_API FBreakerTargetConditionRider
     EBreakerNodeStatTarget StatTarget = EBreakerNodeStatTarget::Damage;
     // Whole percent, already multiplied by the owned rank.
     float Percent = 0.0f;
+    // O98: set on a rider-delivered slice row (MeleeDamage today, keyed on
+    // Damage.Melee). The row pays only when the request's SourceTags carry
+    // this tag — the slice is selected by what the hit says it IS, never by
+    // what triggered it. Invalid on every pool-targeted row, and an invalid
+    // tag requires nothing.
+    FGameplayTag RequiredSourceTag;
 };
 
 UCLASS(ClassGroup=Progression, BlueprintType, meta=(BlueprintSpawnableComponent))

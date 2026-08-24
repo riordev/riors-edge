@@ -164,10 +164,23 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
         // folded into the wrong bucket — which is the "silently pay into the
         // general bucket" failure the pre-split filter was placed here to
         // prevent, now that partition rows genuinely exist.
-        const EBreakerDamagePool RiderPool = BreakerDamagePoolFor(Rider.StatTarget);
+        //
+        // O98 widens the same rule rather than adding a second one: a
+        // rider-delivered slice (MeleeDamage) has no pool of its own, so
+        // BreakerRiderLanePoolFor names the lane the slice cuts — weapon —
+        // and the tag gate below is what makes it a SLICE of that lane
+        // rather than the lane itself.
+        const EBreakerDamagePool RiderPool = BreakerRiderLanePoolFor(Rider.StatTarget);
+        const bool bDeliveredLane = RiderPool == EBreakerDamagePool::Weapon
+            || RiderPool == EBreakerDamagePool::Ability
+            || RiderPool == EBreakerDamagePool::Shared;
         const bool bLaneMatches = RiderPool == EBreakerDamagePool::Shared
             || (RiderPool == EBreakerDamagePool::Ability) == (Request.Delivery == EBreakerDamageDelivery::Ability);
-        if (!BreakerIsDeliveredDamagePool(Rider.StatTarget) || !bLaneMatches) continue;
+        if (!bDeliveredLane || !bLaneMatches) continue;
+        // The tag gate: a tag-keyed row pays only when the request says the
+        // hit IS that slice. Cleave and the Tank sweep stamp Damage.Melee at
+        // their fill sites; a bullet carries no tag and pays nothing here.
+        if (Rider.RequiredSourceTag.IsValid() && !Request.SourceTags.HasTag(Rider.RequiredSourceTag)) continue;
         if (Conditions.SatisfiesAll(Rider.Condition, Rider.AlsoRequires))
         {
             RiderPercent += Rider.Percent;

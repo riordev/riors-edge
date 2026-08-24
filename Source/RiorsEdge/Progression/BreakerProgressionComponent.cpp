@@ -10,6 +10,7 @@ static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttribu
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerGritComponent.h"
 #include "Progression/BreakerWorldPoints.h"
@@ -1267,6 +1268,21 @@ bool UBreakerProgressionComponent::IsNodeMoreAuthoringLegal(const UBreakerProgre
     return true;
 }
 
+namespace
+{
+    // O98: the source tag a rider-delivered stat target keys on. One switch so
+    // the builder cannot disagree with the vocabulary about which tag selects
+    // which slice. MeleeDamage is the only rider-delivered target today; the
+    // tag is the native one Cleave and the Tank sweep already stamp on their
+    // requests, referenced here rather than restated as a string.
+    FGameplayTag BreakerRiderSliceSourceTag(EBreakerNodeStatTarget Target)
+    {
+        return Target == EBreakerNodeStatTarget::MeleeDamage
+            ? BreakerAbilityTags::Damage_Melee.GetTag()
+            : FGameplayTag();
+    }
+}
+
 TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetConditionRiders(
     const TArray<const UBreakerProgressionNode*>& Nodes, const TArray<FBreakerNodeRank>& Ranks)
 {
@@ -1289,7 +1305,13 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
         const int32 EffectiveRank = FMath::Min(Rank.Rank, Node->MaxRank);
         for (const FBreakerNodeEffect& Effect : Node->Effects)
         {
-            if (!Effect.RequiresTargetState()) continue;
+            // O98: a rider-delivered slice line rides this table even when its
+            // condition is Always — the tag requirement on the row is what
+            // defers it to the hit, exactly as a Target* condition defers a
+            // conditional line. The aggregator files the same effect into a
+            // bucket nothing reads, so this is the line's ONLY payment.
+            const bool bTagKeyed = BreakerStatTargetIsRiderDelivered(Effect.StatTarget);
+            if (!Effect.RequiresTargetState() && !bTagKeyed) continue;
 
             // Target-side lines are Increased-bucket only, and Damage is the
             // one stat target with a rider consumer today. Everything else is
@@ -1308,7 +1330,7 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
             // rider read per event against a live target has nothing to attach
             // to.
             if (Effect.StatBucket != EBreakerNodeStatBucket::IncreasedPercent
-                || !BreakerIsDeliveredDamagePool(Effect.StatTarget))
+                || !(BreakerIsDeliveredDamagePool(Effect.StatTarget) || bTagKeyed))
             {
                 static TSet<FName> WarnedOnceTargetRiderNodeIds;
                 if (!WarnedOnceTargetRiderNodeIds.Contains(Node->NodeId))
@@ -1326,6 +1348,7 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
             Rider.AlsoRequires = Effect.AlsoRequires;
             Rider.StatTarget = Effect.StatTarget;
             Rider.Percent = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
+            Rider.RequiredSourceTag = BreakerRiderSliceSourceTag(Effect.StatTarget);
         }
     }
     return Riders;

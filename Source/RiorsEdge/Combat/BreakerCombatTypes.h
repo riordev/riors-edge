@@ -52,9 +52,11 @@ struct RIORSEDGE_API FBreakerDamageRequest
     // bHasSourceSplit is the presence flag: only a submission site that
     // actually snapshotted the split sets it, and ReceiveDamage recomposes
     // ONLY when it is set AND a rider fired — otherwise the request resolves
-    // bit-identically to a request that never heard of the split. Today the
-    // weapon paths (hitscan and rocket) fill it; ability submissions and DoT
-    // tick requests stay composed-only and get riders in a later pass.
+    // bit-identically to a request that never heard of the split. Every live
+    // submission fills it through FillSourcePools — the O54 pass routed the
+    // ability sites too. DoT tick requests stay composed-only: a tick's
+    // multiplier is the application-time snapshot and its halves were never
+    // carried.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceIncreasedPercent = 0.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) float SourceMoreProduct = 1.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHasSourceSplit = false;

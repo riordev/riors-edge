@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include <initializer_list>
+#include "Abilities/BreakerAbilityTags.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCombatTypes.h"
@@ -312,6 +313,96 @@ bool FBreakerTargetRiderTableTest::RunTest(const FString& Parameters)
         TArray<FBreakerNodeRank> Ranks = { {TEXT("Test.Table.FlatRider"), 1} };
         TestEqual(TEXT("a Flat target-conditional effect is dropped, never published"),
             UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks).Num(), 0);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O98 — the first TAG-KEYED rider: MeleeDamage rows key on Damage.Melee and
+// ride the weapon lane. The slice is selected by what the hit says it IS (the
+// request's SourceTags — the same tag Cleave and the Tank sweep already
+// stamp), never by what triggered it. The tag requirement is what defers an
+// unconditional line to the hit, exactly as a Target* condition defers a
+// conditional one — which is why the same table and the same recomposition
+// carry both, and why this file is where the slice is proven.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSourceTagRiderMeleeTest,
+    "RiorsEdge.Combat.TargetRiders.SourceTagMelee",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSourceTagRiderMeleeTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerTargetRiderTest;
+
+    // An UNCONDITIONAL MeleeDamage Increased line publishes a rider row
+    // carrying the native tag. Condition Always is an honest shape here: the
+    // tag is the gate.
+    UBreakerProgressionNode* Node = BreakerMakeRiderNode(TEXT("Test.Rider.Melee"),
+        EBreakerBuildCondition::Always, {}, 30.0f,
+        EBreakerNodeStatBucket::IncreasedPercent, EBreakerNodeStatTarget::MeleeDamage);
+    AActor* Attacker = BreakerMakeRiderAttacker(Node, 1);
+
+    const UBreakerProgressionComponent* Progression = Attacker->FindComponentByClass<UBreakerProgressionComponent>();
+    if (!TestEqual(TEXT("a MeleeDamage line publishes exactly one rider row"),
+        Progression->GetTargetConditionRiders().Num(), 1))
+    {
+        return true;
+    }
+    TestTrue(TEXT("the row keys on the native Damage.Melee tag, not a restated string"),
+        Progression->GetTargetConditionRiders()[0].RequiredSourceTag == BreakerAbilityTags::Damage_Melee.GetTag());
+
+    // A melee-tagged, weapon-delivered hit — the exact request shape Cleave
+    // and the Tank sweep submit: +30 joins the source's +20 in the ADDITIVE
+    // bucket. 100 x (1 + (20+30)/100) = 150, never 100 x 1.20 x 1.30.
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Request = BreakerMakeSplitRequest(Attacker, 20.0f, 1.0f);
+        Request.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
+        TestEqual(TEXT("a melee-tagged weapon hit pays the slice additively (150)"),
+            Victim.Combat->ReceiveDamage(Request).RawDamage, 150.0f, 0.001f);
+    }
+
+    // The same attacker firing a BULLET (untagged): the slice pays nothing.
+    // This is the whole line between a slice and a lane — fold the 30 in here
+    // and MeleeDamage has quietly become the weapon pool.
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        TestEqual(TEXT("an untagged weapon hit resolves without the slice (120)"),
+            Victim.Combat->ReceiveDamage(BreakerMakeSplitRequest(Attacker, 20.0f, 1.0f)).RawDamage, 120.0f, 0.001f);
+    }
+
+    // Tagged but ABILITY-delivered: refused by the lane rule. No shipped melee
+    // submits as Ability (O55 makes swinging the equipped weapon
+    // weapon-delivered), so this pins the refusal, not a live case.
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Request = BreakerMakeSplitRequest(Attacker, 20.0f, 1.0f);
+        Request.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
+        Request.Delivery = EBreakerDamageDelivery::Ability;
+        TestEqual(TEXT("a melee-tagged ability-delivered hit is refused by the lane rule (120)"),
+            Victim.Combat->ReceiveDamage(Request).RawDamage, 120.0f, 0.001f);
+    }
+
+    // A melee line may still carry a condition, and the requirements AND: the
+    // tag on the request, the condition on the pair of actors (both rigs sit
+    // at the origin, so TargetAtCloseRange is genuinely satisfied).
+    {
+        AActor* Conditional = BreakerMakeRiderAttacker(BreakerMakeRiderNode(TEXT("Test.Rider.MeleeClose"),
+            EBreakerBuildCondition::TargetAtCloseRange, {}, 25.0f,
+            EBreakerNodeStatBucket::IncreasedPercent, EBreakerNodeStatTarget::MeleeDamage), 1);
+        {
+            FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+            FBreakerDamageRequest Request = BreakerMakeSplitRequest(Conditional, 0.0f, 1.0f);
+            Request.SourceTags.AddTag(BreakerAbilityTags::Damage_Melee.GetTag());
+            TestEqual(TEXT("tag AND condition satisfied together pay (125)"),
+                Victim.Combat->ReceiveDamage(Request).RawDamage, 125.0f, 0.001f);
+        }
+        {
+            FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+            TestEqual(TEXT("condition satisfied but tag absent pays nothing (100)"),
+                Victim.Combat->ReceiveDamage(BreakerMakeSplitRequest(Conditional, 0.0f, 1.0f)).RawDamage, 100.0f, 0.001f);
+        }
     }
     return true;
 }

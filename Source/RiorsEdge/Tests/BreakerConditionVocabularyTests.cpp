@@ -470,16 +470,21 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
         static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::AbilityDamage)),
         static_cast<int32>(EBreakerDamagePool::Ability));
 
-    // MeleeDamage stays unpaid, and the reason is not "nobody got to it": melee
-    // is weapon-DELIVERED under O55, so it is a narrower slice of the weapon
-    // pool selected by the Damage_Melee source tag, not a fourth pool. It waits
-    // on that tag-keyed rider mechanism, and until then a node authoring it
-    // must be visibly unpaid rather than quietly folded into the weapon bucket.
+    // MeleeDamage is paid by the tag-keyed rider, not by a lane: melee is
+    // weapon-DELIVERED under O55, so it is a narrower slice of the weapon pool
+    // selected by the Damage_Melee source tag on the request, not a fourth
+    // pool. Both halves are pinned — no aggregation lane and no pool of its
+    // own (either would be a SECOND payment of the same line), and the rider
+    // lane mapping that routes its rows onto weapon-delivered hits. The rider
+    // itself is covered by RiorsEdge.Combat.TargetRiders.SourceTagMelee.
     TestFalse(TEXT("MeleeDamage does not borrow the weapon pool's lane"),
         BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::MeleeDamage));
     TestEqual(TEXT("MeleeDamage is not a pool of its own"),
         static_cast<int32>(BreakerDamagePoolFor(EBreakerNodeStatTarget::MeleeDamage)),
         static_cast<int32>(EBreakerDamagePool::None));
+    TestEqual(TEXT("MeleeDamage rider rows ride the weapon lane (O98)"),
+        static_cast<int32>(BreakerRiderLanePoolFor(EBreakerNodeStatTarget::MeleeDamage)),
+        static_cast<int32>(EBreakerDamagePool::Weapon));
 
     // The enum is serialized by value into Data Assets, so the ten original
     // entries must keep their numbers. Pinning the first and last of the
