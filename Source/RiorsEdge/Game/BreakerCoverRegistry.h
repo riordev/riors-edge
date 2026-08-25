@@ -465,7 +465,7 @@ public:
     // ground a player dashes down is held by the CORRIDOR rejection in
     // IsLayoutLegal — no piece of any class may stand within
     // CorridorHalfWidth of the centreline over the corridor span — and that
-    // is what keeps chest-flanked ground open (O125). Two rules, two
+    // is what keeps chest-flanked ground open (O132). Two rules, two
     // measurements, and the readout now prints both rather than one figure
     // under a word that fits either.
     UFUNCTION(BlueprintPure, Category="Cover")

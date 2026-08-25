@@ -99,10 +99,13 @@ pack contradicts itself (label `phase 2 of 4`, readout `PHASE 3 / 4`), so
 it draws phase-count-only until the encounter exposes a total, per O120.
 GLASS PICKED UP FROM KIT'S CENSUS: zero sound anywhere is an Audio item.
 
-DECISIONS.md HAS DUPLICATE O-NUMBERS: two different O125s (dash-lane
-corridor, health bands) and two O120s, from lanes allocating concurrently
-against the highest number each could see. Not rewritten — another lane's
-line — but allocation needs to happen at push time, or it recurs.
+DECISIONS.md HAD DUPLICATE O-NUMBERS from lanes allocating concurrently
+against the highest number each could see. THE O125 COLLISION IS CLOSED:
+LEDGER landed first and keeps O125 (health bands); the dash-lane trio
+renumbered to O132/O133/O134 on the owner's call, citations in Source and
+Scripts moved with them. TWO O120s REMAIN (loading progress, reward
+composition) — another lane's line, reported not rewritten. Allocation
+needs to happen at push time, or it recurs.
 
 GROUND LANE, THE READOUT PASS (453 / 4 / 0 on the rebased tree, same
 expected-red roster).
@@ -114,7 +117,7 @@ is mantled, not rounded), and the ground the player dashes down is held
 by the CORRIDOR rejection instead — no cover of any class within
 `CorridorHalfWidth` 900 of the centreline. Pulling the chest pairs to
 +-5 m goes RED, and `RiorsEdge.Zone.Fernhall.LaneGuard` proves which rule
-objects by perturbing the yard rather than asserting it. O125 rules it.
+objects by perturbing the yard rather than asserting it. O132 rules it.
 `DescribeCoverField` now names the lane's CLASS, prints the corridor
 margin beside it as an OFFSET (never a width — centre-to-centre versus
 face-to-face is the same defect in a new place), and states every band's
@@ -126,21 +129,58 @@ THE WAVE SOLVER'S PARTY AXIS HAS COVERAGE (`RiorsEdge.Game.Waves.PartyScaling`):
 the elite interpolation pointwise across 1-5 plus both clamps, the
 per-player body ceiling, the FLAT ranged cap, the per-player Warden cap
 reached rather than merely respected, and `IsCompositionLegal` at every
-party size over 30 waves. IT FOUND SOMETHING (O126): the budget curve
+party size over 30 waves. IT FOUND SOMETHING (O133): the budget curve
 carries no party term while 5.3's caps are per-player, so at wave 3 solo
 buys a Warden, a Lattice and nine Skitters on 18 points while five
 players buy three Wardens and NOTHING ELSE. Both legal; pinned as
 measured, not intent, and it goes red the day a party term lands.
-O127 records the question rift interiors must answer before any solver
+O134 records the question rift interiors must answer before any solver
 code: what a room's shape does to its budget. Archetype roster and
 cross-solve state stay HELD; the endgame-pacing question (periodic is
 predictable) is in DECISIONS' Open list.
 
-CROWD PROBE READOUT, SCOPE STATED: `-BreakerCrowdProbe` measures
-PURSUING, UNENGAGED bodies — they run the full chase tick but spawn 60 m
-out and never close, so no shot, hit reaction, damage number or death
-effect is on the frame. The log line and header now say so. A
-combat-live grid is a separate flag whose name must say so.
+O134'S QUESTION IS ANSWERED AHEAD OF THE INTERIORS (O166/O167), as a
+design report with no code: a rift budget takes THREE space inputs, not
+one, because 5.3's caps are spatial in three different units — density
+is navigable ground, the ranged cap is sightlines against cover, the
+Warden cap is flanking angle — and the ELITE cap is not spatial at all
+(two modifier sets to read is attention, which the room does not change).
+Collapsing them into one room-size scalar prices a corridor and a small
+arena identically while they fail in opposite directions. The solver
+seam is already right: pricing and spend order are space-free and are
+reused unchanged, the cap block is what a rift supplies, and the three
+measurements ALREADY EXIST in the cover grammar (LargestUncoveredGap,
+LargestGapToLineBreak, the corridor rule + MinimumOpenLaneWidth). No
+magnitudes authored; interiors still come first.
+
+CROWD PROBE: THE FLAG NAMES THE SCENE AND THE SUMMARY MEASURES IT.
+FIELD found the mechanism and it was worse than a standing grid: at
+6000 cm against a 2200 cm DetectionRange NOTHING EVER PURSUED — the
+bodies could not see the player, so every figure ever taken with this
+probe is the cost of N enemies on the PATROL branch. My own
+"pursuing-unengaged" label was wrong too. `-BreakerCrowdLoad=<patrol|
+engaged>` now names it: patrol keeps the historical far grid unchanged
+so old figures stay comparable, engaged arrays the crowd in frontal
+rings 900-2100 cm (inside detection) and drops the safe ring for the
+run. AND THE MODE NAME IS NOT TRUSTED — the sampler reads each body's
+own state label and prints `engaged=NN% (measured)` beside the
+requested load, erroring when the two disagree in EITHER direction.
+That guard caught my first attempt: zeroing SafeZoneRadius does not
+work, because IsInSafeZone compares with <= and the pawn spawns AT the
+centre, so the crowd sat at 600 cm and still reported 0% engaged. The
+flag clears bSafeZoneSet instead, and restores it at the summary. An
+unrecognised load is refused with the probe unarmed and the run ended
+(read the log line, not the exit code — status 1 is requested and
+measured as 0). INSTRUMENT SELF-TEST, one run each, this machine,
+1280x720, 100 primitive bodies, area level 10, 10 s sample:
+patrol 0% engaged / nearest 6001 cm / 6.70 ms / 149 fps; engaged 100%
+/ nearest 0 cm / 34.16 ms / 29 fps, game thread 34.16 of it. THE
+MEASUREMENT IS FIELD'S TO RE-RUN; those two lines are evidence the
+instrument works, not a result. STILL MISSING, AND IT NEEDS FIELD:
+nothing shoots BACK, so no enemy hit reaction, damage number or death
+effect is on the frame — that half needs a damage entry point in
+`Combat/`, which this lane does not own. Ask before assuming engaged
+covers it.
 
 DEFECT FOR THE OWNER, NOT FIXED HERE: `Docs/DECISIONS.md` has TWO O120
 rulings (loading progress, and reward composition). Both cite-able; only
@@ -214,10 +254,14 @@ in ten minutes, readable at 50-100 enemies. HEAD `b8a4efe`, 445
 passing / 4 expected red (same roster) / 0 unexpected. LANDED: the
 crowd measurement first (`-BreakerCrowdProbe=N` 1-200 +
 `-BreakerCrowdSkeletal`, 5 s warmup / 10 s sample; this machine,
-1920x1080, load=pursuing-unengaged: 100 primitive enemies 5.48 ms
-avg / 182 fps, 100 skeletal mannequins 8.35 ms avg / 120 fps, game
-thread dominant, GPU idle — the mannequin is AFFORDABLE at target
-density); rank colour (ApplyRankPresentation blends each part's
+1920x1080, load=PATROL — re-labelled, not re-measured, and the scene
+is now known to have had nothing detecting the player: 100 primitive
+enemies 5.48 ms avg / 182 fps, 100 skeletal mannequins 8.35 ms avg /
+120 fps, game thread dominant, GPU idle. THE AFFORDABILITY VERDICT
+DOES NOT SURVIVE THAT: it was drawn from a patrolling crowd and the
+engaged figure is five times the game-thread cost, so the mannequin
+question is OPEN again and is FIELD's to re-run under
+-BreakerCrowdLoad=engaged); rank colour (ApplyRankPresentation blends each part's
 CAPTURED family paint toward Elite gold / ModifierBearing violet one
 tick after every chassis pass; Trash/Boss restore the base; blends
 O2); selective bars (above-Trash always inside range, trash only

@@ -383,11 +383,42 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         SpawnEffectProbe();
     }
     // -BreakerCrowdProbe=N: the density instrument (see the header block).
+    // -BreakerCrowdLoad=<patrol|engaged> names the scene. An UNRECOGNISED value
+    // is refused loudly rather than falling back: the capture harness already
+    // has one switch that silently falls back to a different screen, and a
+    // performance instrument that quietly measures a scene you did not ask for
+    // is exactly the failure this flag exists to close.
     int32 CrowdCount = 0;
     if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCrowdProbe="), CrowdCount) && CrowdCount > 0)
     {
-        SpawnCrowdProbe(FMath::Clamp(CrowdCount, 1, 200),
-            FParse::Param(FCommandLine::Get(), TEXT("BreakerCrowdSkeletal")));
+        ECrowdLoad Load = ECrowdLoad::Patrol;
+        FString LoadName;
+        if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCrowdLoad="), LoadName))
+        {
+            if (LoadName.Equals(TEXT("engaged"), ESearchCase::IgnoreCase)) Load = ECrowdLoad::Engaged;
+            else if (LoadName.Equals(TEXT("patrol"), ESearchCase::IgnoreCase)) Load = ECrowdLoad::Patrol;
+            else
+            {
+                UE_LOG(LogTemp, Error,
+                    TEXT("[BreakerCrowd] -BreakerCrowdLoad=%s is not a load. Use patrol or engaged. Probe not armed."),
+                    *LoadName);
+                CrowdCount = 0;
+                // AND THE RUN ENDS. Without this an unattended run sits
+                // forever: the exit is wired to the probe's summary, and a
+                // refused flag means no probe, so no summary, so no exit. A
+                // harness script would have HUNG rather than failed, and the
+                // first attempt at this flag did exactly that. Status 1 is
+                // requested but MEASURED AS 0 at the process — something on the
+                // shutdown path overrides it — so a script must read the log
+                // line above, not the exit code, to tell a refusal from a run.
+                if (FApp::IsUnattended()) FPlatformMisc::RequestExitWithStatus(false, 1);
+            }
+        }
+        if (CrowdCount > 0)
+        {
+            SpawnCrowdProbe(FMath::Clamp(CrowdCount, 1, 200),
+                FParse::Param(FCommandLine::Get(), TEXT("BreakerCrowdSkeletal")), Load);
+        }
     }
     if (!EffectProbeConsoleCommand)
     {
@@ -451,15 +482,54 @@ void ABreakerGameMode::SpawnEffectProbe()
     }
 }
 
-void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal)
+const TCHAR* ABreakerGameMode::CrowdLoadName() const
+{
+    return CrowdLoad == ECrowdLoad::Engaged ? TEXT("engaged") : TEXT("patrol");
+}
+
+void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal, ECrowdLoad Load)
 {
     UWorld* World = GetWorld();
     if (!World || !bFieldFrameSet) return;
 
-    // A far grid, ten to a row, 800 cm pitch, starting 60 m downfield: the
-    // pack pursues (a real crowd moves — an idle crowd under-measures), but
-    // at trash speed it cannot reach the pawn inside the sampling window.
-    // Loot and respawn are off so the measurement is enemies, not pickups.
+    // TWO LAYOUTS, ONE PER LOAD, and the geometry is the whole difference.
+    //
+    // PATROL keeps the historical far grid — ten to a row, 800 cm pitch, from
+    // 60 m downfield. The comment that used to sit here said "the pack
+    // pursues"; it does not and never did. 6000 cm is nearly three times
+    // ABreakerEnemy's 2200 cm DetectionRange, so every body takes the PATROL
+    // branch. The layout is kept EXACTLY as it was so the figures already
+    // taken with it remain comparable; only its name is corrected.
+    //
+    // ENGAGED arrays the crowd in frontal rings from 900 to 2100 cm, every
+    // one of them inside DetectionRange, and drops the safe ring below. Ring
+    // pitch is chosen against the widest body in the project (120 cm): the
+    // tightest arc here is the innermost, and it seats its share at over
+    // 140 cm apart.
+    //
+    // Loot and respawn are off in both so the measurement is enemies, not
+    // pickups.
+    CrowdLoad = Load;
+    CrowdRoster.Reset();
+    if (Load == ECrowdLoad::Engaged && bSafeZoneSet)
+    {
+        // A player inside the safe ring is off-limits to EVERY enemy
+        // (IsInSafeZone nulls the target before detection is even consulted),
+        // so the ring alone would hold the whole crowd in PATROL however close
+        // it spawned. Saved and restored at the summary rather than dropped for
+        // the process, because a probe must not leave the world altered under
+        // a controller-in-hand run that keeps going afterwards.
+        //
+        // THE FLAG IS CLEARED, NOT THE RADIUS. Setting the radius to zero does
+        // not work and the first attempt at this shipped that bug: IsInSafeZone
+        // compares with <=, and the pawn spawns AT SafeZoneCenter, so a zero
+        // radius still contains it and the whole crowd stayed in PATROL at
+        // 600 cm. The probe's own engaged%% guard is what caught it.
+        CrowdSavedSafeZoneRadius = SafeZoneRadius;
+        bSafeZoneSet = false;
+    }
+    const int32 Rings = 5;
+    const int32 PerRing = FMath::Max(FMath::DivideAndRoundUp(Count, Rings), 1);
     USkeletalMesh* ProbeManny = bSkeletal ? LoadObject<USkeletalMesh>(nullptr,
         TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")) : nullptr;
     UClass* ProbeAnim = bSkeletal ? LoadClass<UAnimInstance>(nullptr,
@@ -467,9 +537,22 @@ void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal)
 
     for (int32 Index = 0; Index < Count; ++Index)
     {
-        const int32 Row = Index / 10;
-        const int32 Col = Index % 10;
-        const FVector Spot = Frame.At(6000.0f + Row * 800.0f, (Col - 4.5f) * 800.0f, 100.0f);
+        FVector Spot;
+        if (Load == ECrowdLoad::Engaged)
+        {
+            const int32 Ring = FMath::Min(Index / PerRing, Rings - 1);
+            const int32 Slot = Index % PerRing;
+            const float RadiusCm = 900.0f + Ring * 300.0f;   // 900..2100, inside DetectionRange
+            const float Sweep = PerRing > 1 ? (Slot / static_cast<float>(PerRing - 1)) : 0.5f;
+            const float AngleRad = FMath::DegreesToRadians(-80.0f + 160.0f * Sweep);
+            Spot = Frame.At(RadiusCm * FMath::Cos(AngleRad), RadiusCm * FMath::Sin(AngleRad), 100.0f);
+        }
+        else
+        {
+            const int32 Row = Index / 10;
+            const int32 Col = Index % 10;
+            Spot = Frame.At(6000.0f + Row * 800.0f, (Col - 4.5f) * 800.0f, 100.0f);
+        }
         FActorSpawnParameters Params;
         Params.ObjectFlags |= RF_Transient;
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
@@ -500,12 +583,14 @@ void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal)
             Skel->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
             Skel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         }
+        CrowdRoster.Add(Enemy);
         ++CrowdSpawned;
     }
     bCrowdProbeArmed = true;
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerCrowd] probe armed: %d/%d enemies spawned, load=pursuing-unengaged, skeletal=%d, area level %d."),
-        CrowdSpawned, Count, ProbeManny != nullptr, GymAreaLevel);
+        TEXT("[BreakerCrowd] probe armed: %d/%d enemies spawned, load=%s, skeletal=%d, area level %d%s."),
+        CrowdSpawned, Count, CrowdLoadName(), ProbeManny != nullptr, GymAreaLevel,
+        CrowdSavedSafeZoneRadius >= 0.0f ? TEXT(" (safe ring dropped for the run)") : TEXT(""));
 }
 
 void ABreakerGameMode::TickCrowdSampler(float DeltaSeconds)
@@ -528,25 +613,77 @@ void ABreakerGameMode::TickCrowdSampler(float DeltaSeconds)
         CrowdGameMsSum += FPlatformTime::ToMilliseconds(GGameThreadTime);
         CrowdRenderMsSum += FPlatformTime::ToMilliseconds(GRenderThreadTime);
         CrowdGpuMsSum += FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles());
+
+        // THE SCENE IS MEASURED, NOT ASSUMED. Every roster body's own state
+        // label decides whether it counts as engaged, and the nearest body's
+        // distance says whether the crowd is where the layout put it. The
+        // first version of this probe claimed a load in a comment and measured
+        // a different one for its whole life; a claim beside a measurement of
+        // the same thing is the only shape that cannot do that again.
+        const APawn* ProbePawn = GetWorld() && GetWorld()->GetFirstPlayerController()
+            ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+        float NearestSq = TNumericLimits<float>::Max();
+        for (const TWeakObjectPtr<ABreakerEnemy>& Weak : CrowdRoster)
+        {
+            const ABreakerEnemy* Body = Weak.Get();
+            if (!Body || Body->IsDeadEnemy()) continue;
+            ++CrowdStateReads;
+            if (Body->GetEnemyStateLabel() != TEXT("PATROL")) ++CrowdEngagedReads;
+            if (ProbePawn)
+            {
+                NearestSq = FMath::Min(NearestSq,
+                    static_cast<float>(FVector::DistSquared2D(Body->GetActorLocation(), ProbePawn->GetActorLocation())));
+            }
+        }
+        if (NearestSq < TNumericLimits<float>::Max())
+        {
+            CrowdNearestCm = FMath::Sqrt(NearestSq);
+        }
         return;
     }
     bCrowdProbeArmed = false;
     const float N = FMath::Max(1, CrowdFrames);
-    // THE SUMMARY NAMES THE LOAD IT MEASURED, because "enemies=100" does not.
-    // These hundred are PURSUING and UNENGAGED: they run the full per-frame
-    // chase (target selection, move, ground snap), but they start 60 m
-    // downfield and cannot close inside the sampling window, so nothing is
-    // shooting, nothing is taking damage, and no ability, hit reaction, damage
-    // number or death effect is on the frame. That is a real load and a
-    // measurable one; it is NOT the cost of a hundred enemies in a fight, and
-    // a reader who takes this number for the fighting figure is reading an
-    // instrument that never claimed it. A combat-live variant is a separate
-    // flag with its own word in this line.
+    // THE SUMMARY CARRIES THE REQUESTED LOAD AND THE MEASURED ONE SIDE BY SIDE.
+    // "enemies=100" says nothing about what the hundred were doing, and the
+    // word alone is what was wrong last time: the flag said crowd and the
+    // scene said patrol-at-three-times-detection-range. engaged%% is read off
+    // the bodies' own state labels, so a run whose scene disagrees with its
+    // flag reports the disagreement in its own summary.
+    const float EngagedPct = CrowdStateReads > 0
+        ? 100.0f * CrowdEngagedReads / static_cast<float>(CrowdStateReads) : 0.0f;
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerCrowd] SUMMARY load=pursuing-unengaged enemies=%d frames=%d avg=%.2fms worst=%.2fms fps=%.0f game=%.2fms render=%.2fms gpu=%.2fms"),
+        TEXT("[BreakerCrowd] SUMMARY load=%s engaged=%.0f%% (measured) nearest=%.0fcm enemies=%d frames=%d avg=%.2fms worst=%.2fms fps=%.0f game=%.2fms render=%.2fms gpu=%.2fms"),
+        CrowdLoadName(), EngagedPct, CrowdNearestCm,
         CrowdSpawned, CrowdFrames, CrowdFrameMsSum / N, CrowdFrameMsMax,
         1000.0f / FMath::Max(CrowdFrameMsSum / N, 0.01f),
         CrowdGameMsSum / N, CrowdRenderMsSum / N, CrowdGpuMsSum / N);
+
+    // AN INSTRUMENT THAT RETURNS A FALSE NEGATIVE IS WORSE THAN ONE THAT
+    // RETURNS NOTHING, so a scene that does not match the flag is an ERROR in
+    // the log rather than a footnote a reader has to notice. Both directions
+    // are checked: an engaged run that did not engage is the original defect,
+    // and a patrol run that DID engage means the far grid stopped being far.
+    if (CrowdLoad == ECrowdLoad::Engaged && EngagedPct < 90.0f)
+    {
+        UE_LOG(LogTemp, Error,
+            TEXT("[BreakerCrowd] load=engaged but only %.0f%% of the crowd engaged (nearest %.0f cm). ")
+            TEXT("These numbers are NOT a fighting crowd's — do not read them as one."),
+            EngagedPct, CrowdNearestCm);
+    }
+    else if (CrowdLoad == ECrowdLoad::Patrol && EngagedPct > 5.0f)
+    {
+        UE_LOG(LogTemp, Error,
+            TEXT("[BreakerCrowd] load=patrol but %.0f%% engaged: the far grid is no longer outside detection range, ")
+            TEXT("so this run is not comparable with the figures taken before it."),
+            EngagedPct);
+    }
+
+    if (CrowdSavedSafeZoneRadius >= 0.0f)
+    {
+        SafeZoneRadius = CrowdSavedSafeZoneRadius;
+        bSafeZoneSet = true;
+        CrowdSavedSafeZoneRadius = -1.0f;
+    }
     if (FApp::IsUnattended())
     {
         // A scripted run has its number; let the script harvest the log.

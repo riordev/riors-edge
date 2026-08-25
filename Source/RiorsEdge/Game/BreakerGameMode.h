@@ -488,26 +488,57 @@ private:
     IConsoleCommand* EffectProbeConsoleCommand = nullptr;
 
     // --- The crowd probe (vertical-slice density instrument) --------------
-    // WHAT LOAD THIS MEASURES, stated because the flag name does not say it:
-    // N PURSUING, UNENGAGED enemies. They run the full per-frame chase, but
-    // they spawn 60 m downfield at trash speed and cannot close inside the
-    // sampling window, so no shot, hit reaction, damage number, ability or
-    // death effect is ever on the frame. The number is the cost of a hundred
-    // bodies MOVING, not the cost of a hundred bodies FIGHTING, and the two
-    // are different questions. A combat-live grid is a separate flag whose
-    // name says so; do not read this one as an answer to it.
+    // -BreakerCrowdProbe=N spawns N trash enemies during the gym build;
+    // -BreakerCrowdSkeletal gives each a dev-only mannequin body so "100
+    // primitive enemies" and "100 skeletal enemies" are the same run with one
+    // flag flipped. A frame sampler warms up, samples, then logs
+    // [BreakerCrowd] frame/game/render/GPU milliseconds. In an -unattended run
+    // it exits after the summary so a script can harvest the log; with a
+    // controller in hand it keeps running.
     //
-    // -BreakerCrowdProbe=N spawns N trash enemies in a far grid during the
-    // gym build; -BreakerCrowdSkeletal gives each a dev-only mannequin body
-    // so "100 primitive enemies" and "100 skeletal enemies" are the same
-    // run with one flag flipped. A frame sampler warms up, samples, then
-    // logs [BreakerCrowd] frame/game/render/GPU milliseconds — the numbers
-    // that decide whether the crowd can wear the mannequin at all. In an
-    // -unattended run it exits after the summary so a script can harvest
-    // the log; with a controller in hand it keeps running.
-    void SpawnCrowdProbe(int32 Count, bool bSkeletal);
+    // THE FLAG DID NOT SAY WHAT LOAD IT APPLIED, AND THE SCENE WAS NOT THE ONE
+    // ITS COMMENT CLAIMED. The grid sat at 6000 cm against ABreakerEnemy's
+    // 2200 cm DetectionRange, so not one body ever detected the player: they
+    // were not declining to fight, they could not see. Every figure taken with
+    // it is the cost of N enemies running the PATROL branch — a sine-wave
+    // sidestep around a leash origin — and reading it as the cost of a crowd
+    // in a fight is reading an instrument that never claimed it. That is worse
+    // than no instrument, because the next reader files a bug against working
+    // code.
+    //
+    // -BreakerCrowdLoad=<patrol|engaged> now names the scene:
+    //
+    //   PATROL (default) keeps the historical far grid, so figures taken
+    //   before this flag existed stay comparable. It is now labelled with what
+    //   it always was.
+    //
+    //   ENGAGED arrays the crowd in frontal rings INSIDE DetectionRange and
+    //   drops the safe ring for the run, so every body detects, closes and
+    //   attacks. Its limit is stated rather than implied: this is the
+    //   enemy-to-player half of a fight. Nothing shoots BACK, so no hit
+    //   reaction, damage number or death effect on an enemy is on the frame —
+    //   that half needs a damage entry this lane does not own.
+    //
+    // AND THE MODE NAME IS NOT TRUSTED. The sampler reads every roster body's
+    // state label each frame and reports the MEASURED engaged fraction beside
+    // the requested mode. A run whose scene disagrees with its flag says so in
+    // its own summary, which is the check that was missing the first time.
+    enum class ECrowdLoad : uint8 { Patrol, Engaged };
+    void SpawnCrowdProbe(int32 Count, bool bSkeletal, ECrowdLoad Load);
+    const TCHAR* CrowdLoadName() const;
     void TickCrowdSampler(float DeltaSeconds);
     bool bCrowdProbeArmed = false;
+    ECrowdLoad CrowdLoad = ECrowdLoad::Patrol;
+    // Weak, because a probe body may be destroyed mid-run; the engaged-fraction
+    // denominator counts only bodies that were actually there to be sampled.
+    TArray<TWeakObjectPtr<class ABreakerEnemy>> CrowdRoster;
+    int32 CrowdStateReads = 0;
+    int32 CrowdEngagedReads = 0;
+    float CrowdNearestCm = 0.0f;
+    // The safe ring is dropped for an engaged run and restored at the summary:
+    // a player standing inside it is off-limits to every enemy, so the ring
+    // alone would hold the whole crowd in PATROL no matter how close it spawned.
+    float CrowdSavedSafeZoneRadius = -1.0f;
     float CrowdWarmupRemaining = 5.0f;    // O2: past the shader-compile hitches
     float CrowdSampleRemaining = 10.0f;
     int32 CrowdFrames = 0;

@@ -398,7 +398,7 @@ bool FBreakerWavePartyScalingTest::RunTest(const FString& Parameters)
     //
     // This is the same 4.2-versus-5.3 collision FBreakerWaveBudgetCollisionTest
     // already pins, seen from the party axis instead of the wave axis, and it
-    // is recorded here as MEASURED rather than as intent. O125 names the open
+    // is recorded here as MEASURED rather than as intent. O133 names the open
     // question; nothing in the shipped configuration answers it, so this test
     // asserts what the solver does today and will go red the moment a party
     // term is added — which is exactly when it should be re-read.

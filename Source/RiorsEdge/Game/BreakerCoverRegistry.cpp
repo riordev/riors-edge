@@ -857,7 +857,7 @@ FString UBreakerCoverLayoutLibrary::DescribeCoverField(const TArray<FBreakerCove
     // and is gone over rather than around. THE GROUND THE PLAYER DASHES DOWN IS
     // GUARDED BY A DIFFERENT RULE — the per-piece corridor rejection — and that
     // rule now prints its own margin beside the lane instead of being the only
-    // constraint here with no number attached (O125).
+    // constraint here with no number attached (O132).
     return FString::Printf(
         TEXT("cover field: %d pieces (%d chest-high @ %.0f cm, %d full-height @ %.0f cm)")
         TEXT(" | largest uncovered gap %.0f CEILING %.0f")

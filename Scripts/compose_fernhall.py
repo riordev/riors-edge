@@ -99,7 +99,7 @@ place("wall_e", "bldg_c", (101.5, 0.0, 0.0), (3.0, 7.0, 56.0))
 # sit at +-9.9 m, so the ground between them is 19.8 m wide. THAT LANE IS
 # GUARDED BY THE CORRIDOR RULE, not by the dash-corridor floor: no cover of
 # any class may stand within CorridorHalfWidth (9 m) of the centreline, so
-# pulling these pairs in to +-5 m goes RED — see O125 and the
+# pulling these pairs in to +-5 m goes RED — see O132 and the
 # RiorsEdge.Zone.Fernhall.LaneGuard perturbation. The 19.8 m figure is this
 # file's own arithmetic off the 10.5 m shoulder; the build prints the
 # SHOULDER OFFSET against its floor, because a width has to pick
