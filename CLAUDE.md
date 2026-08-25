@@ -205,6 +205,19 @@ inside iCloud, OneDrive, Dropbox or a network drive.
   opening elsewhere. Never commit `Binaries`, `Intermediate`, `Saved` or
   `DerivedDataCache`. Binary Unreal assets cannot be merged — coordinate
   ownership of maps and Blueprints rather than resolving conflicts in them.
+- **Parallel lanes run in git worktrees, never in this checkout.** The main
+  checkout belongs to the owner: playtests, live edits, whatever the editor
+  has open. Each agent lane works in a sibling worktree on its own branch —
+  `../riors-edge-lane-ui` on `lane/ui`, `../riors-edge-lane-dev` on
+  `lane/dev`, made with `git worktree add ../riors-edge-lane-<name> -b
+  lane/<name>`. A lane's cycle ends: fetch, rebase onto `origin/main`, then
+  `git push origin lane/<name>:main` — a push main can fast-forward to, or a
+  refusal; never force. Stage files by name, never `git add -A`: a file-level
+  fence cannot see the other lane's uncommitted work, and the sweep that
+  committed another lane's files "as found" is the failure this rule
+  replaces. Each worktree builds its own `Binaries` and `Intermediate`; while
+  the owner's editor is open, a worktree build passes `-NoHotReloadFromIDE`
+  (the lock note above).
 
 ## Code discipline
 
