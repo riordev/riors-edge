@@ -9,7 +9,11 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "CollisionShape.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "UObject/ConstructorHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -274,6 +278,7 @@ void ABreakerCharacter::BeginPlay()
     AdoptSessionCharacter();
     // Holstered for the whole life of an Anchor pawn (see IsWeaponsHolstered).
     bWeaponsHolstered = UBreakerGameInstance::IsAnchorMap(this);
+    ApplyCharacterBody();
     AbilitySystem->InitAbilityActorInfo(this, this);
     if (Weapon) Weapon->OnShot.AddDynamic(this, &ThisClass::HandleShotCosmetics);
     if (Combat) Combat->OnDeath.AddDynamic(this, &ThisClass::HandlePlayerDeath);
@@ -563,7 +568,13 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     // C for the character sheet, the same shape as I for the loadout: a
     // full-screen modal, toggled, and legal while paused.
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ThisClass::ToggleCharacterSheet).bExecuteWhenPaused = true;
-    PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
+    // Interact rides Enhanced Input now (ruled: a raw BindKey appears in no
+    // keybind list). The raw F is only the asset-not-cooked fallback, gated
+    // so the two paths can never both fire one press.
+    if (!InputConfig || !InputConfig->Interact)
+    {
+        PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ThisClass::InteractWithNearbyNPC);
+    }
     PlayerInputComponent->BindKey(EKeys::F4, IE_Pressed, this, &ThisClass::StartWave);
     // Raw-key ability fallbacks so the slice is playable before DA_PlayerInputConfig
     // gains ability actions. Q is dash, R is reload, C is slide, so abilities take
@@ -625,6 +636,7 @@ void ABreakerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     if (InputConfig->PlaytestDiagnostics) Input->BindAction(InputConfig->PlaytestDiagnostics, ETriggerEvent::Started, this, &ThisClass::TogglePlaytestDiagnostics);
     if (InputConfig->FOVUp) Input->BindAction(InputConfig->FOVUp, ETriggerEvent::Started, this, &ThisClass::IncreaseFOV);
     if (InputConfig->FOVDown) Input->BindAction(InputConfig->FOVDown, ETriggerEvent::Started, this, &ThisClass::DecreaseFOV);
+    if (InputConfig->Interact) Input->BindAction(InputConfig->Interact, ETriggerEvent::Started, this, &ThisClass::InteractWithNearbyNPC);
     if (InputConfig->AbilityOne) Input->BindAction(InputConfig->AbilityOne, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityOne);
     if (InputConfig->AbilityTwo) Input->BindAction(InputConfig->AbilityTwo, ETriggerEvent::Started, this, &ThisClass::ActivateAbilityTwo);
     if (InputConfig->Ultimate) Input->BindAction(InputConfig->Ultimate, ETriggerEvent::Started, this, &ThisClass::ActivateUltimate);
@@ -953,7 +965,16 @@ void ABreakerCharacter::UpdateViewmodelKick()
         PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
     }
 }
-void ABreakerCharacter::HandleReloadInput() { if (Weapon) Weapon->StartReload(); OnReloadInput(); }
+void ABreakerCharacter::HandleReloadInput()
+{
+    if (Weapon) Weapon->StartReload();
+    OnReloadInput();
+    // The body reloads on the press. PLACEHOLDER honesty: this plays even
+    // when StartReload refuses (full magazine, mid-swap) — syncing to the
+    // weapon's real reload state wants a started-reload broadcast the
+    // component does not have yet.
+    if (!bWeaponsHolstered) PlayBodyAction(ReloadMontage);
+}
 
 void ABreakerCharacter::EquipPrimaryWeapon()
 {
@@ -1327,6 +1348,9 @@ void ABreakerCharacter::HandleClassResourceDamageTaken(const FBreakerHitContext&
     if (Hit.Result.HealthDamage > 0.0f || Hit.Result.ShieldDamage > 0.0f)
     {
         ShakeTrauma = BreakerShake::AddTrauma(ShakeTrauma, BreakerShakeDamageTrauma);
+        // The body flinches with the shake and the take-hit sound: one hit,
+        // three answers, one gate.
+        PlayBodyAction(HitReactMontage);
     }
     if (!Grit) return;
     // POST-MITIGATION, health and shield as separate quantities — the split
@@ -1442,11 +1466,88 @@ void ABreakerCharacter::UpdateClassResourceStates()
     }
 }
 
+void ABreakerCharacter::ApplyCharacterBody()
+{
+    // The template mannequin on the inherited Mesh — the component every
+    // ACharacter has carried since the project began and nothing ever
+    // touched. Standard template fit: feet at the capsule bottom, yawed -90
+    // because the mannequin faces Y. The head bone is hidden so the
+    // first-person camera does not sit inside a skull; what the player sees
+    // of themselves is shoulders-down and their shadow, which is the whole
+    // point — a body that exists.
+    USkeletalMeshComponent* Body = GetMesh();
+    if (!Body) return;
+    USkeletalMesh* Manny = LoadObject<USkeletalMesh>(nullptr,
+        TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+    if (!Manny)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[BreakerBody] mannequin missing — the pawn stays meshless."));
+        return;
+    }
+    Body->SetSkeletalMesh(Manny);
+    Body->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+    Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+    if (UClass* AnimClass = LoadClass<UAnimInstance>(nullptr,
+        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed.ABP_Unarmed_C")))
+    {
+        Body->SetAnimInstanceClass(AnimClass);
+    }
+    // OWNER-INVISIBLE, SHADOW-CAST. The first wiring left the body visible
+    // and the capture showed the inside of a mannequin skull filling the
+    // whole frame — a first-person camera lives at head height, inside the
+    // head. Hiding one bone still leaves shoulders through the lens, and a
+    // true first-person body (camera-clipped torso, visible legs) is an
+    // authored setup this placeholder pass does not own. So the OWNER sees
+    // nothing of it and the WORLD sees everything: the animated shadow —
+    // firing, reloading, flinching — is the visible proof of the skeleton,
+    // and any future third-person view gets the body free.
+    Body->SetOwnerNoSee(true);
+    Body->SetCastShadow(true);
+    Body->bCastHiddenShadow = true;
+
+    // The three ruled montages. MM_ is the template's montage prefix; a
+    // rename or a sequence-not-montage asset loads null and that verb
+    // simply stays still — logged so the miss is visible.
+    // The template's MM_ assets turned out to be SEQUENCES, not montages —
+    // the first wiring loaded UAnimMontage and all three came back null,
+    // which the [BreakerBody] log line surfaced on the very first run.
+    // UAnimSequenceBase accepts either; PlayBodyAction plays whichever it
+    // got (a real montage directly, a sequence as a dynamic slot montage
+    // over the ABP's default slot).
+    const auto LoadMontage = [](const TCHAR* Path)
+    {
+        UAnimSequenceBase* Action = LoadObject<UAnimSequenceBase>(nullptr, Path);
+        if (!Action) UE_LOG(LogTemp, Warning, TEXT("[BreakerBody] body action missing: %s"), Path);
+        return Action;
+    };
+    FireMontage = LoadMontage(TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Fire.MM_Rifle_Fire"));
+    ReloadMontage = LoadMontage(TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Reload.MM_Rifle_Reload"));
+    HitReactMontage = LoadMontage(TEXT("/Game/Characters/Mannequins/Anims/Rifle/HitReact/MM_HitReact_Front_Med_01.MM_HitReact_Front_Med_01"));
+    UE_LOG(LogTemp, Log, TEXT("[BreakerBody] mannequin applied (fire %d, reload %d, hit react %d)."),
+        FireMontage != nullptr, ReloadMontage != nullptr, HitReactMontage != nullptr);
+}
+
+void ABreakerCharacter::PlayBodyAction(UAnimSequenceBase* Action)
+{
+    if (!Action) return;
+    USkeletalMeshComponent* Body = GetMesh();
+    UAnimInstance* Anim = Body ? Body->GetAnimInstance() : nullptr;
+    if (!Anim) return;
+    if (UAnimMontage* AsMontage = Cast<UAnimMontage>(Action))
+    {
+        Anim->Montage_Play(AsMontage);
+        return;
+    }
+    Anim->PlaySlotAnimationAsDynamicMontage(Action, TEXT("DefaultSlot"), 0.1f, 0.1f);
+}
+
 void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
     // Fire shake: one of the two ruled trauma sources.
     ShakeTrauma = BreakerShake::AddTrauma(ShakeTrauma, BreakerShakeFireTrauma);
+    // The body fires with the gun.
+    PlayBodyAction(FireMontage);
     // The muzzle blink follows the archetype's WEIGHT: the viewmodel kick is
     // already the per-archetype "how hard does this gun hit the shoulder"
     // number (shotgun 9.0, SMG 2.0), so the flash borrows it rather than

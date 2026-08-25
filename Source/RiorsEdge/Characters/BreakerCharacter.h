@@ -375,6 +375,21 @@ private:
 
     FTransform PlaytestSpawnTransform;
     float FallKillZ = -100000.0f;
+    // THE CHARACTER BODY (ruled): the first skeletal mesh the game has ever
+    // touched. ACharacter's inherited Mesh gets the template mannequin, the
+    // unarmed locomotion ABP, and the three ruled montages — fire, reload,
+    // hit react — playing over it. Loaded at runtime with the audio/NPC
+    // fallback shape: a clone without the template folders keeps the
+    // meshless pawn it always had. The proxy viewmodel is deliberately
+    // untouched until this body proves out.
+    void ApplyCharacterBody();
+    // Montage-or-sequence tolerant: the template ships both kinds under the
+    // MM_ prefix, and PlayBodyAction plays either.
+    void PlayBodyAction(class UAnimSequenceBase* Action);
+    UPROPERTY(Transient) TObjectPtr<class UAnimSequenceBase> FireMontage;
+    UPROPERTY(Transient) TObjectPtr<class UAnimSequenceBase> ReloadMontage;
+    UPROPERTY(Transient) TObjectPtr<class UAnimSequenceBase> HitReactMontage;
+
     // Camera shake (ruled: fire and take-damage only, subtle, tuned live
     // through Breaker.Shake.*). Trauma model in Characters/BreakerShakeMath.h.
     void UpdateCameraShake(float DeltaSeconds);
