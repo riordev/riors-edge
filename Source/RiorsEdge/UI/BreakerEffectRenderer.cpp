@@ -3,6 +3,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UI/BreakerGlowMaterial.h"
 
@@ -36,6 +37,20 @@ namespace
         }
         return Mesh;
     }
+}
+
+ABreakerEffectRenderer* ABreakerEffectRenderer::FindOrSpawn(UWorld* World)
+{
+    if (!World) return nullptr;
+    for (TActorIterator<ABreakerEffectRenderer> It(World); It; ++It)
+    {
+        return *It;
+    }
+    FActorSpawnParameters Params;
+    Params.ObjectFlags |= RF_Transient;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    return World->SpawnActor<ABreakerEffectRenderer>(
+        ABreakerEffectRenderer::StaticClass(), FTransform::Identity, Params);
 }
 
 ABreakerEffectRenderer::ABreakerEffectRenderer()

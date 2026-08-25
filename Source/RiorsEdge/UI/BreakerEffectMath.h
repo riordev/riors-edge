@@ -53,6 +53,33 @@ namespace BreakerFX
         float Alpha = 0.0f;
     };
 
+    // --- Ground ring geometry ----------------------------------------------
+    // A zone's rim as a closed polygon of strokes. Sixteen sides at Rot's
+    // 400 cm radius means each chord bows at most ~8 cm off the true circle,
+    // which reads as a circle; the count is O2 PLACEHOLDER and the stroke
+    // pool fits two full rings by the pool test. The RADIUS IS NEVER
+    // APPROXIMATED INWARD: every vertex sits exactly on the circle, so the
+    // drawn rim is the true footprint and a target standing on the line is
+    // standing on the real membership boundary (chords bow inward between
+    // vertices, never outward past it).
+    constexpr int32 GroundRingStrokes = 16;   // O2 PLACEHOLDER
+
+    inline FVector RingVertex(const FVector& Center, float RadiusCm, int32 Index, int32 Count)
+    {
+        const int32 Wrapped = Count > 0 ? ((Index % Count) + Count) % Count : 0;
+        const float Angle = Count > 0 ? 2.0f * PI * static_cast<float>(Wrapped) / static_cast<float>(Count) : 0.0f;
+        return Center + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.0f) * RadiusCm;
+    }
+
+    // Endpoints of the Index'th side. Side i runs vertex i -> vertex i+1, so
+    // consecutive sides share their endpoints exactly and the loop closes.
+    inline void RingStroke(const FVector& Center, float RadiusCm, int32 Index, int32 Count,
+        FVector& OutA, FVector& OutB)
+    {
+        OutA = RingVertex(Center, RadiusCm, Index, Count);
+        OutB = RingVertex(Center, RadiusCm, Index + 1, Count);
+    }
+
     inline FEffectSample SampleEffect(const FEffectTiming& Timing, float AgeSeconds)
     {
         FEffectSample Sample;

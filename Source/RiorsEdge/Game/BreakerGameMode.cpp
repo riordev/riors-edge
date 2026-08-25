@@ -30,6 +30,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Combat/BreakerZoneActor.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerPlaytestHUD.h"
 #include "UI/BreakerUIStyle.h"
@@ -346,6 +347,26 @@ void ABreakerGameMode::SpawnEffectProbe()
     // and UNTIL WHEN, then reads the screenshots for whether the world agreed.
     UE_LOG(LogTemp, Log, TEXT("[BreakerGym] effect probe: glow at (%.0f, %.0f, %.0f) for %.1f s."),
         ProbeSpot.X, ProbeSpot.Y, ProbeSpot.Z, Timing.DurationSeconds);
+
+    // A Rot-shaped zone beside the glow, on the same 7.0 s straddle clock:
+    // the zone's own presentation plus the rim the effect renderer draws for
+    // it, photographed alive in the first frame and expired out of the later
+    // ones. Geometry is Rot's authored footprint (400 cm), payload empty —
+    // this is a photograph, not an encounter.
+    FBreakerZoneSpec ProbeZone;
+    ProbeZone.ZoneTag = FGameplayTag::RequestGameplayTag(TEXT("Zone.EffectProbe"), false);
+    ProbeZone.RadiusCm = 400.0f;
+    ProbeZone.Duration = Timing.DurationSeconds;
+    FActorSpawnParameters ZoneParams;
+    ZoneParams.ObjectFlags |= RF_Transient;
+    ZoneParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    if (ABreakerZoneActor* Zone = World->SpawnActor<ABreakerZoneActor>(
+            ABreakerZoneActor::StaticClass(), FTransform(Frame.At(900.0f, 250.0f, 2.0f)), ZoneParams))
+    {
+        Zone->ConfigureZone(ProbeZone, nullptr);
+        UE_LOG(LogTemp, Log, TEXT("[BreakerGym] effect probe: zone rim r=%.0f for %.1f s."),
+            ProbeZone.RadiusCm, ProbeZone.Duration);
+    }
 }
 
 bool ABreakerGameMode::IsBossAlive() const

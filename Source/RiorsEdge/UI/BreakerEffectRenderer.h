@@ -47,6 +47,13 @@ class RIORSEDGE_API ABreakerEffectRenderer : public AActor
 public:
     ABreakerEffectRenderer();
 
+    // The shared instance: the first renderer already in the world, or a
+    // transient one spawned on demand. Gameplay actors that need a visual
+    // (the zone actor's ring, an ability's burst) reach the pool through
+    // this, so the HUD's instance, the probe's and a zone's are one pool
+    // rather than three part-empty ones. Null in a world that cannot spawn.
+    static ABreakerEffectRenderer* FindOrSpawn(UWorld* World);
+
     // A sphere of light at a point: bursts, arrival/departure flashes, orbs.
     // DelaySeconds > 0 schedules the birth into the future.
     void AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,

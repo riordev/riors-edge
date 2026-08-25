@@ -106,6 +106,32 @@ bool FBreakerEffectScheduleTest::RunTest(const FString& Parameters)
             BreakerFX::SampleEffect(Held, BreakAge + 0.15f).bFinished);
     }
 
+    // --- The ground ring closes, at the true radius --------------------------
+    // Every vertex sits exactly on the circle (the radius is never
+    // approximated), consecutive strokes share endpoints exactly so the loop
+    // has no gaps, and the last stroke ends where the first began.
+    {
+        const FVector Center(1200.0f, -300.0f, 40.0f);
+        const float Radius = 400.0f;   // Rot's authored footprint
+        const int32 Count = BreakerFX::GroundRingStrokes;
+        FVector FirstA = FVector::ZeroVector, PreviousB = FVector::ZeroVector;
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            FVector A, B;
+            BreakerFX::RingStroke(Center, Radius, Index, Count, A, B);
+            TestTrue(TEXT("Ring vertex A sits on the true radius"),
+                FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(A, Center)), Radius, 0.01f));
+            TestTrue(TEXT("Ring vertex B sits on the true radius"),
+                FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(B, Center)), Radius, 0.01f));
+            TestTrue(TEXT("Ring strokes stay in the ground plane"),
+                FMath::IsNearlyEqual(static_cast<float>(A.Z), static_cast<float>(Center.Z)));
+            if (Index == 0) FirstA = A;
+            else TestTrue(TEXT("Consecutive strokes share their endpoint"), A.Equals(PreviousB, 0.01));
+            PreviousB = B;
+        }
+        TestTrue(TEXT("The ring closes"), PreviousB.Equals(FirstA, 0.01));
+    }
+
     // --- Pool arithmetic, like the tracer's ----------------------------------
     TestTrue(TEXT("A 16-stroke ground ring fits the stroke pool twice over"),
         ABreakerEffectRenderer::GetStrokeSlots() >= 32);

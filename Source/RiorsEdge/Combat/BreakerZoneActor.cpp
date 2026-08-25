@@ -11,6 +11,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "UI/BreakerEffectMath.h"
+#include "UI/BreakerEffectRenderer.h"
 
 namespace BreakerZoneActorLocal
 {
@@ -106,6 +108,10 @@ void ABreakerZoneActor::ConfigureZone(const FBreakerZoneSpec& InSpec, AActor* In
     // is pausable, a lifespan timer is not), and SetLifeSpan dereferences the
     // world, which is fatal for a zone constructed in automation.
     RefreshPresentation();
+    // The rim rides ARMING, not BeginPlay: an unconfigured zone's default
+    // spec is not a footprint anyone chose, and automation constructs zones
+    // with no world for the renderer to live in.
+    if (GetWorld()) SubmitRimEffect();
 }
 
 void ABreakerZoneActor::RefreshDuration(float NewDuration)
@@ -357,6 +363,42 @@ ABreakerZoneActor* ABreakerZoneActor::FindRefreshableZone(const UWorld* World, F
 void ABreakerZoneActor::OnRep_Spec()
 {
     RefreshPresentation();
+    SubmitRimEffect();
+}
+
+void ABreakerZoneActor::SubmitRimEffect()
+{
+    if (bRimSubmitted || Spec.Duration <= 0.0f) return;
+    ABreakerEffectRenderer* Renderer = ABreakerEffectRenderer::FindOrSpawn(GetWorld());
+    if (!Renderer) return;
+    bRimSubmitted = true;
+
+    // The clip is the zone's whole life with the final second as the visible
+    // expiry — the rim dims to nothing exactly as the volume stops biting.
+    // THE CLIP IS FIXED AT SUBMISSION, which leaves three recorded gaps, all
+    // of them lifetime mutations this placeholder does not track:
+    // RefreshDuration (a VW4 recast resets the clock; the old rim still dies
+    // on the old clock), SetExpiryPaused (Long Dark freezes the zone but not
+    // the rim), and SetFollowActor (VW8 rides an actor; the rim stays where
+    // it was drawn). All three want per-slot handles on the renderer — the
+    // seam BreakerEffectRenderer.h already names for Siphon's channel break.
+    // An EARLY Destroy has the mirror gap: the rim finishes its clip alone.
+    BreakerFX::FEffectTiming Timing;
+    Timing.DurationSeconds = Spec.Duration;
+    Timing.FadeInSeconds = 0.2f;    // O2 PLACEHOLDER
+    Timing.FadeOutSeconds = 1.0f;   // O2 PLACEHOLDER
+
+    // Lifted a hand off the floor so the strokes never z-fight the disc, and
+    // thick enough to read at placement range. Both O2 PLACEHOLDER.
+    const FVector Center = GetActorLocation() + FVector(0.0f, 0.0f, 6.0f);
+    constexpr float RimThicknessCm = 7.0f;
+    constexpr float RimIntensity = 2.8f;
+    for (int32 Index = 0; Index < BreakerFX::GroundRingStrokes; ++Index)
+    {
+        FVector A, B;
+        BreakerFX::RingStroke(Center, Spec.RadiusCm, Index, BreakerFX::GroundRingStrokes, A, B);
+        Renderer->AddStroke(A, B, RimThicknessCm, Spec.ZoneColor, RimIntensity, Timing);
+    }
 }
 
 void ABreakerZoneActor::RefreshPresentation()

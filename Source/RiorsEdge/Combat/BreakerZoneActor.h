@@ -167,6 +167,12 @@ protected:
 
     // Cosmetic footprint, rebuilt from the replicated spec on every machine.
     void RefreshPresentation();
+    // The rim: a closed ring of pooled strokes at the TRUE effective radius,
+    // drawn once through the shared ABreakerEffectRenderer when the zone
+    // arms, on a clip timed to the zone's whole life with the last second as
+    // the visible expiry. The disc says roughly where; the rim says exactly
+    // whether a target is inside. Once per life — see the flag.
+    void SubmitRimEffect();
 
     UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Footprint;
@@ -196,4 +202,8 @@ private:
     int32 TicksDelivered = 0;
     bool bExpiryPaused = false;
     bool bReleased = false;
+    // The rim is claimed from a shared pool on fixed clips, so it must be
+    // submitted exactly once per zone life: ConfigureZone and OnRep_Spec can
+    // each fire more than once and a resubmission would stack rings.
+    bool bRimSubmitted = false;
 };
