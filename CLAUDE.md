@@ -60,8 +60,18 @@ cluster entries for the five new wheels + Travel. Phase D's one-shot
 diagnosis (in the session report): three "round landed" signals at
 three different times — hit sound at trigger, crosshair at +16 ms,
 world spark at flight time — and the dummy itself is inert (all hit
-reactions live on ABreakerEnemy). The owner-side Fieldplate menu lane
-landed as 7e3ace2, committed as found.
+reactions live on ABreakerEnemy). The Fieldplate menu lane is COMPLETE:
+all seven pack screens live in-game — Settings (sidebar + panes),
+BREAKERS roster, ENLIST A BREAKER, the Forge's verb bench, the
+Quartermaster — on the three imported role fonts (Archivo / IBM Plex
+Sans / IBM Plex Mono, Assets/fonts -> Scripts/import_fonts.py ->
+BreakerBuildRoleFonts). Owed at their sites: roster doctrine title +
+LAST AREA (summary fields), create's MODEL/FACE/VOICE (save fields),
+Settings' slide/aim hold-or-toggle + controller deadzone (model
+fields), insignia/rarity mark textures (import session). The doctrine
+display rename the pack proposes (Skimline et al., level-3 wording) is
+with the owner; the UI prints the trees' real names and O86's Forge
+until ruled.
 
 Update this section as the last step of each session.
 
