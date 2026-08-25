@@ -984,6 +984,14 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         else if (Board == TEXT("KEYBINDS")) { SettingsPane = 1; }
         else if (Board == TEXT("VIDEO")) { SettingsPane = 2; }
         else if (Board == TEXT("AUDIO")) { SettingsPane = 3; }
+        // Enlist-screen states: pre-select a class so a capture run can see
+        // the chosen card, the populated summary and the live gold ENLIST —
+        // none of which the harness can click its way to.
+        else if (Board == TEXT("SWIFT")) { PendingCreateClass = EBreakerClassId::Swift; }
+        else if (Board == TEXT("CASTER")) { PendingCreateClass = EBreakerClassId::Caster; }
+        else if (Board == TEXT("GUNSMITH")) { PendingCreateClass = EBreakerClassId::Gunsmith; }
+        else if (Board == TEXT("TANK")) { PendingCreateClass = EBreakerClassId::Tank; }
+        else if (Board == TEXT("SUPPORT")) { PendingCreateClass = EBreakerClassId::Support; }
     }
     Rebuild(Screen);
 }
@@ -1785,11 +1793,11 @@ namespace
     // harm-red diamond (the file's existing drawn-diamond vocabulary) until a
     // mark texture exists. The WORDS beside it are what carry the refusal —
     // red alone is never a refusal.
-    TSharedRef<SWidget> BreakerWarnMark()
+    TSharedRef<SWidget> BreakerWarnMark(const FLinearColor& Color = Harm)
     {
         return SNew(SBox).WidthOverride(12.0f).HeightOverride(12.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
         [
-            RotateFortyFive(SNew(SBox).WidthOverride(7.0f).HeightOverride(7.0f)[SolidBlock(Harm)])
+            RotateFortyFive(SNew(SBox).WidthOverride(7.0f).HeightOverride(7.0f)[SolidBlock(Color)])
         ];
     }
 
@@ -4809,20 +4817,31 @@ namespace
         const TCHAR* Resource;
         const TCHAR* Branches;
         const TCHAR* Pitch;
+        // The enlist card's resource-behaviour caption, in the pack's own
+        // words, and where the card's little resource bar RESTS out of combat
+        // — a start-state illustration, not a measurement. O2 PLACEHOLDER on
+        // every fraction.
+        const TCHAR* ResourceBehaviour;
+        float RestFraction;
     };
 
     const FBreakerClassBlurb GBreakerClassBlurbs[] =
     {
         { EBreakerClassId::Swift,    TEXT("SWIFT"),    TEXT("MOMENTUM"), TEXT("Frenzy / Kinetic / Marksman"),
-          TEXT("Speed is the build. Movement generates power, and standing still spends it.") },
+          TEXT("Speed is the build. Movement generates power, and standing still spends it."),
+          TEXT("BUILT BY MOVING · DECAYS WHEN STILL"), 0.12f },
         { EBreakerClassId::Caster,   TEXT("CASTER"),   TEXT("MANA"),     TEXT("Spellblade / Void Whisperer / Multispell"),
-          TEXT("Mana is the cooldown. Statuses, reactions and ability-driven combat.") },
+          TEXT("Mana is the cooldown. Statuses, reactions and ability-driven combat."),
+          TEXT("STARTS FULL · SPENDS DOWN"), 1.0f },
         { EBreakerClassId::Gunsmith, TEXT("GUNSMITH"), TEXT("SCRAP"),    TEXT("Armory / Field Tech / Tinkerer"),
-          TEXT("Deployables and weapon mastery. The gun is the character.") },
+          TEXT("Deployables and weapon mastery. The gun is the character."),
+          TEXT("BANKED FROM THE FIGHT · SPENT IN LUMPS"), 0.6f },
         { EBreakerClassId::Tank,     TEXT("TANK"),     TEXT("GRIT"),     TEXT("Leech / Bastion / Demolitionist"),
-          TEXT("Mitigation becomes fuel. Hold the line and be paid for it.") },
+          TEXT("Mitigation becomes fuel. Hold the line and be paid for it."),
+          TEXT("EARNED BY TAKING HITS · STEPS UP"), 0.3f },
         { EBreakerClassId::Support,  TEXT("SUPPORT"),  TEXT("CHARGE"),   TEXT("Medic / Conductor / Warden"),
-          TEXT("Amplify, sustain, control — and solo viable, never a second seat.") },
+          TEXT("Amplify, sustain, control — and solo viable, never a second seat."),
+          TEXT("FROM CONTRIBUTING · HELD, NOT SPENT ALONE"), 0.5f },
     };
 
     const FBreakerClassBlurb* FindClassBlurb(EBreakerClassId ClassId)
@@ -4897,144 +4916,6 @@ TSharedRef<SWidget> SBreakerMenu::MakeClassSilhouette(EBreakerClassId ClassId, b
     [
         MakePlate(Inner, Plate, bImplemented ? Cyan : BorderEmphasis,
             FMargin(BreakerUI::Space8, BreakerUI::Space8), false, BreakerUI::BorderRest)
-    ];
-}
-
-TSharedRef<SWidget> SBreakerMenu::MakeClassTile(EBreakerClassId ClassId, bool bSelected)
-{
-    const FBreakerClassBlurb* Blurb = FindClassBlurb(ClassId);
-    if (!Blurb) return SNullWidget::NullWidget;
-    const bool bImplemented = ClassHasImplementedKit(ClassId);
-
-    TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
-    Text->AddSlot().AutoHeight()
-    [
-        MenuText(FText::FromString(Blurb->Name), BreakerUI::TypeH2,
-            bImplemented ? (bSelected ? Cyan : Primary) : Disabled, true)
-    ];
-    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-    [
-        MenuText(FText::FromString(FString::Printf(TEXT("RESOURCE: %s"), Blurb->Resource)),
-            BreakerUI::TypeCaption, bImplemented ? SoftText : Disabled, true)
-    ];
-    Text->AddSlot().AutoHeight()
-    [
-        MenuText(FText::FromString(Blurb->Branches), BreakerUI::TypeCaption,
-            bImplemented ? Muted : Disabled, true)
-    ];
-    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        SNew(STextBlock)
-            .Text(FText::FromString(Blurb->Pitch))
-            .ColorAndOpacity(bImplemented ? SoftText : Disabled)
-            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-            .AutoWrapText(true)
-    ];
-    if (!bImplemented)
-    {
-        // O39, said out loud rather than left as a dead button. A disabled
-        // tile with no reason reads as a bug; a disabled tile that says why
-        // reads as a roadmap.
-        Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-        [
-            MenuText(FText::FromString(TEXT("NO KIT YET — CANNOT BE CHOSEN")), BreakerUI::TypeCaption, Amber, true)
-        ];
-    }
-
-    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)[MakeClassSilhouette(ClassId, bImplemented)];
-    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
-
-    const EBreakerClassId Captured = ClassId;
-    return BorderWrap(
-        SNew(SButton)
-        .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
-        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
-        .HAlign(HAlign_Fill).VAlign(VAlign_Center)
-        .OnClicked(FOnClicked::CreateLambda([this, Captured, bImplemented]()
-        {
-            if (!bImplemented)
-            {
-                // Refused, and it SAYS so. A click that does nothing is the
-                // failure mode this project keeps rediscovering.
-                CharacterScreenStatus = FText::FromString(
-                    TEXT("That class has no kit yet. Class choice is permanent, so it cannot be chosen."));
-            }
-            else
-            {
-                PendingCreateClass = Captured;
-                CharacterScreenStatus = FText::GetEmpty();
-            }
-            Rebuild(EBreakerMenuScreen::CharacterCreate);
-            return FReply::Handled();
-        }))
-        [
-            Row
-        ],
-        bSelected ? Cyan : (bImplemented ? BorderEmphasis : BreakerUI::BorderRest),
-        bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
-}
-
-TSharedRef<SWidget> SBreakerMenu::MakeClassBanner(EBreakerClassId ClassId, bool bSelected)
-{
-    const FBreakerClassBlurb* Blurb = FindClassBlurb(ClassId);
-    if (!Blurb) return SNullWidget::NullWidget;
-    const bool bImplemented = ClassHasImplementedKit(ClassId);
-
-    // A tall narrow crest, the shape a class banner wants, carrying identity
-    // only — the name and the resource. Everything else about the class reads
-    // on the detail panel to the right, so scanning the column is a scan of
-    // FIVE THINGS rather than five paragraphs.
-    // NO THUMBNAIL. A scaled-down figure plus two text lines overran the
-    // banner box and spilled its name through the border below it — and the
-    // figure it showed was the same one already drawn large on the right, at a
-    // size where it read as a grey smudge. The banner carries IDENTITY, the
-    // right-hand panel carries the character; duplicating the figure bought
-    // nothing and cost the layout. Removing it also removes the caption-
-    // clipping problem at its root rather than suppressing the caption.
-    TSharedRef<SVerticalBox> Inner = SNew(SVerticalBox);
-    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center)
-    [
-        MenuText(FText::FromString(Blurb->Name), BreakerUI::TypeBody,
-            bImplemented ? (bSelected ? Cyan : Primary) : Disabled, true)
-    ];
-    Inner->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-    [
-        MenuText(FText::FromString(Blurb->Resource), BreakerUI::TypeCaption,
-            bImplemented ? Muted : Disabled, true)
-    ];
-
-    const EBreakerClassId Captured = ClassId;
-    // 72: name plus resource plus the button's own padding, measured against
-    // what actually fits. Five of these plus spacing sit inside the column
-    // beside the character with room left, so nothing scrolls and nothing
-    // overruns the name field beneath. Sized to the CONTENT rather than
-    // picked — the two previous values were picked, and both were wrong.
-    return SNew(SBox).HeightOverride(72.0f)
-    [
-        BorderWrap(
-            SNew(SButton)
-            .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
-            .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space8))
-            .HAlign(HAlign_Fill).VAlign(VAlign_Center)
-            .OnClicked(FOnClicked::CreateLambda([this, Captured, bImplemented]()
-            {
-                // An unbuilt class still SELECTS — it just cannot be created.
-                // Letting the player read what Tank is meant to be is the whole
-                // reason O39 shows them greyed rather than hiding them; a
-                // banner that refuses even to be inspected teaches nothing.
-                PendingCreateClass = Captured;
-                CharacterScreenStatus = bImplemented
-                    ? FText::GetEmpty()
-                    : FText::FromString(TEXT("This class has no kit yet and cannot be created."));
-                Rebuild(EBreakerMenuScreen::CharacterCreate);
-                return FReply::Handled();
-            }))
-            [
-                Inner
-            ],
-            bSelected ? Cyan : (bImplemented ? BorderEmphasis : BreakerUI::BorderRest),
-            bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
     ];
 }
 
@@ -5396,175 +5277,441 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
 {
     EnsureRosterLoaded();
 
-    // Two columns, mirrored from the genre convention the owner referenced:
-    // the CLASS COLUMN on the LEFT and the CHARACTER on the RIGHT. The shape
-    // matters — the thing you are choosing between wants to be a short
-    // scannable list, and the thing you are choosing wants to be shown large.
-    // The previous stacked version made the player scroll past five paragraphs
-    // to compare two classes, and drew the figure five times at thumbnail size.
+    // The reference's ENLIST A BREAKER: "choose a resource — the resource is
+    // the class". Five full-height class columns on the left, THE BREAKER
+    // rail on the right with the name, the summary and the gold arm/confirm
+    // ENLIST. What the rail shows that no data pays — MODEL (O14's Human and
+    // Effigy), FACE, VOICE — is painted disabled with the STUB mark, the
+    // GAMEPLAY/ACCESSIBILITY ruling again: no field exists anywhere in
+    // Source, and a live control over nothing would be the quiet lie. OWED:
+    // model, face and voice fields on the character save, their own commit.
     const FBreakerClassBlurb* Selected = FindClassBlurb(PendingCreateClass);
     const bool bSelectedImplemented = Selected && ClassHasImplementedKit(Selected->ClassId);
 
-    // ---- LEFT: the five banners ----------------------------------------
-    TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
-    for (const FBreakerClassBlurb& Blurb : GBreakerClassBlurbs)
+    // ---- One class column --------------------------------------------------
+    auto MakeClassColumn = [this](const FBreakerClassBlurb& Blurb) -> TSharedRef<SWidget>
     {
-        Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-        [
-            MakeClassBanner(Blurb.ClassId, Blurb.ClassId == PendingCreateClass)
-        ];
-    }
+        const bool bCardSelected = Blurb.ClassId == PendingCreateClass;
+        const bool bImplemented = ClassHasImplementedKit(Blurb.ClassId);
+        const FLinearColor Head = bImplemented ? (bCardSelected ? Primary : SoftText) : Disabled;
+        const FLinearColor Copy = bImplemented ? (bCardSelected ? SoftText : Muted) : Disabled;
 
-    // ---- RIGHT: the character, then what it is --------------------------
-    TSharedRef<SVerticalBox> Detail = SNew(SVerticalBox);
-    Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-    [
-        // Nothing selected yet still draws a figure, greyed. An empty right
-        // half would read as a broken screen on the one screen a new player
-        // cannot avoid.
-        MakeClassSilhouette(Selected ? Selected->ClassId : EBreakerClassId::None,
-            Selected != nullptr && bSelectedImplemented, 1.55f)
-    ];
-    Detail->AddSlot().AutoHeight().HAlign(HAlign_Center)
-    [
-        MenuText(FText::FromString(Selected ? Selected->Name : TEXT("SELECT A CLASS")),
-            BreakerUI::TypeH1, Selected ? Primary : Muted, true)
-    ];
-    if (Selected)
-    {
-        // The keyword line: the branches, which ARE this class's three
-        // identities, in the same slot the reference gives its three-word
-        // character summary.
-        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        TSharedRef<SVerticalBox> Card = SNew(SVerticalBox);
+        Card->AddSlot().AutoHeight()
         [
-            MenuText(FText::FromString(FString(Selected->Branches).ToUpper().Replace(TEXT("/"), TEXT("."))),
-                BreakerUI::TypeCaption, Cyan, true)
+            MenuText(FText::FromString(Blurb.Name), BreakerUI::TypeH2, Head, true)
         ];
-        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
         [
-            SNew(SBox).MaxDesiredWidth(420.0f)
+            BreakerMonoText(FText::FromString(Blurb.Resource), BreakerUI::TypeCaption,
+                bCardSelected ? Cyan : Copy, 0.16f)
+        ];
+        // The resource bar at its out-of-combat rest: an illustration of the
+        // behaviour caption under it, never a measurement, cyan only on the
+        // chosen card.
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+        [
+            SNew(SBox).HeightOverride(8.0f)
             [
-                SNew(STextBlock)
-                    .Text(FText::FromString(Selected->Pitch))
-                    .Justification(ETextJustify::Center)
-                    .ColorAndOpacity(SoftText)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), BreakerUI::TypeCaption))
-                    .AutoWrapText(true)
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().FillWidth(FMath::Max(0.01f, Blurb.RestFraction))
+                [
+                    SolidBlock(bImplemented ? (bCardSelected ? Cyan : SoftText) : Disabled)
+                ]
+                + SHorizontalBox::Slot().FillWidth(FMath::Max(0.01f, 1.0f - Blurb.RestFraction))
+                [
+                    SolidBlock(PanelHover)
+                ]
             ]
         ];
-        Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
         [
-            MenuText(FText::FromString(FString::Printf(TEXT("CLASS RESOURCE - %s"), Selected->Resource)),
-                BreakerUI::TypeCaption, Muted, true)
+            SNew(STextBlock)
+                .Text(FText::FromString(Blurb.ResourceBehaviour))
+                .ColorAndOpacity(Copy)
+                .WrapTextAt(210.0f)
+                .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
         ];
-        if (!bSelectedImplemented)
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+        [
+            SNew(STextBlock)
+                .Text(FText::FromString(Blurb.Pitch))
+                .ColorAndOpacity(Copy)
+                .WrapTextAt(210.0f)
+                .Font(BreakerBodyFont(BreakerUI::TypeBody))
+        ];
+        if (!bImplemented)
         {
-            Detail->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+            // O39, in words: a painted-quiet card with no reason reads as a
+            // bug; one that says why reads as a roadmap.
+            Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
             [
-                MenuText(FText::FromString(TEXT("NO KIT YET - CANNOT BE CREATED")), BreakerUI::TypeCaption, Amber, true)
+                BreakerMonoText(FText::FromString(TEXT("NO KIT YET — CANNOT BE ENLISTED")),
+                    BreakerUI::TypeCaption, Amber, 0.16f)
             ];
         }
-    }
+        Card->AddSlot().FillHeight(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+        // DIVERGENCE FROM THE PLATE, flagged and deliberate: the reference
+        // footers name fifteen renamed doctrines (Skimline, Voidhold,
+        // Fieldworks…) and say "CHOSEN AT LEVEL 3". The trees carry no such
+        // rename — O103 makes that a display-field ruling whenever it is
+        // ruled — and O86 puts commitment at the Forge. The card prints the
+        // game's real names and the ruling's words.
+        Card->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+        // WRAPPED at the card's known copy width, like every other line here:
+        // the first capture photographed "CHOSEN AT T" and "VOID WHISP"
+        // clipping at the card edge.
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+        [
+            SNew(STextBlock)
+                .Text(FText::FromString(TEXT("DOCTRINES · CHOSEN AT THE FORGE")))
+                .ColorAndOpacity(Muted)
+                .WrapTextAt(210.0f)
+                .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+        ];
+        Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            SNew(STextBlock)
+                .Text(FText::FromString(FString(Blurb.Branches).ToUpper().Replace(TEXT(" / "), TEXT(" · "))))
+                .ColorAndOpacity(Copy)
+                .WrapTextAt(210.0f)
+                .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+        ];
 
+        const EBreakerClassId Captured = Blurb.ClassId;
+        return BorderWrap(
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(bCardSelected ? PanelRaised : Panel)
+            .Padding(FMargin(0.0f))
+            [
+                SNew(SButton)
+                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                .ContentPadding(FMargin(BreakerUI::Space24, BreakerUI::Space24))
+                .HAlign(HAlign_Fill)
+                .VAlign(VAlign_Fill)
+                .OnClicked(FOnClicked::CreateLambda([this, Captured]()
+                {
+                    // An unbuilt class still SELECTS — reading what Tank is
+                    // meant to be is the whole reason O39 shows it painted
+                    // rather than hidden. It cannot be ENLISTED, and the rail
+                    // says so. Any class click disarms a pending enlist.
+                    PendingCreateClass = Captured;
+                    PendingEnlistArm = false;
+                    CharacterScreenStatus = ClassHasImplementedKit(Captured)
+                        ? FText::GetEmpty()
+                        : FText::FromString(TEXT("This class has no kit yet and cannot be enlisted."));
+                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                    return FReply::Handled();
+                }))
+                [
+                    Card
+                ]
+            ],
+            bCardSelected ? Cyan : BorderRest,
+            bCardSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
+    };
+
+    const int32 BlurbCount = UE_ARRAY_COUNT(GBreakerClassBlurbs);
     TSharedRef<SHorizontalBox> Columns = SNew(SHorizontalBox);
-    Columns->AddSlot().AutoWidth()
-    [
-        // Scrolled as well as sized: the fix above makes five banners fit, and
-        // this is what stops a sixth class silently reintroducing the overrun.
-        SNew(SBox).WidthOverride(200.0f)
-        [
-            SNew(SScrollBox)
-            + SScrollBox::Slot()[Column]
-        ]
-    ];
-    Columns->AddSlot().FillWidth(1.0f).VAlign(VAlign_Top).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
-    [
-        Detail
-    ];
-
-    // ---- Below both columns: name, create, back -------------------------
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-    [
-        MenuText(FText::FromString(
-            TEXT("Class choice is PERMANENT for this character - the Forge can respec nodes, never the class.")),
-            BreakerUI::TypeCaption, SoftText, true)
-    ];
-    Body->AddSlot().FillHeight(1.0f)[Columns];
-
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
-    [
-        MenuText(FText::FromString(TEXT("NAME")), BreakerUI::TypeCaption, Muted, true)
-    ];
-    Body->AddSlot().AutoHeight()
-    [
-        SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
-        [
-            SNew(SEditableTextBox)
-            .Text(PendingCreateName)
-            .HintText(FText::FromString(TEXT("Name this Breaker")))
-            .OnTextChanged(FOnTextChanged::CreateLambda([this](const FText& NewText)
-            {
-                // Stored WITHOUT rebuilding: rebuilding on every keystroke
-                // would destroy the text box mid-word and take focus with it.
-                PendingCreateName = NewText;
-            }))
-        ]
-    ];
-
-    if (!CharacterScreenStatus.IsEmpty())
+    for (int32 Index = 0; Index < BlurbCount; ++Index)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+        Columns->AddSlot().FillWidth(1.0f)
+            .Padding(0.0f, 0.0f, Index + 1 < BlurbCount ? 18.0f : 0.0f, 0.0f)
         [
-            MenuText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, true)
+            // The plate's full-height card, fixed rather than measured so the
+            // five keep one bottom edge whatever their copy does.
+            SNew(SBox).HeightOverride(760.0f)
+            [
+                MakeClassColumn(GBreakerClassBlurbs[Index])
+            ]
         ];
     }
 
-    const bool bReady = PendingCreateClass != EBreakerClassId::None && bSelectedImplemented;
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    // ---- THE BREAKER rail --------------------------------------------------
+    auto MakeRailCaption = [](const TCHAR* Label) -> TSharedRef<SWidget>
+    {
+        return BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, 0.16f);
+    };
+    auto MakeStubCaption = [&MakeRailCaption](const TCHAR* Label) -> TSharedRef<SWidget>
+    {
+        return SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[MakeRailCaption(Label)]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+            [
+                BreakerSettingsStubMark()
+            ];
+    };
+
+    TSharedRef<SVerticalBox> Rail = SNew(SVerticalBox);
+    Rail->AddSlot().AutoHeight()[MakeRailCaption(TEXT("THE BREAKER"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)[BreakerSettingsDivider()];
+
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeRailCaption(TEXT("NAME"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
-        MakeButton(FText::FromString(bReady ? TEXT("CREATE") : TEXT("CHOOSE A CLASS")),
-            FOnClicked::CreateLambda([this]()
-            {
-                EnsureRosterLoaded();
-                if (!Roster.IsValid() || PendingCreateClass == EBreakerClassId::None)
+        SNew(SBox).HeightOverride(BreakerSettingsControlHeight)
+        [
+            BorderWrap(
+                SNew(SEditableTextBox)
+                .Text(PendingCreateName)
+                .HintText(FText::FromString(TEXT("Name this Breaker")))
+                .Font(BreakerBodyFont(BreakerUI::TypeBody))
+                .OnTextChanged(FOnTextChanged::CreateLambda([this](const FText& NewText)
                 {
-                    CharacterScreenStatus = FText::FromString(TEXT("Choose a class first."));
-                    Rebuild(EBreakerMenuScreen::CharacterCreate);
-                    return FReply::Handled();
-                }
-                FText Failure;
-                const FGuid Created = Roster->CreateCharacter(
-                    PendingCreateName.ToString(), PendingCreateClass, Failure);
-                if (!Created.IsValid())
-                {
-                    // The roster's own reason, surfaced verbatim rather than
-                    // replaced with a generic one - it already distinguishes a
-                    // full roster from a bad name from a kitless class.
-                    CharacterScreenStatus = Failure;
-                    Rebuild(EBreakerMenuScreen::CharacterCreate);
-                    return FReply::Handled();
-                }
-                SelectedCharacterId = Created;
-                PendingCreateClass = EBreakerClassId::None;
-                PendingCreateName = FText::GetEmpty();
-                CharacterScreenStatus = FText::GetEmpty();
-                Rebuild(EBreakerMenuScreen::CharacterSelect);
-                return FReply::Handled();
-            }), bReady)
+                    // Stored WITHOUT rebuilding: rebuilding on every keystroke
+                    // would destroy the text box mid-word and take focus with
+                    // it.
+                    PendingCreateName = NewText;
+                })),
+                BorderEmphasis)
+        ]
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+
+    // MODEL / FACE / VOICE, painted disabled behind the STUB mark until the
+    // save carries them.
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("MODEL"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
-        MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateLambda([this]()
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("HUMAN"), 100.0f)]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            BreakerSettingsDisabledButton(TEXT("EFFIGY"), 100.0f)
+        ]
+    ];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("FACE"))];
+    {
+        TSharedRef<SHorizontalBox> Faces = SNew(SHorizontalBox);
+        for (int32 Index = 0; Index < 6; ++Index)
         {
+            Faces->AddSlot().AutoWidth().Padding(0.0f, 0.0f, Index < 5 ? BreakerUI::Space8 : 0.0f, 0.0f)
+            [
+                SNew(SBox).WidthOverride(40.0f).HeightOverride(36.0f)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::BgRaised)
+                        [
+                            SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+                        ],
+                        BorderRest)
+                ]
+            ];
+        }
+        Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)[Faces];
+    }
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MakeStubCaption(TEXT("VOICE"))];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth()[BreakerSettingsDisabledButton(TEXT("LOW"), 76.0f)]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            BreakerSettingsDisabledButton(TEXT("MID"), 76.0f)
+        ]
+        + SHorizontalBox::Slot().AutoWidth().Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+        [
+            BreakerSettingsDisabledButton(TEXT("DRY"), 76.0f)
+        ]
+    ];
+
+    // BODY PREVIEW: the dashed box holding the drawn figure — a runtime
+    // primitive shown as itself, in words.
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    [
+        BreakerDashedRing(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().FillHeight(1.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                MakeClassSilhouette(Selected ? Selected->ClassId : EBreakerClassId::None,
+                    Selected != nullptr && bSelectedImplemented, 1.0f, /*bShowCaption=*/false)
+            ]
+            + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                BreakerMonoText(FText::FromString(TEXT("BODY PREVIEW · RUNTIME PRIMITIVE")),
+                    BreakerUI::TypeCaption, Disabled, 0.16f)
+            ],
+            288.0f, BorderRest)
+    ];
+
+    // The summary: what enlisting right now means, said as data.
+    auto MakeSummaryRow = [](const TCHAR* Label, const FString& Value, const FLinearColor& ValueColor) -> TSharedRef<SWidget>
+    {
+        return SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            [
+                BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                BreakerMonoText(FText::FromString(Value), BreakerUI::TypeCaption, ValueColor, 0.16f)
+            ];
+    };
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[BreakerSettingsDivider()];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+    [
+        MakeSummaryRow(TEXT("CLASS"), Selected ? FString(Selected->Name) : FString(TEXT("NOT CHOSEN")),
+            Selected ? Primary : Muted)
+    ];
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeSummaryRow(TEXT("RESOURCE"), Selected ? FString(Selected->Resource) : FString(TEXT("NOT CHOSEN")),
+            Selected ? Primary : Muted)
+    ];
+    // O17: gear is an account asset, and the rail says so at the moment of
+    // creation, when it matters most.
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+    [
+        MakeSummaryRow(TEXT("GEAR"), FString(TEXT("ACCOUNT-WIDE")), Primary)
+    ];
+
+    // The status line, reserved at two caption lines so a refusal cannot
+    // reflow the rail.
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+    [
+        SNew(SBox).HeightOverride(34.0f)
+        [
+            SNew(STextBlock)
+                .Text(CharacterScreenStatus)
+                .ColorAndOpacity(Amber)
+                .WrapTextAt(320.0f)
+                .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+        ]
+    ];
+
+    // ENLIST: the gold commit. Class choice is permanent, so it is
+    // arm-then-confirm like every irreversible control in this front end —
+    // the first click states the rule, the second enlists. The dark gold
+    // face is the plate's own commit surface (2A2416 under a gold ring), the
+    // gold cousin of DestructiveFace.
+    const bool bReady = PendingCreateClass != EBreakerClassId::None && bSelectedImplemented;
+    const bool bArmed = PendingEnlistArm && bReady;
+    Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+    [
+        bReady
+            ? StaticCastSharedRef<SWidget>(
+                SNew(SBox).HeightOverride(47.0f)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::Hex(0x2A2416))
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .ContentPadding(FMargin(BreakerUI::Space8, 0.0f))
+                            .HAlign(HAlign_Center)
+                            .VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateLambda([this]()
+                            {
+                                if (!PendingEnlistArm)
+                                {
+                                    PendingEnlistArm = true;
+                                    CharacterScreenStatus = FText::FromString(
+                                        TEXT("Class is permanent for this Breaker — the Forge respecs nodes, never the class. Confirm to enlist."));
+                                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                                    return FReply::Handled();
+                                }
+                                PendingEnlistArm = false;
+                                EnsureRosterLoaded();
+                                if (!Roster.IsValid() || PendingCreateClass == EBreakerClassId::None)
+                                {
+                                    CharacterScreenStatus = FText::FromString(TEXT("Choose a class first."));
+                                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                                    return FReply::Handled();
+                                }
+                                FText Failure;
+                                const FGuid Created = Roster->CreateCharacter(
+                                    PendingCreateName.ToString(), PendingCreateClass, Failure);
+                                if (!Created.IsValid())
+                                {
+                                    // The roster's own reason, verbatim — it
+                                    // already distinguishes a full roster from
+                                    // a bad name from a kitless class.
+                                    CharacterScreenStatus = Failure;
+                                    Rebuild(EBreakerMenuScreen::CharacterCreate);
+                                    return FReply::Handled();
+                                }
+                                SelectedCharacterId = Created;
+                                PendingCreateClass = EBreakerClassId::None;
+                                PendingCreateName = FText::GetEmpty();
+                                CharacterScreenStatus = FText::GetEmpty();
+                                Rebuild(EBreakerMenuScreen::CharacterSelect);
+                                return FReply::Handled();
+                            }))
+                            [
+                                BreakerMonoText(FText::FromString(bArmed
+                                    ? TEXT("CONFIRM — CLASS IS PERMANENT")
+                                    : TEXT("ENLIST")), 12, Amber, 0.16f)
+                            ]
+                        ],
+                        Amber)
+                ])
+            : BreakerSettingsDisabledButton(TEXT("ENLIST"), 333.0f)
+    ];
+
+    const TSharedRef<SWidget> Body = SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().FillWidth(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24,
+                BreakerUI::Space24, BreakerUI::Space40))
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+                [
+                    BreakerMonoText(FText::FromString(TEXT("CHOOSE A RESOURCE. THE RESOURCE IS THE CLASS.")),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+                + SVerticalBox::Slot().AutoHeight()[Columns]
+            ]
+        ]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+        ]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(380.0f)
+            [
+                SNew(SOverlay)
+                + SOverlay::Slot()[SolidBlock(BreakerUI::BgRaised)]
+                + SOverlay::Slot()
+                [
+                    SNew(SScrollBox)
+                    + SScrollBox::Slot().Padding(FMargin(BreakerUI::Space24, BreakerUI::Space24))
+                    [
+                        Rail
+                    ]
+                ]
+            ]
+        ];
+
+    // The permanence warning lives in the header, gold words beside the gold
+    // drawn mark — caution, not refusal, so it is never harm red.
+    return BreakerScreenShell(TEXT("BREAKERS"), TEXT("ENLIST A BREAKER"),
+        SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+        [
+            BreakerWarnMark(Amber)
+        ]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+        [
+            BreakerMonoText(FText::FromString(TEXT("CLASS CANNOT BE CHANGED LATER")),
+                BreakerUI::TypeCaption, Amber, 0.16f)
+        ],
+        FOnClicked::CreateLambda([this]()
+        {
+            PendingEnlistArm = false;
             CharacterScreenStatus = FText::GetEmpty();
             Rebuild(EBreakerMenuScreen::CharacterSelect);
             return FReply::Handled();
-        }))
-    ];
-
-    return BuildFrame(FText::FromString(TEXT("CREATE CHARACTER")),
-        FText::FromString(TEXT("Unbuilt classes are shown greyed and cannot be created.")), Body, 900.0f);
+        }),
+        Body);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildClassSelectScreen()

@@ -464,16 +464,11 @@ private:
     // out because both are loops whose bodies would otherwise bury the screen
     // they belong to.
     TSharedRef<SWidget> MakeCharacterRow(const struct FBreakerCharacterSummary& Summary, bool bSelected);
-    TSharedRef<SWidget> MakeClassTile(EBreakerClassId ClassId, bool bSelected);
-    // The greyed silhouette a class tile draws instead of a model. Owner's
+    // The greyed silhouette a class card draws instead of a model. Owner's
     // call: unimplemented classes are shown as silhouettes rather than hidden,
     // so the roster of what the game intends to be is legible from the start
     // while O39 still refuses to let anyone lock into one.
     TSharedRef<SWidget> MakeClassSilhouette(EBreakerClassId ClassId, bool bImplemented, float Scale = 1.0f, bool bShowCaption = true) const;
-    // The narrow selector on the LEFT of the create screen. Named a banner
-    // rather than a tile because it carries identity, not detail — the detail
-    // panel on the right is what reads.
-    TSharedRef<SWidget> MakeClassBanner(EBreakerClassId ClassId, bool bSelected);
     void EnsureRosterLoaded();
     TSharedRef<SWidget> BuildSkillTreesScreen();
     TSharedRef<SWidget> BuildDialogueScreen();
@@ -621,6 +616,10 @@ private:
     // Create-screen state.
     EBreakerClassId PendingCreateClass = EBreakerClassId::None;
     FText PendingCreateName;
+    // ENLIST is arm-then-confirm — class choice is permanent — in the same
+    // two-click shape every destructive control in this file uses. Any class
+    // or navigation interaction disarms it.
+    bool PendingEnlistArm = false;
     FText CharacterScreenStatus;
     TSharedPtr<SBox> ContentHost;
     EBreakerMenuScreen CurrentScreen = EBreakerMenuScreen::Main;
