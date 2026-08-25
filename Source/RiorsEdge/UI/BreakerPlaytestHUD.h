@@ -170,6 +170,11 @@ private:
     // zero delay, through a one-shot timer for a round still in flight.
     void ScheduleArrivalSound(float DelaySeconds, bool bKill);
     void DrawDamageNumbers();
+    // DEFINED IN Combat/BreakerEnemyHealthBars.cpp, not beside its siblings
+    // here. The bar answers a combat question -- which enemy am I fighting,
+    // how close is it to dead -- and two lanes editing it inside this file on
+    // the same day is what moved it out. The declaration stays because it is
+    // still a member drawing on this HUD's canvas; only the body left.
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
     // Overhead floating labels for the friendly interactables — every
