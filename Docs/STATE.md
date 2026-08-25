@@ -24,12 +24,12 @@ measurement without judging it.
 | Scaffolding nodes | ceiling | 42 of 445 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
-| Build variance band, at cap | band | 5.69 | band 8.0–10.0 | **OUT** |
-| Build variance band, endgame | band | 14.86 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.39 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.24 | no pin — measurement only | — |
+| Build variance band, at cap | band | 6.01 | band 8.0–10.0 | **OUT** |
+| Build variance band, endgame | band | 14.46 | band 12.0–20.0 | ok |
+| Ability lane throughput against weapon lane, at cap | band | 0.27 | band 0.85–1.15 | **OUT** |
+| Ability lane throughput against weapon lane, endgame | band | 0.2 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
-| Worst single rewrite step on an optimized build | ceiling | 1.48 | ceiling 1.25 | **OUT** |
+| Worst single rewrite step on an optimized build | ceiling | 1.45 | ceiling 1.25 | **OUT** |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |
 
 ## Tests

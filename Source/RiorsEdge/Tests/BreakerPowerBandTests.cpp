@@ -296,32 +296,77 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> BaselineRanks()
     {
-        // Gateways, the generalist ladders at partial rank, and a lot of
-        // defence and utility. No Convergence, no conditional node.
-        //
-        // EVERY CORE ROW ASKS RANK 1, re-pointed ahead of the atlas (Phase 4
-        // step 3): the atlas makes every Core node a single purchase, and a
-        // row asking more would pass the id check and be silently clamped at
-        // BreakerProgressionComponent.cpp:944 — the drift the rank assertion
-        // above exists to refuse. Six rows here gave up 10 ranks; the freed
-        // budget is NOT redistributed until the wheels exist to spend it in,
-        // so the fixture is deliberately lean until the atlas lands. Doctrine
-        // (Swift.*) rows keep their ranks — doctrine MaxRanks do not move.
+        // A FULL 65-POINT at-cap character, spent BADLY on purpose: entries,
+        // gateways, defence and utility, generalist travel picks (All +6),
+        // no Convergence, no More, and no conditional line it plays around.
+        // RING-LEGAL: a purchase order exists from the three entries through
+        // every node below, with every AND gate's rims owned. Bulwark and
+        // Aegis wheels complete (minus their hubs), Kinesis complete,
+        // Reservoir complete, a toe into Precision and Elements. 65 points
+        // exactly; the Swift doctrine rows are the same 8-point doctrine
+        // spend as ever.
         return {
+            // Precision, from the entry: 4
             {TEXT("Core.Precision.Sightline"), 1},
+            {TEXT("Core.Precision.Steady"), 1},
             {TEXT("Core.Precision.CalledShot"), 1},
-            {TEXT("Core.Volley.TriggerDiscipline"), 1},
-            {TEXT("Core.Volley.Cyclic"), 1},
-            {TEXT("Core.Volley.Salvo"), 1},
-            {TEXT("Core.Affliction.OpenWound"), 1},
-            {TEXT("Core.Affliction.Deepen"), 1},
+            // Bulwark, from its entry, hubless by refusal: 12
             {TEXT("Core.Bulwark.SetStance"), 1},
             {TEXT("Core.Bulwark.Read"), 1},
+            {TEXT("Core.Bulwark.Weight"), 1},
+            {TEXT("Core.Bulwark.HeldGround"), 1},
+            {TEXT("Core.Bulwark.LineofSight"), 1},
+            {TEXT("Core.Bulwark.Loud"), 1},
             {TEXT("Core.Bulwark.Parry"), 1},
+            {TEXT("Core.Bulwark.Counterweight"), 1},
+            {TEXT("Core.Bulwark.Interposition"), 1},
+            // The run to Kinesis, generalist picks: 3
+            {TEXT("Core.Travel.Ring8P1All"), 1},
+            {TEXT("Core.Travel.Ring8P2All"), 1},
+            {TEXT("Core.Travel.Ring8P3All"), 1},
+            // Kinesis, complete (no hub exists): 12
             {TEXT("Core.Kinesis.LightFooting"), 1},
             {TEXT("Core.Kinesis.Loft"), 1},
+            {TEXT("Core.Kinesis.Landing"), 1},
+            {TEXT("Core.Kinesis.Carry"), 1},
+            {TEXT("Core.Kinesis.Contact"), 1},
+            {TEXT("Core.Kinesis.Redirect"), 1},
             {TEXT("Core.Kinesis.AirJump"), 1},
+            {TEXT("Core.Kinesis.Slipcut"), 1},
             {TEXT("Core.Kinesis.PhantomStep"), 1},
+            // The run to Aegis, entered from the Bulwark end: 3
+            {TEXT("Core.Travel.Ring7P1All"), 1},
+            {TEXT("Core.Travel.Ring7P2All"), 1},
+            {TEXT("Core.Travel.Ring7P3All"), 1},
+            // Aegis, complete (no hub exists): 12
+            {TEXT("Core.Aegis.Footing"), 1},
+            {TEXT("Core.Aegis.Brace"), 1},
+            {TEXT("Core.Aegis.Recover"), 1},
+            {TEXT("Core.Aegis.CleanHands"), 1},
+            {TEXT("Core.Aegis.SecondOpinion"), 1},
+            {TEXT("Core.Aegis.Bulk"), 1},
+            {TEXT("Core.Aegis.ShortCircuit"), 1},
+            {TEXT("Core.Aegis.IronFrame"), 1},
+            {TEXT("Core.Aegis.AnsweringFire"), 1},
+            // Reservoir, from its entry, complete (no hub exists): 12
+            {TEXT("Core.Reservoir.Draw"), 1},
+            {TEXT("Core.Reservoir.Wellspring"), 1},
+            {TEXT("Core.Reservoir.Capacity"), 1},
+            {TEXT("Core.Reservoir.Tithe"), 1},
+            {TEXT("Core.Reservoir.DeepPockets"), 1},
+            {TEXT("Core.Reservoir.SecondShift"), 1},
+            {TEXT("Core.Reservoir.ConvergencePoint"), 1},
+            {TEXT("Core.Reservoir.Spillover"), 1},
+            {TEXT("Core.Reservoir.Reserve"), 1},
+            // The run to Elements and a toe inside: 3 + 4
+            {TEXT("Core.Travel.Ring4P1All"), 1},
+            {TEXT("Core.Travel.Ring4P2All"), 1},
+            {TEXT("Core.Travel.Ring4P3All"), 1},
+            {TEXT("Core.Elements.Conductive"), 1},
+            {TEXT("Core.Elements.ChargeUp"), 1},
+            {TEXT("Core.Elements.Penetrance"), 1},
+            {TEXT("Core.Elements.Attunement"), 1},
+            // The doctrine layer, unchanged.
             {TEXT("Swift.Marksman.LongLens"), 2},
             {TEXT("Swift.Marksman.Steady"), 2},
             {TEXT("Swift.Marksman.Ledger"), 2},
@@ -352,28 +397,70 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> OptimizedRanks()
     {
-        // EVERY CORE ROW ASKS RANK 1 — same re-point as BaselineRanks above,
-        // seven rows giving up 12 ranks, four of them the Velocity
-        // conditionals that are most of this build's damage. The Redline row
-        // moved with the atlas commit that renamed and DEMOTED the node: a
-        // x1.20 More became a +14% ability line, so the build now owns three
-        // More sources — and the composed More product is unchanged, because
-        // Redline was the weakest of four under the strongest-three rule.
+        // A FULL 65-POINT at-cap character, spent WELL: the airborne Swift
+        // weapon build the Velocity wheel exists for. RING-LEGAL like the
+        // baseline. Precision, Volley and Velocity complete to their hubs —
+        // three Mores, Fixate and Barrage on the weapon lane and Terminal
+        // Velocity shared while airborne, the same x1.9349 composed product
+        // the pre-atlas build held — travel taken on Weapon picks, and the
+        // spare eleven points pushed into Ruin for Execute and Siege.
+        // 65 points exactly.
         return {
+            // Precision, complete: 15
             {TEXT("Core.Precision.Sightline"), 1},
+            {TEXT("Core.Precision.Steady"), 1},
+            {TEXT("Core.Precision.Angle"), 1},
+            {TEXT("Core.Precision.Ledger"), 1},
+            {TEXT("Core.Precision.LongLens"), 1},
+            {TEXT("Core.Precision.Lead"), 1},
             {TEXT("Core.Precision.CalledShot"), 1},
             {TEXT("Core.Precision.TunnelVision"), 1},
-            {TEXT("Core.Precision.Fixate"), 1},              // More x1.22, unconditional
-            {TEXT("Core.Volley.TriggerDiscipline"), 1},
+            {TEXT("Core.Precision.Deadeye"), 1},
+            {TEXT("Core.Precision.Fixate"), 1},              // More x1.22, weapon lane
+            // The run to Volley, weapon picks: 3
+            {TEXT("Core.Travel.Ring0P1Weapon"), 1},
+            {TEXT("Core.Travel.Ring0P2Weapon"), 1},
+            {TEXT("Core.Travel.Ring0P3Weapon"), 1},
+            // Volley, complete: 15
             {TEXT("Core.Volley.Cyclic"), 1},
+            {TEXT("Core.Volley.Feed"), 1},
+            {TEXT("Core.Volley.TriggerDiscipline"), 1},
+            {TEXT("Core.Volley.Chambered"), 1},
+            {TEXT("Core.Volley.ColdBarrel"), 1},
+            {TEXT("Core.Volley.WorkingStock"), 1},
             {TEXT("Core.Volley.Salvo"), 1},
-            {TEXT("Core.Volley.Barrage"), 1},                // More x1.22, unconditional
+            {TEXT("Core.Volley.LastRound"), 1},
+            {TEXT("Core.Volley.Overrev"), 1},
+            {TEXT("Core.Volley.Barrage"), 1},                // More x1.22, weapon lane
+            // The chord from Reservoir's entry to Velocity, weapon picks: 6
+            {TEXT("Core.Reservoir.Draw"), 1},
+            {TEXT("Core.Travel.Chord2P1Weapon"), 1},
+            {TEXT("Core.Travel.Chord2P2Weapon"), 1},
+            {TEXT("Core.Travel.Chord2P3Weapon"), 1},
+            {TEXT("Core.Travel.Chord2P4Weapon"), 1},
+            {TEXT("Core.Travel.Chord2P5Weapon"), 1},
+            // Velocity, complete: 15
             {TEXT("Core.Velocity.Freefall"), 1},             // airborne
-            {TEXT("Core.Velocity.Slipstream"), 1},           // sliding: owned, not live
-            {TEXT("Core.Velocity.Traction"), 1},             // wall riding: owned, not live
             {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
-            {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne
+            {TEXT("Core.Velocity.Traction"), 1},             // wall riding: owned, not live
+            {TEXT("Core.Velocity.Slipstream"), 1},           // sliding: owned, not live
+            {TEXT("Core.Velocity.Grind"), 1},
+            {TEXT("Core.Velocity.Downforce"), 1},            // airborne, weapon
+            {TEXT("Core.Velocity.TerminalDescent"), 1},      // airborne, weapon
             {TEXT("Core.Velocity.Redline"), 1},              // demoted: +14% ability at Redline, no More
+            {TEXT("Core.Velocity.NoGround"), 1},             // decay valve, airborne/grounded
+            {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne, SHARED
+            // The run into Ruin and the finisher pair: 3 + 8
+            {TEXT("Core.Travel.Ring10P1Weapon"), 1},
+            {TEXT("Core.Travel.Ring10P2Weapon"), 1},
+            {TEXT("Core.Travel.Ring10P3Weapon"), 1},
+            {TEXT("Core.Ruin.WeightofIt"), 1},
+            {TEXT("Core.Ruin.Cull"), 1},
+            {TEXT("Core.Ruin.Break"), 1},
+            {TEXT("Core.Ruin.ShapedCharge"), 1},
+            {TEXT("Core.Ruin.Execute"), 1},                  // armour ignored below the threshold
+            {TEXT("Core.Ruin.Siege"), 1},                    // TargetElite rider
+            // The doctrine layer, unchanged.
             {TEXT("Swift.Marksman.LongLens"), 2},
             {TEXT("Swift.Marksman.Deadeye"), 2},
             {TEXT("Swift.Marksman.PierceDiscipline"), 2},
