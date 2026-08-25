@@ -36,6 +36,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
 #include "Save/BreakerCharacterRoster.h"
+#include "Characters/BreakerShakeMath.h"
 #include "Game/BreakerGameInstance.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerQuestContent.h"
@@ -168,6 +169,56 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
 
 UAbilitySystemComponent* ABreakerCharacter::GetAbilitySystemComponent() const { return AbilitySystem; }
 
+namespace
+{
+    // Breaker.Shake.* — the camera-shake tuning surface, live from the
+    // first commit (ruled): the owner tunes with a controller in hand, and
+    // nothing here is a compile away. Defaults are deliberately SUBTLE —
+    // hours-long game, most over-applied tool in the box. All O2.
+    float BreakerShakeScale = 1.0f;
+    float BreakerShakeFireTrauma = 0.12f;
+    float BreakerShakeDamageTrauma = 0.35f;
+    float BreakerShakeFrequencyHz = 18.0f;
+    float BreakerShakeMaxPitchDegrees = 0.5f;
+    float BreakerShakeMaxYawDegrees = 0.4f;
+    float BreakerShakeDecayPerSecond = 1.8f;
+    FAutoConsoleVariableRef BreakerCVarShakeScale(TEXT("Breaker.Shake.Scale"), BreakerShakeScale,
+        TEXT("Master camera-shake scale. 0 disables shake entirely."));
+    FAutoConsoleVariableRef BreakerCVarShakeFire(TEXT("Breaker.Shake.FireTrauma"), BreakerShakeFireTrauma,
+        TEXT("Trauma added per shot fired."));
+    FAutoConsoleVariableRef BreakerCVarShakeDamage(TEXT("Breaker.Shake.DamageTrauma"), BreakerShakeDamageTrauma,
+        TEXT("Trauma added per hit taken."));
+    FAutoConsoleVariableRef BreakerCVarShakeFrequency(TEXT("Breaker.Shake.FrequencyHz"), BreakerShakeFrequencyHz,
+        TEXT("Noise frequency of the shake."));
+    FAutoConsoleVariableRef BreakerCVarShakeMaxPitch(TEXT("Breaker.Shake.MaxPitchDegrees"), BreakerShakeMaxPitchDegrees,
+        TEXT("Pitch ceiling at full trauma."));
+    FAutoConsoleVariableRef BreakerCVarShakeMaxYaw(TEXT("Breaker.Shake.MaxYawDegrees"), BreakerShakeMaxYawDegrees,
+        TEXT("Yaw ceiling at full trauma."));
+    FAutoConsoleVariableRef BreakerCVarShakeDecay(TEXT("Breaker.Shake.DecayPerSecond"), BreakerShakeDecayPerSecond,
+        TEXT("How fast trauma drains."));
+}
+
+void ABreakerCharacter::UpdateCameraShake(float DeltaSeconds)
+{
+    // FIRE and TAKE-DAMAGE only (ruled) — the trauma adds live at those two
+    // hooks and nowhere else. Applied as a net-zero control-rotation delta:
+    // the noise is zero-centred and the trauma decays to nothing, so the
+    // aim ends exactly where it began (see BreakerShakeMath.h).
+    ShakeTrauma = BreakerShake::DecayTrauma(ShakeTrauma, BreakerShakeDecayPerSecond, DeltaSeconds);
+    const FRotator NewShake = BreakerShake::ShakeOffset(
+        ShakeTrauma * FMath::Clamp(BreakerShakeScale, 0.0f, 4.0f),
+        GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0,
+        BreakerShakeFrequencyHz, BreakerShakeMaxPitchDegrees, BreakerShakeMaxYawDegrees);
+    if (Controller && (!NewShake.IsNearlyZero() || !LastShakeOffset.IsNearlyZero()))
+    {
+        FRotator Rotation = Controller->GetControlRotation();
+        Rotation.Pitch += NewShake.Pitch - LastShakeOffset.Pitch;
+        Rotation.Yaw += NewShake.Yaw - LastShakeOffset.Yaw;
+        Controller->SetControlRotation(Rotation);
+    }
+    LastShakeOffset = NewShake;
+}
+
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -177,6 +228,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     ApplyWeaponPresentation();
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
+    UpdateCameraShake(DeltaSeconds);
     // Coarse poll for the Grit/Charge discrete state inputs (in-combat,
     // enemy-within-5m). Cheap: early-outs unless one of those loops is live.
     if (HasAuthority())
@@ -1269,6 +1321,13 @@ void ABreakerCharacter::HandleClassResourceHitDealt(const FBreakerHitContext& Hi
 
 void ABreakerCharacter::HandleClassResourceDamageTaken(const FBreakerHitContext& Hit)
 {
+    // Take-damage shake: the other ruled trauma source, ahead of the Grit
+    // gate because getting hit shakes every class. Real damage only — a
+    // fully dodged or zeroed hit moves nothing.
+    if (Hit.Result.HealthDamage > 0.0f || Hit.Result.ShieldDamage > 0.0f)
+    {
+        ShakeTrauma = BreakerShake::AddTrauma(ShakeTrauma, BreakerShakeDamageTrauma);
+    }
     if (!Grit) return;
     // POST-MITIGATION, health and shield as separate quantities — the split
     // the Grit component demands so shield absorption pays half. Instigator on
@@ -1386,6 +1445,8 @@ void ABreakerCharacter::UpdateClassResourceStates()
 void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
+    // Fire shake: one of the two ruled trauma sources.
+    ShakeTrauma = BreakerShake::AddTrauma(ShakeTrauma, BreakerShakeFireTrauma);
     // The muzzle blink follows the archetype's WEIGHT: the viewmodel kick is
     // already the per-archetype "how hard does this gun hit the shoulder"
     // number (shotgun 9.0, SMG 2.0), so the flash borrows it rather than

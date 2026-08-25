@@ -375,6 +375,12 @@ private:
 
     FTransform PlaytestSpawnTransform;
     float FallKillZ = -100000.0f;
+    // Camera shake (ruled: fire and take-damage only, subtle, tuned live
+    // through Breaker.Shake.*). Trauma model in Characters/BreakerShakeMath.h.
+    void UpdateCameraShake(float DeltaSeconds);
+    float ShakeTrauma = 0.0f;
+    FRotator LastShakeOffset = FRotator::ZeroRotator;
+
     // The death beat: input dead, HUD reads REDEPLOYING, then the respawn.
     // Long enough to register as a consequence, short enough that unlimited
     // campaign respawn stays a rhythm rather than a punishment. O2 PLACEHOLDER.
