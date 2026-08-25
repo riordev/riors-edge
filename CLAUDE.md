@@ -2,10 +2,34 @@
 
 ## Current work
 
-THE PERCEPTIBILITY PASS IS DONE (phases A-E) AND THE RIFT DATA MODEL
-IS IN. HEAD `2406226`, every commit at BUILD -> SUITE -> COMMIT ->
-PUSH, now 442 passing / 4 expected red (same roster) / 0 unexpected.
-Landed: three synthesized sounds (fire/hit/kill, no files, no
+THE VERTICAL-SLICE GOAL RULES THIS LANE: a fight the owner can judge
+in ten minutes, readable at 50-100 enemies. HEAD `b8a4efe`, 445
+passing / 4 expected red (same roster) / 0 unexpected. LANDED: the
+crowd measurement first (`-BreakerCrowdProbe=N` 1-200 +
+`-BreakerCrowdSkeletal`, 5 s warmup / 10 s sample; this machine,
+1920x1080, standing crowd, no combat: 100 primitive enemies 5.48 ms
+avg / 182 fps, 100 skeletal mannequins 8.35 ms avg / 120 fps, game
+thread dominant, GPU idle — the mannequin is AFFORDABLE at target
+density); rank colour (ApplyRankPresentation blends each part's
+CAPTURED family paint toward Elite gold / ModifierBearing violet one
+tick after every chassis pass; Trash/Boss restore the base; blends
+O2); selective bars (above-Trash always inside range, trash only
+while aimed-at + 0.6 s fade — this lane's ruled rule replaced the UI
+lane's recency retune FOR ENEMIES at the rebase; the 1.5 s recency
+window now governs only the dummy block — FLAGGED FOR THE OWNER,
+two lanes shipped two trash-bar rules in one day); and the wave-mode
+enemy pool (a poolable corpse parks on the same fuse-safe corpse
+clock, AcquirePooledEnemy revives by EXACT class, ReviveFromPool
+carries the full reset checklist — scale/speed/weave/seams/rank/
+paint/ward; scope: the three direct wave spawns Skitter/Lattice/
+Warden; Skirmisher and Drudge still churn through bespoke helpers;
+weak pointers shrug off ResetPlaytestTargets). NOT YET VERIFIED
+LIVE: the pool across real wave churn needs a controller (F4) — no
+headless path presses F4. Wave-budget generalisation was delivered
+as a REPORT, no extension made, by rule.
+
+PREVIOUSLY LANDED (perceptibility A-E + rift data model), still the
+live shape of those systems: three synthesized sounds (fire/hit/kill, no files, no
 licence — the provenance is Audio/BreakerSoundMath.h); the pooled
 ABreakerEffectRenderer (tracer's sibling: strokes/glows/lights on
 clip clocks, handles + EndEffect duration-rewrite, anchored beams);
