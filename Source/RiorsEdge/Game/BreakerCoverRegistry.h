@@ -62,14 +62,21 @@
 // measured field, at the shipped parameters:
 //
 //   106 pieces (79 chest-high, 27 full-height)
-//   largest uncovered gap              1645 cm  (limit 1700 - G23)
-//   furthest ground from a line break  2647 cm  (limit 3400 - 2 x G23)
-//   narrowest lane between line breaks 1700 cm  (limit 1600 - G3)
-//   tightest gap between any two pieces 259 cm  (widest enemy body 120)
-//   cover footprint                    3.03% of the band
+//   largest uncovered gap              1645 cm  CEILING 1700   (G23)
+//   furthest ground from a line break  2647 cm  CEILING 3400   (2 x G23)
+//   narrowest FULL-HEIGHT lane         1700 cm  FLOOR   1600   (G3)
+//   nearest piece to corridor centre   (per field)  FLOOR CorridorHalfWidth
+//   tightest gap between any two pieces 259 cm  FLOOR    120   (widest body)
+//   cover footprint                    3.03%             BAND  0.5%-5.0%
 //
-// Those four lines are what the automation asserts. If a parameter changes and
-// one of them moves out of band, the test names which.
+// EVERY LINE STATES ITS DIRECTION, in status.py's vocabulary, because two of
+// these pass by being UNDER their number and two by being OVER it and the
+// figures alone do not say which. A reader who assumes the wrong direction
+// reads a passing field as failing, or worse, the reverse. DescribeCoverField
+// prints the same words at runtime.
+//
+// Those five lines are what the automation asserts. If a parameter changes and
+// one of them moves the wrong way, the test names which.
 //
 // O2: every value in FBreakerCoverFieldParams is a PLACEHOLDER. Layout
 // dimensions are not balance, but the ones that are not forced by the geometry
@@ -435,10 +442,6 @@ public:
     static float LargestUncoveredGap(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params,
         int32 SamplesAcross = 96);
 
-    // THE MAZE MEASUREMENT. Narrowest clear gap between two pieces belonging to
-    // DIFFERENT clusters. Within a cluster the pieces are close on purpose; it
-    // is the ground BETWEEN clusters that has to stay dashable, and this is the
-    // number that says whether it does.
     // THE LINE-BREAK MEASUREMENT. Same sweep, restricted to FULL-HEIGHT pieces
     // and skipping the instrument corridor — which carries no full-height cover
     // BY DESIGN, because a 400 cm slab in it would stand across the TTK
@@ -447,16 +450,44 @@ public:
     static float LargestGapToLineBreak(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params,
         int32 SamplesAcross = 96);
 
+    // THE MAZE MEASUREMENT, AND IT IS FULL-HEIGHT ONLY. Narrowest clear gap
+    // between two FULL-HEIGHT pieces belonging to DIFFERENT clusters. Within a
+    // cluster the pieces are close on purpose; it is the ground BETWEEN
+    // clusters that has to stay dashable, and this is the number that says
+    // whether it does.
+    //
+    // THE CLASS RESTRICTION IS THE WHOLE RULE, and saying "lane" without
+    // saying "full-height" has already misled one reader. Chest-high cover is
+    // 120 cm, under MantleStepHeight 145: a player goes OVER it, so it does
+    // not close a lane and does not appear here.
+    //
+    // THIS IS NOT THE ONLY LANE RULE, which is the half that got missed. The
+    // ground a player dashes down is held by the CORRIDOR rejection in
+    // IsLayoutLegal — no piece of any class may stand within
+    // CorridorHalfWidth of the centreline over the corridor span — and that
+    // is what keeps chest-flanked ground open (O125). Two rules, two
+    // measurements, and the readout now prints both rather than one figure
+    // under a word that fits either.
     UFUNCTION(BlueprintPure, Category="Cover")
     static float MinimumOpenLaneWidth(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params);
 
-    // Cover footprint as a fraction of the band's ground area.
+    // THE CORRIDOR MARGIN. Smallest |Right| among pieces standing in the
+    // corridor's forward span — how much room the closest piece left the
+    // centreline. IsLayoutLegal already REJECTS anything inside
+    // CorridorHalfWidth; this reports the margin so it is visible while it is
+    // healthy, not only in the failure message. AN OFFSET, NOT A WIDTH: the
+    // placement rule is written about centres, so this is measured about
+    // centres and compared against that same number.
+    UFUNCTION(BlueprintPure, Category="Cover")
+    static float NearestPieceToCorridorCentre(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params);
+
     // Narrowest gap between ANY two pieces, chest-high included. Negative means
     // interpenetrating geometry; under WidestEnemyBodyCm means a gap the widest
     // enemy in the project cannot path through.
     UFUNCTION(BlueprintPure, Category="Cover")
     static float MinimumPieceClearance(const TArray<FBreakerCoverPiece>& Pieces);
 
+    // Cover footprint as a fraction of the band's ground area.
     UFUNCTION(BlueprintPure, Category="Cover")
     static float CoverAreaFraction(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params);
 

@@ -488,6 +488,15 @@ private:
     IConsoleCommand* EffectProbeConsoleCommand = nullptr;
 
     // --- The crowd probe (vertical-slice density instrument) --------------
+    // WHAT LOAD THIS MEASURES, stated because the flag name does not say it:
+    // N PURSUING, UNENGAGED enemies. They run the full per-frame chase, but
+    // they spawn 60 m downfield at trash speed and cannot close inside the
+    // sampling window, so no shot, hit reaction, damage number, ability or
+    // death effect is ever on the frame. The number is the cost of a hundred
+    // bodies MOVING, not the cost of a hundred bodies FIGHTING, and the two
+    // are different questions. A combat-live grid is a separate flag whose
+    // name says so; do not read this one as an answer to it.
+    //
     // -BreakerCrowdProbe=N spawns N trash enemies in a far grid during the
     // gym build; -BreakerCrowdSkeletal gives each a dev-only mannequin body
     // so "100 primitive enemies" and "100 skeletal enemies" are the same

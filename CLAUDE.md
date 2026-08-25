@@ -2,6 +2,48 @@
 
 ## Current work
 
+GROUND LANE, THE READOUT PASS (450 / 4 / 0, same expected-red roster).
+THE FERNHALL LANE DEFECT IS CLOSED, AND THE ANSWER INVERTED THE
+DIAGNOSIS. The yard prints two lanes and they were printing under one
+word, but the chest lane is NOT unguarded: `MinimumOpenLaneWidth` is
+full-height only (correctly — chest cover is under MantleStepHeight and
+is mantled, not rounded), and the ground the player dashes down is held
+by the CORRIDOR rejection instead — no cover of any class within
+`CorridorHalfWidth` 900 of the centreline. Pulling the chest pairs to
++-5 m goes RED, and `RiorsEdge.Zone.Fernhall.LaneGuard` proves which rule
+objects by perturbing the yard rather than asserting it. O125 rules it.
+`DescribeCoverField` now names the lane's CLASS, prints the corridor
+margin beside it as an OFFSET (never a width — centre-to-centre versus
+face-to-face is the same defect in a new place), and states every band's
+DIRECTION in status.py's vocabulary. The Fernhall grammar test logs the
+readout on PASSING runs too; it used to print only on failure, so the
+numbers were visible exactly once — when they were already wrong.
+
+THE WAVE SOLVER'S PARTY AXIS HAS COVERAGE (`RiorsEdge.Game.Waves.PartyScaling`):
+the elite interpolation pointwise across 1-5 plus both clamps, the
+per-player body ceiling, the FLAT ranged cap, the per-player Warden cap
+reached rather than merely respected, and `IsCompositionLegal` at every
+party size over 30 waves. IT FOUND SOMETHING (O126): the budget curve
+carries no party term while 5.3's caps are per-player, so at wave 3 solo
+buys a Warden, a Lattice and nine Skitters on 18 points while five
+players buy three Wardens and NOTHING ELSE. Both legal; pinned as
+measured, not intent, and it goes red the day a party term lands.
+O127 records the question rift interiors must answer before any solver
+code: what a room's shape does to its budget. Archetype roster and
+cross-solve state stay HELD; the endgame-pacing question (periodic is
+predictable) is in DECISIONS' Open list.
+
+CROWD PROBE READOUT, SCOPE STATED: `-BreakerCrowdProbe` measures
+PURSUING, UNENGAGED bodies — they run the full chase tick but spawn 60 m
+out and never close, so no shot, hit reaction, damage number or death
+effect is on the frame. The log line and header now say so. A
+combat-live grid is a separate flag whose name must say so.
+
+DEFECT FOR THE OWNER, NOT FIXED HERE: `Docs/DECISIONS.md` has TWO O120
+rulings (loading progress, and reward composition). Both cite-able; only
+the loading one is actually cited. Renumbering is a ledger call and the
+reward ruling is LEDGER's subject, so it is reported, not touched.
+
 THE KIT LANE OPENED WITH A CENSUS, NOT A FEATURE (lane/kit). Over
 the 25 registered fallback abilities (Swift 4, Caster 7, Gunsmith 7,
 Tank 7, Support 7): every definition names a real UGameplayAbility
@@ -69,7 +111,7 @@ in ten minutes, readable at 50-100 enemies. HEAD `b8a4efe`, 445
 passing / 4 expected red (same roster) / 0 unexpected. LANDED: the
 crowd measurement first (`-BreakerCrowdProbe=N` 1-200 +
 `-BreakerCrowdSkeletal`, 5 s warmup / 10 s sample; this machine,
-1920x1080, standing crowd, no combat: 100 primitive enemies 5.48 ms
+1920x1080, load=pursuing-unengaged: 100 primitive enemies 5.48 ms
 avg / 182 fps, 100 skeletal mannequins 8.35 ms avg / 120 fps, game
 thread dominant, GPU idle — the mannequin is AFFORDABLE at target
 density); rank colour (ApplyRankPresentation blends each part's

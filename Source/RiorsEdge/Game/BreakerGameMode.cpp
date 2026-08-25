@@ -503,7 +503,8 @@ void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal)
         ++CrowdSpawned;
     }
     bCrowdProbeArmed = true;
-    UE_LOG(LogTemp, Display, TEXT("[BreakerCrowd] probe armed: %d/%d enemies spawned, skeletal=%d, area level %d."),
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerCrowd] probe armed: %d/%d enemies spawned, load=pursuing-unengaged, skeletal=%d, area level %d."),
         CrowdSpawned, Count, ProbeManny != nullptr, GymAreaLevel);
 }
 
@@ -531,8 +532,18 @@ void ABreakerGameMode::TickCrowdSampler(float DeltaSeconds)
     }
     bCrowdProbeArmed = false;
     const float N = FMath::Max(1, CrowdFrames);
+    // THE SUMMARY NAMES THE LOAD IT MEASURED, because "enemies=100" does not.
+    // These hundred are PURSUING and UNENGAGED: they run the full per-frame
+    // chase (target selection, move, ground snap), but they start 60 m
+    // downfield and cannot close inside the sampling window, so nothing is
+    // shooting, nothing is taking damage, and no ability, hit reaction, damage
+    // number or death effect is on the frame. That is a real load and a
+    // measurable one; it is NOT the cost of a hundred enemies in a fight, and
+    // a reader who takes this number for the fighting figure is reading an
+    // instrument that never claimed it. A combat-live variant is a separate
+    // flag with its own word in this line.
     UE_LOG(LogTemp, Display,
-        TEXT("[BreakerCrowd] SUMMARY enemies=%d frames=%d avg=%.2fms worst=%.2fms fps=%.0f game=%.2fms render=%.2fms gpu=%.2fms"),
+        TEXT("[BreakerCrowd] SUMMARY load=pursuing-unengaged enemies=%d frames=%d avg=%.2fms worst=%.2fms fps=%.0f game=%.2fms render=%.2fms gpu=%.2fms"),
         CrowdSpawned, CrowdFrames, CrowdFrameMsSum / N, CrowdFrameMsMax,
         1000.0f / FMath::Max(CrowdFrameMsSum / N, 0.01f),
         CrowdGameMsSum / N, CrowdRenderMsSum / N, CrowdGpuMsSum / N);

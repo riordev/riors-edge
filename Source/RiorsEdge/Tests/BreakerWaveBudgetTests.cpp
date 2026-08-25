@@ -300,4 +300,118 @@ bool FBreakerWaveArchetypeReachabilityTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// THE PARTY DIMENSION. O82 rules party size a real axis, and until this test
+// existed the solver's party arithmetic had almost no coverage: every
+// production call site passes 1, and the two assertions that reached past it
+// checked GetMaximumElites at exactly 5 and one wave's ranged count. The
+// interpolated middle, the per-player body ceiling, the per-player Warden cap
+// and IsCompositionLegal above solo had never been executed at all. A ruled
+// design axis with no coverage breaks the first time somebody trusts it.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWavePartyScalingTest,
+    "RiorsEdge.Game.Waves.PartyScaling",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWavePartyScalingTest::RunTest(const FString& Parameters)
+{
+    using ELib = UBreakerWaveBudgetLibrary;
+    const FBreakerWaveBudgetParams Params;
+
+    // --- The elite allowance, across the whole range -----------------------
+    // 5.3 gives only the two ends (solo 1, five-player 3); the middle is
+    // interpolated. Pinned pointwise so a change to the interpolation or the
+    // rounding is VISIBLE rather than absorbed, and asserted as a shape too
+    // — O115: two bounds alone constrain nothing between them.
+    const int32 ExpectedElites[6] = { 0, 1, 2, 2, 3, 3 };   // index = party size
+    for (int32 Party = 1; Party <= 5; ++Party)
+    {
+        TestEqual(FString::Printf(TEXT("Party %d allows %d elites"), Party, ExpectedElites[Party]),
+            ELib::GetMaximumElites(Party, Params), ExpectedElites[Party]);
+    }
+    for (int32 Party = 2; Party <= 5; ++Party)
+    {
+        TestTrue(FString::Printf(TEXT("The elite allowance never falls as the party grows (%d)"), Party),
+            ELib::GetMaximumElites(Party, Params) >= ELib::GetMaximumElites(Party - 1, Params));
+    }
+    // Both clamps. A zero or negative party is a caller bug, not a wave with
+    // no elites, and a six-player party is not a thing 5.3 priced.
+    TestEqual(TEXT("Party 0 clamps to solo"), ELib::GetMaximumElites(0, Params), 1);
+    TestEqual(TEXT("A negative party clamps to solo"), ELib::GetMaximumElites(-3, Params), 1);
+    TestEqual(TEXT("Party 9 clamps to the five-player allowance"), ELib::GetMaximumElites(9, Params), 3);
+
+    // --- The body ceiling scales per player; the ranged cap does not -------
+    // This is the axis 5.3 actually draws, and it is the one worth asserting:
+    // density is per-player, but converging PROJECTILE SOURCES are capped flat
+    // because four of them removes all safe ground no matter how many players
+    // are standing in it.
+    for (int32 Party = 1; Party <= 5; ++Party)
+    {
+        TestEqual(FString::Printf(TEXT("Party %d carries %d live bodies"), Party, Party * 12),
+            ELib::GetMaximumLiveEnemies(Party, Params), Party * 12);
+    }
+    TestEqual(TEXT("Party 0 clamps to one player's density"), ELib::GetMaximumLiveEnemies(0, Params), 12);
+
+    // --- Every party size, every wave, still legal -------------------------
+    // The solver's own legality helper run at each party size, which is the
+    // arithmetic that had never executed above 1.
+    for (int32 Party = 1; Party <= 5; ++Party)
+    {
+        for (int32 Wave = 1; Wave <= 30; ++Wave)
+        {
+            const FBreakerWaveComposition Composition = ELib::SolveWave(Wave, Party, Params);
+            FString Reason;
+            if (!ELib::IsCompositionLegal(Composition, Party, Params, Reason))
+            {
+                AddError(FString::Printf(TEXT("Party %d wave %d is illegal: %s (%s)"),
+                    Party, Wave, *Reason, *ELib::DescribeComposition(Composition)));
+            }
+            // Restated directly rather than only through the helper, so a bug
+            // in the helper cannot make the caps look enforced.
+            TestTrue(FString::Printf(TEXT("Party %d wave %d respects the per-player density ceiling"), Party, Wave),
+                Composition.TotalEnemies() <= Party * 12);
+            TestTrue(FString::Printf(TEXT("Party %d wave %d holds the FLAT ranged cap of 3"), Party, Wave),
+                Composition.RangedSources() <= 3);
+            TestTrue(FString::Printf(TEXT("Party %d wave %d respects one Warden-class anchor per player"), Party, Wave),
+                Composition.Wardens + (Composition.bBoss ? 1 : 0) <= Party);
+            TestTrue(FString::Printf(TEXT("Party %d wave %d respects its elite allowance"), Party, Wave),
+                Composition.Elites <= ELib::GetMaximumElites(Party, Params));
+            TestTrue(FString::Printf(TEXT("Party %d wave %d never overspends"), Party, Wave),
+                Composition.SpentBudget <= Composition.Budget);
+            TestTrue(FString::Printf(TEXT("Party %d wave %d is never empty"), Party, Wave),
+                Composition.TotalEnemies() >= 1);
+        }
+    }
+
+    // The per-player Warden cap is REACHED, not merely respected: a cap that
+    // no wave ever touches is a cap no test is actually exercising.
+    TestTrue(TEXT("A five-player wave fields more than one Warden"),
+        ELib::SolveWave(20, 5, Params).Wardens > 1);
+
+    // --- A FINDING, pinned by test so it cannot quietly stop being true ----
+    // THE BUDGET CURVE CARRIES NO PARTY TERM WHILE THE CAPS DO, so at a low
+    // wave a LARGER party receives a SMALLER, more expensive wave. At wave 3
+    // the budget is 18 either way: solo spends it on one Warden, one Lattice
+    // and nine Skitters, while five players get three Wardens and nothing else
+    // — the Wardens exhaust the budget at the per-player cap and there is
+    // nothing left to buy a body with. Both compositions are LEGAL; 5.3's caps
+    // are ceilings and the solver is right not to invent budget to fill them.
+    //
+    // This is the same 4.2-versus-5.3 collision FBreakerWaveBudgetCollisionTest
+    // already pins, seen from the party axis instead of the wave axis, and it
+    // is recorded here as MEASURED rather than as intent. O125 names the open
+    // question; nothing in the shipped configuration answers it, so this test
+    // asserts what the solver does today and will go red the moment a party
+    // term is added — which is exactly when it should be re-read.
+    const FBreakerWaveComposition SoloEarly = ELib::SolveWave(3, 1, Params);
+    const FBreakerWaveComposition PartyEarly = ELib::SolveWave(3, 5, Params);
+    TestEqual(TEXT("The wave budget is identical at any party size"),
+        SoloEarly.Budget, PartyEarly.Budget);
+    TestTrue(TEXT("FINDING: a five-player wave 3 fields FEWER bodies than a solo wave 3"),
+        PartyEarly.TotalEnemies() < SoloEarly.TotalEnemies());
+    TestTrue(TEXT("FINDING: and spends them all on Warden-class anchors"),
+        PartyEarly.Wardens == PartyEarly.TotalEnemies() && PartyEarly.Wardens > 1);
+
+    return true;
+}
+
 #endif

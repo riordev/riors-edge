@@ -663,6 +663,31 @@ float UBreakerCoverLayoutLibrary::MinimumOpenLaneWidth(const TArray<FBreakerCove
     return Narrowest;
 }
 
+float UBreakerCoverLayoutLibrary::NearestPieceToCorridorCentre(const TArray<FBreakerCoverPiece>& Pieces,
+    const FBreakerCoverFieldParams& Params)
+{
+    // THE CORRIDOR RULE, REPORTED IN THE RULE'S OWN UNITS. IsLayoutLegal
+    // already rejects any piece standing within CorridorHalfWidth of the
+    // centreline over the corridor's forward span; this returns how much room
+    // the closest piece actually left, so the margin is visible while it is
+    // healthy instead of only when it is gone.
+    //
+    // IT IS AN OFFSET, NOT A WIDTH, and that is deliberate. A width has to
+    // pick a convention — centre-to-centre or face-to-face — and the two differ
+    // by a piece's depth, so printing one against a floor written in the other
+    // is how a passing field reads as failing. The placement rule is written
+    // about CENTRES, so this reports centres and compares against the same
+    // number the rule uses. A zone author who wants a face-to-face figure
+    // subtracts their own piece's half-depth and owns the arithmetic.
+    float Nearest = TNumericLimits<float>::Max();
+    for (const FBreakerCoverPiece& Piece : Pieces)
+    {
+        if (Piece.Forward <= Params.CorridorNearCm || Piece.Forward >= Params.CorridorFarCm) continue;
+        Nearest = FMath::Min(Nearest, FMath::Abs(Piece.Right));
+    }
+    return Nearest;
+}
+
 float UBreakerCoverLayoutLibrary::MinimumPieceClearance(const TArray<FBreakerCoverPiece>& Pieces)
 {
     // The narrowest gap between ANY two pieces, chest-high included. Two
@@ -789,7 +814,7 @@ bool UBreakerCoverLayoutLibrary::IsLayoutLegal(const TArray<FBreakerCoverPiece>&
     if (Lane < Params.DashCorridorWidthCm)
     {
         OutReason = FString::Printf(
-            TEXT("narrowest lane between two line-breaking pieces is %.0f cm against a dash corridor width of %.0f"),
+            TEXT("narrowest FULL-HEIGHT lane is %.0f cm against a dash corridor FLOOR of %.0f"),
             Lane, Params.DashCorridorWidthCm);
         return false;
     }
@@ -819,14 +844,36 @@ bool UBreakerCoverLayoutLibrary::IsLayoutLegal(const TArray<FBreakerCoverPiece>&
 FString UBreakerCoverLayoutLibrary::DescribeCoverField(const TArray<FBreakerCoverPiece>& Pieces,
     const FBreakerCoverFieldParams& Params)
 {
+    // EVERY BAND STATES ITS DIRECTION, in status.py's vocabulary (CEILING falls
+    // and never rises, FLOOR rises and never falls, BAND stays inside). Two of
+    // these pass by being UNDER their limit and two by being OVER it, and the
+    // bare "%.0f (limit %.0f)" this line used to print did not say which — so a
+    // reader assuming the wrong direction reads a passing field as failing, or
+    // worse, the reverse.
+    //
+    // The lane figure NAMES ITS CLASS. It used to print as "narrowest lane",
+    // which reads as the ground the player dashes down and is not: it is
+    // full-height only, because chest cover at 120 cm is under MantleStepHeight
+    // and is gone over rather than around. THE GROUND THE PLAYER DASHES DOWN IS
+    // GUARDED BY A DIFFERENT RULE — the per-piece corridor rejection — and that
+    // rule now prints its own margin beside the lane instead of being the only
+    // constraint here with no number attached (O125).
     return FString::Printf(
-        TEXT("cover field: %d pieces (%d chest-high @ %.0f cm, %d full-height @ %.0f cm) | largest uncovered gap %.0f (limit %.0f) | furthest from a line break %.0f (limit %.0f) | narrowest lane %.0f (limit %.0f) | tightest gap %.0f (widest body %.0f) | %.2f%% of the band"),
+        TEXT("cover field: %d pieces (%d chest-high @ %.0f cm, %d full-height @ %.0f cm)")
+        TEXT(" | largest uncovered gap %.0f CEILING %.0f")
+        TEXT(" | furthest from a line break %.0f CEILING %.0f")
+        TEXT(" | narrowest FULL-HEIGHT lane %.0f FLOOR %.0f")
+        TEXT(" | nearest piece to the corridor centreline %.0f FLOOR %.0f")
+        TEXT(" | tightest gap %.0f FLOOR %.0f (widest body)")
+        TEXT(" | cover footprint %.2f%% BAND %.2f%%-%.2f%%"),
         Pieces.Num(),
         CountOfClass(Pieces, EBreakerCoverClass::ChestHigh), Params.ChestHeightCm,
         CountOfClass(Pieces, EBreakerCoverClass::FullHeight), Params.FullHeightCm,
         LargestUncoveredGap(Pieces, Params), Params.CoverPitchMaxCm,
         LargestGapToLineBreak(Pieces, Params), Params.MaximumLineBreakGapCm,
         MinimumOpenLaneWidth(Pieces, Params), Params.DashCorridorWidthCm,
+        NearestPieceToCorridorCentre(Pieces, Params), Params.CorridorHalfWidthCm,
         MinimumPieceClearance(Pieces), Params.WidestEnemyBodyCm,
-        CoverAreaFraction(Pieces, Params) * 100.0f);
+        CoverAreaFraction(Pieces, Params) * 100.0f,
+        Params.MinimumCoverFraction * 100.0f, Params.MaximumCoverFraction * 100.0f);
 }

@@ -92,11 +92,24 @@ place("wall_w", "bldg_b", (-1.5, 0.0, 0.0), (3.0, 7.0, 56.0))
 place("wall_e", "bldg_c", (101.5, 0.0, 0.0), (3.0, 7.0, 56.0))
 
 # ---- The cover lattice ------------------------------------------------------
+# TWO DIFFERENT LANES LIVE HERE AND THEY ARE GUARDED BY DIFFERENT RULES.
+#
 # Chest pairs flank the main lane every 15 m (pitch under the 17 m grammar
-# max); their inner faces sit at +-9.9 m, leaving a 19.8 m dash lane. Full
-# -height line breaks stand off-lane, each its own cluster, spaced so the
-# clear gap between any two stays over the 16 m dash-corridor floor — 24 m
-# centre-to-centre is the tightest pair here, 21 m clear after extents.
+# max), standing on the corridor's 10.5 m shoulder line; their inner faces
+# sit at +-9.9 m, so the ground between them is 19.8 m wide. THAT LANE IS
+# GUARDED BY THE CORRIDOR RULE, not by the dash-corridor floor: no cover of
+# any class may stand within CorridorHalfWidth (9 m) of the centreline, so
+# pulling these pairs in to +-5 m goes RED — see O125 and the
+# RiorsEdge.Zone.Fernhall.LaneGuard perturbation. The 19.8 m figure is this
+# file's own arithmetic off the 10.5 m shoulder; the build prints the
+# SHOULDER OFFSET against its floor, because a width has to pick
+# centre-to-centre or face-to-face and an offset does not.
+#
+# The dash-corridor floor guards the OTHER lane, the full-height one. Line
+# breaks stand off-lane, each its own cluster, spaced so the clear gap
+# between any two stays over the 16 m floor — 24 m centre-to-centre is the
+# tightest pair here, 21 m clear after extents. Chest cover is invisible to
+# that measurement by design, which is why it needs the corridor rule.
 for i, x in enumerate((25.0, 40.0, 55.0, 70.0, 85.0)):
     place("blk_chest_n%02d" % i, "chest", (x, 0.0, 10.5), (3.0, 1.2, 1.2))
     place("blk_chest_s%02d" % i, "chest", (x, 0.0, -10.5), (3.0, 1.2, 1.2))
