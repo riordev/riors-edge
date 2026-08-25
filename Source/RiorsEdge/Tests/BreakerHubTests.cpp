@@ -22,24 +22,25 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
 {
     const TArray<FBreakerTravelDestination>& Registry = ABreakerTravelPoint::GetFallbackRegistry();
 
-    // TWO destinations now, and the second one is not scope creep — it is the
-    // WAY BACK. The registry shipped with the gym alone, per the brief ("for
-    // now the only option in that interactable should be the gym"), and that
-    // made travel one-way: a player who left the hub was stranded in the gym
-    // with the vendors and the story start unreachable for the rest of the
-    // session. A place you can enter and not leave is a trap, not a location.
+    // THREE destinations: the gym, the way back (the Anchor), and the
+    // Fernhall approach — the vertical slice's authored zone. The old "no
+    // third destination without checking the selection UI exists" reason is
+    // discharged: SBreakerMenu::BuildTravelScreen is a real multi-card picker
+    // that iterates GetAvailableDestinations, so any point can offer several
+    // places at once.
     //
-    // The count is still pinned exactly rather than loosened to "at least
-    // one", because the reason for pinning it has not changed: a third
-    // destination appearing without anyone updating this test means nobody
-    // checked whether the selection UI exists yet, and ABreakerCharacter's
-    // interact path deliberately refuses to guess past one.
+    // The count stays pinned exactly rather than loosened to "at least one"
+    // because every entry here is a REACHABILITY claim: a destination in this
+    // registry with no map branch behind it is a card that travels to a
+    // refusal log line. Adding an entry means adding its
+    // HandleHubTravelSelected branch and its map-identity exclusion, and this
+    // pin is what makes forgetting that a red instead of a shrug.
     int32 EnabledCount = 0;
     for (const FBreakerTravelDestination& Destination : Registry)
     {
         if (Destination.bEnabled) ++EnabledCount;
     }
-    TestEqual(TEXT("Exactly two destinations are enabled: the gym and the way back"), EnabledCount, 2);
+    TestEqual(TEXT("Exactly three destinations are enabled: the gym, the way back, and Fernhall"), EnabledCount, 3);
 
     // A travel point never offers the place it stands in, which is what keeps
     // each point at exactly one option and therefore inside the no-picker-yet

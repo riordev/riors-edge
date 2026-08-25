@@ -1,0 +1,5 @@
+Kit pieces in this directory are from Kenney's starter kits
+(github.com/KenneyNL/Starter-Kit-FPS, Starter-Kit-City-Builder).
+The 3D models are CC0 (stated in each repo's README: "Sprites and
+3D Models (CC0 licensed)"); repo code is MIT and none of it is
+vendored here. Files are prefixed fps_ / city_ by source kit.

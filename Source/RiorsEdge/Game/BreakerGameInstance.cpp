@@ -39,16 +39,27 @@ bool UBreakerGameInstance::IsAnchorMap(const UObject* WorldContext)
     return BreakerCurrentMapName(WorldContext) == AnchorMapName();
 }
 
+bool UBreakerGameInstance::IsFernhallMap(const UObject* WorldContext)
+{
+    return BreakerCurrentMapName(WorldContext) == FernhallMapName();
+}
+
 bool UBreakerGameInstance::IsGymMap(const UObject* WorldContext)
+{
+    return IsGymMapName(BreakerCurrentMapName(WorldContext));
+}
+
+bool UBreakerGameInstance::IsGymMapName(const FString& Name)
 {
     // THE FALLBACK IS THE GYM, and it is load-bearing. Every existing entry
     // point — the capture harness, a PIE drop-in on the old template map,
-    // -BreakerAutoPlay — runs in a map that is none of the three by name, and
-    // every one of them expects the gym field to be there. Treating "not the
-    // front end and not the anchor" as the gym is what keeps all of that
-    // working while the three maps are still empty shells.
-    const FString Name = BreakerCurrentMapName(WorldContext);
-    return Name != FrontEndMapName() && Name != AnchorMapName();
+    // -BreakerAutoPlay — runs in a map that is none of the named maps, and
+    // every one of them expects the gym field to be there. Treating "none of
+    // the named maps" as the gym is what keeps all of that working. The cost
+    // of the fallback is that every NEW named map must be excluded here by
+    // hand, or it silently fills with targets and a boss key — which is why
+    // this is a name-in, bool-out function the suite can hold.
+    return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName();
 }
 
 // ---------------------------------------------------------------------------

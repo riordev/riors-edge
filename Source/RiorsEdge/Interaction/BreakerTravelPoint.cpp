@@ -10,6 +10,7 @@
 
 const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
 const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
+const FName ABreakerTravelPoint::FernhallDestinationId(TEXT("Fernhall"));
 
 ABreakerTravelPoint::ABreakerTravelPoint()
 {
@@ -151,8 +152,19 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Hub.DisplayName = FText::FromString(TEXT("The Anchor"));
     Hub.Description = TEXT("The hub — vendors, the Forge Keeper, and the way into the story.");
     Hub.bEnabled = true;
+    // THE FIRST AUTHORED ZONE. The vertical slice's place: a kit-bashed
+    // approach yard with the rift site at its far end. Named for the rift
+    // definition it fronts (FBreakerRiftDefinition's Fernhall) so the travel
+    // list and the deployment briefing speak the same name.
+    FBreakerTravelDestination Fernhall;
+    Fernhall.Id = ABreakerTravelPoint::FernhallDestinationId;
+    Fernhall.DisplayName = FText::FromString(TEXT("The Fernhall Approach"));
+    Fernhall.Description = TEXT("The overgrown yard outside Fernhall — the First Contract, and the rift.");
+    Fernhall.bEnabled = true;
+
     Registry.Add(Gym);
     Registry.Add(Hub);
+    Registry.Add(Fernhall);
 
     return Registry;
 }

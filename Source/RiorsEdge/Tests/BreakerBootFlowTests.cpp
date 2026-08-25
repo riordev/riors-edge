@@ -55,7 +55,8 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
     // pins the other direction — the names the code holds must resolve to
     // packages on disk.
     for (const TCHAR* MapName : { UBreakerGameInstance::FrontEndMapName(),
-        UBreakerGameInstance::AnchorMapName(), UBreakerGameInstance::GymMapName() })
+        UBreakerGameInstance::AnchorMapName(), UBreakerGameInstance::GymMapName(),
+        UBreakerGameInstance::FernhallMapName() })
     {
         const FString PackagePath = FString::Printf(TEXT("/Game/Breaker/Maps/%s"), MapName);
         TestTrue(*FString::Printf(TEXT("Map package '%s' exists"), *PackagePath),

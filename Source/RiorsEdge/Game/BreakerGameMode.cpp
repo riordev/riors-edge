@@ -1,6 +1,7 @@
 #include "Game/BreakerGameMode.h"
 
 #include "Game/BreakerHubBuilder.h"
+#include "Game/BreakerZoneBuilder.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerWorldBasics.h"
 #include "GameFramework/PlayerStart.h"
@@ -135,6 +136,11 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
         UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
         return;
     }
+    if (DestinationId == ABreakerTravelPoint::FernhallDestinationId)
+    {
+        UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::FernhallMapName()));
+        return;
+    }
     // Any other id is refused rather than guessed at. The old teleport that
     // stood here is gone with the one-map world it belonged to: the gym is a
     // separate level now, so arriving there is a load, and the load is what
@@ -244,6 +250,55 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         // schedule its exit, or the harness can never photograph the hub.
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] anchor — hub built, no gym."));
+        return;
+    }
+
+    // FERNHALL: the authored zone. Assembled from imported meshes, not
+    // generated — UBreakerZoneBuilder spawns the composer's scene at identity
+    // and hands back the marker transforms. No targets, no boss key, no waves:
+    // the yard is a place, and what fights happen in it will be authored into
+    // it (the rift is next). Registered by name in IsGymMapName's exclusion
+    // list, which is the only thing standing between this branch and the gym
+    // fall-through filling the yard with dummies.
+    if (UBreakerGameInstance::IsFernhallMap(this))
+    {
+        FBreakerZoneMarkers Markers;
+        if (UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers))
+        {
+            if (APawn* Pawn = NewPlayer->GetPawn())
+            {
+                // Feet on the marker's ground plane (capsule half-height 88,
+                // same arithmetic as the fallback PlayerStart), facing the
+                // rift end of the yard so the first thing seen is somewhere
+                // to go.
+                const FVector StandAt = Markers.PlayerStart + FVector(0.0f, 0.0f, 112.0f);
+                const FRotator Facing = (Markers.Rift - Markers.PlayerStart).GetSafeNormal2D().Rotation();
+                Pawn->TeleportTo(StandAt, Facing);
+                if (AController* Controller = Pawn->GetController())
+                {
+                    Controller->SetControlRotation(Facing);
+                }
+            }
+            // The way back. The yard fronts the rift; it must not be a trap
+            // while the rift is not built yet, so the entry keeps a gate to
+            // everywhere else the registry knows. Placed off the lane on the
+            // entry plaza, in the yard's own marker-derived frame rather than
+            // world axes, so a re-exported yard carries its gate with it.
+            const FVector YardForward = (Markers.Rift - Markers.PlayerStart).GetSafeNormal2D();
+            const FVector YardRight = FVector::CrossProduct(FVector::UpVector, YardForward);
+            const FVector GateAt = Markers.PlayerStart - YardForward * 300.0f + YardRight * 900.0f
+                + FVector(0.0f, 0.0f, 100.0f);
+            if (ABreakerTravelPoint* Gate = GetWorld()->SpawnActor<ABreakerTravelPoint>(
+                ABreakerTravelPoint::StaticClass(),
+                FTransform(YardForward.Rotation(), GateAt)))
+            {
+                Gate->ExcludedDestinationId = ABreakerTravelPoint::FernhallDestinationId;
+                Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+            }
+        }
+        bPlaytestTargetsSpawned = true;
+        ScheduleScreenshots();
+        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — zone assembled, no gym field."));
         return;
     }
 

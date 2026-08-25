@@ -10,11 +10,11 @@
 // fallback list, not content assets, so the slice needs no editor setup to
 // have destinations at all.
 //
-// bEnabled exists because the owner's brief is explicit: for now exactly ONE
-// destination is enabled (the gym) and every other destination is DATA-ABSENT,
-// not authored-and-disabled. The flag stays on the struct anyway because a
-// destination will need to go from disabled to enabled later without a
-// registry reshape — but do not add fake entries to exercise it today.
+// bEnabled exists because the owner's brief is explicit: a destination that
+// is not real yet is DATA-ABSENT, not authored-and-disabled. The flag stays
+// on the struct because a destination will need to go from disabled to
+// enabled later without a registry reshape — but do not add fake entries to
+// exercise it today.
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerTravelDestination
 {
@@ -70,19 +70,19 @@ public:
 
     FBreakerTravelRequested OnDestinationSelected;
 
-    // Zero-setup fallback registry. Exactly one entry today: the gym, id
-    // "Gym", enabled. See the struct comment above for why the rest of the
-    // owner's requested destinations ("other maps, quests, missions") are not
+    // Zero-setup fallback registry: the gym, the hub, and the Fernhall
+    // approach. See the struct comment above for why the rest of the owner's
+    // requested destinations ("other maps, quests, missions") are not
     // represented here at all.
     static const TArray<FBreakerTravelDestination>& GetFallbackRegistry();
     static bool FindDestination(FName DestinationId, FBreakerTravelDestination& OutDestination);
 
-    // The one destination this build ships. Exposed as a stable id so the
-    // game mode does not have to hardcode the string "Gym" to bind travel —
-    // it can bind BreakerTravelDestinations::Gym instead and get a compile
-    // error if this registry ever renames it.
+    // The shipped destinations, exposed as stable ids so the game mode does
+    // not have to hardcode strings to bind travel — a rename here is a
+    // compile error at every binding site instead of a silent mismatch.
     static const FName GymDestinationId;
     static const FName HubDestinationId;
+    static const FName FernhallDestinationId;
     // Which destination this point IS, so it does not offer to send the
     // player where they already are. Set by whoever spawns it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FName ExcludedDestinationId;

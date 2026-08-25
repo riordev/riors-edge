@@ -79,25 +79,32 @@ public:
     // the travel path need them, and a second copy of a string that must match
     // an asset path is exactly how a rename becomes a silent no-op.
     //
-    // RENAMING A MAP ASSET WITHOUT EDITING THE THREE STRINGS BELOW FAILS
-    // SILENTLY. There is no compile error and no log line: the renamed map
-    // simply stops matching FrontEnd or Anchor, and IsGymMap's "neither of the
-    // other two" fallback swallows it, so the map becomes the gym. A renamed
-    // Lvl_Anchor builds a gym field in the hub and nothing anywhere says why.
-    // These three strings and the .umap short names are one contract.
+    // RENAMING A MAP ASSET WITHOUT EDITING THE STRINGS BELOW FAILS SILENTLY.
+    // There is no compile error and no log line: the renamed map simply stops
+    // matching its name here, and IsGymMap's "none of the named maps" fallback
+    // swallows it, so the map becomes the gym. A renamed Lvl_Anchor builds a
+    // gym field in the hub and nothing anywhere says why. These strings and
+    // the .umap short names are one contract.
     static const TCHAR* FrontEndMapName() { return TEXT("Lvl_FrontEnd"); }
     static const TCHAR* AnchorMapName()   { return TEXT("Lvl_Anchor"); }
     static const TCHAR* GymMapName()      { return TEXT("Lvl_Gym"); }
+    static const TCHAR* FernhallMapName() { return TEXT("Lvl_Fernhall"); }
 
-    // What a map is FOR. The game mode is shared across all three, so it asks
-    // this rather than carrying three subclasses — the alternative is three
+    // What a map is FOR. The game mode is shared across all of them, so it
+    // asks this rather than carrying a subclass per map — the alternative is
     // near-identical game modes and a config entry per map to keep in sync.
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsFrontEndMap(const UObject* WorldContext);
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsAnchorMap(const UObject* WorldContext);
     UFUNCTION(BlueprintPure, Category="Breaker|Session")
+    static bool IsFernhallMap(const UObject* WorldContext);
+    UFUNCTION(BlueprintPure, Category="Breaker|Session")
     static bool IsGymMap(const UObject* WorldContext);
+    // The fallback rule itself, name-in bool-out so the suite can hold the
+    // exclusion list: a named map that this returns true for is a map that
+    // silently fills with the gym's targets and boss key.
+    static bool IsGymMapName(const FString& Name);
 
     // Travels, carrying the active character across the load.
     UFUNCTION(BlueprintCallable, Category="Breaker|Session")
