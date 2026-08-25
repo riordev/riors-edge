@@ -449,36 +449,17 @@ protected:
     bool bLastHitWasWeakPoint = false;
 
     // --- Hit / death presentation (cosmetic only) --------------------------
-    // A brief whole-body material pulse on damage and a two-beat death (pop,
-    // then crumple to ash) before the body vanishes. Presentation ONLY: no
-    // stat, timer or AI decision reads any of this state, collision is already
-    // off before the death beat starts, and every visual it moves is restored
-    // before a respawn or revive shows the body again.
-
-    // White pulse (gold on a weak-point hit) across every body-part dynamic
-    // material instance, restored by timer. All magnitudes O2 PLACEHOLDER.
-    void StartHitFlash(bool bWeakPoint);
-    UFUNCTION() void EndHitFlash();
-    // Captures each part's dynamic material and its CURRENT colour, so the
-    // restore returns exactly what the archetype had painted (subclasses tint
-    // their bodies after the base constructor).
-    void CaptureBodyMaterials();
-    // The death beat: called where SetBodyVisible(false) used to be. Weak-point
-    // kills get the loudest version.
+    // EXTRACTED (ruled): the flash, the two-beat death and the revive
+    // restore live in UBreakerHitReactionComponent now, so the target dummy
+    // can carry the same reactions without inheriting an enemy. This class
+    // registers its six parts, forwards its damage/death/revive moments, and
+    // hides its own body when the crumple lands. Behaviour unchanged.
+    UFUNCTION() void HandleDeathPresentationFinished();
     void StartDeathPresentation(bool bWeakPointKill);
-    // Advances the beat; runs at the very top of Tick, BEFORE the authority
-    // gate, because it is client-legal cosmetics.
-    void UpdateDeathPresentation(float DeltaSeconds);
-    // Restores actor scale and part colours; safe to call twice.
     void ResetDeathPresentation();
 
-    FTimerHandle HitFlashTimer;
-    bool bHitFlashActive = false;
-    TArray<TPair<TWeakObjectPtr<class UMaterialInstanceDynamic>, FLinearColor>> BodyMaterialBases;
-    // Negative = no death presentation in flight.
-    float DeathPresentationElapsed = -1.0f;
-    bool bDeathBeatWeakPoint = false;
-    FVector DeathBaseScale = FVector::OneVector;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Presentation")
+    TObjectPtr<class UBreakerHitReactionComponent> HitReaction;
 
 private:
     FVector LeashOrigin = FVector::ZeroVector;

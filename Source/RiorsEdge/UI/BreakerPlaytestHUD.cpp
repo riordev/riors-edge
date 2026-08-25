@@ -401,7 +401,17 @@ void ABreakerPlaytestHUD::DrawHUD()
     // the single most important mark in this pass and nothing in a headless run
     // pulls a trigger to produce one.
     const bool bPreviewHit = IsCapturePreview();
-    if ((bRecentShot && Shot && Shot->bHit) || bPreviewHit)
+    // ONE TICK, ONE CLOCK, ONE PATH (ruled). This block used to be two: a
+    // shot-driven tick firing the frame the trigger was pulled, and a
+    // "universal" tick off the hit-dealt latch that a bullet could never
+    // reach because the shot branch always won first. The latch is now
+    // future-dated to the round's ARRIVAL, so bullets reach the universal
+    // path by arriving on it, an ability's cleave still confirms instantly,
+    // and the mark lands in the same frame as the spark and the sound. The
+    // age guard is what holds a still-flying round's tick back.
+    const double TickNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const double HitAge = TickNow - LastHitDealtTime;
+    if ((HitAge >= 0.0 && HitAge < BreakerHUD::HitTickSeconds) || bPreviewHit)
     {
         // ABSORBED is the THIRD tick state, and it exists because the owner
         // shot a Warden in its armoured front and read "the game is broken"
@@ -418,9 +428,9 @@ void ABreakerPlaytestHUD::DrawHUD()
         // side of the same event — and the GEOMETRY is what separates it from
         // the gold weak-point tick, which is the FIELDPLATE-correct division of
         // labour anyway.
-        const bool bAbsorbed = bPreviewHit || LastShotMitigatedFraction >= BreakerUI::DamageAbsorbedThreshold;
+        const bool bAbsorbed = bPreviewHit || bHitDealtAbsorbed;
         const FLinearColor TickColor = bAbsorbed ? BreakerUI::Orange
-            : (Shot && Shot->bWeakPoint) ? BreakerUI::Gold : BreakerUI::Harm;
+            : bHitDealtWeakPoint ? BreakerUI::Gold : BreakerUI::Harm;
         const float Inner = bAbsorbed ? S(13.0f) : S(6.0f);
         const float Outer = bAbsorbed ? S(23.0f) : S(14.0f);
         const float Diagonal = 0.7071f;
@@ -447,31 +457,6 @@ void ABreakerPlaytestHUD::DrawHUD()
                          Center.X + DX * (Reach - Corner), Center.Y + DY * Reach, TickColor, S(2.5f));
                 DrawLine(Center.X + DX * Reach, Center.Y + DY * Reach,
                          Center.X + DX * Reach, Center.Y + DY * (Reach - Corner), TickColor, S(2.5f));
-            }
-        }
-    }
-    else
-    {
-        // The universal hit tick: any landed damage the player DEALT — an
-        // ability's cleave, a detonation — confirms at the crosshair exactly
-        // as a bullet does. Same geometry as the shot tick so "I hit" is one
-        // mark everywhere; only reached when the shot path above did not
-        // already draw it, so a bullet never ticks twice. DoT ticks are
-        // excluded at the latch.
-        const double HitAge = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - LastHitDealtTime;
-        if (HitAge >= 0.0 && HitAge < BreakerHUD::HitTickSeconds)
-        {
-            const FLinearColor TickColor = bHitDealtWeakPoint ? BreakerUI::Gold : BreakerUI::Harm;
-            const float Inner = S(6.0f);
-            const float Outer = S(14.0f);
-            const float Diagonal = 0.7071f;
-            for (int32 Index = 0; Index < 4; ++Index)
-            {
-                const float DX = (Index & 1) ? 1.0f : -1.0f;
-                const float DY = (Index & 2) ? 1.0f : -1.0f;
-                DrawLine(Center.X + DX * Inner * Diagonal, Center.Y + DY * Inner * Diagonal,
-                         Center.X + DX * Outer * Diagonal, Center.Y + DY * Outer * Diagonal,
-                         TickColor, S(2.0f));
             }
         }
     }
@@ -1637,6 +1622,50 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             }
         }
     }
+
+    // --- Target dummies (ruled with the reaction extraction) ----------------
+    // A looter shooter where you can't tell whether you're doing damage has
+    // no feedback loop, and the gym's own targets had no readout at all. The
+    // CORE of the enemy bar — shield pip, health fill, recent-damage
+    // visibility, distance scaling — over every live dummy, plus its profile
+    // label; no blips, no elite border, no focus line: those are enemy facts.
+    for (TActorIterator<ABreakerTargetDummy> It(World); It; ++It)
+    {
+        const ABreakerTargetDummy* Dummy = *It;
+        if (!Dummy) continue;
+        const float Distance = FVector::Distance(ViewerLocation, Dummy->GetActorLocation());
+        if (Distance > BreakerHUD::EnemyBarMaxDistance) continue;
+        const UAbilitySystemComponent* DummyAbilitySystem = Dummy->GetAbilitySystemComponent();
+        const UBreakerAttributeSet* DummyAttributes = DummyAbilitySystem ? DummyAbilitySystem->GetSet<UBreakerAttributeSet>() : nullptr;
+        if (!DummyAttributes) continue;
+        const float Health = DummyAttributes->GetHealth();
+        const float MaxHealth = DummyAttributes->GetMaxHealth();
+        if (Health <= 0.0f || MaxHealth <= UE_SMALL_NUMBER) continue;
+        const UBreakerCombatComponent* DummyCombat = Dummy->FindComponentByClass<UBreakerCombatComponent>();
+        const bool bRecentlyDamaged = DummyCombat && DummyCombat->GetSecondsSinceDamage() < BreakerHUD::EnemyBarRecentDamageSeconds;
+        if (!bRecentlyDamaged && Distance > BreakerHUD::EnemyBarAlwaysDistance) continue;
+        const FVector Projected = Project(Dummy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), false);
+        if (Projected.Z <= 0.0f) continue;
+        const float DistanceAlpha = FMath::Clamp((Distance - 500.0f) / (BreakerHUD::EnemyBarMaxDistance - 500.0f), 0.0f, 1.0f);
+        const float DistanceScale = FMath::Lerp(1.0f, 0.55f, DistanceAlpha);
+        const float BarW = S(BreakerUI::HudEnemyBarWidth) * DistanceScale;
+        const float BarH = S(BreakerUI::HudEnemyBarHeight) * DistanceScale;
+        const float BarX = Projected.X - BarW * 0.5f;
+        const float BarY = Projected.Y;
+        const float Shield = DummyAttributes->GetShield();
+        const float MaxShield = DummyAttributes->GetMaxShield();
+        if (Shield > 0.0f && MaxShield > UE_SMALL_NUMBER)
+        {
+            const float ShieldH = FMath::Max(BarH * 0.45f, S(2.0f));
+            const float ShieldY = BarY - ShieldH - S(1.0f);
+            DrawRect(BreakerUI::Panel10, BarX, ShieldY, BarW, ShieldH);
+            DrawRect(BreakerUI::Cyan, BarX, ShieldY, BarW * FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f), ShieldH);
+        }
+        DrawRect(BreakerUI::Panel10, BarX, BarY, BarW, BarH);
+        DrawRect(BreakerUI::Harm, BarX, BarY, BarW * FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f), BarH);
+        DrawSpecTextCentered(Dummy->GetProfileLabel(), Projected.X, BarY + BarH + S(3.0f),
+            BreakerUI::TextMuted, 10.0f * DistanceScale);
+    }
 }
 
 void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Character)
@@ -2344,6 +2373,37 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     // hit event cannot provide because it knows nothing about a muzzle.
 }
 
+void ABreakerPlaytestHUD::ScheduleArrivalSound(float DelaySeconds, bool bKill)
+{
+    // Retrigger-cut semantics survive the delay: each scheduled play calls
+    // the same voice, and the newest arrival wins exactly as it does at
+    // zero delay. The timer handle is deliberately per-call and discarded —
+    // a pending arrival must never be cancelled by the next trigger pull,
+    // because its round is still in the air.
+    if (DelaySeconds <= 0.0f)
+    {
+        if (ABreakerSoundDirector* Sound = GetSoundDirector())
+        {
+            if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();
+        }
+        return;
+    }
+    UWorld* World = GetWorld();
+    if (!World) return;
+    TWeakObjectPtr<ABreakerPlaytestHUD> WeakThis(this);
+    FTimerHandle Discarded;
+    World->GetTimerManager().SetTimer(Discarded, FTimerDelegate::CreateLambda([WeakThis, bKill]()
+    {
+        if (ABreakerPlaytestHUD* HUD = WeakThis.Get())
+        {
+            if (ABreakerSoundDirector* Sound = HUD->GetSoundDirector())
+            {
+                if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();
+            }
+        }
+    }), DelaySeconds, false);
+}
+
 void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
 {
     // OVERKILL-INCLUSIVE, display only. Applied damage is clamped to what the
@@ -2356,38 +2416,50 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     const float Shown = Applied > 0.0f ? Applied + Hit.Result.OverkillDamage : Hit.Result.MitigatedDamage;
     if (Shown <= 0.0f) return;
 
-    const UWorld* World = GetWorld();
+    UWorld* World = GetWorld();
     const float Now = World ? World->GetTimeSeconds() : 0.0f;
     const float Raw = Hit.Result.RawDamage;
     const float Mitigated = Raw > UE_SMALL_NUMBER
         ? FMath::Clamp(1.0f - Hit.Result.MitigatedDamage / Raw, 0.0f, 1.0f) : 0.0f;
     const bool bWeak = Hit.bWeakPoint || Hit.Result.bWeakPoint;
 
+    // THE ARRIVAL CLOCK (ruled). The DAMAGE above this line already landed:
+    // hitscan resolves instantly, that rule is untouched, and nothing below
+    // delays a single point of it. What rides the arrival is every SIGNAL
+    // that says "the round landed" — this tick's sound, the crosshair mark,
+    // the floating number, the kill confirm — computed with the SAME
+    // function and the SAME live knobs the tracer and the impact spark
+    // already fly on, so all of them land in the one frame the streak does.
+    // A weapon hit's flight is muzzle-to-impact; an ability's confirm is
+    // instantaneous and stays at zero.
+    float ArrivalDelay = 0.0f;
+    if (!Hit.bFromDoT && Hit.Delivery == EBreakerDamageDelivery::Weapon && BoundWeapon)
+    {
+        ArrivalDelay = BreakerHUD::TracerFlightSeconds(BreakerHUD::LiveTracerFlight(),
+            static_cast<float>((Hit.WorldLocation - BoundWeapon->GetVisualMuzzleLocation()).Size()));
+    }
+    const float ArrivalTime = Now + ArrivalDelay;
+
     // Crosshair confirms, from the same universal feed the numbers ride: an
     // ability's cleave ticks the crosshair exactly as a bullet does. DoT
     // ticks are excluded — a Bleed on three targets is not something the
-    // player just did, and it would strobe the crosshair forever.
+    // player just did, and it would strobe the crosshair forever. The latch
+    // may sit in the FUTURE; every consumer already guards age >= 0.
     if (!Hit.bFromDoT)
     {
-        LastHitDealtTime = Now;
+        LastHitDealtTime = ArrivalTime;
         bHitDealtWeakPoint = bWeak;
-        // The confirm tick, under the same DoT exclusion as the crosshair
-        // and for the same reason. On a killing blow it plays UNDER the kill
-        // sound below — separate voices, and the kill is authored to read
-        // over it.
-        if (ABreakerSoundDirector* Sound = GetSoundDirector())
-        {
-            Sound->PlayHitConfirm();
-        }
+        bHitDealtAbsorbed = Mitigated >= BreakerUI::DamageAbsorbedThreshold;
+        // The confirm tick at arrival. On a killing blow it plays UNDER the
+        // kill sound below — separate voices, and the kill is authored to
+        // read over it.
+        ScheduleArrivalSound(ArrivalDelay, /*bKill*/ false);
     }
     if (Hit.Result.bKilled)
     {
-        LastKillConfirmTime = Now;
+        LastKillConfirmTime = ArrivalTime;
         bKillConfirmWeakPoint = bWeak;
-        if (ABreakerSoundDirector* Sound = GetSoundDirector())
-        {
-            Sound->PlayKill();
-        }
+        ScheduleArrivalSound(ArrivalDelay, /*bKill*/ true);
     }
 
     // MERGE rather than spawn. A shotgun resolves eight pellets as eight hits,
@@ -2418,7 +2490,10 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
         ExistingKey.bCritical = Existing.bCritical;
         ExistingKey.bWeakPoint = Existing.bWeakPoint;
         ExistingKey.bFromDoT = Existing.bFromDoT;
-        if (!BreakerDamageFeed::ShouldMerge(ExistingKey, Existing.Time, IncomingKey, Now)) continue;
+        // Merge windows are measured at ARRIVAL: two pellets of one shot share
+        // an arrival and merge exactly as they did when both were born at the
+        // trigger.
+        if (!BreakerDamageFeed::ShouldMerge(ExistingKey, Existing.Time, IncomingKey, ArrivalTime)) continue;
 
         Existing.Value += Shown;
         // DELIBERATELY NOT `Existing.Time = Now`. That refresh is what made the
@@ -2452,7 +2527,9 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     Number.bWeakPoint = bWeak;
     Number.bFromDoT = Hit.bFromDoT;
     Number.MitigatedFraction = Mitigated;
-    Number.Time = Now;
+    // BORN AT ARRIVAL: the draw skips negative ages, so the number appears
+    // the frame the round lands, beside the spark it belongs to.
+    Number.Time = ArrivalTime;
     Number.bKilled = Hit.Result.bKilled;
     Number.Overkill = Hit.Result.OverkillDamage;
     Number.Lifetime = Hit.Result.bKilled ? BreakerHUD::DamageKillLifetime

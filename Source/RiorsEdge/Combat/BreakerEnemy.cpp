@@ -1,5 +1,7 @@
 #include "Combat/BreakerEnemy.h"
 
+#include "Combat/BreakerHitReactionComponent.h"
+
 #include "Items/BreakerAffixLibrary.h"
 
 #include "AbilitySystemComponent.h"
@@ -145,6 +147,7 @@ ABreakerEnemy::ABreakerEnemy()
     // ANY enemy (Encounter-Design §1.0: modifiers are a field of the taxonomy,
     // not a subclass).
     ModifierComponent = CreateDefaultSubobject<UBreakerEnemyModifierComponent>(TEXT("Modifiers"));
+    HitReaction = CreateDefaultSubobject<UBreakerHitReactionComponent>(TEXT("HitReaction"));
 }
 
 void ABreakerEnemy::BeginPlay()
@@ -153,6 +156,18 @@ void ABreakerEnemy::BeginPlay()
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
+    // The reaction layer paints these six; registration is here rather than
+    // the constructor so a subclass's own repaint has already happened by
+    // the first capture (which is at flash time anyway).
+    if (HitReaction)
+    {
+        for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
+            RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
+        {
+            HitReaction->RegisterPart(Part);
+        }
+        HitReaction->OnDeathPresentationFinished.AddUObject(this, &ABreakerEnemy::HandleDeathPresentationFinished);
+    }
     if (LeashOrigin.IsNearlyZero()) LeashOrigin = GetActorLocation();
     // Captured once, before anything can have scaled them, so Fleetfoot
     // multiplies a base rather than compounding on itself.
@@ -404,9 +419,9 @@ FString ABreakerEnemy::GetEnemyStateLabel() const
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    // Cosmetic death beat first, BEFORE the authority gate: it is client-legal
-    // presentation and a dead server-side pawn must still finish its crumple.
-    UpdateDeathPresentation(DeltaSeconds);
+    // The cosmetic death beat advances in the reaction COMPONENT's own tick
+    // now — client-legal presentation, so a dead server-side pawn still
+    // finishes its crumple with no line here.
     if (!HasAuthority() || !GetWorld()) return;
     if (bDead)
     {
@@ -849,145 +864,32 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
     LastDamageEventTime = Now;
 
     // The body ANSWERS the hit: a one-blink material pulse, gold when the hit
-    // was a weak point. Cosmetic only — nothing above reads it.
-    StartHitFlash(Result.bWeakPoint);
+    // was a weak point. Cosmetic only — nothing above reads it. The pulse
+    // lives in the shared reaction component now (see its header), so the
+    // target dummy answers exactly the same way.
+    if (HitReaction) HitReaction->NotifyHit(Result.bWeakPoint);
 }
 
 // --- Hit / death presentation (cosmetic only) ------------------------------
-
-namespace
-{
-    // All O2 PLACEHOLDER, tuned by eye against capture stills.
-    constexpr float BreakerHitFlashSeconds = 0.07f;
-    constexpr float BreakerDeathPopSeconds = 0.12f;
-    constexpr float BreakerDeathBeatSeconds = 0.45f;
-    constexpr float BreakerDeathBeatWeakPointSeconds = 0.60f;
-    constexpr float BreakerDeathPopScale = 0.12f;
-    constexpr float BreakerDeathPopWeakPointScale = 0.24f;
-    // Ash: near-black with a breath of the body's violet, so the corpse reads
-    // as burnt out rather than as painted black.
-    const FLinearColor BreakerDeathAshColor(0.05f, 0.045f, 0.06f);
-    const FLinearColor BreakerHitFlashColor(1.35f, 1.30f, 1.25f);
-    const FLinearColor BreakerHitFlashWeakPointColor(1.60f, 1.15f, 0.35f);
-}
-
-void ABreakerEnemy::CaptureBodyMaterials()
-{
-    BodyMaterialBases.Reset();
-    for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
-        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
-    {
-        if (!Part) continue;
-        UMaterialInstanceDynamic* Dynamic = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0));
-        if (!Dynamic) continue;
-        // The CURRENT colour, not the constructor's: subclasses repaint their
-        // bodies (the Altered's severance tint, the Warden's plate) and the
-        // restore must return exactly that.
-        FLinearColor Base = FLinearColor::White;
-        Dynamic->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Base);
-        BodyMaterialBases.Emplace(Dynamic, Base);
-    }
-}
-
-void ABreakerEnemy::StartHitFlash(bool bWeakPoint)
-{
-    // Never over the death beat: the crumple owns the materials once it runs.
-    if (bDead || DeathPresentationElapsed >= 0.0f) return;
-    // Capture only from a rested body, so a flash landing mid-flash cannot
-    // capture the flash colour as the base and stick the body white.
-    if (!bHitFlashActive) CaptureBodyMaterials();
-    bHitFlashActive = true;
-    const FLinearColor Flash = bWeakPoint ? BreakerHitFlashWeakPointColor : BreakerHitFlashColor;
-    for (const auto& Pair : BodyMaterialBases)
-    {
-        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Flash);
-    }
-    GetWorldTimerManager().SetTimer(HitFlashTimer, this, &ThisClass::EndHitFlash, BreakerHitFlashSeconds, false);
-}
-
-void ABreakerEnemy::EndHitFlash()
-{
-    if (!bHitFlashActive) return;
-    bHitFlashActive = false;
-    for (const auto& Pair : BodyMaterialBases)
-    {
-        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
-    }
-}
+// The flash, the two-beat death and the revive restore moved verbatim into
+// UBreakerHitReactionComponent. What stays here is what is the ENEMY'S: which
+// parts get painted (registered in BeginPlay), and what vanishes when the
+// crumple lands.
 
 void ABreakerEnemy::StartDeathPresentation(bool bWeakPointKill)
 {
-    // A flash in flight would have captured true bases; settle it first so the
-    // beat's own capture below is honest.
-    GetWorldTimerManager().ClearTimer(HitFlashTimer);
-    EndHitFlash();
-    CaptureBodyMaterials();
-    DeathBaseScale = GetActorScale3D();
-    bDeathBeatWeakPoint = bWeakPointKill;
-    DeathPresentationElapsed = 0.0f;
+    if (HitReaction) HitReaction->StartDeathPresentation(bWeakPointKill);
+    else SetBodyVisible(false);
 }
 
-void ABreakerEnemy::UpdateDeathPresentation(float DeltaSeconds)
+void ABreakerEnemy::HandleDeathPresentationFinished()
 {
-    if (DeathPresentationElapsed < 0.0f) return;
-    DeathPresentationElapsed += DeltaSeconds;
-    const float Total = bDeathBeatWeakPoint ? BreakerDeathBeatWeakPointSeconds : BreakerDeathBeatSeconds;
-    if (DeathPresentationElapsed >= Total)
-    {
-        SetBodyVisible(false);
-        ResetDeathPresentation();
-        return;
-    }
-
-    const FLinearColor Flash = bDeathBeatWeakPoint ? BreakerHitFlashWeakPointColor : BreakerHitFlashColor;
-    if (DeathPresentationElapsed <= BreakerDeathPopSeconds)
-    {
-        // Beat one, THE POP: the whole assembly (actor scale, so subclass
-        // dressing and the elite multiplier ride along) swells and lands back,
-        // painted in the flash colour. Weak-point kills pop harder and gold.
-        const float Alpha = DeathPresentationElapsed / BreakerDeathPopSeconds;
-        const float PopScale = bDeathBeatWeakPoint ? BreakerDeathPopWeakPointScale : BreakerDeathPopScale;
-        SetActorScale3D(DeathBaseScale * (1.0f + PopScale * FMath::Sin(Alpha * PI)));
-        for (const auto& Pair : BodyMaterialBases)
-        {
-            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Flash);
-        }
-    }
-    else
-    {
-        // Beat two, THE CRUMPLE: squash toward the ground, spreading slightly,
-        // while the flash colour burns down to ash. Ease-in on the squash so
-        // the collapse accelerates like a fall rather than a slide.
-        const float Alpha = FMath::Clamp(
-            (DeathPresentationElapsed - BreakerDeathPopSeconds) / FMath::Max(Total - BreakerDeathPopSeconds, KINDA_SMALL_NUMBER),
-            0.0f, 1.0f);
-        const float Eased = Alpha * Alpha;
-        const float SquashZ = FMath::Max(0.08f, 1.0f - Eased);
-        const float SpreadXY = 1.0f + 0.30f * Eased;
-        SetActorScale3D(DeathBaseScale * FVector(SpreadXY, SpreadXY, SquashZ));
-        const FLinearColor Burn = FMath::Lerp(Flash, BreakerDeathAshColor, Eased);
-        for (const auto& Pair : BodyMaterialBases)
-        {
-            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Burn);
-        }
-    }
+    SetBodyVisible(false);
 }
 
 void ABreakerEnemy::ResetDeathPresentation()
 {
-    // Settle any hit flash first; its own restore path handles the colours.
-    GetWorldTimerManager().ClearTimer(HitFlashTimer);
-    EndHitFlash();
-    if (DeathPresentationElapsed < 0.0f) return;
-    DeathPresentationElapsed = -1.0f;
-    // Scale is only ever touched by the beat, so it is only restored when a
-    // beat ran — an elite's authored scale must never be stamped with the
-    // default just because this was called defensively.
-    SetActorScale3D(DeathBaseScale);
-    for (const auto& Pair : BodyMaterialBases)
-    {
-        if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
-    }
+    if (HitReaction) HitReaction->ResetDeathPresentation();
 }
 
 void ABreakerEnemy::GrantExperience()

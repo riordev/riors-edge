@@ -3,7 +3,9 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerHitReactionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
@@ -52,6 +54,7 @@ ABreakerTargetDummy::ABreakerTargetDummy()
     AbilitySystem->SetIsReplicated(true);
     Attributes = CreateDefaultSubobject<UBreakerAttributeSet>(TEXT("Attributes"));
     Combat = CreateDefaultSubobject<UBreakerCombatComponent>(TEXT("Combat"));
+    HitReaction = CreateDefaultSubobject<UBreakerHitReactionComponent>(TEXT("HitReaction"));
 }
 
 void ABreakerTargetDummy::BeginPlay()
@@ -59,8 +62,38 @@ void ABreakerTargetDummy::BeginPlay()
     Super::BeginPlay();
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
+    Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
+    // The flash paints dynamic material instances, and a bare SetStaticMesh
+    // carries none — without this the dummy's reaction layer would be wired
+    // and silently paint nothing, the exact no-op-instrument shape this
+    // project keeps finding. Same stock-material pattern as the zone
+    // footprint; near-white keeps the dummy's current look.
+    if (BodyVisual)
+    {
+        if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr,
+            TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+        {
+            if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Base, BodyVisual))
+            {
+                Dynamic->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.84f, 0.88f));   // O2 PLACEHOLDER
+                BodyVisual->SetMaterial(0, Dynamic);
+            }
+        }
+    }
+    if (HitReaction)
+    {
+        HitReaction->RegisterPart(BodyVisual);
+        HitReaction->OnDeathPresentationFinished.AddUObject(this, &ABreakerTargetDummy::HandleDeathBeatFinished);
+    }
     MotionOrigin = GetActorLocation();
     ConfigureProfile(Profile);
+}
+
+void ABreakerTargetDummy::HandleDamageReceived(const FBreakerDamageResult& Result)
+{
+    if (Result.HealthDamage <= 0.0f && Result.ShieldDamage <= 0.0f) return;
+    bLastHitWasWeakPoint = Result.bWeakPoint;
+    if (HitReaction) HitReaction->NotifyHit(Result.bWeakPoint);
 }
 
 UAbilitySystemComponent* ABreakerTargetDummy::GetAbilitySystemComponent() const { return AbilitySystem; }
@@ -98,9 +131,25 @@ void ABreakerTargetDummy::Tick(float DeltaSeconds)
 
 void ABreakerTargetDummy::HandleDeath()
 {
+    // Collision dies immediately — a corpse mid-crumple is not a target —
+    // but the body stays visible for the death beat, then hides when the
+    // crumple lands (HandleDeathBeatFinished). The old path vanished the
+    // dummy the same frame it died, which read as deletion, not a kill.
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    if (HitReaction)
+    {
+        HitReaction->StartDeathPresentation(bLastHitWasWeakPoint);
+    }
+    else
+    {
+        HandleDeathBeatFinished();
+    }
+}
+
+void ABreakerTargetDummy::HandleDeathBeatFinished()
+{
     BodyVisual->SetVisibility(false, true);
     FTimerHandle RespawnTimer;
     GetWorldTimerManager().SetTimer(RespawnTimer, this, &ThisClass::RespawnDummy, RespawnDelay, false);

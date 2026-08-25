@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "GameFramework/Actor.h"
 #include "BreakerTargetDummy.generated.h"
 
@@ -39,6 +40,11 @@ protected:
     virtual void Tick(float DeltaSeconds) override;
     UFUNCTION() void HandleDeath();
     UFUNCTION() void RespawnDummy();
+    // The dummy ANSWERS hits now (ruled): the same reaction component the
+    // enemies carry — flash, death pop and crumple — without inheriting an
+    // enemy, because a dummy with AI stops being a dummy.
+    UFUNCTION() void HandleDamageReceived(const FBreakerDamageResult& Result);
+    void HandleDeathBeatFinished();
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> BodyCollision;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> BodyVisual;
@@ -48,6 +54,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UBreakerHitReactionComponent> HitReaction;
+    bool bLastHitWasWeakPoint = false;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Playtest", meta=(ClampMin="0.1")) float RespawnDelay = 2.5f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Playtest") EBreakerTargetProfile Profile = EBreakerTargetProfile::Health;
     FVector MotionOrigin = FVector::ZeroVector;

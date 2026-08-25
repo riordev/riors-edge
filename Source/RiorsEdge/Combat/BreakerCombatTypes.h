@@ -263,4 +263,8 @@ struct RIORSEDGE_API FBreakerHitContext
     UPROPERTY(BlueprintReadOnly) bool bWeakPoint = false;
     UPROPERTY(BlueprintReadOnly) EBreakerDamageFamily DamageFamily = EBreakerDamageFamily::Physical;
     UPROPERTY(BlueprintReadOnly) FVector WorldLocation = FVector::ZeroVector;
+    // Carried from the request so presentation can put weapon hits on the
+    // round's ARRIVAL clock (the HUD's ruling) while ability hits confirm
+    // immediately. FillSourcePools stamps it on every real damage path.
+    UPROPERTY(BlueprintReadOnly) EBreakerDamageDelivery Delivery = EBreakerDamageDelivery::Weapon;
 };

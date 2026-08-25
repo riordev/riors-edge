@@ -152,6 +152,9 @@ private:
     // ride (OnShot, OnHitDealt), through the same lazily-spawned cosmetic
     // sibling; see BreakerSoundDirector.h.
     ABreakerSoundDirector* GetSoundDirector();
+    // Plays the hit-confirm (or kill) sound on the arrival clock: now for a
+    // zero delay, through a one-shot timer for a round still in flight.
+    void ScheduleArrivalSound(float DelaySeconds, bool bKill);
     void DrawDamageNumbers();
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
@@ -245,6 +248,9 @@ private:
     // strobe the crosshair forever over nothing the player just did.
     double LastHitDealtTime = -1000.0;
     bool bHitDealtWeakPoint = false;
+    // The absorbed read, latched per hit off the mitigated fraction so the
+    // one unified crosshair tick can tell all three of its states.
+    bool bHitDealtAbsorbed = false;
     double LastKillConfirmTime = -1000.0;
     bool bKillConfirmWeakPoint = false;
 

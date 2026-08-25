@@ -295,6 +295,7 @@ void UBreakerCombatComponent::DispatchHitDealt(const FBreakerDamageRequest& Requ
     Context.bFromDoT = Request.bIsDamageOverTime;
     Context.bWeakPoint = Result.bWeakPoint;
     Context.DamageFamily = Request.DamageFamily;
+    Context.Delivery = Request.Delivery;
     // The IMPACT point when the request carries one (weapons trace real hits,
     // projectiles resolve at a real location), so the HUD's floating number
     // draws where the shot landed. The victim's pivot is only the FALLBACK for
