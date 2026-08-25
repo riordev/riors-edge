@@ -27,6 +27,7 @@
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Interaction/BreakerNPC.h"
@@ -1029,6 +1030,49 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 // heights, the same fix the ammo pair and the resource row already carry, so a
 // change to either size cannot drift them apart again.
 // --------------------------------------------------------------------------
+const ABreakerBossEnemy* ABreakerPlaytestHUD::ResolveEncounterBoss()
+{
+    // Cached across the encounter. The caller has already asked the game mode
+    // whether a boss is alive (two pointer checks), so the scan below runs
+    // only on a cold cache — in practice once, on the frame the boss appears.
+    // ABreakerGameMode::ActiveBoss is private with no accessor, so the HUD
+    // finds its own; if that accessor is ever published this whole function
+    // deletes itself.
+    if (const ABreakerBossEnemy* Cached = CachedEncounterBoss.Get())
+    {
+        if (!Cached->IsDeadEnemy()) return Cached;
+    }
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+    for (TActorIterator<ABreakerBossEnemy> It(World); It; ++It)
+    {
+        const ABreakerBossEnemy* Boss = *It;
+        if (!Boss || Boss->IsDeadEnemy()) continue;
+        CachedEncounterBoss = Boss;
+        return Boss;
+    }
+    CachedEncounterBoss = nullptr;
+    return nullptr;
+}
+
+// How many phases the fight HAS, read off the enum rather than written down.
+// THREE NUMBERS DISAGREED ABOUT THIS (O156): the readability pack's Boss row
+// labels itself "phase 2 of 4" while the readout it draws reads "PHASE 3 / 4",
+// and the game ships THREE — Deployment, Suppression, Commitment, gated at
+// 100/66/33. The artwork is wrong twice and is not the authority; the enum is.
+// Reflected rather than hard-coded so a fourth phase updates this readout by
+// existing, which is the only way a count in the UI cannot drift from the
+// count in the fight. NumEnums() includes UHT's generated _MAX, hence the -1.
+static int32 BreakerHUDBossPhaseCount()
+{
+    static const int32 Count = []
+    {
+        const UEnum* PhaseEnum = StaticEnum<EBreakerBossPhase>();
+        return PhaseEnum ? FMath::Max(1, PhaseEnum->NumEnums() - 1) : 1;
+    }();
+    return Count;
+}
+
 void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
 {
     // THE ENCOUNTER READOUT. At a hundred enemies the player tracks the
@@ -1052,17 +1096,40 @@ void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
     int32 KnownTotal = -1;
 
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
-    const bool bPreview = IsCapturePreview() && (!GameMode || GameMode->GetCurrentWave() <= 0);
-    if (!bPreview && (!GameMode || GameMode->GetCurrentWave() <= 0)) return;
+    // THE BOSS ROW OUTRANKS THE WAVE ROW. A boss encounter spawns adds, so
+    // both states are live at once and one row has to win; the boss is the
+    // fight. IsBossAlive() is two pointer checks, so this costs nothing on
+    // every frame of the game that has no boss in it.
+    const ABreakerBossEnemy* Boss = (GameMode && GameMode->IsBossAlive()) ? ResolveEncounterBoss() : nullptr;
+    const bool bPreview = !Boss && IsCapturePreview() && (!GameMode || GameMode->GetCurrentWave() <= 0);
+    if (!Boss && !bPreview && (!GameMode || GameMode->GetCurrentWave() <= 0)) return;
 
     // The preview CYCLES the three shapes this row can take -- the owner's own
     // screenshot, a two-digit count with its pack bar (the widest active
     // case), and the cleared state with its em dash -- so a capture run
     // photographs all of them instead of proving one string fits.
     const int32 PreviewCase = bPreview
-        ? FMath::Abs(FMath::FloorToInt(static_cast<float>(GetWorld()->GetTimeSeconds()) / 2.0f)) % 3 : 0;
-    bActive = bPreview ? PreviewCase != 2 : GameMode->IsWaveActive();
-    if (!bPreview)
+        ? FMath::Abs(FMath::FloorToInt(static_cast<float>(GetWorld()->GetTimeSeconds()) / 2.0f)) % 4 : 0;
+    bActive = bPreview ? PreviewCase != 2 : (Boss != nullptr || GameMode->IsWaveActive());
+    if (Boss)
+    {
+        // A5, THE BOSS PHASE READOUT. Phase is a real exposed value on both
+        // halves — ABreakerBossEnemy::GetPhase() for the numerator, the enum's
+        // own cardinality for the denominator — so O120 is satisfied and the
+        // fraction is drawn rather than the bare count. Neither number is the
+        // artwork's: the pack says four phases in two different ways and the
+        // fight has three.
+        //
+        // NO BAR IN THIS ROW, deliberately. The boss already carries a
+        // world-space health bar, and BreakerHealthBands gives Boss EIGHT
+        // segments — a second bar here would be a second owner of the same
+        // question, which is the exact failure the bar's own split was for.
+        // The row carries WHICH PHASE; the body carries how much health.
+        Title = TEXT("BOSS");
+        Status = FString::Printf(TEXT("PHASE %d / %d"),
+            static_cast<int32>(Boss->GetPhase()) + 1, BreakerHUDBossPhaseCount());
+    }
+    else if (!bPreview)
     {
         Title = FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave());
         AliveCount = GameMode->GetWaveEnemiesAlive();
@@ -1071,10 +1138,18 @@ void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
     }
     else
     {
+        // Case 3 is the BOSS row, so a capture run photographs it without a
+        // boss having to be spawned and driven to a phase. Its phase count
+        // comes from the same enum the live row reads, never a literal — a
+        // preview that disagreed with the game would be an instrument
+        // returning a false negative.
         Title = PreviewCase == 0 ? FString(TEXT("WAVE 01"))
-            : PreviewCase == 1 ? FString(TEXT("WAVE 12")) : FString(TEXT("WAVE 07"));
+            : PreviewCase == 1 ? FString(TEXT("WAVE 12"))
+            : PreviewCase == 2 ? FString(TEXT("WAVE 07")) : FString(TEXT("BOSS"));
         Status = PreviewCase == 0 ? FString(TEXT("4 HOSTILE"))
-            : PreviewCase == 1 ? FString(TEXT("24 HOSTILE")) : FString(TEXT("CLEAR — F4"));
+            : PreviewCase == 1 ? FString(TEXT("24 HOSTILE"))
+            : PreviewCase == 2 ? FString(TEXT("CLEAR — F4"))
+            : FString::Printf(TEXT("PHASE %d / %d"), 2, BreakerHUDBossPhaseCount());
         if (PreviewCase == 1) { AliveCount = 24; KnownTotal = 40; }
     }
 
@@ -1124,8 +1199,16 @@ void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
 // thing a player needs from this field is "how far along am I".
 //
 // COST. It iterates nothing. DrawEnemyHealthBars already walks every enemy
-// once per frame and now fills EnemyBlips as it goes; this reads that array.
-// The array is a member, so after the first few frames it never allocates.
+// once per frame and fills EnemyBlips as it goes; this reads that array. The
+// array is a member, so after the first few frames it never allocates.
+//
+// CONSUMER END OF A CROSS-LANE CONTRACT (O155). That producer is NOT in this
+// file and is not this lane's: DrawEnemyHealthBars lives in
+// Combat/BreakerEnemyHealthBars.cpp and belongs to the COMBAT lane. This read
+// depends on it having run FIRST this frame — DrawHUD's call order is what
+// guarantees that, and nothing else does. A silent breakage here draws last
+// frame's hostiles rather than failing, so a change to EnemyBlips from either
+// side is a declared crossing.
 // --------------------------------------------------------------------------
 void ABreakerPlaytestHUD::DrawMinimap(const ABreakerCharacter* Character, float X, float Y, float Width, float Height)
 {

@@ -194,6 +194,16 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const ABreakerEnemy* Enemy = *It;
         if (!Enemy) continue;
 
+        // PRODUCER END OF A CROSS-LANE CONTRACT (O155). This fill belongs to
+        // the COMBAT lane; the consumer is the UI lane's DrawMinimap, which
+        // iterates nothing and reads exactly what this loop leaves behind.
+        // The ordering is load-bearing — the fill must run before the read in
+        // the same frame or the map draws last frame's hostiles — and neither
+        // the compiler nor the suite can see it break, because the two halves
+        // are members of one class. A change to the shape, the meaning or the
+        // fill order of EnemyBlips is a declared crossing: tell the UI lane
+        // before it lands.
+        //
         // Collected BEFORE the health-bar culls, because the two readouts want
         // different ranges: a bar is pointless past 50 m, and a minimap is
         // mostly useful for the hostiles that are further away than that.

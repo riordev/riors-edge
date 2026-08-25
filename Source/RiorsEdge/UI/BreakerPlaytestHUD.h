@@ -131,6 +131,12 @@ private:
     // The encounter readout (was DrawWaveBanner): which encounter, how much
     // remains, and — only over a KNOWN total, per O120 — the pack bar.
     void DrawEncounterReadout(const FVector2D& Center);
+    // The live boss, resolved for the readout's boss row and cached across the
+    // encounter. Only ever consulted when the game mode already says a boss is
+    // alive, so the actor scan behind it runs about once per encounter rather
+    // than once per frame. Weak, because the boss dying is the normal exit.
+    const class ABreakerBossEnemy* ResolveEncounterBoss();
+    TWeakObjectPtr<const class ABreakerBossEnemy> CachedEncounterBoss;
     // ---- Density instruments (see DrawHUD) --------------------------------
     bool bHudStressSpawned = false;
     double HudCostWindowStart = 0.0;
@@ -291,6 +297,13 @@ private:
     // A member rather than a local so the allocation happens on the first few
     // frames and never again: DrawHUD runs every frame and a TArray built in
     // it is a per-frame allocation by definition.
+    //
+    // THE TWO HALVES HAVE DIFFERENT OWNERS (O155). The fill is the COMBAT
+    // lane's, in Combat/BreakerEnemyHealthBars.cpp; the read is the UI lane's,
+    // in DrawMinimap below. This is the shared surface the split left behind —
+    // a producer/consumer contract that is a member variable, so there is no
+    // header to publish and no compile error when it breaks. Changing its
+    // shape, its meaning or its fill order is a declared crossing.
     TArray<FBreakerHUDMapBlip> EnemyBlips;
     // Screen-space rectangles (CentreX, TopY, Width, Height) already claimed by
     // an enemy label this frame, so a second enemy projecting to nearly the
