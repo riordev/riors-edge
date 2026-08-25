@@ -933,6 +933,10 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     FirstDamageTime = -1.0;
     LastDamageEventTime = -1.0;
     EngagedSeconds = 0.0f;
+    // TargetBandBroken's bit is a statement about the PREVIOUS HIT, and on a
+    // reused body the previous hit belonged to a different life — without
+    // this, the first hit on a revived enemy inherits a rider it didn't earn.
+    if (Combat) Combat->ClearBandBreakTracking();
     LastAttackTime = -1000.0;
     WeaveTime = 0.0f;
     LungeStartTime = -1000.0;
