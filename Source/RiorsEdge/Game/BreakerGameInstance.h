@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Game/BreakerRiftDefinition.h"
 #include "BreakerGameInstance.generated.h"
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,29 @@ public:
     // Where the player is headed. Read once on arrival so the game mode knows
     // whether it is building a hub or a gym, then left alone.
     UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FName PendingDestinationId;
+
+    // The rift being travelled to — the data model the loading screen wears
+    // (see BreakerRiftDefinition.h). TRANSIENT TRAVEL STATE like the two
+    // fields above, not a second save system: set at the door, read by the
+    // destination's build, gone with the session. Unset (AreaLevel 0) keeps
+    // every legacy path on the game mode's GymAreaLevel dev fallback.
+    UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FBreakerRiftDefinition PendingRift;
+
+    // The travel loading screen: the flat Fieldplate plate, shown over every
+    // Anchor/Gym load. The widget rebuild (live fields) comes later; the
+    // plate alone replaces a black hitch with a place.
+    virtual void Init() override;
+
+private:
+    void HandlePreLoadMap(const FString& MapName);
+    // The plate texture, loaded from the raw PNG at first travel and kept
+    // for the session. Runtime-loaded rather than an imported .uasset: no
+    // DXT (the flat panels band), no mips, sRGB — exactly the pack's import
+    // demands, satisfied by construction.
+    UPROPERTY(Transient) TObjectPtr<class UTexture2D> LoadingPlateTexture;
+    TSharedPtr<struct FSlateBrush> LoadingPlateBrush;
+
+public:
 
     // ---- Map identity ---------------------------------------------------
     // The map names are the contract between the level assets and the code.

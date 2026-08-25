@@ -199,6 +199,19 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         return;
     }
 
+    // THE RIFT DEFINITION OWNS THE AREA LEVEL when a travel carried one:
+    // adopted once per map build, before anything derives from it. The
+    // EditAnywhere GymAreaLevel remains the dev fallback for sessions with
+    // no chosen rift — PIE drop-ins, the capture harness — which is the wall
+    // between "a tunable on the game mode" and "a property of the place".
+    if (const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>())
+    {
+        if (Session->PendingRift.IsSet())
+        {
+            GymAreaLevel = Session->PendingRift.EffectiveAreaLevel();
+        }
+    }
+
     BuildFieldFrame(NewPlayer->GetPawn());
 
     // The Anchor builds the hub and stops. No gym field, no encounter, no

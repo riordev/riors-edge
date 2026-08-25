@@ -361,6 +361,11 @@ protected:
     // a LOOT bonus only and deliberately does not touch the chassis, which
     // takes its elite ratio from the rank table instead.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) int32 EliteDropItemLevelBonus = 5;   // O2 PLACEHOLDER
+public:
+    // The rift readout derives its item-level ceiling from the same authored
+    // bonus ApplyChassis hands GrantLoot — read here, never transcribed.
+    UFUNCTION(BlueprintPure, Category="Enemy") int32 GetEliteDropItemLevelBonus() const { return EliteDropItemLevelBonus; }
+protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bDropsLoot = true;
     // Wave-mode enemies die for good instead of recycling.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") bool bRespawns = true;
