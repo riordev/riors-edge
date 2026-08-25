@@ -145,7 +145,7 @@ Numbers are permanent and never reused.
 
 **O81** — The top pack-composition tier is renamed off the canon location's word.
 
-**O82** — The death budget favours solo: solo carries two, and a party's scales with its size.
+**O82** — The death budget is endgame-only and favours solo: an endgame instance grants a solo character two deaths and scales a party's with its size. Campaign respawn is unlimited from the start of the tileset, and a solo death inside a boss encounter resets the encounter rather than spending a budget.
 
 **O83** — A campaign rift's enemy level is clamped to a small margin above the player's.
 
@@ -206,6 +206,12 @@ Numbers are permanent and never reused.
 **O118** — A gate and the budget it gates against are ONE NUMBER IN TWO PLACES. Every investment gate states the budget it was priced against, and a ruling that moves a budget moves every gate keyed to it in the same commit. Twice a budget moved and the gate did not, and both times the result was content no player could buy behind a green suite: six branch keystones, then all fifteen doctrine keystones needing 11 against a wallet of 8. Doctrine trees therefore carry NO gate — picking a smaller number only re-arms it for the next budget change — and their depth is the per-tier gate, which is derived rather than pinned. `Progression.TreeDepthIsReachable` walks every tree against its own grant and is the standing check; it exists before Core's atlas does, on purpose.
 
 **O120** — Loading progress is never a percentage. The slice streams, so a number would be a guess, and a bar that stalls at 90% costs more trust than no bar at all: the loading screen's animations stay indeterminate and the stage line in words is the honest signal.
+
+**O121** — A boss encounter that grows past a few minutes takes a checkpoint instead of a reset. The reset is fair only because O18 puts a boss at twenty to forty-five seconds, so the encounter's length is what licenses the rule.
+
+**O122** — A campaign rift is entered freely and an endgame rift is consumable. A death limit is a stake only where re-entry costs something, so the two rules ship together or the limit is a loading screen.
+
+**O123** — The death allowance field is always present and reads its mode: campaign prints UNLIMITED, endgame prints the count remaining.
 
 **O119** — The doctrine cornerstone gate is REMOVED, not repriced, and the keystone is an ordinary tier-4 node at cost 2. `CornerstoneInvestmentGate` was 8 points spent in the tree against a wallet of 8, so all fifteen keystones needed 11 and none was purchasable. Picking a smaller value only re-arms the same failure at the next budget change, so doctrine trees carry no cornerstone gate at all — `MakeTree` zeroes it by currency, in one place rather than fifteen — and the keystone keeps `bCornerstone` because that flag is what sites the ultimate's rewrite and what O37 gates on commitment. Cost 2 rather than 3 makes every doctrine node cost two points to max, so eight divides into four picks with nothing stranded. Keystone-XOR-tier-4 was an artifact of the same arithmetic and does not survive it. This ruling replaces the expected-red entry that recorded the defect; the standing check is `Progression.TreeDepthIsReachable`, and the general rule is O118.
 

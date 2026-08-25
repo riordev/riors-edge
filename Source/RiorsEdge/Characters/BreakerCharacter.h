@@ -344,6 +344,11 @@ private:
     void OpenMenuScreenForCapture(const FString& ScreenName);
     UFUNCTION() void HandleShotCosmetics(const FBreakerShotResult& Shot);
     UFUNCTION() void HandlePlayerDeath();
+    // O82 (amended): the campaign respawn. After the death beat, back to the
+    // tileset start with vitals and ammunition restored — the WORLD is left
+    // standing (F1 remains the dev reset that rebuilds it), except a live
+    // boss encounter, which resets whole per the ruling.
+    void RespawnAtTilesetStart();
     // --- Class-resource event wiring (the T7 step-2 call sites) ------------
     // Each handler fans one real combat/weapon event out to whichever resource
     // loop is live for this character's class; the loops themselves stay
@@ -370,6 +375,16 @@ private:
 
     FTransform PlaytestSpawnTransform;
     float FallKillZ = -100000.0f;
+    // The death beat: input dead, HUD reads REDEPLOYING, then the respawn.
+    // Long enough to register as a consequence, short enough that unlimited
+    // campaign respawn stays a rhythm rather than a punishment. O2 PLACEHOLDER.
+    float RespawnDelaySeconds = 2.0f;
+    bool bRespawnPending = false;
+    FTimerHandle RespawnTimer;
+public:
+    // The HUD's read for the death beat's own line.
+    bool IsAwaitingRespawn() const { return bRespawnPending; }
+private:
     UPROPERTY() TObjectPtr<UBreakerQuestJournal> Quests;
     float LookSensitivity = 1.0f;
     bool bInvertLookY = false;

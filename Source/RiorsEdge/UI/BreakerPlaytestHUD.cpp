@@ -358,6 +358,16 @@ void ABreakerPlaytestHUD::DrawHUD()
         return;
     }
 
+    // The death beat (O82 campaign respawn): input is dead and the respawn
+    // timer is running, so the one honest thing to draw is what happens
+    // next. Dying with nothing on screen read as a bug in the first
+    // playtest; dying with this line reads as a rule.
+    if (Character->IsAwaitingRespawn())
+    {
+        DrawSpecTextCentered(TEXT("REDEPLOYING — FROM THE TILESET START"),
+            Center.X, Center.Y - S(40.0f), BreakerUI::Harm, 16.0f);
+    }
+
     TickCapturePreview(Character);
 
     const UBreakerWeaponComponent* Weapon = Character->GetWeapon();

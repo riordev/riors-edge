@@ -22,6 +22,19 @@
 // disagree with what the game actually spawns. Do not add authored copies
 // of derivable numbers.
 // ---------------------------------------------------------------------------
+// Which death rule a rift runs under (O82, amended). Campaign: unlimited
+// respawn from the tileset start, boss deaths reset the encounter. Endgame:
+// the death budget — two for a solo character — PARKED behind O122's other
+// half: no decrement may be wired until endgame rifts are consumable,
+// because a limit on a free instance kicks the player out of a door they
+// immediately walk back through.
+UENUM(BlueprintType)
+enum class EBreakerRiftTier : uint8
+{
+    Campaign,
+    Endgame,
+};
+
 USTRUCT(BlueprintType)
 struct RIORSEDGE_API FBreakerRiftDefinition
 {
@@ -39,6 +52,11 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     // fallback.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift", meta=(ClampMin="0", ClampMax="100"))
     int32 AreaLevel = 0;
+
+    // Which death rule this rift runs under. Every rift today is Campaign;
+    // Endgame arrives with O122's consumable entry.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rift")
+    EBreakerRiftTier Tier = EBreakerRiftTier::Campaign;
 
     bool IsSet() const { return AreaLevel > 0; }
     int32 EffectiveAreaLevel() const { return UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel); }
@@ -79,5 +97,22 @@ public:
     {
         return UBreakerMonsterChassisLibrary::GetChassisDamage(AreaLevel, Params)
             / FMath::Max(UBreakerMonsterChassisLibrary::GetChassisDamage(1, Params), KINDA_SMALL_NUMBER);
+    }
+
+    // O82: what an endgame instance grants a solo character. The party
+    // scaling and the decrement are both parked behind O122's consumable
+    // entry; this constant exists so the readout below and the future
+    // budget spend read one number.
+    static constexpr int32 SoloEndgameDeathBudget = 2;
+
+    // O123: the death-allowance field is ALWAYS present and reads its mode —
+    // campaign prints UNLIMITED, endgame prints the count remaining. Never
+    // hide it and never lay it out conditionally; only the value moves.
+    UFUNCTION(BlueprintPure, Category="Rift")
+    static FString GetDeathAllowanceReadout(EBreakerRiftTier Tier, int32 EndgameDeathsRemaining)
+    {
+        return Tier == EBreakerRiftTier::Campaign
+            ? FString(TEXT("UNLIMITED"))
+            : FString::Printf(TEXT("%d REMAINING"), FMath::Max(EndgameDeathsRemaining, 0));
     }
 };

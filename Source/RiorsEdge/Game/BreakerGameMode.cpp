@@ -387,6 +387,27 @@ bool ABreakerGameMode::IsBossAlive() const
     return IsValid(ActiveBoss) && !ActiveBoss->IsDeadEnemy();
 }
 
+void ABreakerGameMode::ResetBossEncounter()
+{
+    // O82 (amended): a solo death inside a boss encounter resets the
+    // encounter rather than spending a budget — the dead boss progress is
+    // the death's whole price in campaign.
+    //
+    // O121, AND WHY IT LIVES HERE TOO: the full reset is fair ONLY because
+    // O18 puts a boss at twenty to forty-five seconds — losing that much
+    // progress is a beat, not an evening. THE ENCOUNTER'S LENGTH IS WHAT
+    // LICENSES THIS RULE. Anyone lengthening a boss fight past a few
+    // minutes — more phases, a longer order cadence, a second health bar —
+    // is obliged by O121 to replace this reset with a checkpoint, and this
+    // comment exists because the TTK figure lives in a different file from
+    // the death rule and nothing else connects them.
+    if (!IsBossAlive()) return;
+    UE_LOG(LogTemp, Display, TEXT("[BreakerGym] boss encounter RESET on player death (O82): the Field Marshal respawns whole."));
+    ActiveBoss->Destroy();
+    ActiveBoss = nullptr;
+    SpawnBossTest();
+}
+
 void ABreakerGameMode::SpawnBossTest()
 {
     UWorld* World = GetWorld();

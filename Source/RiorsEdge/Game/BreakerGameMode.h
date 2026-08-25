@@ -229,6 +229,9 @@ public:
     // console command backs it up.
     UFUNCTION(BlueprintCallable, Category="Playtest|Boss") void SpawnBossTest();
     UFUNCTION(BlueprintPure, Category="Playtest|Boss") bool IsBossAlive() const;
+    // O82: a campaign death during a live boss encounter resets it whole.
+    // O121's length dependency is recorded at the implementation.
+    UFUNCTION(BlueprintCallable, Category="Playtest|Boss") void ResetBossEncounter();
     UFUNCTION() void HandleBossDefeated();
 
     // The boss needs ±1900 cm of clear ground for its gallery offsets and

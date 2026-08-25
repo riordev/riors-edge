@@ -1179,10 +1179,61 @@ void ABreakerCharacter::PoseArm(UStaticMeshComponent* Forearm, UStaticMeshCompon
 
 void ABreakerCharacter::HandlePlayerDeath()
 {
-    // Death zeroes Grit BEFORE the playtest reset restores vitals: no banking
-    // through a death and no free Hold on respawn (Class-Kits-Tank §1.4).
+    // Death zeroes Grit BEFORE anything restores vitals: no banking through a
+    // death and no free Hold on respawn (Class-Kits-Tank §1.4).
     if (Grit) Grit->NotifyDeath();
-    ResetPlaytest();
+
+    // O82 (amended): CAMPAIGN RESPAWN, UNLIMITED, FROM THE TILESET START.
+    // Death used to call ResetPlaytest() — the F1 dev reset — which rebuilt
+    // every target in the field and wiped the session telemetry on the way:
+    // a dev tool wearing a death's clothes. A campaign death now costs a
+    // beat and the walk back, and the world stays exactly as you left it.
+    // The endgame death budget is a different mode entirely and is parked
+    // behind O122's consumable-entry half — nothing here spends anything.
+    // Solo-only by design: the party layer does not exist, and a revive is
+    // additive later without changing any of this.
+    if (bRespawnPending) return;
+    bRespawnPending = true;
+    if (APlayerController* PC = Cast<APlayerController>(Controller))
+    {
+        DisableInput(PC);
+    }
+    GetWorldTimerManager().SetTimer(RespawnTimer, this,
+        &ABreakerCharacter::RespawnAtTilesetStart, FMath::Max(RespawnDelaySeconds, 0.1f), false);
+}
+
+void ABreakerCharacter::RespawnAtTilesetStart()
+{
+    bRespawnPending = false;
+    if (APlayerController* PC = Cast<APlayerController>(Controller))
+    {
+        EnableInput(PC);
+    }
+
+    // A death INSIDE a live boss encounter resets the encounter, not a
+    // budget (O82). The game mode owns the boss, so it owns the reset.
+    if (ABreakerGameMode* GameMode = GetWorld() ? Cast<ABreakerGameMode>(GetWorld()->GetAuthGameMode()) : nullptr)
+    {
+        if (GameMode->IsBossAlive())
+        {
+            GameMode->ResetBossEncounter();
+        }
+    }
+
+    // The respawn proper: the tileset start (the same transform the field
+    // was built around), vitals and ammunition whole, momentum dead so the
+    // fall that killed you cannot carry through. Deliberately NOT
+    // ResetPlaytestTargets and NOT ResetStats: the world survives a
+    // campaign death and the telemetry keeps counting — F1 stays the dev
+    // reset for both.
+    SetActorTransform(PlaytestSpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    GetCharacterMovement()->StopMovementImmediately();
+    DashFeedbackElapsed = -1.0f;
+    bDashRollApplied = false;
+    ApplyBaseFieldOfView();
+    if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
+    if (Weapon) Weapon->ResetAmmunition();
+    if (Combat) Combat->RestoreVitals();
 }
 
 // ---------------------------------------------------------------------------

@@ -62,6 +62,21 @@ bool FBreakerRiftDerivationTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A fresh definition is unset"), Rift.IsSet());
     Rift.AreaLevel = 250;
     TestEqual(TEXT("The effective level clamps into the area band"), Rift.EffectiveAreaLevel(), 100);
+
+    // --- O123: the death-allowance field reads its mode ----------------------
+    // Campaign prints UNLIMITED whatever number rides along; endgame prints
+    // the count remaining and never a negative one. The default tier is
+    // Campaign — every rift today runs the unlimited rule.
+    TestEqual(TEXT("Every rift today is campaign"), Rift.Tier, EBreakerRiftTier::Campaign);
+    TestEqual(TEXT("Campaign prints UNLIMITED"),
+        UBreakerRiftLibrary::GetDeathAllowanceReadout(EBreakerRiftTier::Campaign, 0), FString(TEXT("UNLIMITED")));
+    TestEqual(TEXT("Campaign ignores any count it is handed"),
+        UBreakerRiftLibrary::GetDeathAllowanceReadout(EBreakerRiftTier::Campaign, 3), FString(TEXT("UNLIMITED")));
+    TestEqual(TEXT("Endgame prints the count remaining"),
+        UBreakerRiftLibrary::GetDeathAllowanceReadout(EBreakerRiftTier::Endgame,
+            UBreakerRiftLibrary::SoloEndgameDeathBudget), FString(TEXT("2 REMAINING")));
+    TestEqual(TEXT("An exhausted budget never reads negative"),
+        UBreakerRiftLibrary::GetDeathAllowanceReadout(EBreakerRiftTier::Endgame, -1), FString(TEXT("0 REMAINING")));
     return true;
 }
 
