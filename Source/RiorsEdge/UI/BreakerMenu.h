@@ -725,6 +725,20 @@ private:
     // selection" on the next rebuild rather than needing an explicit clear.
     FGuid ForgeSelectedItemId;
     FText ForgeStatus;
+    // The Forge's verb strip: 0 TEMPER, 1 REFORGE, 2 ATTUNE, 3 SALVAGE,
+    // 4 RESPEC. Switching verb keeps the bench (the selected item survives);
+    // it clears the affix selection and any pending arms, because an arm must
+    // never outlive the view that explained it.
+    int32 ForgeVerb = 0;
+    // Which affix line TEMPER acts on. -1 none; clamped against the selected
+    // item on every rebuild.
+    int32 ForgeSelectedAffix = -1;
+    // Arm halves of the Forge's two destructive-or-permanent verbs, the same
+    // two-click shape as everything else: salvage destroys an item, respec
+    // refunds a whole pool. -1 / false disarmed; any selection or verb change
+    // disarms.
+    bool bForgeSalvageArm = false;
+    int32 ForgeRespecArm = -1;
     // Abilities tab: result line echoed under the slot that was last clicked,
     // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
     // stays readable after the rebuild it triggers.

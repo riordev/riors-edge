@@ -992,6 +992,23 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         else if (Board == TEXT("GUNSMITH")) { PendingCreateClass = EBreakerClassId::Gunsmith; }
         else if (Board == TEXT("TANK")) { PendingCreateClass = EBreakerClassId::Tank; }
         else if (Board == TEXT("SUPPORT")) { PendingCreateClass = EBreakerClassId::Support; }
+        else if (Board == TEXT("FORGEBENCH"))
+        {
+            // Fabricates a bench subject the way -BreakerCaptureHUD fabricates
+            // HUD events: a capture run cannot click the sandbox's GRANT, and
+            // the forge's outcome-space rows are exactly the part of that
+            // screen that must not ship unphotographed. SEEDED, so any two
+            // captures photograph the same item.
+            Screen = EBreakerMenuScreen::Forge;
+            if (Character.IsValid() && Character->GetEquipment())
+            {
+                const FBreakerItemInstance Rolled = UBreakerLootLibrary::RollItem(
+                    TEXT("CaptureBench"), EBreakerEquipSlot::BodyArmour,
+                    EBreakerItemRarity::Exceptional, 60, /*RandomSeed=*/1887);
+                Character->GetEquipment()->AddToBackpack(Rolled);
+                ForgeSelectedItemId = Rolled.ItemId;
+            }
+        }
     }
     Rebuild(Screen);
 }
@@ -8320,13 +8337,13 @@ namespace
 
 TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
 {
-    // Reach (Decisions.md O37/O40c): Items/BreakerForgeLibrary.h's three verbs
-    // plus salvage and the wallet had zero UI callers — CONTEXT.md called this
-    // "the biggest built-but-unreachable item in the project." Utilitarian
-    // FIELDPLATE per the brief: plates, rails, the existing type scale: no new
-    // tokens invented for this tab.
+    // The reference's KESS / THE FORGE: a verb strip (TEMPER · REFORGE ·
+    // ATTUNE · SALVAGE · RESPEC), the held-item list on the left, and one
+    // verb's bench at a time — "SWITCHING VERB KEEPS THE BENCH". The old
+    // screen showed every verb at once; the plate shows one decision at a
+    // time, and the outcome-space tracks are what the stacked buttons could
+    // never say: what a spend can actually produce.
     UBreakerEquipmentComponent* Equipment = Character.IsValid() ? Character->GetEquipment() : nullptr;
-    const FWideScreenMetrics Metrics = MeasureWideScreen();
 
     const FBreakerForgeWallet EmptyWallet;
     const FBreakerForgeWallet& Wallet = Equipment ? Equipment->GetForgeWallet() : EmptyWallet;
@@ -8338,6 +8355,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
     FBreakerItemInstance SelectedItem;
     bool bSelectedFound = false;
     bool bSelectedEquipped = false;
+    int32 ShownCount = 0;
     if (Equipment && ForgeSelectedItemId.IsValid())
     {
         for (const FBreakerItemInstance& HeldItem : Equipment->GetEquipped())
@@ -8355,356 +8373,924 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             }
         }
     }
-
-    // ---- Header: tab strip, wallet, BACK -----------------------------------
-    // The ONE wallet chip: the currency's name over its amount. Imperative
-    // rebuild like everything else on this screen — the amount is re-read on
-    // the next rebuild, never a per-frame attribute. AutoWidth, so the chip
-    // always fits its widest content (the RIFTGLASS caption).
-    auto MakeCurrencyChip = [](int32 Amount) -> TSharedRef<SWidget>
+    // The bench never opens empty while something is held — the reference
+    // opens with an item selected, and a screen whose first read is "select
+    // something" when there is only one thing to select is a click tax.
+    if (!bSelectedFound && Equipment)
     {
-        return MakePlate(
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(BreakerForge::CurrencyDisplayName), BreakerUI::TypeCaption, Muted, true)]
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Amount))), BreakerUI::TypeH2, Primary, true)],
-            PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space4));
-    };
-    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)[BuildScreenTabs(EBreakerMenuScreen::Forge)];
-    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)[MakeCurrencyChip(Wallet.Get())];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
-    [
-        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
-    ];
+        for (const FBreakerItemInstance& HeldItem : Equipment->GetEquipped())
+        {
+            if (HeldItem.IsValid()) { SelectedItem = HeldItem; bSelectedFound = true; bSelectedEquipped = true; break; }
+        }
+        if (!bSelectedFound && Equipment->GetBackpack().Num() > 0)
+        {
+            SelectedItem = Equipment->GetBackpack()[0];
+            bSelectedFound = true;
+        }
+        if (bSelectedFound) ForgeSelectedItemId = SelectedItem.ItemId;
+    }
+    if (!bSelectedFound || !SelectedItem.Affixes.IsValidIndex(ForgeSelectedAffix))
+    {
+        ForgeSelectedAffix = INDEX_NONE;
+    }
+    if (bSelectedFound && ForgeVerb == 0 && ForgeSelectedAffix == INDEX_NONE)
+    {
+        // TEMPER opens with the first line that can still climb chosen, as
+        // the reference does — the cost and the landing point are the whole
+        // read, and both need a subject.
+        const int32 SelectionCeiling = UBreakerForgeLibrary::TemperCeilingForItem(SelectedItem);
+        for (int32 AffixIndex = 0; AffixIndex < SelectedItem.Affixes.Num(); ++AffixIndex)
+        {
+            if (SelectedItem.Affixes[AffixIndex].Tier - 1 >= SelectionCeiling)
+            {
+                ForgeSelectedAffix = AffixIndex;
+                break;
+            }
+        }
+    }
 
-    // ---- Left: pick a held item (equipped or backpack) ---------------------
-    auto MakeSelectRow = [this](const FBreakerItemInstance& Item) -> TSharedRef<SWidget>
+    const TArray<FBreakerAffixDefinition>& AffixPool = UBreakerAffixLibrary::GetSliceAffixPool();
+
+    // How an affix magnitude prints on the track's edge labels — the same
+    // percent decision DescribeAffix makes, without the name and the tier.
+    auto FormatMagnitude = [](const FBreakerAffixDefinition* Definition, float Value) -> FString
+    {
+        const bool bPercent = Definition && (Definition->StatBucket != EBreakerStatBucket::Flat
+            || Definition->StatTarget == EBreakerStatTarget::CriticalChance
+            || Definition->StatTarget == EBreakerStatTarget::CriticalDamage);
+        const FString Digits = FMath::Abs(Value) < 10.0f
+            ? FString::Printf(TEXT("%.1f"), Value)
+            : FString::Printf(TEXT("%.0f"), Value);
+        return FString::Printf(TEXT("+%s%s"), *Digits, bPercent ? TEXT("%") : TEXT(""));
+    };
+
+    // THE ROLL LAW, read from the code it lives in, never re-invented here:
+    // a value at tier T lands in [V(T), lerp(V(T), V(T-1), 0.5)] — the drop
+    // pipeline's and Reforge's shared in-band lerp — and Temper RE-DERIVES at
+    // exactly V(T-1). So REFORGE draws a band, and TEMPER draws a POINT: the
+    // reference plate paints "LANDS IN HERE" as a band because its fiction
+    // rolls tempering too, and ours does not. The bench tells the truth.
+    auto BandTop = [](const FBreakerAffixDefinition& Definition, int32 Tier) -> float
+    {
+        const float TierValue = UBreakerAffixLibrary::ValueForTier(Definition, Tier);
+        const float NextValue = UBreakerAffixLibrary::ValueForTier(Definition,
+            FMath::Max(Tier - 1, UBreakerAffixLibrary::TopTier));
+        return FMath::Lerp(TierValue, NextValue, 0.5f);
+    };
+
+    // ---- The verb strip ----------------------------------------------------
+    static const TCHAR* VerbNames[] = { TEXT("TEMPER"), TEXT("REFORGE"), TEXT("ATTUNE"), TEXT("SALVAGE"), TEXT("RESPEC") };
+    static const TCHAR* VerbSubs[] =
+    {
+        TEXT("ONE AFFIX, ONE TIER"), TEXT("ALL VALUES, SAME BANDS"), TEXT("WHICH AFFIXES"),
+        TEXT("PAYS RIFTGLASS"), TEXT("FORGE ONLY")
+    };
+    TSharedRef<SHorizontalBox> VerbStrip = SNew(SHorizontalBox);
+    for (int32 Verb = 0; Verb < 5; ++Verb)
+    {
+        const bool bActive = ForgeVerb == Verb;
+        // Content-sized, not fixed: the first capture clipped "ALL VALUES,
+        // SAME BANDS" inside a 190px box, and a tab's sub-caption is exactly
+        // the changing-label trap the file keeps re-finding.
+        VerbStrip->AddSlot().AutoWidth()
+        [
+            SNew(SBox).HeightOverride(56.0f)
+            [
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(bActive ? Panel : Transparent)
+                .Padding(FMargin(0.0f))
+                [
+                    SNew(SButton)
+                    .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                    .ContentPadding(FMargin(BreakerUI::Space24, 0.0f))
+                    .HAlign(HAlign_Left)
+                    .VAlign(VAlign_Center)
+                    .OnClicked(FOnClicked::CreateLambda([this, Verb]()
+                    {
+                        if (ForgeVerb != Verb)
+                        {
+                            ForgeVerb = Verb;
+                            ForgeSelectedAffix = INDEX_NONE;
+                            bForgeSalvageArm = false;
+                            ForgeRespecArm = INDEX_NONE;
+                            ForgeStatus = FText::GetEmpty();
+                            Rebuild(EBreakerMenuScreen::Forge);
+                        }
+                        return FReply::Handled();
+                    }))
+                    [
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(VerbNames[Verb]), BreakerUI::TypeBody,
+                                bActive ? Primary : SoftText, true)
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            BreakerMonoText(FText::FromString(VerbSubs[Verb]), BreakerUI::TypeCaption,
+                                bActive ? Amber : Muted, 0.16f)
+                        ]
+                    ]
+                ]
+            ]
+        ];
+    }
+    const TSharedRef<SWidget> VerbBand = SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().Padding(BreakerSettingsContentPad, 0.0f, 0.0f, 0.0f)[VerbStrip]
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+                .Padding(BreakerUI::Space24, 0.0f, BreakerSettingsContentPad, 0.0f)
+            [
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
+                [
+                    BreakerMonoText(FText::FromString(TEXT("SWITCHING VERB KEEPS THE BENCH")),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ]
+        ]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+        ];
+
+    // ---- The held-item list ------------------------------------------------
+    auto MakeItemRow = [this](const FBreakerItemInstance& Item, bool bEquipped) -> TSharedRef<SWidget>
     {
         const bool bRowSelected = ForgeSelectedItemId == Item.ItemId;
         const FGuid CapturedId = Item.ItemId;
-        return SNew(SBox).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        // Rarity appears ONCE per item per view: the 3px rail is the carrier,
+        // and the caption names it in words at the muted tone.
+        const FString Caption = FString::Printf(TEXT("%s · %s"), *RarityName(Item.Rarity),
+            bEquipped ? TEXT("EQUIPPED") : TEXT("BACKPACK"));
+        return SNew(SBox).HeightOverride(68.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
         [
-            MakeRarityCard(
-                SNew(SButton)
-                .ButtonColorAndOpacity(bRowSelected ? PanelHover : PanelRaised)
-                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                .OnClicked(FOnClicked::CreateLambda([this, CapturedId]()
-                {
-                    ForgeSelectedItemId = CapturedId;
-                    ForgeStatus = FText::GetEmpty();
-                    Rebuild(EBreakerMenuScreen::Forge);
-                    return FReply::Handled();
-                }))
+            BorderWrap(
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()
                 [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                    SNew(SBox).WidthOverride(BreakerUI::RailThickness)[SolidBlock(RarityColor(Item.Rarity))]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f)
+                [
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(bRowSelected ? PanelRaised : Panel)
+                    .Padding(FMargin(0.0f))
                     [
-                        MenuText(FText::FromString(RarityName(Item.Rarity)), BreakerUI::TypeCaption, RarityColor(Item.Rarity), true)
+                        SNew(SButton)
+                        .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                        .ContentPadding(FMargin(BreakerUI::Space12, 0.0f))
+                        .HAlign(HAlign_Fill)
+                        .VAlign(VAlign_Center)
+                        .OnClicked(FOnClicked::CreateLambda([this, CapturedId]()
+                        {
+                            ForgeSelectedItemId = CapturedId;
+                            ForgeSelectedAffix = INDEX_NONE;
+                            bForgeSalvageArm = false;
+                            ForgeStatus = FText::GetEmpty();
+                            Rebuild(EBreakerMenuScreen::Forge);
+                            return FReply::Handled();
+                        }))
+                        [
+                            SNew(SHorizontalBox)
+                            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                            [
+                                SNew(SVerticalBox)
+                                + SVerticalBox::Slot().AutoHeight()
+                                [
+                                    MenuText(FText::FromString(ItemSlotLabel(Item).ToUpper()), BreakerUI::TypeBody,
+                                        bRowSelected ? Primary : SoftText, true)
+                                ]
+                                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                                [
+                                    BreakerMonoText(FText::FromString(Caption), BreakerUI::TypeCaption, Muted, 0.16f)
+                                ]
+                            ]
+                            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                            [
+                                BreakerMonoText(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)),
+                                    BreakerUI::TypeCaption, bRowSelected ? Primary : Muted, 0.16f)
+                            ]
+                        ]
                     ]
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(ItemSlotLabel(Item)), BreakerUI::TypeCaption, bRowSelected ? Primary : Muted, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), Item.ItemLevel)), BreakerUI::TypeCaption, SoftText, true)]
                 ],
-                Item.Rarity, true)
+                bRowSelected ? Cyan : BorderRest,
+                bRowSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
         ];
     };
 
     TSharedRef<SVerticalBox> PickerList = SNew(SVerticalBox);
-    PickerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("EQUIPPED")), BreakerUI::TypeCaption, Muted, true)];
     static const EBreakerEquipSlot ForgeWearOrder[] =
     {
         EBreakerEquipSlot::Helmet, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist,
         EBreakerEquipSlot::Boots, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary,
     };
-    bool bAnyEquipped = false;
     for (const EBreakerEquipSlot Slot : ForgeWearOrder)
     {
         FBreakerItemInstance Item;
         if (Equipment && Equipment->GetEquippedItem(Slot, Item))
         {
-            bAnyEquipped = true;
-            PickerList->AddSlot().AutoHeight()[MakeSelectRow(Item)];
+            ++ShownCount;
+            PickerList->AddSlot().AutoHeight()[MakeItemRow(Item, true)];
         }
     }
-    if (!bAnyEquipped) PickerList->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("NOTHING EQUIPPED")), BreakerUI::TypeCaption, Disabled)];
-
-    PickerList->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("BACKPACK")), BreakerUI::TypeCaption, Muted, true)];
     TArray<FBreakerItemInstance> BackpackItems = Equipment ? Equipment->GetBackpack() : TArray<FBreakerItemInstance>();
     Algo::Reverse(BackpackItems);
     BackpackItems.StableSort([](const FBreakerItemInstance& A, const FBreakerItemInstance& B)
     {
         return static_cast<uint8>(A.Rarity) > static_cast<uint8>(B.Rarity);
     });
-    if (BackpackItems.IsEmpty()) PickerList->AddSlot().AutoHeight()[MenuText(FText::FromString(TEXT("BACKPACK EMPTY")), BreakerUI::TypeCaption, Disabled)];
     for (const FBreakerItemInstance& Item : BackpackItems)
     {
-        PickerList->AddSlot().AutoHeight()[MakeSelectRow(Item)];
+        ++ShownCount;
+        PickerList->AddSlot().AutoHeight()[MakeItemRow(Item, false)];
     }
-
-    // ---- Right: the selected item's Forge operations -----------------------
-    TSharedRef<SVerticalBox> OpsColumn = SNew(SVerticalBox);
-    if (!bSelectedFound)
+    if (ShownCount == 0)
     {
-        OpsColumn->AddSlot().AutoHeight()
+        PickerList->AddSlot().AutoHeight()
         [
-            MakePlate(
-                MenuText(FText::FromString(TEXT("SELECT A HELD ITEM ON THE LEFT TO SALVAGE OR CRAFT IT.")), BreakerUI::TypeCaption, Muted),
-                PanelRaised, BorderEmphasis, FMargin(BreakerUI::Space16, BreakerUI::Space16))
+            MenuText(FText::FromString(TEXT("Nothing held. The Forge works on what you carry.")),
+                BreakerUI::TypeBody, SoftText)
         ];
     }
-    else
-    {
-        TSharedRef<SVerticalBox> ForgePanel = SNew(SVerticalBox);
-        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+
+    const TSharedRef<SWidget> ListColumn = SNew(SBox).WidthOverride(375.0f)
+    [
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().Padding(FMargin(BreakerUI::Space24, BreakerUI::Space16, BreakerUI::Space24, BreakerUI::Space8))
         [
             SNew(SHorizontalBox)
             + SHorizontalBox::Slot().FillWidth(1.0f)
             [
-                MenuText(FText::FromString(FString::Printf(TEXT("%s %s"), *RarityName(SelectedItem.Rarity), *ItemSlotLabel(SelectedItem))), BreakerUI::TypeH2, RarityColor(SelectedItem.Rarity), true)
+                BreakerMonoText(FText::FromString(TEXT("EQUIPPED AND BACKPACK")), BreakerUI::TypeCaption, Muted, 0.16f)
             ]
-            + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(FString::Printf(TEXT("i%d"), SelectedItem.ItemLevel)), BreakerUI::TypeCaption, Primary, true)]
-        ];
-        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-        [
-            MenuText(FText::FromString(bSelectedEquipped ? TEXT("CURRENTLY EQUIPPED") : TEXT("IN BACKPACK")), BreakerUI::TypeCaption, Muted, true)
-        ];
-
-        // ---- IF EQUIPPED: the composed delta, per lane ---------------------
-        // This is what the printed gear score was reaching for, and the reason
-        // a score could not do it: damage is partitioned by DELIVERY (O54), so
-        // one number has to pick a lane and is then wrong for whoever built the
-        // other one. The two lanes measure 0.647x of each other at the cap.
-        //
-        // Only for a piece NOT already worn — the delta against itself is zero,
-        // and five rows of nothing is worse than no rows.
-        //
-        // VERTICAL furniture on purpose. Every clipped-text report on this file
-        // has been horizontal overflow against the card width solve, and this
-        // adds no column: it is stacked rows in a panel that already scrolls.
-        UBreakerProgressionComponent* EquipProgression =
-            Character.IsValid() ? Character->GetProgression() : nullptr;
-        const UBreakerAttributeSet* EquipAttributes =
-            Character.IsValid() ? Character->GetAttributes() : nullptr;
-        if (!bSelectedEquipped && EquipProgression)
-        {
-            const FBreakerSkillSnapshot EquipSnapshot =
-                BreakerSkillProjection::MakeSnapshot(EquipProgression, EquipAttributes);
-            const TArray<FBreakerItemInstance> Worn =
-                Equipment ? Equipment->GetEquipped() : TArray<FBreakerItemInstance>();
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+            + SHorizontalBox::Slot().AutoWidth()
             [
-                MenuText(FText::FromString(TEXT("IF EQUIPPED")), BreakerUI::TypeCaption, Cyan, true)
-            ];
-            for (const FBreakerStatLine& Line : BreakerSkillProjection::ProjectEquip(EquipSnapshot, Worn, SelectedItem))
-            {
-                // The same three colours the per-affix delta marks already use,
-                // so one screen does not teach two vocabularies for "better".
-                const FLinearColor RowColor = !Line.Changed() ? Muted
-                    : (Line.After > Line.Before ? Cyan : Harm);
-                ForgePanel->AddSlot().AutoHeight()
+                BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d SHOWN"), ShownCount)),
+                    BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+        ]
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerUI::Space24, 0.0f, BreakerUI::Space16, BreakerUI::Space16))
+            [
+                PickerList
+            ]
+        ]
+    ];
+
+    // ---- The bench ---------------------------------------------------------
+    TSharedRef<SVerticalBox> Bench = SNew(SVerticalBox);
+    TSharedRef<SWidget> FooterAction = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+    FString CostLead;
+    FString CostTail;
+
+    if (!bSelectedFound)
+    {
+        Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("Select a held item on the left. The verb acts on what the bench holds.")),
+                BreakerUI::TypeBody, SoftText)
+        ];
+    }
+    else
+    {
+        const int32 Ceiling = UBreakerForgeLibrary::TemperCeilingForItem(SelectedItem);
+
+        // Item header: the name line, the mono fact line, the tier ceiling.
+        // The plate draws the ceiling as five rarity-coloured squares; our
+        // ladder is fourteen tiers deep (T12..T-1), so the words carry it.
+        Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()
                 [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)
-                    [
-                        MenuText(FText::FromString(Line.Label), BreakerUI::TypeCaption, Muted, true)
-                    ]
-                    + SHorizontalBox::Slot().AutoWidth()
-                    [
-                        MenuText(FText::FromString(Line.Changed()
-                            ? BreakerSkillProjection::FormatTransition(Line)
-                            : BreakerSkillProjection::FormatStat(Line.Before, Line.Format)),
-                            BreakerUI::TypeCaption, RowColor, true)
-                    ]
-                ];
-            }
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+                    MenuText(FText::FromString(ItemSlotLabel(SelectedItem).ToUpper()), BreakerUI::TypeH1, Primary, true)
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    BreakerMonoText(FText::FromString(FString::Printf(TEXT("%s · i%d · %s"),
+                        *RarityName(SelectedItem.Rarity), SelectedItem.ItemLevel,
+                        bSelectedEquipped ? TEXT("EQUIPPED") : TEXT("BACKPACK"))),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
-                MenuText(FText::FromString(TEXT("EFFECTIVE HEALTH EXCLUDES BLOCK AND DODGE — BOTH ARE CHANCE")),
-                    BreakerUI::TypeCaption, Disabled, true)
-            ];
-        }
-
-        // ---- TEMPER: one row per affix line --------------------------------
-        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
-        [
-            MenuText(FText::FromString(TEXT("TEMPER — ONE AFFIX, ONE TIER BETTER")), BreakerUI::TypeCaption, Cyan, true)
+                BreakerMonoText(FText::FromString(FString::Printf(TEXT("TIER CEILING %s · SET BY %s"),
+                    *TierLabel(Ceiling), *RarityName(SelectedItem.Rarity))),
+                    BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
         ];
-        if (SelectedItem.Affixes.IsEmpty())
-        {
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)[MenuText(FText::FromString(TEXT("NO AFFIXES TO TEMPER.")), BreakerUI::TypeCaption, Disabled)];
-        }
-        for (int32 AffixIndex = 0; AffixIndex < SelectedItem.Affixes.Num(); ++AffixIndex)
+
+        // One outcome-space affix row. The track spans the affix's whole
+        // reachable range on THIS item — V(T12) to the top of the ceiling
+        // tier's band — with the current value as a cyan tick.
+        auto MakeAffixRow = [&](int32 AffixIndex, bool bTemperView) -> TSharedRef<SWidget>
         {
             const FBreakerRolledAffix& Affix = SelectedItem.Affixes[AffixIndex];
-            const int32 TargetTier = Affix.Tier - 1;
-            const int32 Ceiling = UBreakerForgeLibrary::TemperCeilingForItem(SelectedItem);
-            // TemperCost returns a deceptive zero — indistinguishable from
-            // free — both for a bad index AND for a line already at its tier
-            // ceiling, so the ceiling has to be checked independently rather
-            // than trusted from Cost.IsFree() alone.
-            const bool bAtCeiling = TargetTier < Ceiling;
-            const FBreakerForgeCost CostTemper = UBreakerForgeLibrary::TemperCost(SelectedItem, AffixIndex);
-            const bool bAffordableTemper = Wallet.CanAfford(CostTemper);
-            const FGuid CapturedId = SelectedItem.ItemId;
-            const int32 CapturedAffixIndex = AffixIndex;
+            const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(AffixPool, Affix.AffixId);
+            const FString Name = Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString();
+            const bool bAtCeiling = Affix.Tier - 1 < Ceiling;
+            const bool bRowSelected = bTemperView && ForgeSelectedAffix == AffixIndex;
+            const bool bSelectable = bTemperView && !bAtCeiling;
 
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+            float SpanMin = 0.0f, SpanMax = 1.0f, Current = 0.5f, NextPoint = 0.5f, BandLow = 0.5f, BandHigh = 0.5f;
+            if (Definition)
+            {
+                SpanMin = UBreakerAffixLibrary::ValueForTier(*Definition, UBreakerAffixLibrary::WorstTier);
+                SpanMax = BandTop(*Definition, Ceiling);
+                Current = Affix.Value;
+                NextPoint = UBreakerAffixLibrary::ValueForTier(*Definition,
+                    FMath::Max(Affix.Tier - 1, UBreakerAffixLibrary::TopTier));
+                BandLow = UBreakerAffixLibrary::ValueForTier(*Definition, Affix.Tier);
+                BandHigh = BandTop(*Definition, Affix.Tier);
+            }
+            const float Span = FMath::Max(SpanMax - SpanMin, KINDA_SMALL_NUMBER);
+            auto Frac = [&](float Value) { return FMath::Clamp((Value - SpanMin) / Span, 0.0f, 1.0f); };
+
+            // The track: fills and ticks are ratio-split slots over a 1px
+            // ringed 8px bar — fractions computed from values, never from an
+            // allotted size.
+            TSharedRef<SOverlay> Track = SNew(SOverlay);
+            Track->AddSlot()[SolidBlock(BreakerUI::BgRaised)];
+            if (!bTemperView && Definition && !FMath::IsNearlyEqual(Frac(BandLow), Frac(BandHigh)))
+            {
+                // REFORGE: the lit band every value rerolls inside.
+                Track->AddSlot()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(Frac(BandLow), 0.0001f))[SNew(SSpacer)]
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(Frac(BandHigh) - Frac(BandLow), 0.0001f))
+                    [
+                        SolidBlock(BreakerUI::GoldDeep)
+                    ]
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(1.0f - Frac(BandHigh), 0.0001f))[SNew(SSpacer)]
+                ];
+            }
+            if (bRowSelected && Definition)
+            {
+                // TEMPER LANDS ON A POINT, not a band — the value is
+                // re-derived at exactly V(T-1). A 3px gold tick says so.
+                Track->AddSlot()
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(Frac(NextPoint), 0.0001f))[SNew(SSpacer)]
+                    + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(3.0f)[SolidBlock(Amber)]]
+                    + SHorizontalBox::Slot().FillWidth(FMath::Max(1.0f - Frac(NextPoint), 0.0001f))[SNew(SSpacer)]
+                ];
+            }
+            // The current value, always: a 3px cyan tick.
+            Track->AddSlot()
             [
                 SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)[MenuText(FText::FromString(DescribeAffix(Affix)), BreakerUI::TypeCaption, SoftText)]
+                + SHorizontalBox::Slot().FillWidth(FMath::Max(Frac(Current), 0.0001f))[SNew(SSpacer)]
+                + SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(3.0f)[SolidBlock(Cyan)]]
+                + SHorizontalBox::Slot().FillWidth(FMath::Max(1.0f - Frac(Current), 0.0001f))[SNew(SSpacer)]
+            ];
+
+            TSharedRef<SVerticalBox> TrackCell = SNew(SVerticalBox);
+            TrackCell->AddSlot().AutoHeight()
+            [
+                SNew(SBox).HeightOverride(8.0f)[BorderWrap(Track, BorderEmphasis)]
+            ];
+            TrackCell->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()
+                [
+                    BreakerMonoText(FText::FromString(FormatMagnitude(Definition, SpanMin)),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).HAlign(HAlign_Center)
+                [
+                    bRowSelected
+                        ? BreakerMonoText(FText::FromString(FString::Printf(TEXT("LANDS ON %s"),
+                            *FormatMagnitude(Definition, NextPoint))), BreakerUI::TypeCaption, Amber, 0.16f)
+                        : BreakerMonoText(FText::GetEmpty(), BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+                + SHorizontalBox::Slot().AutoWidth()
+                [
+                    BreakerMonoText(FText::FromString(FormatMagnitude(Definition, SpanMax)),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ];
+
+            const TSharedRef<SWidget> RowContent = SNew(SHorizontalBox)
                 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
                 [
-                    SNew(SBox).WidthOverride(150.0f)
+                    SNew(SBox).WidthOverride(210.0f)
                     [
-                        bAtCeiling
-                            ? StaticCastSharedRef<SWidget>(SNew(SBox).HAlign(HAlign_Right)[MenuText(FText::FromString(TEXT("MAXED")), BreakerUI::TypeCaption, Disabled, true)])
-                            : StaticCastSharedRef<SWidget>(BorderWrap(
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(Name), BreakerUI::TypeBody,
+                                bAtCeiling && bTemperView ? Disabled : Primary, true)
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            BreakerMonoText(FText::FromString(bAtCeiling && bTemperView
+                                ? FString::Printf(TEXT("%s · MAXED"), *TierLabel(Affix.Tier))
+                                : TierLabel(Affix.Tier)), BreakerUI::TypeCaption,
+                                bRowSelected ? Amber : Muted, 0.16f)
+                        ]
+                    ]
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f)
+                [
+                    TrackCell
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    SNew(SBox).WidthOverride(84.0f).HAlign(HAlign_Fill)
+                    [
+                        SNew(STextBlock)
+                            .Text(FText::FromString(FormatMagnitude(Definition, Current)))
+                            .Justification(ETextJustify::Right)
+                            .ColorAndOpacity(bAtCeiling && bTemperView ? Disabled : Primary)
+                            .Font(BreakerMonoFont(BreakerUI::TypeBody))
+                    ]
+                ];
+
+            const int32 CapturedIndex = AffixIndex;
+            TSharedRef<SWidget> Face = bSelectable
+                ? StaticCastSharedRef<SWidget>(
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(bRowSelected ? PanelRaised : Panel)
+                    .Padding(FMargin(0.0f))
+                    [
+                        SNew(SButton)
+                        .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space12))
+                        .HAlign(HAlign_Fill)
+                        .VAlign(VAlign_Center)
+                        .OnClicked(FOnClicked::CreateLambda([this, CapturedIndex]()
+                        {
+                            ForgeSelectedAffix = CapturedIndex;
+                            ForgeStatus = FText::GetEmpty();
+                            Rebuild(EBreakerMenuScreen::Forge);
+                            return FReply::Handled();
+                        }))
+                        [
+                            RowContent
+                        ]
+                    ])
+                : StaticCastSharedRef<SWidget>(
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(Panel)
+                    .Padding(FMargin(BreakerUI::Space16, BreakerUI::Space12))
+                    [
+                        RowContent
+                    ]);
+            return SNew(SBox).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                BorderWrap(Face, bRowSelected ? Amber : BorderRest)
+            ];
+        };
+
+        auto AddKicker = [&](const TCHAR* Lead, const TCHAR* Tail, const TCHAR* Helper)
+        {
+            Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, BreakerUI::Space16)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    BreakerMonoText(FText::FromString(Lead), BreakerUI::TypeCaption, Cyan, 0.16f)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                [
+                    BreakerMonoText(FText::FromString(Tail), BreakerUI::TypeCaption, Amber, 0.16f)
+                ]
+                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(Helper), BreakerUI::TypeBody, SoftText)
+                ]
+            ];
+        };
+
+        const FGuid CapturedSelectedId = SelectedItem.ItemId;
+        if (ForgeVerb == 0)
+        {
+            // ---- TEMPER --------------------------------------------------
+            AddKicker(TEXT("OUTCOME SPACE"), TEXT("· NEXT TIER"),
+                TEXT("Click an affix to choose the one that improves. Temper lands exactly on the next tier's value."));
+            if (SelectedItem.Affixes.IsEmpty())
+            {
+                Bench->AddSlot().AutoHeight()[MenuText(FText::FromString(TEXT("No affixes to temper.")), BreakerUI::TypeBody, SoftText)];
+            }
+            for (int32 AffixIndex = 0; AffixIndex < SelectedItem.Affixes.Num(); ++AffixIndex)
+            {
+                Bench->AddSlot().AutoHeight()[MakeAffixRow(AffixIndex, true)];
+            }
+            if (ForgeSelectedAffix != INDEX_NONE)
+            {
+                const FBreakerForgeCost Cost = UBreakerForgeLibrary::TemperCost(SelectedItem, ForgeSelectedAffix);
+                const bool bAffordable = Wallet.CanAfford(Cost);
+                CostLead = FString::FromInt(Cost.Amount);
+                // LEAVES only when it can leave anything: a negative remainder
+                // is not a balance, it is a shortfall, and it says so.
+                CostTail = bAffordable
+                    ? FString::Printf(TEXT("LEAVES %d"), Wallet.Get() - Cost.Amount)
+                    : FString::Printf(TEXT("SHORT %d"), Cost.Amount - Wallet.Get());
+                const int32 CapturedAffix = ForgeSelectedAffix;
+                FooterAction = bAffordable
+                    ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(220.0f).HeightOverride(47.0f)
+                    [
+                        BorderWrap(
+                            SNew(SBorder)
+                            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                            .BorderBackgroundColor(BreakerUI::Hex(0x2A2416))
+                            .Padding(FMargin(0.0f))
+                            [
                                 SNew(SButton)
-                                .ButtonColorAndOpacity(PanelRaised)
-                                .ContentPadding(FMargin(BreakerUI::Space8, BreakerUI::Space4))
-                                .OnClicked(FOnClicked::CreateLambda([this, CapturedId, CapturedAffixIndex]()
+                                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                                .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                                .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId, CapturedAffix]()
                                 {
                                     if (Character.IsValid() && Character->GetEquipment())
                                     {
-                                        // Forge-proximity gating arrives with the
-                                        // hub, same interim rule as Progression::
-                                        // RespecAtForge's menu-side shim above:
+                                        // Forge-proximity gating arrives with the hub;
                                         // pass true unconditionally so the verb is
-                                        // testable from the menu today.
-                                        const EBreakerForgeResult Result = Character->GetEquipment()->TemperItem(CapturedId, CapturedAffixIndex, /*bIsAtForge=*/true);
+                                        // testable from the menu today (the standing
+                                        // shim, unchanged by the restyle).
+                                        const EBreakerForgeResult Result = Character->GetEquipment()->TemperItem(
+                                            CapturedSelectedId, CapturedAffix, /*bIsAtForge=*/true);
                                         ForgeStatus = FText::FromString(FString::Printf(TEXT("TEMPER: %s"), *DescribeForgeResult(Result)));
                                     }
                                     Rebuild(EBreakerMenuScreen::Forge);
                                     return FReply::Handled();
                                 }))
                                 [
-                                    MenuText(FText::FromString(FString::Printf(TEXT("TEMPER · %s"), *DescribeForgeCost(CostTemper))), BreakerUI::TypeCaption, bAffordableTemper ? Amber : Harm, true)
-                                ],
-                                bAffordableTemper ? Amber : HarmDeep))
-                    ]
-                ]
-            ];
+                                    BreakerMonoText(FText::FromString(FString::Printf(TEXT("TEMPER FOR %d"), Cost.Amount)),
+                                        12, Amber, 0.16f)
+                                ]
+                            ],
+                            Amber)
+                    ])
+                    : BreakerSettingsDisabledButton(TEXT("TEMPER — SHORT"), 220.0f);
+                if (!bAffordable)
+                {
+                    ForgeStatus = FText::FromString(FString::Printf(TEXT("Costs %d Riftglass; the wallet holds %d."),
+                        Cost.Amount, Wallet.Get()));
+                }
+            }
         }
-
-        // ---- REFORGE / ATTUNE: whole-item verbs -----------------------------
-        const FBreakerForgeCost CostReforge = UBreakerForgeLibrary::ReforgeCost(SelectedItem);
-        const bool bAffordableReforge = Wallet.CanAfford(CostReforge);
-        const FBreakerForgeCost CostAttune = UBreakerForgeLibrary::AttuneCost(SelectedItem);
-        const bool bAffordableAttune = Wallet.CanAfford(CostAttune);
-        const FGuid CapturedSelectedId = SelectedItem.ItemId;
-
-        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
-        [
-            BorderWrap(
-                SNew(SButton)
-                .ButtonColorAndOpacity(PanelRaised)
-                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
-                {
-                    if (Character.IsValid() && Character->GetEquipment())
-                    {
-                        const EBreakerForgeResult Result = Character->GetEquipment()->ReforgeItem(CapturedSelectedId, /*bIsAtForge=*/true);
-                        ForgeStatus = FText::FromString(FString::Printf(TEXT("REFORGE: %s"), *DescribeForgeResult(Result)));
-                    }
-                    Rebuild(EBreakerMenuScreen::Forge);
-                    return FReply::Handled();
-                }))
-                [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(TEXT("REFORGE — REROLL EVERY AFFIX VALUE")), BreakerUI::TypeBody, Primary, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(DescribeForgeCost(CostReforge)), BreakerUI::TypeBody, bAffordableReforge ? Amber : Harm, true)]
-                ],
-                BorderEmphasis)
-        ];
-        ForgePanel->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
-        [
-            BorderWrap(
-                SNew(SButton)
-                .ButtonColorAndOpacity(PanelRaised)
-                .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
-                {
-                    if (Character.IsValid() && Character->GetEquipment())
-                    {
-                        const EBreakerForgeResult Result = Character->GetEquipment()->AttuneItem(CapturedSelectedId, /*bIsAtForge=*/true);
-                        ForgeStatus = FText::FromString(FString::Printf(TEXT("ATTUNE: %s"), *DescribeForgeResult(Result)));
-                    }
-                    Rebuild(EBreakerMenuScreen::Forge);
-                    return FReply::Handled();
-                }))
-                [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().FillWidth(1.0f)[MenuText(FText::FromString(TEXT("ATTUNE — REROLL WHICH AFFIXES IT CARRIES")), BreakerUI::TypeBody, Primary, true)]
-                    + SHorizontalBox::Slot().AutoWidth()[MenuText(FText::FromString(DescribeForgeCost(CostAttune)), BreakerUI::TypeBody, bAffordableAttune ? Amber : Harm, true)]
-                ],
-                BorderEmphasis)
-        ];
-
-        // ---- SALVAGE: backpack only, destroys the item ----------------------
-        if (!bSelectedEquipped)
+        else if (ForgeVerb == 1)
         {
-            const FBreakerForgeWallet SalvagePreview = UBreakerForgeLibrary::SalvageValue(SelectedItem);
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, BreakerUI::Space4)
-            [
-                MenuText(FText::FromString(FString::Printf(TEXT("SALVAGE — DESTROYS THE ITEM · PAYS %d %s"),
-                    SalvagePreview.Get(), BreakerForge::CurrencyDisplayName)),
-                    BreakerUI::TypeCaption, Harm, true)
-            ];
-            ForgePanel->AddSlot().AutoHeight()
-            [
-                BorderWrap(
-                    SNew(SButton)
-                    .ButtonColorAndOpacity(Panel)
-                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                    .ToolTipText(FText::FromString(TEXT("Destroys this item and pays its salvage value into the wallet.")))
-                    .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
-                    {
-                        if (Character.IsValid() && Character->GetEquipment())
-                        {
-                            const bool bOk = Character->GetEquipment()->SalvageFromBackpack(CapturedSelectedId);
-                            ForgeStatus = FText::FromString(bOk ? TEXT("SALVAGE: DONE.") : TEXT("SALVAGE: ITEM NOT FOUND."));
-                            if (bOk) ForgeSelectedItemId.Invalidate();
-                        }
-                        Rebuild(EBreakerMenuScreen::Forge);
-                        return FReply::Handled();
-                    }))
+            // ---- REFORGE -------------------------------------------------
+            AddKicker(TEXT("OUTCOME SPACE"), TEXT("· SAME BANDS"),
+                TEXT("Every value rerolls inside its lit band. Tiers do not move."));
+            for (int32 AffixIndex = 0; AffixIndex < SelectedItem.Affixes.Num(); ++AffixIndex)
+            {
+                Bench->AddSlot().AutoHeight()[MakeAffixRow(AffixIndex, false)];
+            }
+            const FBreakerForgeCost Cost = UBreakerForgeLibrary::ReforgeCost(SelectedItem);
+            const bool bAffordable = Wallet.CanAfford(Cost);
+            CostLead = FString::FromInt(Cost.Amount);
+            CostTail = bAffordable
+                ? FString::Printf(TEXT("LEAVES %d"), Wallet.Get() - Cost.Amount)
+                : FString::Printf(TEXT("SHORT %d"), Cost.Amount - Wallet.Get());
+            FooterAction = bAffordable
+                ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(220.0f).HeightOverride(47.0f)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::Hex(0x2A2416))
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                            {
+                                if (Character.IsValid() && Character->GetEquipment())
+                                {
+                                    const EBreakerForgeResult Result = Character->GetEquipment()->ReforgeItem(
+                                        CapturedSelectedId, /*bIsAtForge=*/true);
+                                    ForgeStatus = FText::FromString(FString::Printf(TEXT("REFORGE: %s"), *DescribeForgeResult(Result)));
+                                }
+                                Rebuild(EBreakerMenuScreen::Forge);
+                                return FReply::Handled();
+                            }))
+                            [
+                                BreakerMonoText(FText::FromString(FString::Printf(TEXT("REFORGE FOR %d"), Cost.Amount)),
+                                    12, Amber, 0.16f)
+                            ]
+                        ],
+                        Amber)
+                ])
+                : BreakerSettingsDisabledButton(TEXT("REFORGE — SHORT"), 220.0f);
+        }
+        else if (ForgeVerb == 2)
+        {
+            // ---- ATTUNE --------------------------------------------------
+            AddKicker(TEXT("OUTCOME SPACE"), TEXT("· WHICH AFFIXES"),
+                TEXT("Rerolls which affixes the item carries. The count and the tiers stay."));
+            for (const FBreakerRolledAffix& Affix : SelectedItem.Affixes)
+            {
+                const FBreakerAffixDefinition* Definition = UBreakerAffixLibrary::FindAffix(AffixPool, Affix.AffixId);
+                Bench->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f)
                     [
-                        MenuText(FText::FromString(TEXT("SALVAGE")), BreakerUI::TypeCaption, Harm, true)
-                    ],
-                    HarmDeep)
-            ];
+                        MenuText(FText::FromString(Definition ? Definition->DisplayName.ToString() : Affix.AffixId.ToString()),
+                            BreakerUI::TypeBody, Primary, true)
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth()
+                    [
+                        BreakerMonoText(FText::FromString(FString::Printf(TEXT("%s · KEPT"), *TierLabel(Affix.Tier))),
+                            BreakerUI::TypeCaption, Muted, 0.16f)
+                    ]
+                ];
+            }
+            const FBreakerForgeCost Cost = UBreakerForgeLibrary::AttuneCost(SelectedItem);
+            const bool bAffordable = Wallet.CanAfford(Cost);
+            CostLead = FString::FromInt(Cost.Amount);
+            CostTail = bAffordable
+                ? FString::Printf(TEXT("LEAVES %d"), Wallet.Get() - Cost.Amount)
+                : FString::Printf(TEXT("SHORT %d"), Cost.Amount - Wallet.Get());
+            FooterAction = bAffordable
+                ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(220.0f).HeightOverride(47.0f)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::Hex(0x2A2416))
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                            {
+                                if (Character.IsValid() && Character->GetEquipment())
+                                {
+                                    const EBreakerForgeResult Result = Character->GetEquipment()->AttuneItem(
+                                        CapturedSelectedId, /*bIsAtForge=*/true);
+                                    ForgeStatus = FText::FromString(FString::Printf(TEXT("ATTUNE: %s"), *DescribeForgeResult(Result)));
+                                }
+                                Rebuild(EBreakerMenuScreen::Forge);
+                                return FReply::Handled();
+                            }))
+                            [
+                                BreakerMonoText(FText::FromString(FString::Printf(TEXT("ATTUNE FOR %d"), Cost.Amount)),
+                                    12, Amber, 0.16f)
+                            ]
+                        ],
+                        Amber)
+                ])
+                : BreakerSettingsDisabledButton(TEXT("ATTUNE — SHORT"), 220.0f);
         }
-
-        if (!ForgeStatus.IsEmpty())
+        else if (ForgeVerb == 3)
         {
-            ForgePanel->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)[MenuText(ForgeStatus, BreakerUI::TypeCaption, Amber, true)];
+            // ---- SALVAGE -------------------------------------------------
+            // Destructive, so it is arm-then-confirm now — the old screen's
+            // single click was a ruling violation waiting for its bug report.
+            const FBreakerForgeWallet SalvagePreview = UBreakerForgeLibrary::SalvageValue(SelectedItem);
+            if (bSelectedEquipped)
+            {
+                Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+                [
+                    MenuText(FText::FromString(TEXT("This piece is equipped. Unequip it to salvage it — the Forge does not undress you.")),
+                        BreakerUI::TypeBody, SoftText)
+                ];
+            }
+            else
+            {
+                Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+                    [
+                        BreakerWarnMark()
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                    [
+                        BreakerMonoText(FText::FromString(TEXT("DESTROYS THE ITEM. THERE IS NO UNDO.")),
+                            BreakerUI::TypeCaption, Harm, 0.16f)
+                    ]
+                ];
+                CostLead = FString::FromInt(SalvagePreview.Get());
+                CostTail = FString::Printf(TEXT("PAYS INTO %d"), Wallet.Get());
+                const bool bArmed = bForgeSalvageArm;
+                FooterAction = SNew(SBox).WidthOverride(260.0f).HeightOverride(47.0f)
+                [
+                    BorderWrap(
+                        SNew(SButton)
+                        .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                        .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                        .OnClicked(FOnClicked::CreateLambda([this, CapturedSelectedId]()
+                        {
+                            if (!bForgeSalvageArm)
+                            {
+                                bForgeSalvageArm = true;
+                                ForgeStatus = FText::FromString(TEXT("Confirm to destroy the item for its Riftglass."));
+                                Rebuild(EBreakerMenuScreen::Forge);
+                                return FReply::Handled();
+                            }
+                            bForgeSalvageArm = false;
+                            if (Character.IsValid() && Character->GetEquipment())
+                            {
+                                const bool bOk = Character->GetEquipment()->SalvageFromBackpack(CapturedSelectedId);
+                                ForgeStatus = FText::FromString(bOk ? TEXT("SALVAGE: DONE.") : TEXT("SALVAGE: ITEM NOT FOUND."));
+                                if (bOk) ForgeSelectedItemId.Invalidate();
+                            }
+                            Rebuild(EBreakerMenuScreen::Forge);
+                            return FReply::Handled();
+                        }))
+                        [
+                            BreakerMonoText(FText::FromString(bArmed
+                                ? TEXT("CONFIRM — DESTROYS IT")
+                                : FString::Printf(TEXT("SALVAGE FOR %d"), SalvagePreview.Get())),
+                                12, Harm, 0.16f)
+                        ],
+                        bArmed ? Harm : HarmDeep)
+                ];
+            }
         }
-
-        OpsColumn->AddSlot().AutoHeight()[MakePlate(ForgePanel, PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space16))];
+        else
+        {
+            // ---- RESPEC --------------------------------------------------
+            // The one verb that acts on the CHARACTER, not the bench — and
+            // the reason the Forge is its only door (O43: doctrine changes at
+            // the Forge; the respec API refuses anywhere else).
+            AddKicker(TEXT("RESPEC"), TEXT("· FORGE ONLY"),
+                TEXT("Refunds a whole pool to be respent. Arm, then confirm."));
+            auto AddRespecRow = [&](const TCHAR* Label, const TCHAR* Caption, EBreakerPointCurrency Currency, int32 ArmIndex)
+            {
+                const bool bArmed = ForgeRespecArm == ArmIndex;
+                Bench->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                    [
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(Label), BreakerUI::TypeBody, Primary, true)]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            BreakerMonoText(FText::FromString(Caption), BreakerUI::TypeCaption, Muted, 0.16f)
+                        ]
+                    ]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                    [
+                        SNew(SBox).WidthOverride(200.0f).HeightOverride(BreakerSettingsControlHeight)
+                        [
+                            BorderWrap(
+                                SNew(SButton)
+                                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                                .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                                .OnClicked(FOnClicked::CreateLambda([this, Currency, ArmIndex]()
+                                {
+                                    if (ForgeRespecArm != ArmIndex)
+                                    {
+                                        ForgeRespecArm = ArmIndex;
+                                        ForgeStatus = FText::FromString(TEXT("Confirm to refund the whole pool."));
+                                        Rebuild(EBreakerMenuScreen::Forge);
+                                        return FReply::Handled();
+                                    }
+                                    ForgeRespecArm = INDEX_NONE;
+                                    UBreakerProgressionComponent* Progression =
+                                        Character.IsValid() ? Character->GetProgression() : nullptr;
+                                    if (Progression)
+                                    {
+                                        FText Failure;
+                                        // The standing shim again: proximity
+                                        // gating arrives with the hub.
+                                        if (Progression->RespecAtForge(Currency, /*bIsAtForge=*/true, Failure))
+                                        {
+                                            ForgeStatus = FText::FromString(TEXT("RESPEC: DONE. The pool is yours to respend."));
+                                            if (Character.IsValid()) Character->SaveGameState();
+                                        }
+                                        else
+                                        {
+                                            // Progression's own reason, verbatim.
+                                            ForgeStatus = Failure;
+                                        }
+                                    }
+                                    Rebuild(EBreakerMenuScreen::Forge);
+                                    return FReply::Handled();
+                                }))
+                                [
+                                    BreakerMonoText(FText::FromString(bArmed ? TEXT("CONFIRM?") : TEXT("RESPEC")),
+                                        BreakerUI::TypeCaption, bArmed ? Harm : SoftText, 0.16f)
+                                ],
+                                bArmed ? HarmDeep : BorderEmphasis)
+                        ]
+                    ]
+                ];
+            };
+            AddRespecRow(TEXT("CORE POINTS"), TEXT("REFUNDS EVERY SPENT CORE POINT"),
+                EBreakerPointCurrency::CorePoints, 0);
+            AddRespecRow(TEXT("DOCTRINE POINTS"), TEXT("REFUNDS THE DOCTRINE SPEND · THE COMMITMENT ITSELF STAYS"),
+                EBreakerPointCurrency::DoctrinePoints, 1);
+        }
     }
 
-    TSharedRef<SHorizontalBox> Body = SNew(SHorizontalBox);
-    Body->AddSlot().AutoWidth()
+    // The status line, reserved.
+    Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
     [
-        SNew(SBox).WidthOverride(420.0f)[SNew(SScrollBox) + SScrollBox::Slot()[PickerList]]
-    ];
-    Body->AddSlot().FillWidth(1.0f).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
-    [
-        SNew(SScrollBox) + SScrollBox::Slot()[OpsColumn]
+        SNew(SBox).HeightOverride(20.0f)
+        [
+            BreakerMonoText(ForgeStatus, BreakerUI::TypeCaption, Amber, 0.16f)
+        ]
     ];
 
-    return BuildZonedFrame(
-        FText::FromString(TEXT("FORGE")),
-        FText::FromString(TEXT("SALVAGE · TEMPER · REFORGE · ATTUNE")),
-        HeaderRight,
-        Body,
-        SNullWidget::NullWidget,
-        Metrics.PanelWidth,
-        Metrics.PanelHeight,
-        // Fixed height, never content height — see the shrink-wrap note in
-        // BuildZonedFrame. A forge selection changes the body's height, and a
-        // centred plate that changes height jumps.
-        /*bFillHeight=*/true);
+    // The bench footer: COST on the left, the verb's gold (or harm) action on
+    // the right — the plate's bottom band.
+    const TSharedRef<SWidget> BenchFooter = SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                BreakerMonoText(FText::FromString(ForgeVerb == 3 ? TEXT("PAYS") : TEXT("COST")),
+                    BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    BreakerMonoText(FText::FromString(CostLead.IsEmpty() ? TEXT("—") : CostLead),
+                        BreakerUI::TypeH2, CostLead.IsEmpty() ? Muted : Primary, 0.0f)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(BreakerUI::Space8, 0.0f, 0.0f, 2.0f)
+                [
+                    BreakerMonoText(FText::FromString(CostTail), BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ]
+        ]
+        + SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[FooterAction];
+
+    const TSharedRef<SWidget> BenchColumn = SNew(SVerticalBox)
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerUI::Space40, 0.0f, BreakerSettingsContentPad, BreakerUI::Space16))
+            [
+                Bench
+            ]
+        ]
+        + SVerticalBox::Slot().AutoHeight().Padding(FMargin(BreakerUI::Space40, BreakerUI::Space8, BreakerSettingsContentPad, BreakerUI::Space16))
+        [
+            BenchFooter
+        ];
+
+    const TSharedRef<SWidget> Body = SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()[VerbBand]
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()[ListColumn]
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f)[BenchColumn]
+        ];
+
+    // The header: the NPC's name is the title — the Forge is a person you
+    // walked up to, and « goes back to the conversation when there is one.
+    // The wallet reads in teal: Riftglass is matter pried out of the world
+    // (the pack colours it as the world-object it is), never chrome.
+    const FString NpcName = DialogueNPC.IsValid() ? DialogueNPC->GetDisplayName().ToString().ToUpper() : FString(TEXT("KESS"));
+    return BreakerScreenShell(*NpcName, *NpcName,
+        BreakerMonoText(FText::FromString(TEXT("THE FORGE · REACHED THROUGH DIALOGUE")),
+            BreakerUI::TypeCaption, Muted, 0.16f),
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+        [
+            BreakerMonoText(FText::FromString(TEXT("RIFTGLASS · ACCOUNT-WIDE")), BreakerUI::TypeCaption, Muted, 0.16f)
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            BreakerMonoText(FText::FromString(BreakerUI::FormatTicker(static_cast<float>(Wallet.Get()))),
+                BreakerUI::TypeH2, BreakerUI::TealAnomalous, 0.0f)
+        ],
+        FOnClicked::CreateLambda([this]()
+        {
+            bForgeSalvageArm = false;
+            ForgeRespecArm = INDEX_NONE;
+            if (DialogueNPC.IsValid())
+            {
+                Rebuild(EBreakerMenuScreen::Dialogue);
+                return FReply::Handled();
+            }
+            return GoBack();
+        }),
+        Body);
 }
 
 
