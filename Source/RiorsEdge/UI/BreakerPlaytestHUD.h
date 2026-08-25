@@ -15,6 +15,7 @@
 #include "BreakerPlaytestHUD.generated.h"
 
 class ABreakerCharacter;
+class ABreakerSoundDirector;
 class ABreakerTracerRenderer;
 class UBreakerAbilityComponent;
 class UBreakerAbilityStateComponent;
@@ -147,6 +148,10 @@ private:
     // shot and hands it to a world-space pooled renderer, spawned lazily on
     // the first shot and never replicated; see BreakerTracerRenderer.h.
     ABreakerTracerRenderer* GetTracerRenderer();
+    // The game's three sounds ride the same two events the visuals already
+    // ride (OnShot, OnHitDealt), through the same lazily-spawned cosmetic
+    // sibling; see BreakerSoundDirector.h.
+    ABreakerSoundDirector* GetSoundDirector();
     void DrawDamageNumbers();
     void DrawEnemyHealthBars(const ABreakerCharacter* Character);
     void DrawLootPickups(const ABreakerCharacter* Character);
@@ -214,6 +219,7 @@ private:
     double SkimBurstTime = -1000.0;
 
     UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
+    UPROPERTY() TObjectPtr<ABreakerSoundDirector> SoundDirector;
     // Every round the player has fired, used only to decide which of them get
     // a visible streak. Never reset: the modulo is what matters, not the count.
     int32 RoundsFired = 0;

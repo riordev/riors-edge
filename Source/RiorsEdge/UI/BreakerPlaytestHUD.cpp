@@ -20,6 +20,7 @@
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
+#include "Audio/BreakerSoundDirector.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Playtest/BreakerPlaytestComponent.h"
@@ -2153,9 +2154,31 @@ ABreakerTracerRenderer* ABreakerPlaytestHUD::GetTracerRenderer()
     return TracerRenderer;
 }
 
+ABreakerSoundDirector* ABreakerPlaytestHUD::GetSoundDirector()
+{
+    if (SoundDirector) return SoundDirector;
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+    FActorSpawnParameters Params;
+    Params.Owner = this;
+    Params.ObjectFlags |= RF_Transient;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    SoundDirector = World->SpawnActor<ABreakerSoundDirector>(
+        ABreakerSoundDirector::StaticClass(), FTransform::Identity, Params);
+    return SoundDirector;
+}
+
 void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 {
     if (!Shot.bFired) return;
+
+    // The report, per trigger pull. Before the projectile branch on purpose:
+    // a launcher skips the tracer because a real actor already flies, but
+    // nothing else makes its sound.
+    if (ABreakerSoundDirector* Sound = GetSoundDirector())
+    {
+        Sound->PlayWeaponFire();
+    }
 
     // A launcher already puts a real actor in the world; a hitscan streak on
     // top of it drew a second, faster, ghost round every time the rocket fired.
@@ -2304,11 +2327,23 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
     {
         LastHitDealtTime = Now;
         bHitDealtWeakPoint = bWeak;
+        // The confirm tick, under the same DoT exclusion as the crosshair
+        // and for the same reason. On a killing blow it plays UNDER the kill
+        // sound below — separate voices, and the kill is authored to read
+        // over it.
+        if (ABreakerSoundDirector* Sound = GetSoundDirector())
+        {
+            Sound->PlayHitConfirm();
+        }
     }
     if (Hit.Result.bKilled)
     {
         LastKillConfirmTime = Now;
         bKillConfirmWeakPoint = bWeak;
+        if (ABreakerSoundDirector* Sound = GetSoundDirector())
+        {
+            Sound->PlayKill();
+        }
     }
 
     // MERGE rather than spawn. A shotgun resolves eight pellets as eight hits,
