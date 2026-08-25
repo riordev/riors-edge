@@ -5497,8 +5497,27 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
     const FBreakerClassBlurb* Selected = FindClassBlurb(PendingCreateClass);
     const bool bSelectedImplemented = Selected && ClassHasImplementedKit(Selected->ClassId);
 
+    // THE CARD COPY WIDTH IS DERIVED, NEVER FIXED. The first pass wrapped at
+    // a literal 210 while the cards are FillWidth — right at 1920 and clipped
+    // at every narrower window, which is exactly where the owner read
+    // "Deployables and weapon" cut at the column edge. Same read as
+    // MeasureWideScreen: the viewport, sampled once per rebuild, never an
+    // allotted size.
+    FVector2D CreateViewport(1920.0f, 1080.0f);
+    if (GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->GetViewportSize(CreateViewport);
+    }
+    if (CreateViewport.X < 640.0f) CreateViewport.X = 1920.0f;
+    // Left pad 40, right pad 24, rail 380 + its 1px divider, four 18px gaps.
+    const float CreateCardWidth = (static_cast<float>(CreateViewport.X)
+        - 40.0f - 24.0f - 381.0f - 4.0f * 18.0f) / 5.0f;
+    // Interior after the card's 24px padding and 1px ring, with a hard floor
+    // so an absurd window degrades to dense text rather than to negative.
+    const float CardCopyWrap = FMath::Max(80.0f, CreateCardWidth - 52.0f);
+
     // ---- One class column --------------------------------------------------
-    auto MakeClassColumn = [this](const FBreakerClassBlurb& Blurb) -> TSharedRef<SWidget>
+    auto MakeClassColumn = [this, CardCopyWrap](const FBreakerClassBlurb& Blurb) -> TSharedRef<SWidget>
     {
         const bool bCardSelected = Blurb.ClassId == PendingCreateClass;
         const bool bImplemented = ClassHasImplementedKit(Blurb.ClassId);
@@ -5538,7 +5557,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             SNew(STextBlock)
                 .Text(FText::FromString(Blurb.ResourceBehaviour))
                 .ColorAndOpacity(Copy)
-                .WrapTextAt(210.0f)
+                .WrapTextAt(CardCopyWrap)
                 .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
         ];
         Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
@@ -5546,7 +5565,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             SNew(STextBlock)
                 .Text(FText::FromString(Blurb.Pitch))
                 .ColorAndOpacity(Copy)
-                .WrapTextAt(210.0f)
+                .WrapTextAt(CardCopyWrap)
                 .Font(BreakerBodyFont(BreakerUI::TypeBody))
         ];
         if (!bImplemented)
@@ -5575,7 +5594,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             SNew(STextBlock)
                 .Text(FText::FromString(TEXT("DOCTRINES · CHOSEN AT THE FORGE")))
                 .ColorAndOpacity(Muted)
-                .WrapTextAt(210.0f)
+                .WrapTextAt(CardCopyWrap)
                 .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
         ];
         Card->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
@@ -5583,7 +5602,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             SNew(STextBlock)
                 .Text(FText::FromString(FString(Blurb.Branches).ToUpper().Replace(TEXT(" / "), TEXT(" · "))))
                 .ColorAndOpacity(Copy)
-                .WrapTextAt(210.0f)
+                .WrapTextAt(CardCopyWrap)
                 .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
         ];
 
@@ -5739,7 +5758,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             ]
             + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
             [
-                BreakerMonoText(FText::FromString(TEXT("BODY PREVIEW · RUNTIME PRIMITIVE")),
+                // Shortened, measured: at 32 tracked glyphs the full
+                // "BODY PREVIEW · RUNTIME PRIMITIVE" overran the ring under
+                // DPI scaling. The words that matter are the honest half.
+                BreakerMonoText(FText::FromString(TEXT("RUNTIME PRIMITIVE")),
                     BreakerUI::TypeCaption, Disabled, 0.16f)
             ],
             288.0f, BorderRest)
@@ -5818,9 +5840,10 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                             {
                                 if (!PendingEnlistArm)
                                 {
+                                    // The arm swaps the label and nothing
+                                    // else: the button's own words are the one
+                                    // permanence warning this screen carries.
                                     PendingEnlistArm = true;
-                                    CharacterScreenStatus = FText::FromString(
-                                        TEXT("Class is permanent for this Breaker — the Forge respecs nodes, never the class. Confirm to enlist."));
                                     Rebuild(EBreakerMenuScreen::CharacterCreate);
                                     return FReply::Handled();
                                 }
@@ -5852,9 +5875,18 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
                                 return FReply::Handled();
                             }))
                             [
+                                // Caption size, measured: Plex Mono at 12
+                                // rendered the armed label wider than the
+                                // 333px rail box and the owner read
+                                // "PERMANEN". 28 glyphs at 11 tracked is
+                                // ~224px against ~315 of interior.
+                                // The armed sentence keeps its words and
+                                // gives up tracking instead: 28 glyphs at
+                                // 0.16em measured right at the box edge under
+                                // DPI scaling, and the words are the warning.
                                 BreakerMonoText(FText::FromString(bArmed
                                     ? TEXT("CONFIRM — CLASS IS PERMANENT")
-                                    : TEXT("ENLIST")), 12, Amber, 0.16f)
+                                    : TEXT("ENLIST")), BreakerUI::TypeCaption, Amber, bArmed ? 0.08f : 0.16f)
                             ]
                         ],
                         Amber)
@@ -5899,20 +5931,13 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
             ]
         ];
 
-    // The permanence warning lives in the header, gold words beside the gold
-    // drawn mark — caution, not refusal, so it is never harm red.
+    // ONE permanence warning, ruled: the armed button's own text carries it,
+    // and the arm-then-confirm IS the warning. The gold header line and the
+    // status caption this screen used to stack on top are deleted, not
+    // restyled.
     return BreakerScreenShell(TEXT("BREAKERS"), TEXT("ENLIST A BREAKER"),
         SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
-        SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-        [
-            BreakerWarnMark(Amber)
-        ]
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-        [
-            BreakerMonoText(FText::FromString(TEXT("CLASS CANNOT BE CHANGED LATER")),
-                BreakerUI::TypeCaption, Amber, 0.16f)
-        ],
+        SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
         FOnClicked::CreateLambda([this]()
         {
             PendingEnlistArm = false;
@@ -9049,6 +9074,16 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
             ];
         };
 
+        // The bench copy width, derived like the create cards': viewport minus
+        // the 375px list, its divider, and the bench pads — never a literal.
+        FVector2D ForgeViewport(1920.0f, 1080.0f);
+        if (GEngine && GEngine->GameViewport)
+        {
+            GEngine->GameViewport->GetViewportSize(ForgeViewport);
+        }
+        if (ForgeViewport.X < 640.0f) ForgeViewport.X = 1920.0f;
+        const float BenchWidth = FMath::Max(320.0f, static_cast<float>(ForgeViewport.X) - 376.0f - 80.0f);
+
         auto AddKicker = [&](const TCHAR* Lead, const TCHAR* Tail, const TCHAR* Helper)
         {
             Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, BreakerUI::Space16)
@@ -9064,7 +9099,8 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
                 ]
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
                 [
-                    MenuText(FText::FromString(Helper), BreakerUI::TypeBody, SoftText)
+                    MenuWrappedText(FText::FromString(Helper), BreakerUI::TypeBody, SoftText,
+                        FMath::Max(160.0f, BenchWidth - 280.0f))
                 ]
             ];
         };
@@ -9670,6 +9706,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildQuartermasterScreen()
 
     const UBreakerAbilityDefinition* Selected = QuartermasterSelectedAbility.IsNone()
         ? nullptr : UBreakerAbilityDefinition::FindFallback(QuartermasterSelectedAbility);
+    // Derived, never a literal: the same defect family as the create cards'
+    // fixed 210 — a fixed 760 wrap clips at any window under ~1220.
+    FVector2D QmViewport(1920.0f, 1080.0f);
+    if (GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->GetViewportSize(QmViewport);
+    }
+    if (QmViewport.X < 640.0f) QmViewport.X = 1920.0f;
+    const float QmCopyWrap = FMath::Max(200.0f, static_cast<float>(QmViewport.X) - 376.0f - 80.0f - 130.0f);
     if (QuartermasterSelectedAbility.IsNone())
     {
         Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
@@ -9715,7 +9760,7 @@ TSharedRef<SWidget> SBreakerMenu::BuildQuartermasterScreen()
                 SNew(STextBlock)
                     .Text(Selected ? Selected->Description : FText::GetEmpty())
                     .ColorAndOpacity(SoftText)
-                    .WrapTextAt(760.0f)
+                    .WrapTextAt(QmCopyWrap)
                     .Font(BreakerBodyFont(BreakerUI::TypeBody))
             ]
         ];
