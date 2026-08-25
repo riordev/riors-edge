@@ -553,6 +553,67 @@ namespace BreakerPowerBandTest
 }
 
 // ---------------------------------------------------------------------------
+// EVERY FIXTURE NODE ID RESOLVES TO A NODE THAT EXISTS.
+//
+// THIS IS THE GUARD PHASE 4 NEEDS AND THE PLAN SCHEDULED FOR PHASE 5, which is
+// one phase too late: Phase 4 replaces Core's thirty nodes with an atlas of a
+// hundred and sixty-eight, and every id in these fixtures changes with it.
+//
+// AggregateStats drops an unknown id in SILENCE -- BreakerProgressionComponent
+// .cpp:941 is `if (!Found) continue;`. So a renamed Core node does not fail
+// here, it contributes nothing, and both fixtures quietly compose down toward
+// gear-plus-floor with band drift as the only symptom. Thirty-four Core ids are
+// named across the two rank lists; a rename lands them all at once, and the
+// bands are already out of band, so the drift would arrive looking like the
+// thing everyone is expecting to move anyway.
+//
+// It asserts the ids specifically rather than a rank count, because a count
+// would be satisfied by thirty-four ids that all resolve to nothing.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerPowerBandFixtureIdsResolveTest,
+    "RiorsEdge.Progression.PowerBand.FixtureIdsResolve",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPowerBandTest;
+
+    TSet<FName> Known;
+    for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
+    {
+        if (!Tree) continue;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            if (Node) Known.Add(Node->NodeId);
+        }
+    }
+    TestTrue(TEXT("The fallback trees carry nodes to resolve against"), Known.Num() > 100);
+
+    int32 Checked = 0;
+    TArray<FString> Missing;
+    for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized")})
+    {
+        const TArray<FBreakerNodeRank> Ranks =
+            FString(Label) == TEXT("baseline") ? BaselineRanks() : OptimizedRanks();
+        for (const FBreakerNodeRank& Rank : Ranks)
+        {
+            ++Checked;
+            if (!Known.Contains(Rank.NodeId))
+            {
+                Missing.Add(FString::Printf(TEXT("%s: %s"), Label, *Rank.NodeId.ToString()));
+            }
+        }
+    }
+
+    TestTrue(TEXT("Both fixtures name ranks at all"), Checked > 30);
+    TestEqual(*FString::Printf(TEXT("Every fixture id resolves to a real node (%d checked): %s"),
+        Checked, Missing.Num() ? *FString::Join(Missing, TEXT("; ")) : TEXT("all resolve")),
+        Missing.Num(), 0);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // O36 split this single test into two, each pinned to its own fixture and its
 // own band. NAMING IS LOAD-BEARING: UE's automation tree cannot hold a leaf
 // test at a node that is ALSO a parent. Before this split,
