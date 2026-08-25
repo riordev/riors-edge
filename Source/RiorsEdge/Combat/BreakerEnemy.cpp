@@ -530,7 +530,18 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     // (b) Strafe weave: a lateral sinusoid folded into the chase vector.
     // Elites are exempt — the identity is that an elite advances
     // implacably and does not juke (Encounter-Design §1.1 chassis).
-    if (!IsElite() && Distance > AttackRange)
+    //
+    // ELITE OR BETTER, and this asked exactly Elite until now. A
+    // ModifierBearing champion and the Field Marshal both juked, which is the
+    // stated identity inverted on the two ranks that carry it hardest -- a boss
+    // weaving is the opposite of implacable. Same file, same predicate and the
+    // same misreading as the drop gate above, which already spells it out.
+    //
+    // It survived that fix because the fix was scoped by CATEGORY -- the header
+    // says IsEliteOrBetter is "the question every REWARD site was actually
+    // asking" -- and this is a behaviour site. Scoping by category leaves every
+    // instance the category does not name.
+    if (!IsEliteOrBetter() && Distance > AttackRange)
     {
         WeaveTime += DeltaSeconds;
         const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();

@@ -1012,7 +1012,14 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
                 // Prefer killable trash over an elite: a reel parked on a
                 // warded elite photographs absorption forever and never a
                 // death beat or a drop.
-                if (!It->IsElite() && DistSq < BestTrashSq) { BestTrashSq = DistSq; BestVisibleTrash = *It; }
+                //
+                // ELITE OR BETTER. This asked exactly Elite, so a BOSS
+                // registered as trash and was actively PREFERRED as the capture
+                // target -- and the failure the comment describes is strictly
+                // worse on a boss than on the elite it was written to avoid.
+                // The harness would park on the one enemy in the game most
+                // likely to photograph absorption and never a death.
+                if (!It->IsEliteOrBetter() && DistSq < BestTrashSq) { BestTrashSq = DistSq; BestVisibleTrash = *It; }
             }
             AActor* CaptureTarget = BestVisibleTrash ? BestVisibleTrash : BestVisibleAny;
             if (!CaptureTarget) CaptureTarget = NearestAny;

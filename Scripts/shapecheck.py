@@ -42,47 +42,76 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "Source", "RiorsEdge")
 
 
-# Each shape: what a fix for it looks like when DELETED, and how to find the
-# other instances. `sibling` runs over every production source line.
+# Each shape has two roles and they are NOT the same question:
+#
+#   find    -- where does this shape live in the tree?
+#   trigger -- did this commit just correct an instance of it?
+#
+# THE TRIGGER MUST NEVER BE NARROWER THAN THE FIND, and it was. absence-
+# justification triggered on "cannot be authored" while finding "cannot author",
+# so b4d5d37 -- one of the four cases in this file's own docstring -- removed the
+# line "genuinely cannot author even as a placeholder" and the tool said nothing.
+# Two patterns for one shape, drifted apart, which is the same defect family the
+# tool exists to catch.
+#
+# So `trigger` now DEFAULTS to `find`, and is only given separately where the two
+# questions genuinely differ -- which is once, and the reason is written there.
 SHAPES = [
     {
         "key": "self-referential-assertion",
         "what": "an assertion comparing a value against its own definition",
-        "deleted": re.compile(r"Test(Equal|True)\s*\(.*(RewriteLayerCeiling|MaximumMinorStackStep|"
+        # THE ONE PLACE THE TWO QUESTIONS DIFFER. Finding every assertion in the
+        # tree is useless -- a tautology is only visible against the definitions
+        # around it -- so the find is any assertion in a file the commit already
+        # touched, while the trigger names the constants whose tautologies have
+        # actually been found. A new one is added here when it is found, not
+        # guessed at in advance.
+        "trigger": re.compile(r"Test(Equal|True)\s*\(.*(RewriteLayerCeiling|MaximumMinorStackStep|"
                               r"MinorStackStep|LayerCeiling)", re.I),
-        "sibling": re.compile(r"Test(Equal|True)\s*\("),
+        "find": re.compile(r"Test(Equal|True)\s*\("),
         "narrow": True,
-        "note": "Only assertions in the same file are listed: an assertion is a tautology "
-                "relative to the definitions around it, so a cross-file list would be noise.",
+        "note": "Only assertions in files this commit touched: a tautology is relative to the "
+                "definitions around it, so a tree-wide list would be noise.",
     },
     {
         "key": "arithmetic-centre-of-a-multiplicative-band",
         "what": "a band centre written as an arithmetic mean where the band composes multiplicatively",
-        "deleted": re.compile(r"BandMid\s*=|BandMid\b"),
-        "sibling": re.compile(r"constexpr\s+float\s+\w*BandMid\w*\s*="),
+        "find": re.compile(r"constexpr\s+float\s+\w*BandMid\w*\s*=|\bBandMid\b"),
         "narrow": False,
         "note": "Every *BandMid in the tree. Two exist and both are arithmetic means.",
     },
     {
         "key": "narrow-rank-predicate",
         "what": "a predicate testing one enum value where the enum is ordered and higher values qualify",
-        "deleted": re.compile(r"IsElite\(\)|==\s*EBreaker\w*Rank::"),
-        "sibling": re.compile(r"IsElite\(\)|==\s*EBreaker\w*Rank::\w+"),
+        "find": re.compile(r"IsElite\(\)|==\s*EBreaker\w*Rank::\w+"),
         "narrow": False,
-        "note": "Ordered-enum equality tests. A reward or gameplay site asking == Elite is "
-                "the shape; a telemetry site asking it is correct and should be said so.",
+        "note": "Ordered-enum equality tests. A reward or behaviour site asking == Elite is the "
+                "shape; a telemetry site asking it is correct, and the two live survivors of "
+                "the first pass were both BEHAVIOUR sites missed because the fix was scoped by "
+                "category rather than by shape.",
+    },
+    {
+        "key": "value-at-its-own-clamp-bound",
+        "what": "a magnitude authored at the edge of its own clamp, so the scale is saturated "
+                "and no bonus applied to it can move",
+        "find": re.compile(r"=\s*1\.0f\s*;.*ClampMax\s*=\s*\"1|ClampMax\s*=\s*\"1\".*=\s*1\.0f"),
+        "narrow": False,
+        "note": "BossDropChance = 1.0f under ClampMax=\"1\" made the Drop Chance affix inert on "
+                "a boss and capped the whole axis at a 10x spread. A value sitting on its own "
+                "bound is a scale that has run out, not a number that was chosen.",
     },
     {
         "key": "absence-justification",
         "what": "a comment asserting a named thing does not exist, is inert, or cannot be authored",
-        "deleted": re.compile(r"//.*(there is no|does not exist|no way to|cannot be authored|"
-                              r"still the one inert|is still inert|has no consumer|nothing reads)", re.I),
-        "sibling": re.compile(r"//.*(there is no |does not exist|no way to |cannot author|"
-                              r"is still inert|the one inert|nothing reads |has no consumer)", re.I),
+        "find": re.compile(r"//.*(there is no |does not exist|no way to |cannot author|"
+                           r"cannot be authored|is still inert|the one inert|nothing reads |"
+                           r"has no consumer|no consumer)", re.I),
         "narrow": False,
+        "comments_are_instances": True,
         "note": "These are paragraphs, so a line match is a POINTER to a block a human reads, "
                 "not a finding. Four of these were wrong this week and every one spanned "
-                "more than one line.",
+                "more than one line. Expect a large number here: it is a reading list, and "
+                "the floor on it is 17.",
     },
 ]
 
@@ -110,7 +139,23 @@ def main():
         print(f"shapecheck: {rev} has no diff to read.")
         return 0
 
-    deleted = [l[1:] for l in diff.splitlines() if l.startswith("-") and not l.startswith("---")]
+    # THE WHOLE HUNK, NOT JUST DELETIONS -- and reading only deletions made this
+    # tool miss two of the four cases in its own docstring.
+    #
+    # b4d5d37, "Drop Chance stops lying on a boss", reported nothing at all: the
+    # correction was a new test and a new comment, so there was no `-` line
+    # carrying the shape. And the band-mid catch on 288c911 fired by COINCIDENCE
+    # -- on a deleted tautology line that happened to contain the text
+    # EndgameBandMid, not on the mid correction, which was purely additive. A
+    # commit that adds the note and deletes nothing reports clean.
+    #
+    # Corrections land on the `+` side constantly: a comment recording a
+    # finding, a new guard, a call swapped for a wider sibling. Noise rises, and
+    # that trade is already accepted everywhere else here by listing sites
+    # instead of judging them.
+    changed = [l[1:] for l in diff.splitlines()
+               if (l.startswith("-") and not l.startswith("---"))
+               or (l.startswith("+") and not l.startswith("+++"))]
 
     # TOUCHED IS A SET OF LINE RANGES, NOT A SET OF FILES, and the first version
     # of this script got that wrong in the exact way it exists to catch. With
@@ -148,14 +193,15 @@ def main():
                 return True
         return False
 
-    print(f"shapecheck {rev}: {len(deleted)} deleted lines, {len(touched)} files touched")
+    print(f"shapecheck {rev}: {len(changed)} changed lines, {len(touched)} files touched")
     print()
 
     sources = list(production_sources())
     any_hit = False
 
     for shape in SHAPES:
-        hits = [d for d in deleted if shape["deleted"].search(d)]
+        trigger = shape.get("trigger", shape["find"])
+        hits = [d for d in changed if trigger.search(d)]
         if not hits:
             continue
         any_hit = True
@@ -173,19 +219,63 @@ def main():
             except OSError:
                 continue
             for n, line in enumerate(text.splitlines(), 1):
-                if shape["sibling"].search(line):
+                if shape["find"].search(line):
                     siblings.append((rel, n, line.strip()[:96], is_test))
 
         untouched = [s for s in siblings if not was_checked(s[0], s[1])]
-        print(f"  {len(siblings)} site(s) match the shape; {len(untouched)} the commit did not go near")
-        for rel, n, line, is_test in untouched[:40]:
-            print(f"    {'[test] ' if is_test else '       '}{rel}:{n}  {line}")
-        if len(untouched) > 40:
-            print(f"    ... and {len(untouched) - 40} more")
+
+        # A RAW COUNT IS UNREADABLE AND WORSE THAN NONE. narrow-rank-predicate
+        # returned 23 of 23, and the 23 included the predicate's OWN
+        # DEFINITION, the header comments explaining the fix, and the test
+        # documenting it. Trust that number and a reader sees 23 unexamined
+        # defects; distrust it and the two real ones stay buried under it.
+        #
+        # The discriminator was already written in each shape's note ("a
+        # telemetry site asking it is correct") and was doing nothing there, so
+        # it moves into the output. Crude on purpose: comment, test and
+        # self-definition are mechanically separable and everything else is
+        # LIVE CODE A HUMAN MUST READ. It does not judge those -- a live site
+        # may be perfectly correct -- it only stops them being counted
+        # alongside their own documentation.
+        # WHETHER A COMMENT IS AN INSTANCE DEPENDS ON THE SHAPE, and treating
+        # that as universal nullified a whole shape. For narrow-rank-predicate a
+        # `//` mentioning IsElite is documentation ABOUT the shape. For
+        # absence-justification the comment IS the shape -- so filing all 141
+        # matches as "self-documenting, not defects" withheld every real one and
+        # reported the exact opposite of the finding.
+        comments_are_instances = shape.get("comments_are_instances", False)
+
+        def bucket(rel, line, is_test):
+            stripped = line.lstrip()
+            if not comments_are_instances and (
+                    stripped.startswith("//") or stripped.startswith("*") or stripped.startswith("/*")):
+                return "comment"
+            if is_test:
+                return "test"
+            if re.search(r"\b(bool|float|int32|void)\s+\w+\s*\(.*\)\s*(const)?\s*\{", line):
+                return "definition"
+            return "live"
+
+        graded = [(rel, n, line, bucket(rel, line, is_test)) for rel, n, line, is_test in untouched]
+        live = [g for g in graded if g[3] == "live"]
+        others = [g for g in graded if g[3] != "live"]
+        counts = {}
+        for g in others:
+            counts[g[3]] = counts.get(g[3], 0) + 1
+        tail = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
+        print(f"  {len(siblings)} site(s) match; {len(untouched)} the commit did not go near")
+        print(f"  OF THOSE: {len(live)} live code" + (f"; {tail} (self-documenting, not defects)" if tail else ""))
+        for rel, n, line, _ in live[:40]:
+            print(f"    {rel}:{n}  {line}")
+        if len(live) > 40:
+            print(f"    ... and {len(live) - 40} more live sites")
+        if others:
+            print(f"    ({len(others)} comment/test/definition site(s) withheld — they describe the shape, "
+                  "they are not instances of it)")
         print()
 
     if not any_hit:
-        print("No recognised shape in this commit's deletions.")
+        print("No recognised shape in this commit's changed lines.")
         print("That is NOT a clean bill: it means none of the listed shapes matched.")
     print("Every site above needs a human verdict. Listing is not judging.")
     return 0
