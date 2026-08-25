@@ -279,24 +279,29 @@ bool FBreakerElementsConstellationTest::RunTest(const FString& Parameters)
         // would render outside the Elements cluster.
         if (Node->NodeId.ToString().StartsWith(TEXT("Core.Elements."))) ElementNodes.Add(Node);
     }
-    TestEqual(TEXT("Elements ships six nodes, so its cluster is no longer sealed"), ElementNodes.Num(), 6);
+    // ATLAS SHAPE (Phase 4 pair C): a full wheel of ten. The six shipped ids
+    // hold with their tags; the four new nodes carry none (dead-tag headroom
+    // is one and a tag may only arrive consumed). The old no-More assertion
+    // is superseded BY RULING — the atlas's nine-More roster spends the slot
+    // §2.4 used to reserve, on the hub and only the hub.
+    TestEqual(TEXT("Elements ships its full wheel of ten"), ElementNodes.Num(), 10);
 
     for (const UBreakerProgressionNode* Node : ElementNodes)
     {
         const FString Context = Node->NodeId.ToString();
         TestEqual(*(Context + TEXT(" spends core points")), Node->Currency, EBreakerPointCurrency::CorePoints);
         TestEqual(*(Context + TEXT(" is class-agnostic")), Node->RequiredClass, EBreakerClassId::None);
-        // The rule this constellation exists to obey: pre-resistance, every
-        // Elements node must still MOVE something. A node carrying only an
-        // unconsumed elemental tag would be the damage-less damage node again.
-        TestTrue(*(Context + TEXT(" authors at least one live stat effect")), Node->Effects.Num() > 0);
-        TestTrue(*(Context + TEXT(" carries its elemental rule as a tag")), Node->GrantedTags.Num() > 0);
-        // §2.4 reserves Elements' More slot and this pass deliberately leaves it
-        // empty: no movement condition can express "a reaction fired", so the
-        // only authorable form would be an unconditional generalist.
-        for (const FBreakerNodeEffect& Effect : Node->Effects)
+        // Every Elements node must still MOVE something today: a stat line on
+        // a live lane, or a rule tag with a live consumer (Threshold).
+        TestTrue(*(Context + TEXT(" authors an effect or carries a tag")),
+            Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0);
+        // The More lives on the hub alone (O3: Convergence nodes only).
+        if (Node->NodeId != FName(TEXT("Core.Elements.ReactionChain")))
         {
-            TestTrue(*(Context + TEXT(" authors no More multiplier")), Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                TestTrue(*(Context + TEXT(" authors no More multiplier")), Effect.StatBucket != EBreakerNodeStatBucket::MorePercent);
+            }
         }
     }
 
@@ -313,35 +318,40 @@ bool FBreakerElementsConstellationTest::RunTest(const FString& Parameters)
     const float BaseCritChance = Attributes->GetCriticalChance();
     const float BaseDamage = Attributes->GetDamageMultiplier();
 
-    // Investment gates are per TREE, not per constellation, and Elements has one
-    // gateway — so reaching its tier-2 lanes costs one point somewhere else in
-    // Core first. That is the intended cross-constellation pull, not a bug, and
-    // the test pays it the way a player would.
-    FText PrimerFailure;
-    TestTrue(TEXT("A point elsewhere in Core opens the tier-2 gate"),
-        Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), PrimerFailure));
+    // The wheel walk, the atlas way: six free rims, three inners each gated
+    // on their two stated rims, the hub on all three inners.
     const float PrimedDoT = Attributes->GetDamageOverTimeMultiplier();
     const float PrimedCritChance = Attributes->GetCriticalChance();
     const float PrimedDamage = Attributes->GetDamageMultiplier();
 
-    // The Convergence sits behind the tier-3 investment gate, which a single
-    // gateway cannot open — buy the lanes first, exactly as a player would.
-    TestTrue(TEXT("Conductive opens the constellation"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.Conductive")));
-    TestTrue(TEXT("Charge Up ladders to three ranks"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.ChargeUp")));
-    TestTrue(TEXT("Threshold purchases"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.Threshold")));
-    TestTrue(TEXT("Catalyst purchases"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.Catalyst")));
-    TestTrue(TEXT("Penetrance purchases"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.Penetrance")));
-    TestTrue(TEXT("Reaction Chain purchases"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.ReactionChain")));
+    for (const TCHAR* Rim : {TEXT("Core.Elements.Conductive"), TEXT("Core.Elements.ChargeUp"),
+        TEXT("Core.Elements.Penetrance"), TEXT("Core.Elements.Attunement"),
+        TEXT("Core.Elements.Catalyst"), TEXT("Core.Elements.Sympathy")})
+    {
+        TestTrue(*FString::Printf(TEXT("%s purchases"), Rim), BranchContentBuyToMax(*this, Progression, Core, Rim));
+    }
+    for (const TCHAR* Inner : {TEXT("Core.Elements.Threshold"), TEXT("Core.Elements.Reaction"), TEXT("Core.Elements.Sequence")})
+    {
+        TestTrue(*FString::Printf(TEXT("%s purchases"), Inner), BranchContentBuyToMax(*this, Progression, Core, Inner));
+    }
+    TestTrue(TEXT("Reaction Chain purchases behind its three inners"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.ReactionChain")));
 
-    // 8 + (7 x 3) + 14 + 25 = 68% into the one additive DoT bucket.
-    TestEqual(TEXT("Elements' damage over time reaches the attribute set"),
-        Attributes->GetDamageOverTimeMultiplier() - PrimedDoT, 0.68f, 0.0001f);
-    // Catalyst 4 x 2 ranks.
+    // Nothing in the atlas Elements authors DoT; the wheel's damage today is
+    // its generic lines plus the hub's More.
+    TestEqual(TEXT("Elements authors no DoT line under the atlas"),
+        Attributes->GetDamageOverTimeMultiplier() - PrimedDoT, 0.0f, 0.0001f);
     TestEqual(TEXT("Catalyst's crit chance reaches the attribute set"),
-        Attributes->GetCriticalChance() - PrimedCritChance, 0.08f, 0.0001f);
-    // Penetrance 4 x 2 ranks plus Reaction Chain's 6.
-    TestEqual(TEXT("Penetrance and Reaction Chain reach the damage bucket"),
-        Attributes->GetDamageMultiplier() - PrimedDamage, 0.14f, 0.0001f);
+        Attributes->GetCriticalChance() - PrimedCritChance, 0.04f, 0.0001f);
+    // Conductive 3 + Penetrance 3 into the additive bucket, then the hub's
+    // x1.26 More on top — the attribute composes (base + Increased) x More.
+    TestEqual(TEXT("The generic lines and the hub's More reach the damage attribute"),
+        Attributes->GetDamageMultiplier(), (PrimedDamage + 0.06f) * 1.26f, 0.0001f);
+    // And the two status lanes carry the wheel's re-targeted rims plus
+    // Sequence's stat half: +10% chance, +20% duration.
+    TestEqual(TEXT("Attunement feeds the StatusChance lane"),
+        Progression->GetNodeStats().StatusChanceMultiplier, 1.10f, 0.0001f);
+    TestEqual(TEXT("Sympathy and Sequence feed the StatusDuration lane"),
+        Progression->GetNodeStats().StatusDurationMultiplier, 1.20f, 0.0001f);
 
     // --- Respec restores exactly -------------------------------------------
     FText Failure;

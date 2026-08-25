@@ -58,6 +58,7 @@ namespace
     // Core atlas rewrites this component consumes (Phase 4).
     FGameplayTag BreakerCoreDeadeyeTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Precision.Deadeye"), false); }
     FGameplayTag BreakerCoreLastRoundTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.LastRound"), false); }
+    FGameplayTag BreakerCoreThresholdTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Threshold"), false); }
 
     // Gunsmith Armory / Tank Bastion tags this component consumes (2026-08-16,
     // the weapon-half pay pass). Same posture as the Marksman tags above:
@@ -2063,7 +2064,19 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     // multiplier needs no cap here.
     const FBreakerNodeStats* BleedNodeStats = GetOwnerNodeStats();
     const float EffectiveBleedChance = Definition->BleedChance * (BleedNodeStats ? BleedNodeStats->StatusChanceMultiplier : 1.0f);
-    if (Stream.FRand() > EffectiveBleedChance) return;
+    // Core.Elements.Threshold: application stops rolling and becomes
+    // deterministic. The chance BANKS across hits (the multishot-accumulator
+    // shape) and the status lands exactly when the bank crosses one — same
+    // long-run rate as the roll, none of its droughts. No RNG is consumed on
+    // this path, so the crit snapshot's draw below stays sequence-identical
+    // whichever door the application came through.
+    if (OwnerHasNodeTag(BreakerCoreThresholdTag()))
+    {
+        BleedChanceAccumulator += EffectiveBleedChance;
+        if (BleedChanceAccumulator < 1.0f) return;
+        BleedChanceAccumulator -= 1.0f;
+    }
+    else if (Stream.FRand() > EffectiveBleedChance) return;
 
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);

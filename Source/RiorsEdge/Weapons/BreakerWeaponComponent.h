@@ -594,6 +594,11 @@ private:
     // the same call stack as the pull, which is the scope this flag is honest
     // over; a projectile in flight resolves on impact and does not read it.
     bool bFiringFinalMagazineRound = false;
+    // Core.Elements.Threshold's bank: bleed chance accumulates here instead
+    // of rolling while the node is owned, and the application fires when it
+    // crosses one (the multishot-accumulator shape). Never holds a whole
+    // application.
+    float BleedChanceAccumulator = 0.0f;
     // AR5's once-per-magazine guard: with the dump threshold at 1 the event
     // fires while a round is still chambered, and this stops the actual last
     // round re-firing it. Cleared where the magazine refills.

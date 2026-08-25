@@ -902,117 +902,162 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     RedlineDoctrine->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
     Tree->Nodes.Add(RedlineDoctrine);
 
-    // --- Elements ----------------------------------------------------------
-    // O5 (renamed by O19): the elements are RIFT / ENTROPY / VOID. The Core
-    // board rendered this cluster as a sealed placeholder because the roster was
-    // empty, not because the constellation was cut — Core-Constellations §6 is
-    // explicit that Elements is "a designed-but-unshipped sixth, not a cut one".
-    //
-    // WHAT IS AND IS NOT AUTHORED HERE, and why. Elements' own grammar is
-    // buildup, thresholds and reactions, and TWO of those three do not exist:
-    // there is no buildup track and no reaction matrix.
-    //
-    // THE THIRD CLAIM THIS PARAGRAPH USED TO MAKE WAS FALSE, and it is the
-    // third instance this pass of a justification outliving its cause. It said
-    // "there is no elemental resistance step in the damage order" and
-    // "`ElementalDamageReduction` is still the one inert stat target in the
-    // project". Both were answered by the 2026-08-16/17 defence-triad ruling
-    // and both are live: BreakerCombatComponent.cpp:74-79 branches on
-    // DamageFamily and reads Stats.ElementalResistancePercent, and
-    // BreakerEquipmentComponent.cpp:854-856 aggregates ElementalDamageReduction
-    // into it under a 60% cap. The affix library's own comment says so in as
-    // many words.
-    //
-    // THE CONCLUSION IS UNCHANGED, which is why the sentence is corrected and
-    // the constellation is not. What Elements still lacks is buildup,
-    // thresholds and reactions -- not resistance -- so authoring in the
-    // PHYSICAL-ONLY pre-resistance form remains right for exactly the reasons
-    // below. So every node below is authored in that form, exactly as §6 instructs ("no node requires an
-    // element to function"): the elemental half of each node is carried as a
-    // tag for the resistance model to pick up, and the half that pays TODAY is
-    // authored against damage-over-time, critical chance and damage — all three
-    // of which have live consumers. A node whose only content was an
-    // unconsumed elemental tag would be the same failure as the damage-less
-    // damage node this project already shipped once.
-    //
-    // Consequence stated plainly: pre-resistance, Elements reads as a second
-    // status-pressure constellation and overlaps Affliction. That is the
-    // honest cost of shipping it early, and it resolves the moment the
-    // resistance step lands and the tags start paying their own half.
-    //
-    // NO MORE MULTIPLIER IS AUTHORED HERE. §2.4 reserves E9 Reaction Chain as
-    // Elements' compliant More slot, and it stays EMPTY: a More's condition
-    // here would have to be "a reaction fired", and `EBreakerBuildCondition`
-    // has only movement states, so the node could only be written unconditional
-    // — a strictly-better generalist than Fixate and Barrage, bought with a
-    // theme it cannot enforce. The slot is reserved, not spent.
+    // --- RESERVOIR: resource economy (atlas pair C, no hub by design) ------
+    UBreakerProgressionNode* ResDraw = MakeNode(TEXT("Core.Reservoir.Draw"), TEXT("Draw"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResDraw, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResDraw);
+
+    UBreakerProgressionNode* ResWellspring = MakeNode(TEXT("Core.Reservoir.Wellspring"), TEXT("Wellspring"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResWellspring, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResWellspring);
+
+    UBreakerProgressionNode* ResCapacity = MakeNode(TEXT("Core.Reservoir.Capacity"), TEXT("Capacity"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResCapacity, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResCapacity);
+
+    UBreakerProgressionNode* ResTithe = MakeNode(TEXT("Core.Reservoir.Tithe"), TEXT("Tithe"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResTithe, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResTithe);
+
+    UBreakerProgressionNode* ResDeepPockets = MakeNode(TEXT("Core.Reservoir.DeepPockets"), TEXT("Deep Pockets"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResDeepPockets, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResDeepPockets);
+
+    UBreakerProgressionNode* ResSecondShift = MakeNode(TEXT("Core.Reservoir.SecondShift"), TEXT("Second Shift"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Reservoir"));
+    AddEffect(ResSecondShift, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResSecondShift);
+
+    // The rule half — O109's convergence on a midpoint — has no loop valve to
+    // rewrite yet (no class component converges today). The Frenzy precedent
+    // carries the intent on the live ClassResourceRegen bucket: the bar finds
+    // its way back a little faster, everywhere, until convergence exists.
+    UBreakerProgressionNode* ResConvergencePoint = MakeNode(TEXT("Core.Reservoir.ConvergencePoint"), TEXT("Convergence Point"),
+        TEXT("Your class resource recovers a little on its own. Its full rule — out of combat the bar converges on a midpoint (O109) — is waiting on the loop valve."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Reservoir"));
+    AddPrerequisite(ResConvergencePoint, TEXT("Core.Reservoir.Draw"));
+    AddPrerequisite(ResConvergencePoint, TEXT("Core.Reservoir.Wellspring"));
+    AddEffect(ResConvergencePoint, EBreakerNodeStatTarget::ClassResourceRegen, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResConvergencePoint);
+
+    UBreakerProgressionNode* ResSpillover = MakeNode(TEXT("Core.Reservoir.Spillover"), TEXT("Spillover"),
+        TEXT("Resource spent past a cast's cost returns as damage."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Reservoir"));
+    AddPrerequisite(ResSpillover, TEXT("Core.Reservoir.Capacity"));
+    AddPrerequisite(ResSpillover, TEXT("Core.Reservoir.Tithe"));
+    AddEffect(ResSpillover, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResSpillover);
+
+    // The spec's "while the bar is above half" has no condition to say it:
+    // ResourceLow exists, its inverse does not, and AND-only composition has
+    // no NOT. Unconditional at a value sized for that, gate recorded waiting.
+    UBreakerProgressionNode* ResReserve = MakeNode(TEXT("Core.Reservoir.Reserve"), TEXT("Reserve"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Reservoir"));
+    AddPrerequisite(ResReserve, TEXT("Core.Reservoir.DeepPockets"));
+    AddPrerequisite(ResReserve, TEXT("Core.Reservoir.SecondShift"));
+    AddEffect(ResReserve, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ResReserve);
+
+    // --- ELEMENTS: reactions (atlas pair C) --------------------------------
+    // Post-slice by O38, so the wheel ships shaped: reactions and buildup do
+    // not exist, and the lines that pay today are the generic ones plus the
+    // two status lanes this pass landed. KEEP tags stay; the six shipped ids
+    // hold; the four new nodes carry no tags (dead-tag headroom is one, and a
+    // tag may only arrive consumed).
     UBreakerProgressionNode* Conductive = MakeNode(TEXT("Core.Elements.Conductive"), TEXT("Conductive"),
-        TEXT("Elements gateway. Elemental buildup decays more slowly, and everything you leave on a target burns longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
-    AddEffect(Conductive, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
+    AddEffect(Conductive, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Conductive->GrantedTags.AddTag(BreakerNodeTags::Node_Conductive.GetTag());
     Tree->Nodes.Add(Conductive);
 
     UBreakerProgressionNode* ChargeUp = MakeNode(TEXT("Core.Elements.ChargeUp"), TEXT("Charge Up"),
-        TEXT("Lane A. The buildup you apply grows with every rank, and damage over time grows with it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Elements"));
-    AddPrerequisite(ChargeUp, TEXT("Core.Elements.Conductive"));
-    AddEffect(ChargeUp, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 7.0f); // O2 PLACEHOLDER
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
+    AddEffect(ChargeUp, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     ChargeUp->GrantedTags.AddTag(BreakerNodeTags::Node_ChargeUp.GetTag());
     Tree->Nodes.Add(ChargeUp);
 
-    UBreakerProgressionNode* Threshold = MakeNode(TEXT("Core.Elements.Threshold"), TEXT("Threshold"),
-        TEXT("Notable. Crossing a status threshold resets the bar halfway instead of emptying it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Elements"));
-    AddPrerequisite(Threshold, TEXT("Core.Elements.Conductive"));
-    AddEffect(Threshold, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
-    Threshold->GrantedTags.AddTag(BreakerNodeTags::Node_Threshold.GetTag());
-    Tree->Nodes.Add(Threshold);
+    UBreakerProgressionNode* Penetrance = MakeNode(TEXT("Core.Elements.Penetrance"), TEXT("Penetrance"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
+    AddEffect(Penetrance, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Penetrance->GrantedTags.AddTag(BreakerNodeTags::Node_Penetrance.GetTag());
+    Tree->Nodes.Add(Penetrance);
 
-    // A reaction is a burst, so the half that can pay today is crit chance
-    // rather than another DoT ladder. This is what stops Lane B reading as a
-    // duplicate of Lane A while the reaction matrix does not exist.
+    // RE-TARGETED (owner ruling, this session): StatusChance's wheel author.
+    // Attunement makes what you apply land more often.
+    UBreakerProgressionNode* ElemAttunement = MakeNode(TEXT("Core.Elements.Attunement"), TEXT("Attunement"),
+        TEXT("Statuses you apply land more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
+    AddEffect(ElemAttunement, EBreakerNodeStatTarget::StatusChance, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ElemAttunement);
+
     UBreakerProgressionNode* Catalyst = MakeNode(TEXT("Core.Elements.Catalyst"), TEXT("Catalyst"),
-        TEXT("Lane B. Reactions come off cooldown sooner, and the shots that set them up find the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Elements"));
-    AddPrerequisite(Catalyst, TEXT("Core.Elements.Conductive"));
+        TEXT("The shots that set up a reaction find the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
     AddEffect(Catalyst, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
     Catalyst->GrantedTags.AddTag(BreakerNodeTags::Node_Catalyst.GetTag());
     Tree->Nodes.Add(Catalyst);
 
-    // Penetrance is resistance penetration, and the blocker MOVED without the
-    // conclusion moving -- worth stating precisely, because the next reader
-    // would otherwise repair the wrong half.
-    //
-    // It used to read "once a resistance exists. Until it does..." A resistance
-    // exists now: the damage order has an elemental branch and the equipment
-    // layer aggregates into it. What is missing is on the TARGET side. The
-    // reduction is read off a UBreakerEquipmentComponent found on the actor
-    // being hit, and no enemy constructs one -- ABreakerCharacter is the only
-    // class in the project that does. So an outgoing elemental hit meets no
-    // resistance at all, and there is still nothing to penetrate.
-    //
-    // Same conclusion, different cause: Increased Damage stays the only honest
-    // expression, and the tag is what upgrades it in place once enemies carry
-    // the component that resists.
-    UBreakerProgressionNode* Penetrance = MakeNode(TEXT("Core.Elements.Penetrance"), TEXT("Penetrance"),
-        TEXT("Lane C. Your damage is turned aside less. Becomes true elemental penetration when resistances exist."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Elements"));
-    AddPrerequisite(Penetrance, TEXT("Core.Elements.Conductive"));
-    AddEffect(Penetrance, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
-    Penetrance->GrantedTags.AddTag(BreakerNodeTags::Node_Penetrance.GetTag());
-    Tree->Nodes.Add(Penetrance);
+    // SYMPATHY is the spec's Resonance, renamed by ruling: E10 Resonance is
+    // the reserved Elements keystone (see the note below) and a rim may not
+    // consume that promise. RE-TARGETED to StatusDuration's lane.
+    UBreakerProgressionNode* ElemSympathy = MakeNode(TEXT("Core.Elements.Sympathy"), TEXT("Sympathy"),
+        TEXT("Statuses you apply last longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Elements"));
+    AddEffect(ElemSympathy, EBreakerNodeStatTarget::StatusDuration, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ElemSympathy);
 
-    // Convergence. Carries the constellation's largest single payout and,
-    // deliberately, no More — see the block comment above.
+    // Rule rewrite with its consumer LIVE in this commit: with the node
+    // owned, ApplyBleedOnHit stops rolling — chance ACCUMULATES across hits
+    // and the status lands exactly when the bank crosses one. The tag had
+    // been declared-unconsumed since the constellation shipped.
+    UBreakerProgressionNode* Threshold = MakeNode(TEXT("Core.Elements.Threshold"), TEXT("Threshold"),
+        TEXT("Status application stops rolling and becomes deterministic."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Elements"));
+    AddPrerequisite(Threshold, TEXT("Core.Elements.Conductive"));
+    AddPrerequisite(Threshold, TEXT("Core.Elements.ChargeUp"));
+    Threshold->GrantedTags.AddTag(BreakerNodeTags::Node_Threshold.GetTag());
+    Tree->Nodes.Add(Threshold);
+
+    // TargetMultiStatus is exactly "a target carrying two statuses" — a
+    // target-side rider, resolved by ReceiveDamage like every Stage-6 line.
+    UBreakerProgressionNode* ElemReaction = MakeNode(TEXT("Core.Elements.Reaction"), TEXT("Reaction"),
+        TEXT("A target carrying two statuses takes increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Elements"));
+    AddPrerequisite(ElemReaction, TEXT("Core.Elements.Penetrance"));
+    AddPrerequisite(ElemReaction, TEXT("Core.Elements.Attunement"));
+    AddEffect(ElemReaction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::TargetMultiStatus); // O2 PLACEHOLDER — conditional band
+    Tree->Nodes.Add(ElemReaction);
+
+    // The rule half — a reaction re-applying the older status at proc 0 —
+    // waits on reactions themselves (post-slice, O38). The Frenzy precedent
+    // carries the intent on the live StatusDuration lane: what you leave on
+    // a target outlasts itself a little.
+    UBreakerProgressionNode* ElemSequence = MakeNode(TEXT("Core.Elements.Sequence"), TEXT("Sequence"),
+        TEXT("Statuses you apply last longer. The full rule — a reaction re-applies the older status at proc coefficient 0 — is waiting on reactions."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Elements"));
+    AddPrerequisite(ElemSequence, TEXT("Core.Elements.Catalyst"));
+    AddPrerequisite(ElemSequence, TEXT("Core.Elements.Sympathy"));
+    AddEffect(ElemSequence, EBreakerNodeStatTarget::StatusDuration, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ElemSequence);
+
+    // The atlas spends the slot §2.4 used to reserve, by the owner's ruled
+    // nine-More roster. UNCONDITIONAL, and the old refusal's reasoning still
+    // holds force: "a reaction on an already-ailing target" is a TARGET
+    // condition, and a target-conditional More is warn-dropped by design —
+    // so until reactions exist this composes as the tree's fourth generalist
+    // More, a consequence named in the pair-C report rather than smuggled.
     UBreakerProgressionNode* ReactionChain = MakeNode(TEXT("Core.Elements.ReactionChain"), TEXT("Reaction Chain"),
-        TEXT("Convergence. A reaction can set off one more, once. Everything you leave burning hurts considerably more."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Elements"));
-    AddPrerequisite(ReactionChain, TEXT("Core.Elements.ChargeUp"));
-    AddEffect(ReactionChain, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 25.0f); // O2 PLACEHOLDER
-    AddEffect(ReactionChain, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f);          // O2 PLACEHOLDER
+        TEXT("Convergence. What you leave on a target becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Elements"));
+    AddPrerequisite(ReactionChain, TEXT("Core.Elements.Threshold"));
+    AddPrerequisite(ReactionChain, TEXT("Core.Elements.Reaction"));
+    AddPrerequisite(ReactionChain, TEXT("Core.Elements.Sequence"));
+    AddDamageMore(ReactionChain, 26.0f); // O2 PLACEHOLDER: x1.26
     ReactionChain->GrantedTags.AddTag(BreakerNodeTags::Node_ReactionChain.GetTag());
     Tree->Nodes.Add(ReactionChain);
 
-    // E10 RESONANCE (the keystone) is DELIBERATELY NOT AUTHORED. Its rewrite is
-    // "you may carry only one element" plus a guaranteed threshold fill; the
-    // cost half is unexpressible with no elements in the pipeline, so shipping
-    // it now would be a pure-upside keystone — and O19 already flags its cost
-    // basis for re-examination independently. It lands with the resistance step.
+    // E10 RESONANCE (the keystone) is DELIBERATELY NOT AUTHORED, and the
+    // atlas's naming ruling protects it: the wheel's rim 5 is Sympathy so the
+    // name Resonance stays free. Its rewrite is "you may carry only one
+    // element" plus a guaranteed threshold fill; the cost half is
+    // unexpressible with no elements in the pipeline, so shipping it now
+    // would be a pure-upside keystone. It lands with the resistance step.
 
     return Tree;
 }
