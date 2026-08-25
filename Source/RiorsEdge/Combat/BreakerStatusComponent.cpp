@@ -3,6 +3,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerDamageLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerProgressionComponent.h"
 
 UBreakerStatusComponent::UBreakerStatusComponent()
 {
@@ -40,6 +41,27 @@ float UBreakerStatusComponent::GetEffectiveAilmentAvoidanceChance() const
 void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& Spec, EBreakerDamageFamily DamageFamily, AActor* Instigator)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || Spec.Duration <= 0.0f || Spec.TickInterval <= 0.0f) return;
+
+    // --- StatusDuration, the APPLIER's lane, folded at the door -----------
+    // This is the one funnel every application path passes through — weapon
+    // bleed, Cleave, zones, projectile-carried specs — so the tree's
+    // StatusDuration lane pays here once rather than at five build sites.
+    // Application-time only, like the rest of the snapshot (O10): a respec
+    // never rewrites a status already running. The tick interval is
+    // deliberately untouched — duration buys more ticks, never slower ones,
+    // so stacking keeps its visibly discrete steps. An instigator with no
+    // progression component (every enemy) scales by exactly 1. At a composed
+    // 0 the application does not exist, mirroring the Duration guard above.
+    float DurationScale = 1.0f;
+    if (Instigator)
+    {
+        if (const UBreakerProgressionComponent* InstigatorProgression = Instigator->FindComponentByClass<UBreakerProgressionComponent>())
+        {
+            DurationScale = InstigatorProgression->GetNodeStats().StatusDurationMultiplier;
+        }
+    }
+    const float ScaledDuration = Spec.Duration * DurationScale;
+    if (ScaledDuration <= 0.0f) return;
 
     // --- Ailment avoidance: one roll per application, at the door ---------
     // BEFORE the immunity check by ruling: avoidance is the ORDINARY defence
@@ -83,7 +105,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
         if (Active.Spec.StatusTag == Spec.StatusTag)
         {
             Active.Stacks = FMath::Min(Active.Stacks + FMath::Max(1, Spec.InitialStacks), GetEffectiveStackCap());
-            Active.RemainingDuration = FMath::Max(Active.RemainingDuration, Spec.Duration);
+            Active.RemainingDuration = FMath::Max(Active.RemainingDuration, ScaledDuration);
             // Refresh credit to whoever most recently reapplied it — and the
             // facing snapshot with it, because credit and angle belong to the
             // same application.
@@ -102,7 +124,7 @@ void UBreakerStatusComponent::ApplyStatus(const FBreakerStatusApplicationSpec& S
     Status.Spec = Spec;
     Status.DamageFamily = DamageFamily;
     Status.Stacks = FMath::Clamp(Spec.InitialStacks, 1, GetEffectiveStackCap());
-    Status.RemainingDuration = Spec.Duration;
+    Status.RemainingDuration = ScaledDuration;
     Status.TimeUntilNextTick = Spec.TickInterval;
     Status.Instigator = Instigator;
     // Application-time facing snapshot. Taken from the applier's position NOW,

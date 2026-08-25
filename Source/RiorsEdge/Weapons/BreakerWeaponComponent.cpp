@@ -710,6 +710,12 @@ bool UBreakerWeaponComponent::OwnerHasNodeTag(const FGameplayTag& Tag) const
     return Progression && Progression->HasNodeTag(Tag);
 }
 
+const FBreakerNodeStats* UBreakerWeaponComponent::GetOwnerNodeStats() const
+{
+    const UBreakerProgressionComponent* Progression = GetOwner() ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    return Progression ? &Progression->GetNodeStats() : nullptr;
+}
+
 bool UBreakerWeaponComponent::IsSpreadReadingStationary() const
 {
     // B7 Emplacement's weapon half. The tag read is first so every non-Tank
@@ -751,7 +757,11 @@ float UBreakerWeaponComponent::GetNextShotSpreadDegrees() const
     // GetMovementSpreadDegrees, not the raw feel-layer read: Steady's rule
     // (§1.5 M2) must shape the predicted cone exactly as it shapes the shot.
     const float Movement = GetMovementSpreadDegrees();
-    return FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, BloomDegrees, BurstShotIndex, Movement);
+    const float Composed = FBreakerWeaponFeel::EffectiveSpreadDegrees(Profile, BaseSpread, BloomDegrees, BurstShotIndex, Movement);
+    // The tree's WeaponSpread lane, divisor convention, applied to the same
+    // composed cone the fire path divides so the crosshair cannot lie.
+    const FBreakerNodeStats* NodeStats = GetOwnerNodeStats();
+    return NodeStats ? Composed / NodeStats->WeaponSpreadReduction : Composed;
 }
 
 FVector UBreakerWeaponComponent::GetViewmodelLocationOffset() const
@@ -898,8 +908,15 @@ void UBreakerWeaponComponent::TickRecoil(float DeltaSeconds)
         }
         else
         {
-            const float NewPitch = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilPitchAccumulated, DeltaSeconds);
-            const float NewYaw = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilYawAccumulated, DeltaSeconds);
+            // The tree's RecoilRecovery lane: the settle runs on scaled time,
+            // which multiplies both the proportional and the constant leg of
+            // RecoverAxis by one number. Scoped to the settle alone — bloom
+            // decay is the spread channel and the recovery DELAY is the
+            // pattern's authored feel, so neither reads it.
+            const FBreakerNodeStats* RecoilNodeStats = GetOwnerNodeStats();
+            const float RecoveryDelta = DeltaSeconds * (RecoilNodeStats ? RecoilNodeStats->RecoilRecoveryMultiplier : 1.0f);
+            const float NewPitch = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilPitchAccumulated, RecoveryDelta);
+            const float NewYaw = FBreakerWeaponFeel::RecoverAxis(Profile, RecoilYawAccumulated, RecoveryDelta);
             Current.Pitch = FRotator::NormalizeAxis(Current.Pitch) + (NewPitch - RecoilPitchAccumulated);
             Current.Yaw = Current.Yaw + (NewYaw - RecoilYawAccumulated);
             RecoilPitchAccumulated = NewPitch;
@@ -1372,7 +1389,12 @@ bool UBreakerWeaponComponent::FireOnce()
     const float MovementSpread = FBreakerWeaponMath::SteadyMovementSpreadDegrees(
         FBreakerWeaponFeel::MovementSpreadDegrees(AimedProfile, GetSpeedFraction(), ShotAimAlpha),
         ShotAimAlpha, GetClassNodeRank(BreakerSteadyNodeId), IsOwnerAirborne());
-    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread);
+    // The tree's WeaponSpread lane divides the fired cone exactly as it
+    // divides GetNextShotSpreadDegrees' predicted one — one convention, both
+    // sites, or the HUD and the round disagree about the purchase.
+    const FBreakerNodeStats* SpreadNodeStats = GetOwnerNodeStats();
+    const float Spread = FBreakerWeaponFeel::EffectiveSpreadDegrees(AimedProfile, BaseSpread, BloomDegrees, BurstShotIndex, MovementSpread)
+        / (SpreadNodeStats ? SpreadNodeStats->WeaponSpreadReduction : 1.0f);
 
     // Recoil state for this shot, resolved before the pellets so the cosmetic
     // event can carry it to every machine and they all kick identically.
@@ -2018,7 +2040,12 @@ void UBreakerWeaponComponent::ApplyBleedOnHit(const UBreakerWeaponDefinition* De
     // Same seed material as the hit's damage, salted so bleed and critical
     // rolls stay independent while remaining reproducible on the server.
     FRandomStream Stream(static_cast<int32>(HashCombine(HashCombine(GetTypeHash(GetOwner()), static_cast<uint32>(SeedBasis)), BreakerBleedSalt)));
-    if (Stream.FRand() > Definition->BleedChance) return;
+    // The tree's StatusChance lane scales the authored chance. Past 1.0 the
+    // roll simply always lands — a guarantee, not an error — which is why the
+    // multiplier needs no cap here.
+    const FBreakerNodeStats* BleedNodeStats = GetOwnerNodeStats();
+    const float EffectiveBleedChance = Definition->BleedChance * (BleedNodeStats ? BleedNodeStats->StatusChanceMultiplier : 1.0f);
+    if (Stream.FRand() > EffectiveBleedChance) return;
 
     FBreakerStatusApplicationSpec Spec;
     Spec.StatusTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);

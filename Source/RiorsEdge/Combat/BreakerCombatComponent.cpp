@@ -93,15 +93,26 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // against one baseline character at both ends; a resistance term multiplies
     // it directly, so a non-zero value has to be folded into that derivation
     // rather than added on top of it.
+    const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>();
     if (Request.DamageFamily != EBreakerDamageFamily::TrueDamage)
     {
+        float ReductionPercent = 0.0f;
         if (const UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
         {
-            const float ReductionPercent = Request.DamageFamily == EBreakerDamageFamily::Physical
+            ReductionPercent += Request.DamageFamily == EBreakerDamageFamily::Physical
                 ? Equipment->GetStats().PhysicalDamageReductionPercent
                 : Equipment->GetStats().ElementalResistancePercent;
-            Defense.IncomingDamageMultiplier *= 1.0f - ReductionPercent / 100.0f;
         }
+        // The tree's lane joins gear's family bucket here — points summed,
+        // ONE 1-R application — never a second multiplier beside it. It pays
+        // against both families because the node line names incoming damage,
+        // not a family; TrueDamage answers to neither layer. Clamped at zero
+        // now that two layers can sum past 100.
+        if (Progression)
+        {
+            ReductionPercent += Progression->GetNodeStats().IncomingDamageReductionPercent;
+        }
+        Defense.IncomingDamageMultiplier *= FMath::Max(0.0f, 1.0f - ReductionPercent / 100.0f);
     }
     // Pushed incoming modifiers compose on top, in the same stage: Caster's
     // Overcast penalty, and defensive windows when they land.
@@ -110,7 +121,7 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Defense.BlockChance = BlockChance;
     Defense.BlockMitigation = BlockMitigation;
     // Tree nodes raise the passive layers on top of the component baseline.
-    if (const UBreakerProgressionComponent* Progression = GetOwner()->FindComponentByClass<UBreakerProgressionComponent>())
+    if (Progression)
     {
         Defense.DodgeChance = FMath::Clamp(Defense.DodgeChance + Progression->GetDodgeChanceBonus(), 0.0f, 1.0f);
         Defense.BlockChance = FMath::Clamp(Defense.BlockChance + Progression->GetBlockChanceBonus(), 0.0f, 1.0f);

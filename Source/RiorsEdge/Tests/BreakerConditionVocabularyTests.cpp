@@ -432,8 +432,17 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // needs two, so they waited on EBreakerAggregatedAttribute gaining
     // AbilityDamageMultiplier rather than on anybody writing their lane.
     //
+    // Plus the five wired on 2026-08-24 in the Core-atlas lane pass (Phase 4,
+    // step 1): IncomingDamageReduction, RecoilRecovery, WeaponSpread,
+    // StatusChance and StatusDuration — single-bidder lanes on
+    // FBreakerNodeStats like the projectile channels; shapes, conventions and
+    // consumers are on the lane register itself. The tree side is built and
+    // the affix lines are NOT: the affix owner has their own four queued.
+    // Lifesteal stays unwired on purpose — no bidder in either layer, owed a
+    // lane or a retirement as its own ruling.
+    //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 26);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 31);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet

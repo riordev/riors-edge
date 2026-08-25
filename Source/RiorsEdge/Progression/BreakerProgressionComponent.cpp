@@ -1144,6 +1144,16 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // The divisor convention (DashCooldownReduction's): 1.20 == 20% shorter.
     // Floored just above zero so no authored row can divide a cooldown by zero.
     Stats.AbilityCooldownReduction = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::AbilityCooldown));
+    // ---- Core-atlas lanes (2026-08-24) -------------------------------------
+    // Shapes and consumers on the lane register in BreakerProgressionTypes.h.
+    // IncomingDamageReduction is the one Flat lane here: percentage POINTS,
+    // summed raw so a downside node may author a negative line; the consumer
+    // clamps the composed 1-R application at zero, not this sum.
+    Stats.IncomingDamageReductionPercent = Flat(EBreakerNodeStatTarget::IncomingDamageReduction);
+    Stats.RecoilRecoveryMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::RecoilRecovery));
+    Stats.WeaponSpreadReduction = FMath::Max(0.01f, Increased(EBreakerNodeStatTarget::WeaponSpread));
+    Stats.StatusChanceMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::StatusChance));
+    Stats.StatusDurationMultiplier = FMath::Max(0.0f, Increased(EBreakerNodeStatTarget::StatusDuration));
 
     if (OutContribution)
     {

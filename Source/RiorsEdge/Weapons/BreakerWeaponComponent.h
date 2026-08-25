@@ -699,6 +699,11 @@ private:
 
     const UBreakerWeaponDefinition* ResolveDefinition() const;
     FBreakerRecoilProfile ResolveRecoilProfile() const;
+    // The owner's tree aggregate, or null with no progression component — the
+    // read behind the weapon-handling lanes (WeaponSpread, RecoilRecovery,
+    // StatusChance). Live like GetShotChannels: a respec changes the next
+    // shot, not the next equip.
+    const struct FBreakerNodeStats* GetOwnerNodeStats() const;
     // Owner ground speed over MoveSpreadReferenceSpeed, clamped to [0,1].
     float GetSpeedFraction() const;
     void SetAimingInternal(bool bNewAiming);

@@ -364,6 +364,34 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::WeaponDamage:
     case EBreakerNodeStatTarget::AbilityDamage:
     case EBreakerNodeStatTarget::DashCooldown:
+    // ---- Wired 2026-08-24, the Core-atlas lane pass (Phase 4, step 1) ------
+    // Five single-bidder lanes landing on FBreakerNodeStats, the projectile-
+    // channel shape: no aggregated attribute exists for any of them and gear
+    // does not bid yet — the affix owner has their own lines queued, so the
+    // day an affix lands, each of these moves onto a shared additive bucket
+    // instead of multiplying beside it. Lifesteal is the one O30 target left
+    // unwired on purpose: no bidder in either layer, owed a lane or a
+    // retirement as its own ruling.
+    //
+    // IncomingDamageReduction: FLAT percentage points, joining gear's
+    // family-reduction bucket in UBreakerCombatComponent::ReceiveDamage —
+    // (gear + tree) summed, ONE 1-R application, never two multipliers.
+    // TrueDamage answers to neither layer.
+    //
+    // RecoilRecovery / StatusChance / StatusDuration: one additive Increased
+    // bucket each, composed to a 1.0-based multiplier floored at 0. Consumed
+    // by TickRecoil's settle, ApplyBleedOnHit's roll, and ApplyStatus's
+    // application-time snapshot respectively.
+    //
+    // WeaponSpread: the DIVISOR convention (DashCooldownReduction's): a
+    // composed 1.20 is a 20% tighter cone, applied identically to the fired
+    // cone and the predicted one so the crosshair cannot lie about the
+    // purchase.
+    case EBreakerNodeStatTarget::IncomingDamageReduction:
+    case EBreakerNodeStatTarget::RecoilRecovery:
+    case EBreakerNodeStatTarget::WeaponSpread:
+    case EBreakerNodeStatTarget::StatusChance:
+    case EBreakerNodeStatTarget::StatusDuration:
         return true;
     default:
         // Every O30 widening entry. They become true one at a time as the
@@ -608,6 +636,19 @@ struct RIORSEDGE_API FBreakerNodeStats
     // 1.20 == 20% shorter). Floored just above zero so a malformed authored
     // row can never divide by zero or lengthen a cooldown to infinity.
     UPROPERTY(BlueprintReadOnly) float AbilityCooldownReduction = 1.0f;
+    // ---- Core-atlas lanes (2026-08-24) -------------------------------------
+    // Five more single-bidder lanes; shapes and consumers are on the lane
+    // register in this file. IncomingDamageReduction is raw percentage POINTS
+    // (Flat bucket) because its consumer sums it with gear's family reduction
+    // into one bucket before the single 1-R application; the other four are
+    // composed multipliers like their neighbours above.
+    UPROPERTY(BlueprintReadOnly) float IncomingDamageReductionPercent = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float RecoilRecoveryMultiplier = 1.0f;
+    // Spread reduction as the DIVISOR (1.20 == 20% tighter cone), floored
+    // just above zero for the same reason AbilityCooldownReduction is.
+    UPROPERTY(BlueprintReadOnly) float WeaponSpreadReduction = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float StatusChanceMultiplier = 1.0f;
+    UPROPERTY(BlueprintReadOnly) float StatusDurationMultiplier = 1.0f;
     // Rule-rewrite and verb-grant nodes cannot be expressed as stats; they
     // publish a tag here and the owning system reads it.
     UPROPERTY(BlueprintReadOnly) FGameplayTagContainer GrantedTags;
