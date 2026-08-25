@@ -47,6 +47,7 @@
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SCanvas.h"
 #include "UI/BreakerSkillProjection.h"
+#include "UI/BreakerTypeRoles.h"
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerCharacterSheetMath.h"
 #include "Combat/BreakerStatusComponent.h"
@@ -87,103 +88,9 @@ namespace
     const FLinearColor Amber = BreakerUI::Gold;
     const FLinearColor Transparent(0.0f, 0.0f, 0.0f, 0.0f);
 
-    // ---- Fieldplate type roles --------------------------------------------
-    // Archivo (display), IBM Plex Sans (body), IBM Plex Mono (numbers and
-    // chrome captions): the three role fonts Scripts/import_fonts.py builds
-    // from Assets/fonts into /Game/Breaker/UI/Fonts. Loaded once and ROOTED —
-    // the cache outlives every widget, and a collected font under a live
-    // FSlateFontInfo is a crash on the next paint. Every helper falls back to
-    // the engine face when the asset is absent (a clone before its LFS pull,
-    // a suite run with no content), so the menu degrades to the old look
-    // rather than to tofu.
-    FSlateFontInfo BreakerRoleFont(const TCHAR* AssetPath, const FName& Typeface, int32 Size,
-        const TCHAR* EngineFallback, float TrackingEm = 0.0f)
-    {
-        static TMap<FString, UFont*> Cache;
-        UFont*& Slot = Cache.FindOrAdd(FString(AssetPath));
-        if (!Slot)
-        {
-            Slot = LoadObject<UFont>(nullptr, AssetPath);
-            if (Slot) Slot->AddToRoot();
-        }
-        FSlateFontInfo Font = Slot
-            ? FSlateFontInfo(Slot, Size, Typeface)
-            : FCoreStyle::GetDefaultFontStyle(EngineFallback, Size);
-        // FSlateFontInfo::LetterSpacing is 1/1000 em — the unit the pack's
-        // tracking_em values state.
-        Font.LetterSpacing = FMath::RoundToInt(TrackingEm * 1000.0f);
-        return Font;
-    }
-
-    // Display: uppercase headings, weights 600/700, the pack's +0.01em.
-    FSlateFontInfo BreakerDisplayFont(int32 Size, bool bHeavy = false)
-    {
-        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerDisplay.F_BreakerDisplay"),
-            bHeavy ? FName(TEXT("Bold")) : FName(TEXT("SemiBold")), Size, TEXT("Bold"), 0.01f);
-    }
-
-    // Body: mixed-case copy, 400/500/600. The bold flag maps to SemiBold —
-    // the pack's body family carries no 700.
-    FSlateFontInfo BreakerBodyFont(int32 Size, bool bSemiBold = false)
-    {
-        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerBody.F_BreakerBody"),
-            bSemiBold ? FName(TEXT("SemiBold")) : FName(TEXT("Regular")), Size,
-            bSemiBold ? TEXT("Bold") : TEXT("Regular"));
-    }
-
-    // Mono: every number, key cap and tracked chrome caption. Tabular figures
-    // come with the face; the tracking parameter is the caption's 0.16em.
-    FSlateFontInfo BreakerMonoFont(int32 Size, float TrackingEm = 0.0f)
-    {
-        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerMono.F_BreakerMono"),
-            FName(TEXT("Regular")), Size, TEXT("Mono"), TrackingEm);
-    }
-
-    TSharedRef<STextBlock> BreakerMonoText(const FText& Text, int32 Size, const FLinearColor& Color,
-        float TrackingEm = 0.0f)
-    {
-        return SNew(STextBlock)
-            .Text(Text)
-            .ColorAndOpacity(Color)
-            .Font(BreakerMonoFont(Size, TrackingEm));
-    }
-
-    // ---- Mark brushes -----------------------------------------------------
-    // The pack's stroke-only marks (Assets/marks -> Scripts/import_marks.py,
-    // /Game/Breaker/UI/Marks). Textures are loaded once and ROOTED, brushes
-    // cached for the process — a brush freed under a live SImage is a crash.
-    // Insignia never tint (they stay #DCE4EE at every state); rarity marks
-    // tint to the rarity hex at the call site. A missing texture (a clone
-    // before its LFS pull) returns null and the caller keeps its layout box,
-    // drawing nothing — the pre-marks look, never tofu.
-    const FSlateBrush* BreakerMarkBrush(const TCHAR* AssetPath, const FVector2D& Size)
-    {
-        static TMap<FString, TUniquePtr<FSlateBrush>> Cache;
-        TUniquePtr<FSlateBrush>& Slot = Cache.FindOrAdd(FString(AssetPath));
-        if (!Slot)
-        {
-            UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, AssetPath);
-            if (!Texture) return nullptr;   // absent stays retryable; menu-rate cost
-            Texture->AddToRoot();
-            Slot = MakeUnique<FSlateBrush>();
-            Slot->SetResourceObject(Texture);
-            Slot->ImageSize = Size;
-            Slot->DrawAs = ESlateBrushDrawType::Image;
-        }
-        return Slot.Get();
-    }
-
-    TSharedRef<SWidget> BreakerMark(const TCHAR* AssetPath, float Size,
-        const FLinearColor& Tint = FLinearColor::White)
-    {
-        const FSlateBrush* Brush = BreakerMarkBrush(AssetPath, FVector2D(Size, Size));
-        return SNew(SBox).WidthOverride(Size).HeightOverride(Size)
-        [
-            Brush
-                ? StaticCastSharedRef<SWidget>(SNew(SImage).Image(Brush).ColorAndOpacity(Tint))
-                : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)))
-        ];
-    }
+    // The type roles and mark brushes live in UI/BreakerTypeRoles.h — one
+    // seam shared with the deployment briefing, because a font loader that
+    // exists twice drifts exactly the way a colour does.
 
     TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = BreakerUI::TextPrimary, bool bBold = false)
     {
@@ -1907,9 +1814,8 @@ namespace
     // the 1px divider.
     constexpr float BreakerSettingsRowPad = 14.0f;
 
-    // The type roles live in the file-top namespace beside MenuText:
-    // BreakerDisplayFont / BreakerBodyFont / BreakerMonoFont, built from the
-    // imported role fonts with the engine faces as their fallback.
+    // The type roles live in UI/BreakerTypeRoles.h, built from the imported
+    // role fonts with the engine faces as their fallback.
 
     // The 1px row separator the plates thread between control rows. Structure
     // comes off borders in this system, not off gaps.

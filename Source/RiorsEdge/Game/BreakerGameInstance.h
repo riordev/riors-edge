@@ -47,19 +47,29 @@ public:
     // every legacy path on the game mode's GymAreaLevel dev fallback.
     UPROPERTY(BlueprintReadWrite, Category="Breaker|Session") FBreakerRiftDefinition PendingRift;
 
-    // The travel loading screen: the flat Fieldplate plate, shown over every
-    // Anchor/Gym load. The widget rebuild (live fields) comes later; the
-    // plate alone replaces a black hitch with a place.
+    // THE DEPLOYMENT BEAT (route ruled by the owner; O120 and O123 govern the
+    // pane). Not a loading screen — a loading screen hides a wait, and these
+    // maps load in fractions of a second; this is a BRIEFING that names where
+    // the player is arriving, and it replaced the MoviePlayer plate outright:
+    // one mechanism, not two. It lives on the game WINDOW's overlay — the
+    // surface MoviePlayer itself used, which survives LoadMap and exists in
+    // PIE, where the engine's IsMoviePlayerEnabled() (!GIsEditor) makes a
+    // MoviePlayer screen structurally impossible. The animated time sits
+    // AROUND the blocking OpenLevel: an animated deploy hold before, a frozen
+    // frame during, an arrival beat after.
     virtual void Init() override;
 
 private:
-    void HandlePreLoadMap(const FString& MapName);
-    // The plate texture, loaded from the raw PNG at first travel and kept
-    // for the session. Runtime-loaded rather than an imported .uasset: no
-    // DXT (the flat panels band), no mips, sRGB — exactly the pack's import
-    // demands, satisfied by construction.
-    UPROPERTY(Transient) TObjectPtr<class UTexture2D> LoadingPlateTexture;
-    TSharedPtr<struct FSlateBrush> LoadingPlateBrush;
+    void HandlePostLoadMap(UWorld* LoadedWorld);
+    // The beat's three steps: show-and-hold, load, arrive-and-leave. Only a
+    // travel with a SET PendingRift gets one — dev drops, captures and every
+    // legacy path stay instant, because a briefing with nothing to say is a
+    // wait after all.
+    void BeginTravel(FName MapName);
+    void EndDeployBeat();
+    TSharedPtr<class SBreakerLoadingScreen> DeployScreen;
+    TWeakPtr<class SWindow> DeployWindow;
+    bool bDeployBeatActive = false;
 
 public:
 
