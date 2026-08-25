@@ -2,52 +2,60 @@
 
 ## Current work
 
-THE ATLAS IS WHOLE AND THE OWNER IS PLAYTESTING. NOTHING ELSE LANDS
-until they say so. HEAD `983b925`: 270 Core nodes (117 wheel + 153
-travel-trio picks across 51 positions), 222 offered against 65 =
-3.42x, ring connectivity live and proven by perturbation, both
-power-band fixtures rebuilt as full ring-legal 65-point characters.
-Every commit of the pass ran BUILD -> SUITE -> COMMIT -> PUSH at
-438 passing / 4 expected red / 0 unexpected.
+THE PERCEPTIBILITY PASS IS DONE (phases A-E) AND THE RIFT DATA MODEL
+IS IN. HEAD `2406226`, every commit at BUILD -> SUITE -> COMMIT ->
+PUSH, now 442 passing / 4 expected red (same roster) / 0 unexpected.
+Landed: three synthesized sounds (fire/hit/kill, no files, no
+licence — the provenance is Audio/BreakerSoundMath.h); the pooled
+ABreakerEffectRenderer (tracer's sibling: strokes/glows/lights on
+clip clocks, handles + EndEffect duration-rewrite, anchored beams);
+all seven Caster visuals from each ability's own geometry (Rot's rim
+at true effective radius rides every zone); Breaker.Tracer.* console
+tuning over one live copy the HUD's impact scheduling shares; the
+Anchor ruling (weapon lowered but IN FRAME, vitals + resource +
+Riftglass drawn, social trim kept); FBreakerRiftDefinition on the
+GameInstance (name/line/level authored, ilvl range and monster
+multipliers DERIVED, area-level-1 baseline per ruling) with the
+Fieldplate plate on travel via MoviePlayer; and the O106 rewrite —
+armour rolls Life/Shield archetypes, base stats derived in
+BreakerItemBaseStats.h, gear owns MaxShield's base, out-of-combat
+recharge in BreakerShieldMath.h fills shield only while heals fill
+life only. The sustain asymmetry IS the rule; no exclusivity rule may
+be added. Enemy elemental still doesn't exist (measured: 11 Physical
++ 1 TrueDamage authored sites), so the shield-break asymmetry
+deliberately waits on bBypassShield.
 
-THE THREE CLOSING RULINGS, landed in order: no hub authors a
-shared-pool More (five retargeted to identity lanes, magnitudes
-unchanged; only conditional commitment — Set at Stationary, Terminal
-Velocity airborne — touches both lanes at once); the ring is
-connectivity as DATA (edges + three entries on the tree, one added
-purchase rule under the untouched AND gates; doctrine trees
-bit-identical; the per-node-refund refusal is recorded on the tree
-for the API that does not exist yet — RespecAtForge cannot orphan by
-construction); travel is 51 three-way mutually-exclusive trios, and
-the offered census counts a trio ONCE, which is how Core reads the
-spec's exact 3.42x.
+INSTRUMENT REPAIRS THIS PASS: -BreakerAutoPlay had only ever
+suppressed the menu — since the map split every autoplay capture sat
+in the empty front end and exited green; it now takes the menu's own
+TravelTo. The -BreakerEffectProbe switch + Breaker.EffectProbe
+command photograph the effect renderer (glow + Rot rim, alive at
+frame 0, gone by frame 2). Menu and CaptureHUD captures were always
+genuine (they draw on the front end by design).
 
-MEASURED AT HEAD: at-cap 6.01 (band 8-10, expected red), endgame
-14.46 in band, ability parity 0.27 at cap — STRUCTURAL AND NAMED:
-both fixtures are weapon builds and travel hands weapon builds eight
-+15% picks while ARC/RESERVOIR go unbought; closing O99 needs an
-ability-built tree fixture as much as affix breadth. Rewrite step
-1.45 (ceiling 1.25, expected red; worst is PROLIFIC — an additive
-tier step over a base the fixtures reshaped). Empty-lanes 0 of 31,
-dead-tags 141 of 206, silent 43/54, scaffolding 42/50, unauthored
-conditions 11/24.
+BLOCKED ON THE OWNER: the O82 death-allowance conflict (plate says
+3 REMAINING, O82 says solo carries two — believed to be lives vs
+deaths counting the same rule; do not render either number without
+the word); the loading-screen WIDGET (needs Archivo + IBM Plex
+imported — a download needing owner permission — and the O82 word);
+death budget mechanic (HandlePlayerDeath spends nothing today).
+Fieldplate pack notes: the three plates are the same campaign frame
+(anomaly/raid states not actually exported), README margin 96 vs
+tokens' 64. Power-band fixtures still carry archetypeless items on
+purpose — re-pointing them at Life/Shield is a deliberate future
+change, not a side effect.
 
-LIVE CORE REWRITES with consumers: Deadeye, Last Round, Threshold,
-Interposition, Execute. Rule halves recorded WAITING at their nodes:
-Overrev (ramp), Cadence Break (cooldown-on-hit), Convergence Point
-(O109 valve), Sequence (reactions), Fester (stack diminish), Short
-Circuit (the OPEN dodge-refund question, unanswered), Iron Frame
-(player-cast interruption), plus the ungated lines on Reach,
-Counterweight, Reserve, Answering Fire, Overpressure — the Recently*
-recorder (RecentlyDashed is the template) unlocks four at a stroke.
-
-RULINGS STILL QUEUED: Slipcut's printed rule is already base kit
-(PrepareSlideJump); Phantom Step's spec text diverges from its
-shipped consumed rule; KINESIS flavor vs its damage rims; Siege reads
-"boss" through TargetElite; saves owning Core.Velocity.RedlineDoctrine
-ranks stop resolving (gym-only, O62). The board UI still has no
-cluster entries for the five new wheels or Travel — the Constellation
-field is the authoritative data, the menu is the other lane.
+QUEUED BEHIND THIS (owner-held): fourteen dead world Core Points,
+First Contract chain, Swift's missing abilities, i-frame ruling, the
+rift instance itself. Plus the standing queue: Slipcut base-kit
+collision, Phantom Step text divergence, KINESIS flavor vs rims,
+Siege TargetElite reading, RedlineDoctrine save ranks (O62), board-UI
+cluster entries for the five new wheels + Travel. Phase D's one-shot
+diagnosis (in the session report): three "round landed" signals at
+three different times — hit sound at trigger, crosshair at +16 ms,
+world spark at flight time — and the dummy itself is inert (all hit
+reactions live on ABreakerEnemy). The owner-side Fieldplate menu lane
+landed as 7e3ace2, committed as found.
 
 Update this section as the last step of each session.
 
