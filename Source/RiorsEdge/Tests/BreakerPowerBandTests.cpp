@@ -569,6 +569,20 @@ namespace BreakerPowerBandTest
 //
 // It asserts the ids specifically rather than a rank count, because a count
 // would be satisfied by thirty-four ids that all resolve to nothing.
+//
+// AND EVERY REQUESTED RANK IS ONE THE NODE CAN HOLD — the larger half. One
+// line below the silent `if (!Found) continue;` sits an equally silent clamp,
+// BreakerProgressionComponent.cpp:944:
+//     const int32 EffectiveRank = FMath::Min(Rank.Rank, Node->MaxRank);
+// The atlas is ranks-free (MaxRank = 1 everywhere in Core), so a fixture row
+// asking rank 3 of a KEEP id resolves correctly, passes the id half above,
+// and quietly buys one rank. Thirteen rows across the two fixtures do exactly
+// that the moment the atlas lands — Baseline loses 10 ranks across 6 rows,
+// Optimized 12 across 7 — and both compose downward into bands already out of
+// band, so the symptom is drift shaped exactly like the drift everyone
+// expects. This assertion is landed BEFORE any atlas node so those thirteen
+// rows fail loudly and are re-pointed deliberately, with the arithmetic
+// stated, instead of silently underbuying.
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerPowerBandFixtureIdsResolveTest,
@@ -579,19 +593,20 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
 {
     using namespace BreakerPowerBandTest;
 
-    TSet<FName> Known;
+    TMap<FName, int32> KnownMaxRank;
     for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
     {
         if (!Tree) continue;
         for (const UBreakerProgressionNode* Node : Tree->Nodes)
         {
-            if (Node) Known.Add(Node->NodeId);
+            if (Node) KnownMaxRank.Add(Node->NodeId, Node->MaxRank);
         }
     }
-    TestTrue(TEXT("The fallback trees carry nodes to resolve against"), Known.Num() > 100);
+    TestTrue(TEXT("The fallback trees carry nodes to resolve against"), KnownMaxRank.Num() > 100);
 
     int32 Checked = 0;
     TArray<FString> Missing;
+    TArray<FString> Overdrawn;
     for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized")})
     {
         const TArray<FBreakerNodeRank> Ranks =
@@ -599,9 +614,15 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
         for (const FBreakerNodeRank& Rank : Ranks)
         {
             ++Checked;
-            if (!Known.Contains(Rank.NodeId))
+            const int32* MaxRank = KnownMaxRank.Find(Rank.NodeId);
+            if (!MaxRank)
             {
                 Missing.Add(FString::Printf(TEXT("%s: %s"), Label, *Rank.NodeId.ToString()));
+            }
+            else if (Rank.Rank > *MaxRank)
+            {
+                Overdrawn.Add(FString::Printf(TEXT("%s: %s asks rank %d of a MaxRank-%d node"),
+                    Label, *Rank.NodeId.ToString(), Rank.Rank, *MaxRank));
             }
         }
     }
@@ -610,6 +631,9 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
     TestEqual(*FString::Printf(TEXT("Every fixture id resolves to a real node (%d checked): %s"),
         Checked, Missing.Num() ? *FString::Join(Missing, TEXT("; ")) : TEXT("all resolve")),
         Missing.Num(), 0);
+    TestEqual(*FString::Printf(TEXT("Every fixture rank is one its node can hold (%d checked): %s"),
+        Checked, Overdrawn.Num() ? *FString::Join(Overdrawn, TEXT("; ")) : TEXT("none clamped")),
+        Overdrawn.Num(), 0);
     return true;
 }
 
