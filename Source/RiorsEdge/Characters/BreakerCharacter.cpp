@@ -832,10 +832,17 @@ namespace
     // OWN hip pose rather than as an authored pose per archetype, for the
     // same anti-rot reason the ADS pose is derived. Prefixed for the unity
     // build like every other file-scope name in Combat/ and Characters/.
-    constexpr float BreakerHolsterDropCm = 24.0f;       // O2 PLACEHOLDER
-    constexpr float BreakerHolsterPullBackCm = 10.0f;   // O2 PLACEHOLDER
-    constexpr float BreakerHolsterPitchDegrees = -35.0f; // O2 PLACEHOLDER
-    constexpr float BreakerHolsterYawDegrees = 10.0f;   // O2 PLACEHOLDER
+    // RULED (owner, after the Anchor's first playtest): holstered but
+    // VISIBLE. The original figures (drop 24, pull-back 10, pitch -35)
+    // deliberately put the rig "out of the eyeline" — and out of the eyeline
+    // at FOV 90 turned out to mean out of the FRAME, which read as having no
+    // hands at all. The gun now hangs low and angled down but stays in the
+    // bottom of the view. Still O2 PLACEHOLDER: these are the first figures
+    // that keep it on screen, not tuned ones.
+    constexpr float BreakerHolsterDropCm = 12.0f;       // O2 PLACEHOLDER
+    constexpr float BreakerHolsterPullBackCm = 6.0f;    // O2 PLACEHOLDER
+    constexpr float BreakerHolsterPitchDegrees = -22.0f; // O2 PLACEHOLDER
+    constexpr float BreakerHolsterYawDegrees = 8.0f;    // O2 PLACEHOLDER
 }
 
 FVector ABreakerCharacter::GetWeaponRestLocation() const

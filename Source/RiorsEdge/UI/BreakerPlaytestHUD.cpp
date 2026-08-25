@@ -23,6 +23,7 @@
 #include "Audio/BreakerSoundDirector.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "Combat/BreakerEnemy.h"
@@ -86,7 +87,9 @@ namespace BreakerHUD
     // ABreakerTracerRenderer, which puts real primitives in the world where
     // the depth buffer can occlude them. See BreakerTracerRenderer.h for why
     // that move happened; the canvas version is gone, not disabled.
-    static const FTracerFlight TracerFlight;
+    // Flight figures come from the shared LIVE copy (Breaker.Tracer.*
+    // console tuning), never a private const one — a tuned speed must move
+    // the scheduled spark exactly as it moves the drawn streak.
 
     // 40ms pop + 520ms rise, FIELDPLATE §04.
     static constexpr float DamageNumberLifetime =
@@ -286,21 +289,52 @@ void ABreakerPlaytestHUD::DrawHUD()
     // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
 
-    // --- ANCHOR TRIM (owner ask, tonight) ---------------------------------
-    // The Anchor is a social space: weapons are holstered for the pawn's whole
-    // life and there is nothing to shoot, so the combat chrome is not merely
-    // idle there — it is a lie about what the place is for. Drawn instead:
-    // the minimap, the quest tracker beneath it, the XP rail with its level
-    // readout (and the level-up banner, which is the same readout's earned
-    // moment), the NPC talk prompt (the Anchor's one verb), and the playtest
-    // instrumentation with its working F3 diagnostics toggle. Everything else
-    // — health/shield, class resource, ammo, crosshair, wave banner, damage
-    // numbers, enemy bars, every combat readout — is deliberately absent.
+    // --- ANCHOR TRIM, AMENDED BY RULING -----------------------------------
+    // The original trim reasoned: the Anchor is a social space, weapons are
+    // holstered for the pawn's whole life and there is nothing to shoot, so
+    // combat chrome is a lie about what the place is for — and it dropped
+    // EVERYTHING but the minimap, quest tracker, XP rail, talk prompt and
+    // instrumentation. That was a reasonable call and it failed its first
+    // playtest: a hub where you lose both your interface and your hands
+    // reads as a loading screen you can walk around.
+    //
+    // RULED (owner, after that playtest): keep the weapon holstered but
+    // visible on the body, and keep HEALTH, RESOURCE and CURRENCY on
+    // screen. The social read survives — ammo, crosshair, wave banner,
+    // damage numbers and enemy bars stay deliberately absent — but the
+    // sense of being in your own character comes back.
     if (UBreakerGameInstance::IsAnchorMap(this))
     {
         // No enemy pass runs here, so the blip array is cleared by hand: the
         // minimap consumes whatever the last combat frame left in it.
         EnemyBlips.Reset();
+        // What the player IS, same centred double bar as the field.
+        DrawVitalsCentred(Character);
+        // The class resource, composed exactly as the field stack's row 2
+        // (rail, track, state word) at the stack's own corner.
+        {
+            const float StackX = S(BreakerUI::HudSafeMargin);
+            const float StackW = S(BreakerUI::HudV2StackWidth);
+            const BreakerHUD::FResourceRow Row = ResolveResourceRow(Character);
+            const float TrackH = S(BreakerUI::HudV2MomentumTrack);
+            const FVector2D WordSize = MeasureSpecText(Row.StateWord, BreakerUI::HudV2MomentumWordPixels);
+            const float RowH = TrackH + S(BreakerUI::Space4) + WordSize.Y;
+            const float RowY = Canvas->ClipY - S(BreakerUI::HudSafeMargin) - RowH;
+            const float RailW = S(BreakerUI::HudV2MomentumRail);
+            const float TrackX = StackX + RailW + S(BreakerUI::HudV2MomentumRailGap);
+            const float TrackW = StackX + StackW - TrackX;
+            DrawRect(Row.StateColor, StackX, RowY, RailW, RowH);
+            DrawResourceTrack(Row, TrackX, RowY, TrackW, TrackH);
+            DrawSpecText(Row.StateWord, TrackX, RowY + TrackH + S(BreakerUI::Space4),
+                Row.StateColor, BreakerUI::HudV2MomentumWordPixels);
+            // The currency, above the row: the Anchor is where Riftglass is
+            // SPENT, which is exactly why it reads here and not in a wave.
+            if (const UBreakerEquipmentComponent* AnchorEquipment = Character->GetEquipment())
+            {
+                DrawSpecText(FString::Printf(TEXT("RIFTGLASS  %d"), AnchorEquipment->GetForgeWallet().Riftglass),
+                    TrackX, RowY - S(20.0f), BreakerUI::Gold, 12.0f);
+            }
+        }
         const float TrackerX = Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudQuestTrackerWidth);
         DrawMinimap(Character,
             Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudMinimapWidth),
@@ -2205,7 +2239,7 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
         // at the impact, which is the only place they have to agree.
         const FVector Start = BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart;
         const FVector End = Shot.bHit ? Shot.ImpactPoint : Shot.TraceEnd;
-        const float FlightSeconds = BreakerHUD::TracerFlightSeconds(BreakerHUD::TracerFlight,
+        const float FlightSeconds = BreakerHUD::TracerFlightSeconds(BreakerHUD::LiveTracerFlight(),
             static_cast<float>((End - Start).Size()));
 
         // Every round counts; only some of them are visible. See

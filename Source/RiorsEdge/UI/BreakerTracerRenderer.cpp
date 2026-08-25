@@ -23,6 +23,53 @@ namespace
     const TCHAR* TracerShapeCube = TEXT("/Engine/BasicShapes/Cube.Cube");
     const TCHAR* TracerShapeSphere = TEXT("/Engine/BasicShapes/Sphere.Sphere");
 
+    // --- Breaker.Tracer.* — the live tuning surface -------------------------
+    // Every O2 PLACEHOLDER in FTracerFlight and FTracerLook, exposed by name
+    // so the owner can tune rounds-in-flight from the gym console with a
+    // controller in hand. The header says outright that no playtest has set
+    // any of these; this is the instrument for that playtest, and it PICKS
+    // NOTHING — every default is the struct's own authored figure. The HUD
+    // schedules impact arrival from the same live copy, so speed moves the
+    // spark's timing and the streak together.
+    BreakerHUD::FTracerFlight& TracerTuneFlight = BreakerHUD::LiveTracerFlight();
+    BreakerHUD::FTracerLook& TracerTuneLook = BreakerHUD::LiveTracerLook();
+    FAutoConsoleVariableRef TracerCVarSpeed(TEXT("Breaker.Tracer.SpeedCms"), TracerTuneFlight.SpeedCms,
+        TEXT("Nominal round speed in cm/s. Readability speed, not ballistic (real rifles ~90000)."));
+    FAutoConsoleVariableRef TracerCVarLength(TEXT("Breaker.Tracer.LengthCm"), TracerTuneFlight.LengthCm,
+        TEXT("Total visible streak length, head plus trail."));
+    FAutoConsoleVariableRef TracerCVarHeadLength(TEXT("Breaker.Tracer.HeadLengthCm"), TracerTuneFlight.HeadLengthCm,
+        TEXT("Bright front section of the streak."));
+    FAutoConsoleVariableRef TracerCVarMinFlight(TEXT("Breaker.Tracer.MinFlightSeconds"), TracerTuneFlight.MinFlightSeconds,
+        TEXT("Flight-time floor: a close round still occupies this long."));
+    FAutoConsoleVariableRef TracerCVarMaxFlight(TEXT("Breaker.Tracer.MaxFlightSeconds"), TracerTuneFlight.MaxFlightSeconds,
+        TEXT("Flight-time ceiling: a long shot never floats lazier than this."));
+    FAutoConsoleVariableRef TracerCVarMinTravel(TEXT("Breaker.Tracer.MinimumTravelCm"), TracerTuneFlight.MinimumTravelCm,
+        TEXT("Below this muzzle-to-impact distance no streak draws at all."));
+    FAutoConsoleVariableRef TracerCVarThickness(TEXT("Breaker.Tracer.ThicknessCm"), TracerTuneLook.ThicknessCm,
+        TEXT("World thickness of the bright head."));
+    FAutoConsoleVariableRef TracerCVarTrailScale(TEXT("Breaker.Tracer.TrailThicknessScale"), TracerTuneLook.TrailThicknessScale,
+        TEXT("Trail thickness as a fraction of the head's."));
+    FAutoConsoleVariableRef TracerCVarScreenFraction(TEXT("Breaker.Tracer.MinScreenFraction"), TracerTuneLook.MinScreenFraction,
+        TEXT("Minimum on-screen width as a fraction of viewport height."));
+    FAutoConsoleVariableRef TracerCVarHeadIntensity(TEXT("Breaker.Tracer.HeadIntensity"), TracerTuneLook.HeadIntensity,
+        TEXT("Additive head brightness multiplier."));
+    FAutoConsoleVariableRef TracerCVarTrailIntensity(TEXT("Breaker.Tracer.TrailIntensity"), TracerTuneLook.TrailIntensity,
+        TEXT("Additive trail brightness multiplier."));
+    FAutoConsoleVariableRef TracerCVarImpactSeconds(TEXT("Breaker.Tracer.ImpactSeconds"), TracerTuneLook.ImpactSeconds,
+        TEXT("Impact spark lifetime."));
+    FAutoConsoleVariableRef TracerCVarImpactRadius(TEXT("Breaker.Tracer.ImpactRadiusCm"), TracerTuneLook.ImpactRadiusCm,
+        TEXT("Impact spark radius."));
+    FAutoConsoleVariableRef TracerCVarImpactIntensity(TEXT("Breaker.Tracer.ImpactIntensity"), TracerTuneLook.ImpactIntensity,
+        TEXT("Impact spark brightness."));
+    FAutoConsoleVariableRef TracerCVarLightSeconds(TEXT("Breaker.Tracer.ImpactLightSeconds"), TracerTuneLook.ImpactLightSeconds,
+        TEXT("Impact blink-light lifetime; outlives the spark so the glow lingers."));
+    FAutoConsoleVariableRef TracerCVarLightIntensity(TEXT("Breaker.Tracer.ImpactLightIntensity"), TracerTuneLook.ImpactLightIntensity,
+        TEXT("Impact blink-light intensity."));
+    FAutoConsoleVariableRef TracerCVarLightRadius(TEXT("Breaker.Tracer.ImpactLightRadiusCm"), TracerTuneLook.ImpactLightRadiusCm,
+        TEXT("Impact blink-light attenuation radius."));
+    FAutoConsoleVariableRef TracerCVarWeakScale(TEXT("Breaker.Tracer.WeakPointLightScale"), TracerTuneLook.WeakPointLightScale,
+        TEXT("How much harder a weak point blinks."));
+
     UStaticMeshComponent* MakePooledMesh(AActor* Owner, USceneComponent* Parent,
         const FString& Name, const TCHAR* MeshPath)
     {
@@ -153,7 +200,7 @@ void ABreakerTracerRenderer::AddSecondaryLeg(const FVector& Start, const FVector
     if (bHit)
     {
         const float LegFlight = BreakerHUD::TracerFlightSeconds(
-            Flight, static_cast<float>((End - Start).Size()));
+            BreakerHUD::LiveTracerFlight(), static_cast<float>((End - Start).Size()));
         // Secondary hits are never weak points today (the leg struct carries
         // no flag); the ordinary orange spark plus the cyan streak is already
         // a distinct signature.
@@ -189,7 +236,7 @@ int32 ABreakerTracerRenderer::AddSpread(const FVector& Start, TArrayView<const F
         if (!Pellet.bHit) continue;
         if (Flashes >= MaxSpreadSparks) break;
         const float FlightSeconds = BreakerHUD::TracerFlightSeconds(
-            Flight, static_cast<float>((Pellet.End - Start).Size()));
+            BreakerHUD::LiveTracerFlight(), static_cast<float>((Pellet.End - Start).Size()));
         AddImpact(Pellet.End, Pellet.bWeakPoint, FlightSeconds);
         ++Flashes;
     }
@@ -268,6 +315,11 @@ void ABreakerTracerRenderer::PlaceSegment(UStaticMeshComponent* Mesh, UMaterialI
 void ABreakerTracerRenderer::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+
+    // Refresh from the live tuning copy so a console change lands on the
+    // very next frame, mid-flight streaks included.
+    Flight = BreakerHUD::LiveTracerFlight();
+    Look = BreakerHUD::LiveTracerLook();
 
     const UWorld* World = GetWorld();
     if (!World) return;

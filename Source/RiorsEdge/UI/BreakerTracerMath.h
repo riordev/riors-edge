@@ -101,6 +101,18 @@ namespace BreakerHUD
         float WeakPointLightScale = 2.6f;       // O2 PLACEHOLDER
     };
 
+    // --- The live tuning surface --------------------------------------------
+    // ONE mutable copy of each knob struct, shared by the renderer (which
+    // draws with it) and the HUD (which schedules impact arrival with it),
+    // so a tuned round speed moves the streak and the spark's timing
+    // together. Every field is exposed as a Breaker.Tracer.* console
+    // variable in BreakerTracerRenderer.cpp — the owner tunes with a
+    // controller in hand; nothing in code picks a value. The defaults are
+    // exactly the structs' authored O2 PLACEHOLDER figures above, which the
+    // automation tests still read from fresh struct instances.
+    inline FTracerFlight& LiveTracerFlight() { static FTracerFlight GLiveFlight; return GLiveFlight; }
+    inline FTracerLook& LiveTracerLook() { static FTracerLook GLiveLook; return GLiveLook; }
+
     // Effective speed for one shot: the nominal speed, trimmed so the flight
     // lands inside the band. Distance is the muzzle-to-impact length.
     inline float TracerEffectiveSpeed(const FTracerFlight& Flight, float DistanceCm)

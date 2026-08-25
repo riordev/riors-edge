@@ -156,8 +156,11 @@ public:
     // The knobs. Both are plain (non-reflected) structs of O2 PLACEHOLDER
     // floats — see BreakerTracerMath.h for what each one does. They are not
     // UPROPERTYs because this actor is never placed, never selected and never
-    // saved; the tuning surface is the two struct defaults in that header,
-    // which the automation tests also read.
+    // saved. THE TUNING SURFACE IS THE Breaker.Tracer.* CONSOLE VARIABLES:
+    // these members are refreshed from BreakerHUD::LiveTracerFlight()/
+    // LiveTracerLook() every Tick, so a console change lands next frame.
+    // The struct defaults in the header remain the authored values the
+    // automation tests read.
     BreakerHUD::FTracerFlight Flight;
     BreakerHUD::FTracerLook Look;
 
