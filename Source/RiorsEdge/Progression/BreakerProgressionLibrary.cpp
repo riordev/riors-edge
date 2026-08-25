@@ -340,6 +340,79 @@ namespace
         AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, PercentAboveOne, Condition);
     }
 
+    // One travel POSITION of the atlas's ring: THREE sibling nodes sharing
+    // the slot, mutually exclusive, one point each — the spec's three-way
+    // chooser, priced by O56's band edge read backwards (a shared line at
+    // 40-50% of a specific pool's value). A position OFFERS one spendable
+    // point from three options, which is exactly how Scripts/status.py
+    // counts it: the parser reads THIS helper by name, three nodes per call
+    // and one offered point per trio — rename it and the census refuses.
+    // Ids are <Base>Weapon / <Base>Ability / <Base>All. All O2 PLACEHOLDER.
+    void BreakerMakeTravelTrio(UBreakerProgressionTree* Tree, const TCHAR* BaseId)
+    {
+        const FString Base(BaseId);
+        const FName WeaponId(*(Base + TEXT("Weapon")));
+        const FName AbilityId(*(Base + TEXT("Ability")));
+        const FName AllId(*(Base + TEXT("All")));
+        struct FBreakerTravelPick
+        {
+            FName Id; const TCHAR* Name; const TCHAR* Desc;
+            EBreakerNodeStatTarget Target; float Value; FName OtherA; FName OtherB;
+        };
+        const FBreakerTravelPick Picks[3] = {
+            { WeaponId,  TEXT("Weapon Damage"),  TEXT("Travel. Your shots hit harder. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::WeaponDamage, 15.0f, AbilityId, AllId },
+            { AbilityId, TEXT("Ability Damage"), TEXT("Travel. Your abilities hit harder. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::AbilityDamage, 15.0f, WeaponId, AllId },
+            { AllId,     TEXT("All Damage"),     TEXT("Travel. Everything you deliver arrives heavier. One pick per stop, and picking again means the Forge."), EBreakerNodeStatTarget::Damage, 6.0f, WeaponId, AbilityId },
+        };
+        for (const FBreakerTravelPick& Pick : Picks)
+        {
+            UBreakerProgressionNode* Node = MakeNode(Pick.Id, Pick.Name, Pick.Desc,
+                EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Travel"));
+            AddEffect(Node, Pick.Target, EBreakerNodeStatBucket::IncreasedPercent, Pick.Value); // O2 PLACEHOLDER
+            Node->MutuallyExclusiveNodeIds.Add(Pick.OtherA);
+            Node->MutuallyExclusiveNodeIds.Add(Pick.OtherB);
+            Tree->Nodes.Add(Node);
+        }
+    }
+
+    // Adds the undirected edges linking two travel POSITIONS (or a position
+    // and a wheel node): every sibling of one end touches every sibling of
+    // the other, because at most one sibling per position is ever owned.
+    void BreakerLinkTravel(UBreakerProgressionTree* Tree, const FString& FromBase, const FString& ToBase)
+    {
+        static const TCHAR* Suffixes[3] = { TEXT("Weapon"), TEXT("Ability"), TEXT("All") };
+        for (const TCHAR* From : Suffixes)
+        {
+            for (const TCHAR* To : Suffixes)
+            {
+                FBreakerNodeEdge Edge;
+                Edge.A = FName(*(FromBase + From));
+                Edge.B = FName(*(ToBase + To));
+                Tree->AdjacencyEdges.Add(Edge);
+            }
+        }
+    }
+
+    void BreakerLinkNodeToTravel(UBreakerProgressionTree* Tree, FName WheelNode, const FString& TravelBase)
+    {
+        static const TCHAR* Suffixes[3] = { TEXT("Weapon"), TEXT("Ability"), TEXT("All") };
+        for (const TCHAR* Suffix : Suffixes)
+        {
+            FBreakerNodeEdge Edge;
+            Edge.A = WheelNode;
+            Edge.B = FName(*(TravelBase + Suffix));
+            Tree->AdjacencyEdges.Add(Edge);
+        }
+    }
+
+    void BreakerLinkNodes(UBreakerProgressionTree* Tree, FName A, FName B)
+    {
+        FBreakerNodeEdge Edge;
+        Edge.A = A;
+        Edge.B = B;
+        Tree->AdjacencyEdges.Add(Edge);
+    }
+
     // THESE OBJECTS LIVE FOR THE WHOLE PROCESS, AND THAT LEAKS BETWEEN TESTS.
     // Every tree below is a static, root-set singleton built once and handed
     // out by pointer, so a test that MUTATES a node — changing a cost, a gate,
@@ -1380,6 +1453,122 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     // element" plus a guaranteed threshold fill; the cost half is
     // unexpressible with no elements in the pipeline, so shipping it now
     // would be a pure-upside keystone. It lands with the resistance step.
+
+    // =======================================================================
+    // THE RING (owner ruling): connectivity as data, travel as content.
+    // Twelve wheels in atlas order; each wheel's rims in the spec's rim
+    // order, because rim adjacency and the inner gates both key off it.
+    // 51 travel positions (12 ring runs of 3, 3 chords of 5), each a
+    // three-way mutually-exclusive trio. Entries: rim 0 of PRECISION (0),
+    // RESERVOIR (4), BULWARK (8), ungated.
+    // =======================================================================
+    {
+        struct FBreakerWheelMap { const TCHAR* Rims[6]; const TCHAR* Inners[3]; const TCHAR* Hub; };
+        const FBreakerWheelMap WheelMap[12] = {
+            { { TEXT("Core.Precision.Sightline"), TEXT("Core.Precision.Steady"), TEXT("Core.Precision.Angle"), TEXT("Core.Precision.Ledger"), TEXT("Core.Precision.LongLens"), TEXT("Core.Precision.Lead") },
+              { TEXT("Core.Precision.CalledShot"), TEXT("Core.Precision.TunnelVision"), TEXT("Core.Precision.Deadeye") }, TEXT("Core.Precision.Fixate") },
+            { { TEXT("Core.Volley.Cyclic"), TEXT("Core.Volley.Feed"), TEXT("Core.Volley.TriggerDiscipline"), TEXT("Core.Volley.Chambered"), TEXT("Core.Volley.ColdBarrel"), TEXT("Core.Volley.WorkingStock") },
+              { TEXT("Core.Volley.Salvo"), TEXT("Core.Volley.LastRound"), TEXT("Core.Volley.Overrev") }, TEXT("Core.Volley.Barrage") },
+            { { TEXT("Core.Vector.Split"), TEXT("Core.Vector.Overpenetration"), TEXT("Core.Vector.Carom"), TEXT("Core.Vector.Spread"), TEXT("Core.Vector.Wake"), TEXT("Core.Vector.Line") },
+              { TEXT("Core.Vector.Multishot"), TEXT("Core.Vector.Chainwork"), TEXT("Core.Vector.PierceDiscipline") }, TEXT("Core.Vector.Splinter") },
+            { { TEXT("Core.Arc.Channel"), TEXT("Core.Arc.Widen"), TEXT("Core.Arc.Recycle"), TEXT("Core.Arc.Anchor"), TEXT("Core.Arc.Prime"), TEXT("Core.Arc.Vent") },
+              { TEXT("Core.Arc.CadenceBreak"), TEXT("Core.Arc.Reach"), TEXT("Core.Arc.Widening") }, TEXT("Core.Arc.Overflow") },
+            { { TEXT("Core.Reservoir.Draw"), TEXT("Core.Reservoir.Wellspring"), TEXT("Core.Reservoir.Capacity"), TEXT("Core.Reservoir.Tithe"), TEXT("Core.Reservoir.DeepPockets"), TEXT("Core.Reservoir.SecondShift") },
+              { TEXT("Core.Reservoir.ConvergencePoint"), TEXT("Core.Reservoir.Spillover"), TEXT("Core.Reservoir.Reserve") }, nullptr },
+            { { TEXT("Core.Elements.Conductive"), TEXT("Core.Elements.ChargeUp"), TEXT("Core.Elements.Penetrance"), TEXT("Core.Elements.Attunement"), TEXT("Core.Elements.Catalyst"), TEXT("Core.Elements.Sympathy") },
+              { TEXT("Core.Elements.Threshold"), TEXT("Core.Elements.Reaction"), TEXT("Core.Elements.Sequence") }, TEXT("Core.Elements.ReactionChain") },
+            { { TEXT("Core.Affliction.OpenWound"), TEXT("Core.Affliction.Deepen"), TEXT("Core.Affliction.Linger"), TEXT("Core.Affliction.Seep"), TEXT("Core.Affliction.Bloodlet"), TEXT("Core.Affliction.SlowBleed") },
+              { TEXT("Core.Affliction.Fester"), TEXT("Core.Affliction.Bloodwork"), TEXT("Core.Affliction.Attrition") }, TEXT("Core.Affliction.Compound") },
+            { { TEXT("Core.Aegis.Footing"), TEXT("Core.Aegis.Brace"), TEXT("Core.Aegis.Recover"), TEXT("Core.Aegis.CleanHands"), TEXT("Core.Aegis.SecondOpinion"), TEXT("Core.Aegis.Bulk") },
+              { TEXT("Core.Aegis.ShortCircuit"), TEXT("Core.Aegis.IronFrame"), TEXT("Core.Aegis.AnsweringFire") }, nullptr },
+            { { TEXT("Core.Bulwark.SetStance"), TEXT("Core.Bulwark.Read"), TEXT("Core.Bulwark.Weight"), TEXT("Core.Bulwark.HeldGround"), TEXT("Core.Bulwark.LineofSight"), TEXT("Core.Bulwark.Loud") },
+              { TEXT("Core.Bulwark.Parry"), TEXT("Core.Bulwark.Counterweight"), TEXT("Core.Bulwark.Interposition") }, TEXT("Core.Bulwark.Set") },
+            { { TEXT("Core.Kinesis.LightFooting"), TEXT("Core.Kinesis.Loft"), TEXT("Core.Kinesis.Landing"), TEXT("Core.Kinesis.Carry"), TEXT("Core.Kinesis.Contact"), TEXT("Core.Kinesis.Redirect") },
+              { TEXT("Core.Kinesis.AirJump"), TEXT("Core.Kinesis.Slipcut"), TEXT("Core.Kinesis.PhantomStep") }, nullptr },
+            { { TEXT("Core.Velocity.Freefall"), TEXT("Core.Velocity.Afterburn"), TEXT("Core.Velocity.Traction"), TEXT("Core.Velocity.Slipstream"), TEXT("Core.Velocity.Grind"), TEXT("Core.Velocity.Downforce") },
+              { TEXT("Core.Velocity.TerminalDescent"), TEXT("Core.Velocity.Redline"), TEXT("Core.Velocity.NoGround") }, TEXT("Core.Velocity.TerminalVelocity") },
+            { { TEXT("Core.Ruin.WeightofIt"), TEXT("Core.Ruin.Cull"), TEXT("Core.Ruin.Break"), TEXT("Core.Ruin.ShapedCharge"), TEXT("Core.Ruin.Concussion"), TEXT("Core.Ruin.Rend") },
+              { TEXT("Core.Ruin.Execute"), TEXT("Core.Ruin.Siege"), TEXT("Core.Ruin.Overpressure") }, TEXT("Core.Ruin.Collapse") },
+        };
+
+        // Wheel-internal edges: the rim hexagon, each inner touching its two
+        // gating rims, the hub touching its three inners. These MIRROR the
+        // AND Prerequisites — adjacency is connectivity, the prerequisites
+        // stay the gates.
+        for (const FBreakerWheelMap& Wheel : WheelMap)
+        {
+            for (int32 J = 0; J < 6; ++J)
+            {
+                BreakerLinkNodes(Tree, FName(Wheel.Rims[J]), FName(Wheel.Rims[(J + 1) % 6]));
+            }
+            for (int32 J = 0; J < 3; ++J)
+            {
+                BreakerLinkNodes(Tree, FName(Wheel.Rims[J * 2]), FName(Wheel.Inners[J]));
+                BreakerLinkNodes(Tree, FName(Wheel.Rims[(J * 2 + 1) % 6]), FName(Wheel.Inners[J]));
+                if (Wheel.Hub) BreakerLinkNodes(Tree, FName(Wheel.Inners[J]), FName(Wheel.Hub));
+            }
+        }
+
+        // The 51 travel positions, LITERAL on purpose: Scripts/status.py's
+        // census reads BreakerMakeTravelTrio calls by name and cannot see a
+        // loop. The link loops below re-derive the same base strings; the
+        // integrity test validates every edge endpoint resolves, so the two
+        // cannot drift silently.
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring0P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring1P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring2P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring3P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring4P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring5P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring6P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring7P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring8P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring9P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring10P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Ring11P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord0P5"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord1P5"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P1")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P2")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P3"));
+        BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P4")); BreakerMakeTravelTrio(Tree, TEXT("Core.Travel.Chord2P5"));
+
+        // Ring runs: three travel positions between adjacent wheels' rim 0,
+        // enterable from either end (every edge here is undirected).
+        for (int32 WheelIndex = 0; WheelIndex < 12; ++WheelIndex)
+        {
+            TArray<FString> Bases;
+            for (int32 Position = 1; Position <= 3; ++Position)
+            {
+                Bases.Add(FString::Printf(TEXT("Core.Travel.Ring%dP%d"), WheelIndex, Position));
+            }
+            BreakerLinkNodeToTravel(Tree, FName(WheelMap[WheelIndex].Rims[0]), Bases[0]);
+            BreakerLinkTravel(Tree, Bases[0], Bases[1]);
+            BreakerLinkTravel(Tree, Bases[1], Bases[2]);
+            BreakerLinkNodeToTravel(Tree, FName(WheelMap[(WheelIndex + 1) % 12].Rims[0]), Bases[2]);
+        }
+
+        // Chords: five positions across the board, wheels 0-6, 2-8, 4-10.
+        const int32 ChordEnds[3][2] = { {0, 6}, {2, 8}, {4, 10} };
+        for (int32 ChordIndex = 0; ChordIndex < 3; ++ChordIndex)
+        {
+            TArray<FString> Bases;
+            for (int32 Position = 1; Position <= 5; ++Position)
+            {
+                Bases.Add(FString::Printf(TEXT("Core.Travel.Chord%dP%d"), ChordIndex, Position));
+            }
+            BreakerLinkNodeToTravel(Tree, FName(WheelMap[ChordEnds[ChordIndex][0]].Rims[0]), Bases[0]);
+            for (int32 Position = 0; Position < 4; ++Position)
+            {
+                BreakerLinkTravel(Tree, Bases[Position], Bases[Position + 1]);
+            }
+            BreakerLinkNodeToTravel(Tree, FName(WheelMap[ChordEnds[ChordIndex][1]].Rims[0]), Bases[4]);
+        }
+
+        Tree->EntryNodeIds.Add(TEXT("Core.Precision.Sightline"));
+        Tree->EntryNodeIds.Add(TEXT("Core.Reservoir.Draw"));
+        Tree->EntryNodeIds.Add(TEXT("Core.Bulwark.SetStance"));
+    }
 
     return Tree;
 }

@@ -7,6 +7,16 @@
 
 class UBreakerProgressionNode;
 
+// One undirected edge of a tree's connectivity graph (see AdjacencyEdges).
+USTRUCT(BlueprintType)
+struct RIORSEDGE_API FBreakerNodeEdge
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName A = NAME_None;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName B = NAME_None;
+};
+
 UCLASS(BlueprintType)
 class RIORSEDGE_API UBreakerProgressionTree : public UPrimaryDataAsset
 {
@@ -42,6 +52,25 @@ public:
     // if the two ever disagree again.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Rules", meta=(ClampMin="0")) int32 CornerstoneInvestmentGate = 8;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Nodes") TArray<TObjectPtr<UBreakerProgressionNode>> Nodes;
+
+    // --- THE RING (owner ruling, Phase 4) ----------------------------------
+    // Connectivity as DATA: undirected edges between node ids, plus the entry
+    // nodes the graph is walked from. A tree that carries edges gains ONE
+    // purchase rule in CanPurchaseNode — a node must be an entry or touch an
+    // owned node — layered UNDER the AND Prerequisites, which stay the real
+    // gates (inner needs BOTH its rims; adjacency alone never opens one).
+    // Empty on every tree that predates the atlas, so doctrine purchase
+    // behaviour is bit-identical.
+    //
+    // REFUND RULING, recorded where the future API will look: there is no
+    // per-node refund today (RespecAtForge is the only way points come back,
+    // which cannot orphan a path by construction). The day one is built, it
+    // REFUSES while any purchased node depends on the refunded one — through
+    // these edges or through Prerequisites — and its failure text names the
+    // dependents ("Refunded X would strand Y, Z"); the full respec stays the
+    // escape hatch.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") TArray<FBreakerNodeEdge> AdjacencyEdges;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ring") TArray<FName> EntryNodeIds;
 
     const UBreakerProgressionNode* FindNode(FName NodeId) const;
 };

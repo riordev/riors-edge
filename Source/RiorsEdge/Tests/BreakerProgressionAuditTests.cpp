@@ -312,9 +312,10 @@ bool FBreakerCoreConstellationFieldTest::RunTest(const FString& Parameters)
     // membership must be intact regardless of the UI catching up to it.
     TestEqual(TEXT("Velocity carries its full atlas wheel"), CountByConstellation.FindRef(TEXT("Velocity")), 10);
     // Re-pinned per atlas pair, the tree-count convention: pair B added the
-    // VECTOR and ARC wheels (7 -> 9), pair C RESERVOIR (9 -> 10); the
-    // remaining pairs raise it to 12.
-    TestEqual(TEXT("All twelve wheels are represented"), CountByConstellation.Num(), 12);
+    // VECTOR and ARC wheels (7 -> 9), pair C RESERVOIR (9 -> 10), pairs D-F
+    // the rest — and the RING adds Travel as a thirteenth group whose 153
+    // trio picks all carry the Core.Travel. prefix.
+    TestEqual(TEXT("Twelve wheels plus Travel are represented"), CountByConstellation.Num(), 13);
 
     // Class branch nodes are not a constellation and must stay None.
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(),
@@ -354,18 +355,21 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Nothing spent before any purchase"), Progression->GetSpentPoints(), 0.0f);
 
-    // Atlas shape: Tunnel Vision's stated rim gate is Angle AND Ledger.
-    TestTrue(TEXT("Angle purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));                 // cost 1, Core
-    TestTrue(TEXT("Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));               // cost 1, Core
-    TestTrue(TEXT("Tunnel Vision purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));  // cost 2, Core
-    TestEqual(TEXT("Core spend tracks three purchases"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
+    // Atlas shape, ring-legal: the hexagon walks from the entry to Tunnel
+    // Vision's two stated rims.
+    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));          // cost 1, Core
+    TestTrue(TEXT("Steady purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Steady"), Failure));                // cost 1, Core
+    TestTrue(TEXT("Angle purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));                  // cost 1, Core
+    TestTrue(TEXT("Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));                // cost 1, Core
+    TestTrue(TEXT("Tunnel Vision purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));   // cost 2, Core
+    TestEqual(TEXT("Core spend tracks five purchases"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
 
     // O111: a doctrine node needs the doctrine wallet, and the wallet is filled
     // by commitment. Granted at exactly the shipped budget rather than an
     // inflated rig figure.
     Progression->GrantPlaytestPoints(UBreakerProgressionLibrary::DoctrinePointGrant, 0);
     TestTrue(TEXT("Carry purchases"), Progression->PurchaseNode(Kinetic, TEXT("Swift.Kinetic.Carry"), Failure));               // cost 1, Doctrine
-    TestEqual(TEXT("Doctrine spend adds on top of core spend"), Progression->GetSpentPoints(), 5.0f, 0.0001f);
+    TestEqual(TEXT("Doctrine spend adds on top of core spend"), Progression->GetSpentPoints(), 7.0f, 0.0001f);
 
     // Respec one currency: its running total resets to zero and the other is
     // untouched.

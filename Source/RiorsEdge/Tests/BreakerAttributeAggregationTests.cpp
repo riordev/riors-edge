@@ -361,25 +361,29 @@ bool FBreakerDamageNodeRaisesWeaponDamageTest::RunTest(const FString& Parameters
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     Progression->ApplySliceDefaultsIfFresh();
     FText Failure;
-    // ATLAS SHAPE (Phase 4): every Core node is a single purchase, so this
-    // asserts single purchases summing in the one bucket rather than ranks.
-    // Core.Volley.Cyclic authors +3% weapon damage (O2 PLACEHOLDER), which
-    // bids the DamageMultiplier attribute.
+    // ATLAS SHAPE (Phase 4): single purchases summing in the one bucket —
+    // reached THROUGH THE RING: entry at Sightline, the run to VOLLEY walked
+    // on Ability picks, which never touch the DamageMultiplier attribute
+    // this test is watching.
+    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
+    TestTrue(TEXT("Travel 1 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P1Ability"), Failure));
+    TestTrue(TEXT("Travel 2 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P2Ability"), Failure));
+    TestTrue(TEXT("Travel 3 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring0P3Ability"), Failure));
+    TestEqual(TEXT("The path moved no weapon damage"), Attributes->GetDamageMultiplier(), 1.0f, 0.0001f);
     TestTrue(TEXT("The damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
 
     TestEqual(TEXT("A purchased damage node moves the attribute"), Attributes->GetDamageMultiplier(), 1.03f, 0.0001f);
     TestEqual(TEXT("A purchased damage node moves the damage a weapon would deal"), WeaponDamageFor(Attributes), 103.0f, 0.001f);
 
-    // Separate purchases keep paying into ONE additive bucket: Trigger
-    // Discipline's weapon line and Feed's shared line join Cyclic's, and
-    // Salvo — gated on Cyclic and Feed, the wheel's stated inner gate —
-    // lands its +16% in the same bucket.
-    TestTrue(TEXT("A second weapon rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure));
-    TestEqual(TEXT("The second rim adds its increment"), Attributes->GetDamageMultiplier(), 1.06f, 0.0001f);
+    // Separate purchases keep paying into ONE additive bucket, walked in
+    // ring order — Feed opens off Cyclic, Trigger Discipline off Feed, and
+    // Salvo's stated AND gate (Cyclic + Feed) is met when adjacency reaches it.
     TestTrue(TEXT("A shared-pool rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Feed"), Failure));
+    TestEqual(TEXT("The shared rim adds its increment"), Attributes->GetDamageMultiplier(), 1.05f, 0.0001f);
+    TestTrue(TEXT("A second weapon rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure));
     TestTrue(TEXT("The rim-gated inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Salvo"), Failure));
     TestEqual(TEXT("Purchases sum into the one additive bucket"), Attributes->GetDamageMultiplier(), 1.24f, 0.0001f);
-    TestEqual(TEXT("Four purchases are worth 24% more damage"), WeaponDamageFor(Attributes), 124.0f, 0.001f);
+    TestEqual(TEXT("The wheel purchases are worth 24% more damage"), WeaponDamageFor(Attributes), 124.0f, 0.001f);
 
     // A respec must hand the damage back exactly, not approximately.
     TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
@@ -420,27 +424,30 @@ bool FBreakerPointSpendDamageBaselineTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("One committed point is one point"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
     TestEqual(TEXT("A damage-less purchase still raises damage"), Attributes->GetDamageMultiplier(), 1.0025f, 0.0001f);
 
-    // Cost, not node count, is the unit: a 2-point inner is worth two.
-    // Atlas shape: Cyclic and Feed are the rims Salvo's stated gate names.
-    TestTrue(TEXT("A damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Cyclic"), Failure));
-    TestTrue(TEXT("A second rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Feed"), Failure));
-    TestTrue(TEXT("The 2-point inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.Salvo"), Failure));
-    TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 5.0f, 0.0001f);
-    // 5 points x 0.25% baseline + the node lines (3 + 2 + 16), all one
+    // Cost, not node count, is the unit: a 2-point inner is worth two. The
+    // ring is walked inside BULWARK, whose entry SetStance is already owned:
+    // Read and Weight ride the hexagon, Held Ground completes
+    // Counterweight's stated AND gate.
+    TestTrue(TEXT("A weapon rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Read"), Failure));
+    TestTrue(TEXT("A damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Weight"), Failure));
+    TestTrue(TEXT("A second damage rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.HeldGround"), Failure));
+    TestTrue(TEXT("The 2-point inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Bulwark.Counterweight"), Failure));
+    TestEqual(TEXT("Committed points count by cost"), Progression->GetSpentPoints(), 6.0f, 0.0001f);
+    // 6 points x 0.25% baseline + the node lines (3 + 2 + 2 + 16), all one
     // bucket. The nodes out-earn the accumulation by an order of magnitude;
     // before the O27 cut they were equal, which is the imbalance it names.
-    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.2225f, 0.0001f);
+    TestEqual(TEXT("Baseline and node damage share one additive bucket"), Attributes->GetDamageMultiplier(), 1.245f, 0.0001f);
 
     // Turning the baseline off must leave exactly the node content behind, so
     // the owner can retune or disable it without touching content.
     const FBreakerProgressionState Allocated = Progression->GetProgressionState();
     Progression->IncreasedDamagePerSpentPoint = 0.0f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("A zeroed baseline leaves only node damage"), Attributes->GetDamageMultiplier(), 1.21f, 0.0001f);
+    TestEqual(TEXT("A zeroed baseline leaves only node damage"), Attributes->GetDamageMultiplier(), 1.23f, 0.0001f);
 
     Progression->IncreasedDamagePerSpentPoint = 2.5f;
     Progression->LoadProgressionState(Allocated);
-    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.335f, 0.0001f);
+    TestEqual(TEXT("The baseline retunes without a content change"), Attributes->GetDamageMultiplier(), 1.38f, 0.0001f);
     return true;
 }
 

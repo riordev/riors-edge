@@ -53,9 +53,11 @@ bool FBreakerSkillProjectionMirrorTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
+    // Three ENTRY nodes — the ring gates everything else, and this test
+    // wants owned content, not a traversal exercise.
     Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason);
     Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Bulwark.SetStance"), Reason);
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Kinesis.LightFooting"), Reason);
+    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Reservoir.Draw"), Reason);
 
     const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     TestTrue(TEXT("Snapshot sees composed attributes"), Snapshot.bHasComposedAttributes);
@@ -105,11 +107,13 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
-    // ATLAS SHAPE (Phase 4): every Core node is a single purchase. Cyclic is
-    // a freely-purchasable rim at +3% weapon damage; two other rims come
-    // first only so the projection starts from a non-trivial live number.
-    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.TriggerDiscipline"), Reason);
+    // ATLAS SHAPE (Phase 4): every Core node is a single purchase, reached
+    // through the ring — entry at Sightline, the run to VOLLEY walked on
+    // Ability picks so the weapon-damage projection under test stays clean.
     Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason);
+    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P1Ability"), Reason);
+    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P2Ability"), Reason);
+    Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Travel.Ring0P3Ability"), Reason);
 
     const FBreakerSkillSnapshot Snapshot = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
     const TArray<FBreakerStatLine> OneRank = BreakerSkillProjection::ProjectPurchase(Snapshot, TEXT("Core.Volley.Cyclic"), 1);

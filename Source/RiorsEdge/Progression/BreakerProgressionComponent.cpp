@@ -216,6 +216,30 @@ bool UBreakerProgressionComponent::CanPurchaseNode(const UBreakerProgressionTree
             return false;
         }
     }
+    // THE RING (owner ruling, Phase 4): in a tree that carries a connectivity
+    // graph, a node is bought FROM the graph — it is an entry, or it touches
+    // a node already owned. This layers UNDER the AND Prerequisites above:
+    // adjacency is how you reach a wheel, prerequisites are what it charges
+    // once you are there. Trees with no edges (every doctrine) skip this
+    // entirely, bit-identically to before the ring existed.
+    if (Tree->AdjacencyEdges.Num() > 0 && !Tree->EntryNodeIds.Contains(NodeId))
+    {
+        bool bConnected = false;
+        for (const FBreakerNodeEdge& Edge : Tree->AdjacencyEdges)
+        {
+            const FName Neighbor = Edge.A == NodeId ? Edge.B : (Edge.B == NodeId ? Edge.A : FName(NAME_None));
+            if (!Neighbor.IsNone() && GetNodeRank(Neighbor, Node->Currency) >= 1)
+            {
+                bConnected = true;
+                break;
+            }
+        }
+        if (!bConnected)
+        {
+            OutFailureReason = LOCTEXT("RingUnreached", "Reach this node through the ring first: no connected node is owned.");
+            return false;
+        }
+    }
     for (const FName ExcludedId : Node->MutuallyExclusiveNodeIds)
     {
         if (GetNodeRank(ExcludedId, Node->Currency) > 0)

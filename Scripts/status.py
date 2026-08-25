@@ -182,6 +182,25 @@ def parse_nodes(lib_text):
                 node["cornerstone"] = True
         nodes.append(node)
 
+    # The ring's travel positions: BreakerMakeTravelTrio authors THREE
+    # mutually-exclusive sibling nodes per literal call — Weapon (+15% weapon),
+    # Ability (+15% ability), All (+6% shared). The helper is read BY NAME, so
+    # the trio picks are visible to every census here, carrying the exclusive
+    # group that lets the offered count below price a position at ONE point
+    # rather than three. Renaming the helper breaks this parse loudly (the
+    # node-count floor refuses), never silently.
+    TRAVEL_PICKS = (("Weapon", "WeaponDamage"), ("Ability", "AbilityDamage"), ("All", "Damage"))
+    for m in re.finditer(r'BreakerMakeTravelTrio\(Tree,\s*TEXT\("([^"]+)"\)\)', lib_text):
+        base = m.group(1)
+        i = line_of(m.start())
+        for suffix, target in TRAVEL_PICKS:
+            nodes.append({
+                "id": base + suffix, "tier": 1, "ranks": 1, "cost": 1,
+                "tree": tree_of(i), "line": i + 1,
+                "effects": [target], "tags": [], "cornerstone": False,
+                "conditions": [], "more": False, "exclusive": base,
+            })
+
     if len(nodes) < 100:
         raise ParseError(
             f"{LIB}: parsed only {len(nodes)} nodes. The MakeNode signature changed; "
@@ -860,7 +879,19 @@ def build_sections(sources):
         by_tree[n["tree"]].append(n)
     ratios = []
     for tree, ns in sorted(by_tree.items()):
-        offered = sum(n["cost"] * max(1, n["ranks"]) for n in ns)
+        # A mutually-exclusive trio OFFERS one spendable point from three
+        # options, so its group counts once — summing siblings would print a
+        # scoped count (authored rows) as a total (offerable points), the
+        # defect this file keeps finding in itself.
+        seen_groups = set()
+        offered = 0
+        for n in ns:
+            group = n.get("exclusive")
+            if group is not None:
+                if group in seen_groups:
+                    continue
+                seen_groups.add(group)
+            offered += n["cost"] * max(1, n["ranks"])
         budget = core_budget if "Core" in tree else doctrine_budget
         ratios.append((tree, len(ns), offered, round(offered / budget, 2)))
     worst = min((r[3] for r in ratios), default=0)

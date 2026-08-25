@@ -318,8 +318,14 @@ bool FBreakerElementsConstellationTest::RunTest(const FString& Parameters)
     const float BaseCritChance = Attributes->GetCriticalChance();
     const float BaseDamage = Attributes->GetDamageMultiplier();
 
-    // The wheel walk, the atlas way: six free rims, three inners each gated
-    // on their two stated rims, the hub on all three inners.
+    // The wheel walk, the atlas way — now RING-LEGAL: enter at RESERVOIR's
+    // Draw, ride the run to ELEMENTS on Ability picks, and capture the
+    // Primed baselines AFTER the path so the wheel's own deltas stay clean.
+    FText PathFailure;
+    TestTrue(TEXT("The entry purchases"), Progression->PurchaseNode(Core, TEXT("Core.Reservoir.Draw"), PathFailure));
+    TestTrue(TEXT("Travel 1 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring4P1Ability"), PathFailure));
+    TestTrue(TEXT("Travel 2 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring4P2Ability"), PathFailure));
+    TestTrue(TEXT("Travel 3 purchases"), Progression->PurchaseNode(Core, TEXT("Core.Travel.Ring4P3Ability"), PathFailure));
     const float PrimedDoT = Attributes->GetDamageOverTimeMultiplier();
     const float PrimedCritChance = Attributes->GetCriticalChance();
     const float PrimedDamage = Attributes->GetDamageMultiplier();

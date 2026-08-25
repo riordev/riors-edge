@@ -91,7 +91,25 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // went from four and five nodes to ten each (30 -> 41); the remaining
     // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 117);
+    TestEqual(TEXT("Core ships the wheels plus the ring's 51 trios"), Core->Nodes.Num(), 270);
+
+    // THE RING'S GRAPH IS VALID DATA: every edge endpoint and every entry
+    // resolves to a real node — the edge builder derives its strings in
+    // loops while the trio calls are literal, and this is what keeps the two
+    // from drifting apart silently.
+    int32 EdgeCount = 0;
+    for (const FBreakerNodeEdge& Edge : Core->AdjacencyEdges)
+    {
+        ++EdgeCount;
+        TestNotNull(*(Edge.A.ToString() + TEXT(" (edge A) resolves")), Core->FindNode(Edge.A));
+        TestNotNull(*(Edge.B.ToString() + TEXT(" (edge B) resolves")), Core->FindNode(Edge.B));
+    }
+    TestTrue(TEXT("The ring carries its edges"), EdgeCount > 200);
+    TestEqual(TEXT("Three entries, ungated"), Core->EntryNodeIds.Num(), 3);
+    for (const FName& Entry : Core->EntryNodeIds)
+    {
+        TestNotNull(*(Entry.ToString() + TEXT(" (entry) resolves")), Core->FindNode(Entry));
+    }
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
@@ -235,11 +253,14 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Tree investment tracks spend"), Progression->GetTreeInvestment(Core), 1);
     TestFalse(TEXT("Rank cap is enforced"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
 
-    // ATLAS SHAPE (Phase 4): an inner is gated on its two stated rims — both
-    // of them, and independently of the (weaker) tier investment gate. With
-    // Sightline and Angle owned the gate at 2 is already met, so the second
-    // refusal below is the PREREQUISITE binding on its own.
-    TestTrue(TEXT("The first of Tunnel Vision's rims purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    // THE RING binds before the wheel's gates: Angle does not touch the
+    // entry, so it refuses until the hexagon is walked to it through Steady.
+    TestFalse(TEXT("The ring refuses a rim nothing owned touches"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestTrue(TEXT("The adjacent rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Steady"), Failure));
+    TestTrue(TEXT("The walk opens the next rim"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    // ATLAS SHAPE: an inner is gated on its two stated rims — both of them,
+    // and independently of adjacency (Angle alone touches Tunnel Vision, so
+    // the refusal below is the AND prerequisite binding on its own).
     TestFalse(TEXT("One rim of two is not enough"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
     TestTrue(TEXT("The second rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));
     TestTrue(TEXT("Both rims open the inner"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
