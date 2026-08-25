@@ -2,80 +2,60 @@
 
 ## Current work
 
-The two-pool rebuild is at the end of Phase 3. Core 65 and Doctrine 8 are ruled
-(O111); the Class Point currency is retired, not removed, and the migration is
-`Save.Migration.V5ToV6`. `Docs/` is ten files and the corpus that preceded it is
-recoverable at the `pre-corpus-deletion` tag — Class-Kits included, which is
-where Caster's nine tier-4 rows were recovered from rather than invented.
+PHASE 4'S WHEELS ARE AUTHORED: 117 of 117 across all twelve, at
+`4b9bffa`, every commit through BUILD → SUITE → COMMIT → PUSH at
+438 passing / 4 expected red / 0 unexpected. The atlas landed in six
+pair commits behind three infrastructure commits: five aggregation
+lanes (IncomingDamageReduction, RecoilRecovery, WeaponSpread,
+StatusChance, StatusDuration — tree side only, the affix lines are the
+affix owner's), the FixtureIdsResolve rank assertion (proven by
+perturbation before it was trusted), and the thirteen fixture rows
+re-pointed to rank 1 with the composed before/after in the commit.
 
-THE FINDING THIS PHASE TURNED ON, now ruled as O118: a gate and the budget it
-gates against are one number in two places. `CornerstoneInvestmentGate` was 8
-points spent in the tree against a wallet of 8, so all fifteen doctrine
-keystones needed 11 and none could be bought — the second time this project has
-shipped unpurchasable keystones from that exact cause. Doctrine trees now carry
-no gate at all, the keystone is an ordinary tier-4 node at cost 2, and every
-doctrine node costs two points to max so the wallet divides into four clean
-picks. `Progression.TreeDepthIsReachable` walks every tree against its own grant
-and exists before Core's atlas does, on purpose.
+FIVE CORE REWRITES ARE LIVE WITH CONSUMERS landed in the same commits
+as their nodes: Deadeye (granted weak points keep the crit roll — the
+purchased O104 exception), Last Round (the magazine's final round
+cannot be a non-crit), Threshold (bleed application banks
+deterministically instead of rolling), Interposition (a hit inside the
+window after a successful block cannot land unblocked), Execute
+(armour ignored below quarter health, resolved at the Stage-6 seam).
+Rule halves still waiting on systems that do not exist carry
+Frenzy-precedent stat halves on live lanes, each named WAITING at its
+node: Overrev (no fire-rate ramp), Cadence Break (no cooldown-on-hit),
+Convergence Point (no loop valve — O109), Sequence (no reactions),
+Fester (no stack diminish to refuse), Short Circuit (the dodge-refund
+OPEN QUESTION, deliberately unanswered), Iron Frame (nothing
+interrupts a player cast), and the ungated lines on Reach,
+Counterweight, Reserve, Answering Fire, Overpressure (each missing a
+condition the vocabulary cannot say — Answering Fire's is one of the
+four never-true Recently* conditions, whose recorder is the unlock).
 
-A doctrine may not author a magnitude on a generic damage pool unless it is
-conditional on that doctrine's own axis. `Progression.AxisOverlap` states that
-over Damage/WeaponDamage/AbilityDamage — deliberately not against Core's
-Constellation field, which Phase 4 deletes. It found three violations, all
-fixed, so it is green rather than enumerated. The at-cap band and weapon/ability
-parity both returned exactly when Culling's unconditional weapon line was gated
-on Aiming, then moved to 6.54 and 0.641 on the other three fixes; the asymmetry
-is that Redline is one of the fixture's three measurement conditions and Aiming
-is not.
+RULINGS THE PASS SURFACED, all awaiting the owner: Slipcut's printed
+rule is ALREADY BASE KIT (PrepareSlideJump preserves slide-jump speed
+unconditionally); Phantom Step's spec text (dash-through) diverges
+from its shipped, CONSUMED rule (dodge invulnerability); KINESIS's
+flavor ("no damage attached to any of it") contradicts its six +2%
+damage rims, and Light Footing kept its shipped dodge/move lines over
+the spec row; the ruled nine-More roster yields FIVE unconditional
+generalist Mores (22/22/25/26/30) where the old tree argued for two —
+a stationary build composes 1.30 x 1.26 x 1.25 with zero commitment;
+rim ring traversal is UNGATED because AND-only prerequisites cannot
+say either-neighbor (the spec's hexagon edges and entry points are
+geometry until an any-of vocabulary is ruled); Siege reads "boss"
+through TargetElite. Saves owning Core.Velocity.RedlineDoctrine ranks
+stop resolving under the rename (gym-only, O62).
 
-BLOCKED ON ONE RULING, and it is the next thing: branch `phase3-caster-trios`
-holds Caster's nine tier-4 rewrites, which close the last recorded branch-content
-gap and put every doctrine on the same twelve-node, 24-point shape. They are
-rules-as-tags, because Mana-loop rewrites have no representation on
-`EBreakerNodeStatTarget` — and nine tag-only nodes move `silent-nodes` 52 -> 61,
-`dead-tags` 143 -> 152 and `scaffolding-nodes` 50 -> 59. A ceiling falls and
-never rises. Either three ceilings are re-pinned with the reason, or the rules
-get their plumbing; three of the nine are already named by the systems that
-would read them (MS9 in `BreakerStatusConsumption.h`, SB10 in Closequarter's
-header, MS10 in `BreakerManaComponent`).
-
-READERS FIRST IS THE ORDER, AND IT MEASURES. SB10's reader landed with its tag
-declared ahead of its node: declared tags went 202 -> 203 and `dead-tags` held,
-because the tag arrived consumed. Merge the trios first and three ceilings move
-by nine each; land the readers first and none move. Same nine nodes, opposite
-outcome, decided by which half goes first. Eight readers remain.
-
-THREE AUDIT FINDINGS, ALL VERIFIED REAL AT HEAD, two closed:
-`uncalled-generation` counted a hook's own definition as its caller and was
-structurally pinned at zero — it reads 3 of 18 now and stays OUT until three
-hooks are wired, never by re-pinning. O104 never reached the weapon path: a
-Lead-granted weak point took the weak-point multiplier AND a live crit roll,
-guarded by a test that hand-set the one field the game never set. Open:
-ModifierBearing pays more than Elite in XP and loot while being weaker on the
-chassis — two independently-pinned reward sites justified by a difficulty ladder
-that does not exist.
-
-THE OWNER'S ORDERED PASSES, all three landed this session: the tag-rider
-consumer exists end to end — MeleeDamage rows key on `Damage.Melee` and pay
-the weapon lane's additive bucket only on tagged hits
-(`Combat.TargetRiders.SourceTagMelee`), one switch to add the next tag, one
-function to name its lane — and generalising it is the gate on Phase 4's
-rule-only inner nodes. O96's two ceilings are derived ahead of authoring:
-layer 2.0 (O33's four avenues, equal log shares of the endgame band), major
-1.5, three-minor stack 4/3, which prices a minor at ~1.10 and says three of
-the four rolled rewrites come down or stay major-slot when O63 reclassifies
-them; `RuleBandImpact.Major` pins the major ceiling on its full current
-population (the three legendaries) and MinorStack stays honestly untested
-until a stack can exist. O106 is rewritten — the shield affix ships — and a
-ruling that gates on a measurement now names its section key, which `make
-status` cross-references and reports as GATE OPEN (dormant until the next
-gated ruling).
-
-Then Phase 4, the Core atlas: twelve wheels offering 222 against 65. Core is
-still the worst tree at 1.05x and is the whole of why `offered-to-spendable` is
-out of band; every doctrine is at 3.00x, exactly, with no margin. Watch
-`scaffolding-nodes` during that pass — it is the number that can go the wrong
-way while every other section on the page improves.
+Measured at head: empty-lanes 0 of 31 (first zero ever), dead-tags 141
+of 206 and falling (three formerly dead tags gained consumers),
+unauthored conditions 11 of 24 (Stationary authored, on Set's
+conditional More), silent 43/54, scaffolding 42/50, Core at 171
+offered against 65 = 2.63x. The floor's worst tree is the Caster
+trios' 2.25 — Core's distance to the spec's 3.42x is exactly step 5,
+the 51 travel points and the three-way chooser, NOT YET ORDERED. The
+board UI has no cluster entries for the five new wheels (the menu's
+hardcoded list — another lane, the Constellation field is authoritative
+data). The at-cap band read 5.69 and parity 0.59 mid-migration; both
+recompose when travel and the re-pointed fixtures' build-out land.
 
 Update this section as the last step of each session.
 
