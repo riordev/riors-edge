@@ -2,60 +2,52 @@
 
 ## Current work
 
-PHASE 4'S WHEELS ARE AUTHORED: 117 of 117 across all twelve, at
-`4b9bffa`, every commit through BUILD → SUITE → COMMIT → PUSH at
-438 passing / 4 expected red / 0 unexpected. The atlas landed in six
-pair commits behind three infrastructure commits: five aggregation
-lanes (IncomingDamageReduction, RecoilRecovery, WeaponSpread,
-StatusChance, StatusDuration — tree side only, the affix lines are the
-affix owner's), the FixtureIdsResolve rank assertion (proven by
-perturbation before it was trusted), and the thirteen fixture rows
-re-pointed to rank 1 with the composed before/after in the commit.
+THE ATLAS IS WHOLE AND THE OWNER IS PLAYTESTING. NOTHING ELSE LANDS
+until they say so. HEAD `983b925`: 270 Core nodes (117 wheel + 153
+travel-trio picks across 51 positions), 222 offered against 65 =
+3.42x, ring connectivity live and proven by perturbation, both
+power-band fixtures rebuilt as full ring-legal 65-point characters.
+Every commit of the pass ran BUILD -> SUITE -> COMMIT -> PUSH at
+438 passing / 4 expected red / 0 unexpected.
 
-FIVE CORE REWRITES ARE LIVE WITH CONSUMERS landed in the same commits
-as their nodes: Deadeye (granted weak points keep the crit roll — the
-purchased O104 exception), Last Round (the magazine's final round
-cannot be a non-crit), Threshold (bleed application banks
-deterministically instead of rolling), Interposition (a hit inside the
-window after a successful block cannot land unblocked), Execute
-(armour ignored below quarter health, resolved at the Stage-6 seam).
-Rule halves still waiting on systems that do not exist carry
-Frenzy-precedent stat halves on live lanes, each named WAITING at its
-node: Overrev (no fire-rate ramp), Cadence Break (no cooldown-on-hit),
-Convergence Point (no loop valve — O109), Sequence (no reactions),
-Fester (no stack diminish to refuse), Short Circuit (the dodge-refund
-OPEN QUESTION, deliberately unanswered), Iron Frame (nothing
-interrupts a player cast), and the ungated lines on Reach,
-Counterweight, Reserve, Answering Fire, Overpressure (each missing a
-condition the vocabulary cannot say — Answering Fire's is one of the
-four never-true Recently* conditions, whose recorder is the unlock).
+THE THREE CLOSING RULINGS, landed in order: no hub authors a
+shared-pool More (five retargeted to identity lanes, magnitudes
+unchanged; only conditional commitment — Set at Stationary, Terminal
+Velocity airborne — touches both lanes at once); the ring is
+connectivity as DATA (edges + three entries on the tree, one added
+purchase rule under the untouched AND gates; doctrine trees
+bit-identical; the per-node-refund refusal is recorded on the tree
+for the API that does not exist yet — RespecAtForge cannot orphan by
+construction); travel is 51 three-way mutually-exclusive trios, and
+the offered census counts a trio ONCE, which is how Core reads the
+spec's exact 3.42x.
 
-RULINGS THE PASS SURFACED, all awaiting the owner: Slipcut's printed
-rule is ALREADY BASE KIT (PrepareSlideJump preserves slide-jump speed
-unconditionally); Phantom Step's spec text (dash-through) diverges
-from its shipped, CONSUMED rule (dodge invulnerability); KINESIS's
-flavor ("no damage attached to any of it") contradicts its six +2%
-damage rims, and Light Footing kept its shipped dodge/move lines over
-the spec row; the ruled nine-More roster yields FIVE unconditional
-generalist Mores (22/22/25/26/30) where the old tree argued for two —
-a stationary build composes 1.30 x 1.26 x 1.25 with zero commitment;
-rim ring traversal is UNGATED because AND-only prerequisites cannot
-say either-neighbor (the spec's hexagon edges and entry points are
-geometry until an any-of vocabulary is ruled); Siege reads "boss"
-through TargetElite. Saves owning Core.Velocity.RedlineDoctrine ranks
-stop resolving under the rename (gym-only, O62).
+MEASURED AT HEAD: at-cap 6.01 (band 8-10, expected red), endgame
+14.46 in band, ability parity 0.27 at cap — STRUCTURAL AND NAMED:
+both fixtures are weapon builds and travel hands weapon builds eight
++15% picks while ARC/RESERVOIR go unbought; closing O99 needs an
+ability-built tree fixture as much as affix breadth. Rewrite step
+1.45 (ceiling 1.25, expected red; worst is PROLIFIC — an additive
+tier step over a base the fixtures reshaped). Empty-lanes 0 of 31,
+dead-tags 141 of 206, silent 43/54, scaffolding 42/50, unauthored
+conditions 11/24.
 
-Measured at head: empty-lanes 0 of 31 (first zero ever), dead-tags 141
-of 206 and falling (three formerly dead tags gained consumers),
-unauthored conditions 11 of 24 (Stationary authored, on Set's
-conditional More), silent 43/54, scaffolding 42/50, Core at 171
-offered against 65 = 2.63x. The floor's worst tree is the Caster
-trios' 2.25 — Core's distance to the spec's 3.42x is exactly step 5,
-the 51 travel points and the three-way chooser, NOT YET ORDERED. The
-board UI has no cluster entries for the five new wheels (the menu's
-hardcoded list — another lane, the Constellation field is authoritative
-data). The at-cap band read 5.69 and parity 0.59 mid-migration; both
-recompose when travel and the re-pointed fixtures' build-out land.
+LIVE CORE REWRITES with consumers: Deadeye, Last Round, Threshold,
+Interposition, Execute. Rule halves recorded WAITING at their nodes:
+Overrev (ramp), Cadence Break (cooldown-on-hit), Convergence Point
+(O109 valve), Sequence (reactions), Fester (stack diminish), Short
+Circuit (the OPEN dodge-refund question, unanswered), Iron Frame
+(player-cast interruption), plus the ungated lines on Reach,
+Counterweight, Reserve, Answering Fire, Overpressure — the Recently*
+recorder (RecentlyDashed is the template) unlocks four at a stroke.
+
+RULINGS STILL QUEUED: Slipcut's printed rule is already base kit
+(PrepareSlideJump); Phantom Step's spec text diverges from its
+shipped consumed rule; KINESIS flavor vs its damage rims; Siege reads
+"boss" through TargetElite; saves owning Core.Velocity.RedlineDoctrine
+ranks stop resolving (gym-only, O62). The board UI still has no
+cluster entries for the five new wheels or Travel — the Constellation
+field is the authoritative data, the menu is the other lane.
 
 Update this section as the last step of each session.
 
