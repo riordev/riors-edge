@@ -248,4 +248,10 @@ private:
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
     bool bDeathBroadcast = false;
     double LastDamageTime = -1000.0;
+    // Core.Bulwark.Interposition's clock: the moment of the last SUCCESSFUL
+    // block. A hit arriving within the window while the node is owned cannot
+    // land unblocked — ReceiveDamage reads it beside the tag.
+    double LastSuccessfulBlockTime = -1000.0;
+    // O2 PLACEHOLDER — the follow-up window Interposition guards.
+    static constexpr float InterpositionWindowSeconds = 1.0f;
 };

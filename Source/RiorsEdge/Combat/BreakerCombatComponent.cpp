@@ -125,6 +125,16 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     {
         Defense.DodgeChance = FMath::Clamp(Defense.DodgeChance + Progression->GetDodgeChanceBonus(), 0.0f, 1.0f);
         Defense.BlockChance = FMath::Clamp(Defense.BlockChance + Progression->GetBlockChanceBonus(), 0.0f, 1.0f);
+        // Core.Bulwark.Interposition: a block that succeeds cannot be
+        // followed by a second hit in the same window — inside it, the block
+        // roll becomes certainty. The chance path, not a bypass, so block
+        // mitigation, O78's ordering and every downstream term are untouched.
+        const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+        if (Now - LastSuccessfulBlockTime <= InterpositionWindowSeconds
+            && Progression->HasNodeTag(FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Bulwark.Interposition"), false)))
+        {
+            Defense.BlockChance = 1.0f;
+        }
     }
 
     // Stage 6 (H3): target-conditional riders resolve HERE, the one site that
@@ -147,6 +157,12 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
     LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    // Interposition's clock arms on the SUCCESSFUL block itself, so the
+    // window measures from the block the player felt, not from the swing.
+    if (Result.bBlocked)
+    {
+        LastSuccessfulBlockTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    }
     OnDamageReceived.Broadcast(Result);
     if (Result.bKilled && !bDeathBroadcast)
     {

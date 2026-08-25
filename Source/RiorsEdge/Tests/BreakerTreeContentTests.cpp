@@ -91,7 +91,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // went from four and five nodes to ten each (30 -> 41); the remaining
     // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 91);
+    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 103);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
@@ -359,13 +359,14 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Increased damage stacks additively across ranks"), Aimed.DamageMultiplier, 1.06f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
-    // Rule-rewrite and verb nodes publish tags instead of stats.
+    // Rule tags publish beside stats, and over-asked ranks clamp: the atlas
+    // makes Read a MaxRank-1 rim with a weapon line, so rank 3 pays rank 1.
     TArray<FBreakerNodeRank> VerbRanks;
     VerbRanks.Add({TEXT("Core.Bulwark.Read"), 3});
     const FBreakerNodeStats InertStats = UBreakerProgressionComponent::AggregateStats(Nodes, VerbRanks);
     TestTrue(TEXT("Read publishes its tag"), InertStats.GrantedTags.HasTag(BreakerNodeTags::Node_Read.GetTag()));
-    TestFalse(TEXT("Read at rank 3 without Parry grants no verb"), InertStats.GrantedTags.HasTag(BreakerNodeTags::Verb_Parry.GetTag()));
-    TestEqual(TEXT("Read at rank 3 without Parry moves no stat"), InertStats.MoveSpeedMultiplier, 1.0f, 0.0001f);
+    TestFalse(TEXT("Read without Parry grants no verb"), InertStats.GrantedTags.HasTag(BreakerNodeTags::Verb_Parry.GetTag()));
+    TestEqual(TEXT("Read's weapon line pays exactly one clamped rank"), InertStats.DamageMultiplier, 1.03f, 0.0001f);
 
     // Ranks beyond the node's cap cannot inflate the aggregate.
     TArray<FBreakerNodeRank> OverRanks;

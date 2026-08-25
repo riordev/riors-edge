@@ -12,6 +12,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_Fixate, "Progression.Node.Core.Fixate");
     UE_DEFINE_GAMEPLAY_TAG(Node_TunnelVision, "Progression.Node.Core.TunnelVision");
     UE_DEFINE_GAMEPLAY_TAG(Node_Core_Deadeye, "Progression.Node.Core.Precision.Deadeye");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Core_Interposition, "Progression.Node.Core.Bulwark.Interposition");
     UE_DEFINE_GAMEPLAY_TAG(Node_TriggerDiscipline, "Progression.Node.Core.TriggerDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Cyclic, "Progression.Node.Core.Cyclic");
     UE_DEFINE_GAMEPLAY_TAG(Node_LastRound, "Progression.Node.Core.LastRound");
@@ -903,72 +904,164 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddEffect(AegAnsweringFire, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(AegAnsweringFire);
 
-    // --- Bulwark -----------------------------------------------------------
+    // --- BULWARK: block and parry (atlas pair E) ---------------------------
+    // Set Stance's shipped effects VERBATIM, by ruling: it is the game's only
+    // source of block chance, its consumer is BreakerCombatComponent, and the
+    // spec's own constraints keep it whole. A deliberate exception to the
+    // uniform one-point rim's shape, not to its cost.
     UBreakerProgressionNode* SetStance = MakeNode(TEXT("Core.Bulwark.SetStance"), TEXT("Set Stance"),
-        TEXT("Bulwark gateway. Block rolls more often and you carry more health."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
-    AddEffect(SetStance, EBreakerNodeStatTarget::BlockChance, EBreakerNodeStatBucket::Flat, 6.0f);  // O2 PLACEHOLDER
-    AddEffect(SetStance, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 90.0f);      // O2 PLACEHOLDER
+        TEXT("Block rolls more often and you carry more health."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(SetStance, EBreakerNodeStatTarget::BlockChance, EBreakerNodeStatBucket::Flat, 6.0f);  // O2 PLACEHOLDER — shipped effects, unchanged
+    AddEffect(SetStance, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 90.0f);      // O2 PLACEHOLDER — shipped effects, unchanged
     SetStance->GrantedTags.AddTag(BreakerNodeTags::Node_SetStance.GetTag());
     Tree->Nodes.Add(SetStance);
 
-    // Inert until Parry is owned. Buying it to rank 3 with no Parry must be a
-    // no-op and must not error (§10.3 criterion 5); it therefore authors no
-    // stat effect at all, only a tag Parry reads.
     UBreakerProgressionNode* Read = MakeNode(TEXT("Core.Bulwark.Read"), TEXT("Read"),
-        TEXT("Parry's window widens. Inert until Parry is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Bulwark"));
-    AddPrerequisite(Read, TEXT("Core.Bulwark.SetStance"));
+        TEXT("Your shots hit a little harder. The tag still widens Parry's window the day Parry ships."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(Read, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Read->GrantedTags.AddTag(BreakerNodeTags::Node_Read.GetTag());
     Tree->Nodes.Add(Read);
 
+    UBreakerProgressionNode* BulWeight = MakeNode(TEXT("Core.Bulwark.Weight"), TEXT("Weight"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(BulWeight, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(BulWeight);
+
+    UBreakerProgressionNode* BulHeldGround = MakeNode(TEXT("Core.Bulwark.HeldGround"), TEXT("Held Ground"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(BulHeldGround, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(BulHeldGround);
+
+    UBreakerProgressionNode* BulLineofSight = MakeNode(TEXT("Core.Bulwark.LineofSight"), TEXT("Line of Sight"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(BulLineofSight, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(BulLineofSight);
+
+    UBreakerProgressionNode* BulLoud = MakeNode(TEXT("Core.Bulwark.Loud"), TEXT("Loud"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Bulwark"));
+    AddEffect(BulLoud, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(BulLoud);
+
     UBreakerProgressionNode* Parry = MakeNode(TEXT("Core.Bulwark.Parry"), TEXT("Parry"),
-        TEXT("VERB GRANT. Parry becomes available on its own short cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Bulwark"));
+        TEXT("VERB GRANT. Parry becomes available on its own short cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
     AddPrerequisite(Parry, TEXT("Core.Bulwark.SetStance"));
-    // PHANTOM GRANT FIXED (audit item 3): "Parry" resolved to no entry in the
-    // ability registry (Abilities/BreakerAbilityDefinition.cpp — no
-    // UBreakerAbilityDefinition, no ability class exists yet), so purchasing
-    // this node could unlock a loadout slot that silently did nothing when
-    // pressed. O1 and O25 still name Parry the one tree-granted verb; the
-    // grant returns the day an actual Parry ability ships, rather than
-    // inventing one here to make this node's text true. Verb_Parry stays —
-    // it is a rule-rewrite tag, not an ability id, and its consumer (a future
-    // Combat/ parry check) is unaffected.
+    AddPrerequisite(Parry, TEXT("Core.Bulwark.Read"));
+    // PHANTOM GRANT still fixed (audit item 3): no Parry ability exists in
+    // the registry, so no id is granted here. O1 and O25 still name Parry the
+    // one tree-granted verb; the grant returns the day the ability ships.
+    // Verb_Parry stays — its consumer is a future Combat/ parry check.
     Parry->GrantedTags.AddTag(BreakerNodeTags::Verb_Parry.GetTag());
     Tree->Nodes.Add(Parry);
 
-    // --- Kinesis -----------------------------------------------------------
+    // The spec's "+16% inside a counter window" has no condition to say it —
+    // counter windows do not exist while Parry is unshipped — so the line is
+    // unconditional at a value sized for that, the gate recorded as waiting
+    // on Parry's counter window.
+    UBreakerProgressionNode* BulCounterweight = MakeNode(TEXT("Core.Bulwark.Counterweight"), TEXT("Counterweight"),
+        TEXT("Your shots hit considerably harder. Its window — inside a parried counter — is waiting on Parry itself."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
+    AddPrerequisite(BulCounterweight, TEXT("Core.Bulwark.Weight"));
+    AddPrerequisite(BulCounterweight, TEXT("Core.Bulwark.HeldGround"));
+    AddEffect(BulCounterweight, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(BulCounterweight);
+
+    // Rule rewrite with its consumer LIVE in the same commit: after a
+    // successful block, a hit arriving inside the follow-up window cannot
+    // land unblocked — ReceiveDamage reads the tag and the block clock.
+    UBreakerProgressionNode* BulInterposition = MakeNode(TEXT("Core.Bulwark.Interposition"), TEXT("Interposition"),
+        TEXT("A block that succeeds cannot be followed by a second hit in the same window."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Bulwark"));
+    AddPrerequisite(BulInterposition, TEXT("Core.Bulwark.LineofSight"));
+    AddPrerequisite(BulInterposition, TEXT("Core.Bulwark.Loud"));
+    BulInterposition->GrantedTags.AddTag(BreakerNodeTags::Node_Core_Interposition.GetTag());
+    Tree->Nodes.Add(BulInterposition);
+
+    // Stationary is a live, self-evaluable condition no content had ever
+    // authored — "holding ground without moving" is exactly it, so this hub
+    // is the first conditional More since Terminal Velocity's and the
+    // condition leaves the unauthored list.
+    UBreakerProgressionNode* BulSet = MakeNode(TEXT("Core.Bulwark.Set"), TEXT("Set"),
+        TEXT("Convergence. Holding ground without moving builds a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Bulwark"));
+    AddPrerequisite(BulSet, TEXT("Core.Bulwark.Parry"));
+    AddPrerequisite(BulSet, TEXT("Core.Bulwark.Counterweight"));
+    AddPrerequisite(BulSet, TEXT("Core.Bulwark.Interposition"));
+    AddDamageMore(BulSet, 20.0f, EBreakerBuildCondition::Stationary); // O2 PLACEHOLDER: x1.20
+    Tree->Nodes.Add(BulSet);
+
+    // --- KINESIS: movement quality (atlas pair E, no hub by design) --------
+    // ONE DEVIATION FROM THE SPEC'S TABLE, stated plainly: the wheel's own
+    // text says "no damage attached to any of it", its gateway's dodge and
+    // move-speed lines are shipped content the aggregation tests pin, and
+    // stripping them for a +2% damage line would gut the wheel's identity to
+    // satisfy a placeholder row. Light Footing keeps its shipped effects; the
+    // other rims follow the spec as printed, and the tension between the
+    // wheel's flavor and its damage rims is named in the pair-E report.
     UBreakerProgressionNode* LightFooting = MakeNode(TEXT("Core.Kinesis.LightFooting"), TEXT("Light Footing"),
-        TEXT("Kinesis gateway. Dodge rolls more often and you move a little quicker."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
-    AddEffect(LightFooting, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 5.0f);             // O2 PLACEHOLDER
-    AddEffect(LightFooting, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f);  // O2 PLACEHOLDER
+        TEXT("Dodge rolls more often and you move a little quicker."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(LightFooting, EBreakerNodeStatTarget::DodgeChance, EBreakerNodeStatBucket::Flat, 5.0f);             // O2 PLACEHOLDER — shipped effects, unchanged
+    AddEffect(LightFooting, EBreakerNodeStatTarget::MoveSpeed, EBreakerNodeStatBucket::IncreasedPercent, 12.0f);  // O2 PLACEHOLDER — shipped effects, unchanged
     Tree->Nodes.Add(LightFooting);
 
-    // Inert until Air Jump is owned — the second inert-node test.
     UBreakerProgressionNode* Loft = MakeNode(TEXT("Core.Kinesis.Loft"), TEXT("Loft"),
-        TEXT("Air Jump gains height and control. Inert until Air Jump is owned."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Kinesis"));
-    AddPrerequisite(Loft, TEXT("Core.Kinesis.LightFooting"));
+        TEXT("Everything you deliver arrives a little heavier. The tag still lifts Air Jump the day its rule lands."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(Loft, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
     Loft->GrantedTags.AddTag(BreakerNodeTags::Node_Loft.GetTag());
     Tree->Nodes.Add(Loft);
 
-    UBreakerProgressionNode* PhantomStep = MakeNode(TEXT("Core.Kinesis.PhantomStep"), TEXT("Phantom Step"),
-        TEXT("A successful Dodge grants brief invulnerability on a 2.0s internal cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Kinesis"));
-    AddPrerequisite(PhantomStep, TEXT("Core.Kinesis.LightFooting"));
-    PhantomStep->GrantedTags.AddTag(BreakerNodeTags::Node_PhantomStep.GetTag());
-    Tree->Nodes.Add(PhantomStep);
+    UBreakerProgressionNode* KinLanding = MakeNode(TEXT("Core.Kinesis.Landing"), TEXT("Landing"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(KinLanding, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(KinLanding);
 
-    // O25 SUPERSEDES this node's original "VERB GRANT" premise: two jumps are
-    // base kit for every class (JumpMaxCount = 2 in ABreakerCharacter), so
-    // there is no longer an "Air Jump" verb left for a node purchase to grant
-    // — Parry is now the only tree-granted verb. The phantom
-    // GrantedAbilityIds.Add(TEXT("AirJump")) (no such id in the ability
-    // registry, audit item 3) is removed rather than reworded into a real
-    // grant; the node keeps its Air Control stat line, which is real content
-    // on its own.
+    UBreakerProgressionNode* KinCarry = MakeNode(TEXT("Core.Kinesis.Carry"), TEXT("Carry"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(KinCarry, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(KinCarry);
+
+    UBreakerProgressionNode* KinContact = MakeNode(TEXT("Core.Kinesis.Contact"), TEXT("Contact"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(KinContact, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(KinContact);
+
+    UBreakerProgressionNode* KinRedirect = MakeNode(TEXT("Core.Kinesis.Redirect"), TEXT("Redirect"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Kinesis"));
+    AddEffect(KinRedirect, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(KinRedirect);
+
+    // Keeps its shipped air-control line beside the spec's rule text: the
+    // decay rule has no decay to delete yet, and a rule-only inner would be
+    // scaffolding where real content already stood (O25's note stands — the
+    // verb itself is base kit; nothing is granted here).
     UBreakerProgressionNode* AirJump = MakeNode(TEXT("Core.Kinesis.AirJump"), TEXT("Air Jump"),
-        TEXT("Sharpens air control. The verb itself is base kit for everyone now (O25); this rank no longer grants it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 2, TEXT("Kinesis"));
+        TEXT("Sharpens air control. Its full rule — control that refuses to decay across a jump arc — is waiting on a decay to refuse."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Kinesis"));
     AddPrerequisite(AirJump, TEXT("Core.Kinesis.LightFooting"));
-    AddEffect(AirJump, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER
+    AddPrerequisite(AirJump, TEXT("Core.Kinesis.Loft"));
+    AddEffect(AirJump, EBreakerNodeStatTarget::AirControl, EBreakerNodeStatBucket::IncreasedPercent, 15.0f); // O2 PLACEHOLDER — shipped effects, unchanged
     AirJump->GrantedTags.AddTag(BreakerNodeTags::Verb_AirJump.GetTag());
     Tree->Nodes.Add(AirJump);
+
+    // THE SPEC'S RULE IS ALREADY BASE KIT: PrepareSlideJump preserves slide
+    // speed into the jump unconditionally, so "a slide that ends in a jump
+    // keeps its speed" describes what every character already does. Gating
+    // shipped movement feel behind a purchase is a design change this pass
+    // may not make, so the node pays in slide speed and the collision is
+    // named in the pair-E report for the owner to rule on.
+    UBreakerProgressionNode* KinSlipcut = MakeNode(TEXT("Core.Kinesis.Slipcut"), TEXT("Slipcut"),
+        TEXT("Slides carry more speed. Its printed rule — a slide-jump that keeps its speed — is already base kit, which is a spec collision awaiting a ruling."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Kinesis"));
+    AddPrerequisite(KinSlipcut, TEXT("Core.Kinesis.Landing"));
+    AddPrerequisite(KinSlipcut, TEXT("Core.Kinesis.Carry"));
+    AddEffect(KinSlipcut, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(KinSlipcut);
+
+    // Keeps its SHIPPED, CONSUMED rule (UBreakerMomentumComponent::
+    // TryPhantomStep reads the tag — dodge-triggered invulnerability). The
+    // spec's different intent for this id ("the dash passes through an enemy
+    // instead of stopping on it") would re-text a live rule into a lie; the
+    // divergence is named in the pair-E report for the owner to rule on.
+    UBreakerProgressionNode* PhantomStep = MakeNode(TEXT("Core.Kinesis.PhantomStep"), TEXT("Phantom Step"),
+        TEXT("A successful Dodge grants brief invulnerability on a 2.0s internal cooldown."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Kinesis"));
+    AddPrerequisite(PhantomStep, TEXT("Core.Kinesis.Contact"));
+    AddPrerequisite(PhantomStep, TEXT("Core.Kinesis.Redirect"));
+    PhantomStep->GrantedTags.AddTag(BreakerNodeTags::Node_PhantomStep.GetTag());
+    Tree->Nodes.Add(PhantomStep);
 
     // --- Velocity ----------------------------------------------------------
     // NEW under O27. "Movement is part of character building rather than a
