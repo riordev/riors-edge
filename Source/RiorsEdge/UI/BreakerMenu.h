@@ -486,6 +486,10 @@ private:
     // The quartermaster's last refusal or confirmation, shown on the screen
     // and cleared by the next rebuild that has something new to say.
     FText QuartermasterStatus;
+    // Which ability the quartermaster's bench holds. NAME_None auto-selects
+    // the first offered row on the next build, so the bench never opens empty
+    // while there is stock.
+    FName QuartermasterSelectedAbility;
     // True only while the Forge screen was entered through Kess. The respec
     // gate reads it, so the "only available at a Forge" refusal is reachable
     // instead of being a branch nothing could ever take.

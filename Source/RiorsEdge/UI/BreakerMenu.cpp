@@ -9311,118 +9311,369 @@ TSharedRef<SWidget> SBreakerMenu::BuildForgeScreen()
 // copy of an unlock rule drifts from the first.
 TSharedRef<SWidget> SBreakerMenu::BuildQuartermasterScreen()
 {
+    // The reference's QUARTERMASTER DRAY, on the Forge's shell family: one
+    // verb (UNLOCK · ONE-TIME TOKENS), the class-ability list on the left,
+    // the chosen ability's bench on the right, cost and the gold commit in
+    // the footer. Two honesty flips against the plate: the token caption
+    // reads THIS BREAKER, not ACCOUNT-WIDE — O100 makes tokens per-character
+    // precisely so an established account cannot buy out a new character —
+    // and there is no rank meter, because abilities have no ranks; ONE TOKEN
+    // · PERMANENT is the whole contract. The plate's not-in-this-class rows
+    // are omitted rather than faked: GetUnlockableAbilityIds lists only this
+    // class's stock, which is the only list progression owns.
     UBreakerProgressionComponent* Progression = Character.IsValid() ? Character->GetProgression() : nullptr;
-    const FWideScreenMetrics Metrics = MeasureWideScreen();
-
     const int32 Tokens = Progression ? Progression->GetUnspentAbilityTokens() : 0;
-
-    TSharedRef<SHorizontalBox> HeaderRight = SNew(SHorizontalBox);
-    // Deliberately NO BuildScreenTabs here. See the block comment above.
-    HeaderRight->AddSlot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
-    [
-        MakePlate(
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::FromString(TEXT("TOKENS")), BreakerUI::TypeCaption, Muted, true)]
-            + SVerticalBox::Slot().AutoHeight()[MenuText(FText::AsNumber(Tokens), BreakerUI::TypeH2, Primary, true)],
-            PanelRaised, Cyan, FMargin(BreakerUI::Space16, BreakerUI::Space4))
-    ];
-    HeaderRight->AddSlot().AutoWidth().VAlign(VAlign_Center)
-    [
-        SNew(SBox).WidthOverride(120.0f)[MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)]
-    ];
-
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    if (!QuartermasterStatus.IsEmpty())
-    {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
-        [
-            MenuText(QuartermasterStatus, BreakerUI::TypeCaption, SoftText)
-        ];
-    }
-
     const TArray<FName> Offered = Progression ? Progression->GetUnlockableAbilityIds() : TArray<FName>();
-    if (Offered.Num() == 0)
+
+    if (QuartermasterSelectedAbility.IsNone() || !Offered.Contains(QuartermasterSelectedAbility))
     {
-        // A class with nothing left to sell is a real state, not an error: the
-        // stock is finite by design (one token per unlockable), so it empties
-        // once the last one is bought. Say so rather than showing a blank plate.
-        Body->AddSlot().AutoHeight()
-        [
-            MenuText(FText::FromString(TEXT("NOTHING IN STOCK FOR YOUR CLASS.")), BreakerUI::TypeCaption, Disabled)
-        ];
+        QuartermasterSelectedAbility = Offered.Num() > 0 ? Offered[0] : NAME_None;
     }
 
+    // ---- The one-verb band -------------------------------------------------
+    const TSharedRef<SWidget> VerbBand = SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().Padding(BreakerSettingsContentPad, 0.0f, 0.0f, 0.0f)
+            [
+                SNew(SBox).HeightOverride(56.0f)
+                [
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(Panel)
+                    .Padding(FMargin(BreakerUI::Space24, 0.0f))
+                    .VAlign(VAlign_Center)
+                    [
+                        SNew(SVerticalBox)
+                        + SVerticalBox::Slot().AutoHeight()
+                        [
+                            MenuText(FText::FromString(TEXT("UNLOCK")), BreakerUI::TypeBody, Primary, true)
+                        ]
+                        + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+                        [
+                            BreakerMonoText(FText::FromString(TEXT("ONE-TIME TOKENS")), BreakerUI::TypeCaption, Amber, 0.16f)
+                        ]
+                    ]
+                ]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+                .Padding(BreakerUI::Space24, 0.0f, BreakerSettingsContentPad, 0.0f)
+            [
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)
+                [
+                    BreakerMonoText(FText::FromString(TEXT("ONE VERB · REFUSALS DISCLOSED")),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ]
+        ]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+        ];
+
+    // ---- The stock list ----------------------------------------------------
+    TSharedRef<SVerticalBox> StockList = SNew(SVerticalBox);
     for (const FName AbilityId : Offered)
     {
         const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(AbilityId);
         const bool bOwned = Progression && Progression->IsAbilityUnlocked(AbilityId);
-        const bool bAffordable = Tokens > 0;
+        const bool bRowSelected = QuartermasterSelectedAbility == AbilityId;
         const FName CapturedId = AbilityId;
+        // The rail carries the row's state: cyan owned, gold still to buy —
+        // and the tag beside the name says the same thing in words.
+        const FLinearColor Rail = bOwned ? Cyan : Amber;
+        StockList->AddSlot().AutoHeight()
+        [
+            SNew(SBox).HeightOverride(68.0f).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+            [
+                BorderWrap(
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth()
+                    [
+                        SNew(SBox).WidthOverride(BreakerUI::RailThickness)[SolidBlock(Rail)]
+                    ]
+                    + SHorizontalBox::Slot().FillWidth(1.0f)
+                    [
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(bRowSelected ? PanelRaised : Panel)
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .ContentPadding(FMargin(BreakerUI::Space12, 0.0f))
+                            .HAlign(HAlign_Fill)
+                            .VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateLambda([this, CapturedId]()
+                            {
+                                QuartermasterSelectedAbility = CapturedId;
+                                QuartermasterStatus = FText::GetEmpty();
+                                Rebuild(EBreakerMenuScreen::Quartermaster);
+                                return FReply::Handled();
+                            }))
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                                [
+                                    MenuText(FText::FromString((Definition ? Definition->DisplayName
+                                        : FText::FromName(AbilityId)).ToString().ToUpper()),
+                                        BreakerUI::TypeBody, bRowSelected ? Primary : SoftText, true)
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                                [
+                                    BreakerMonoText(FText::FromString(bOwned ? TEXT("OWNED") : TEXT("1 TK")),
+                                        BreakerUI::TypeCaption, bOwned ? Cyan : Amber, 0.16f)
+                                ]
+                            ]
+                        ]
+                    ],
+                    bRowSelected ? Cyan : BorderRest,
+                    bRowSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
+            ]
+        ];
+    }
+    if (Offered.Num() == 0)
+    {
+        // A class with nothing left to sell is a real state, not an error: the
+        // stock is finite by design (one token per unlockable), so it empties
+        // once the last one is bought. Say so rather than a blank list.
+        StockList->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(TEXT("Nothing in stock for your class.")), BreakerUI::TypeBody, SoftText)
+        ];
+    }
 
-        TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
-        Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
+    const TSharedRef<SWidget> ListColumn = SNew(SBox).WidthOverride(375.0f)
+    [
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().Padding(FMargin(BreakerUI::Space24, BreakerUI::Space16, BreakerUI::Space24, BreakerUI::Space8))
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f)
+            [
+                BreakerMonoText(FText::FromString(TEXT("CLASS ABILITIES")), BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d SHOWN"), Offered.Num())),
+                    BreakerUI::TypeCaption, Muted, 0.16f)
+            ]
+        ]
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerUI::Space24, 0.0f, BreakerUI::Space16, BreakerUI::Space16))
+            [
+                StockList
+            ]
+        ]
+    ];
+
+    // ---- The bench ---------------------------------------------------------
+    TSharedRef<SVerticalBox> Bench = SNew(SVerticalBox);
+    TSharedRef<SWidget> FooterAction = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
+    FString CostLead;
+    FString CostTail;
+
+    const UBreakerAbilityDefinition* Selected = QuartermasterSelectedAbility.IsNone()
+        ? nullptr : UBreakerAbilityDefinition::FindFallback(QuartermasterSelectedAbility);
+    if (QuartermasterSelectedAbility.IsNone())
+    {
+        Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("The stock is sold through. Every ability this class can learn is yours.")),
+                BreakerUI::TypeBody, SoftText)
+        ];
+    }
+    else
+    {
+        const bool bOwned = Progression && Progression->IsAbilityUnlocked(QuartermasterSelectedAbility);
+        Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    // Uppercase on the display face — the pack's display role
+                    // carries the transform, and authored ability names are
+                    // mixed-case body copy.
+                    MenuText(FText::FromString((Selected ? Selected->DisplayName
+                        : FText::FromName(QuartermasterSelectedAbility)).ToString().ToUpper()),
+                        BreakerUI::TypeH1, Primary, true)
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+                [
+                    BreakerMonoText(FText::FromString(bOwned ? TEXT("OWNED · PERMANENT") : TEXT("ONE TOKEN · PERMANENT")),
+                        BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
+            ]
+        ];
+        Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)
+            [
+                BreakerMonoText(FText::FromString(TEXT("WHAT IT DOES")), BreakerUI::TypeCaption, Cyan, 0.16f)
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+            [
+                SNew(STextBlock)
+                    .Text(Selected ? Selected->Description : FText::GetEmpty())
+                    .ColorAndOpacity(SoftText)
+                    .WrapTextAt(760.0f)
+                    .Font(BreakerBodyFont(BreakerUI::TypeBody))
+            ]
+        ];
+
+        if (bOwned)
+        {
+            CostLead = TEXT("OWNED");
+            CostTail = FString::Printf(TEXT("TOKENS %d"), Tokens);
+            FooterAction = BreakerSettingsDisabledButton(TEXT("UNLOCKED"), 240.0f);
+        }
+        else
+        {
+            const bool bAffordable = Tokens > 0;
+            CostLead = TEXT("1 TOKEN");
+            CostTail = bAffordable
+                ? FString::Printf(TEXT("LEAVES %d"), Tokens - 1)
+                : FString(TEXT("NONE HELD"));
+            const FName CapturedId = QuartermasterSelectedAbility;
+            FooterAction = bAffordable
+                ? StaticCastSharedRef<SWidget>(SNew(SBox).WidthOverride(260.0f).HeightOverride(47.0f)
+                [
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::Hex(0x2A2416))
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .HAlign(HAlign_Center).VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateLambda([this, CapturedId]()
+                            {
+                                UBreakerProgressionComponent* Target =
+                                    Character.IsValid() ? Character->GetProgression() : nullptr;
+                                if (!Target) return FReply::Handled();
+                                FText Failure;
+                                // The screen never decides. Progression
+                                // refuses or spends, and its reason is what
+                                // the player reads.
+                                if (Target->SpendAbilityToken(CapturedId, Failure))
+                                {
+                                    QuartermasterStatus = FText::FromString(TEXT("Unlocked. Equip it from the Abilities screen."));
+                                }
+                                else
+                                {
+                                    QuartermasterStatus = Failure;
+                                }
+                                Rebuild(EBreakerMenuScreen::Quartermaster);
+                                return FReply::Handled();
+                            }))
+                            [
+                                BreakerMonoText(FText::FromString(TEXT("UNLOCK FOR 1 TOKEN")), 12, Amber, 0.16f)
+                            ]
+                        ],
+                        Amber)
+                ])
+                : BreakerSettingsDisabledButton(TEXT("NO TOKENS"), 240.0f);
+        }
+    }
+
+    // The status line, reserved: refusals are disclosed here in progression's
+    // own words.
+    Bench->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+    [
+        SNew(SBox).HeightOverride(20.0f)
+        [
+            BreakerMonoText(QuartermasterStatus, BreakerUI::TypeCaption, Amber, 0.16f)
+        ]
+    ];
+
+    const TSharedRef<SWidget> BenchFooter = SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
         [
             SNew(SVerticalBox)
             + SVerticalBox::Slot().AutoHeight()
             [
-                MenuText(Definition ? Definition->DisplayName : FText::FromName(AbilityId),
-                    BreakerUI::TypeBody, bOwned ? Muted : Primary, true)
+                BreakerMonoText(FText::FromString(TEXT("COST")), BreakerUI::TypeCaption, Muted, 0.16f)
             ]
-            + SVerticalBox::Slot().AutoHeight()
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
             [
-                MenuText(Definition ? Definition->Description : FText::GetEmpty(), BreakerUI::TypeCaption, SoftText)
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                [
+                    BreakerMonoText(FText::FromString(CostLead.IsEmpty() ? TEXT("—") : CostLead),
+                        BreakerUI::TypeH2, CostLead.IsEmpty() ? Muted : Primary, 0.0f)
+                ]
+                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(BreakerUI::Space8, 0.0f, 0.0f, 2.0f)
+                [
+                    BreakerMonoText(FText::FromString(CostTail), BreakerUI::TypeCaption, Muted, 0.16f)
+                ]
             ]
-        ];
-        Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+        ]
+        + SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[FooterAction];
+
+    const TSharedRef<SWidget> Body = SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()[VerbBand]
+        + SVerticalBox::Slot().FillHeight(1.0f)
         [
-            SNew(SBox).WidthOverride(160.0f)
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()[ListColumn]
+            + SHorizontalBox::Slot().AutoWidth()
             [
-                bOwned
-                ? MenuText(FText::FromString(TEXT("UNLOCKED")), BreakerUI::TypeCaption, Muted, true)
-                : MakeButton(FText::FromString(TEXT("UNLOCK · 1 TOKEN")),
-                    FOnClicked::CreateLambda([this, CapturedId]()
-                    {
-                        UBreakerProgressionComponent* Target = Character.IsValid() ? Character->GetProgression() : nullptr;
-                        if (!Target) return FReply::Handled();
-                        FText Failure;
-                        // The screen never decides. Progression refuses or
-                        // spends, and its reason is what the player reads.
-                        if (Target->SpendAbilityToken(CapturedId, Failure))
-                        {
-                            QuartermasterStatus = FText::FromString(TEXT("UNLOCKED. EQUIP IT FROM THE ABILITIES TAB."));
-                        }
-                        else
-                        {
-                            QuartermasterStatus = Failure;
-                        }
-                        Rebuild(EBreakerMenuScreen::Quartermaster);
-                        return FReply::Handled();
-                    }),
-                    // PAINTED, NEVER FADED (the banned-patterns rule): an
-                    // unaffordable unlock renders as a secondary button rather
-                    // than a dimmed one, and the click is refused in the
-                    // handler by progression. Opacity on a subtree shows the
-                    // plate seams behind it.
-                    /*bPrimary=*/bAffordable)
+                SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f)
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().FillHeight(1.0f)
+                [
+                    SNew(SScrollBox)
+                    + SScrollBox::Slot().Padding(FMargin(BreakerUI::Space40, 0.0f, BreakerSettingsContentPad, BreakerUI::Space16))
+                    [
+                        Bench
+                    ]
+                ]
+                + SVerticalBox::Slot().AutoHeight().Padding(FMargin(BreakerUI::Space40, BreakerUI::Space8, BreakerSettingsContentPad, BreakerUI::Space16))
+                [
+                    BenchFooter
+                ]
             ]
         ];
 
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+    // Tokens are the one number here, and they stay TEXT-white: a token is
+    // scrip this Breaker earned, not matter from the world, so the teal the
+    // plate lends it stays reserved (the teal object law outranks a plate).
+    const FString NpcName = DialogueNPC.IsValid()
+        ? DialogueNPC->GetDisplayName().ToString().ToUpper() : FString(TEXT("QUARTERMASTER"));
+    return BreakerScreenShell(TEXT("QUARTERMASTER"), *NpcName,
+        BreakerMonoText(FText::FromString(TEXT("ABILITY ISSUE · REACHED THROUGH DIALOGUE")),
+            BreakerUI::TypeCaption, Muted, 0.16f),
+        SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
         [
-            MakePlate(Row, PanelRaised, BorderRest, FMargin(BreakerUI::Space16, BreakerUI::Space8))
-        ];
-    }
-
-    return BuildZonedFrame(
-        FText::FromString(TEXT("QUARTERMASTER")),
-        FText::FromString(TEXT("ABILITY UNLOCKS")),
-        HeaderRight,
-        Body,
-        SNullWidget::NullWidget,
-        Metrics.PanelWidth,
-        Metrics.PanelHeight,
-        /*bFillHeight=*/true);
+            BreakerMonoText(FText::FromString(TEXT("ISSUE TOKENS · THIS BREAKER")), BreakerUI::TypeCaption, Muted, 0.16f)
+        ]
+        + SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+        [
+            BreakerMonoText(FText::AsNumber(Tokens), BreakerUI::TypeH2, Primary, 0.0f)
+        ],
+        FOnClicked::CreateLambda([this]()
+        {
+            if (DialogueNPC.IsValid())
+            {
+                Rebuild(EBreakerMenuScreen::Dialogue);
+                return FReply::Handled();
+            }
+            return GoBack();
+        }),
+        Body);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildAbilitiesScreen()
