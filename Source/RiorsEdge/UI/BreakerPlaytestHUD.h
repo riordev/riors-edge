@@ -128,7 +128,18 @@ private:
     // row is painted into the fixed 12px track.
     static BreakerHUD::FResourceRow ResolveResourceRow(const ABreakerCharacter* Character);
     void DrawResourceTrack(const BreakerHUD::FResourceRow& Row, float X, float Y, float Width, float Height);
-    void DrawWaveBanner(const FVector2D& Center);
+    // The encounter readout (was DrawWaveBanner): which encounter, how much
+    // remains, and — only over a KNOWN total, per O120 — the pack bar.
+    void DrawEncounterReadout(const FVector2D& Center);
+    // ---- Density instruments (see DrawHUD) --------------------------------
+    bool bHudStressSpawned = false;
+    double HudCostWindowStart = 0.0;
+    double HudCostAccumMs = 0.0;
+    double HudCostMaxMs = 0.0;
+    double HudCostBarsMs = 0.0;
+    double HudCostNumbersMs = 0.0;
+    double HudCostMapMs = 0.0;
+    int32 HudCostFrames = 0;
     // Top-right field plate. Cheap by construction: it consumes EnemyBlips,
     // which DrawEnemyHealthBars has already filled from the one enemy
     // iteration the HUD was making anyway, and allocates nothing per frame.

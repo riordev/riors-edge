@@ -171,7 +171,12 @@ namespace BreakerHUD
     static constexpr float LevelUpOutSeconds = 0.12f;
     static constexpr float LevelUpRailBlinkSeconds = 0.25f; // O2 PLACEHOLDER
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
-    static constexpr float EnemyBarRecentDamageSeconds = 6.0f;
+    // RETUNED FOR DENSITY, not replaced: at six seconds the recency window
+    // self-limits correctly around ten enemies and FLOODS at eighty, because
+    // the player damages dozens inside any six-second span. At ~1.5s a bar
+    // means "what I am shooting right now", which is the reading the rule
+    // always wanted. O2 PLACEHOLDER — the owner tunes this in hand.
+    static constexpr float EnemyBarRecentDamageSeconds = 1.5f;
 
     // Ability feedback timings. All cosmetic: nothing here gates a rule.
     static constexpr float AbilityFlashSeconds = 0.3f;
@@ -285,6 +290,51 @@ void ABreakerPlaytestHUD::DrawHUD()
     EnsureWeaponBinding(Character);
     EnsureAbilityBinding(Character);
     EnsureProgressionBinding(Character);
+
+    // ---- Density instruments (dev, command-line gated by construction) ----
+    // -BreakerHUDStress=N spawns N enemies in a ring once the field is up, so
+    // the overlay can be MEASURED at hundred-enemy density — the harness
+    // cannot herd a real horde. Every fourth ranks up through the enemy's own
+    // public SetMonsterRank + ApplyChassis so the permanent-bar path draws.
+    // -BreakerHUDCost logs a [HUDCost] line every 5s: whole-overlay ms plus
+    // the three sections that could dominate. Scope of every number: THIS
+    // HUD's DrawHUD only — world tick, enemy AI and rendering are not in it.
+    static int32 HudStressCount = -1;
+    if (HudStressCount < 0)
+    {
+        HudStressCount = 0;
+        FParse::Value(FCommandLine::Get(), TEXT("BreakerHUDStress="), HudStressCount);
+    }
+    UWorld* StressWorld = GetWorld();
+    if (HudStressCount > 0 && !bHudStressSpawned && StressWorld
+        && StressWorld->GetAuthGameMode<ABreakerGameMode>()
+        && UBreakerGameInstance::IsGymMap(StressWorld)
+        && StressWorld->GetTimeSeconds() > 8.0f)
+    {
+        bHudStressSpawned = true;
+        const FVector Base = Character->GetActorLocation();
+        for (int32 Index = 0; Index < HudStressCount; ++Index)
+        {
+            const float Angle = 2.0f * PI * static_cast<float>(Index) / FMath::Max(HudStressCount, 1);
+            const float Radius = 900.0f + 2600.0f * (static_cast<float>(Index % 10) / 10.0f);
+            const FVector At = Base + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 60.0f);
+            FActorSpawnParameters Params;
+            Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+            if (ABreakerEnemy* Spawned = StressWorld->SpawnActor<ABreakerEnemy>(At, FRotator::ZeroRotator, Params))
+            {
+                if (Index % 4 == 3)
+                {
+                    // Rank only — ApplyChassis is the enemy's own protected
+                    // business, and this measure exercises the DRAWING path,
+                    // which reads rank, not the chassis it would retune.
+                    Spawned->SetMonsterRank(EBreakerMonsterRank::Elite);
+                }
+            }
+        }
+        UE_LOG(LogTemp, Display, TEXT("[HUDStress] spawned %d enemies (every 4th elite) around the player"), HudStressCount);
+    }
+    const bool bHudCostLogging = FParse::Param(FCommandLine::Get(), TEXT("BreakerHUDCost"));
+    const double HudDrawStart = FPlatformTime::Seconds();
     // Everything below, ability callouts included, is suppressed while the
     // pause/inventory menu owns the screen.
     if (Character->IsMenuOpen()) return;
@@ -375,9 +425,13 @@ void ABreakerPlaytestHUD::DrawHUD()
     // Rounds in flight are NOT in this list any more — they are world
     // primitives now (ABreakerTracerRenderer) and the renderer draws them,
     // correctly occluded, before the HUD gets the canvas at all.
+    const double HudBarsStart = FPlatformTime::Seconds();
     DrawEnemyHealthBars(Character);
+    HudCostBarsMs += (FPlatformTime::Seconds() - HudBarsStart) * 1000.0;
     DrawMarkedTarget(Character);
+    const double HudNumbersStart = FPlatformTime::Seconds();
     DrawDamageNumbers();
+    HudCostNumbersMs += (FPlatformTime::Seconds() - HudNumbersStart) * 1000.0;
     DrawLootPickups(Character);
     // The gym camp's Kess/Quartermaster and its travel point get the same
     // over-actor labels the Anchor draws; in a wave they sit far outside the
@@ -475,16 +529,18 @@ void ABreakerPlaytestHUD::DrawHUD()
     // --- Bottom-centre: what the player IS --------------------------------
     DrawVitalsCentred(Character);
 
-    // --- Top centre: wave banner ------------------------------------------
-    DrawWaveBanner(Center);
+    // --- Top centre: the encounter readout --------------------------------
+    DrawEncounterReadout(Center);
 
     // --- Top right: the field plate ---------------------------------------
     // Must follow DrawEnemyHealthBars, which fills EnemyBlips from the one
     // enemy iteration the HUD makes.
+    const double HudMapStart = FPlatformTime::Seconds();
     DrawMinimap(Character,
         Canvas->ClipX - S(BreakerUI::HudSafeMargin) - S(BreakerUI::HudMinimapWidth),
         S(BreakerUI::HudSafeMargin),
         S(BreakerUI::HudMinimapWidth), S(BreakerUI::HudMinimapHeight));
+    HudCostMapMs += (FPlatformTime::Seconds() - HudMapStart) * 1000.0;
     // The quest tracker rides directly under the minimap on EVERY map, not
     // only the Anchor: a contract accepted in camp is worked in the field,
     // and objectives that vanish the moment the player travels are objectives
@@ -531,7 +587,15 @@ void ABreakerPlaytestHUD::DrawHUD()
     // time this callout should stay readable.
     if (bRecentShot && Shot && Shot->bHit && Shot->DamageResult.bKilled)
     {
-        if (const ABreakerEnemy* KilledEnemy = Cast<ABreakerEnemy>(Shot->HitActor.Get()); KilledEnemy && KilledEnemy->IsElite())
+        // The same rank-predicate shape again: == Elite exactly kept the
+        // callout silent for a ModifierBearing kill — the harder version of
+        // the kill it announces. Boss stays EXCLUDED on purpose: a boss death
+        // ends the encounter through OnBossDefeated, and a 1.2s "ELITE DOWN"
+        // under that moment would be the smaller fact shouting over the
+        // bigger one.
+        if (const ABreakerEnemy* KilledEnemy = Cast<ABreakerEnemy>(Shot->HitActor.Get());
+            KilledEnemy && KilledEnemy->IsEliteOrBetter()
+            && KilledEnemy->GetMonsterRank() != EBreakerMonsterRank::Boss)
             LastEliteKillTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     }
     const double EliteKillAge = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) - LastEliteKillTime;
@@ -542,6 +606,28 @@ void ABreakerPlaytestHUD::DrawHUD()
     }
 
     DrawPlaytestInstrumentation(Character, Center);
+
+    // The cost window closes: whole-overlay time this frame, reported as a
+    // 5-second average with its worst frame, sections beside it.
+    if (bHudCostLogging)
+    {
+        const double FrameMs = (FPlatformTime::Seconds() - HudDrawStart) * 1000.0;
+        HudCostAccumMs += FrameMs;
+        HudCostMaxMs = FMath::Max(HudCostMaxMs, FrameMs);
+        ++HudCostFrames;
+        const double NowSeconds = FPlatformTime::Seconds();
+        if (HudCostWindowStart <= 0.0) HudCostWindowStart = NowSeconds;
+        if (NowSeconds - HudCostWindowStart >= 5.0 && HudCostFrames > 0)
+        {
+            UE_LOG(LogTemp, Display,
+                TEXT("[HUDCost] frames=%d avg=%.3fms max=%.3fms | bars=%.3f numbers=%.3f minimap=%.3f (avg ms; scope: DrawHUD only)"),
+                HudCostFrames, HudCostAccumMs / HudCostFrames, HudCostMaxMs,
+                HudCostBarsMs / HudCostFrames, HudCostNumbersMs / HudCostFrames, HudCostMapMs / HudCostFrames);
+            HudCostAccumMs = HudCostMaxMs = HudCostBarsMs = HudCostNumbersMs = HudCostMapMs = 0.0;
+            HudCostFrames = 0;
+            HudCostWindowStart = NowSeconds;
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -957,27 +1043,54 @@ void ABreakerPlaytestHUD::DrawResourceTrack(const BreakerHUD::FResourceRow& Row,
 // heights, the same fix the ammo pair and the resource row already carry, so a
 // change to either size cannot drift them apart again.
 // --------------------------------------------------------------------------
-void ABreakerPlaytestHUD::DrawWaveBanner(const FVector2D& Center)
+void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
 {
+    // THE ENCOUNTER READOUT. At a hundred enemies the player tracks the
+    // FIGHT, not the enemy: one top-centre row saying which encounter this is
+    // and how much of it remains. It is composed as a little view-model so a
+    // defended objective and an escort slot in beside the wave when their
+    // states exist — the composition changes, the drawing does not.
+    //
+    // O120 GOVERNS THE FRACTION. The pack bar under the row draws ONLY when
+    // the encounter's total is KNOWN (KnownTotal > 0) — a fraction against a
+    // guessed total is a counter that lies, and it costs more than no
+    // counter. The wave's alive-count is known (GetWaveEnemiesAlive); its
+    // TOTAL is not exposed by the game mode today, so the wave case ships
+    // with the count and no bar, and the bar's socket lights the day the
+    // mode exposes the spawned total. The capture preview demonstrates the
+    // bar with authored numbers so the drawing is photographable now.
+    FString Title;
+    FString Status;
+    bool bActive = false;
+    int32 AliveCount = -1;
+    int32 KnownTotal = -1;
+
     const ABreakerGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr;
     const bool bPreview = IsCapturePreview() && (!GameMode || GameMode->GetCurrentWave() <= 0);
     if (!bPreview && (!GameMode || GameMode->GetCurrentWave() <= 0)) return;
 
     // The preview CYCLES the three shapes this row can take -- the owner's own
-    // screenshot, a two-digit count (the widest active case), and the cleared
-    // state with its em dash -- so a four-shot capture run photographs all of
-    // them instead of proving one string fits.
+    // screenshot, a two-digit count with its pack bar (the widest active
+    // case), and the cleared state with its em dash -- so a capture run
+    // photographs all of them instead of proving one string fits.
     const int32 PreviewCase = bPreview
         ? FMath::Abs(FMath::FloorToInt(static_cast<float>(GetWorld()->GetTimeSeconds()) / 2.0f)) % 3 : 0;
-    const bool bActive = bPreview ? PreviewCase != 2 : GameMode->IsWaveActive();
-    const FString Title = !bPreview ? FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave())
-        : PreviewCase == 0 ? FString(TEXT("WAVE 01"))
-        : PreviewCase == 1 ? FString(TEXT("WAVE 12")) : FString(TEXT("WAVE 07"));
-    const FString Status = !bPreview
-        ? (bActive ? FString::Printf(TEXT("%d HOSTILE"), GameMode->GetWaveEnemiesAlive())
-                   : FString(TEXT("CLEAR — F4")))
-        : PreviewCase == 0 ? FString(TEXT("4 HOSTILE"))
-        : PreviewCase == 1 ? FString(TEXT("24 HOSTILE")) : FString(TEXT("CLEAR — F4"));
+    bActive = bPreview ? PreviewCase != 2 : GameMode->IsWaveActive();
+    if (!bPreview)
+    {
+        Title = FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave());
+        AliveCount = GameMode->GetWaveEnemiesAlive();
+        Status = bActive ? FString::Printf(TEXT("%d HOSTILE"), AliveCount)
+                         : FString(TEXT("CLEAR — F4"));
+    }
+    else
+    {
+        Title = PreviewCase == 0 ? FString(TEXT("WAVE 01"))
+            : PreviewCase == 1 ? FString(TEXT("WAVE 12")) : FString(TEXT("WAVE 07"));
+        Status = PreviewCase == 0 ? FString(TEXT("4 HOSTILE"))
+            : PreviewCase == 1 ? FString(TEXT("24 HOSTILE")) : FString(TEXT("CLEAR — F4"));
+        if (PreviewCase == 1) { AliveCount = 24; KnownTotal = 40; }
+    }
 
     // HUD v2: the plate is gone. One 2px underline in the state colour carries
     // the grouping that a 56px plate used to, and the banner stops being a
@@ -1000,6 +1113,17 @@ void ABreakerPlaytestHUD::DrawWaveBanner(const FVector2D& Center)
 
     DrawRect(bActive ? BreakerUI::Orange : BreakerUI::Cyan,
         BlockX, Baseline + S(BreakerUI::Space8), BlockW, S(BreakerUI::HudV2WaveUnderline));
+
+    // The pack bar: the active group's remainder, only over a KNOWN total
+    // (O120 — see the composition note above).
+    if (bActive && KnownTotal > 0 && AliveCount >= 0)
+    {
+        const float PackY = Baseline + S(BreakerUI::Space8) + S(BreakerUI::HudV2WaveUnderline) + S(3.0f);
+        const float PackH = S(4.0f);
+        const float Fraction = FMath::Clamp(static_cast<float>(AliveCount) / static_cast<float>(KnownTotal), 0.0f, 1.0f);
+        DrawRect(BreakerUI::Panel10, BlockX, PackY, BlockW, PackH);
+        DrawRect(BreakerUI::Orange, BlockX, PackY, BlockW * Fraction, PackH);
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1501,7 +1625,11 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         {
             FBreakerHUDMapBlip& Blip = EnemyBlips.AddDefaulted_GetRef();
             Blip.World = Enemy->GetActorLocation();
-            Blip.bElite = Enemy->GetMonsterRank() == EBreakerMonsterRank::Elite;
+            // The same rank-predicate shape as the bar fix beside it: == Elite
+            // exactly blipped a ModifierBearing champion as TRASH. It blips as
+            // an elite; Boss keeps its own mark.
+            Blip.bElite = Enemy->GetMonsterRank() == EBreakerMonsterRank::Elite
+                || Enemy->GetMonsterRank() == EBreakerMonsterRank::ModifierBearing;
             Blip.bBoss = Enemy->GetMonsterRank() == EBreakerMonsterRank::Boss;
         }
 
@@ -1518,9 +1646,17 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         // Recently damaged is read off the enemy's own combat component: the
         // enemy's Attributes/Combat members are protected, this is not.
+        //
+        // ANYTHING ABOVE TRASH KEEPS A PERMANENT BAR, recency or not — that
+        // is how the elite stays findable in a crowd, the same decision as
+        // giving it a distinct silhouette. IsEliteOrBetter, NEVER IsElite:
+        // rank == Elite exactly would exclude ModifierBearing and Boss — the
+        // two ranks ABOVE the one meant — and the project has shipped that
+        // predicate bug twice (the enemy header records both).
+        const bool bRankedBar = Enemy->IsEliteOrBetter();
         const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
         const bool bRecentlyDamaged = EnemyCombat && EnemyCombat->GetSecondsSinceDamage() < BreakerHUD::EnemyBarRecentDamageSeconds;
-        if (!bRecentlyDamaged && Distance > BreakerHUD::EnemyBarAlwaysDistance) continue;
+        if (!bRankedBar && !bRecentlyDamaged && Distance > BreakerHUD::EnemyBarAlwaysDistance) continue;
 
         const FVector Projected = Project(Enemy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), false);
         if (Projected.Z <= 0.0f) continue;
@@ -1528,7 +1664,12 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // Gentle distance scaling: readable up close, unobtrusive far away.
         const float DistanceAlpha = FMath::Clamp((Distance - 500.0f) / (BreakerHUD::EnemyBarMaxDistance - 500.0f), 0.0f, 1.0f);
         const float DistanceScale = FMath::Lerp(1.0f, 0.55f, DistanceAlpha);
-        const bool bElite = Enemy->IsElite();
+        // The gold edge and the rank word follow the SAME predicate as the
+        // permanent bar. ModifierBearing prints ELITE — it is, by the enemy
+        // header's own definition, a modifier-bearing elite, and its modifier
+        // banner (always printed below) is what distinguishes it further.
+        const bool bElite = Enemy->IsEliteOrBetter();
+        const bool bBossRank = Enemy->GetMonsterRank() == EBreakerMonsterRank::Boss;
         const float BarW = S(BreakerUI::HudEnemyBarWidth) * DistanceScale;
         const float BarH = S(BreakerUI::HudEnemyBarHeight) * DistanceScale;
         const float BarX = Projected.X - BarW * 0.5f;
@@ -1577,7 +1718,7 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const bool bFocused = (Enemy == FocusedEnemy);
         const FString ModifierBanner = Enemy->GetEnemyModifierBanner();
         TArray<FString> Lines;
-        if (bElite) Lines.Add(TEXT("ELITE"));
+        if (bElite) Lines.Add(bBossRank ? TEXT("BOSS") : TEXT("ELITE"));
         if (!ModifierBanner.IsEmpty()) Lines.Add(ModifierBanner);
         if (bFocused) Lines.Add(Enemy->GetEnemyStateLabel());
 
