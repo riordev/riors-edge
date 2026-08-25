@@ -105,7 +105,7 @@ const TArray<FName>& UBreakerGameSettingsLibrary::BindableActionNames()
     // the same grouping the asset's Category tags already declare.
     static const TArray<FName> Names = {
         TEXT("Move"), TEXT("Look"), TEXT("Jump"), TEXT("Sprint"), TEXT("Dash"), TEXT("Slide"),
-        TEXT("Fire"), TEXT("Aim"), TEXT("Reload"),
+        TEXT("Fire"), TEXT("Aim"), TEXT("Reload"), TEXT("Interact"),
         TEXT("AbilityOne"), TEXT("AbilityTwo"), TEXT("Ultimate"),
         TEXT("FOVUp"), TEXT("FOVDown"), TEXT("SensitivityUp"), TEXT("SensitivityDown"),
         TEXT("PlaytestReset"), TEXT("PlaytestReport"), TEXT("PlaytestDiagnostics")
@@ -128,6 +128,7 @@ FText UBreakerGameSettingsLibrary::DescribeAction(FName Action)
         { TEXT("Fire"),                TEXT("FIRE") },
         { TEXT("Aim"),                 TEXT("AIM") },
         { TEXT("Reload"),              TEXT("RELOAD") },
+        { TEXT("Interact"),            TEXT("INTERACT") },
         { TEXT("AbilityOne"),          TEXT("ABILITY 1") },
         { TEXT("AbilityTwo"),          TEXT("ABILITY 2") },
         { TEXT("Ultimate"),            TEXT("ULTIMATE") },
@@ -221,6 +222,11 @@ void UBreakerGameSettingsLibrary::ListConfigActions(const UBreakerInputConfig* C
     Add(TEXT("Fire"), Config->Fire);
     Add(TEXT("Aim"), Config->Aim);
     Add(TEXT("Reload"), Config->Reload);
+    // The contextual verb the interact prompt names. Added the day the config
+    // gained the field: this list also feeds BuildRuntimeMappingContext, so
+    // an action missing here is not merely rowless — its rebinds silently
+    // never apply.
+    Add(TEXT("Interact"), Config->Interact);
     Add(TEXT("AbilityOne"), Config->AbilityOne);
     Add(TEXT("AbilityTwo"), Config->AbilityTwo);
     Add(TEXT("Ultimate"), Config->Ultimate);
