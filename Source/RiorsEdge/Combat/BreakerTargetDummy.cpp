@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerBodyPaint.h"
 #include "Combat/BreakerHitReactionComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -75,13 +76,20 @@ void ABreakerTargetDummy::BeginPlay()
         {
             if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Base, BodyVisual))
             {
-                Dynamic->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.84f, 0.88f));   // O2 PLACEHOLDER
+                Dynamic->SetVectorParameterValue(TEXT("Color"), BreakerBodyPaint::DummyFamilyPaint);
                 BodyVisual->SetMaterial(0, Dynamic);
             }
         }
     }
     if (HitReaction)
     {
+        // Layer 1 declared, and the other three left alone: a dummy has no
+        // family beyond itself, no rank, and its health is a test fixture
+        // rather than a threat read, so O129's ramp stays OFF here. That is
+        // an opt-out, not an oversight — a dummy reddening as it takes a
+        // magazine would be the gym telling the player something about the
+        // gym.
+        HitReaction->SetFamilyPaint(BreakerBodyPaint::DummyFamilyPaint);
         HitReaction->RegisterPart(BodyVisual);
         HitReaction->OnDeathPresentationFinished.AddUObject(this, &ABreakerTargetDummy::HandleDeathBeatFinished);
     }

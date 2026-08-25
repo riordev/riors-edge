@@ -1,5 +1,7 @@
 #include "Combat/BreakerAlteredEnemy.h"
 
+#include "Combat/BreakerBodyPaint.h"
+
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
@@ -24,7 +26,10 @@ namespace BreakerAlteredDetail
     // grey-violet, not just a different brightness, or the two families would
     // silhouette identically at a glance, which defeats the whole point of a
     // second family.
-    const FLinearColor OliveSlate(0x4A / 255.0f, 0x50 / 255.0f, 0x49 / 255.0f);      // #4A5049
+    // #4A5049, and the SAME symbol the paint resolver defaults this family
+    // to: a family's declared paint and its painted paint are one value or
+    // they drift (O128).
+    const FLinearColor OliveSlate = BreakerBodyPaint::AlteredFamilyPaint;
     const FLinearColor HazardAmber(0xD8 / 255.0f, 0x9A / 255.0f, 0x2E / 255.0f);     // #D89A2E
 
     static UMaterialInstanceDynamic* BreakerMakeAlteredMaterial(UStaticMeshComponent* Mesh, const FLinearColor& Color)
@@ -50,6 +55,8 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // is the mechanical form of the same sentence, and it is why this
     // archetype adds no behaviour at all: there is nothing left to add.
     Family = EBreakerEnemyFamily::Altered;
+    // Layer 1, declared. Everything below paints from it.
+    FamilyPaint = BreakerAlteredDetail::OliveSlate;
     SeveranceStage = EBreakerSeveranceStage::Late;
 
     // --- CHASSIS (all O2 PLACEHOLDER, derived against the shipped roster) --
@@ -125,7 +132,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // Z: -21.5..33.5 — inside +-75.
     BodyVisual->SetRelativeLocation(FVector(16.0f, 0.0f, 6.0f));
     BodyVisual->SetRelativeScale3D(FVector(0.66f, 0.50f, 0.55f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(BodyVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(BodyVisual, FamilyPaint);
 
     // HeadVisual — kept small and low rather than removed: Assets/story-source.md is
     // explicit the skeleton must stay legible, and a body with no head reads
@@ -133,7 +140,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // Half-extent 14 at offset (14, 0, 46): X: 0..28, Z: 32..60 — inside.
     HeadVisual->SetRelativeLocation(FVector(14.0f, 0.0f, 46.0f));
     HeadVisual->SetRelativeScale3D(FVector(0.28f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(HeadVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(HeadVisual, FamilyPaint);
 
     // RightArmVisual — THE oversized limb the source blockout was built
     // around. The capsule's cross-section is a CIRCLE (radius 60), not a
@@ -146,7 +153,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // grow at all. Z: -48.5..36.5 — inside the +-75 half-height.
     RightArmVisual->SetRelativeLocation(FVector(14.0f, 33.0f, -6.0f));
     RightArmVisual->SetRelativeScale3D(FVector(0.28f, 0.30f, 0.85f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(RightArmVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(RightArmVisual, FamilyPaint);
 
     // LeftArmVisual — the withered counterpart. Small and tucked in close, the
     // opposite read from the dominant right arm.
@@ -154,7 +161,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // distance sqrt(11^2+23^2) = 25.5 cm, well inside. Z: 3..41 — inside.
     LeftArmVisual->SetRelativeLocation(FVector(6.0f, -18.0f, 22.0f));
     LeftArmVisual->SetRelativeScale3D(FVector(0.10f, 0.10f, 0.38f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(LeftArmVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(LeftArmVisual, FamilyPaint);
 
     // RightLegVisual — planted, stouter, bearing the dominant forward mass.
     // Half-extents (13, 14, 33) at offset (4, 16, -40): far corner (17, 30),
@@ -164,7 +171,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     // performs.
     RightLegVisual->SetRelativeLocation(FVector(4.0f, 16.0f, -40.0f));
     RightLegVisual->SetRelativeScale3D(FVector(0.26f, 0.28f, 0.66f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(RightLegVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(RightLegVisual, FamilyPaint);
 
     // LeftLegVisual — the dragging rear leg: splayed back and out rather than
     // planted under the body, which is the "dragging rear" half of the source
@@ -178,7 +185,7 @@ ABreakerAlteredEnemy::ABreakerAlteredEnemy()
     LeftLegVisual->SetRelativeLocation(FVector(-24.0f, -28.0f, -36.0f));
     LeftLegVisual->SetRelativeRotation(FRotator(0.0f, 18.0f, 0.0f));
     LeftLegVisual->SetRelativeScale3D(FVector(0.22f, 0.24f, 0.58f));
-    BreakerAlteredDetail::BreakerMakeAlteredMaterial(LeftLegVisual, BreakerAlteredDetail::OliveSlate);
+    BreakerAlteredDetail::BreakerMakeAlteredMaterial(LeftLegVisual, FamilyPaint);
 
     // BodyHitBox — resized to match the new frame. Unlike the six cosmetic
     // meshes above, this does NOT have to fit the capsule's circular

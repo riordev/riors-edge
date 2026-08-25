@@ -33,7 +33,10 @@ namespace
 {
     // Muted Vestige-ish grey-violet for the humanoid body parts. Local copy of
     // the dressing helper so the enemy never pulls in game mode internals.
-    void ApplyEnemyBodyColor(UStaticMeshComponent* Mesh)
+    // The COLOUR is not a local copy: it is the same symbol the paint state
+    // defaults to, because a family's declared paint and its painted paint
+    // being two literals is exactly the drift O128 removes.
+    void ApplyEnemyBodyColor(UStaticMeshComponent* Mesh, const FLinearColor& FamilyPaint)
     {
         if (!Mesh) return;
         UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
@@ -41,7 +44,7 @@ namespace
         if (!BaseMaterial) return;
         if (UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(BaseMaterial, Mesh))
         {
-            Dynamic->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.35f, 0.32f, 0.42f));
+            Dynamic->SetVectorParameterValue(TEXT("Color"), FamilyPaint);
             Mesh->SetMaterial(0, Dynamic);
         }
     }
@@ -70,7 +73,7 @@ ABreakerEnemy::ABreakerEnemy()
     BodyVisual->SetRelativeLocation(FVector(0.0f, 0.0f, 22.0f));
     BodyVisual->SetRelativeScale3D(FVector(0.55f, 0.36f, 0.78f));
     if (CubeMesh.Succeeded()) BodyVisual->SetStaticMesh(CubeMesh.Object);
-    ApplyEnemyBodyColor(BodyVisual);
+    ApplyEnemyBodyColor(BodyVisual, FamilyPaint);
 
     HeadVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadVisual"));
     HeadVisual->SetupAttachment(BodyCollision);
@@ -78,7 +81,7 @@ ABreakerEnemy::ABreakerEnemy()
     HeadVisual->SetRelativeLocation(FVector(0.0f, 0.0f, 78.0f));
     HeadVisual->SetRelativeScale3D(FVector(0.34f));
     if (BodySphereMesh.Succeeded()) HeadVisual->SetStaticMesh(BodySphereMesh.Object);
-    ApplyEnemyBodyColor(HeadVisual);
+    ApplyEnemyBodyColor(HeadVisual, FamilyPaint);
 
     LeftArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftArmVisual"));
     LeftArmVisual->SetupAttachment(BodyCollision);
@@ -87,7 +90,7 @@ ABreakerEnemy::ABreakerEnemy()
     LeftArmVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, 12.0f));
     LeftArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.62f));
     if (CubeMesh.Succeeded()) LeftArmVisual->SetStaticMesh(CubeMesh.Object);
-    ApplyEnemyBodyColor(LeftArmVisual);
+    ApplyEnemyBodyColor(LeftArmVisual, FamilyPaint);
 
     RightArmVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightArmVisual"));
     RightArmVisual->SetupAttachment(BodyCollision);
@@ -96,7 +99,7 @@ ABreakerEnemy::ABreakerEnemy()
     RightArmVisual->SetRelativeRotation(FRotator(0.0f, 0.0f, -12.0f));
     RightArmVisual->SetRelativeScale3D(FVector(0.18f, 0.18f, 0.62f));
     if (CubeMesh.Succeeded()) RightArmVisual->SetStaticMesh(CubeMesh.Object);
-    ApplyEnemyBodyColor(RightArmVisual);
+    ApplyEnemyBodyColor(RightArmVisual, FamilyPaint);
 
     LeftLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftLegVisual"));
     LeftLegVisual->SetupAttachment(BodyCollision);
@@ -104,7 +107,7 @@ ABreakerEnemy::ABreakerEnemy()
     LeftLegVisual->SetRelativeLocation(FVector(0.0f, -14.0f, -50.0f));
     LeftLegVisual->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.80f));
     if (CubeMesh.Succeeded()) LeftLegVisual->SetStaticMesh(CubeMesh.Object);
-    ApplyEnemyBodyColor(LeftLegVisual);
+    ApplyEnemyBodyColor(LeftLegVisual, FamilyPaint);
 
     RightLegVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightLegVisual"));
     RightLegVisual->SetupAttachment(BodyCollision);
@@ -112,7 +115,7 @@ ABreakerEnemy::ABreakerEnemy()
     RightLegVisual->SetRelativeLocation(FVector(0.0f, 14.0f, -50.0f));
     RightLegVisual->SetRelativeScale3D(FVector(0.22f, 0.22f, 0.80f));
     if (CubeMesh.Succeeded()) RightLegVisual->SetStaticMesh(CubeMesh.Object);
-    ApplyEnemyBodyColor(RightLegVisual);
+    ApplyEnemyBodyColor(RightLegVisual, FamilyPaint);
 
     BodyHitBox = CreateDefaultSubobject<UBoxComponent>(TEXT("BodyHitBox"));
     BodyHitBox->SetupAttachment(BodyCollision);
@@ -156,11 +159,14 @@ void ABreakerEnemy::BeginPlay()
     AbilitySystem->InitAbilityActorInfo(this, this);
     Combat->OnDeath.AddDynamic(this, &ThisClass::HandleDeath);
     Combat->OnDamageReceived.AddDynamic(this, &ThisClass::HandleDamageReceived);
-    // The reaction layer paints these six; registration is here rather than
-    // the constructor so a subclass's own repaint has already happened by
-    // the first capture (which is at flash time anyway).
+    // The reaction layer paints these six, and since O128 it is the ONLY
+    // thing that paints them. The family paint goes in before the first
+    // registration so a part never lands on a default that a later layer has
+    // to correct; registration is still here rather than in the constructor
+    // because the parts are not final until now.
     if (HitReaction)
     {
+        HitReaction->SetFamilyPaint(FamilyPaint);
         for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
             RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
         {
@@ -218,68 +224,36 @@ void ABreakerEnemy::ApplyChassis()
         if (Combat) Combat->RestoreVitals();
     }
 
-    // Rank colour, one tick later: subclass identity paints (the Warden's
-    // plate, the Altered's severance tint) run through BeginPlay, and a
-    // repaint racing them would be overwritten or would capture a
-    // half-painted body as its base.
-    if (UWorld* World = GetWorld())
-    {
-        TWeakObjectPtr<ABreakerEnemy> WeakThis(this);
-        World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakThis]()
-        {
-            if (ABreakerEnemy* Enemy = WeakThis.Get()) Enemy->ApplyRankPresentation();
-        }));
-    }
+    // The chassis just moved rank and refilled vitals, so both of this
+    // class's paint layers are stale. Immediate, not next-tick: the deferral
+    // existed to let the reaction layer's capture read a finished body, and
+    // there is no capture left to protect. No registered body part is painted
+    // in any subclass BeginPlay — the Skirmisher's muzzle and insignia, the
+    // Boss's apparatus and the Warden's shield are separate meshes with one
+    // writer each — so nothing races this.
+    RefreshBodyPaint();
 }
 
-void ABreakerEnemy::ApplyRankPresentation()
+void ABreakerEnemy::RefreshBodyPaint()
 {
     // "WHICH ONE IS THE ELITE" IN A GLANCE (ruled): silhouette carries
     // FAMILY, colour carries RANK, and in a fight of eighty nobody reads a
-    // bar edge. The blend starts from a CAPTURED base — the family's own
-    // paint, captured once after the subclass finished painting — so
-    // repeated chassis passes (SetAreaLevel then SetMonsterRank) can never
-    // compound the tint toward solid gold. Trash keeps its family paint
-    // untouched; the Boss subclass owns its whole identity and is skipped.
-    // Blend weights O2 PLACEHOLDER — legibility first, beauty later.
-    // A DEMOTION restores the family paint — GrantModifiers'
-    // capture-and-restore path and a pooled reuse both send a body back to
-    // Trash, and an early-return here left it gold forever (found by the
-    // pooling recon, not by a playtest, which is the cheap time to find it).
-    if (MonsterRank == EBreakerMonsterRank::Trash || MonsterRank == EBreakerMonsterRank::Boss)
-    {
-        for (const auto& Pair : RankBaseColors)
-        {
-            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
-        }
-        return;
-    }
-    if (RankBaseColors.Num() == 0)
-    {
-        for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
-            RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
-        {
-            UMaterialInstanceDynamic* Dynamic = Part ? Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)) : nullptr;
-            if (!Dynamic) continue;
-            FLinearColor Base = FLinearColor::White;
-            Dynamic->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Base);
-            RankBaseColors.Emplace(Dynamic, Base);
-        }
-    }
-    const bool bElite = MonsterRank == EBreakerMonsterRank::Elite;
-    // Elite is the reward gold; ModifierBearing the ultimate violet's cooler
-    // cousin — both read at crowd distance on the largest surfaces the enemy
-    // owns, and both survive the hit flash because the flash restores from
-    // the CURRENT colour it captured.
-    const FLinearColor RankHue = bElite ? FLinearColor(1.0f, 0.72f, 0.25f) : FLinearColor(0.62f, 0.38f, 0.95f);
-    const float Blend = bElite ? 0.45f : 0.40f;   // O2 PLACEHOLDER
-    for (const auto& Pair : RankBaseColors)
-    {
-        if (Pair.Key.IsValid())
-        {
-            Pair.Key->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(Pair.Value, RankHue, Blend));
-        }
-    }
+    // bar edge. Since O129 colour also carries HEALTH, which is the axis the
+    // readability measurement says is worth the most separation — the ramp
+    // travels 45-62 dE76 where rank manages 10-14.
+    //
+    // Both layers are pushed, never painted. The component composes family,
+    // rank, health and reaction forward and writes once; that is what makes a
+    // demotion, a pooled revive and a flash-in-flight all free.
+    if (!HitReaction) return;
+    HitReaction->SetFamilyPaint(FamilyPaint);
+    HitReaction->SetRank(MonsterRank);
+    // The ramp is the ENEMY's axis. The dummy leaves it off (its health is a
+    // test fixture, not a threat read), which is why this is a flag and not
+    // an unconditional layer.
+    HitReaction->SetHealthRampEnabled(true);
+    const float MaxHealth = Attributes ? Attributes->GetMaxHealth() : 0.0f;
+    HitReaction->SetHealthFraction(MaxHealth > 0.0f ? Attributes->GetHealth() / MaxHealth : 1.0f);
 }
 
 float ABreakerEnemy::GetMonsterMaxHealth() const
@@ -948,11 +922,21 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     WindupDurationMultipliers.Empty();
     AimErrorMultipliers.Empty();
     OutgoingDamageMultipliers.Empty();
-    // Demoted BEFORE the caller's ConfigureWave: that chassis pass re-derives
-    // health for rank Trash, and its next-tick repaint restores the family
-    // paint from the captured base.
+    // Demoted, and the gold given back HERE (O128). This used to be the
+    // rank assignment alone, and the paint came back only because all three
+    // pool callers happen to run ConfigureWave on the next line — correct by
+    // caller, not by function, and only for callers that happen to. A
+    // function's contract does not live in its callers, so the repaint is
+    // inside the function that promises a fresh, unranked body.
     MonsterRank = EBreakerMonsterRank::Trash;
     ModifierCountHealthMultiplier = 1.0f;
+    RefreshBodyPaint();
+    // A parked body's health is still zero until the caller's chassis pass
+    // refills it, and O129's ramp would read that corpse figure. This
+    // function promises a FRESH body, so the paint says fresh rather than
+    // inheriting a dead reading for the frame — the same reason the rank
+    // restore moved in here rather than staying with whoever calls next.
+    if (HitReaction) HitReaction->SetHealthFraction(1.0f);
 }
 
 void ABreakerEnemy::EnterWakefulDowned()
@@ -987,6 +971,9 @@ void ABreakerEnemy::FinishWakefulRevive()
     {
         Attributes->SetShield(0.0f);
     }
+    // Wakeful rises at a FRACTION of max health, so it rises already reddened
+    // — which is the honest read and the reason this is not a full restore.
+    RefreshBodyPaint();
     StateLabel = TEXT("RISEN");
 }
 
@@ -1010,6 +997,11 @@ void ABreakerEnemy::HandleDamageReceived(const FBreakerDamageResult& Result)
     // lives in the shared reaction component now (see its header), so the
     // target dummy answers exactly the same way.
     if (HitReaction) HitReaction->NotifyHit(Result.bWeakPoint);
+    // O129's health ramp: the body reddens as it dies, and this is the event
+    // that moves it. Pushed here rather than read on tick — a hundred enemies
+    // sampling two attributes every frame to find out nothing changed is the
+    // cost this event already pays for free.
+    RefreshBodyPaint();
 }
 
 // --- Hit / death presentation (cosmetic only) ------------------------------

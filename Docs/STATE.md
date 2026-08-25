@@ -15,7 +15,7 @@ measurement without judging it.
 | Stat targets with no aggregation lane | ceiling | 1 of 33 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 0 of 31 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 141 of 206 declared | ceiling 143 | ok |
-| Conditions no content authors | ceiling | 11 of 25 | ceiling 12 | ok |
+| Conditions no content authors | ceiling | 11 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 38 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
@@ -34,7 +34,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 453
+- passing: 451
 - expected red: 4
 - **unexpected red: 0**
 - asserted invariants with no test: 38
@@ -136,7 +136,7 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 
 ## Conditions no content authors
 
-**ceiling** · 11 of 25 · ceiling 12
+**ceiling** · 11 of 24 · ceiling 12
 
 Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of its consumers is what produced most of this list.
 

@@ -1,5 +1,7 @@
 #include "Combat/BreakerRangedEnemy.h"
 
+#include "Combat/BreakerBodyPaint.h"
+
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerEnemyProjectile.h"
 #include "Components/CapsuleComponent.h"
@@ -14,7 +16,8 @@ namespace
     // humanoid's grey-violet at a glance, and sits inside the overgrown-Earth
     // read (O24). Deliberately NOT teal: the object-chroma law reserves
     // saturated teal for rift objects and suppression hardware.
-    const FLinearColor RangedBodyColor(0.20f, 0.27f, 0.19f);
+    // The same symbol the paint resolver defaults this family to (O128).
+    const FLinearColor RangedBodyColor = BreakerBodyPaint::LatticeFamilyPaint;
 
     void ApplyColor(UStaticMeshComponent* Mesh, const FLinearColor& Color)
     {
@@ -56,10 +59,13 @@ ABreakerRangedEnemy::ABreakerRangedEnemy()
 
     ProjectileClass = ABreakerEnemyProjectile::StaticClass();
 
+    // Layer 1, declared, then painted from the same value.
+    FamilyPaint = RangedBodyColor;
+
     for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
         RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
     {
-        ApplyColor(Part, RangedBodyColor);
+        ApplyColor(Part, FamilyPaint);
     }
 
     EmitterVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("EmitterVisual"));

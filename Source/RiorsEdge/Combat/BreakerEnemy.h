@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Combat/BreakerBodyPaint.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Items/BreakerDropTable.h"
 #include "BreakerEnemy.generated.h"
@@ -284,11 +285,25 @@ protected:
     // authored parameters. That property is what the "same area level always
     // produces the same chassis" test checks.
     void ApplyChassis();
-    // Rank colour over family silhouette (crowd legibility, ruled): blends
-    // the captured family paint toward the rank hue, one tick after the
-    // chassis so subclass identity paints have already landed.
-    void ApplyRankPresentation();
-    TArray<TPair<TWeakObjectPtr<class UMaterialInstanceDynamic>, FLinearColor>> RankBaseColors;
+    // Pushes this enemy's two owned paint layers — rank and health fraction —
+    // into the one component that writes the body's colour, which recomposes
+    // from scratch (O128). Cheap and idempotent: call it wherever rank or
+    // health moves. It used to be ApplyRankPresentation, it used to keep its
+    // own capture-and-restore cache of the family paint, and it used to run a
+    // tick late to dodge a race with the reaction layer's cache. None of that
+    // survives: there is nothing to capture and nothing to race.
+    void RefreshBodyPaint();
+
+    // Layer 1, DECLARED. A subclass sets this in its constructor and paints
+    // its parts from the same value; nothing reads a material to find out
+    // what a body "was". Vestige grey-violet by default (O24).
+    FLinearColor FamilyPaint = BreakerBodyPaint::VestigeFamilyPaint;
+public:
+    // Read-only, and it exists so the shipped configuration is assertable: a
+    // subclass that DECLARES one colour and PAINTS another is exactly the
+    // drift O128 removes, and only a test that reads both can see it.
+    const FLinearColor& GetFamilyPaint() const { return FamilyPaint; }
+protected:
 
     // The per-frame decision an enemy makes while it has a live target. The
     // base implementation is the melee three-gear chase below; ranged
