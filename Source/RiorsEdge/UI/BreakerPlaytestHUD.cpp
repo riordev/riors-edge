@@ -171,12 +171,14 @@ namespace BreakerHUD
     static constexpr float LevelUpOutSeconds = 0.12f;
     static constexpr float LevelUpRailBlinkSeconds = 0.25f; // O2 PLACEHOLDER
     static constexpr float EnemyBarAlwaysDistance = 1500.0f;
-    // RETUNED FOR DENSITY, not replaced: at six seconds the recency window
-    // self-limits correctly around ten enemies and FLOODS at eighty, because
-    // the player damages dozens inside any six-second span. At ~1.5s a bar
-    // means "what I am shooting right now", which is the reading the rule
-    // always wanted. O2 PLACEHOLDER — the owner tunes this in hand.
+    // Feeds only the DUMMY block now (four targets, a reading rather than a
+    // crowd); the enemy path went selective below. The density retune from
+    // 6.0s stands — at six seconds a bar outlives the shot that earned it.
+    // O2 PLACEHOLDER — the owner tunes this in hand.
     static constexpr float EnemyBarRecentDamageSeconds = 1.5f;
+    // How long a trash bar lingers after the aim leaves it (selective bars;
+    // above-Trash ranks are always barred). O2 PLACEHOLDER.
+    static constexpr float EnemyBarFocusFadeSeconds = 0.6f;
 
     // Ability feedback timings. All cosmetic: nothing here gates a rule.
     static constexpr float AbilityFlashSeconds = 0.3f;
@@ -1644,19 +1646,42 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const float MaxHealth = EnemyAttributes->GetMaxHealth();
         if (Health <= 0.0f || MaxHealth <= UE_SMALL_NUMBER) continue;
 
-        // Recently damaged is read off the enemy's own combat component: the
-        // enemy's Attributes/Combat members are protected, this is not.
-        //
-        // ANYTHING ABOVE TRASH KEEPS A PERMANENT BAR, recency or not — that
-        // is how the elite stays findable in a crowd, the same decision as
-        // giving it a distinct silhouette. IsEliteOrBetter, NEVER IsElite:
-        // rank == Elite exactly would exclude ModifierBearing and Boss — the
-        // two ranks ABOVE the one meant — and the project has shipped that
-        // predicate bug twice (the enemy header records both).
-        const bool bRankedBar = Enemy->IsEliteOrBetter();
-        const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
-        const bool bRecentlyDamaged = EnemyCombat && EnemyCombat->GetSecondsSinceDamage() < BreakerHUD::EnemyBarRecentDamageSeconds;
-        if (!bRankedBar && !bRecentlyDamaged && Distance > BreakerHUD::EnemyBarAlwaysDistance) continue;
+        // SELECTIVE BARS (ruled for the crowd): in a fight of eighty, eighty
+        // bars is a rendering cost AND the noise that hides the read the
+        // bars exist for. The rules, built now with the visual to swap in
+        // later:
+        //  * ABOVE TRASH — always barred inside EnemyBarMaxDistance. Elites
+        //    and champions are the fight's anchors; their health is standing
+        //    information. IsEliteOrBetter, NEVER IsElite: rank == Elite
+        //    exactly would exclude ModifierBearing and Boss — the two ranks
+        //    ABOVE the one meant — and the project has shipped that
+        //    predicate bug twice (the enemy header records both).
+        //  * TRASH — barred only while AIMED AT, fading for
+        //    EnemyBarFocusFadeSeconds after the aim leaves so glancing
+        //    across a pack reads as a sweep, not a strobe. An unfocused
+        //    trash hit shows no bar: the damage numbers already carry "it
+        //    hurt", and a recently-damaged rule at any window would light
+        //    the whole pack the moment a cleave landed.
+        const bool bAboveTrash = Enemy->IsEliteOrBetter();
+        float BarAlpha = 1.0f;
+        if (!bAboveTrash)
+        {
+            const double Now = World->GetTimeSeconds();
+            if (Enemy == FocusedEnemy)
+            {
+                LastFocusBarEnemy = Enemy;
+                LastFocusBarTime = Now;
+            }
+            else if (Enemy == LastFocusBarEnemy.Get()
+                && Now - LastFocusBarTime < BreakerHUD::EnemyBarFocusFadeSeconds)
+            {
+                BarAlpha = 1.0f - static_cast<float>((Now - LastFocusBarTime) / BreakerHUD::EnemyBarFocusFadeSeconds);
+            }
+            else
+            {
+                continue;
+            }
+        }
 
         const FVector Projected = Project(Enemy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), false);
         if (Projected.Z <= 0.0f) continue;
@@ -1681,16 +1706,16 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         {
             const float ShieldH = FMath::Max(BarH * 0.45f, S(2.0f));
             const float ShieldY = BarY - ShieldH - S(1.0f);
-            DrawRect(BreakerUI::Panel10, BarX, ShieldY, BarW, ShieldH);
-            DrawRect(BreakerUI::Cyan, BarX, ShieldY, BarW * FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f), ShieldH);
+            DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), BarX, ShieldY, BarW, ShieldH);
+            DrawRect(BreakerUI::Alpha(BreakerUI::Cyan, BarAlpha), BarX, ShieldY, BarW * FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f), ShieldH);
         }
 
-        DrawRect(BreakerUI::Panel10, BarX, BarY, BarW, BarH);
-        DrawRect(BreakerUI::Harm, BarX, BarY, BarW * FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f), BarH);
+        DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), BarX, BarY, BarW, BarH);
+        DrawRect(BreakerUI::Alpha(BreakerUI::Harm, BarAlpha), BarX, BarY, BarW * FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f), BarH);
         if (bElite)
         {
             // Gold edge, not a gold fill: the health colour must stay readable.
-            DrawBorder(BarX, BarY, BarW, BarH, BreakerUI::Gold, S(1.0f) * DistanceScale);
+            DrawBorder(BarX, BarY, BarW, BarH, BreakerUI::Alpha(BreakerUI::Gold, BarAlpha), S(1.0f) * DistanceScale);
         }
 
         // ---- The label, and how much of it -----------------------------

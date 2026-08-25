@@ -235,6 +235,11 @@ private:
     // Skim, not only the first three.
     double SkimBurstTime = -1000.0;
 
+    // The trash-bar focus linger (selective bars, ruled): the one enemy the
+    // aim last left, and when it left, so its bar fades instead of blinking.
+    TWeakObjectPtr<const class ABreakerEnemy> LastFocusBarEnemy;
+    double LastFocusBarTime = -1000.0;
+
     UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
     UPROPERTY() TObjectPtr<ABreakerSoundDirector> SoundDirector;
     // Every round the player has fired, used only to decide which of them get
