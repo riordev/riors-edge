@@ -326,6 +326,22 @@ struct RIORSEDGE_API FBreakerRolledAffix
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerAffixCategory Category = EBreakerAffixCategory::Prefix;
 };
 
+// WHICH POOL AN ARMOUR PIECE FEEDS. The base-stat archetype: Life pieces
+// carry the bigger health pool, Shield pieces a smaller pool that recharges
+// out of combat. The commitment enforces itself through the SUSTAIN
+// asymmetry (leech and healing fill life only, recharge fills shield only —
+// a hybrid wearer has more total pool than either purist and can refill
+// none of it fully), so there is deliberately NO exclusivity rule and none
+// may be added. Serialized by value: APPEND-ONLY, forever. None means a
+// pre-archetype item, which keeps every old save exactly as it was.
+UENUM(BlueprintType)
+enum class EBreakerArmourArchetype : uint8
+{
+    None,
+    Life,
+    Shield,
+};
+
 // A generated item. References a definition by stable id and carries rolled
 // affixes separately — definitions are immutable content, instances are save
 // data (same rule as progression state: ids and numbers, never pointers).
@@ -356,6 +372,13 @@ struct RIORSEDGE_API FBreakerItemInstance
     // Defaults to Rifle rather than Count so that every item saved before this
     // field existed loads as a rifle instead of as an invalid archetype.
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerWeaponArchetype WeaponArchetype = EBreakerWeaponArchetype::Rifle;
+
+    // WHICH POOL THIS PIECE FEEDS (O106 rewrite: base stats are an item
+    // property set by the piece's archetype; affixes add on top). Meaningful
+    // only on armour slots; weapons stay None. The magnitudes are never
+    // stored — BreakerItemBaseStats.h derives them from slot, level and this
+    // field, so a retune never needs a save migration.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EBreakerArmourArchetype ArmourArchetype = EBreakerArmourArchetype::None;
 
     // THE RULE THIS ITEM REWRITES, or None. Rolled onto Anomalous drops and
     // fixed on legendaries; every other item in the game leaves it None.
@@ -461,6 +484,14 @@ struct RIORSEDGE_API FBreakerEquipmentStats
     GENERATED_BODY()
 
     UPROPERTY(BlueprintReadOnly) float BonusHealth = 0.0f;
+    // ---- Gear base stats (O106 rewrite) -----------------------------------
+    // What the pieces grant BEFORE any affix: the summed Life bases and
+    // Shield bases of the equipped armour, derived per piece in
+    // BreakerItemBaseStats.h. Base health joins BonusHealth in the MaxHealth
+    // lane; base shield is applied as the base of MaxShield, which gear now
+    // owns (class conversion ceilings raise above it, raise-only).
+    UPROPERTY(BlueprintReadOnly) float BaseHealthFromGear = 0.0f;
+    UPROPERTY(BlueprintReadOnly) float BaseShieldFromGear = 0.0f;
     UPROPERTY(BlueprintReadOnly) float ResourceRegenPerSecond = 0.0f;
     UPROPERTY(BlueprintReadOnly) float BonusMaxResource = 0.0f;
     UPROPERTY(BlueprintReadOnly) float MoveSpeedMultiplier = 1.0f;

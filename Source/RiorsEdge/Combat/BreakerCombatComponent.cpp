@@ -4,7 +4,9 @@
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerShieldMath.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -35,6 +37,24 @@ void UBreakerCombatComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
 void UBreakerCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    // THE PLAYER-SIDE SHIELD RECHARGE — the missing source for a pool the
+    // damage library has spent correctly since it shipped. Pure step in
+    // Combat/BreakerShieldMath.h, clocked off this component's own
+    // seconds-since-damage (the write at the top of ReceiveDamage is what
+    // makes taking a hit stop the refill). Recharge fills SHIELD ONLY and
+    // never routes through ApplyHealing — the sustain asymmetry is the
+    // armour archetypes' whole mechanism. PLAYER pawns only: enemies own
+    // their shields through the Warded modifier's recharge, and a shielded
+    // target dummy that refilled itself would quietly move every TTK probe.
+    if (Attributes && GetOwner() && GetOwner()->HasAuthority()
+        && Cast<APawn>(GetOwner()) && Cast<APawn>(GetOwner())->IsPlayerControlled())
+    {
+        const float Current = Attributes->GetShield();
+        const float Next = BreakerShield::RechargeStep(Current, Attributes->GetMaxShield(),
+            GetSecondsSinceDamage(), DeltaTime);
+        if (Next > Current) Attributes->ApplyShield(Next);
+    }
 }
 
 FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamageRequest& Request)

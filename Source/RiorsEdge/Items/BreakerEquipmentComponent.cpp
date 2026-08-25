@@ -5,6 +5,7 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerItemBaseStats.h"
 #include "Items/BreakerLootLibrary.h"
 #include "Net/UnrealNetwork.h"
 
@@ -829,6 +830,15 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
 
     FBreakerEquipmentStats Stats;
     Stats.BonusHealth = FlatByTarget[static_cast<int32>(EBreakerStatTarget::Health)];
+    // The armour archetypes' base pools, summed per piece. Derived at read
+    // time from slot, level and archetype — never stored on the instance —
+    // so a base retune is an edit to BreakerItemBaseStats.h, not a save
+    // migration.
+    for (const FBreakerItemInstance& Item : Items)
+    {
+        Stats.BaseHealthFromGear += BreakerItemBase::BaseLifeOf(Item);
+        Stats.BaseShieldFromGear += BreakerItemBase::BaseShieldOf(Item);
+    }
     Stats.ResourceRegenPerSecond = FlatByTarget[static_cast<int32>(EBreakerStatTarget::ResourceRegen)];
     Stats.BonusMaxResource = FlatByTarget[static_cast<int32>(EBreakerStatTarget::MaxResource)];
     Stats.MoveSpeedMultiplier = Increased(EBreakerStatTarget::MoveSpeed);
@@ -909,7 +919,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // Gear authors no More multipliers — those are reserved for trees and
         // Anomalous items (O3).
         OutContribution->Reset();
-        OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth);
+        // Base health rides the same lane as the Health affix: one flat
+        // bucket, folded with the tree's, so a Life piece and a Health line
+        // compose instead of stacking through different doors.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxHealth, Stats.BonusHealth + Stats.BaseHealthFromGear);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxClassResource, Stats.BonusMaxResource);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
@@ -1017,6 +1030,21 @@ void UBreakerEquipmentComponent::ApplyStatsToAttributes()
     // any number of times, converges to the same numbers.
     if (!Attributes || !HasAttributeAuthority()) return;
     Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, CachedContribution);
+
+    // O106 REWRITE: gear owns the BASE of MaxShield — Shield-archetype
+    // pieces are the pool's source, and MaxShield stays deliberately outside
+    // the aggregation pass (a single system owns it outright; that system is
+    // now this one). The class conversion ceilings (Charge MD5/MD9, Grit
+    // §T1, both 25%-of-max-health) are RAISE-ONLY per their own tick, so
+    // this hard set can dip below a ceiling for at most one class tick
+    // before it is re-raised; a non-Tank/Support has no ceiling and reads
+    // the gear base exactly. Current shield clamps into the new cap so
+    // unequipping a Shield piece can never leave a bar above its maximum.
+    Attributes->ApplyMaxShield(CachedStats.BaseShieldFromGear);
+    if (Attributes->GetShield() > Attributes->GetMaxShield())
+    {
+        Attributes->ApplyShield(Attributes->GetMaxShield());
+    }
 }
 
 void UBreakerEquipmentComponent::OnRep_Equipped()

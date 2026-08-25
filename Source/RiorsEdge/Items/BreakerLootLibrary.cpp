@@ -97,6 +97,20 @@ FBreakerItemInstance UBreakerLootLibrary::RollItemInternal(FName DefinitionId, E
         Item.WeaponArchetype = static_cast<EBreakerWeaponArchetype>(
             Random.RandRange(0, static_cast<int32>(EBreakerWeaponArchetype::Count) - 1));
     }
+    else
+    {
+        // An armour drop decides WHICH POOL IT FEEDS, the same way a weapon
+        // decides which gun it is. Even odds on purpose — the commitment
+        // mechanism is the sustain asymmetry, not scarcity. Drawn from its
+        // OWN stream derived off the same seed, never from the main one:
+        // consuming the shared stream here would shift every affix a seeded
+        // armour item has ever rolled, which is a silent rewrite of existing
+        // drops and of every test that pins a seed.
+        FRandomStream ArchetypeStream(static_cast<int32>(HashCombine(
+            static_cast<uint32>(RandomSeed), 0xA83Du)));
+        Item.ArmourArchetype = ArchetypeStream.RandRange(0, 1) == 0
+            ? EBreakerArmourArchetype::Life : EBreakerArmourArchetype::Shield;
+    }
 
     int32 MinimumAffixes = 1;
     int32 MaximumAffixes = 1;
