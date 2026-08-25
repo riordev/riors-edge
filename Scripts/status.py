@@ -163,7 +163,12 @@ def parse_nodes(lib_text):
                 break
             for e in re.finditer(r'AddEffect\([^,]+,\s*EBreakerNodeStatTarget::(\w+)', l):
                 node["effects"].append(e.group(1))
-            for e in re.finditer(r'AddMoreEffect\(', l):
+            # AddDamageMore is the library's real More helper (this used to
+            # match "AddMoreEffect", a name that appears nowhere in the
+            # source, so every AddDamageMore node's More was invisible to the
+            # effects list and only a consumed tag kept such nodes off the
+            # silent report — a tagless More hub read as scaffolding).
+            for e in re.finditer(r'AddDamageMore\(', l):
                 node["effects"].append("Damage")
                 node["more"] = True
             if "MorePercent" in l:
