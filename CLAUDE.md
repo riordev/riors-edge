@@ -225,6 +225,43 @@ weapon lane's zero-commitment unconditional product falling 1.9825
 unchanged by any of this — neither power-band fixture can afford
 Collapse's chain.
 
+THE FIELD LANE (this pass): `Color` HAS ONE OWNER AND THE BODY BLEEDS.
+HEAD `ff96f6b`, 456 passing / 4 expected red (same roster) / 0
+unexpected. O128: two capture-and-restore caches over one material
+parameter were a live race — the reaction layer guarded itself, the
+rank layer (written later) did not, and a flash landing before the
+deferred rank repaint captured WHITE as the family paint, so every
+later demotion restored the body white forever. Both caches are gone:
+Combat/BreakerBodyPaint.h resolves family paint -> rank blend ->
+health ramp -> reaction as a pure function of one state struct, the
+reaction component is the sole writer, and a family's paint is
+DECLARED by its class rather than sampled off a material. The
+next-tick deferral went with the capture it existed to protect. O129:
+the readability pack's twenty health colours ship as a DELTA from
+each rank's full-health entry — absolutes collapse the three families
+to one colour (12.1 -> 0.0 dE76) and O24 spends colour on exactly
+that read. The pack's rank claim does NOT ship: minimum pairwise L*
+separation is 0.99 at full health, 0.59 at a quarter. ReviveFromPool
+gives the gold back itself now instead of relying on all three pool
+callers running a chassis pass next line.
+
+THREE INSTRUMENT FINDINGS, none fixed here because the probe is
+GROUND's file. The crowd probe's grid spawns at 6000 cm against a
+2200 cm DetectionRange, so its "the pack pursues" comment is false —
+the hundred is idle, confirmed by unmoved minimap blips across a
+12-second capture. GPU moves 2.53 -> 2.75 ms from one enemy to a
+hundred skeletal, which is not a hundred drawn characters: the probe
+measures TICK and ANIMATION, not DRAW. And the previous baseline (one
+enemy at 6.11 ms, slower than a hundred) does not reproduce — three
+reps each give 4.14 / 5.20 / 8.08 ms at +-1.5%, with the ordering
+never inverted. The mannequin question stays open: 8.08 ms is a floor
+under a crowd that neither fights nor draws. A3's fracture mask is an
+ASSET REQUEST — BasicShapeMaterial declares exactly `Color` and
+`Roughness` (measured), no emissive and no texture parameter, and it
+is an engine asset. A1's segmented bar waits on GLASS splitting
+DrawEnemyHealthBars into its own TU; LEDGER's BreakerHealthBands.h
+has landed and is ready to call.
+
 Update this section as the last step of each session.
 
 ## Build and test
