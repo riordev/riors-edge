@@ -53,6 +53,7 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 #include "Engine/Engine.h"
+#include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "Algo/Reverse.h"
 #include "Widgets/SBoxPanel.h"
@@ -85,12 +86,77 @@ namespace
     const FLinearColor Amber = BreakerUI::Gold;
     const FLinearColor Transparent(0.0f, 0.0f, 0.0f, 0.0f);
 
-    TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = BreakerUI::TextPrimary, bool bBold = false)
+    // ---- Fieldplate type roles --------------------------------------------
+    // Archivo (display), IBM Plex Sans (body), IBM Plex Mono (numbers and
+    // chrome captions): the three role fonts Scripts/import_fonts.py builds
+    // from Assets/fonts into /Game/Breaker/UI/Fonts. Loaded once and ROOTED —
+    // the cache outlives every widget, and a collected font under a live
+    // FSlateFontInfo is a crash on the next paint. Every helper falls back to
+    // the engine face when the asset is absent (a clone before its LFS pull,
+    // a suite run with no content), so the menu degrades to the old look
+    // rather than to tofu.
+    FSlateFontInfo BreakerRoleFont(const TCHAR* AssetPath, const FName& Typeface, int32 Size,
+        const TCHAR* EngineFallback, float TrackingEm = 0.0f)
+    {
+        static TMap<FString, UFont*> Cache;
+        UFont*& Slot = Cache.FindOrAdd(FString(AssetPath));
+        if (!Slot)
+        {
+            Slot = LoadObject<UFont>(nullptr, AssetPath);
+            if (Slot) Slot->AddToRoot();
+        }
+        FSlateFontInfo Font = Slot
+            ? FSlateFontInfo(Slot, Size, Typeface)
+            : FCoreStyle::GetDefaultFontStyle(EngineFallback, Size);
+        // FSlateFontInfo::LetterSpacing is 1/1000 em — the unit the pack's
+        // tracking_em values state.
+        Font.LetterSpacing = FMath::RoundToInt(TrackingEm * 1000.0f);
+        return Font;
+    }
+
+    // Display: uppercase headings, weights 600/700, the pack's +0.01em.
+    FSlateFontInfo BreakerDisplayFont(int32 Size, bool bHeavy = false)
+    {
+        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerDisplay.F_BreakerDisplay"),
+            bHeavy ? FName(TEXT("Bold")) : FName(TEXT("SemiBold")), Size, TEXT("Bold"), 0.01f);
+    }
+
+    // Body: mixed-case copy, 400/500/600. The bold flag maps to SemiBold —
+    // the pack's body family carries no 700.
+    FSlateFontInfo BreakerBodyFont(int32 Size, bool bSemiBold = false)
+    {
+        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerBody.F_BreakerBody"),
+            bSemiBold ? FName(TEXT("SemiBold")) : FName(TEXT("Regular")), Size,
+            bSemiBold ? TEXT("Bold") : TEXT("Regular"));
+    }
+
+    // Mono: every number, key cap and tracked chrome caption. Tabular figures
+    // come with the face; the tracking parameter is the caption's 0.16em.
+    FSlateFontInfo BreakerMonoFont(int32 Size, float TrackingEm = 0.0f)
+    {
+        return BreakerRoleFont(TEXT("/Game/Breaker/UI/Fonts/F_BreakerMono.F_BreakerMono"),
+            FName(TEXT("Regular")), Size, TEXT("Mono"), TrackingEm);
+    }
+
+    TSharedRef<STextBlock> BreakerMonoText(const FText& Text, int32 Size, const FLinearColor& Color,
+        float TrackingEm = 0.0f)
     {
         return SNew(STextBlock)
             .Text(Text)
             .ColorAndOpacity(Color)
-            .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
+            .Font(BreakerMonoFont(Size, TrackingEm));
+    }
+
+    TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = BreakerUI::TextPrimary, bool bBold = false)
+    {
+        // Role by size, one seam for every screen: 20 and up is a heading
+        // (TypeH2/TypeH1) and takes the display face; 14 is body and 11 is a
+        // caption, both on the body face. Numbers do not come through here —
+        // they are MenuValueColumn and BreakerMonoText, on the mono role.
+        return SNew(STextBlock)
+            .Text(Text)
+            .ColorAndOpacity(Color)
+            .Font(Size >= BreakerUI::TypeH2 ? BreakerDisplayFont(Size, bBold) : BreakerBodyFont(Size, bBold));
     }
 
     // Text that WRAPS at a known pixel width instead of running past the edge
@@ -115,7 +181,7 @@ namespace
             .Text(Text)
             .ColorAndOpacity(Color)
             .WrapTextAt(WrapAt)
-            .Font(FCoreStyle::GetDefaultFontStyle(bBold ? TEXT("Bold") : TEXT("Regular"), Size));
+            .Font(Size >= BreakerUI::TypeH2 ? BreakerDisplayFont(Size, bBold) : BreakerBodyFont(Size, bBold));
     }
 
     // A number in a fixed-width column, right-aligned by JUSTIFICATION rather
@@ -129,13 +195,15 @@ namespace
     // fix MakeMarkerLabel already carries for the marker captions.
     TSharedRef<SWidget> MenuValueColumn(const FText& Text, float Width, int32 Size, const FLinearColor& Color)
     {
+        // The mono role: every value column is a number, and the pack puts
+        // ALL numbers on IBM Plex Mono with tabular figures.
         return SNew(SBox).WidthOverride(Width).HAlign(HAlign_Fill)
         [
             SNew(STextBlock)
                 .Text(Text)
                 .Justification(ETextJustify::Right)
                 .ColorAndOpacity(Color)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), Size))
+                .Font(BreakerMonoFont(Size))
         ];
     }
 
@@ -1603,32 +1671,9 @@ namespace
     // the 1px divider.
     constexpr float BreakerSettingsRowPad = 14.0f;
 
-    // ---- Type roles -------------------------------------------------------
-    // The pack's roles are Archivo (display), IBM Plex Sans (body) and IBM
-    // Plex Mono (all numbers, tabular figures). None of the three exists as a
-    // Font Face asset yet — importing them is an editor act on binary assets —
-    // so display and body ride MenuText's engine face, and THIS is the mono
-    // seam: the engine's default composite carries a "Mono" typeface
-    // (DroidSansMono — monospaced, so tabular by construction), and every
-    // number, key cap and chrome caption on the settings screen draws through
-    // here. When the real faces land, this function is the single edit.
-    FSlateFontInfo BreakerMonoFont(int32 Size, float TrackingEm = 0.0f)
-    {
-        FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Mono"), Size);
-        // FSlateFontInfo::LetterSpacing is 1/1000 em — the same unit the
-        // pack's caption_tracking_em (0.16) states.
-        Font.LetterSpacing = FMath::RoundToInt(TrackingEm * 1000.0f);
-        return Font;
-    }
-
-    TSharedRef<STextBlock> BreakerMonoText(const FText& Text, int32 Size, const FLinearColor& Color,
-        float TrackingEm = 0.0f)
-    {
-        return SNew(STextBlock)
-            .Text(Text)
-            .ColorAndOpacity(Color)
-            .Font(BreakerMonoFont(Size, TrackingEm));
-    }
+    // The type roles live in the file-top namespace beside MenuText:
+    // BreakerDisplayFont / BreakerBodyFont / BreakerMonoFont, built from the
+    // imported role fonts with the engine faces as their fallback.
 
     // The 1px row separator the plates thread between control rows. Structure
     // comes off borders in this system, not off gaps.
@@ -2453,12 +2498,14 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
     // ---- THE KEY CAP, and its width budget --------------------------------
     // The key display IS the control (README: no BIND button; click arms).
     // The cap is the plate's fixed 110px box, so the strings in it are SHORT
-    // display names — GetDisplayName(false): LMB, RMB, SPACE — at mono 13
-    // (~7.8px per glyph). The widest realistic short name is "SCROLL LOCK",
-    // 11 glyphs ≈ 86px against 110 - 2px ring - 8px pad = 100. The cap never
-    // says "PRESS A KEY…": listening is the blinking gold frame plus the
-    // status line, which has room for whole sentences. Long key names stay in
-    // the status line too, where they fit.
+    // display names — GetDisplayName(false): LMB, RMB, SPACE. MEASURED, not
+    // derived: IBM Plex Mono rendered "LEFT SHIFT" at ~98px (~9.8px per glyph
+    // at size 13 — wider than the metrics tables suggest), which is why the
+    // cap is mono 12 on a 2px pad: 11 glyphs ("SCROLL LOCK", the widest short
+    // name the desk produces) ≈ 100px against 110 - 2px ring - 4px pad = 104.
+    // The cap never says "PRESS A KEY…": listening is the blinking gold frame
+    // plus the status line, which has room for whole sentences. Long key
+    // names stay in the status line too, where they fit.
     if (bPending)
     {
         // The cap previews the key the player pressed; the badge names who
@@ -2527,7 +2574,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
             [
                 SNew(SButton)
                 .ButtonStyle(FCoreStyle::Get(), "NoBorder")
-                .ContentPadding(FMargin(BreakerUI::Space4, 0.0f))
+                .ContentPadding(FMargin(2.0f, 0.0f))
                 .HAlign(HAlign_Fill)
                 .VAlign(VAlign_Center)
                 .OnClicked(FOnClicked::CreateLambda([this, Action]()
@@ -2544,7 +2591,7 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
                         .Text(FText::FromString(KeyLabel))
                         .Justification(ETextJustify::Center)
                         .ColorAndOpacity(CapColor)
-                        .Font(BreakerMonoFont(13))
+                        .Font(BreakerMonoFont(12))
                 ]
             ];
 

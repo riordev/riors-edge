@@ -14,5 +14,12 @@ public class RiorsEdge : ModuleRules
             // engine's own draw-while-loading mechanism, nothing more.
             "MoviePlayer"
         });
+        if (Target.bBuildEditor)
+        {
+            // UI/BreakerFontTools.cpp: the role-font builder registers the
+            // fonts it saves with the asset registry. Editor-only, like the
+            // command itself.
+            PrivateDependencyModuleNames.Add("AssetRegistry");
+        }
     }
 }
