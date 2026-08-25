@@ -351,8 +351,9 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Nothing spent before any purchase"), Progression->GetSpentPoints(), 0.0f);
 
-    TestTrue(TEXT("Sightline purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));         // cost 1, Core
-    TestTrue(TEXT("Volley gateway purchases"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure)); // cost 1, Core
+    // Atlas shape: Tunnel Vision's stated rim gate is Angle AND Ledger.
+    TestTrue(TEXT("Angle purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));                 // cost 1, Core
+    TestTrue(TEXT("Ledger purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));               // cost 1, Core
     TestTrue(TEXT("Tunnel Vision purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));  // cost 2, Core
     TestEqual(TEXT("Core spend tracks three purchases"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
 

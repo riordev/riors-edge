@@ -11,6 +11,7 @@ namespace BreakerNodeTags
 {
     UE_DEFINE_GAMEPLAY_TAG(Node_Fixate, "Progression.Node.Core.Fixate");
     UE_DEFINE_GAMEPLAY_TAG(Node_TunnelVision, "Progression.Node.Core.TunnelVision");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Core_Deadeye, "Progression.Node.Core.Precision.Deadeye");
     UE_DEFINE_GAMEPLAY_TAG(Node_TriggerDiscipline, "Progression.Node.Core.TriggerDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Cyclic, "Progression.Node.Core.Cyclic");
     UE_DEFINE_GAMEPLAY_TAG(Node_LastRound, "Progression.Node.Core.LastRound");
@@ -417,96 +418,178 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     Tree = MakeTree(TEXT("Core.Slice"), TEXT("Core Constellations (Slice)"), EBreakerPointCurrency::CorePoints, EBreakerClassId::None);
 
-    // --- Precision ---------------------------------------------------------
+    // =======================================================================
+    // THE CORE ATLAS (Phase 4). Twelve wheels; this pass authors them in
+    // pairs. Per wheel: six 1-point rims, three 2-point inners each gated on
+    // two adjacent rims (AND — the stated gate), one 3-point hub Convergence
+    // gated on all three inners. MaxRank = 1 on every Core node. RIMS CARRY
+    // NO PREREQUISITES: the spec's ring adjacency (rim[j] <-> rim[j+1],
+    // travel runs, three entries) is either-neighbor traversal, which the
+    // AND-only prerequisite vocabulary cannot express — so rims are freely
+    // purchasable until that traversal is ruled and given plumbing, and the
+    // gates authored here are exactly the ones the spec states, no more.
+    // Tier 1/2/3 on rim/inner/hub is board layout; GateForTier's investment
+    // gates (0/2/4) are strictly weaker than the prerequisite chains and
+    // never bite. Every magnitude is O2 PLACEHOLDER.
+    // =======================================================================
+
+    // --- PRECISION: crit and the weak point --------------------------------
     UBreakerProgressionNode* Sightline = MakeNode(TEXT("Core.Precision.Sightline"), TEXT("Sightline"),
-        TEXT("Precision gateway. Weak-point damage is easier to earn, and everything you fire lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
-    AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 7.0f); // O2 PLACEHOLDER
-    AddEffect(Sightline, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+        TEXT("Deliberate fire finds the seam a little more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(Sightline, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Sightline);
 
-    // TARGET RIDER (Stage 6, first authoring pass): the node's own text has
-    // promised "while a single target holds your attention" since it was
-    // authored, and the crit-damage line never carried that condition because
-    // no condition could say it. TargetElite is the vocabulary's honest
-    // reading of the promise — the elite is the fight where one target holds
-    // your attention, and Hook-And-Condition-Vocabulary calls TargetElite
-    // "the honest way to author a strong conditional without inflating trash
-    // clear". The unconditional crit line keeps its authored value (removing
-    // it would be an O2 retune); the rider is the half that now keeps the
-    // text's word.
+    // RE-TARGETED (owner ruling, this session): the spec's generic weapon
+    // line moves onto the RecoilRecovery lane so the lane has a wheel author
+    // — the word and the mechanic agree, a steady hand is recoil control.
+    UBreakerProgressionNode* PrecSteady = MakeNode(TEXT("Core.Precision.Steady"), TEXT("Steady"),
+        TEXT("Recoil settles faster after every burst."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(PrecSteady, EBreakerNodeStatTarget::RecoilRecovery, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(PrecSteady);
+
+    UBreakerProgressionNode* PrecAngle = MakeNode(TEXT("Core.Precision.Angle"), TEXT("Angle"),
+        TEXT("Another degree of advantage on every shot."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(PrecAngle, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(PrecAngle);
+
+    UBreakerProgressionNode* PrecLedger = MakeNode(TEXT("Core.Precision.Ledger"), TEXT("Ledger"),
+        TEXT("The seam pays better when you find it."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(PrecLedger, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 4.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(PrecLedger);
+
+    // RE-TARGETED (owner ruling, this session): WeaponSpread's wheel author.
+    // A long lens is a tighter cone.
+    UBreakerProgressionNode* PrecLongLens = MakeNode(TEXT("Core.Precision.LongLens"), TEXT("Long Lens"),
+        TEXT("Your cone of fire tightens."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(PrecLongLens, EBreakerNodeStatTarget::WeaponSpread, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(PrecLongLens);
+
+    UBreakerProgressionNode* PrecLead = MakeNode(TEXT("Core.Precision.Lead"), TEXT("Lead"),
+        TEXT("Reading the target's path finds the seam more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Precision"));
+    AddEffect(PrecLead, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(PrecLead);
+
+    UBreakerProgressionNode* CalledShot = MakeNode(TEXT("Core.Precision.CalledShot"), TEXT("Called Shot"),
+        TEXT("Deliberate fire lands considerably harder where it matters."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Precision"));
+    AddPrerequisite(CalledShot, TEXT("Core.Precision.Sightline"));
+    AddPrerequisite(CalledShot, TEXT("Core.Precision.Steady"));
+    AddEffect(CalledShot, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 14.0f); // O2 PLACEHOLDER
+    CalledShot->GrantedTags.AddTag(BreakerNodeTags::Node_CalledShot.GetTag());
+    Tree->Nodes.Add(CalledShot);
+
+    // TARGET RIDER PRESERVED across the atlas rebuild: the TargetElite line is
+    // Stage-6 authoring the rider tests pin, and the node's text has promised
+    // "while a single target holds your attention" since it was first written.
     UBreakerProgressionNode* TunnelVision = MakeNode(TEXT("Core.Precision.TunnelVision"), TEXT("Tunnel Vision"),
-        TEXT("Notable. Critical damage rises while a single target holds your attention, and elites take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Precision"));
-    AddPrerequisite(TunnelVision, TEXT("Core.Precision.Sightline"));
-    AddEffect(TunnelVision, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 22.0f); // O2 PLACEHOLDER
+        TEXT("Critical damage rises while a single target holds your attention, and elites take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Precision"));
+    AddPrerequisite(TunnelVision, TEXT("Core.Precision.Angle"));
+    AddPrerequisite(TunnelVision, TEXT("Core.Precision.Ledger"));
+    AddEffect(TunnelVision, EBreakerNodeStatTarget::CriticalDamage, EBreakerNodeStatBucket::Flat, 18.0f); // O2 PLACEHOLDER
     AddEffect(TunnelVision, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f, EBreakerBuildCondition::TargetElite); // O2 PLACEHOLDER — sized against the 9-14/rank conditional band
     TunnelVision->GrantedTags.AddTag(BreakerNodeTags::Node_TunnelVision.GetTag());
     Tree->Nodes.Add(TunnelVision);
 
-    // Called Shot is the crit-chance choice the Precision line was missing:
-    // without a second chance source, Critical Damage had nothing to turn on
-    // and crit could not be the third axis of the variance band (Power-Curve
-    // §4). Two ranks, so it reads as a Minor on the board.
-    UBreakerProgressionNode* CalledShot = MakeNode(TEXT("Core.Precision.CalledShot"), TEXT("Called Shot"),
-        TEXT("Deliberate fire finds the seam. Critical chance rises sharply, and every shot lands a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Precision"));
-    AddPrerequisite(CalledShot, TEXT("Core.Precision.Sightline"));
-    AddEffect(CalledShot, EBreakerNodeStatTarget::CriticalChance, EBreakerNodeStatBucket::Flat, 4.0f);          // O2 PLACEHOLDER
-    AddEffect(CalledShot, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f);      // O2 PLACEHOLDER
-    CalledShot->GrantedTags.AddTag(BreakerNodeTags::Node_CalledShot.GetTag());
-    Tree->Nodes.Add(CalledShot);
+    // Rule rewrite with its consumer LIVE in the same commit: O104 forbids a
+    // GRANTED weak point from also taking the crit roll; owning Deadeye is
+    // the purchased exception. UBreakerWeaponComponent::SubmitWeaponDamage
+    // reads the tag and passes it into CanCriticalOnWeakPoint. Earned weak
+    // points already crit (O104 permits them), so the node's whole payload is
+    // the granted case — Lead's mark, and whatever grants come after it.
+    UBreakerProgressionNode* CoreDeadeye = MakeNode(TEXT("Core.Precision.Deadeye"), TEXT("Deadeye"),
+        TEXT("A weak-point hit does not consume the crit roll."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Precision"));
+    AddPrerequisite(CoreDeadeye, TEXT("Core.Precision.LongLens"));
+    AddPrerequisite(CoreDeadeye, TEXT("Core.Precision.Lead"));
+    CoreDeadeye->GrantedTags.AddTag(BreakerNodeTags::Node_Core_Deadeye.GetTag());
+    Tree->Nodes.Add(CoreDeadeye);
 
-    // Fixate is a Convergence node after O21 and now carries a REAL More
-    // multiplier: EBreakerNodeStatBucket::MorePercent exists, and the aggregator
-    // composes it under the O3 cap. Unconditional, which is what makes it the
-    // generalist pick against Terminal Velocity's larger conditional one.
     UBreakerProgressionNode* Fixate = MakeNode(TEXT("Core.Precision.Fixate"), TEXT("Fixate"),
         TEXT("Convergence. Repeated hits on one target build a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Precision"));
+    AddPrerequisite(Fixate, TEXT("Core.Precision.CalledShot"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.TunnelVision"));
+    AddPrerequisite(Fixate, TEXT("Core.Precision.Deadeye"));
     AddDamageMore(Fixate, 22.0f); // O2 PLACEHOLDER: x1.22
     Fixate->GrantedTags.AddTag(BreakerNodeTags::Node_Fixate.GetTag());
     Tree->Nodes.Add(Fixate);
 
-    // --- Volley ------------------------------------------------------------
-    UBreakerProgressionNode* TriggerDiscipline = MakeNode(TEXT("Core.Volley.TriggerDiscipline"), TEXT("Trigger Discipline"),
-        TEXT("Volley gateway. Recoil settles faster between controlled bursts."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
-    TriggerDiscipline->GrantedTags.AddTag(BreakerNodeTags::Node_TriggerDiscipline.GetTag());
-    Tree->Nodes.Add(TriggerDiscipline);
-
+    // --- VOLLEY: sustained fire --------------------------------------------
     UBreakerProgressionNode* Cyclic = MakeNode(TEXT("Core.Volley.Cyclic"), TEXT("Cyclic"),
-        TEXT("Sustained fire ramps rate of fire, then decays when you stop. Every rank increases damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Volley"));
-    AddPrerequisite(Cyclic, TEXT("Core.Volley.TriggerDiscipline"));
-    // The rate-of-fire ramp is still only a tag nothing consumes, so until the
-    // weapon layer reads it this node's three ranks were a purchase that did
-    // literally nothing. The Increased Damage per rank is real output now and
-    // stays when the ramp lands.
-    AddEffect(Cyclic, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+        TEXT("The gun that keeps firing hits a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(Cyclic, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
     Cyclic->GrantedTags.AddTag(BreakerNodeTags::Node_Cyclic.GetTag());
     Tree->Nodes.Add(Cyclic);
 
-    UBreakerProgressionNode* LastRound = MakeNode(TEXT("Core.Volley.LastRound"), TEXT("Last Round"),
-        TEXT("The final round of a magazine fires extra projectiles. They apply no statuses (proc coefficient 0)."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Volley"));
-    AddPrerequisite(LastRound, TEXT("Core.Volley.TriggerDiscipline"));
-    LastRound->GrantedTags.AddTag(BreakerNodeTags::Node_LastRound.GetTag());
-    Tree->Nodes.Add(LastRound);
+    UBreakerProgressionNode* VolleyFeed = MakeNode(TEXT("Core.Volley.Feed"), TEXT("Feed"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(VolleyFeed, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VolleyFeed);
 
-    // The generalist damage ladder. Deliberately the LARGEST unconditional
-    // per-rank damage in the tree and deliberately the most boring: it is the
-    // control against which every conditional node is measured, and a build
-    // that takes only this is exactly the "baseline" the variance band is
-    // defined against.
+    UBreakerProgressionNode* TriggerDiscipline = MakeNode(TEXT("Core.Volley.TriggerDiscipline"), TEXT("Trigger Discipline"),
+        TEXT("Controlled bursts land harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(TriggerDiscipline, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    TriggerDiscipline->GrantedTags.AddTag(BreakerNodeTags::Node_TriggerDiscipline.GetTag());
+    Tree->Nodes.Add(TriggerDiscipline);
+
+    UBreakerProgressionNode* VolleyChambered = MakeNode(TEXT("Core.Volley.Chambered"), TEXT("Chambered"),
+        TEXT("A round ready is a round that counts."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(VolleyChambered, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VolleyChambered);
+
+    // RE-TARGETED (owner ruling, this session): WeaponSpread's second wheel
+    // author. A cold barrel shoots straight.
+    UBreakerProgressionNode* VolleyColdBarrel = MakeNode(TEXT("Core.Volley.ColdBarrel"), TEXT("Cold Barrel"),
+        TEXT("Your cone of fire tightens."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(VolleyColdBarrel, EBreakerNodeStatTarget::WeaponSpread, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VolleyColdBarrel);
+
+    // RE-TARGETED (owner ruling, this session): RecoilRecovery's second wheel
+    // author. A working stock is recoil control.
+    UBreakerProgressionNode* VolleyWorkingStock = MakeNode(TEXT("Core.Volley.WorkingStock"), TEXT("Working Stock"),
+        TEXT("Recoil settles faster after every burst."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Volley"));
+    AddEffect(VolleyWorkingStock, EBreakerNodeStatTarget::RecoilRecovery, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VolleyWorkingStock);
+
     UBreakerProgressionNode* Salvo = MakeNode(TEXT("Core.Volley.Salvo"), TEXT("Salvo"),
-        TEXT("Volume over placement. Every rank increases all damage dealt, with no condition attached."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Volley"));
-    AddPrerequisite(Salvo, TEXT("Core.Volley.TriggerDiscipline"));
-    AddEffect(Salvo, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 6.0f); // O2 PLACEHOLDER
+        TEXT("Volume over placement. Weapon damage rises with no condition attached."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Volley"));
+    AddPrerequisite(Salvo, TEXT("Core.Volley.Cyclic"));
+    AddPrerequisite(Salvo, TEXT("Core.Volley.Feed"));
+    AddEffect(Salvo, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f); // O2 PLACEHOLDER
     Salvo->GrantedTags.AddTag(BreakerNodeTags::Node_Salvo.GetTag());
     Tree->Nodes.Add(Salvo);
 
-    // Second unconditional More. Fixate and Barrage are both generalists, so a
-    // build that wants three Mores and refuses to commit to a movement state
-    // can find only two — which is the shape O27 asks for: the uncommitted
-    // build is viable, the committed one is stronger.
+    // Rule rewrite whose consumer went LIVE in this commit — the tag was
+    // declared unconsumed for a milestone and now pays:
+    // UBreakerWeaponComponent::SubmitWeaponDamage forces the crit roll to
+    // certainty on the pull that chambers the magazine's final round. O104
+    // still outranks it on a granted weak point without Deadeye: bCanCritical
+    // false beats CriticalChance 1.0, and that ordering is the ruling's.
+    UBreakerProgressionNode* LastRound = MakeNode(TEXT("Core.Volley.LastRound"), TEXT("Last Round"),
+        TEXT("The final round of a magazine cannot be a non-crit."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Volley"));
+    AddPrerequisite(LastRound, TEXT("Core.Volley.TriggerDiscipline"));
+    AddPrerequisite(LastRound, TEXT("Core.Volley.Chambered"));
+    LastRound->GrantedTags.AddTag(BreakerNodeTags::Node_LastRound.GetTag());
+    Tree->Nodes.Add(LastRound);
+
+    // The RULE half — rate of fire ramps and stops decaying between
+    // magazines — has no ramp to rewrite yet, so per the Frenzy authoring
+    // precedent the node carries its intent in a currency that reaches
+    // gameplay today: a flat fire-rate line on the live FireRateMultiplier
+    // lane. Deliberately NOT a tag (a declared tag nothing reads would spend
+    // dead-tag headroom that is currently zero), and deliberately not
+    // nothing (FallbackTreeIntegrity refuses a node that grants nothing —
+    // naked scaffolding is structurally illegal here). The ramp half lands
+    // the day the weapon layer grows one; this line stays as its floor.
+    UBreakerProgressionNode* VolleyOverrev = MakeNode(TEXT("Core.Volley.Overrev"), TEXT("Overrev"),
+        TEXT("The gun runs hotter. Its full ramp — rate of fire that builds and survives the reload — is waiting on the ramp itself."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Volley"));
+    AddPrerequisite(VolleyOverrev, TEXT("Core.Volley.ColdBarrel"));
+    AddPrerequisite(VolleyOverrev, TEXT("Core.Volley.WorkingStock"));
+    AddEffect(VolleyOverrev, EBreakerNodeStatTarget::FireRate, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VolleyOverrev);
+
     UBreakerProgressionNode* Barrage = MakeNode(TEXT("Core.Volley.Barrage"), TEXT("Barrage"),
         TEXT("Convergence. Sustained output becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Volley"));
-    AddPrerequisite(Barrage, TEXT("Core.Volley.Cyclic"));
+    AddPrerequisite(Barrage, TEXT("Core.Volley.Salvo"));
+    AddPrerequisite(Barrage, TEXT("Core.Volley.LastRound"));
+    AddPrerequisite(Barrage, TEXT("Core.Volley.Overrev"));
     AddDamageMore(Barrage, 22.0f); // O2 PLACEHOLDER: x1.22
     Barrage->GrantedTags.AddTag(BreakerNodeTags::Node_Barrage.GetTag());
     Tree->Nodes.Add(Barrage);

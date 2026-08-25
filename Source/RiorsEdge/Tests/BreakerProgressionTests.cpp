@@ -85,7 +85,8 @@ bool FBreakerRespecRestoresAttributesTest::RunTest(const FString& Parameters)
     UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
     FText Failure;
     TestTrue(TEXT("Gateway node purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
-    TestEqual(TEXT("A purchased node reaches the attribute"), Attributes->GetCriticalChance(), BaseCritChance + 0.07f, 0.0001f);
+    // Atlas shape: Sightline is a +2 crit rim (O2 PLACEHOLDER).
+    TestEqual(TEXT("A purchased node reaches the attribute"), Attributes->GetCriticalChance(), BaseCritChance + 0.02f, 0.0001f);
 
     TestTrue(TEXT("Respec at a Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::CorePoints, true, Failure));
     TestEqual(TEXT("Respec restores the pre-purchase crit chance exactly"), Attributes->GetCriticalChance(), BaseCritChance);

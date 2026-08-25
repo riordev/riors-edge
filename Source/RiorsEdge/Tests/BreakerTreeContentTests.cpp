@@ -85,8 +85,13 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // Elements as a sealed placeholder because its roster was empty, and O5
     // plus Core-Constellations §6 both say it is designed-but-unshipped rather
     // than cut. Six nodes joined the Core tree (24 -> 30).
+    // RE-PINNED for the Core atlas (Phase 4), pair by pair, the same way the
+    // Swift pins below moved: the number rises by exactly the wheels authored
+    // in each commit and says so in that commit's diff. PRECISION and VOLLEY
+    // went from four and five nodes to ten each (30 -> 41); the remaining
+    // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core slice ships exactly the authored 30"), Core->Nodes.Num(), 30);
+    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 41);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
@@ -230,15 +235,19 @@ bool FBreakerNodePurchaseFlowTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Tree investment tracks spend"), Progression->GetTreeInvestment(Core), 1);
     TestFalse(TEXT("Rank cap is enforced"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Sightline"), Failure));
 
-    // Tier-2 investment gate: prerequisite met, gate not yet.
-    TestFalse(TEXT("Investment gate rejects an early tier 2 node"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
-    TestTrue(TEXT("A second gateway can be bought"), Progression->PurchaseNode(Core, TEXT("Core.Volley.TriggerDiscipline"), Failure));
-    TestTrue(TEXT("Investment gate opens at two points"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
-    TestTrue(TEXT("Tier 2 notable purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
+    // ATLAS SHAPE (Phase 4): an inner is gated on its two stated rims — both
+    // of them, and independently of the (weaker) tier investment gate. With
+    // Sightline and Angle owned the gate at 2 is already met, so the second
+    // refusal below is the PREREQUISITE binding on its own.
+    TestTrue(TEXT("The first of Tunnel Vision's rims purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Angle"), Failure));
+    TestFalse(TEXT("One rim of two is not enough"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
+    TestTrue(TEXT("The second rim purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.Ledger"), Failure));
+    TestTrue(TEXT("Both rims open the inner"), Progression->CanPurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
+    TestTrue(TEXT("The inner purchases"), Progression->PurchaseNode(Core, TEXT("Core.Precision.TunnelVision"), Failure));
 
     // Effects are live: crit chance and crit damage both moved.
-    TestEqual(TEXT("Crit chance aggregates from Sightline"), Progression->GetNodeStats().CriticalChanceBonus, 0.07f, 0.0001f);
-    TestEqual(TEXT("Crit damage aggregates from Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
+    TestEqual(TEXT("Crit chance aggregates from the crit rims"), Progression->GetNodeStats().CriticalChanceBonus, 0.04f, 0.0001f);
+    TestEqual(TEXT("Crit damage aggregates from Ledger and Tunnel Vision"), Progression->GetNodeStats().CriticalMultiplierBonus, 0.22f, 0.0001f);
 
     // O111: THE DOCTRINE WALLET IS FILLED BY COMMITMENT, NOT BY LEVELLING.
     // A doctrine node is unaffordable until the Forge pays the eight, and that
@@ -318,7 +327,8 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     }
 
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});     // +7 crit chance
+    Ranks.Add({TEXT("Core.Precision.Sightline"), 1});     // +2 crit chance (atlas rim)
+    Ranks.Add({TEXT("Core.Precision.Lead"), 1});          // +2 crit chance (atlas rim)
     Ranks.Add({TEXT("Core.Bulwark.SetStance"), 1});       // +6 block, +90 health
     Ranks.Add({TEXT("Core.Kinesis.LightFooting"), 1});    // +5 dodge, +12% move
     Ranks.Add({TEXT("Core.Affliction.Deepen"), 2});       // +18% DoT per rank
@@ -326,7 +336,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});      // +18 crit damage per rank
 
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks);
-    TestEqual(TEXT("Flat crit chance sums into a fraction"), Stats.CriticalChanceBonus, 0.07f, 0.0001f);
+    TestEqual(TEXT("Flat crit chance sums into a fraction"), Stats.CriticalChanceBonus, 0.04f, 0.0001f);
     TestEqual(TEXT("Flat crit damage scales with rank"), Stats.CriticalMultiplierBonus, 0.36f, 0.0001f);
     TestEqual(TEXT("Block chance converts to a fraction"), Stats.BlockChanceBonus, 0.06f, 0.0001f);
     TestEqual(TEXT("Dodge chance converts to a fraction"), Stats.DodgeChanceBonus, 0.05f, 0.0001f);
@@ -334,20 +344,19 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.36f, 0.0001f);
-    // SIGHTLINE ALONE, because Long Lens's damage line is now gated on Aiming
-    // (Progression.AxisOverlap: a doctrine may not author a magnitude on a
-    // generic damage pool unconditionally). Standing there not aiming, Core's
-    // +4% is the whole of it.
-    TestEqual(TEXT("An unaimed build gets only Core's unconditional damage line"), Stats.DamageMultiplier, 1.04f, 0.0001f);
-    // AND THE ADDITIVITY THIS ASSERTION EXISTS FOR, which changing the number
-    // alone would have quietly dropped: down sights, Sightline's +4% and Long
-    // Lens's +3% across two ranks land in ONE bucket -- 4 + 3 + 3 = 10, not
-    // 1.04 x 1.03 x 1.03. Across nodes AND across ranks, which is the whole
-    // claim, and it needs both lines live to be worth making.
+    // NOTHING UNAIMED, twice over now: Long Lens's damage line is gated on
+    // Aiming (Progression.AxisOverlap), and the atlas's Sightline is a pure
+    // crit rim with no damage line at all. Standing there not aiming, the
+    // fixture authors no damage.
+    TestEqual(TEXT("An unaimed build gets no damage line at all"), Stats.DamageMultiplier, 1.0f, 0.0001f);
+    // AND THE ADDITIVITY THIS ASSERTION EXISTS FOR: down sights, Long Lens's
+    // +3% across two ranks lands in ONE bucket -- 3 + 3 = 6, not
+    // 1.03 x 1.03. Across ranks, which is the surviving half of the claim
+    // now that the atlas's Core rims author no unconditional damage here.
     FBreakerBuildConditionState Aiming;
     Aiming.Set(EBreakerBuildCondition::Aiming, true);
     const FBreakerNodeStats Aimed = UBreakerProgressionComponent::AggregateStats(Nodes, Ranks, nullptr, Aiming);
-    TestEqual(TEXT("Increased damage stacks additively across nodes and ranks"), Aimed.DamageMultiplier, 1.10f, 0.0001f);
+    TestEqual(TEXT("Increased damage stacks additively across ranks"), Aimed.DamageMultiplier, 1.06f, 0.0001f);
     TestEqual(TEXT("Untouched multipliers stay neutral"), Stats.SlideSpeedMultiplier, 1.0f, 0.0001f);
 
     // Rule-rewrite and verb nodes publish tags instead of stats.

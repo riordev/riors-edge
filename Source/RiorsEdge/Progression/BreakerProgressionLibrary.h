@@ -18,6 +18,12 @@ namespace BreakerNodeTags
     // Core constellation slice
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Fixate);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TunnelVision);
+    // Core atlas rewrite tags (Phase 4). Each is declared in the same commit
+    // as its consumer — dead-tag headroom is zero, so a tag may only arrive
+    // consumed. Prefixed Core_ because the doctrine layer already holds the
+    // bare display names (Marksman's Deadeye), and two tags must never share
+    // an identifier across a unity build.
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Core_Deadeye);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TriggerDiscipline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Cyclic);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_LastRound);

@@ -105,10 +105,9 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
 
     FRig Rig = MakeRig();
     FText Reason;
-    // Cyclic is the slice's clearest damage node: 3 ranks at +3% Increased
-    // Damage each, 1 point per rank. It needs Trigger Discipline as a
-    // prerequisite AND 2 points already invested in the tree (its Tier-2
-    // gate), so two entry nodes come first.
+    // ATLAS SHAPE (Phase 4): every Core node is a single purchase. Cyclic is
+    // a freely-purchasable rim at +3% weapon damage; two other rims come
+    // first only so the projection starts from a non-trivial live number.
     Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.TriggerDiscipline"), Reason);
     Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Precision.Sightline"), Reason);
 
@@ -123,23 +122,24 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     // both in the one additive Increased bucket. The baseline was 1% until O27
     // cut it to a floor; the node's own effect is what carries a purchase now,
     // which is the point of the ruling.
-    TestEqual(TEXT("One rank of Cyclic projects +3.25% damage"), Damage.After - Damage.Before, 0.0325f, 0.0005f);
+    TestEqual(TEXT("Cyclic projects +3.25% damage"), Damage.After - Damage.Before, 0.0325f, 0.0005f);
 
     // Now actually buy it. The arrow has to have been telling the truth.
     TestTrue(TEXT("Cyclic is purchasable"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
     TestEqual(TEXT("The real purchase lands exactly where the projection pointed"),
         Rig.Attributes->GetDamageMultiplier(), Damage.After, 0.0001f);
 
-    // Buying to max is the same arithmetic three ranks deep, and the screen
-    // offers it on SHIFT+LMB, so it is projected the same way.
+    // A 2-point inner projects by COST: Salvo's +16% node line plus two
+    // points of baseline. Feed first — Salvo's stated rim gate is Cyclic AND
+    // Feed, and the projection must be made against a purchasable node.
+    TestTrue(TEXT("Feed purchases"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Feed"), Reason));
     const FBreakerSkillSnapshot AfterOne = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
-    const TArray<FBreakerStatLine> ToMax = BreakerSkillProjection::ProjectPurchase(AfterOne, TEXT("Core.Volley.Cyclic"), 2);
-    // 2 x (3% node + 0.25% baseline).
-    TestEqual(TEXT("Two more ranks project +6.5% damage"), ToMax[0].After - ToMax[0].Before, 0.065f, 0.0005f);
-    TestTrue(TEXT("Cyclic rank 2"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
-    TestTrue(TEXT("Cyclic rank 3"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Cyclic"), Reason));
-    TestEqual(TEXT("Buying to max lands where the projection pointed"),
-        Rig.Attributes->GetDamageMultiplier(), ToMax[0].After, 0.0001f);
+    const TArray<FBreakerStatLine> InnerBuy = BreakerSkillProjection::ProjectPurchase(AfterOne, TEXT("Core.Volley.Salvo"), 1);
+    // 16% node + 2 x 0.25% baseline.
+    TestEqual(TEXT("Salvo projects +16.5% damage"), InnerBuy[0].After - InnerBuy[0].Before, 0.165f, 0.0005f);
+    TestTrue(TEXT("Salvo purchases"), Rig.Progression->PurchaseNode(CoreTree(), TEXT("Core.Volley.Salvo"), Reason));
+    TestEqual(TEXT("The inner lands where the projection pointed"),
+        Rig.Attributes->GetDamageMultiplier(), InnerBuy[0].After, 0.0001f);
 
     // A node with no effects still costs a point, and the point itself pays.
     // That is the whole reason the baseline exists, so the screen must show it.
@@ -183,7 +183,8 @@ bool FBreakerSkillProjectionArithmeticTest::RunTest(const FString& Parameters)
     }
     TArray<FBreakerNodeRank> Committed;
     Committed.Add({TEXT("Core.Precision.Fixate"), 1});          // cost 3
-    Committed.Add({TEXT("Core.Volley.Cyclic"), 3});             // cost 1 x 3
+    Committed.Add({TEXT("Core.Volley.Salvo"), 1});              // cost 2
+    Committed.Add({TEXT("Core.Volley.Cyclic"), 1});             // cost 1
     TestEqual(TEXT("Committed points count cost, not rank"), CommittedPoints(Nodes, Committed), 6);
     TestEqual(TEXT("An unknown node falls back to cost 1"),
         CommittedPoints(Nodes, {{TEXT("Nope"), 4}}), 4);

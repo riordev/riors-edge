@@ -37,12 +37,18 @@ public:
     // because it hand-set bCanCritical = false and then checked the library
     // honoured it: the library half of the rule, proved, with the caller half
     // untested. That is the one this project keeps finding.
-    static bool CanCriticalOnWeakPoint(bool bEarnedWeakPoint, bool bGrantedWeakPoint)
+    static bool CanCriticalOnWeakPoint(bool bEarnedWeakPoint, bool bGrantedWeakPoint, bool bWeakPointKeepsCritRoll = false)
     {
         // An ordinary hit is neither, and crits normally. Earning it always
         // wins: a round that struck the weak point earned its crit even if a
         // mark would have granted the same hit anyway.
-        return bEarnedWeakPoint || !bGrantedWeakPoint;
+        //
+        // The third parameter is Core.Precision.Deadeye — the PURCHASED
+        // exception to O104's granted-weak-point rule, passed by the one
+        // caller that owns a progression component to read it from. Default
+        // false, so every pre-existing call keeps the ruling's behaviour
+        // bit-identically.
+        return bEarnedWeakPoint || (bGrantedWeakPoint && bWeakPointKeepsCritRoll) || !bGrantedWeakPoint;
     }
 
     static constexpr float WeakPointMultiplierFloor = 1.0f;

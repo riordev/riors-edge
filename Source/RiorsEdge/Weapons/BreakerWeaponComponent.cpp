@@ -55,6 +55,9 @@ namespace
     FGameplayTag BreakerSightlineTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Sightline"), false); }
     FGameplayTag BreakerOverpenetrationTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.Overpenetration"), false); }
     FGameplayTag BreakerMarksmanCalledShotTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Swift.Marksman.CalledShot"), false); }
+    // Core atlas rewrites this component consumes (Phase 4).
+    FGameplayTag BreakerCoreDeadeyeTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Precision.Deadeye"), false); }
+    FGameplayTag BreakerCoreLastRoundTag() { return FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.LastRound"), false); }
 
     // Gunsmith Armory / Tank Bastion tags this component consumes (2026-08-16,
     // the weapon-half pay pass). Same posture as the Marksman tags above:
@@ -1357,6 +1360,9 @@ bool UBreakerWeaponComponent::FireOnce()
     // is 0 for exactly that one shot, 1 for every other shot any build ever
     // fires (the pure rule; the arm site is FinishReload, node-gated there).
     MagazineAmmo -= FBreakerWeaponMath::MagazineDebitRounds(bChamberedRoundArmed);
+    // Core.Volley.LastRound reads this in SubmitWeaponDamage: the pull that
+    // empties the magazine is the one whose round cannot be a non-crit.
+    bFiringFinalMagazineRound = MagazineAmmo <= 0;
     bChamberedRoundArmed = false;
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
     // AR5 Last Round moves the dump boundary: threshold 0 without the node
@@ -1794,9 +1800,21 @@ FBreakerDamageResult UBreakerWeaponComponent::SubmitWeaponDamage(const UBreakerW
     // forbids. The player path can never produce bCanCritical = false any other
     // way: every existing false comes from enemy attacks, DoT ticks or
     // self-damage.
+    // Core.Precision.Deadeye is the purchased exception O104 permits: with
+    // the node owned, a GRANTED weak point keeps its crit roll too. The
+    // library default keeps every other caller on the ruling's behaviour.
     Damage.bCanCritical = UBreakerDamageLibrary::CanCriticalOnWeakPoint(
-        bWeakPoint && !bWeakPointIsGranted, bWeakPointIsGranted);
+        bWeakPoint && !bWeakPointIsGranted, bWeakPointIsGranted,
+        OwnerHasNodeTag(BreakerCoreDeadeyeTag()));
     Damage.CriticalChance = SourceAttributes ? SourceAttributes->GetCriticalChance() : UBreakerAttributeSet::DefaultCriticalChance;
+    // Core.Volley.LastRound: the magazine's final round cannot be a non-crit
+    // — chance forced to certainty, never the multiplier, and bCanCritical
+    // still outranks it (O104's granted-weak-point suppression stands unless
+    // Deadeye is also owned).
+    if (bFiringFinalMagazineRound && OwnerHasNodeTag(BreakerCoreLastRoundTag()))
+    {
+        Damage.CriticalChance = 1.0f;
+    }
     Damage.CriticalMultiplier = SourceAttributes ? SourceAttributes->GetCriticalMultiplier() : UBreakerAttributeSet::DefaultCriticalMultiplier;
     // ONE number, and ONE place that derives it. Gear's Weapon Damage affix,
     // every node that raises damage and the shared pool are already summed into

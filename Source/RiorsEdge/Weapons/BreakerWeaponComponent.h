@@ -588,6 +588,12 @@ private:
     // the arm site). Server fire-path state, cleared by every path that
     // changes which weapon is in the hands.
     bool bChamberedRoundArmed = false;
+    // True while resolving the trigger pull that chambered the magazine's
+    // final round — set beside the ammo debit, read by SubmitWeaponDamage for
+    // Core.Volley.LastRound's crit guarantee. Hitscan resolution happens in
+    // the same call stack as the pull, which is the scope this flag is honest
+    // over; a projectile in flight resolves on impact and does not read it.
+    bool bFiringFinalMagazineRound = false;
     // AR5's once-per-magazine guard: with the dump threshold at 1 the event
     // fires while a round is still chambered, and this stops the actual last
     // round re-firing it. Cleared where the magazine refills.
