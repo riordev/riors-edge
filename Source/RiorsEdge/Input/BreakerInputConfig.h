@@ -22,6 +22,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Fire;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Aim;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Reload;
+    // Talk / travel / take — the one contextual verb (ruled out of its raw
+    // BindKey so it appears in the keybind list like everything else).
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Interact;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> AbilityOne;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> AbilityTwo;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Abilities") TObjectPtr<UInputAction> Ultimate;

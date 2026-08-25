@@ -102,6 +102,12 @@ protected:
     // O2 PLACEHOLDER — layout, not balance, but sized like the NPC default
     // (BreakerNPC::InteractionRange) so the two interactable kinds feel the
     // same to walk up to.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel", meta=(ClampMin="50")) float InteractionRange = 300.0f;
+    // WIDENED FROM 300 (ruled, defect (d)): hub arrival lands the player at
+    // 320 cm from this point — twenty centimetres OUTSIDE the old radius of
+    // the only interactive object in the room. A gate with a fourteen-metre
+    // beacon is not a person; its reach is the threshold, not an arm. 450
+    // puts the arriving player inside the radius with the prompt already
+    // up, which is also how F gets taught. O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel", meta=(ClampMin="50")) float InteractionRange = 450.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FText PromptLabel = FText::FromString(TEXT("Travel"));
 };

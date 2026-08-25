@@ -349,11 +349,7 @@ void ABreakerPlaytestHUD::DrawHUD()
         // anywhere on the plaza — the Anchor's whole verb set, floating over
         // the actors that own it.
         DrawInteractableLabels(Character);
-        if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
-        {
-            DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
-                Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
-        }
+        DrawInteractPrompt(Character, Center);
         DrawPlaytestInstrumentation(Character, Center);
         return;
     }
@@ -503,11 +499,7 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawExperienceRail(Character);
     DrawLevelUpBanner(Center);
     DrawDefenseFeedback(Center);
-    if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
-    {
-        DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
-            Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
-    }
+    DrawInteractPrompt(Character, Center);
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
     {
         // Harm is instant: full-bleed edge lines, no inset, no fade in.
@@ -1668,6 +1660,34 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     }
 }
 
+void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character, const FVector2D& Center)
+{
+    // ONE PROMPT, MIRRORING F'S OWN PRECEDENCE (loot beats travel beats
+    // talk — InteractWithNearbyNPC's order, restated here so the prompt can
+    // never advertise a verb the key would not perform). This used to be an
+    // NPC-only prompt, which made "F TALK" the sole key-bearing affordance
+    // in the game; travel and loot now speak too.
+    if (!Character) return;
+#if BREAKER_HAS_LOOT_PICKUP
+    if (Character->FindNearbyPickup())
+    {
+        DrawSpecTextCentered(TEXT("F  TAKE"), Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+        return;
+    }
+#endif
+    if (const ABreakerTravelPoint* Travel = Character->FindNearbyTravelPoint())
+    {
+        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *Travel->GetPromptLabel().ToString().ToUpper()),
+            Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+        return;
+    }
+    if (const ABreakerNPC* NearbyNPC = Character->FindNearbyNPC())
+    {
+        DrawSpecTextCentered(FString::Printf(TEXT("F  TALK — %s"), *NearbyNPC->GetDisplayName().ToString().ToUpper()),
+            Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+    }
+}
+
 void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Character)
 {
     UWorld* World = GetWorld();
@@ -1699,8 +1719,16 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // bars' +120 anchor.
         const FVector Projected = Project(NPC->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), false);
         if (Projected.Z <= 0.0f) continue;
+        const float NameScale = DistanceScaleFor(Distance);
         DrawSpecTextCentered(NPC->GetDisplayName().ToString().ToUpper(),
-            Projected.X, Projected.Y, PersonWarm, 12.0f * DistanceScaleFor(Distance));
+            Projected.X, Projected.Y, PersonWarm, 12.0f * NameScale);
+        // THE VERB UNDER THE NAME (ruled: close the 30:1 gap between "I can
+        // read its name at 9,000" and "I'm told what to press at 300").
+        // Always drawn: muted while out of reach — a standing answer to
+        // "what does this thing answer to" — and cyan once F would land.
+        const bool bInReach = Distance <= NPC->GetInteractionRange();
+        DrawSpecTextCentered(TEXT("F  TALK"), Projected.X, Projected.Y + S(14.0f) * NameScale,
+            bInReach ? BreakerUI::Cyan : BreakerUI::TextMuted, 10.0f * NameScale);
     }
 
     for (TActorIterator<ABreakerTravelPoint> It(World); It; ++It)
@@ -1716,8 +1744,15 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         if (Projected.Z <= 0.0f) continue;
         // Rift-teal, because travel is the rift verb — the one text colour the
         // reserve permits, on the one label describing a rift object.
+        const float GateScale = DistanceScaleFor(Distance);
         DrawSpecTextCentered(TEXT("TRAVEL"),
-            Projected.X, Projected.Y, BreakerUI::TealAnomalous, 13.0f * DistanceScaleFor(Distance));
+            Projected.X, Projected.Y, BreakerUI::TealAnomalous, 13.0f * GateScale);
+        // GetPromptLabel finally gets its caller (ruled: a dead API that
+        // already knew the answer). Same always-drawn verb rule as the NPCs.
+        const bool bInReach = Distance <= TravelPoint->GetInteractionRange();
+        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *TravelPoint->GetPromptLabel().ToString().ToUpper()),
+            Projected.X, Projected.Y + S(15.0f) * GateScale,
+            bInReach ? BreakerUI::Cyan : BreakerUI::TextMuted, 10.0f * GateScale);
     }
 }
 

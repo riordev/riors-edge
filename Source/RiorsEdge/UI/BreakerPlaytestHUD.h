@@ -148,6 +148,9 @@ private:
     // shot and hands it to a world-space pooled renderer, spawned lazily on
     // the first shot and never replicated; see BreakerTracerRenderer.h.
     ABreakerTracerRenderer* GetTracerRenderer();
+    // The centre-screen interact prompt, resolving loot > travel > talk in
+    // exactly F's own precedence.
+    void DrawInteractPrompt(const ABreakerCharacter* Character, const FVector2D& Center);
     // The game's three sounds ride the same two events the visuals already
     // ride (OnShot, OnHitDealt), through the same lazily-spawned cosmetic
     // sibling; see BreakerSoundDirector.h.
