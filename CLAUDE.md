@@ -2,6 +2,36 @@
 
 ## Current work
 
+THE PLACE IS BUILT AND GATED ON THE OWNER (`f78013b`, 448 / 4 / 0):
+the Fernhall approach yard — the vertical slice's zone — landed end
+to end. The GLB route is real: Scripts/compose_fernhall.py authors
+the scene from the vendored CC0 Kenney kit (Assets/zones/kit, models
+CC0 per each repo's README), bakes world transforms into vertices,
+names every mesh under the prefix contract (blk_full_ / blk_chest_ /
+wall_ / flr_ / dress_ / marker_); Content/Python/
+breaker_import_fernhall.py splits it into 58 static meshes + creates
+Lvl_Fernhall; UBreakerZoneBuilder is only the assembly loop (spawn at
+identity, markers consumed, complex-as-simple collision, O24 palette
+painted on because trimesh STRIPS the kit texture in the bake — an
+unpainted piece renders near-black). The suite measures PLACED
+geometry for the first time: RiorsEdge.Zone.Fernhall.* runs the
+cover-registry validators over the same CollectZonePieces the spawner
+uses (lane 2100 vs 1600 floor, pitch 1450 vs 1700 ceiling, line-break
+1546, clearance 358, cover 3.00%). Lvl_Fernhall is excluded from the
+gym fall-through via the new testable IsGymMapName; travel registry
+has a third entry (hub pin moved 2→3 — its no-picker rationale was
+discharged by the Fieldplate travel screen); the yard keeps a gate
+out so it is not a trap. Reach it: Anchor gate → THE FERNHALL
+APPROACH, or `Lvl_Fernhall -game -BreakerAutoPlay` (autoplay on a
+non-front-end map suppresses the menu in place). Capture note: first
+frames of a cold run photograph shader-compile placeholders (black
+kit meshes) — read the LAST frame of a 10-frame run. GATED: the
+owner stands in the yard before the rift (marked site, PendingRift
+writer, gym as interior) and the First Contract mission are built
+into it. marker_rift sits at the far-lane pad, marker_npc_contract
+on the entry plaza — both already measured, neither consumed by an
+actor yet.
+
 THE VERTICAL-SLICE GOAL RULES THIS LANE: a fight the owner can judge
 in ten minutes, readable at 50-100 enemies. HEAD `b8a4efe`, 445
 passing / 4 expected red (same roster) / 0 unexpected. LANDED: the
