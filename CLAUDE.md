@@ -327,42 +327,55 @@ weapon lane's zero-commitment unconditional product falling 1.9825
 unchanged by any of this — neither power-band fixture can afford
 Collapse's chain.
 
-THE FIELD LANE (this pass): `Color` HAS ONE OWNER AND THE BODY BLEEDS.
-HEAD `ff96f6b`, 456 passing / 4 expected red (same roster) / 0
-unexpected. O128: two capture-and-restore caches over one material
-parameter were a live race — the reaction layer guarded itself, the
-rank layer (written later) did not, and a flash landing before the
-deferred rank repaint captured WHITE as the family paint, so every
-later demotion restored the body white forever. Both caches are gone:
-Combat/BreakerBodyPaint.h resolves family paint -> rank blend ->
-health ramp -> reaction as a pure function of one state struct, the
-reaction component is the sole writer, and a family's paint is
-DECLARED by its class rather than sampled off a material. The
-next-tick deferral went with the capture it existed to protect. O129:
-the readability pack's twenty health colours ship as a DELTA from
-each rank's full-health entry — absolutes collapse the three families
-to one colour (12.1 -> 0.0 dE76) and O24 spends colour on exactly
-that read. The pack's rank claim does NOT ship: minimum pairwise L*
-separation is 0.99 at full health, 0.59 at a quarter. ReviveFromPool
-gives the gold back itself now instead of relying on all three pool
-callers running a chassis pass next line.
+THE FIELD LANE (this pass): TWO WRONG SPACES, AND THE BAR LANDS. HEAD
+`e8b2349`, 457 passing / 4 expected red (same roster) / 0 unexpected.
+O145: FLinearColor is LINEAR and the perceived colour is its sRGB
+ENCODING. Every dE76 this lane reported last cycle read the stored
+value as though it were already sRGB and inflated all of them — a
+Vestige trash ramp measured 44.7 where it delivers 27.7. The error
+survived because the figures were quoted ONE PER RANK, which the
+delta form cannot have: travel starts from a family base, so it
+differs per family by construction, and the per-rank average is
+exactly the format that hides it. Scope is now part of every figure.
+O146: the same mistake was in the COMPOSITION. The pack's hexes are
+display colours; added to a linear value they deliver a travel that
+depends on where the family base sits, spread 30.8 dE76 across the
+twelve (family, rank) pairs with Champion the worst rank in the game
+to read. Encoding the base, adding the authored offset in its own
+domain, decoding back: spread 11.1, worst case 38.8, and NOTHING
+retuned — the twenty hexes, both rank hues and both blend weights
+stand. Champion was never a blend problem. Gain was measured and
+rejected (inflates Boss to 91 dE76, washes every swatch pastel).
+Known and open: the delta carries magnitude, not hue direction, so a
+Vestige Boss dies MAGENTA. DeliveredSeparation is the new test and it
+asserts the delivered colour, not the authored table — the old ramp
+test would have passed with Champion at 27.8 forever.
 
-THREE INSTRUMENT FINDINGS, none fixed here because the probe is
-GROUND's file. The crowd probe's grid spawns at 6000 cm against a
-2200 cm DetectionRange, so its "the pack pursues" comment is false —
-the hundred is idle, confirmed by unmoved minimap blips across a
-12-second capture. GPU moves 2.53 -> 2.75 ms from one enemy to a
-hundred skeletal, which is not a hundred drawn characters: the probe
-measures TICK and ANIMATION, not DRAW. And the previous baseline (one
-enemy at 6.11 ms, slower than a hundred) does not reproduce — three
-reps each give 4.14 / 5.20 / 8.08 ms at +-1.5%, with the ordering
-never inverted. The mannequin question stays open: 8.08 ms is a floor
-under a crowd that neither fights nor draws. A3's fracture mask is an
-ASSET REQUEST — BasicShapeMaterial declares exactly `Color` and
-`Roughness` (measured), no emissive and no texture parameter, and it
-is an engine asset. A1's segmented bar waits on GLASS splitting
-DrawEnemyHealthBars into its own TU; LEDGER's BreakerHealthBands.h
-has landed and is ready to call.
+THE ENEMY BAR IS FIELD'S NOW (Combat/BreakerEnemyHealthBars.cpp) and
+four of its five items landed: bands from
+BreakerHealthBands::SegmentCountFor with a PIXEL-keyed draw limit
+rather than a rank-keyed one, a hatched shield fill, modifier marks
+beyond 15 m instead of prose, and A7 — which was a real defect: the
+focus fade held ONE body, so a crosshair sweep hard-cut every bar but
+the last. Now per-enemy; that replaced two private HUD members with a
+map and is a DECLARED CROSSING to GLASS. A4 needed no code (ARMOR 2
+was never implemented). A1's BOSS half is held: three phases at
+100/66/33 against eight bands means phases change INSIDE bands, and
+the recommendation to LEDGER is six bands plus gates derived as exact
+thirds, so a phase boundary IS a band boundary and needs no second
+mark layer.
+
+INSTRUMENT GAPS, all three still open and one now blocking. The crowd
+probe's grid still sits at 6000 cm against a 2200 cm DetectionRange,
+so BreakerEnemy.cpp:507 takes the PATROL branch and the hundred has
+never pursued — b414d5c did not move the grid, it added
+`load=pursuing-unengaged` to the summary line, so the claim now
+prints in the measurement output a script harvests. A GPU column
+moving 0.22 ms across a hundred skeletal meshes is still not drawing
+them. And the enemy bar cannot be photographed at all: autoplay faces
+a berm, the crowd grid is past the 50 m cull, and the capture tour
+moves the CAMERA while the cull measures from the PLAYER. The bar
+work above shipped unphotographed and says so.
 
 Update this section as the last step of each session.
 
