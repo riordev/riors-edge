@@ -1050,6 +1050,14 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     // source, DoT Mores included: the skill screen's "N / 3 MORE" is the whole
     // budget, not the direct-hit lane alone.
     Stats.DamageMoreSourceCount = MoreSources.Num();
+    // THE SORT IS BY RAW MAGNITUDE, NOT BY CONTRIBUTION. A Shared source
+    // multiplies both delivery lanes from its one slot while a Weapon-only
+    // source multiplies one — so a x1.20 Shared can be worth more to a build
+    // than a x1.22 Weapon-only and still lose its slot to it here. Every More
+    // in the content today is same-lane (AddDamageMore -> Shared), so the two
+    // orderings agree; the first time a doctrine or an Anomalous item authors
+    // a lane-specific More alongside Shared ones, this line is where the
+    // selection stops meaning "most valuable three" and a decision is due.
     MoreSources.Sort([](const FBreakerMoreSource& A, const FBreakerMoreSource& B) { return A.Multiplier > B.Multiplier; });
     // O54/O74: four lanes out of ONE selection. A shared source is one slot of
     // the three and multiplies both delivery lanes; it is not two purchases and

@@ -333,7 +333,7 @@ namespace BreakerPowerBandTest
 
     // OPTIMIZED: the airborne Swift build the Velocity constellation exists
     // for. Top-band rolls on every slot, conditional damage lines chosen to
-    // match the states it actually holds, and five More sources of which O3
+    // match the states it actually holds, and four More sources of which O3
     // lets three count. This is "optimized 50 feels great" (at cap) / "gear
     // depth is real" (at endgame) depending which ItemLevel/Tier is passed.
     TArray<FBreakerItemInstance> OptimizedLoadout(int32 ItemLevel, int32 Tier)
@@ -377,7 +377,7 @@ namespace BreakerPowerBandTest
             {TEXT("Swift.Marksman.LongLens"), 2},
             {TEXT("Swift.Marksman.Deadeye"), 2},
             {TEXT("Swift.Marksman.PierceDiscipline"), 2},
-            {TEXT("Swift.Marksman.Culling"), 1},             // More x1.18, unconditional
+            {TEXT("Swift.Marksman.Culling"), 1},             // conditional Increased lines, not a More (O95)
             {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
             {TEXT("Swift.Kinetic.Downforce"), 2},            // airborne
         };

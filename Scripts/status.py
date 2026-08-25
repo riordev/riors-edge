@@ -694,27 +694,47 @@ def build_sections(sources):
     # a file that always shows a diff is one people stop reading diffs on.
     # Same reasoning as dropping the commit stamp — determinism is what makes
     # this file's diffs worth reading.
-    # A lane ruled affix-owned (O76 — the tree is BARRED from authoring it)
-    # counts its authors from the affix pool, or the section is a scoped
+    # A lane counts its authors from BOTH layers, or the section is a scoped
     # measurement printed as a total: "carrying nothing" that means "carrying
-    # nothing from the tree" reports a lane OUT forever however many affixes
-    # feed its bucket. The counterpart map below names the EBreakerStatTarget
-    # the affix authors bid on, and it is VERIFIED per run: the affix must
-    # exist in the affix library today, so a deleted or renamed affix puts the
+    # nothing from the tree" reported Armor, ClassResourceRegen, DashCooldown
+    # and AbilityDamage as empty while a shipped gear affix fed each one's
+    # aggregated attribute — the two enums simply spell the same concept
+    # differently (Armor/Armour, DashCooldown/DashCooldownReduction), which is
+    # what this map records. One entry per node lane whose composed value an
+    # affix line lands in, VERIFIED per run: the named EBreakerStatTarget must
+    # exist in the affix pool today, so a deleted or renamed affix puts the
     # lane straight back on the empty list. A lane the header declares
-    # affix-owned with no mapping here refuses the report — loud, never a
-    # silent pass.
+    # affix-owned by ruling (O76) with no mapping here refuses the report —
+    # loud, never a silent pass. A lane absent from this map has no affix
+    # counterpart at all today (the projectile channels, the geometry scales,
+    # the five Core-atlas lanes' queued-but-unbuilt affix lines).
     AFFIX_COUNTERPARTS = {
+        "Health": "Health",
+        "CriticalChance": "CriticalChance",
+        "CriticalDamage": "CriticalDamage",
+        "MoveSpeed": "MoveSpeed",
+        "SlideSpeed": "SlideSpeed",
+        "AirControl": "AirControl",
+        "DamageOverTime": "DamageOverTime",
+        "Damage": "SharedDamage",
+        "WeaponDamage": "WeaponDamage",
+        "AbilityDamage": "AbilityDamage",
+        "AbilityCost": "ResourceEfficiency",
+        "MaxClassResource": "MaxResource",
+        "ClassResourceRegen": "ResourceRegen",
+        "FireRate": "FireRate",
+        "Armor": "Armour",
+        "DashCooldown": "DashCooldownReduction",
         "IncomingDamageReduction": "PhysicalDamageReduction",
     }
     affix_lib = strip_cpp_comments(sources[os.path.join(SRC, "Items", "BreakerAffixLibrary.cpp")])
-    affix_authored = set()
     for lane in sorted(affix_owned):
-        counterpart = AFFIX_COUNTERPARTS.get(lane)
-        if counterpart is None:
+        if lane not in AFFIX_COUNTERPARTS:
             raise ParseError(
                 f"{TYPES}: {lane} is declared affix-owned but this reporter maps no "
                 "affix counterpart for it; add the mapping so its authors can be counted.")
+    affix_authored = set()
+    for lane, counterpart in AFFIX_COUNTERPARTS.items():
         if re.search(r'EBreakerStatTarget::' + counterpart + r'\b', affix_lib):
             affix_authored.add(lane)
     empty_lanes = [t for t in targets
@@ -732,9 +752,8 @@ def build_sections(sources):
         "direction": CEILING, "value": len(empty_lanes), "unit": f"of {len(paid)} lanes",
         "detail": empty_lanes,
         "note": "Plumbing with no author, counted across BOTH authoring layers: node "
-                "effects, and the affix pool for a lane ruled affix-owned (O76). "
-                + (f"Affix-owned and affix-authored today: {', '.join(sorted(affix_authored))}."
-                   if affix_authored else ""),
+                "effects, and shipped affix lines landing in the same composed value. "
+                "A lane listed here is fed by neither.",
     })
 
     # --- dead tags --------------------------------------------------------

@@ -13,7 +13,7 @@ measurement without judging it.
 |---|---|---|---|---|
 | Silent nodes | ceiling | 51 of 205 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 33 | ceiling 6 | ok |
-| Aggregation lanes carrying nothing | ceiling | 10 of 31 lanes | ceiling 9 | **OUT** |
+| Aggregation lanes carrying nothing | ceiling | 6 of 31 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 143 of 203 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
@@ -82,15 +82,11 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 10 of 31 lanes · ceiling 9  ·  **OUT**
+**ceiling** · 6 of 31 lanes · ceiling 9
 
-Plumbing with no author, counted across BOTH authoring layers: node effects, and the affix pool for a lane ruled affix-owned (O76). Affix-owned and affix-authored today: IncomingDamageReduction.
+Plumbing with no author, counted across BOTH authoring layers: node effects, and shipped affix lines landing in the same composed value. A lane listed here is fed by neither.
 
-- AbilityDamage
 - AbilityArea
-- Armor
-- ClassResourceRegen
-- DashCooldown
 - RecoilRecovery
 - WeaponSpread
 - StatusDuration
