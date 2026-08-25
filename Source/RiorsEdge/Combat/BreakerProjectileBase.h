@@ -69,6 +69,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Projectile") const FBreakerDamageRequest& GetProjectileDamage() const { return Damage; }
     UFUNCTION(BlueprintPure, Category="Projectile") bool HasImpacted() const { return bImpacted; }
 
+    // Retints the orb and its light AFTER spawn. BeginPlay has already run
+    // by the time a spawner can call anything (SpawnActor returns a fully
+    // begun actor), so writing OrbColor alone would repaint nothing — this
+    // re-applies to the live material instance and the light. Fracture uses
+    // it to tint the round by the status it will apply.
+    UFUNCTION(BlueprintCallable, Category="Projectile|Presentation")
+    void SetOrbColor(const FLinearColor& NewColor);
+
     UPROPERTY(BlueprintAssignable, Category="Projectile") FBreakerProjectileImpact OnImpact;
 
     // Pure travel maths, world-free and testable in the precedent of

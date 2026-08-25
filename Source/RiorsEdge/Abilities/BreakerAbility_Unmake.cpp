@@ -12,6 +12,8 @@
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 #include "UObject/UObjectIterator.h"
 
 namespace
@@ -175,6 +177,34 @@ void UBreakerAbility_Unmake::BeginCascadeListening(UWorld* World, ABreakerCharac
         Listener->Caster = Character;
         Component->OnStatusApplied.AddDynamic(Listener, &UBreakerCascadeEchoListener::HandleStatusApplied);
         CascadeListeners.Add(Listener);
+    }
+
+    // THE CHAIN, IN FIRE ORDER: one leg per armed listener, walking caster to
+    // first target to second and on, in exactly the order the loop above
+    // armed them, each leg a beat after the last so the cascade visibly
+    // TRAVELS. Endpoints are captured at arming — a placeholder honesty gap
+    // for targets that move during the stagger. Figures O2 PLACEHOLDER.
+    // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Lift(0.0f, 0.0f, 60.0f);
+        FVector Previous = Character->GetActorLocation() + Lift;
+        BreakerFX::FEffectTiming LegTiming;
+        LegTiming.DurationSeconds = 0.45f;
+        LegTiming.FadeInSeconds = 0.03f;
+        LegTiming.FadeOutSeconds = 0.3f;
+        int32 LegIndex = 0;
+        for (const UBreakerCascadeEchoListener* Listener : CascadeListeners)
+        {
+            const AActor* LegTarget = Listener ? Listener->Target.Get() : nullptr;
+            if (!LegTarget) continue;
+            const FVector Next = LegTarget->GetActorLocation() + Lift;
+            const float Delay = 0.08f * LegIndex;
+            Effects->AddStroke(Previous, Next, 4.0f, BreakerUI::Cyan, 2.4f, LegTiming, Delay);
+            Effects->AddGlow(Next, 30.0f, BreakerUI::Cyan, 2.4f, LegTiming, Delay);
+            Previous = Next;
+            ++LegIndex;
+        }
     }
 }
 

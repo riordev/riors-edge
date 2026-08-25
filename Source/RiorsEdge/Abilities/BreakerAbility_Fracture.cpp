@@ -9,6 +9,7 @@
 #include "Combat/BreakerStatusCycleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "UI/BreakerEffectMath.h"
 
 UBreakerAbility_Fracture::UBreakerAbility_Fracture()
 {
@@ -117,6 +118,15 @@ void UBreakerAbility_Fracture::ActivateAbility(const FGameplayAbilitySpecHandle 
         Carried.Spec = Entry.Spec;
         Carried.DamageFamily = Entry.DamageFamily;
         Projectile->AddImpactStatus(Carried);
+
+        // The round is TINTED by the status it will apply — the cycle is
+        // Fracture's whole identity and an untinted orb hides which position
+        // this cast is on. First position wins when MS7 loads several; an
+        // unmapped tag keeps the orb's shipped violet (see ColorForStatusTag).
+        if (Index == 0)
+        {
+            Projectile->SetOrbColor(BreakerFX::ColorForStatusTag(Entry.Spec.StatusTag, Projectile->OrbColor));
+        }
     }
 
     Projectile->InitializeProjectile(Damage, Direction, ProjectileSpeed);

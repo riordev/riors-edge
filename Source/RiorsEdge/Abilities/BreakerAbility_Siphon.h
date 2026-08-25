@@ -76,4 +76,7 @@ private:
     FTimerHandle ChannelTimer;
     FTimerHandle ChannelEndTimer;
     int32 TicksDelivered = 0;
+    // The beam's effect handle (0 = none). Ended in StopChannel, which every
+    // exit path funnels through.
+    int32 BeamHandle = 0;
 };

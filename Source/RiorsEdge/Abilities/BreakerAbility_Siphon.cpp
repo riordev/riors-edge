@@ -9,6 +9,8 @@
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Siphon::UBreakerAbility_Siphon()
 {
@@ -102,6 +104,21 @@ void UBreakerAbility_Siphon::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         // Published for the HUD; the ability's own lifetime is the GAS
         // activation, not this window.
         State->StartWindow(ChannelWindowKey(), ChannelSeconds);
+    }
+
+    // THE BEAM. Anchored to both actors so it tracks caster and target every
+    // frame with no work here, sized to the channel's authored maximum, and
+    // ended THROUGH the handle in StopChannel — which every early exit
+    // funnels through, so the beam cannot outlive the channel by even a
+    // tick. Chest lift and figures O2 PLACEHOLDER.
+    // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        BreakerFX::FEffectTiming BeamTiming;
+        BeamTiming.DurationSeconds = FMath::Max(0.05f, ChannelSeconds);
+        BeamTiming.FadeInSeconds = 0.08f;
+        BeamTiming.FadeOutSeconds = 0.15f;
+        BeamHandle = Effects->AddBeam(Character, Target, 5.0f, BreakerUI::Cyan, 2.6f, BeamTiming, 50.0f);
     }
 
     World->GetTimerManager().SetTimer(ChannelTimer, this, &ThisClass::TickChannel,
@@ -206,6 +223,18 @@ void UBreakerAbility_Siphon::StopChannel()
         {
             World->GetTimerManager().ClearTimer(ChannelTimer);
             World->GetTimerManager().ClearTimer(ChannelEndTimer);
+            // The beam breaks the instant the channel does — a leash break,
+            // a qualifying hit, target death and natural expiry all arrive
+            // here, and the duration rewrite gives every one of them the
+            // same 0.15 s snap-out. Stale handle after expiry is a no-op.
+            if (BeamHandle != 0)
+            {
+                if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+                {
+                    Effects->EndEffect(BeamHandle, 0.15f);
+                }
+                BeamHandle = 0;
+            }
         }
         if (UBreakerAbilityStateComponent* State = Character->FindComponentByClass<UBreakerAbilityStateComponent>())
         {

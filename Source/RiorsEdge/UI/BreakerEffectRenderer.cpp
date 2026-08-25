@@ -115,7 +115,7 @@ void ABreakerEffectRenderer::BeginPlay()
     BuildMaterials(StrokeMeshes, StrokeMaterials);
 }
 
-void ABreakerEffectRenderer::AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,
+int32 ABreakerEffectRenderer::AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,
     float Intensity, const BreakerFX::FEffectTiming& Timing, float DelaySeconds)
 {
     // Round-robin, oldest-first — with clips of very different lengths the
@@ -124,6 +124,7 @@ void ABreakerEffectRenderer::AddGlow(const FVector& Center, float RadiusCm, cons
     // seventeen simultaneous glows, which is not an ability load, it is a
     // bug this policy makes graceful.
     FEffectSlot& Slot = GlowState[NextGlowSlot];
+    Slot = FEffectSlot();
     Slot.A = Center;
     Slot.B = Center;
     Slot.StartTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
@@ -132,13 +133,16 @@ void ABreakerEffectRenderer::AddGlow(const FVector& Center, float RadiusCm, cons
     Slot.SizeCm = RadiusCm;
     Slot.Intensity = Intensity;
     Slot.bActive = true;
+    Slot.Serial = NextSerial++;
     NextGlowSlot = (NextGlowSlot + 1) % GlowSlots;
+    return Slot.Serial;
 }
 
-void ABreakerEffectRenderer::AddStroke(const FVector& Start, const FVector& End, float ThicknessCm,
+int32 ABreakerEffectRenderer::AddStroke(const FVector& Start, const FVector& End, float ThicknessCm,
     const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing, float DelaySeconds)
 {
     FEffectSlot& Slot = StrokeState[NextStrokeSlot];
+    Slot = FEffectSlot();
     Slot.A = Start;
     Slot.B = End;
     Slot.StartTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + FMath::Max(DelaySeconds, 0.0f);
@@ -147,10 +151,27 @@ void ABreakerEffectRenderer::AddStroke(const FVector& Start, const FVector& End,
     Slot.SizeCm = ThicknessCm;
     Slot.Intensity = Intensity;
     Slot.bActive = true;
+    Slot.Serial = NextSerial++;
     NextStrokeSlot = (NextStrokeSlot + 1) % StrokeSlots;
+    return Slot.Serial;
 }
 
-void ABreakerEffectRenderer::AddBlinkLight(const FVector& Center, float AttenuationRadiusCm,
+int32 ABreakerEffectRenderer::AddBeam(AActor* SourceAnchor, AActor* TargetAnchor, float ThicknessCm,
+    const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing, float AnchorZOffsetCm)
+{
+    if (!SourceAnchor || !TargetAnchor) return 0;
+    const int32 Handle = AddStroke(SourceAnchor->GetActorLocation(), TargetAnchor->GetActorLocation(),
+        ThicknessCm, Color, Intensity, Timing);
+    // AddStroke just claimed the slot BEHIND the cursor.
+    FEffectSlot& Slot = StrokeState[(NextStrokeSlot + StrokeSlots - 1) % StrokeSlots];
+    Slot.bAnchored = true;
+    Slot.AnchorA = SourceAnchor;
+    Slot.AnchorB = TargetAnchor;
+    Slot.AnchorZOffsetCm = AnchorZOffsetCm;
+    return Handle;
+}
+
+int32 ABreakerEffectRenderer::AddBlinkLight(const FVector& Center, float AttenuationRadiusCm,
     const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing, float DelaySeconds)
 {
     FEffectLightSlot& Slot = LightState[NextLightSlot];
@@ -161,7 +182,35 @@ void ABreakerEffectRenderer::AddBlinkLight(const FVector& Center, float Attenuat
     Slot.AttenuationRadiusCm = AttenuationRadiusCm;
     Slot.Intensity = Intensity;
     Slot.bActive = true;
+    Slot.Serial = NextSerial++;
     NextLightSlot = (NextLightSlot + 1) % EffectLightSlots;
+    return Slot.Serial;
+}
+
+void ABreakerEffectRenderer::EndEffect(int32 Handle, float FadeOutSeconds)
+{
+    if (Handle <= 0) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float Fade = FMath::Max(FadeOutSeconds, 0.0f);
+    // The duration rewrite from BreakerEffectMath.h: the clip now ends Fade
+    // seconds from this instant. A clip still scheduled for the future is
+    // simply killed — it was never seen, so it has nothing to fade from.
+    const auto EndSlot = [&](auto& Slot)
+    {
+        if (!Slot.bActive || Slot.Serial != Handle) return false;
+        const float Age = static_cast<float>(Now - Slot.StartTime);
+        if (Age < 0.0f)
+        {
+            Slot.bActive = false;
+            return true;
+        }
+        Slot.Timing.DurationSeconds = FMath::Min(Slot.Timing.DurationSeconds, Age + Fade);
+        Slot.Timing.FadeOutSeconds = Fade;
+        return true;
+    };
+    for (FEffectSlot& Slot : GlowState) { if (EndSlot(Slot)) return; }
+    for (FEffectSlot& Slot : StrokeState) { if (EndSlot(Slot)) return; }
+    for (FEffectLightSlot& Slot : LightState) { if (EndSlot(Slot)) return; }
 }
 
 void ABreakerEffectRenderer::Hide(UStaticMeshComponent* Mesh)
@@ -222,6 +271,22 @@ void ABreakerEffectRenderer::Tick(float DeltaSeconds)
             Slot.bActive = false;
             Hide(Mesh);
             continue;
+        }
+        if (Slot.bAnchored)
+        {
+            // A beam follows its anchors; an anchor that died ends the beam
+            // this frame rather than freezing it where the actor last stood.
+            AActor* A = Slot.AnchorA.Get();
+            AActor* B = Slot.AnchorB.Get();
+            if (!A || !B)
+            {
+                Slot.bActive = false;
+                Hide(Mesh);
+                continue;
+            }
+            const FVector Lift(0.0f, 0.0f, Slot.AnchorZOffsetCm);
+            Slot.A = A->GetActorLocation() + Lift;
+            Slot.B = B->GetActorLocation() + Lift;
         }
         const FVector Delta = Slot.B - Slot.A;
         const float Length = static_cast<float>(Delta.Size());

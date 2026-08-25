@@ -13,6 +13,31 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
+
+namespace
+{
+    // The blink as two events: a dim glow where the caster left and a
+    // brighter one plus a blink light where they truly arrived, so a sweep-
+    // shortened blink reads honestly. All figures O2 PLACEHOLDER.
+    // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
+    void BreakerClosequarterBlinkCosmetics(UWorld* World, const FVector& Departure, const FVector& Arrival)
+    {
+        ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World);
+        if (!Effects) return;
+        const FVector Lift(0.0f, 0.0f, 60.0f);
+        BreakerFX::FEffectTiming DepartTiming;
+        DepartTiming.DurationSeconds = 0.22f;
+        DepartTiming.FadeOutSeconds = 0.18f;
+        Effects->AddGlow(Departure + Lift, 45.0f, BreakerUI::Cyan, 2.2f, DepartTiming);
+        BreakerFX::FEffectTiming ArriveTiming;
+        ArriveTiming.DurationSeconds = 0.30f;
+        ArriveTiming.FadeOutSeconds = 0.22f;
+        Effects->AddGlow(Arrival + Lift, 60.0f, BreakerUI::Cyan, 4.0f, ArriveTiming);
+        Effects->AddBlinkLight(Arrival + Lift, 500.0f, BreakerUI::Cyan, 3000.0f, ArriveTiming);
+    }
+}
 
 UBreakerAbility_Closequarter::UBreakerAbility_Closequarter()
 {
@@ -147,13 +172,18 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         // distance is transcribed, not authored here. Deliberately NOT the
         // Edgework trace range: "no range limit within line of sight" needs a
         // target to sight; the free-aimed blink stays 12 m.
-        const FVector BlinkDestination = UntargetedBlinkDestination(Character->GetActorLocation(), ViewRotation.Vector(), MaximumRangeCm);
+        const FVector UntargetedDeparture = Character->GetActorLocation();
+        const FVector BlinkDestination = UntargetedBlinkDestination(UntargetedDeparture, ViewRotation.Vector(), MaximumRangeCm);
         FHitResult UntargetedHit;
         Character->SetActorLocation(BlinkDestination, /*bSweep*/ true, &UntargetedHit, ETeleportType::TeleportPhysics);
         if (UPawnMovementComponent* Movement = Character->GetMovementComponent())
         {
             Movement->Velocity = FVector::ZeroVector;
         }
+        // The blink's two events, drawn where they truly happened — arrival
+        // is read back AFTER the swept move, never from the requested
+        // destination the sweep may have refused.
+        BreakerClosequarterBlinkCosmetics(World, UntargetedDeparture, Character->GetActorLocation());
         // No target, no refund: the refund gate reads target health.
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
@@ -165,7 +195,8 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
         return;
     }
 
-    const FVector Destination = ArrivalPoint(Character->GetActorLocation(), Target->GetActorLocation(), StandoffCm);
+    const FVector Departure = Character->GetActorLocation();
+    const FVector Destination = ArrivalPoint(Departure, Target->GetActorLocation(), StandoffCm);
 
     // Swept, so the blink stops at the last non-penetrating position instead of
     // depositing the player inside geometry. bSweep is the whole safety
@@ -179,6 +210,7 @@ void UBreakerAbility_Closequarter::ActivateAbility(const FGameplayAbilitySpecHan
     {
         Movement->Velocity = FVector::ZeroVector;
     }
+    BreakerClosequarterBlinkCosmetics(World, Departure, Character->GetActorLocation());
 
     float HealthFraction = 1.0f;
     if (const IAbilitySystemInterface* TargetAbilities = Cast<IAbilitySystemInterface>(Target))

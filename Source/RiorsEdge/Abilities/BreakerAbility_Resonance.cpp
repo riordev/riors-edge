@@ -9,6 +9,8 @@
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Resonance::UBreakerAbility_Resonance()
 {
@@ -83,6 +85,25 @@ void UBreakerAbility_Resonance::ActivateAbility(const FGameplayAbilitySpecHandle
     const float BaseDamage = UBreakerStatusConsumption::DetonationDamage(DistinctCount, Detonation, Curve)
         * AbilityDamageScalarFor(Character);
     const UBreakerAttributeSet* SourceAttributes = GetBreakerAttributes();
+
+    // THE BURST, SCALED BY THE COUNT CONSUMED: the whole ability is "consume
+    // what is there", so how much was there has to be the thing you see.
+    // Radius grows per distinct status against the detonation's own counted
+    // cap (six), so a max detonation reads max and one status reads small.
+    // Centred on the target it consumed FROM. Figures O2 PLACEHOLDER.
+    // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const int32 Counted = FMath::Min(DistinctCount, Detonation.MaximumCountedStatuses);
+        const FVector BurstCenter = Target->GetActorLocation() + FVector(0.0f, 0.0f, 50.0f);
+        const float BurstRadius = 60.0f + 40.0f * Counted;
+        BreakerFX::FEffectTiming BurstTiming;
+        BurstTiming.DurationSeconds = 0.35f;
+        BurstTiming.FadeOutSeconds = 0.28f;
+        Effects->AddGlow(BurstCenter, BurstRadius, BreakerUI::Cyan, 4.5f, BurstTiming);
+        Effects->AddBlinkLight(BurstCenter, 300.0f + 120.0f * Counted, BreakerUI::Cyan,
+            2000.0f + 1200.0f * Counted, BurstTiming);
+    }
 
     if (UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
     {

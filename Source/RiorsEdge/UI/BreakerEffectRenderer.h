@@ -54,21 +54,49 @@ public:
     // rather than three part-empty ones. Null in a world that cannot spawn.
     static ABreakerEffectRenderer* FindOrSpawn(UWorld* World);
 
+    // Every Add* returns a HANDLE: a serial that stays valid until the slot
+    // is recycled. 0 is never a handle. Callers that fire-and-forget ignore
+    // it; callers whose effect can end early (Siphon's channel) or must
+    // follow the world (a beam between two actors) keep it.
+    //
+    // CALLER'S SIDE OF THE NET: the abilities that call in are ServerOnly
+    // and this actor is client cosmetic. In the single-player playtest they
+    // are the same process and the calls land; under real replication a
+    // server-side call draws nothing on clients, and the shipped patterns
+    // for crossing are the zone's OnRep_Spec and the projectile's
+    // MulticastImpactCosmetics. Recorded here once rather than at six seams.
+
     // A sphere of light at a point: bursts, arrival/departure flashes, orbs.
     // DelaySeconds > 0 schedules the birth into the future.
-    void AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,
+    int32 AddGlow(const FVector& Center, float RadiusCm, const FLinearColor& Color,
         float Intensity, const BreakerFX::FEffectTiming& Timing, float DelaySeconds = 0.0f);
 
     // A straight bright segment: beams, chain legs, ring sides, arc strokes.
-    void AddStroke(const FVector& Start, const FVector& End, float ThicknessCm,
+    int32 AddStroke(const FVector& Start, const FVector& End, float ThicknessCm,
         const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing,
         float DelaySeconds = 0.0f);
 
+    // A stroke ANCHORED to two actors: endpoints re-resolved every frame at
+    // each anchor's location plus AnchorZOffsetCm, so the beam tracks a
+    // moving caster and a moving target with no caller involvement. Either
+    // anchor dying ends the slot that frame. Timing is the beam's MAXIMUM
+    // life; end it early through EndEffect.
+    int32 AddBeam(AActor* SourceAnchor, AActor* TargetAnchor, float ThicknessCm,
+        const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing,
+        float AnchorZOffsetCm = 0.0f);
+
     // A shadowless point light on the same clock, so a burst can make its
     // surroundings answer. Budgeted far below the meshes on purpose.
-    void AddBlinkLight(const FVector& Center, float AttenuationRadiusCm,
+    int32 AddBlinkLight(const FVector& Center, float AttenuationRadiusCm,
         const FLinearColor& Color, float Intensity, const BreakerFX::FEffectTiming& Timing,
         float DelaySeconds = 0.0f);
+
+    // Ends a live effect NOW, softly: its duration is rewritten to the
+    // current age plus FadeOutSeconds — the technique BreakerEffectMath.h
+    // records, so "held until released" is never a second lifetime mode. A
+    // stale or recycled handle is a silent no-op, which is what a caller
+    // tearing down after its target already died wants.
+    void EndEffect(int32 Handle, float FadeOutSeconds);
 
 protected:
     virtual void BeginPlay() override;
@@ -102,6 +130,15 @@ private:
         float SizeCm = 0.0f;
         float Intensity = 0.0f;
         bool bActive = false;
+        // The claim's serial, for EndEffect. Survives until recycled.
+        int32 Serial = 0;
+        // Beams only: endpoints re-resolved at these every frame. bAnchored
+        // distinguishes "no anchors" from "anchors that died" — a dead
+        // anchor ends the slot rather than freezing the beam mid-air.
+        bool bAnchored = false;
+        TWeakObjectPtr<AActor> AnchorA;
+        TWeakObjectPtr<AActor> AnchorB;
+        float AnchorZOffsetCm = 0.0f;
     };
 
     struct FEffectLightSlot
@@ -113,6 +150,7 @@ private:
         float AttenuationRadiusCm = 0.0f;
         float Intensity = 0.0f;
         bool bActive = false;
+        int32 Serial = 0;
     };
 
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> GlowMeshes;
@@ -127,6 +165,8 @@ private:
     int32 NextGlowSlot = 0;
     int32 NextStrokeSlot = 0;
     int32 NextLightSlot = 0;
+    // Handles start at 1 so 0 can mean "no effect" in caller members.
+    int32 NextSerial = 1;
 
     static void Hide(UStaticMeshComponent* Mesh);
 };

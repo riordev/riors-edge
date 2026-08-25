@@ -133,6 +133,19 @@ void ABreakerProjectileBase::BeginPlay()
     SetLifeSpan(MaximumLifetime);
 }
 
+void ABreakerProjectileBase::SetOrbColor(const FLinearColor& NewColor)
+{
+    OrbColor = NewColor;
+    if (Visual)
+    {
+        if (UMaterialInstanceDynamic* Dynamic = Cast<UMaterialInstanceDynamic>(Visual->GetMaterial(0)))
+        {
+            Dynamic->SetVectorParameterValue(TEXT("Color"), OrbColor);
+        }
+    }
+    if (Glow) Glow->SetLightColor(OrbColor);
+}
+
 void ABreakerProjectileBase::ConfigureIgnoredActors()
 {
     // A shot must never be stopped by the thing that fired it.

@@ -132,6 +132,52 @@ bool FBreakerEffectScheduleTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("The ring closes"), PreviousB.Equals(FirstA, 0.01));
     }
 
+    // --- The swept arc covers exactly its included angle ---------------------
+    // Vertex 0 sits at -half off Forward (the LEFT edge, so index-staggered
+    // strokes sweep left to right), the last vertex at +half, every vertex at
+    // the true range, and consecutive strokes share endpoints.
+    {
+        const FVector Origin(0.0f, 0.0f, 100.0f);
+        const FVector Forward(1.0f, 0.0f, 0.0f);
+        const float Arc = 120.0f;      // Cleave's authored ArcDegrees
+        const float Range = 300.0f;    // Cleave's authored RangeCm
+        const int32 Count = BreakerFX::SweptArcStrokes;
+        FVector PreviousB = FVector::ZeroVector;
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            FVector A, B;
+            BreakerFX::ArcStroke(Origin, Forward, Arc, Range, Index, Count, A, B);
+            TestTrue(TEXT("Arc vertices sit at the true range"),
+                FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(A, Origin)), Range, 0.01f)
+                && FMath::IsNearlyEqual(static_cast<float>(FVector::Dist(B, Origin)), Range, 0.01f));
+            if (Index > 0) TestTrue(TEXT("Consecutive arc strokes share their endpoint"), A.Equals(PreviousB, 0.01));
+            PreviousB = B;
+        }
+        const FVector LeftEdge = BreakerFX::ArcVertex(Origin, Forward, Arc, Range, 0, Count);
+        const FVector RightEdge = BreakerFX::ArcVertex(Origin, Forward, Arc, Range, Count, Count);
+        const float HalfRad = FMath::DegreesToRadians(Arc * 0.5f);
+        TestTrue(TEXT("The first vertex sits at minus half the included angle"),
+            FMath::IsNearlyEqual(static_cast<float>(LeftEdge.Y), -Range * FMath::Sin(HalfRad), 0.1f));
+        TestTrue(TEXT("The last vertex sits at plus half the included angle"),
+            FMath::IsNearlyEqual(static_cast<float>(RightEdge.Y), Range * FMath::Sin(HalfRad), 0.1f));
+    }
+
+    // --- The status tint map is total ----------------------------------------
+    // Mapped tags tint; anything else — including an invalid tag — keeps the
+    // caller's fallback rather than inventing a colour.
+    {
+        const FLinearColor Fallback(0.62f, 0.14f, 0.92f);
+        const FLinearColor Bleed = BreakerFX::ColorForStatusTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false), Fallback);
+        const FLinearColor Poison = BreakerFX::ColorForStatusTag(
+            FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false), Fallback);
+        TestFalse(TEXT("Bleed tints away from the fallback"), Bleed.Equals(Fallback));
+        TestFalse(TEXT("Poison tints away from the fallback"), Poison.Equals(Fallback));
+        TestFalse(TEXT("Bleed and Poison are distinguishable"), Bleed.Equals(Poison));
+        TestTrue(TEXT("An unmapped tag keeps the fallback"),
+            BreakerFX::ColorForStatusTag(FGameplayTag(), Fallback).Equals(Fallback));
+    }
+
     // --- Pool arithmetic, like the tracer's ----------------------------------
     TestTrue(TEXT("A 16-stroke ground ring fits the stroke pool twice over"),
         ABreakerEffectRenderer::GetStrokeSlots() >= 32);

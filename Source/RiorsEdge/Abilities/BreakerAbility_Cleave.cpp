@@ -14,6 +14,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
 
@@ -159,6 +161,31 @@ void UBreakerAbility_Cleave::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
     UBreakerCombatComponent* OwnerCombat = Character->FindComponentByClass<UBreakerCombatComponent>();
     const TArray<AActor*> Targets = UBreakerMeleeSweep::SweepTargets(World, Character, Params);
+
+    // THE SWING, VISIBLE: the arc's outer rim in pooled strokes at the exact
+    // geometry the sweep just resolved with — same Origin, same Forward, the
+    // EFFECTIVE range and arc, so an Edge-widened 180 draws as 180. Strokes
+    // appear left to right on a short stagger, which is what makes it read
+    // as a swing rather than as a fence popping up. Lifted to mid-torso;
+    // the sweep itself is height-tolerant. Timings O2 PLACEHOLDER.
+    // (Server-only ability, cosmetic call — see BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector ArcOrigin = Params.Origin + FVector(0.0f, 0.0f, 60.0f);
+        BreakerFX::FEffectTiming SwingTiming;
+        SwingTiming.DurationSeconds = 0.22f;
+        SwingTiming.FadeInSeconds = 0.02f;
+        SwingTiming.FadeOutSeconds = 0.12f;
+        const float SweepSeconds = 0.16f;
+        for (int32 Index = 0; Index < BreakerFX::SweptArcStrokes; ++Index)
+        {
+            FVector A, B;
+            BreakerFX::ArcStroke(ArcOrigin, Params.Forward, Params.ArcDegrees, Params.RangeCm,
+                Index, BreakerFX::SweptArcStrokes, A, B);
+            Effects->AddStroke(A, B, 6.0f, BreakerUI::Cyan, 3.0f, SwingTiming,
+                SweepSeconds * Index / BreakerFX::SweptArcStrokes);
+        }
+    }
 
     int32 TargetIndex = 0;
     for (AActor* Target : Targets)

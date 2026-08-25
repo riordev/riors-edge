@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 
 // ---------------------------------------------------------------------------
 // Ability-effect lifetime maths.
@@ -78,6 +79,48 @@ namespace BreakerFX
     {
         OutA = RingVertex(Center, RadiusCm, Index, Count);
         OutB = RingVertex(Center, RadiusCm, Index + 1, Count);
+    }
+
+    // --- Swept arc geometry -------------------------------------------------
+    // Cleave's edge: the outer rim of a melee arc as consecutive chords.
+    // ArcDegrees is the FULL included angle (the melee sweep's own
+    // convention: 90 means +/-45 off Forward), Forward must be horizontal,
+    // and vertex 0 sits on the arc's LEFT edge so a caller staggering
+    // stroke delays by index gets a left-to-right sweep.
+    constexpr int32 SweptArcStrokes = 8;   // O2 PLACEHOLDER
+
+    inline FVector ArcVertex(const FVector& Origin, const FVector& Forward,
+        float ArcDegrees, float RangeCm, int32 Index, int32 Count)
+    {
+        const float Half = ArcDegrees * 0.5f;
+        const float Fraction = Count > 0 ? static_cast<float>(FMath::Clamp(Index, 0, Count)) / static_cast<float>(Count) : 0.0f;
+        const float AngleDeg = -Half + ArcDegrees * Fraction;
+        return Origin + Forward.RotateAngleAxis(AngleDeg, FVector::UpVector) * RangeCm;
+    }
+
+    inline void ArcStroke(const FVector& Origin, const FVector& Forward,
+        float ArcDegrees, float RangeCm, int32 Index, int32 Count,
+        FVector& OutA, FVector& OutB)
+    {
+        OutA = ArcVertex(Origin, Forward, ArcDegrees, RangeCm, Index, Count);
+        OutB = ArcVertex(Origin, Forward, ArcDegrees, RangeCm, Index + 1, Count);
+    }
+
+    // --- What colour a status is --------------------------------------------
+    // The tint a carried status lends the thing carrying it (Fracture's
+    // round). Total: an unmapped tag keeps the projectile's shipped violet
+    // rather than inventing a colour. All O2 PLACEHOLDER; the poison green
+    // is the zone actor's shipped ZoneColor so the round that will seed a
+    // puddle matches the puddle. Deliberately not teal (O19) and the mapped
+    // colours reuse tokens that already carry these meanings elsewhere
+    // (Harm red is what a Bleed already draws in the damage feed).
+    inline FLinearColor ColorForStatusTag(const FGameplayTag& StatusTag, const FLinearColor& Fallback)
+    {
+        static const FGameplayTag BleedTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Bleed"), false);
+        static const FGameplayTag PoisonTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Poison"), false);
+        if (StatusTag.IsValid() && StatusTag == BleedTag) return FLinearColor(1.0f, 0.25f, 0.25f);
+        if (StatusTag.IsValid() && StatusTag == PoisonTag) return FLinearColor(0.35f, 0.85f, 0.25f);
+        return Fallback;
     }
 
     inline FEffectSample SampleEffect(const FEffectTiming& Timing, float AgeSeconds)
