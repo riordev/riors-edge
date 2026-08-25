@@ -33,7 +33,14 @@
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SMenuAnchor.h"
 #include "Widgets/Input/SSlider.h"
+#include "Widgets/SLeafWidget.h"
+#include "Animation/CurveSequence.h"
+// FActiveTimerHandle is engine-private in 5.8; SWidget.h forward-declares it,
+// and TSharedPtr's type-erased deleter makes that enough to hold and Reset()
+// the handle RegisterActiveTimer returns.
+#include "Rendering/DrawElements.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
@@ -901,6 +908,14 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         // for the skill screen: neither string matches CORE/COMPARE/BRANCH*.
         else if (Board == TEXT("FORGE")) { Screen = EBreakerMenuScreen::Forge; }
         else if (Board == TEXT("ABILITIES")) { Screen = EBreakerMenuScreen::Abilities; }
+        // Settings panes, same pattern: the sidebar shows one pane at a time,
+        // so a capture run that says only SETTINGS photographs INPUT and the
+        // other three panes ship unlooked-at, e.g.
+        // -BreakerCaptureMenu=SETTINGS -BreakerCaptureBoard=KEYBINDS.
+        else if (Board == TEXT("INPUT")) { SettingsPane = 0; }
+        else if (Board == TEXT("KEYBINDS")) { SettingsPane = 1; }
+        else if (Board == TEXT("VIDEO")) { SettingsPane = 2; }
+        else if (Board == TEXT("AUDIO")) { SettingsPane = 3; }
     }
     Rebuild(Screen);
 }
@@ -1527,8 +1542,11 @@ void SBreakerMenu::EnsureSettingsLoaded()
 
 namespace
 {
-    // A section header: cyan caption over a 1px divider. Structure comes off
-    // borders in this system, not off gaps.
+    // ---- The PREVIOUS settings idiom, now the dev-screen idiom -------------
+    // The settings screen moved onto the Fieldplate pack's sidebar layout and
+    // control geometry (below). These three survive because the breakpoint
+    // sandbox and the character sheet were built on them and are not in this
+    // pass; they leave when those screens get theirs.
     TSharedRef<SWidget> SettingsSectionHeader(const FString& Label)
     {
         return SNew(SVerticalBox)
@@ -1542,16 +1560,7 @@ namespace
             ];
     }
 
-    // Fixed label column, so every control on the screen starts on the same
-    // vertical edge whatever its label says. 210 clears the longest label the
-    // screen carries ("SENSITIVITY DOWN", "SCOPED SENSITIVITY") at TypeBody
-    // bold, and is chosen against the KEYBIND row's total width rather than
-    // against the setting rows — the keybind row is the one with five columns
-    // and therefore the one that decides how much anything else may have.
     constexpr float SettingsLabelWidth = 210.0f;
-    // Fixed readout column. HAlign_Fill + right justification inside, via
-    // MenuValueColumn, which is the project's fix for the clipped-number
-    // defect.
     constexpr float SettingsValueWidth = 96.0f;
 
     TSharedRef<SWidget> SettingsRow(const FString& Label, const TSharedRef<SWidget>& Control,
@@ -1572,28 +1581,635 @@ namespace
             ];
     }
 
-    // A choice strip: N fixed-width chips, exactly one selected. Used by window
-    // mode and by the frame cap, which are both small closed sets — a
-    // frame-cap SLIDER would have to represent "uncapped" as a magic zero at
-    // one end of a continuum, and a player dragging past 30 would land on it by
-    // accident. ClampFrameRateCap treats 0 as a sentinel precisely because it
-    // is a separate CHOICE, so it is offered as one.
-    constexpr float SettingsChipWidth = 132.0f;
+    // ---- Fieldplate settings geometry -------------------------------------
+    // Transcribed from the reference plates (screens.zip export,
+    // screen_settings_*.png at 1920x1080) and README-UE5.txt's control
+    // geometry. The plates are pixel REFERENCE, never textures: these
+    // constants are the transcription, and the plate is held beside the build.
+    constexpr float BreakerSettingsSidebarWidth = 300.0f;  // 299 face + 1px divider
+    constexpr float BreakerSettingsNavRowHeight = 44.0f;   // every row 44 minimum
+    constexpr float BreakerSettingsContentPad = 40.0f;     // pane margin, both sides
+    constexpr float BreakerSettingsLabelWidth = 332.0f;    // labels at x340, controls at x672
+    constexpr float BreakerSettingsControlHeight = 44.0f;
+    // README caps the track at 460; the plate draws 380 with the value column
+    // reading at track-end + 16, and the plate is what the build is held
+    // against.
+    constexpr float BreakerSettingsSliderWidth = 380.0f;
+    constexpr float BreakerSettingsValueWidth = 64.0f;     // fixed mono readout column
+    constexpr float BreakerSettingsDropdownWidth = 260.0f; // plate: x672-931
+    constexpr float BreakerSettingsKeyBoxWidth = 110.0f;   // plate: x672-781
+    constexpr float BreakerSettingsDefaultWidth = 87.0f;   // plate: x1791-1878
+    // 73px row pitch on the plate: 14 above the 44px control, 14 below, then
+    // the 1px divider.
+    constexpr float BreakerSettingsRowPad = 14.0f;
+
+    // ---- Type roles -------------------------------------------------------
+    // The pack's roles are Archivo (display), IBM Plex Sans (body) and IBM
+    // Plex Mono (all numbers, tabular figures). None of the three exists as a
+    // Font Face asset yet — importing them is an editor act on binary assets —
+    // so display and body ride MenuText's engine face, and THIS is the mono
+    // seam: the engine's default composite carries a "Mono" typeface
+    // (DroidSansMono — monospaced, so tabular by construction), and every
+    // number, key cap and chrome caption on the settings screen draws through
+    // here. When the real faces land, this function is the single edit.
+    FSlateFontInfo BreakerMonoFont(int32 Size, float TrackingEm = 0.0f)
+    {
+        FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Mono"), Size);
+        // FSlateFontInfo::LetterSpacing is 1/1000 em — the same unit the
+        // pack's caption_tracking_em (0.16) states.
+        Font.LetterSpacing = FMath::RoundToInt(TrackingEm * 1000.0f);
+        return Font;
+    }
+
+    TSharedRef<STextBlock> BreakerMonoText(const FText& Text, int32 Size, const FLinearColor& Color,
+        float TrackingEm = 0.0f)
+    {
+        return SNew(STextBlock)
+            .Text(Text)
+            .ColorAndOpacity(Color)
+            .Font(BreakerMonoFont(Size, TrackingEm));
+    }
+
+    // The 1px row separator the plates thread between control rows. Structure
+    // comes off borders in this system, not off gaps.
+    TSharedRef<SWidget> BreakerSettingsDivider()
+    {
+        return SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(Panel)];
+    }
+
+    // Pane header: display title, body subtitle, divider. The subtitle is
+    // mixed case on the plates — body copy carries no uppercase transform,
+    // only display does.
+    TSharedRef<SWidget> BreakerSettingsPaneHeader(const FString& Title, const FString& Subtitle)
+    {
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(FText::FromString(Title), BreakerUI::TypeH1, Primary, true)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(Subtitle), BreakerUI::TypeBody, SoftText)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+            [
+                BreakerSettingsDivider()
+            ];
+    }
+
+    // One settings row: fixed label column (optionally carrying a mono
+    // sub-caption), the control on the shared control edge, the readout in a
+    // fixed mono column 16px after it. Readout colour is text/primary — the
+    // plates reserve cyan for the control itself.
+    TSharedRef<SWidget> BreakerSettingsRow(const FString& Label, const FString& SubCaption,
+        const TSharedRef<SWidget>& Control, const TSharedRef<SWidget>& Readout)
+    {
+        TSharedRef<SVerticalBox> LabelCell = SNew(SVerticalBox);
+        LabelCell->AddSlot().AutoHeight()
+        [
+            MenuText(FText::FromString(Label), BreakerUI::TypeBody, Primary, true)
+        ];
+        if (!SubCaption.IsEmpty())
+        {
+            // WRAPPED at the label column's own width, never clipped: the
+            // first capture of this pane photographed "SAVED, NOT Y" running
+            // under the slider. WrapTextAt with a width known before layout,
+            // per the file's standing rule; a second caption line only grows
+            // the row downward.
+            LabelCell->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                SNew(STextBlock)
+                    .Text(FText::FromString(SubCaption))
+                    .ColorAndOpacity(Muted)
+                    .WrapTextAt(BreakerSettingsLabelWidth - BreakerUI::Space8)
+                    .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+            ];
+        }
+        return SNew(SBox).MinDesiredHeight(BreakerSettingsControlHeight)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                SNew(SBox).WidthOverride(BreakerSettingsLabelWidth).HAlign(HAlign_Fill)[LabelCell]
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Control]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+            [
+                Readout
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))]
+        ];
+    }
+
+    // ---- Drawn marks ------------------------------------------------------
+    // Every non-alphanumeric mark is drawn geometry, never a glyph: the stock
+    // Slate face carries 878 codepoints and no Geometric Shapes block, which
+    // is why the pack ships every mark as a texture or a measurement.
+
+    // README's dropdown caret: 12x8, two 2px strokes.
+    TSharedRef<SWidget> BreakerDrawnCaret(const FLinearColor& Color)
+    {
+        TSharedRef<SCanvas> Canvas = SNew(SCanvas);
+        AddCanvasSegment(Canvas, FVector2D(1.0, 2.0), FVector2D(6.0, 7.0), Color, 2.0f);
+        AddCanvasSegment(Canvas, FVector2D(6.0, 7.0), FVector2D(11.0, 2.0), Color, 2.0f);
+        return SNew(SBox).WidthOverride(12.0f).HeightOverride(8.0f)[Canvas];
+    }
+
+    // The refusal mark drawn beside a clash badge. The plate draws a warning
+    // triangle; Slate's flat brushes cannot fill a triangle, so this is a
+    // harm-red diamond (the file's existing drawn-diamond vocabulary) until a
+    // mark texture exists. The WORDS beside it are what carry the refusal —
+    // red alone is never a refusal.
+    TSharedRef<SWidget> BreakerWarnMark()
+    {
+        return SNew(SBox).WidthOverride(12.0f).HeightOverride(12.0f).HAlign(HAlign_Center).VAlign(VAlign_Center)
+        [
+            RotateFortyFive(SNew(SBox).WidthOverride(7.0f).HeightOverride(7.0f)[SolidBlock(Harm)])
+        ];
+    }
+
+    // The header's « mark: two drawn chevrons, never the glyph.
+    TSharedRef<SWidget> BreakerBackChevrons()
+    {
+        TSharedRef<SCanvas> Canvas = SNew(SCanvas);
+        AddCanvasSegment(Canvas, FVector2D(6.0, 1.0), FVector2D(1.0, 5.0), Muted, 2.0f);
+        AddCanvasSegment(Canvas, FVector2D(1.0, 5.0), FVector2D(6.0, 9.0), Muted, 2.0f);
+        AddCanvasSegment(Canvas, FVector2D(12.0, 1.0), FVector2D(7.0, 5.0), Muted, 2.0f);
+        AddCanvasSegment(Canvas, FVector2D(7.0, 5.0), FVector2D(12.0, 9.0), Muted, 2.0f);
+        return SNew(SBox).WidthOverride(14.0f).HeightOverride(10.0f)[Canvas];
+    }
+
+    // The sidebar's stub marker: a 6px drawn square and the word, both at the
+    // disabled colour. Words beside geometry — colour is never alone.
+    TSharedRef<SWidget> BreakerSettingsStubMark()
+    {
+        return SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                SNew(SBox).WidthOverride(6.0f).HeightOverride(6.0f)[SolidBlock(Disabled)]
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                BreakerMonoText(FText::FromString(TEXT("STUB")), BreakerUI::TypeCaption, Disabled, 0.16f)
+            ];
+    }
+
+    // ---- Quiet buttons ----------------------------------------------------
+    // The settings screen's button voice: no fill, 1px emphasis ring, tracked
+    // mono caption. DEFAULT and RESET ALL KEYBINDS are this; the plates keep
+    // primary buttons off the screen entirely.
+    TSharedRef<SWidget> BreakerSettingsGhostButton(const FString& Label, const FOnClicked& OnClicked, float Width)
+    {
+        return SNew(SBox).WidthOverride(Width).HeightOverride(BreakerSettingsControlHeight)
+        [
+            BorderWrap(
+                SNew(SButton)
+                .ButtonColorAndOpacity(Transparent)
+                .ContentPadding(FMargin(BreakerUI::Space8, 0.0f))
+                .HAlign(HAlign_Center)
+                .VAlign(VAlign_Center)
+                .OnClicked(OnClicked)
+                [
+                    BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, SoftText, 0.16f)
+                ],
+                BorderEmphasis)
+        ];
+    }
+
+    // The same geometry with the interaction gone. Disabled is PAINTED, never
+    // faded: geometry kept, fill to bg/raised, ring to border/rest, text to
+    // text/disabled, accent stripped — opacity would reveal the plate seams.
+    TSharedRef<SWidget> BreakerSettingsDisabledButton(const FString& Label, float Width)
+    {
+        return SNew(SBox).WidthOverride(Width).HeightOverride(BreakerSettingsControlHeight)
+        [
+            BorderWrap(
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(BreakerUI::BgRaised)
+                .HAlign(HAlign_Center)
+                .VAlign(VAlign_Center)
+                [
+                    BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, Disabled, 0.16f)
+                ],
+                BorderRest)
+        ];
+    }
+
+    DECLARE_DELEGATE_OneParam(FBreakerOnToggle, bool);
+    DECLARE_DELEGATE_OneParam(FBreakerOnPick, int32);
+
+    // ---- FIELDPLATE slider ------------------------------------------------
+    // README: 6px track, 14x20 drawn thumb (a rectangle, not a circle), value
+    // right-aligned in a fixed 64px mono column. A custom leaf widget rather
+    // than a restyled SSlider because the reference fills the travelled half
+    // of the track in system cyan and SSlider has no filled segment — the
+    // fill is half of what the control says at a glance.
+    class SBreakerFieldplateSlider : public SLeafWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerFieldplateSlider)
+            : _Value(0.0f)
+            {}
+            SLATE_ARGUMENT(float, Value)
+            SLATE_EVENT(FOnFloatValueChanged, OnValueChanged)
+            SLATE_EVENT(FSimpleDelegate, OnCaptureEnd)
+        SLATE_END_ARGS()
+
+        static constexpr float TrackHeight = 6.0f;
+        static constexpr float ThumbWidth = 14.0f;
+        static constexpr float ThumbHeight = 20.0f;
+
+        void Construct(const FArguments& InArgs)
+        {
+            Value = FMath::Clamp(InArgs._Value, 0.0f, 1.0f);
+            OnValueChanged = InArgs._OnValueChanged;
+            OnCaptureEnd = InArgs._OnCaptureEnd;
+        }
+
+        virtual FVector2D ComputeDesiredSize(float) const override
+        {
+            // The whole 44px strip is the hit target, not the 6px bar.
+            return FVector2D(BreakerSettingsSliderWidth, BreakerSettingsControlHeight);
+        }
+
+        virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+            const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId,
+            const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+        {
+            const FSlateBrush* Brush = FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
+            const FVector2f Size = FVector2f(AllottedGeometry.GetLocalSize());
+            const float TrackY = Size.Y * 0.5f - TrackHeight * 0.5f;
+            const float Span = FMath::Max(1.0f, Size.X - ThumbWidth);
+            const float ThumbX = Span * Value;
+
+            // Untravelled track, the travelled span over it, then the thumb —
+            // a cyan 14x20 rectangle with the panel face inset 1px.
+            FSlateDrawElement::MakeBox(OutDrawElements, LayerId,
+                AllottedGeometry.ToPaintGeometry(FVector2f(Size.X, TrackHeight),
+                    FSlateLayoutTransform(FVector2f(0.0f, TrackY))),
+                Brush, ESlateDrawEffect::None, PanelRaised);
+            FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 1,
+                AllottedGeometry.ToPaintGeometry(FVector2f(ThumbX + ThumbWidth * 0.5f, TrackHeight),
+                    FSlateLayoutTransform(FVector2f(0.0f, TrackY))),
+                Brush, ESlateDrawEffect::None, Cyan);
+            const float ThumbY = Size.Y * 0.5f - ThumbHeight * 0.5f;
+            FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 2,
+                AllottedGeometry.ToPaintGeometry(FVector2f(ThumbWidth, ThumbHeight),
+                    FSlateLayoutTransform(FVector2f(ThumbX, ThumbY))),
+                Brush, ESlateDrawEffect::None, Cyan);
+            FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 3,
+                AllottedGeometry.ToPaintGeometry(FVector2f(ThumbWidth - 2.0f, ThumbHeight - 2.0f),
+                    FSlateLayoutTransform(FVector2f(ThumbX + 1.0f, ThumbY + 1.0f))),
+                Brush, ESlateDrawEffect::None, PanelRaised);
+            return LayerId + 3;
+        }
+
+        virtual FReply OnMouseButtonDown(const FGeometry& Geometry, const FPointerEvent& Event) override
+        {
+            if (Event.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
+            SetValueFromPointer(Geometry, Event);
+            return FReply::Handled().CaptureMouse(SharedThis(this));
+        }
+
+        virtual FReply OnMouseMove(const FGeometry& Geometry, const FPointerEvent& Event) override
+        {
+            if (!HasMouseCapture()) return FReply::Unhandled();
+            SetValueFromPointer(Geometry, Event);
+            return FReply::Handled();
+        }
+
+        virtual FReply OnMouseButtonUp(const FGeometry&, const FPointerEvent&) override
+        {
+            if (!HasMouseCapture()) return FReply::Unhandled();
+            // Saved on RELEASE, not per drag frame: the drag handler fires
+            // dozens of times a second and Save() flushes an ini file.
+            OnCaptureEnd.ExecuteIfBound();
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+
+        virtual FCursorReply OnCursorQuery(const FGeometry&, const FPointerEvent&) const override
+        {
+            return FCursorReply::Cursor(EMouseCursor::Hand);
+        }
+
+    private:
+        void SetValueFromPointer(const FGeometry& Geometry, const FPointerEvent& Event)
+        {
+            const FVector2D Local = Geometry.AbsoluteToLocal(Event.GetScreenSpacePosition());
+            const float Span = FMath::Max(1.0f, static_cast<float>(Geometry.GetLocalSize().X) - ThumbWidth);
+            const float NewValue = FMath::Clamp((static_cast<float>(Local.X) - ThumbWidth * 0.5f) / Span, 0.0f, 1.0f);
+            if (!FMath::IsNearlyEqual(NewValue, Value))
+            {
+                Value = NewValue;
+                OnValueChanged.ExecuteIfBound(Value);
+                Invalidate(EInvalidateWidgetReason::Paint);
+            }
+        }
+
+        float Value = 0.0f;
+        FOnFloatValueChanged OnValueChanged;
+        FSimpleDelegate OnCaptureEnd;
+    };
+
+    // ---- FIELDPLATE toggle ------------------------------------------------
+    // README: 52x26 plate, 20x20 knob translating 24px in 120ms, and the word
+    // ON or OFF ALWAYS sits beside it — colour is never alone. The word is
+    // the row's job (it needs a live text handle); this widget is the plate
+    // and the knob. The README's 2px radius is not drawable with the flat
+    // WhiteBrush this file draws with; the whole menu is square today and the
+    // toggle stays consistent with it.
+    class SBreakerFieldplateToggle : public SCompoundWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerFieldplateToggle)
+            : _IsOn(false)
+            {}
+            SLATE_ARGUMENT(bool, IsOn)
+            SLATE_EVENT(FBreakerOnToggle, OnToggled)
+        SLATE_END_ARGS()
+
+        static constexpr float PlateWidth = 52.0f;
+        static constexpr float PlateHeight = 26.0f;
+        static constexpr float KnobSize = 20.0f;
+        // 1px border + 3 inset + 20 knob + 24 travel + 3 inset + 1px = 52.
+        static constexpr float KnobTravel = 24.0f;
+        static constexpr float TravelSeconds = 0.12f;
+
+        void Construct(const FArguments& InArgs)
+        {
+            bOn = InArgs._IsOn;
+            OnToggled = InArgs._OnToggled;
+            Anim = FCurveSequence(0.0f, TravelSeconds, ECurveEaseFunction::QuadInOut);
+            if (bOn) Anim.JumpToEnd();
+
+            SAssignNew(KnobFace, SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(bOn ? Cyan : Disabled)
+                [
+                    SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))
+                ];
+            SAssignNew(Knob, SBox).WidthOverride(KnobSize).HeightOverride(KnobSize)
+            [
+                KnobFace.ToSharedRef()
+            ];
+
+            ChildSlot
+            [
+                // The 44px hit target the row demands, holding the 26px plate.
+                SNew(SBox).WidthOverride(PlateWidth).HeightOverride(BreakerSettingsControlHeight).VAlign(VAlign_Center)
+                [
+                    SNew(SBox).HeightOverride(PlateHeight)
+                    [
+                        BorderWrap(
+                            SNew(SOverlay)
+                            + SOverlay::Slot()[SolidBlock(BreakerUI::BgRaised)]
+                            + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(3.0f, 0.0f, 0.0f, 0.0f)
+                            [
+                                Knob.ToSharedRef()
+                            ],
+                            BorderEmphasis)
+                    ]
+                ]
+            ];
+            ApplyKnob();
+        }
+
+        virtual FReply OnMouseButtonDown(const FGeometry&, const FPointerEvent& Event) override
+        {
+            if (Event.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
+            bOn = !bOn;
+            if (bOn) Anim.Play(AsShared()); else Anim.PlayReverse(AsShared());
+            KnobFace->SetBorderBackgroundColor(bOn ? Cyan : Disabled);
+            // Drive the knob imperatively for the 120ms of travel: an active
+            // timer that STOPS, never a per-frame attribute.
+            if (!TimerHandle.IsValid())
+            {
+                TimerHandle = RegisterActiveTimer(0.0f,
+                    FWidgetActiveTimerDelegate::CreateSP(this, &SBreakerFieldplateToggle::DriveKnob));
+            }
+            OnToggled.ExecuteIfBound(bOn);
+            return FReply::Handled();
+        }
+
+        virtual FCursorReply OnCursorQuery(const FGeometry&, const FPointerEvent&) const override
+        {
+            return FCursorReply::Cursor(EMouseCursor::Hand);
+        }
+
+    private:
+        EActiveTimerReturnType DriveKnob(double, float)
+        {
+            ApplyKnob();
+            if (!Anim.IsPlaying())
+            {
+                TimerHandle.Reset();
+                return EActiveTimerReturnType::Stop;
+            }
+            return EActiveTimerReturnType::Continue;
+        }
+
+        void ApplyKnob()
+        {
+            if (Knob.IsValid())
+            {
+                Knob->SetRenderTransform(TOptional<FSlateRenderTransform>(
+                    FSlateRenderTransform(FVector2D(KnobTravel * Anim.GetLerp(), 0.0f))));
+            }
+        }
+
+        bool bOn = false;
+        FBreakerOnToggle OnToggled;
+        FCurveSequence Anim;
+        TSharedPtr<SBox> Knob;
+        TSharedPtr<SBorder> KnobFace;
+        TSharedPtr<FActiveTimerHandle> TimerHandle;
+    };
+
+    // ---- Listening frame --------------------------------------------------
+    // README: "click arms it, border blinks gold at 1s". Visible for the
+    // first half of each second, at the rest colour for the second half — the
+    // same 500ms step the loading screen's cursor block names. A 2Hz active
+    // timer flips an SBorder colour imperatively; nothing here is a
+    // paint-time attribute.
+    class SBreakerBlinkBorder : public SCompoundWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerBlinkBorder)
+            : _OnColor(FLinearColor::White)
+            , _OffColor(FLinearColor::Transparent)
+            , _Thickness(BreakerUI::BorderThin)
+            {}
+            SLATE_ARGUMENT(FLinearColor, OnColor)
+            SLATE_ARGUMENT(FLinearColor, OffColor)
+            SLATE_ARGUMENT(float, Thickness)
+            SLATE_DEFAULT_SLOT(FArguments, Content)
+        SLATE_END_ARGS()
+
+        void Construct(const FArguments& InArgs)
+        {
+            OnColor = InArgs._OnColor;
+            OffColor = InArgs._OffColor;
+            ChildSlot
+            [
+                SAssignNew(Frame, SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(OnColor)
+                    .Padding(FMargin(InArgs._Thickness))
+                [
+                    InArgs._Content.Widget
+                ]
+            ];
+            RegisterActiveTimer(0.5f, FWidgetActiveTimerDelegate::CreateSP(this, &SBreakerBlinkBorder::Step));
+        }
+
+    private:
+        EActiveTimerReturnType Step(double, float)
+        {
+            bLit = !bLit;
+            if (Frame.IsValid()) Frame->SetBorderBackgroundColor(bLit ? OnColor : OffColor);
+            return EActiveTimerReturnType::Continue;
+        }
+
+        TSharedPtr<SBorder> Frame;
+        FLinearColor OnColor = FLinearColor::White;
+        FLinearColor OffColor = FLinearColor::Transparent;
+        bool bLit = true;
+    };
+
+    // ---- FIELDPLATE dropdown ----------------------------------------------
+    // README: 44px min height, 1px border, drawn 12x8 caret. Open list is
+    // flat, no shadow, selected row marked by a 3px left rail, not a check.
+    // SMenuAnchor in-window (UseCurrentWindow) so the list is a plain plate
+    // rather than an OS popup with a drop shadow.
+    class SBreakerFieldplateDropdown : public SCompoundWidget
+    {
+    public:
+        SLATE_BEGIN_ARGS(SBreakerFieldplateDropdown)
+            : _SelectedIndex(0)
+            {}
+            SLATE_ARGUMENT(TArray<FString>, Options)
+            SLATE_ARGUMENT(int32, SelectedIndex)
+            SLATE_EVENT(FBreakerOnPick, OnPicked)
+        SLATE_END_ARGS()
+
+        void Construct(const FArguments& InArgs)
+        {
+            Options = InArgs._Options;
+            Selected = FMath::Clamp(InArgs._SelectedIndex, 0, FMath::Max(0, Options.Num() - 1));
+            OnPicked = InArgs._OnPicked;
+
+            const FString Current = Options.IsValidIndex(Selected) ? Options[Selected] : FString();
+            ChildSlot
+            [
+                SAssignNew(Anchor, SMenuAnchor)
+                .Placement(MenuPlacement_ComboBox)
+                .Method(EPopupMethod::UseCurrentWindow)
+                .OnGetMenuContent(FOnGetContent::CreateSP(this, &SBreakerFieldplateDropdown::BuildList))
+                [
+                    SNew(SBox).WidthOverride(BreakerSettingsDropdownWidth).HeightOverride(BreakerSettingsControlHeight)
+                    [
+                        BorderWrap(
+                            SNew(SButton)
+                            .ButtonColorAndOpacity(BreakerUI::BgRaised)
+                            .ContentPadding(FMargin(BreakerUI::Space16, 0.0f))
+                            .HAlign(HAlign_Fill)
+                            .VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateSP(this, &SBreakerFieldplateDropdown::ToggleOpen))
+                            [
+                                SNew(SHorizontalBox)
+                                + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+                                [
+                                    BreakerMonoText(FText::FromString(Current), BreakerUI::TypeCaption, Primary, 0.16f)
+                                ]
+                                + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                                [
+                                    BreakerDrawnCaret(Muted)
+                                ]
+                            ],
+                            BorderEmphasis)
+                    ]
+                ]
+            ];
+        }
+
+    private:
+        FReply ToggleOpen()
+        {
+            if (Anchor.IsValid()) Anchor->SetIsOpen(!Anchor->IsOpen());
+            return FReply::Handled();
+        }
+
+        TSharedRef<SWidget> BuildList()
+        {
+            TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+            for (int32 Index = 0; Index < Options.Num(); ++Index)
+            {
+                const bool bSelected = Index == Selected;
+                Rows->AddSlot().AutoHeight()
+                [
+                    SNew(SBox).HeightOverride(BreakerSettingsControlHeight)
+                    [
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot().AutoWidth()
+                        [
+                            SNew(SBox).WidthOverride(BreakerUI::RailThickness)
+                            [
+                                SolidBlock(bSelected ? Cyan : Transparent)
+                            ]
+                        ]
+                        + SHorizontalBox::Slot().FillWidth(1.0f)
+                        [
+                            SNew(SButton)
+                            .ButtonColorAndOpacity(bSelected ? PanelRaised : BreakerUI::BgRaised)
+                            .ContentPadding(FMargin(BreakerUI::Space16 - BreakerUI::RailThickness, 0.0f))
+                            .HAlign(HAlign_Fill)
+                            .VAlign(VAlign_Center)
+                            .OnClicked(FOnClicked::CreateSP(this, &SBreakerFieldplateDropdown::Pick, Index))
+                            [
+                                BreakerMonoText(FText::FromString(Options[Index]), BreakerUI::TypeCaption,
+                                    bSelected ? Primary : SoftText, 0.16f)
+                            ]
+                        ]
+                    ]
+                ];
+            }
+            return SNew(SBox).WidthOverride(BreakerSettingsDropdownWidth)
+            [
+                BorderWrap(Rows, BorderEmphasis)
+            ];
+        }
+
+        FReply Pick(int32 Index)
+        {
+            if (Anchor.IsValid()) Anchor->SetIsOpen(false);
+            if (Index != Selected) OnPicked.ExecuteIfBound(Index);
+            return FReply::Handled();
+        }
+
+        TArray<FString> Options;
+        int32 Selected = 0;
+        FBreakerOnPick OnPicked;
+        TSharedPtr<SMenuAnchor> Anchor;
+    };
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildSettingsInputSection()
 {
     UBreakerGameSettings* Model = GameSettings.Get();
     TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
-    Section->AddSlot().AutoHeight()[SettingsSectionHeader(TEXT("INPUT"))];
+    Section->AddSlot().AutoHeight()
+    [
+        BreakerSettingsPaneHeader(TEXT("INPUT"), TEXT("Sensitivity and invert. Applied live."))
+    ];
     if (!Model) return Section;
 
     // Live readouts are held as widget handles and written imperatively from
     // the slider's own OnValueChanged. NOT a Text_Lambda: a per-frame text
     // attribute is banned in this file, and it is not needed — a slider that
     // moves fires an event, and an event is exactly when the number changes.
-    // Each one sits in a fixed-width column so a value going from "1.0" to
-    // "1.25" cannot reflow the row.
+    // Each one sits in the fixed 64px mono column so a value going from "1.0"
+    // to "1.25" cannot reflow the row.
     //
     // The readout widget is built FIRST and the handle captured BY VALUE. Both
     // matter: the handle is captured into a lambda that outlives this function,
@@ -1603,109 +2219,130 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsInputSection()
     // on others, which is the worst kind of both.
     TSharedPtr<STextBlock> SensitivityReadout;
     const TSharedRef<SWidget> SensitivityValue =
-        SNew(SBox).WidthOverride(SettingsValueWidth).HAlign(HAlign_Fill)
+        SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
         [
             SAssignNew(SensitivityReadout, STextBlock)
                 .Text(FText::FromString(FString::Printf(TEXT("%.2f"), Model->MouseSensitivity)))
                 .Justification(ETextJustify::Right)
-                .ColorAndOpacity(Cyan)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
         ];
 
     TSharedPtr<STextBlock> ScopedReadout;
     const TSharedRef<SWidget> ScopedValue =
-        SNew(SBox).WidthOverride(SettingsValueWidth).HAlign(HAlign_Fill)
+        SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
         [
             SAssignNew(ScopedReadout, STextBlock)
                 .Text(FText::FromString(FString::Printf(TEXT("%.2fx"), Model->ScopedSensitivityMultiplier)))
                 .Justification(ETextJustify::Right)
-                .ColorAndOpacity(Cyan)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
         ];
 
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        SettingsRow(TEXT("LOOK SENSITIVITY"),
-            SNew(SSlider)
-            // 0.2 .. 2.0, the range ClampMouseSensitivity enforces
-            // (Settings/BreakerGameSettings.cpp:12-15) and the range the
-            // previous screen's slider already spanned.
-            .Value((Model->MouseSensitivity - 0.2f) / 1.8f)
-            .OnValueChanged_Lambda([this, SensitivityReadout](float Value)
-            {
-                UBreakerGameSettings* Live = GameSettings.Get();
-                if (!Live) return;
-                Live->MouseSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(0.2f + Value * 1.8f);
-                // The live pawn keeps its own copy of these three; pushing them
-                // through ApplyMenuSettings is what makes the slider FELT
-                // rather than merely stored.
-                if (Character.IsValid())
+        BreakerSettingsRow(TEXT("Look sensitivity"), FString(),
+            SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+            [
+                SNew(SBreakerFieldplateSlider)
+                // 0.2 .. 2.0, the range ClampMouseSensitivity enforces
+                // (Settings/BreakerGameSettings.cpp:12-15) and the range the
+                // previous screen's slider already spanned.
+                .Value((Model->MouseSensitivity - 0.2f) / 1.8f)
+                .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, SensitivityReadout](float Value)
                 {
-                    Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
-                }
-                if (SensitivityReadout.IsValid())
-                {
-                    SensitivityReadout->SetText(FText::FromString(FString::Printf(TEXT("%.2f"), Live->MouseSensitivity)));
-                }
-            })
-            // Saved on RELEASE, not per drag frame: a drag fires this handler
-            // dozens of times a second and Save() flushes an ini file.
-            .OnMouseCaptureEnd_Lambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }),
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->MouseSensitivity = UBreakerGameSettingsLibrary::ClampMouseSensitivity(0.2f + Value * 1.8f);
+                    // The live pawn keeps its own copy of these three; pushing
+                    // them through ApplyMenuSettings is what makes the slider
+                    // FELT rather than merely stored.
+                    if (Character.IsValid())
+                    {
+                        Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
+                    }
+                    if (SensitivityReadout.IsValid())
+                    {
+                        SensitivityReadout->SetText(FText::FromString(FString::Printf(TEXT("%.2f"), Live->MouseSensitivity)));
+                    }
+                }))
+                .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }))
+            ],
             SensitivityValue)
     ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
 
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+    // The plate's name for this row is ADS; the model keeps
+    // ScopedSensitivityMultiplier and the honesty line stays until the aim
+    // path reads it.
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        SettingsRow(TEXT("SCOPED SENSITIVITY"),
-            SNew(SSlider)
-            // 0.1 .. 3.0 (ClampScopedSensitivityMultiplier,
-            // BreakerGameSettings.cpp:17-20).
-            .Value((Model->ScopedSensitivityMultiplier - 0.1f) / 2.9f)
-            .OnValueChanged_Lambda([this, ScopedReadout](float Value)
-            {
-                UBreakerGameSettings* Live = GameSettings.Get();
-                if (!Live) return;
-                Live->ScopedSensitivityMultiplier =
-                    UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(0.1f + Value * 2.9f);
-                if (ScopedReadout.IsValid())
+        BreakerSettingsRow(TEXT("ADS sensitivity"),
+            TEXT("MULTIPLIER OF LOOK — SAVED, NOT YET READ BY THE AIM PATH"),
+            SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+            [
+                SNew(SBreakerFieldplateSlider)
+                // 0.1 .. 3.0 (ClampScopedSensitivityMultiplier,
+                // BreakerGameSettings.cpp:17-20).
+                .Value((Model->ScopedSensitivityMultiplier - 0.1f) / 2.9f)
+                .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, ScopedReadout](float Value)
                 {
-                    ScopedReadout->SetText(FText::FromString(FString::Printf(TEXT("%.2fx"), Live->ScopedSensitivityMultiplier)));
-                }
-            })
-            .OnMouseCaptureEnd_Lambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }),
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->ScopedSensitivityMultiplier =
+                        UBreakerGameSettingsLibrary::ClampScopedSensitivityMultiplier(0.1f + Value * 2.9f);
+                    if (ScopedReadout.IsValid())
+                    {
+                        ScopedReadout->SetText(FText::FromString(FString::Printf(TEXT("%.2fx"), Live->ScopedSensitivityMultiplier)));
+                    }
+                }))
+                .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }))
+            ],
             ScopedValue)
     ];
-    // Said plainly on the screen rather than left for a player to discover by
-    // dragging it and feeling nothing. The multiplier persists and clamps; the
-    // aiming path does not read it yet.
-    Section->AddSlot().AutoHeight().Padding(SettingsLabelWidth, 0.0f, 0.0f, BreakerUI::Space16)
-    [
-        MenuText(FText::FromString(TEXT("MULTIPLIER OF LOOK SENSITIVITY WHILE AIMING. SAVED; NOT YET READ BY THE AIM PATH.")),
-            BreakerUI::TypeCaption, Muted)
-    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
 
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+    // The toggle's word, built first for the same capture-order reason as the
+    // readouts. The word IS the state — colour is never alone.
+    TSharedPtr<STextBlock> InvertWord;
+    const TSharedRef<SWidget> InvertWordWidget =
+        SAssignNew(InvertWord, STextBlock)
+            .Text(FText::FromString(Model->bInvertVerticalLook ? TEXT("ON") : TEXT("OFF")))
+            .ColorAndOpacity(Model->bInvertVerticalLook ? SoftText : Muted)
+            .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f));
+
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        SNew(SCheckBox)
-        .IsChecked(Model->bInvertVerticalLook ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
-        .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
-        {
-            UBreakerGameSettings* Live = GameSettings.Get();
-            if (!Live) return;
-            Live->bInvertVerticalLook = State == ECheckBoxState::Checked;
-            if (Character.IsValid())
-            {
-                Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
-            }
-            Live->Save();
-        })
-        [
-            SNew(SBox).Padding(FMargin(BreakerUI::Space8, 0.0f, 0.0f, 0.0f))
+        BreakerSettingsRow(TEXT("Invert vertical"), FString(),
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
-                MenuText(FText::FromString(TEXT("INVERT VERTICAL LOOK")), BreakerUI::TypeBody, Primary, true)
+                SNew(SBreakerFieldplateToggle)
+                .IsOn(Model->bInvertVerticalLook)
+                .OnToggled(FBreakerOnToggle::CreateLambda([this, InvertWord](bool bOn)
+                {
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->bInvertVerticalLook = bOn;
+                    if (Character.IsValid())
+                    {
+                        Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
+                    }
+                    Live->Save();
+                    if (InvertWord.IsValid())
+                    {
+                        InvertWord->SetText(FText::FromString(bOn ? TEXT("ON") : TEXT("OFF")));
+                        InvertWord->SetColorAndOpacity(bOn ? SoftText : Muted);
+                    }
+                }))
             ]
-        ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+            [
+                InvertWordWidget
+            ],
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
     ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
     return Section;
 }
 
@@ -1758,23 +2395,33 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
     }
     const bool bOverridden = Model && Model->KeybindOverrides.Contains(Action);
 
-    // What the key column says.
+    // What the key cap says. SHORT display names throughout — the cap is a
+    // fixed 110px box (see the budget note below), and only the keyboard/mouse
+    // half: joining every default including the gamepad names produced strings
+    // like "GAMEPAD LEFT THUMBSTICK 2D-AXIS  MOUSE XY 2D-AXIS" and the row
+    // clipped them on the left.
     FString KeyLabel;
+    FString CompositeList;
     if (bComposite)
     {
-        // Only the keyboard/mouse half, which is also what stopped this column
-        // overflowing: joining every default including the gamepad names
-        // produced strings like "GAMEPAD LEFT THUMBSTICK 2D-AXIS  MOUSE XY
-        // 2D-AXIS" and the row clipped them on the left.
+        // The CAP shows only the first key — the full list cannot fit a 110px
+        // box (the first capture photographed "USE XY 2D-AX" clipped at both
+        // ends) — and the BADGE carries the whole list beside its reason,
+        // where there is a screen-half of room. Axis suffixes come off the
+        // cap: "MOUSE XY" says what the badge's "MOUSE XY 2D-AXIS" details.
         for (const FKey& Key : DeskDefaults)
         {
-            if (!KeyLabel.IsEmpty()) KeyLabel += TEXT("  ");
-            KeyLabel += Key.GetDisplayName(false).ToString().ToUpper();
+            if (!CompositeList.IsEmpty()) CompositeList += TEXT(" ");
+            CompositeList += Key.GetDisplayName(false).ToString().ToUpper();
         }
+        KeyLabel = DeskDefaults.Num() > 0 ? DeskDefaults[0].GetDisplayName(false).ToString().ToUpper() : TEXT("UNBOUND");
+        KeyLabel.RemoveFromEnd(TEXT(" 2D-AXIS"));
+        KeyLabel.RemoveFromEnd(TEXT(" 3D-AXIS"));
+        KeyLabel.RemoveFromEnd(TEXT(" AXIS"));
     }
     else if (Resolved.IsValid())
     {
-        KeyLabel = Resolved.GetDisplayName().ToString().ToUpper();
+        KeyLabel = Resolved.GetDisplayName(false).ToString().ToUpper();
     }
     else
     {
@@ -1794,205 +2441,190 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
 
     const bool bListening = ListeningKeybindAction == Action;
     const bool bPending = PendingKeybindAction == Action && PendingKeybindKey.IsValid();
+    // The pending clash's owner, for the badge — the same live question the
+    // committed-share badge asks, asked about the key the player just pressed.
+    FName PendingClashWith = NAME_None;
+    if (bPending && Model)
+    {
+        UBreakerGameSettingsLibrary::FindKeybindConflict(Action, PendingKeybindKey, Model->KeybindOverrides,
+            FlatDefaults, PendingClashWith);
+    }
 
-    // ---- THE KEY CONTROL, and its width budget ---------------------------
-    // The key display IS the button now. There is no separate BIND column:
-    // owner, "this should show the current bind you click and replace it this
-    // is ugly". So one control per row carries three states in the same box —
-    // the current key at rest, "PRESS A KEY…" while listening, and the conflict
-    // confirm — and the box is sized to the longest of them.
-    //
-    // TRAP 1, reported FOUR times in this file: a fixed box carrying a CHANGING
-    // label is sized to the LONGEST string it can ever hold, never to the one
-    // it happens to show first. Every candidate, measured at its own type size
-    // against Roboto Bold (~0.65em per uppercase glyph, so ~9.1px at TypeBody
-    // and ~7.2px at TypeCaption):
-    //
-    //   "MIDDLE MOUSE BUTTON"  19 glyphs, TypeBody    ~173 + 34 chrome = 207
-    //   "RIGHT MOUSE BUTTON"   18 glyphs, TypeBody    ~164 + 34 chrome = 198
-    //   "BIND ANYWAY"          11 glyphs, TypeBody    ~100 + 34 chrome = 134
-    //   "PRESS A KEY…"         12 glyphs, TypeBody    ~110 + 34 chrome = 144
-    //   "W  S  A  D  UP  DOWN  RIGHT  LEFT"
-    //                          33 glyphs, TypeCaption ~237, no chrome  = 237
-    //
-    // The chrome is the control's 16px content padding on each side plus its
-    // 1px ring on each side. The COMPOSITE string is the widest thing this
-    // column ever holds — it is plain text, not a control, so it pays no
-    // padding, and it is still 30px wider than the longest single key name.
-    // Sizing to the longest SINGLE key is the exact mistake that produced the
-    // four clipping reports; 260 clears the composite string with ~23px spare.
-    constexpr float KeyControlWidth = 260.0f;
-    constexpr float DefaultButtonWidth = 110.0f;
-    // ROW BUDGET, re-measured for the four-column layout (the old note said
-    // five columns totalling 738 and was stale the moment BIND was deleted):
-    //
-    //   210 label + 260 key + 16 gap + [badge fills] + 8 gap + 110 default
-    //   = 604 of fixed width.
-    //
-    // The plate is 1040 wide; its interior is roughly 1040 - 3 rail - 2 border
-    // - 48 padding - 16 scroll bar = 971. That leaves ~367 for the badge, whose
-    // longest string is "SHARED: " plus the longest action label
-    // ("SCOPED SENSITIVITY", 18) = 26 glyphs at TypeCaption ~187. Comfortable,
-    // and 134px MORE headroom than the five-column layout had — which is the
-    // point of deleting a column.
-
-    // What the control says. Rest is the key itself; listening replaces it in
-    // place; a pending conflict replaces it with its own confirm.
-    FString KeyControlLabel = KeyLabel;
-    if (bListening) KeyControlLabel = TEXT("PRESS A KEY…");
-    else if (bPending) KeyControlLabel = TEXT("BIND ANYWAY");
+    // ---- THE KEY CAP, and its width budget --------------------------------
+    // The key display IS the control (README: no BIND button; click arms).
+    // The cap is the plate's fixed 110px box, so the strings in it are SHORT
+    // display names — GetDisplayName(false): LMB, RMB, SPACE — at mono 13
+    // (~7.8px per glyph). The widest realistic short name is "SCROLL LOCK",
+    // 11 glyphs ≈ 86px against 110 - 2px ring - 8px pad = 100. The cap never
+    // says "PRESS A KEY…": listening is the blinking gold frame plus the
+    // status line, which has room for whole sentences. Long key names stay in
+    // the status line too, where they fit.
+    if (bPending)
+    {
+        // The cap previews the key the player pressed; the badge names who
+        // holds it; nothing has been written.
+        KeyLabel = PendingKeybindKey.GetDisplayName(false).ToString().ToUpper();
+    }
 
     TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
     Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
     [
-        SNew(SBox).WidthOverride(SettingsLabelWidth).HAlign(HAlign_Fill)
+        SNew(SBox).WidthOverride(BreakerSettingsLabelWidth).HAlign(HAlign_Fill)
         [
             MenuText(UBreakerGameSettingsLibrary::DescribeAction(Action), BreakerUI::TypeBody,
-                bListening ? Cyan : Primary, true)
+                bListening ? Amber : Primary, true)
         ]
     ];
-    // ---- The key column --------------------------------------------------
-    // Composite rows are PLAIN TEXT and not clickable: there is nothing a
-    // single FKey could replace a two-dimensional axis or four movement keys
-    // with, so the row shows what it is bound to and the badge beside it says
-    // which of the two reasons applies. Boxed to the control's own height so
-    // the rows keep a straight edge either way.
+
+    // ---- The key column ---------------------------------------------------
     if (bComposite)
     {
-        Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
+        // Not single-key rebindable — there is nothing one FKey could replace
+        // a 2D axis or four movement keys with — so the cap is PAINTED
+        // disabled: geometry kept, fill to bg/raised, ring to border/rest,
+        // text to disabled. Never a missing control, never opacity.
+        Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
         [
-            SNew(SBox)
-            .WidthOverride(KeyControlWidth)
-            .HeightOverride(BreakerUI::MinHitTarget + BreakerUI::Space8)
-            .HAlign(HAlign_Fill)
-            .VAlign(VAlign_Center)
+            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerSettingsControlHeight)
             [
-                // HAlign_Fill on the box plus justification inside, never
-                // HAlign_Left — see MenuValueColumn for why an alignment other
-                // than Fill shaves the boundary glyph.
-                SNew(STextBlock)
-                    .Text(FText::FromString(KeyLabel))
-                    .Justification(ETextJustify::Left)
-                    .ColorAndOpacity(SoftText)
-                    .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeCaption))
+                BorderWrap(
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(BreakerUI::BgRaised)
+                    .HAlign(HAlign_Fill)
+                    .VAlign(VAlign_Center)
+                    [
+                        SNew(STextBlock)
+                            .Text(FText::FromString(KeyLabel))
+                            .Justification(ETextJustify::Center)
+                            .ColorAndOpacity(Disabled)
+                            .Font(BreakerMonoFont(BreakerUI::TypeCaption))
+                    ],
+                    BorderRest)
             ]
         ];
     }
     else
     {
-        // THE CONTROL. Built from BorderWrap + SButton — the same two-part
-        // vocabulary MakeButton itself is made of — rather than through
-        // MakeButton, because this control needs a THIRD colour state that
-        // MakeButton's primary/secondary pair cannot express: an overridden key
-        // reads cyan at rest, which is the only tell that a row is off its
-        // default other than the DEFAULT button appearing next to it.
-        const bool bArmed = bListening || bPending;
-        const FLinearColor LabelColor = bArmed
-            ? (bPending ? Amber : Cyan)
+        // Rest state text: cyan is the overridden tell (beside the DEFAULT
+        // button going live — two carriers, never colour alone).
+        const FLinearColor CapColor = bPending
+            ? Primary
             : (Resolved.IsValid() ? (bOverridden ? Cyan : Primary) : Disabled);
-        Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space16, 0.0f)
-        [
-            SNew(SBox)
-            .WidthOverride(KeyControlWidth)
-            .HeightOverride(BreakerUI::MinHitTarget + BreakerUI::Space8)
+        // The NoBorder button style, with the face painted by an explicit
+        // SBorder underneath. The default style's brush both DARKENS the
+        // ButtonColorAndOpacity tint (the cap face photographed near-black
+        // against the plate's 18263A) and spends ~32px of hidden style
+        // padding, which is what clipped "LEFT SHIFT" inside a box whose
+        // arithmetic said it fit. With the style chrome gone the interior is
+        // 110 - 2px ring - 8px pad = 100px — 11 glyphs at mono 13, clearing
+        // "SCROLL LOCK", the widest short name the desk produces.
+        const TSharedRef<SWidget> Cap =
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(PanelRaised)
+            .Padding(FMargin(0.0f))
             [
-                BorderWrap(
-                    SNew(SButton)
-                    .ButtonColorAndOpacity(bArmed ? PanelHover : PanelRaised)
-                    .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
-                    // HAlign_Fill for the clipping reason MakeButton documents.
-                    .HAlign(HAlign_Fill)
-                    .VAlign(VAlign_Center)
-                    .OnClicked(FOnClicked::CreateLambda([this, Action]()
-                    {
-                        if (PendingKeybindAction == Action && PendingKeybindKey.IsValid())
-                        {
-                            // CONFLICT CONFIRM, rehomed onto this control. It
-                            // used to be the BIND button's third label, and
-                            // that button no longer exists; putting it here
-                            // rather than on a new adjacent affordance keeps
-                            // the row at one clickable thing and matches the
-                            // armed-chip pattern already in this file, where a
-                            // control swaps its own label to CONFIRM rather
-                            // than growing a neighbour.
-                            const FKey Confirmed = PendingKeybindKey;
-                            PendingKeybindAction = NAME_None;
-                            PendingKeybindKey = FKey();
-                            if (UBreakerGameSettings* Live = GameSettings.Get())
-                            {
-                                Live->SetKeybindOverride(Action, Confirmed);
-                                Live->Save();
-                                KeybindStatus = FText::FromString(FString::Printf(TEXT("%s BOUND TO %s — THE KEY IS NOW SHARED."),
-                                    *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString(),
-                                    *Confirmed.GetDisplayName().ToString().ToUpper()));
-                                bKeybindStatusIsClash = true;
-                            }
-                            Rebuild(EBreakerMenuScreen::Settings);
-                            return FReply::Handled();
-                        }
-                        BeginKeybindListen(Action);
-                        return FReply::Handled();
-                    }))
-                    [
-                        SNew(STextBlock)
-                            .Text(FText::FromString(KeyControlLabel))
-                            .Justification(ETextJustify::Left)
-                            .ColorAndOpacity(LabelColor)
-                            .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
-                    ],
-                    bArmed ? (bPending ? Amber : Cyan) : BorderEmphasis,
-                    bArmed ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
-            ]
+                SNew(SButton)
+                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                .ContentPadding(FMargin(BreakerUI::Space4, 0.0f))
+                .HAlign(HAlign_Fill)
+                .VAlign(VAlign_Center)
+                .OnClicked(FOnClicked::CreateLambda([this, Action]()
+                {
+                    // While ANY row is listening, mouse presses are captured
+                    // by OnPreviewMouseButtonDown before this can fire — which
+                    // is correct, LMB is bindable — so this click is always
+                    // the arm.
+                    BeginKeybindListen(Action);
+                    return FReply::Handled();
+                }))
+                [
+                    SNew(STextBlock)
+                        .Text(FText::FromString(KeyLabel))
+                        .Justification(ETextJustify::Center)
+                        .ColorAndOpacity(CapColor)
+                        .Font(BreakerMonoFont(13))
+                ]
+            ];
+
+        // The frame carries the state: gold blink while listening (README's
+        // 1s step), harm-deep while a named clash waits for its second press,
+        // emphasis ring at rest.
+        TSharedRef<SWidget> Framed = bPending
+            ? BorderWrap(Cap, HarmDeep)
+            : (bListening
+                ? StaticCastSharedRef<SWidget>(SNew(SBreakerBlinkBorder).OnColor(Amber).OffColor(BorderEmphasis)[Cap])
+                : BorderWrap(Cap, BorderEmphasis));
+        Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+        [
+            SNew(SBox).WidthOverride(BreakerSettingsKeyBoxWidth).HeightOverride(BreakerSettingsControlHeight)[Framed]
         ];
     }
-    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
-    [
-        MenuText(
-            bComposite
-                // Short, because widening the key column squeezed this trailing slot and
-                // the badge clipped in turn. "NOT REBINDABLE" was redundant anyway: the
-                // key is drawn as plain text rather than as a control, which says it
-                // louder than the words did.
-                ? FText::FromString(bAxisBound ? TEXT("ANALOG AXIS") : TEXT("MULTI-KEY"))
-                : (ClashWith != NAME_None
-                    ? FText::FromString(FString::Printf(TEXT("SHARED: %s"),
-                        *UBreakerGameSettingsLibrary::DescribeAction(ClashWith).ToString()))
-                    : FText::GetEmpty()),
-            BreakerUI::TypeCaption, bComposite ? Muted : Harm, true)
-    ];
 
+    // ---- The badge --------------------------------------------------------
+    const FName BadgeNames = bPending ? PendingClashWith : ClashWith;
+    TSharedRef<SWidget> Badge = SNew(SSpacer).Size(FVector2D(1.0f, 1.0f));
     if (bComposite)
     {
-        // Keeps the column edges straight without pretending a control is
-        // there and disabled — there is nothing to disable, and an action with
-        // no override has nothing to reset either.
-        Row->AddSlot().AutoWidth()[SNew(SBox).WidthOverride(BreakerUI::Space8 + DefaultButtonWidth)];
-        return Row;
+        // The reason, then the whole list the cap could not hold.
+        const FString Reason = bAxisBound ? TEXT("ANALOG AXIS") : TEXT("MULTI-KEY");
+        Badge = BreakerMonoText(FText::FromString(FString::Printf(TEXT("%s: %s"), *Reason, *CompositeList)),
+            BreakerUI::TypeCaption, Muted, 0.16f);
     }
-
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+    else if (BadgeNames != NAME_None)
+    {
+        // A refusal states its reason in words beside a drawn mark — red
+        // alone is never a refusal. The committed share keeps the same shape:
+        // it is a fact the player chose, said on both rows for as long as it
+        // is true.
+        const FString Owner = UBreakerGameSettingsLibrary::DescribeAction(BadgeNames).ToString();
+        const FString BadgeText = bPending
+            ? FString::Printf(TEXT("HELD BY %s"), *Owner)
+            : FString::Printf(TEXT("SHARED: %s"), *Owner);
+        Badge = SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                BreakerWarnMark()
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+            [
+                BreakerMonoText(FText::FromString(BadgeText), BreakerUI::TypeCaption, Harm, 0.16f)
+            ];
+    }
+    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f)
     [
-        SNew(SBox).WidthOverride(DefaultButtonWidth)
+        // Clipped, because an SHorizontalBox draws an oversized child straight
+        // through its neighbour — a runaway badge must not print through
+        // DEFAULT.
+        SNew(SBox).Clipping(EWidgetClipping::ClipToBounds).HAlign(HAlign_Left).VAlign(VAlign_Center)
         [
-            bOverridden
-                ? MakeButton(FText::FromString(TEXT("DEFAULT")), FOnClicked::CreateLambda([this, Action]()
-                  {
-                      if (UBreakerGameSettings* Live = GameSettings.Get())
-                      {
-                          Live->ClearKeybindOverride(Action);
-                          Live->Save();
-                          KeybindStatus = FText::FromString(FString::Printf(TEXT("%s IS BACK ON ITS DEFAULT KEY."),
-                              *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString()));
-                          bKeybindStatusIsClash = false;
-                      }
-                      CancelKeybindListen();
-                      Rebuild(EBreakerMenuScreen::Settings);
-                      return FReply::Handled();
-                  }))
-                // An action with no override has nothing to reset, and a live
-                // button that does nothing is worse than no button.
-                : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)))
+            Badge
         ]
+    ];
+
+    // ---- DEFAULT ----------------------------------------------------------
+    // Always present, per the plate: live when there is an override to clear,
+    // otherwise painted disabled — geometry kept, never a hole in the column.
+    const bool bResettable = !bComposite && bOverridden;
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+    [
+        bResettable
+            ? BreakerSettingsGhostButton(TEXT("DEFAULT"), FOnClicked::CreateLambda([this, Action]()
+              {
+                  if (UBreakerGameSettings* Live = GameSettings.Get())
+                  {
+                      Live->ClearKeybindOverride(Action);
+                      Live->Save();
+                      KeybindStatus = FText::FromString(FString::Printf(TEXT("%s IS BACK ON ITS DEFAULT KEY."),
+                          *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString()));
+                      bKeybindStatusIsClash = false;
+                  }
+                  CancelKeybindListen();
+                  Rebuild(EBreakerMenuScreen::Settings);
+                  return FReply::Handled();
+              }), BreakerSettingsDefaultWidth)
+            : BreakerSettingsDisabledButton(TEXT("DEFAULT"), BreakerSettingsDefaultWidth)
     ];
     return Row;
 }
@@ -2000,7 +2632,14 @@ TSharedRef<SWidget> SBreakerMenu::MakeKeybindRow(FName Action, const TMap<FName,
 TSharedRef<SWidget> SBreakerMenu::BuildSettingsKeybindSection()
 {
     TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
-    Section->AddSlot().AutoHeight()[SettingsSectionHeader(TEXT("KEYBINDS"))];
+    // The subtitle is the behavioural contract, in the pack's own words: the
+    // first press of a clashing key names the clash and commits nothing; the
+    // second press takes it.
+    Section->AddSlot().AutoHeight()
+    [
+        BreakerSettingsPaneHeader(TEXT("KEYBINDS"),
+            TEXT("The key display is the control. Click it, press a key, press again to take it."))
+    ];
 
     const TMap<FName, FKey> FlatDefaults = UBreakerGameSettingsLibrary::FirstKeyPerAction(DefaultKeybinds);
 
@@ -2008,63 +2647,60 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsKeybindSection()
     {
         // Said out loud rather than drawn as a list of UNBOUND rows that would
         // read as "this game has no controls".
-        Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
         [
-            MenuText(FText::FromString(TEXT("NO INPUT CONFIG COULD BE LOADED — DEFAULT KEYS ARE UNKNOWN. REBINDS STILL SAVE.")),
-                BreakerUI::TypeCaption, Harm, true)
+            BreakerMonoText(FText::FromString(TEXT("NO INPUT CONFIG COULD BE LOADED — DEFAULT KEYS ARE UNKNOWN. REBINDS STILL SAVE.")),
+                BreakerUI::TypeCaption, Harm, 0.16f)
         ];
     }
 
     for (const FName& Action : UBreakerGameSettingsLibrary::BindableActionNames())
     {
-        Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space4)
+        Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
         [
             MakeKeybindRow(Action, DefaultKeybinds, FlatDefaults)
         ];
+        Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
     }
 
     // The status line. One line, always present so the section cannot change
     // height when it populates — an empty FText still reserves the row.
-    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, BreakerUI::Space8)
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
     [
         SNew(SBox).HeightOverride(20.0f)
         [
-            MenuText(KeybindStatus, BreakerUI::TypeCaption, bKeybindStatusIsClash ? Harm : SoftText, true)
+            BreakerMonoText(KeybindStatus, BreakerUI::TypeCaption, bKeybindStatusIsClash ? Harm : SoftText, 0.16f)
         ]
     ];
 
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
         SNew(SHorizontalBox)
         + SHorizontalBox::Slot().AutoWidth()
         [
-            SNew(SBox).WidthOverride(240.0f)
-            [
-                MakeButton(FText::FromString(TEXT("RESET ALL KEYBINDS")), FOnClicked::CreateLambda([this]()
+            BreakerSettingsGhostButton(TEXT("RESET ALL KEYBINDS"), FOnClicked::CreateLambda([this]()
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
                 {
-                    if (UBreakerGameSettings* Live = GameSettings.Get())
-                    {
-                        Live->ResetKeybindsToDefault();
-                        Live->Save();
-                        KeybindStatus = FText::FromString(TEXT("EVERY ACTION IS BACK ON ITS DEFAULT KEY."));
-                        bKeybindStatusIsClash = false;
-                    }
-                    CancelKeybindListen();
-                    Rebuild(EBreakerMenuScreen::Settings);
-                    return FReply::Handled();
-                }))
-            ]
+                    Live->ResetKeybindsToDefault();
+                    Live->Save();
+                    KeybindStatus = FText::FromString(TEXT("EVERY ACTION IS BACK ON ITS DEFAULT KEY."));
+                    bKeybindStatusIsClash = false;
+                }
+                CancelKeybindListen();
+                Rebuild(EBreakerMenuScreen::Settings);
+                return FReply::Handled();
+            }), 240.0f)
         ]
     ];
     // The honest line, second edition. The disclosure that used to end this
     // sentence ("live input still uses the default keys") became FALSE when
     // ABreakerCharacter grew ApplyKeybindOverrides — overrides now rebuild a
     // transient mapping context at spawn and live on change — so it is gone.
-    // The how-to stays.
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
     [
-        MenuText(FText::FromString(TEXT("CLICK A KEY, THEN PRESS THE ONE YOU WANT INSTEAD.  ESC CANCELS.\nREBINDS SAVE TO YOUR PROFILE AND APPLY IMMEDIATELY.")),
-            BreakerUI::TypeCaption, Muted)
+        BreakerMonoText(FText::FromString(TEXT("REBINDS SAVE TO YOUR PROFILE AND APPLY IMMEDIATELY.  ESC CANCELS A LISTENING ROW.")),
+            BreakerUI::TypeCaption, Muted, 0.16f)
     ];
     return Section;
 }
@@ -2073,139 +2709,166 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsVideoSection()
 {
     UBreakerGameSettings* Model = GameSettings.Get();
     TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
-    Section->AddSlot().AutoHeight()[SettingsSectionHeader(TEXT("VIDEO"))];
+    Section->AddSlot().AutoHeight()
+    [
+        BreakerSettingsPaneHeader(TEXT("VIDEO"), TEXT("Window, frame cap, and field of view. Applied on change."))
+    ];
     if (!Model) return Section;
 
     // Built first, captured by value — see the note in BuildSettingsInputSection.
     TSharedPtr<STextBlock> FOVReadout;
     const TSharedRef<SWidget> FOVValue =
-        SNew(SBox).WidthOverride(SettingsValueWidth).HAlign(HAlign_Fill)
+        SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
         [
             SAssignNew(FOVReadout, STextBlock)
                 .Text(FText::FromString(FString::Printf(TEXT("%.0f"), Model->FieldOfView)))
                 .Justification(ETextJustify::Right)
-                .ColorAndOpacity(Cyan)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
         ];
 
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        SettingsRow(TEXT("FIELD OF VIEW"),
-            // 70 .. 120 (ClampFOV, BreakerGameSettings.cpp:22-25), the same
-            // span the previous screen used and the same one
-            // ABreakerCharacter::BaseFieldOfView enforces.
-            SNew(SSlider)
-            .Value((Model->FieldOfView - 70.0f) / 50.0f)
-            .OnValueChanged_Lambda([this, FOVReadout](float Value)
-            {
-                UBreakerGameSettings* Live = GameSettings.Get();
-                if (!Live) return;
-                Live->FieldOfView = UBreakerGameSettingsLibrary::ClampFOV(70.0f + Value * 50.0f);
-                if (Character.IsValid())
+        BreakerSettingsRow(TEXT("Field of view"), FString(),
+            SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+            [
+                // 70 .. 120 (ClampFOV, BreakerGameSettings.cpp:22-25), the
+                // same span the previous screen used and the same one
+                // ABreakerCharacter::BaseFieldOfView enforces.
+                SNew(SBreakerFieldplateSlider)
+                .Value((Model->FieldOfView - 70.0f) / 50.0f)
+                .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, FOVReadout](float Value)
                 {
-                    Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
-                }
-                if (FOVReadout.IsValid())
-                {
-                    FOVReadout->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Live->FieldOfView)));
-                }
-            })
-            .OnMouseCaptureEnd_Lambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }),
+                    UBreakerGameSettings* Live = GameSettings.Get();
+                    if (!Live) return;
+                    Live->FieldOfView = UBreakerGameSettingsLibrary::ClampFOV(70.0f + Value * 50.0f);
+                    if (Character.IsValid())
+                    {
+                        Character->ApplyMenuSettings(Live->MouseSensitivity, Live->FieldOfView, Live->bInvertVerticalLook);
+                    }
+                    if (FOVReadout.IsValid())
+                    {
+                        FOVReadout->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Live->FieldOfView)));
+                    }
+                }))
+                .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]() { if (GameSettings.IsValid()) GameSettings->Save(); }))
+            ],
             FOVValue)
     ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
 
     // ---- Window mode -------------------------------------------------------
-    TSharedRef<SHorizontalBox> ModeStrip = SNew(SHorizontalBox);
-    auto AddModeChip = [this, &ModeStrip, Model](const FString& Label, EBreakerWindowMode Mode)
-    {
-        const bool bSelected = Model->WindowMode == Mode;
-        ModeStrip->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-        [
-            SNew(SBox).WidthOverride(SettingsChipWidth)
-            [
-                MakeButton(FText::FromString(Label), FOnClicked::CreateLambda([this, Mode]()
-                {
-                    if (UBreakerGameSettings* Live = GameSettings.Get())
-                    {
-                        Live->WindowMode = Mode;
-                        Live->Save();
-                        // Video is the one group that reaches the engine, and
-                        // it does so IMMEDIATELY: a window-mode chip that only
-                        // took effect on restart would be indistinguishable
-                        // from a broken one.
-                        Live->ApplyToEngine();
-                    }
-                    Rebuild(EBreakerMenuScreen::Settings);
-                    return FReply::Handled();
-                }), bSelected)
-            ]
-        ];
-    };
-    AddModeChip(TEXT("FULLSCREEN"), EBreakerWindowMode::Fullscreen);
-    AddModeChip(TEXT("BORDERLESS"), EBreakerWindowMode::BorderlessWindowed);
-    AddModeChip(TEXT("WINDOWED"), EBreakerWindowMode::Windowed);
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+    // A dropdown over the whole closed set — the pack's control for a closed
+    // choice. Video is the one group that reaches the engine, and it does so
+    // IMMEDIATELY: a mode that only took effect on restart would be
+    // indistinguishable from a broken one.
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
     [
-        SettingsRow(TEXT("WINDOW MODE"), ModeStrip, SNew(SBox).WidthOverride(SettingsValueWidth))
+        BreakerSettingsRow(TEXT("Window mode"), FString(),
+            SNew(SBreakerFieldplateDropdown)
+            .Options(TArray<FString>({ TEXT("FULLSCREEN"), TEXT("BORDERLESS"), TEXT("WINDOWED") }))
+            .SelectedIndex(static_cast<int32>(Model->WindowMode))
+            .OnPicked(FBreakerOnPick::CreateLambda([this](int32 Index)
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
+                {
+                    Live->WindowMode = static_cast<EBreakerWindowMode>(
+                        FMath::Clamp(Index, 0, static_cast<int32>(EBreakerWindowMode::Windowed)));
+                    Live->Save();
+                    Live->ApplyToEngine();
+                }
+                Rebuild(EBreakerMenuScreen::Settings);
+                return;
+            })),
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
     ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
 
     // ---- Frame cap ---------------------------------------------------------
-    TSharedRef<SHorizontalBox> CapStrip = SNew(SHorizontalBox);
-    auto AddCapChip = [this, &CapStrip, Model](const FString& Label, float Cap)
+    // Still a closed set, for the reason the old chip strip documented: a
+    // SLIDER would bury "uncapped" as a magic zero at one end of a continuum.
+    // Every offered value is inside ClampFrameRateCap's [30, 360] band, or the
+    // 0 sentinel (BreakerGameSettings.cpp:27-33), so no row in this list can
+    // be silently rewritten by the clamp into a different row's value. A
+    // hand-edited ini can hold any clamped value, so an unlisted one is shown
+    // as its own row rather than lighting the wrong one.
+    TArray<FString> CapLabels = { TEXT("UNCAPPED"), TEXT("60"), TEXT("120"), TEXT("144"), TEXT("240"), TEXT("360") };
+    TArray<float> CapValues = { 0.0f, 60.0f, 120.0f, 144.0f, 240.0f, 360.0f };
+    int32 CapIndex = INDEX_NONE;
+    for (int32 Index = 0; Index < CapValues.Num(); ++Index)
     {
-        const bool bSelected = FMath::IsNearlyEqual(Model->FrameRateCapFPS, Cap);
-        CapStrip->AddSlot().AutoWidth().Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
-        [
-            SNew(SBox).WidthOverride(96.0f)
+        if (FMath::IsNearlyEqual(Model->FrameRateCapFPS, CapValues[Index]))
+        {
+            CapIndex = Index;
+            break;
+        }
+    }
+    if (CapIndex == INDEX_NONE)
+    {
+        CapLabels.Add(FString::Printf(TEXT("%.0f"), Model->FrameRateCapFPS));
+        CapValues.Add(Model->FrameRateCapFPS);
+        CapIndex = CapValues.Num() - 1;
+    }
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Frame rate cap"), FString(),
+            SNew(SBreakerFieldplateDropdown)
+            .Options(CapLabels)
+            .SelectedIndex(CapIndex)
+            .OnPicked(FBreakerOnPick::CreateLambda([this, CapValues](int32 Index)
+            {
+                if (UBreakerGameSettings* Live = GameSettings.Get())
+                {
+                    Live->FrameRateCapFPS = UBreakerGameSettingsLibrary::ClampFrameRateCap(
+                        CapValues.IsValidIndex(Index) ? CapValues[Index] : 0.0f);
+                    Live->Save();
+                    Live->ApplyToEngine();
+                }
+                Rebuild(EBreakerMenuScreen::Settings);
+                return;
+            })),
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
+    ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
+
+    // ---- Vertical sync ------------------------------------------------------
+    TSharedPtr<STextBlock> VSyncWord;
+    const TSharedRef<SWidget> VSyncWordWidget =
+        SAssignNew(VSyncWord, STextBlock)
+            .Text(FText::FromString(Model->bVSyncEnabled ? TEXT("ON") : TEXT("OFF")))
+            .ColorAndOpacity(Model->bVSyncEnabled ? SoftText : Muted)
+            .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f));
+
+    Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
+    [
+        BreakerSettingsRow(TEXT("Vertical sync"), FString(),
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
             [
-                MakeButton(FText::FromString(Label), FOnClicked::CreateLambda([this, Cap]()
+                SNew(SBreakerFieldplateToggle)
+                .IsOn(Model->bVSyncEnabled)
+                .OnToggled(FBreakerOnToggle::CreateLambda([this, VSyncWord](bool bOn)
                 {
                     if (UBreakerGameSettings* Live = GameSettings.Get())
                     {
-                        Live->FrameRateCapFPS = UBreakerGameSettingsLibrary::ClampFrameRateCap(Cap);
+                        Live->bVSyncEnabled = bOn;
                         Live->Save();
                         Live->ApplyToEngine();
                     }
-                    Rebuild(EBreakerMenuScreen::Settings);
-                    return FReply::Handled();
-                }), bSelected)
+                    if (VSyncWord.IsValid())
+                    {
+                        VSyncWord->SetText(FText::FromString(bOn ? TEXT("ON") : TEXT("OFF")));
+                        VSyncWord->SetColorAndOpacity(bOn ? SoftText : Muted);
+                    }
+                }))
             ]
-        ];
-    };
-    // Every offered value is inside ClampFrameRateCap's [30, 360] band, or the
-    // 0 sentinel (BreakerGameSettings.cpp:27-33), so no chip on this strip can
-    // be silently rewritten by the clamp into a different chip's value.
-    AddCapChip(TEXT("NONE"), 0.0f);
-    AddCapChip(TEXT("60"), 60.0f);
-    AddCapChip(TEXT("120"), 120.0f);
-    AddCapChip(TEXT("144"), 144.0f);
-    AddCapChip(TEXT("240"), 240.0f);
-    AddCapChip(TEXT("360"), 360.0f);
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-    [
-        SettingsRow(TEXT("FRAME RATE CAP"), CapStrip, SNew(SBox).WidthOverride(SettingsValueWidth))
-    ];
-
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
-    [
-        SNew(SCheckBox)
-        .IsChecked(Model->bVSyncEnabled ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
-        .OnCheckStateChanged_Lambda([this](ECheckBoxState State)
-        {
-            if (UBreakerGameSettings* Live = GameSettings.Get())
-            {
-                Live->bVSyncEnabled = State == ECheckBoxState::Checked;
-                Live->Save();
-                Live->ApplyToEngine();
-            }
-        })
-        [
-            SNew(SBox).Padding(FMargin(BreakerUI::Space8, 0.0f, 0.0f, 0.0f))
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
             [
-                MenuText(FText::FromString(TEXT("VERTICAL SYNC")), BreakerUI::TypeBody, Primary, true)
-            ]
-        ]
+                VSyncWordWidget
+            ],
+            SNew(SBox).WidthOverride(BreakerSettingsValueWidth))
     ];
+    Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
     return Section;
 }
 
@@ -2213,7 +2876,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
 {
     UBreakerGameSettings* Model = GameSettings.Get();
     TSharedRef<SVerticalBox> Section = SNew(SVerticalBox);
-    Section->AddSlot().AutoHeight()[SettingsSectionHeader(TEXT("AUDIO"))];
+    // The subtitle is the same honesty the model's own header carries: all
+    // three values persist and route nowhere yet. A player who drags these
+    // and hears no change should be told why on the screen, not left to
+    // conclude the sliders are broken. The sidebar's STUB mark on this pane
+    // states the same fact and both leave together, when the routing lands.
+    Section->AddSlot().AutoHeight()
+    [
+        BreakerSettingsPaneHeader(TEXT("AUDIO"), TEXT("Three volumes. Saved; not yet routed to the sound path."))
+    ];
     if (!Model) return Section;
 
     // All three are the same control over a different float, so they are built
@@ -2225,54 +2896,47 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsAudioSection()
     auto AddVolumeRow = [this, &Section](const FString& Label, float UBreakerGameSettings::* Field, float Initial)
     {
         TSharedPtr<STextBlock> Readout;
-        const TSharedRef<SWidget> ValueColumn = SNew(SBox).WidthOverride(SettingsValueWidth).HAlign(HAlign_Fill)
+        const TSharedRef<SWidget> ValueColumn = SNew(SBox).WidthOverride(BreakerSettingsValueWidth).HAlign(HAlign_Fill)
         [
             SAssignNew(Readout, STextBlock)
                 .Text(FText::FromString(FString::Printf(TEXT("%.0f%%"), Initial * 100.0f)))
                 .Justification(ETextJustify::Right)
-                .ColorAndOpacity(BreakerUI::Cyan)
-                .Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), BreakerUI::TypeBody))
+                .ColorAndOpacity(Primary)
+                .Font(BreakerMonoFont(BreakerUI::TypeBody))
         ];
-        Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        Section->AddSlot().AutoHeight().Padding(0.0f, BreakerSettingsRowPad)
         [
-            SettingsRow(Label,
-                SNew(SSlider)
-                .Value(Initial)   // volumes are already 0..1, so no remap
-                .OnValueChanged_Lambda([this, Field, Readout](float Value)
-                {
-                    UBreakerGameSettings* Live = GameSettings.Get();
-                    if (!Live) return;
-                    Live->*Field = UBreakerGameSettingsLibrary::ClampVolume(Value);
-                    if (Readout.IsValid())
+            BreakerSettingsRow(Label, FString(),
+                SNew(SBox).WidthOverride(BreakerSettingsSliderWidth)
+                [
+                    SNew(SBreakerFieldplateSlider)
+                    .Value(Initial)   // volumes are already 0..1, so no remap
+                    .OnValueChanged(FOnFloatValueChanged::CreateLambda([this, Field, Readout](float Value)
                     {
-                        Readout->SetText(FText::FromString(FString::Printf(TEXT("%.0f%%"), Live->*Field * 100.0f)));
-                    }
-                })
-                .OnMouseCaptureEnd_Lambda([this]()
-                {
-                    if (UBreakerGameSettings* Live = GameSettings.Get())
+                        UBreakerGameSettings* Live = GameSettings.Get();
+                        if (!Live) return;
+                        Live->*Field = UBreakerGameSettingsLibrary::ClampVolume(Value);
+                        if (Readout.IsValid())
+                        {
+                            Readout->SetText(FText::FromString(FString::Printf(TEXT("%.0f%%"), Live->*Field * 100.0f)));
+                        }
+                    }))
+                    .OnCaptureEnd(FSimpleDelegate::CreateLambda([this]()
                     {
-                        Live->Save();
-                        Live->ApplyToEngine();
-                    }
-                }),
+                        if (UBreakerGameSettings* Live = GameSettings.Get())
+                        {
+                            Live->Save();
+                            Live->ApplyToEngine();
+                        }
+                    }))
+                ],
                 ValueColumn)
         ];
+        Section->AddSlot().AutoHeight()[BreakerSettingsDivider()];
     };
-    AddVolumeRow(TEXT("MASTER VOLUME"), &UBreakerGameSettings::MasterVolume, Model->MasterVolume);
-    AddVolumeRow(TEXT("EFFECTS VOLUME"), &UBreakerGameSettings::EffectsVolume, Model->EffectsVolume);
-    AddVolumeRow(TEXT("MUSIC VOLUME"), &UBreakerGameSettings::MusicVolume, Model->MusicVolume);
-
-    // The same honesty the model's own header already carries
-    // (BreakerGameSettings.cpp:250-261): the project has no audio pipeline, so
-    // all three values persist and route nowhere. A player who drags these and
-    // hears nothing should be told why on the screen, not left to conclude the
-    // sliders are broken.
-    Section->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
-    [
-        MenuText(FText::FromString(TEXT("SAVED. THE GAME HAS NO AUDIO YET — THESE TAKE EFFECT THE DAY SOUND EXISTS.")),
-            BreakerUI::TypeCaption, Muted)
-    ];
+    AddVolumeRow(TEXT("Master volume"), &UBreakerGameSettings::MasterVolume, Model->MasterVolume);
+    AddVolumeRow(TEXT("Effects volume"), &UBreakerGameSettings::EffectsVolume, Model->EffectsVolume);
+    AddVolumeRow(TEXT("Music volume"), &UBreakerGameSettings::MusicVolume, Model->MusicVolume);
     return Section;
 }
 
@@ -2280,42 +2944,186 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
 {
     EnsureSettingsLoaded();
 
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-    Body->AddSlot().AutoHeight()[BuildSettingsInputSection()];
-    Body->AddSlot().AutoHeight()[BuildSettingsKeybindSection()];
-    Body->AddSlot().AutoHeight()[BuildSettingsVideoSection()];
-    Body->AddSlot().AutoHeight()[BuildSettingsAudioSection()];
+    // One pane at a time — the reference is a sidebar layout, not a scroll of
+    // stacked sections.
+    TSharedRef<SWidget> Pane =
+          SettingsPane == 1 ? BuildSettingsKeybindSection()
+        : SettingsPane == 2 ? BuildSettingsVideoSection()
+        : SettingsPane == 3 ? BuildSettingsAudioSection()
+        : BuildSettingsInputSection();
 
-    Body->AddSlot().AutoHeight()
-    [
-        SNew(SBox).WidthOverride(240.0f)
+    // ---- Sidebar navigation ------------------------------------------------
+    // 44px rows, active row on the plate face behind a 3px cyan rail, group
+    // captions in tracked mono. The reference lists GAMEPLAY and
+    // ACCESSIBILITY as well; neither has a model behind it yet, so both are
+    // painted disabled with the STUB mark rather than drawn live over nothing
+    // — a nav entry that opens an empty pane would be reachable content
+    // nothing pays for.
+    auto MakeNavGroup = [](const FString& Label) -> TSharedRef<SWidget>
+    {
+        return SNew(SBox).Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24, BreakerUI::Space24, BreakerUI::Space8))
         [
-            MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack), true)
+            BreakerMonoText(FText::FromString(Label), BreakerUI::TypeCaption, Muted, 0.16f)
+        ];
+    };
+    auto MakeNavRow = [this](const FString& Label, int32 Pane, bool bEnabled, bool bStub) -> TSharedRef<SWidget>
+    {
+        const bool bActive = bEnabled && SettingsPane == Pane;
+        TSharedRef<SHorizontalBox> Content = SNew(SHorizontalBox);
+        Content->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
+        [
+            MenuText(FText::FromString(Label), BreakerUI::TypeBody, bEnabled ? Primary : Disabled, true)
+        ];
+        if (bStub)
+        {
+            Content->AddSlot().AutoWidth().VAlign(VAlign_Center)[BreakerSettingsStubMark()];
+        }
+
+        const FMargin RowPad(BreakerSettingsContentPad - BreakerUI::RailThickness, 0.0f, BreakerUI::Space24, 0.0f);
+        TSharedRef<SWidget> Face = bEnabled
+            ? StaticCastSharedRef<SWidget>(
+                SNew(SButton)
+                .ButtonColorAndOpacity(bActive ? Panel : Transparent)
+                .ContentPadding(RowPad)
+                .HAlign(HAlign_Fill)
+                .VAlign(VAlign_Center)
+                .OnClicked(FOnClicked::CreateLambda([this, Pane]()
+                {
+                    if (SettingsPane != Pane)
+                    {
+                        SettingsPane = Pane;
+                        CancelKeybindListen();
+                        Rebuild(EBreakerMenuScreen::Settings);
+                    }
+                    return FReply::Handled();
+                }))
+                [
+                    Content
+                ])
+            : StaticCastSharedRef<SWidget>(
+                // Painted, never faded: geometry kept, accent stripped, the
+                // STUB mark says why in words.
+                SNew(SBox).Padding(RowPad).VAlign(VAlign_Center)[Content]);
+
+        return SNew(SBox).HeightOverride(BreakerSettingsNavRowHeight)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()
+            [
+                SNew(SBox).WidthOverride(BreakerUI::RailThickness)
+                [
+                    SolidBlock(bActive ? Cyan : Transparent)
+                ]
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f)[Face]
+        ];
+    };
+
+    TSharedRef<SVerticalBox> Nav = SNew(SVerticalBox);
+    Nav->AddSlot().AutoHeight()[MakeNavGroup(TEXT("PLAY"))];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("INPUT"), 0, true, false)];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("KEYBINDS"), 1, true, false)];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("GAMEPLAY"), INDEX_NONE, false, true)];
+    Nav->AddSlot().AutoHeight()[MakeNavGroup(TEXT("PRESENT"))];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("VIDEO"), 2, true, false)];
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("ACCESSIBILITY"), INDEX_NONE, false, true)];
+    // AUDIO opens and its sliders save; the STUB mark stays until the values
+    // route to a sound path (see BuildSettingsAudioSection).
+    Nav->AddSlot().AutoHeight()[MakeNavRow(TEXT("AUDIO"), 3, true, true)];
+    Nav->AddSlot().FillHeight(1.0f)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    // The sidebar's standing fact, from the plate: this screen is the same
+    // screen whichever door it was entered through — Main's SETTINGS button
+    // and the pause menu both land here, and RootScreen only decides where
+    // BACK returns.
+    Nav->AddSlot().AutoHeight().Padding(FMargin(BreakerSettingsContentPad, 0.0f, BreakerUI::Space24, BreakerUI::Space24))
+    [
+        SNew(STextBlock)
+            .Text(FText::FromString(TEXT("SETTINGS IS IDENTICAL FROM TITLE AND FROM PAUSE")))
+            .ColorAndOpacity(Muted)
+            .WrapTextAt(220.0f)
+            .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+    ];
+
+    const TSharedRef<SWidget> Sidebar = SNew(SBox).WidthOverride(BreakerSettingsSidebarWidth)
+    [
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().FillWidth(1.0f)
+        [
+            SNew(SOverlay)
+            + SOverlay::Slot()[SolidBlock(BreakerUI::BgRaised)]
+            + SOverlay::Slot()[Nav]
+        ]
+        + SHorizontalBox::Slot().AutoWidth()
+        [
+            SNew(SBox).WidthOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
         ]
     ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+
+    // ---- Header band -------------------------------------------------------
+    // 87px + its 1px divider: the drawn « chevrons and BACK, then the screen
+    // title. BACK is the same GoBack Escape drives, so the two doors agree.
+    const TSharedRef<SWidget> Header = SNew(SBox).HeightOverride(87.0f)
     [
-        MenuText(FText::FromString(TEXT("CHANGES SAVE IMMEDIATELY  |  ESC BACK")), BreakerUI::TypeCaption, SoftText)
+        SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerSettingsContentPad, 0.0f, 0.0f, 0.0f)
+        [
+            SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+            [
+                SNew(SButton)
+                .ButtonColorAndOpacity(Transparent)
+                .ContentPadding(FMargin(0.0f, 0.0f, BreakerUI::Space8, 0.0f))
+                .HAlign(HAlign_Left)
+                .VAlign(VAlign_Center)
+                .OnClicked(FOnClicked::CreateSP(this, &SBreakerMenu::GoBack))
+                [
+                    SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[BreakerBackChevrons()]
+                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                    [
+                        BreakerMonoText(FText::FromString(TEXT("BACK")), BreakerUI::TypeCaption, Muted, 0.16f)
+                    ]
+                ]
+            ]
+        ]
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+        [
+            MenuText(FText::FromString(TEXT("SETTINGS")), BreakerUI::TypeH1, Primary, true)
+        ]
     ];
 
-    // Wider than the 720 default: the keybind rows carry four columns
-    // (action, the key control, badge, DEFAULT) whose fixed widths and gaps
-    // total 604, and the badge needs the rest — see the budget note in
-    // MakeKeybindRow. Deleting the BIND column bought back 134px of that
-    // budget; the plate stays at 1040 because the badge is what was tight, not
-    // the plate. BuildFrame
-    // is still the fixed-height plate with the scrolling body: the four
-    // sections are far taller than any viewport, and a plate that grew to fit
-    // them is trap 2 in this file, not a fix.
-    //
-    // Clamped to the viewport the same way the wide screens are: 1040 is the
-    // width the rows were laid out against, not a width the window is promised
-    // to have, and a plate wider than the window runs its right-hand columns
-    // off the edge — which is exactly how the tab strip's labels were lost
-    // once already (see BuildScreenTabs).
-    const float SettingsPanelWidth = FMath::Min(1040.0f, MeasureWideScreen().PanelWidth);
-    return BuildFrame(FText::FromString(TEXT("SETTINGS")),
-        FText::FromString(TEXT("INPUT / KEYBINDS / VIDEO / AUDIO")), Body, SettingsPanelWidth);
+    // Full-bleed, not a centred plate: the reference is a full-screen layout
+    // — header band, sidebar, one pane at a time — and fixed-geometry zones
+    // cannot jitter, which is all BuildFrame's fixed plate existed to stop.
+    return SNew(SOverlay)
+        + SOverlay::Slot()
+        [
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BreakerUI::BgBase)
+        ]
+        + SOverlay::Slot()
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()[Header]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+            ]
+            + SVerticalBox::Slot().FillHeight(1.0f)
+            [
+                SNew(SHorizontalBox)
+                + SHorizontalBox::Slot().AutoWidth()[Sidebar]
+                + SHorizontalBox::Slot().FillWidth(1.0f)
+                [
+                    SNew(SScrollBox)
+                    + SScrollBox::Slot().Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24,
+                        BreakerSettingsContentPad, BreakerUI::Space40))
+                    [
+                        Pane
+                    ]
+                ]
+            ]
+        ];
 }
 
 void SBreakerMenu::BeginKeybindListen(FName Action)
@@ -2351,14 +3159,32 @@ void SBreakerMenu::CancelKeybindListen()
 void SBreakerMenu::CommitKeybind(const FKey& Key)
 {
     const FName Action = ListeningKeybindAction;
-    ListeningKeybindAction = NAME_None;
     if (Action == NAME_None) return;
 
     UBreakerGameSettings* Model = GameSettings.Get();
     if (!Model || !Key.IsValid())
     {
+        CancelKeybindListen();
         KeybindStatus = FText::FromString(TEXT("THAT INPUT CANNOT BE BOUND."));
         bKeybindStatusIsClash = true;
+        Rebuild(EBreakerMenuScreen::Settings);
+        return;
+    }
+
+    // THE SECOND TAKE. README: "first press names the clash and commits
+    // nothing; second takes it" — the same key arriving while its own clash
+    // is on the board is the player answering yes. This is also the mouse
+    // path's confirm: a mouse-button clash re-arrives through
+    // OnPreviewMouseButtonDown exactly like a key does.
+    if (PendingKeybindAction == Action && PendingKeybindKey == Key)
+    {
+        CancelKeybindListen();
+        Model->SetKeybindOverride(Action, Key);
+        Model->Save();
+        KeybindStatus = FText::FromString(FString::Printf(TEXT("%s BOUND TO %s — THE KEY IS NOW SHARED."),
+            *UBreakerGameSettingsLibrary::DescribeAction(Action).ToString(),
+            *Key.GetDisplayName().ToString().ToUpper()));
+        bKeybindStatusIsClash = false;
         Rebuild(EBreakerMenuScreen::Settings);
         return;
     }
@@ -2371,19 +3197,21 @@ void SBreakerMenu::CommitKeybind(const FKey& Key)
         // actions sharing a key is sometimes a deliberate choice, which is why
         // FindKeybindConflict is offered separately from SetKeybindOverride
         // rather than being enforced inside it (BreakerGameSettings.h:208-211).
-        // So the clash is reported with the action that owns the key, the row
-        // arms, and the player's second click is what decides.
+        // The row KEEPS LISTENING, because the answer is another press: the
+        // same key to share, a different key to try instead, Escape to walk
+        // away. Nothing was written by this press.
         PendingKeybindAction = Action;
         PendingKeybindKey = Key;
-        KeybindStatus = FText::FromString(FString::Printf(TEXT("%s IS ALREADY %s. CLICK BIND ANYWAY TO SHARE IT, OR REBIND %s FIRST."),
+        KeybindStatus = FText::FromString(FString::Printf(TEXT("%s IS HELD BY %s. PRESS %s AGAIN TO SHARE IT, OR A DIFFERENT KEY.  ESC CANCELS."),
             *Key.GetDisplayName().ToString().ToUpper(),
             *UBreakerGameSettingsLibrary::DescribeAction(ClashWith).ToString(),
-            *UBreakerGameSettingsLibrary::DescribeAction(ClashWith).ToString()));
+            *Key.GetDisplayName().ToString().ToUpper()));
         bKeybindStatusIsClash = true;
         Rebuild(EBreakerMenuScreen::Settings);
         return;
     }
 
+    CancelKeybindListen();
     Model->SetKeybindOverride(Action, Key);
     Model->Save();
     KeybindStatus = FText::FromString(FString::Printf(TEXT("%s BOUND TO %s."),
@@ -7958,10 +8786,12 @@ TSharedRef<SWidget> SBreakerMenu::BuildTravelScreen()
 // game about what a level-30 character with area-40 loot IS. No game rule
 // lives here.
 //
-// It follows the settings screen's idiom exactly: SettingsSectionHeader /
+// It keeps the settings screen's PREVIOUS idiom: SettingsSectionHeader /
 // SettingsRow rows, BuildFrame's fixed-height scrolling plate clamped to the
 // viewport, MakeButton chrome, and readouts that are plain text rebuilt by the
 // click that changed them — never a per-frame attribute polling a component.
+// (The settings screen itself moved onto the Fieldplate sidebar layout; this
+// dev screen is not part of that pass and follows it whenever its turn comes.)
 // ---------------------------------------------------------------------------
 TSharedRef<SWidget> SBreakerMenu::BuildDevSandboxScreen()
 {

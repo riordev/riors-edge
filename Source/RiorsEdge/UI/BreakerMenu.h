@@ -553,6 +553,10 @@ private:
     TSharedRef<SWidget> BuildSettingsKeybindSection();
     TSharedRef<SWidget> BuildSettingsVideoSection();
     TSharedRef<SWidget> BuildSettingsAudioSection();
+    // Which settings pane the sidebar has open: 0 INPUT, 1 KEYBINDS, 2 VIDEO,
+    // 3 AUDIO. A member rather than a screen value for the same reason
+    // CharacterSheetTab is: switching panes must not change the back target.
+    int32 SettingsPane = 0;
     // One keybind row: label, THE KEY CONTROL, conflict badge, DEFAULT.
     // Four columns, not five. The separate BIND button is gone — owner: "this
     // should show the current bind you click and replace it this is ugly" — so
