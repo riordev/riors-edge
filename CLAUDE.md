@@ -159,6 +159,29 @@ display rename the pack proposes (Skimline et al., level-3 wording) is
 with the owner; the UI prints the trees' real names and O86's Forge
 until ruled.
 
+THE LEDGER LANE (this pass): HEALTH BANDS ARE STATE. HEAD `c486214`,
+451 passing / 4 expected red (same roster) / 0 unexpected.
+Attributes/BreakerHealthBands.h is the one segment-count source
+(IndexOf/SegmentCountFor, pure; every rank returns a real count,
+Trash included — O125; the bar draws what it can, the display limit
+is never in the state function). TargetBandBroken is the 25th
+condition (target block end, mask 25/32): per-target, previous-hit
+lifetime — the bit sits on the target's combat component, written at
+ReceiveDamage's foot (hunks agreed with lane/dev), read by the next
+hit's rider resolution; ClearBandBreakTracking is published and
+lane/dev owes the one-line ReviveFromPool call for pooled corpses.
+Overpressure re-gated conditional at 16.0 (Siege's comparable).
+COLLAPSE DID NOT MOVE: its intended shared-pool More gated on
+TargetBandBroken has NO payment lane — standing aggregation never
+holds a target bit and the rider lane is Increased-bucket only by
+rule — so authoring it is a dead line; the per-hit More lane is
+O125's open bullet, with the composition it would open (TV x
+Collapse x Overflow = 2.1632 against the 2.197 ceiling, and the
+weapon lane's zero-commitment unconditional product falling 1.9825
+-> 1.8605). Ability parity measured 0.268x at cap / 0.202x endgame,
+unchanged by any of this — neither power-band fixture can afford
+Collapse's chain.
+
 Update this section as the last step of each session.
 
 ## Build and test
