@@ -2,7 +2,8 @@
 
 ## Current work
 
-GROUND LANE, THE READOUT PASS (450 / 4 / 0, same expected-red roster).
+GROUND LANE, THE READOUT PASS (453 / 4 / 0 on the rebased tree, same
+expected-red roster).
 THE FERNHALL LANE DEFECT IS CLOSED, AND THE ANSWER INVERTED THE
 DIAGNOSIS. The yard prints two lanes and they were printing under one
 word, but the chest lane is NOT unguarded: `MinimumOpenLaneWidth` is
