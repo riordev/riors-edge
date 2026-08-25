@@ -2,6 +2,38 @@
 
 ## Current work
 
+THE KIT LANE OPENED WITH A CENSUS, NOT A FEATURE (lane/kit). Over
+the 25 registered fallback abilities (Swift 4, Caster 7, Gunsmith 7,
+Tank 7, Support 7): every definition names a real UGameplayAbility
+and every ActivateAbility runs real logic — the owner's "make sure
+all abilities are implemented" is answered YES for the registered
+set, and the gap is PRESENTATION, not activation. Zero of 25 make a
+sound or shake a camera. In-world visuals: 12 of 25 draw something
+(five Caster abilities call ABreakerEffectRenderer directly; Rot and
+Fracture draw through their spawned actors; the deployable/zone
+actors carry Turret, AmmoCrate, MineCluster, Disruptor, AnchorPoint,
+Suppress, FieldAssembly — but Turret fires invisibly, the crate
+dispenses invisibly, and Mine Cluster's individual charges have NO
+visual, only the cluster marker, while the player must avoid the
+charges). 8 are HUD-only (Sidearm Rig, Overhaul, Bloodline, Hold,
+Metronome, Conduit, Cadence — window bars — plus Lead/Mark's target
+diamond). 9 draw NOTHING at all: Skim, CadenceBreak, Overdrive (all
+three Swift non-mark abilities), Rend, Provoke, Breach Charge (the
+charge is a bare FVector), Ground Zero, Patch, Purge. Swift's
+missing three are NAMED from the deleted Class-Kits §1.2: S1 Slipcut
+(a designed STARTER — code starters are Skim+Lead where design said
+Slipcut+Skim), S4 Hard Stop (its verb already lives as a branch
+inside BreakerAbility_Skim), S5 Sightline; population 28 intended =
+25 registered + these 3. The class-swap stale loadout
+(BreakerAbilityComponent.cpp:92) still occurs — DevForceClass never
+migrates AbilityLoadout — but the grant is guarded at
+ResolveDefinition (foreign-class id falls back to the class default)
+and no non-dev path can change a chosen class. Stale note found:
+Lead's header says the mark is "tracked, not consumed";
+BreakerWeaponComponent.cpp:1434-1579 consumes it. Nothing repaired,
+by rule; the full census with per-ability effect/presentation rows
+and the recorded-gap ledger is the session report.
+
 THE PLACE IS BUILT AND GATED ON THE OWNER (`f78013b`, 448 / 4 / 0):
 the Fernhall approach yard — the vertical slice's zone — landed end
 to end. The GLB route is real: Scripts/compose_fernhall.py authors
