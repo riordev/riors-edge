@@ -55,6 +55,8 @@
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/Texture2D.h"
+#include "Widgets/Images/SImage.h"
 #include "Algo/Reverse.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
@@ -145,6 +147,43 @@ namespace
             .Text(Text)
             .ColorAndOpacity(Color)
             .Font(BreakerMonoFont(Size, TrackingEm));
+    }
+
+    // ---- Mark brushes -----------------------------------------------------
+    // The pack's stroke-only marks (Assets/marks -> Scripts/import_marks.py,
+    // /Game/Breaker/UI/Marks). Textures are loaded once and ROOTED, brushes
+    // cached for the process — a brush freed under a live SImage is a crash.
+    // Insignia never tint (they stay #DCE4EE at every state); rarity marks
+    // tint to the rarity hex at the call site. A missing texture (a clone
+    // before its LFS pull) returns null and the caller keeps its layout box,
+    // drawing nothing — the pre-marks look, never tofu.
+    const FSlateBrush* BreakerMarkBrush(const TCHAR* AssetPath, const FVector2D& Size)
+    {
+        static TMap<FString, TUniquePtr<FSlateBrush>> Cache;
+        TUniquePtr<FSlateBrush>& Slot = Cache.FindOrAdd(FString(AssetPath));
+        if (!Slot)
+        {
+            UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, AssetPath);
+            if (!Texture) return nullptr;   // absent stays retryable; menu-rate cost
+            Texture->AddToRoot();
+            Slot = MakeUnique<FSlateBrush>();
+            Slot->SetResourceObject(Texture);
+            Slot->ImageSize = Size;
+            Slot->DrawAs = ESlateBrushDrawType::Image;
+        }
+        return Slot.Get();
+    }
+
+    TSharedRef<SWidget> BreakerMark(const TCHAR* AssetPath, float Size,
+        const FLinearColor& Tint = FLinearColor::White)
+    {
+        const FSlateBrush* Brush = BreakerMarkBrush(AssetPath, FVector2D(Size, Size));
+        return SNew(SBox).WidthOverride(Size).HeightOverride(Size)
+        [
+            Brush
+                ? StaticCastSharedRef<SWidget>(SNew(SImage).Image(Brush).ColorAndOpacity(Tint))
+                : StaticCastSharedRef<SWidget>(SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)))
+        ];
     }
 
     TSharedRef<STextBlock> MenuText(const FText& Text, int32 Size, const FLinearColor& Color = BreakerUI::TextPrimary, bool bBold = false)
@@ -992,6 +1031,9 @@ void SBreakerMenu::ShowScreenForCapture(EBreakerMenuScreen Screen)
         else if (Board == TEXT("GUNSMITH")) { PendingCreateClass = EBreakerClassId::Gunsmith; }
         else if (Board == TEXT("TANK")) { PendingCreateClass = EBreakerClassId::Tank; }
         else if (Board == TEXT("SUPPORT")) { PendingCreateClass = EBreakerClassId::Support; }
+        // The front door's second state: the reveal listens for a real key,
+        // which a capture run cannot press.
+        else if (Board == TEXT("REVEALED")) { bTitleRevealed = true; }
         else if (Board == TEXT("FORGEBENCH"))
         {
             // Fabricates a bench subject the way -BreakerCaptureHUD fabricates
@@ -1494,76 +1536,226 @@ void SBreakerMenu::EnsureRosterLoaded()
 
 TSharedRef<SWidget> SBreakerMenu::BuildMainScreen()
 {
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+    // The reference's front door (screen_frontdoor_attract): a full-bleed
+    // night scene — the hatched field, a black skyline standing on the ground
+    // line, the road band under it — with the identity stack centred over
+    // everything. The SAME scene carries both states: before the key the
+    // bottom offers PRESS ANY KEY; after it, PLAY / SETTINGS / QUIT stand in
+    // the same place. The reveal changes what is offered, never where you
+    // are — the old version swapped a centred plate for a different centred
+    // plate and two thirds of the screen never existed.
 
-    // ---- The attract plate --------------------------------------------
+    // ---- The hatch --------------------------------------------------------
+    // 2px diagonals of bg/raised at the plate's ~17px pitch, drawn once at
+    // the authored 1920x1080 span and CLIPPED by the sky box — at another
+    // window size the pattern crops, exactly as a texture would.
+    TSharedRef<SCanvas> Hatch = SNew(SCanvas);
+    for (int32 Index = 0; Index < 178; ++Index)
+    {
+        const float X = -1080.0f + 17.0f * static_cast<float>(Index);
+        AddCanvasSegment(Hatch, FVector2D(X, 1080.0), FVector2D(X + 1080.0, 0.0), BreakerUI::BgRaised, 2.0f);
+    }
+
+    // ---- The skyline -------------------------------------------------------
+    // Five black silhouettes ringed 2px in the panel tone, anchored to the
+    // ground line. Spaced by the plate's ratios (FillWidth weights are the
+    // plate's pixel runs), so the composition holds at any width; heights are
+    // fixed — a skyline that squashed with the window would read as a bug.
+    auto MakeBlock = [](float Height) -> TSharedRef<SWidget>
+    {
+        return SNew(SBox).HeightOverride(Height)
+        [
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(PanelRaised)
+            .Padding(FMargin(2.0f, 2.0f, 2.0f, 0.0f))
+            [
+                SolidBlock(FLinearColor::Black)
+            ]
+        ];
+    };
+    TSharedRef<SHorizontalBox> Skyline = SNew(SHorizontalBox);
+    auto SkyGap = [&Skyline](float Weight)
+    {
+        Skyline->AddSlot().FillWidth(Weight)[SNew(SSpacer).Size(FVector2D(1.0f, 1.0f))];
+    };
+    auto SkyBlock = [&Skyline, &MakeBlock](float Weight, float Height)
+    {
+        Skyline->AddSlot().FillWidth(Weight).VAlign(VAlign_Bottom)[MakeBlock(Height)];
+    };
+    SkyGap(240.0f); SkyBlock(188.0f, 287.0f); SkyGap(92.0f); SkyBlock(168.0f, 197.0f);
+    SkyGap(603.0f); SkyBlock(228.0f, 338.0f); SkyGap(83.0f); SkyBlock(157.0f, 157.0f);
+    SkyGap(142.0f); SkyBlock(80.0f, 157.0f);
+
+    // Sky over ground line over road over the dark below, at the plate's
+    // proportions (758 / 2 / 84 / 236 of 1080).
+    const TSharedRef<SWidget> Scene = SNew(SVerticalBox)
+        + SVerticalBox::Slot().FillHeight(758.0f)
+        [
+            SNew(SOverlay)
+            + SOverlay::Slot()
+            [
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds)[Hatch]
+            ]
+            + SOverlay::Slot().VAlign(VAlign_Bottom)[Skyline]
+        ]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SBox).HeightOverride(2.0f)[SolidBlock(Panel)]
+        ]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            SNew(SBox).HeightOverride(84.0f)[SolidBlock(BreakerUI::BgRaised)]
+        ]
+        + SVerticalBox::Slot().FillHeight(236.0f)[SolidBlock(BreakerUI::BgVoid)];
+
+    // ---- The identity stack ------------------------------------------------
+    TSharedRef<SVerticalBox> Stack = SNew(SVerticalBox);
+    Stack->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space24)
+    [
+        // The breakers insignia, the real texture — never tinted.
+        BreakerMark(TEXT("/Game/Breaker/UI/Marks/T_InsigniaBreakers.T_InsigniaBreakers"), 40.0f)
+    ];
+    Stack->AddSlot().AutoHeight().HAlign(HAlign_Center)
+    [
+        // The loading spec's display scale for an area name; the title is the
+        // biggest thing the game ever sets.
+        MenuText(FText::FromString(TEXT("RIOR'S EDGE")), 100, Primary, true)
+    ];
+    auto AddKickerLine = [&Stack](const TCHAR* Line, const FLinearColor& Color, float TopPad)
+    {
+        Stack->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, TopPad, 0.0f, 0.0f)
+        [
+            BreakerMonoText(FText::FromString(Line), 13, Color, 0.22f)
+        ];
+    };
+    AddKickerLine(TEXT("ONE MAN OPENED THE RIFTS"), Muted, BreakerUI::Space24);
+    AddKickerLine(TEXT("THE TIMELINES ARE BEING ERASED OUTWARD"), Muted, BreakerUI::Space8);
+    AddKickerLine(TEXT("BREAKERS NEEDED"), Primary, BreakerUI::Space8);
+
+    // ---- The offer: PRESS ANY KEY, or the three verbs ----------------------
+    TSharedRef<SVerticalBox> Offer = SNew(SVerticalBox);
     if (!bTitleRevealed)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-        [
-            MenuText(FText::FromString(TEXT("LOOT THE RIFTS. OUTRUN THE EDGE.")), 11, SoftText)
-        ];
-        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
-        [
-            MenuText(FText::FromString(TEXT("PRESS ENTER")), BreakerUI::TypeH2, Cyan, true)
-        ];
-        // A visible fallback for the case the keyboard path is somehow not
-        // reaching us. The owner asked for a key, and a key is what this
-        // listens for — but a title screen with no clickable way forward is
-        // unrecoverable if focus is wrong, and that is a bad thing to be
+        // The caption is itself the mouse fallback: the reveal listens on the
+        // player-input path, but a title screen with no clickable way forward
+        // is unrecoverable if focus is wrong, and that is a bad thing to be
         // certain about without having looked.
-        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space24, 0.0f, 0.0f)
+        Offer->AddSlot().AutoHeight().HAlign(HAlign_Center)
         [
-            MakeButton(FText::FromString(TEXT("CONTINUE")), FOnClicked::CreateLambda([this]()
+            SNew(SButton)
+            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+            .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space8))
+            .OnClicked(FOnClicked::CreateLambda([this]()
             {
                 bTitleRevealed = true;
                 Rebuild(EBreakerMenuScreen::Main);
                 return FReply::Handled();
-            }), true)
+            }))
+            [
+                BreakerMonoText(FText::FromString(TEXT("PRESS ANY KEY")), BreakerUI::TypeCaption, Muted, 0.22f)
+            ]
         ];
-        return BuildFrame(FText::FromString(TEXT("RIOR'S EDGE")),
-            FText::FromString(TEXT("")), Body, 720.0f);
     }
-
-    // ---- PLAY / SETTINGS / QUIT ----------------------------------------
-    // Exactly the three the owner asked for. LOADOUT, INVENTORY and BREAKER
-    // CLASS used to sit here and have MOVED to the pause menu, where they
-    // belong: they act on a character, and at the title screen there is not
-    // one yet — every one of them silently operated on whatever pawn the gym
-    // happened to have spawned.
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
-    [
-        MenuText(FText::FromString(TEXT("LOOT THE RIFTS. OUTRUN THE EDGE.")), 11, SoftText)
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("PLAY")), FOnClicked::CreateLambda([this]()
+    else
+    {
+        // Exactly the three the owner asked for. LOADOUT, INVENTORY and
+        // BREAKER CLASS used to sit here and have MOVED to the pause menu,
+        // where they belong: they act on a character, and at the title screen
+        // there is not one yet.
+        auto AddVerb = [this, &Offer](const TCHAR* Label, const FOnClicked& OnClicked, bool bPrimaryVerb)
+        {
+            Offer->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
+            [
+                SNew(SBox).WidthOverride(300.0f).HeightOverride(47.0f)
+                [
+                    // The ring needs an OPAQUE face inside it: BorderWrap's
+                    // SBorder paints its colour across the whole rect and the
+                    // padding only insets the child, so a see-through button
+                    // renders as a solid slab of ring colour — which is
+                    // exactly how the first capture photographed PLAY.
+                    BorderWrap(
+                        SNew(SBorder)
+                        .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                        .BorderBackgroundColor(BreakerUI::BgBase)
+                        .Padding(FMargin(0.0f))
+                        [
+                            SNew(SButton)
+                            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                            .HAlign(HAlign_Center)
+                            .VAlign(VAlign_Center)
+                            .OnClicked(OnClicked)
+                            [
+                                MenuText(FText::FromString(Label), BreakerUI::TypeH2,
+                                    bPrimaryVerb ? Primary : SoftText, bPrimaryVerb)
+                            ]
+                        ],
+                        bPrimaryVerb ? Cyan : BorderEmphasis)
+                ]
+            ];
+        };
+        AddVerb(TEXT("PLAY"), FOnClicked::CreateLambda([this]()
         {
             Rebuild(EBreakerMenuScreen::CharacterSelect);
             return FReply::Handled();
-        }), true)
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 10.0f)
-    [
-        MakeButton(FText::FromString(TEXT("SETTINGS")), FOnClicked::CreateLambda([this]()
+        }), true);
+        AddVerb(TEXT("SETTINGS"), FOnClicked::CreateLambda([this]()
         {
             Rebuild(EBreakerMenuScreen::Settings);
             return FReply::Handled();
-        }))
-    ];
-    Body->AddSlot().AutoHeight()
-    [
-        MakeButton(FText::FromString(TEXT("QUIT GAME")), FOnClicked::CreateLambda([this]()
+        }), false);
+        AddVerb(TEXT("QUIT"), FOnClicked::CreateLambda([this]()
         {
             if (Character.IsValid()) Character->QuitFromMenu();
             return FReply::Handled();
-        }))
-    ];
-    Body->AddSlot().AutoHeight().Padding(0.0f, 26.0f, 0.0f, 0.0f)
-    [
-        MenuText(FText::FromString(TEXT("BUILD 0.1  |  WIN64 DEVELOPMENT")), 9, SoftText)
-    ];
-    return BuildFrame(FText::FromString(TEXT("RIOR'S EDGE")), FText::FromString(TEXT("BREAK THE LINE. KEEP THE MOMENTUM.")), Body);
+        }), false);
+    }
+
+    // ---- The build line ----------------------------------------------------
+    // Real data or nothing: the project version from the project settings ini
+    // and the net mode the world is actually in — never an authored string
+    // pretending to be either.
+    FString BuildLine;
+    FString ProjectVersion;
+    if (GConfig)
+    {
+        GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"),
+            TEXT("ProjectVersion"), ProjectVersion, GGameIni);
+    }
+    if (!ProjectVersion.IsEmpty())
+    {
+        BuildLine = FString::Printf(TEXT("BUILD %s"), *ProjectVersion);
+    }
+    if (Character.IsValid() && Character->GetWorld())
+    {
+        const TCHAR* NetModeName = nullptr;
+        switch (Character->GetWorld()->GetNetMode())
+        {
+            case NM_ListenServer: NetModeName = TEXT("LISTEN SERVER"); break;
+            case NM_DedicatedServer: NetModeName = TEXT("DEDICATED SERVER"); break;
+            case NM_Client: NetModeName = TEXT("CLIENT"); break;
+            default: NetModeName = TEXT("STANDALONE"); break;
+        }
+        BuildLine += BuildLine.IsEmpty() ? NetModeName
+            : FString::Printf(TEXT(" · %s"), NetModeName);
+    }
+
+    return SNew(SOverlay)
+        + SOverlay::Slot()[SolidBlock(BreakerUI::BgBase)]
+        + SOverlay::Slot()[Scene]
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.0f, 0.0f, 0.0f, 76.0f)
+        [
+            Stack
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.0f, 0.0f, 0.0f, 88.0f)
+        [
+            Offer
+        ]
+        + SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)
+            .Padding(BreakerUI::Space40, 0.0f, 0.0f, BreakerUI::Space24)
+        [
+            BreakerMonoText(FText::FromString(BuildLine), BreakerUI::TypeCaption, Disabled, 0.16f)
+        ];
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildPauseScreen()
