@@ -25,6 +25,7 @@ namespace BreakerNodeTags
     // an identifier across a unity build.
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Core_Deadeye);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Core_Interposition);
+    RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Core_Execute);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_TriggerDiscipline);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_Cyclic);
     RIORSEDGE_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Node_LastRound);

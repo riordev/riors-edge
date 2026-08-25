@@ -333,8 +333,8 @@ namespace BreakerPowerBandTest
 
     // OPTIMIZED: the airborne Swift build the Velocity constellation exists
     // for. Top-band rolls on every slot, conditional damage lines chosen to
-    // match the states it actually holds, and four More sources of which O3
-    // lets three count. This is "optimized 50 feels great" (at cap) / "gear
+    // match the states it actually holds, and three More sources — all of
+    // which O3 lets count. This is "optimized 50 feels great" (at cap) / "gear
     // depth is real" (at endgame) depending which ItemLevel/Tier is passed.
     TArray<FBreakerItemInstance> OptimizedLoadout(int32 ItemLevel, int32 Tier)
     {
@@ -354,11 +354,11 @@ namespace BreakerPowerBandTest
     {
         // EVERY CORE ROW ASKS RANK 1 — same re-point as BaselineRanks above,
         // seven rows giving up 12 ranks, four of them the Velocity
-        // conditionals that are most of this build's damage. RedlineDoctrine
-        // keeps its id until the atlas's own commit renames the node
-        // (Core.Velocity.Redline) and demotes it from a x1.20 More to an
-        // increased line — that change belongs to the tree, and this fixture
-        // tracks it there, not here.
+        // conditionals that are most of this build's damage. The Redline row
+        // moved with the atlas commit that renamed and DEMOTED the node: a
+        // x1.20 More became a +14% ability line, so the build now owns three
+        // More sources — and the composed More product is unchanged, because
+        // Redline was the weakest of four under the strongest-three rule.
         return {
             {TEXT("Core.Precision.Sightline"), 1},
             {TEXT("Core.Precision.CalledShot"), 1},
@@ -373,7 +373,7 @@ namespace BreakerPowerBandTest
             {TEXT("Core.Velocity.Traction"), 1},             // wall riding: owned, not live
             {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
             {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne
-            {TEXT("Core.Velocity.RedlineDoctrine"), 1},      // More x1.20, at Redline
+            {TEXT("Core.Velocity.Redline"), 1},              // demoted: +14% ability at Redline, no More
             {TEXT("Swift.Marksman.LongLens"), 2},
             {TEXT("Swift.Marksman.Deadeye"), 2},
             {TEXT("Swift.Marksman.PierceDiscipline"), 2},

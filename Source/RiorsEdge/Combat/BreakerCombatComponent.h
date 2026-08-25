@@ -254,4 +254,7 @@ private:
     double LastSuccessfulBlockTime = -1000.0;
     // O2 PLACEHOLDER — the follow-up window Interposition guards.
     static constexpr float InterpositionWindowSeconds = 1.0f;
+    // O2 PLACEHOLDER — Core.Ruin.Execute's threshold: at or below this
+    // health fraction, a tagged attacker's damage ignores armour.
+    static constexpr float ExecuteHealthFraction = 0.25f;
 };

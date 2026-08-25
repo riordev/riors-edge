@@ -13,6 +13,7 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_TunnelVision, "Progression.Node.Core.TunnelVision");
     UE_DEFINE_GAMEPLAY_TAG(Node_Core_Deadeye, "Progression.Node.Core.Precision.Deadeye");
     UE_DEFINE_GAMEPLAY_TAG(Node_Core_Interposition, "Progression.Node.Core.Bulwark.Interposition");
+    UE_DEFINE_GAMEPLAY_TAG(Node_Core_Execute, "Progression.Node.Core.Ruin.Execute");
     UE_DEFINE_GAMEPLAY_TAG(Node_TriggerDiscipline, "Progression.Node.Core.TriggerDiscipline");
     UE_DEFINE_GAMEPLAY_TAG(Node_Cyclic, "Progression.Node.Core.Cyclic");
     UE_DEFINE_GAMEPLAY_TAG(Node_LastRound, "Progression.Node.Core.LastRound");
@@ -1063,66 +1064,169 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     PhantomStep->GrantedTags.AddTag(BreakerNodeTags::Node_PhantomStep.GetTag());
     Tree->Nodes.Add(PhantomStep);
 
-    // --- Velocity ----------------------------------------------------------
-    // NEW under O27. "Movement is part of character building rather than a
-    // fixed utility layer" was true of the movement STATS and false of
-    // everything that mattered: no node anywhere converted a movement state
-    // into damage, so the pillar had no offensive expression at all.
-    //
-    // Four laddered conditionals and two Convergences. Each pays roughly twice
-    // what Salvo's unconditional rank pays, and each is worth nothing while you
-    // stand still — the trade that makes a movement build a build.
+    // --- VELOCITY: movement as damage (atlas pair F) -----------------------
     UBreakerProgressionNode* Freefall = MakeNode(TEXT("Core.Velocity.Freefall"), TEXT("Freefall"),
-        TEXT("Velocity gateway. Increased damage while airborne. Nothing while your feet are down."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1, TEXT("Velocity"));
-    AddEffect(Freefall, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+        TEXT("Increased damage while airborne. Nothing while your feet are down."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(Freefall, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
     Freefall->GrantedTags.AddTag(BreakerNodeTags::Node_Freefall.GetTag());
     Tree->Nodes.Add(Freefall);
 
-    UBreakerProgressionNode* Slipstream = MakeNode(TEXT("Core.Velocity.Slipstream"), TEXT("Slipstream"),
-        TEXT("Velocity gateway. Increased damage while sliding, and slides carry further."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 3, 1, TEXT("Velocity"));
-    AddEffect(Slipstream, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 9.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
-    AddEffect(Slipstream, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f);                              // O2 PLACEHOLDER
-    Slipstream->GrantedTags.AddTag(BreakerNodeTags::Node_Slipstream.GetTag());
-    Tree->Nodes.Add(Slipstream);
-
-    // The narrowest condition in the tree pays the most per rank. Wall riding
-    // is the hardest state to hold, so the node is priced for the player who
-    // actually builds their traversal around it.
-    UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
-        TEXT("Increased damage while wall riding. The narrowest window in the constellation, and the largest per rank."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 2, 1, TEXT("Velocity"));
-    AddPrerequisite(Traction, TEXT("Core.Velocity.Freefall"));
-    AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
-    Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
-    Tree->Nodes.Add(Traction);
-
+    // Keeps its shipped slide-speed line beside the conditional damage — the
+    // movement-attribute tests pin it, and stripping quality to satisfy a
+    // placeholder row is the Light Footing call again.
     UBreakerProgressionNode* Afterburn = MakeNode(TEXT("Core.Velocity.Afterburn"), TEXT("Afterburn"),
-        TEXT("Increased damage for a few seconds after dashing. The one Velocity line you can trigger on demand."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Velocity"));
-    AddPrerequisite(Afterburn, TEXT("Core.Velocity.Slipstream"));
-    AddEffect(Afterburn, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 8.0f, EBreakerBuildCondition::RecentlyDashed); // O2 PLACEHOLDER
+        TEXT("Increased damage for a few seconds after dashing. The one Velocity line you can trigger on demand."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(Afterburn, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::RecentlyDashed); // O2 PLACEHOLDER
     Afterburn->GrantedTags.AddTag(BreakerNodeTags::Node_Afterburn.GetTag());
     Tree->Nodes.Add(Afterburn);
 
+    UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
+        TEXT("Increased damage while wall riding — the narrowest window in the wheel."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
+    Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
+    Tree->Nodes.Add(Traction);
+
+    UBreakerProgressionNode* Slipstream = MakeNode(TEXT("Core.Velocity.Slipstream"), TEXT("Slipstream"),
+        TEXT("Increased damage while sliding, and slides carry further."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(Slipstream, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Sliding); // O2 PLACEHOLDER
+    AddEffect(Slipstream, EBreakerNodeStatTarget::SlideSpeed, EBreakerNodeStatBucket::IncreasedPercent, 5.0f); // O2 PLACEHOLDER — shipped line, unchanged
+    Slipstream->GrantedTags.AddTag(BreakerNodeTags::Node_Slipstream.GetTag());
+    Tree->Nodes.Add(Slipstream);
+
+    UBreakerProgressionNode* VelGrind = MakeNode(TEXT("Core.Velocity.Grind"), TEXT("Grind"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(VelGrind, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VelGrind);
+
+    UBreakerProgressionNode* VelDownforce = MakeNode(TEXT("Core.Velocity.Downforce"), TEXT("Downforce"),
+        TEXT("Your shots hit harder while airborne."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(VelDownforce, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VelDownforce);
+
+    UBreakerProgressionNode* VelTerminalDescent = MakeNode(TEXT("Core.Velocity.TerminalDescent"), TEXT("Terminal Descent"),
+        TEXT("Your shots hit considerably harder while airborne."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Velocity"));
+    AddPrerequisite(VelTerminalDescent, TEXT("Core.Velocity.Freefall"));
+    AddPrerequisite(VelTerminalDescent, TEXT("Core.Velocity.Afterburn"));
+    AddEffect(VelTerminalDescent, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VelTerminalDescent);
+
+    // THE RENAME THAT IS ALSO A DEMOTION, exactly as the spec's migration
+    // note states it: RedlineDoctrine shipped as a 3-point Convergence
+    // carrying AddDamageMore(20, Redline); Redline is a 2-point inner at
+    // +14% increased ability damage with no More. The fixture row moves in
+    // this same commit, and the composed consequence — the optimized build's
+    // More PRODUCT unmoved, its source count down one — was derived from the
+    // strongest-three selection in the step-3 commit and is measured by this
+    // commit's suite run. The id changes under the atlas's one sanctioned
+    // exception to O103; the old tag stays declared (append-only) and the
+    // node keeps granting it so its history of consumers, if any arrive,
+    // resolves.
+    UBreakerProgressionNode* VelRedline = MakeNode(TEXT("Core.Velocity.Redline"), TEXT("Redline"),
+        TEXT("Your abilities hit harder at Redline Momentum. Inert for a class with no Momentum."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Velocity"));
+    AddPrerequisite(VelRedline, TEXT("Core.Velocity.Traction"));
+    AddPrerequisite(VelRedline, TEXT("Core.Velocity.Slipstream"));
+    AddEffect(VelRedline, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER
+    VelRedline->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
+    Tree->Nodes.Add(VelRedline);
+
+    // O105's shape, on the wired decay lane with the existing sign
+    // convention: negative while Airborne is "never decays airborne",
+    // positive while Grounded is "drains on the ground". The same authoring
+    // Swift.Kinetic.NoGround carries; duplication is legal by ruling.
+    UBreakerProgressionNode* VelNoGround = MakeNode(TEXT("Core.Velocity.NoGround"), TEXT("No Ground"),
+        TEXT("Momentum never decays airborne and drains on the ground."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Velocity"));
+    AddPrerequisite(VelNoGround, TEXT("Core.Velocity.Grind"));
+    AddPrerequisite(VelNoGround, TEXT("Core.Velocity.Downforce"));
+    AddEffect(VelNoGround, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, -100.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER
+    AddEffect(VelNoGround, EBreakerNodeStatTarget::ClassResourceDecay, EBreakerNodeStatBucket::IncreasedPercent, 50.0f, EBreakerBuildCondition::Grounded);   // O2 PLACEHOLDER
+    Tree->Nodes.Add(VelNoGround);
+
     // The largest single multiplier in the game and the hardest to keep on.
-    // Capped at the Damage-Pipeline §4 per-More ceiling of 1.30x by the
-    // aggregator, so authoring it AT the ceiling is a statement that nothing
-    // will ever be allowed past it.
     UBreakerProgressionNode* TerminalVelocity = MakeNode(TEXT("Core.Velocity.TerminalVelocity"), TEXT("Terminal Velocity"),
         TEXT("Convergence. A MORE multiplier to all damage dealt while airborne. Land and it is gone."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Velocity"));
-    AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.Traction"));
+    AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.TerminalDescent"));
+    AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.Redline"));
+    AddPrerequisite(TerminalVelocity, TEXT("Core.Velocity.NoGround"));
     AddDamageMore(TerminalVelocity, 30.0f, EBreakerBuildCondition::Airborne); // O2 PLACEHOLDER: x1.30
     TerminalVelocity->GrantedTags.AddTag(BreakerNodeTags::Node_TerminalVelocity.GetTag());
     Tree->Nodes.Add(TerminalVelocity);
 
-    // Class-coupled by construction rather than by a RequiredClass field: the
-    // Momentum loop is inert for everyone but Swift, so Redline never fires for
-    // another class. It stays a Core node because O15 forbids mutually
-    // exclusive tiers and a Tank can see, and decline, the trade honestly.
-    UBreakerProgressionNode* RedlineDoctrine = MakeNode(TEXT("Core.Velocity.RedlineDoctrine"), TEXT("Redline Doctrine"),
-        TEXT("Convergence. A MORE multiplier to all damage dealt while at Redline Momentum. Inert for a class with no Momentum."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Velocity"));
-    AddPrerequisite(RedlineDoctrine, TEXT("Core.Velocity.Afterburn"));
-    AddDamageMore(RedlineDoctrine, 20.0f, EBreakerBuildCondition::Redline); // O2 PLACEHOLDER: x1.20
-    RedlineDoctrine->GrantedTags.AddTag(BreakerNodeTags::Node_RedlineDoctrine.GetTag());
-    Tree->Nodes.Add(RedlineDoctrine);
+    // --- RUIN: heavy hits and finishing (atlas pair F) ---------------------
+    UBreakerProgressionNode* RuinWeightofIt = MakeNode(TEXT("Core.Ruin.WeightofIt"), TEXT("Weight of It"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinWeightofIt, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinWeightofIt);
+
+    UBreakerProgressionNode* RuinCull = MakeNode(TEXT("Core.Ruin.Cull"), TEXT("Cull"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinCull, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinCull);
+
+    UBreakerProgressionNode* RuinBreak = MakeNode(TEXT("Core.Ruin.Break"), TEXT("Break"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinBreak, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinBreak);
+
+    UBreakerProgressionNode* RuinShapedCharge = MakeNode(TEXT("Core.Ruin.ShapedCharge"), TEXT("Shaped Charge"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinShapedCharge, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinShapedCharge);
+
+    UBreakerProgressionNode* RuinConcussion = MakeNode(TEXT("Core.Ruin.Concussion"), TEXT("Concussion"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinConcussion, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinConcussion);
+
+    UBreakerProgressionNode* RuinRend = MakeNode(TEXT("Core.Ruin.Rend"), TEXT("Rend"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Ruin"));
+    AddEffect(RuinRend, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinRend);
+
+    // Rule rewrite with its consumer LIVE in the same commit: with the
+    // attacker owning the tag and the target below the execute threshold,
+    // ReceiveDamage zeroes armour out of the mitigation for that hit — the
+    // one site that knows both actors, the same seam the Stage-6 riders use.
+    UBreakerProgressionNode* RuinExecute = MakeNode(TEXT("Core.Ruin.Execute"), TEXT("Execute"),
+        TEXT("Below a health threshold, your damage ignores armour."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Ruin"));
+    AddPrerequisite(RuinExecute, TEXT("Core.Ruin.WeightofIt"));
+    AddPrerequisite(RuinExecute, TEXT("Core.Ruin.Cull"));
+    RuinExecute->GrantedTags.AddTag(BreakerNodeTags::Node_Core_Execute.GetTag());
+    Tree->Nodes.Add(RuinExecute);
+
+    // The spec says "against a boss"; the vocabulary's boss-shaped condition
+    // is TargetElite (the elite is where one target holds the fight, and the
+    // Field Marshal carries rank on an elite chassis). The narrower reading
+    // waits on a TargetBoss condition if the owner wants one.
+    UBreakerProgressionNode* RuinSiege = MakeNode(TEXT("Core.Ruin.Siege"), TEXT("Siege"),
+        TEXT("Elites and bosses take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Ruin"));
+    AddPrerequisite(RuinSiege, TEXT("Core.Ruin.Break"));
+    AddPrerequisite(RuinSiege, TEXT("Core.Ruin.ShapedCharge"));
+    AddEffect(RuinSiege, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f, EBreakerBuildCondition::TargetElite); // O2 PLACEHOLDER — conditional band
+    Tree->Nodes.Add(RuinSiege);
+
+    // "On a hit that removes a health band" has no condition to say it —
+    // health bands are display, not state — so the line ships unconditional
+    // at a value sized for that, the gate recorded as waiting.
+    UBreakerProgressionNode* RuinOverpressure = MakeNode(TEXT("Core.Ruin.Overpressure"), TEXT("Overpressure"),
+        TEXT("Everything you deliver arrives considerably heavier. Its trigger — a hit that removes a health band — is waiting on bands becoming state."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Ruin"));
+    AddPrerequisite(RuinOverpressure, TEXT("Core.Ruin.Concussion"));
+    AddPrerequisite(RuinOverpressure, TEXT("Core.Ruin.Rend"));
+    AddEffect(RuinOverpressure, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(RuinOverpressure);
+
+    // COLLAPSE is the spec's Unmake, renamed by ruling — Caster.Unmake is the
+    // Caster ultimate and Spellblade's Edgework rewrites it by name. Its
+    // health-band theme has no condition, so this is the game's strongest
+    // UNCONDITIONAL More, at the per-More edge with zero commitment — the
+    // sharpest consequence of the ruled nine-More roster, named in the
+    // pair-F report.
+    UBreakerProgressionNode* RuinCollapse = MakeNode(TEXT("Core.Ruin.Collapse"), TEXT("Collapse"),
+        TEXT("Convergence. The finishing blow becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
+    AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Execute"));
+    AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Siege"));
+    AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Overpressure"));
+    AddDamageMore(RuinCollapse, 30.0f); // O2 PLACEHOLDER: x1.30
+    Tree->Nodes.Add(RuinCollapse);
 
     // --- RESERVOIR: resource economy (atlas pair C, no hub by design) ------
     UBreakerProgressionNode* ResDraw = MakeNode(TEXT("Core.Reservoir.Draw"), TEXT("Draw"),

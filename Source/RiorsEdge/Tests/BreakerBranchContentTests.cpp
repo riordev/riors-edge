@@ -384,12 +384,20 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     }
 
     // Every More node in the content, so a build that could hold them all does
-    // not get to. Five of them; the aggregator must keep the strongest three.
+    // not get to. NINE under the atlas — the owner's ruled roster, one per
+    // hub Convergence — and the aggregator must keep the strongest three
+    // across every lane from ONE budget (O74).
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Fixate"), 1});            // x1.22 unconditional
-    Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 unconditional
-    Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne
-    Ranks.Add({TEXT("Core.Velocity.RedlineDoctrine"), 1});    // x1.20 at Redline
+    Ranks.Add({TEXT("Core.Precision.Fixate"), 1});            // x1.22 unconditional, shared
+    Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 unconditional, shared
+    Ranks.Add({TEXT("Core.Vector.Splinter"), 1});             // x1.25 unconditional, shared
+    Ranks.Add({TEXT("Core.Elements.ReactionChain"), 1});      // x1.26 unconditional, shared
+    Ranks.Add({TEXT("Core.Bulwark.Set"), 1});                 // x1.20 stationary, shared
+    Ranks.Add({TEXT("Core.Arc.Overflow"), 1});                // x1.28 ability lane
+    Ranks.Add({TEXT("Core.Affliction.Compound"), 1});         // x1.24 DoT lane
+    Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne, shared
+    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 unconditional, shared
+    Ranks.Add({TEXT("Core.Velocity.Redline"), 1});            // DEMOTED: +14% ability line, no More
     // O95: these three author no More any more. They stay in the fixture
     // deliberately -- owning every doctrine keystone must not change the
     // multiplier layer at all, and that is asserted below.
@@ -400,19 +408,19 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(
         Nodes, Ranks, nullptr, FBreakerBuildConditionState::All());
 
-    // FOUR, AND IT USED TO SAY SEVEN. Seven was four Core plus the three
-    // doctrine keystones that went through AddDamageMore -- it never counted
-    // Caster.VoidWhisperer.LongDark, which authored a x1.30 on the
-    // DamageOverTime pool directly and so was invisible to a search for the
-    // helper. The real figure before O95 was eight; this test asserted seven
-    // and passed. Now every More is Core's and the number is four.
-    TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 4);
+    // Nine — the ruled atlas roster, counted across every lane (the skill
+    // screen's "N / 3 MORE" is the whole budget). Redline contributes none:
+    // its demotion from the tenth More is the pair-F change this fixture
+    // witnesses.
+    TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 9);
     TestTrue(TEXT("More options outnumber the O3 cap, so holding three is a choice"),
         Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
-    // Strongest three of the four Core Convergences: 1.30 x 1.22 x 1.22. The
-    // doctrine keystones in this fixture contribute nothing to it, which is the
-    // point of leaving them in.
-    TestEqual(TEXT("Only the strongest three More multipliers compose"), Stats.DamageMoreMultiplier, 1.30f * 1.22f * 1.22f, 0.0001f);
+    // Strongest three across lanes: Terminal Velocity and Collapse (1.30
+    // shared) and Overflow (1.28, ability lane). The weapon lane sees only
+    // the two shared slots; the ability lane sees all three. One budget,
+    // spent once (O74).
+    TestEqual(TEXT("The weapon lane composes the two shared winners"), Stats.DamageMoreMultiplier, 1.30f * 1.30f, 0.0001f);
+    TestEqual(TEXT("The ability lane composes all three winners"), Stats.AbilityDamageMoreMultiplier, 1.30f * 1.30f * 1.28f, 0.0001f);
     // A hard upper bound stated independently of the content, so a future node
     // authored above the ceiling fails here rather than in a playtest.
     const float AbsoluteCeiling = FMath::Pow(UBreakerProgressionComponent::SingleMoreCeiling,

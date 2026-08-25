@@ -310,11 +310,11 @@ bool FBreakerCoreConstellationFieldTest::RunTest(const FString& Parameters)
     // Velocity is the constellation the UI's hardcoded cluster list is
     // missing (six nodes, per CONTEXT.md's recorded UNMAPPED gap). Its field
     // membership must be intact regardless of the UI catching up to it.
-    TestEqual(TEXT("Velocity carries its authored six nodes"), CountByConstellation.FindRef(TEXT("Velocity")), 6);
+    TestEqual(TEXT("Velocity carries its full atlas wheel"), CountByConstellation.FindRef(TEXT("Velocity")), 10);
     // Re-pinned per atlas pair, the tree-count convention: pair B added the
     // VECTOR and ARC wheels (7 -> 9), pair C RESERVOIR (9 -> 10); the
     // remaining pairs raise it to 12.
-    TestEqual(TEXT("Eleven constellations are represented"), CountByConstellation.Num(), 11);
+    TestEqual(TEXT("All twelve wheels are represented"), CountByConstellation.Num(), 12);
 
     // Class branch nodes are not a constellation and must stay None.
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftKineticTree(),

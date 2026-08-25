@@ -59,6 +59,23 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
             GetOwner()->GetActorForwardVector(), GetOwner()->GetActorLocation(),
             Request.SourceLocation, RearArcArmorMultiplier, RearArcCosine);
     }
+    // Core.Ruin.Execute: below the execute threshold, the ATTACKER's damage
+    // ignores armour — resolved here, the one site that knows both actors
+    // (the Stage-6 seam). The threshold reads the defender's live fraction;
+    // armour alone is zeroed, so resistance, block and dodge stand.
+    if (Attributes->GetMaxHealth() > 0.0f
+        && Attributes->GetHealth() / Attributes->GetMaxHealth() <= ExecuteHealthFraction)
+    {
+        if (const AActor* ExecuteAttacker = Request.Instigator.Get())
+        {
+            const UBreakerProgressionComponent* AttackerProgression = ExecuteAttacker->FindComponentByClass<UBreakerProgressionComponent>();
+            if (AttackerProgression && AttackerProgression->HasNodeTag(
+                FGameplayTag::RequestGameplayTag(TEXT("Progression.Node.Core.Ruin.Execute"), false)))
+            {
+                Defense.Armor = 0.0f;
+            }
+        }
+    }
     // Gear-rolled damage reduction folds into the incoming multiplier so the
     // resolution order stays single-path. Physical DR and Elemental
     // resistance are the same mechanism aimed at different families (the
