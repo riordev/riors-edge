@@ -6,6 +6,8 @@
 #include "Characters/BreakerCharacter.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Lead::UBreakerAbility_Lead()
 {
@@ -74,6 +76,31 @@ void UBreakerAbility_Lead::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // ability instance — starting with the HUD's target diamond — can see
         // *which* actor was marked, not merely that a mark is running.
         State->SetMark(MarkedTarget.Get(), Duration);
+    }
+
+    // The painting, drawn once at cast: a thin gold line from the eye to
+    // where the mark landed (gold is the weak-point family, which is what a
+    // mark promises), and a small glow at the point. The mark's LIFETIME is
+    // the HUD diamond's job — a six-second world primitive on a moving target
+    // would lie about where the target is. Figures O2 PLACEHOLDER.
+    // (Server-vs-client caveat recorded once in BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector MarkPoint = MarkedTarget.IsValid() ? Hit.ImpactPoint : TraceEnd;
+        BreakerFX::FEffectTiming PaintTiming;
+        PaintTiming.DurationSeconds = 0.30f;
+        PaintTiming.FadeInSeconds = 0.03f;
+        PaintTiming.FadeOutSeconds = 0.22f;
+        // The start hangs off the weapon side, not the eye: a stroke fired
+        // from the camera's own origin is seen end-on — a dot — by the one
+        // player it is for (caught by the ability probe's first photograph).
+        const FVector PaintSide = FVector::CrossProduct(ViewRotation.Vector(), FVector::UpVector).GetSafeNormal();
+        Effects->AddStroke(ViewLocation + ViewRotation.Vector() * 90.0f + PaintSide * 25.0f - FVector(0.0f, 0.0f, 20.0f),
+            MarkPoint, 2.0f, BreakerUI::Gold, 2.6f, PaintTiming);
+        if (MarkedTarget.IsValid())
+        {
+            Effects->AddGlow(MarkPoint, 28.0f, BreakerUI::Gold, 3.2f, PaintTiming);
+        }
     }
 
     // The mark is consumed in UBreakerWeaponComponent::FireOnce: a hit on the

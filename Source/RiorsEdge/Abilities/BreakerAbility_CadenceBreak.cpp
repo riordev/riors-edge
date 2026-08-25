@@ -8,6 +8,8 @@
 #include "Engine/World.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_CadenceBreak::UBreakerAbility_CadenceBreak()
 {
@@ -188,6 +190,28 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->StartWindow(WindowKey(), Duration);
+    }
+
+    // The snap, drawn once: an orange slash across the weapon line plus a
+    // hard glow — the bolt slamming home. Orange is the weapon family's
+    // colour; the 3s state is the HUD bar's job, not a world aura on a
+    // moving Swift. Figures O2 PLACEHOLDER. (Server-vs-client caveat in
+    // BreakerEffectRenderer.h.)
+    if (UWorld* World = Character->GetWorld())
+    {
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+        {
+            const FVector Chest = Character->GetActorLocation() + FVector(0.0f, 0.0f, 15.0f);
+            const FVector Aim = Character->GetControlRotation().Vector();
+            const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
+            BreakerFX::FEffectTiming SnapTiming;
+            SnapTiming.DurationSeconds = 0.20f;
+            SnapTiming.FadeInSeconds = 0.0f;
+            SnapTiming.FadeOutSeconds = 0.15f;
+            Effects->AddGlow(Chest + Aim * 55.0f, 26.0f, BreakerUI::Orange, 3.4f, SnapTiming);
+            Effects->AddStroke(Chest + Aim * 40.0f + Side * 30.0f - FVector(0.0f, 0.0f, 25.0f),
+                Chest + Aim * 70.0f - Side * 30.0f + FVector(0.0f, 0.0f, 25.0f), 4.0f, BreakerUI::Orange, 2.8f, SnapTiming);
+        }
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

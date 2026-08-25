@@ -126,8 +126,13 @@ void UBreakerAbility_Sightline::ActivateAbility(const FGameplayAbilitySpecHandle
             LineTiming.DurationSeconds = 0.40f;
             LineTiming.FadeInSeconds = 0.05f;
             LineTiming.FadeOutSeconds = 0.30f;
-            Effects->AddStroke(Eye + Aim * 120.0f, Eye + Aim * 2200.0f, 2.5f, BreakerUI::Gold, 2.8f, LineTiming);
-            Effects->AddGlow(Eye + Aim * 120.0f, 22.0f, BreakerUI::Gold, 3.0f, LineTiming);
+            // Offset off the weapon side so the caster sees a LINE, not the
+            // end-on dot a camera-origin stroke collapses to (the Lead
+            // photograph's lesson, applied here by principle).
+            const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
+            Effects->AddStroke(Eye + Aim * 110.0f + Side * 25.0f - FVector(0.0f, 0.0f, 18.0f),
+                Eye + Aim * 2200.0f, 2.5f, BreakerUI::Gold, 2.8f, LineTiming);
+            Effects->AddGlow(Eye + Aim * 130.0f, 22.0f, BreakerUI::Gold, 3.0f, LineTiming);
         }
     }
 

@@ -6,6 +6,8 @@
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Skim::UBreakerAbility_Skim()
 {
@@ -106,6 +108,28 @@ void UBreakerAbility_Skim::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         // than as an impulse. That keeps the no-self-acceleration rule intact
         // while making the new line read as a commitment, not a shrug.
         Movement->PushSpeedMultiplier(BurstKey(), BurstSpeedMultiplier, BurstSeconds);
+
+        // The cut, drawn where it happened: two cyan chevron strokes opening
+        // along the NEW line at the feet — the departure point, deliberately
+        // left behind so the player reads the corner they just made. Only a
+        // redirect that RAN draws; a refused one (below walk speed) showing a
+        // flash would be the ability lying about itself. Figures O2
+        // PLACEHOLDER. (Server-vs-client caveat in BreakerEffectRenderer.h.)
+        if (UWorld* World = Character->GetWorld())
+        {
+            if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+            {
+                const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+                const FVector Line = HorizontalDirectionForView(ViewRotation);
+                const FVector Side = FVector::CrossProduct(Line, FVector::UpVector).GetSafeNormal();
+                BreakerFX::FEffectTiming CutTiming;
+                CutTiming.DurationSeconds = 0.28f;
+                CutTiming.FadeInSeconds = 0.0f;
+                CutTiming.FadeOutSeconds = 0.22f;
+                Effects->AddStroke(Feet - Side * 45.0f - Line * 20.0f, Feet + Line * 110.0f, 3.5f, BreakerUI::Cyan, 2.6f, CutTiming);
+                Effects->AddStroke(Feet + Side * 45.0f - Line * 20.0f, Feet + Line * 110.0f, 3.5f, BreakerUI::Cyan, 2.6f, CutTiming);
+            }
+        }
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

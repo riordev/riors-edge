@@ -4,8 +4,14 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Classes/BreakerMomentumComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Progression/BreakerProgressionComponent.h"
+#include "TimerManager.h"
 
 UBreakerAbilityComponent::UBreakerAbilityComponent()
 {
@@ -17,6 +23,67 @@ void UBreakerAbilityComponent::BeginPlay()
 {
     Super::BeginPlay();
     RefreshGrants();
+
+#if !UE_BUILD_SHIPPING
+    // -BreakerAbilityProbe: the ability-cast half the capture harness cannot
+    // reach (it cannot press a key). Self-scheduled against the harness's own
+    // screenshot clock (first frame 6.0s, then every 2.0s): the class is
+    // forced at 5.0s, slot two casts at 5.85s and the ultimate at 7.6s. The
+    // probe clock (BeginPlay) and the harness clock (capture arm) skew by up
+    // to ~0.3s run to run — one photograph landed BEFORE the cast it was
+    // for — so each cast leads its frame by less than its flash's life
+    // rather than by a margin the skew can eat. Casts
+    // only what a REAL character holds — the default loadout through the one
+    // grant site — so the probe can never photograph an ability a player
+    // could not reach; the O176-gated abilities join the photograph when
+    // their unlock rows land. Resource is granted through the loop's own
+    // unmetered dev grant, not by touching the bank.
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe")))
+    {
+        AActor* Owner = GetOwner();
+        UWorld* World = GetWorld();
+        if (Owner && World && Owner->HasAuthority() && Cast<APawn>(Owner))
+        {
+            TWeakObjectPtr<UBreakerAbilityComponent> WeakThis(this);
+            FTimerHandle ClassHandle, SlotTwoHandle, UltimateHandle;
+            World->GetTimerManager().SetTimer(ClassHandle, FTimerDelegate::CreateLambda([WeakThis]()
+            {
+                UBreakerAbilityComponent* Probe = WeakThis.Get();
+                UBreakerProgressionComponent* Progression = Probe ? Probe->GetProgression() : nullptr;
+                if (Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::None)
+                {
+                    Progression->DevForceClass(EBreakerClassId::Swift);
+                }
+                if (Probe)
+                {
+                    Probe->RefreshGrants();
+                }
+            }), 5.0f, false);
+            auto ProbeCast = [WeakThis](EBreakerAbilitySlot Slot)
+            {
+                UBreakerAbilityComponent* Probe = WeakThis.Get();
+                if (!Probe)
+                {
+                    return;
+                }
+                if (UBreakerMomentumComponent* Momentum = Probe->GetOwner()->FindComponentByClass<UBreakerMomentumComponent>())
+                {
+                    Momentum->GrantMomentum(200.0f);
+                }
+                const bool bActivated = Probe->TryActivateSlot(Slot);
+                UE_LOG(LogTemp, Log, TEXT("[BreakerAbilityProbe] slot %d activate=%d"), static_cast<int32>(Slot), bActivated ? 1 : 0);
+            };
+            World->GetTimerManager().SetTimer(SlotTwoHandle, FTimerDelegate::CreateLambda([ProbeCast]()
+            {
+                ProbeCast(EBreakerAbilitySlot::ClassAbilityTwo);
+            }), 5.85f, false);
+            World->GetTimerManager().SetTimer(UltimateHandle, FTimerDelegate::CreateLambda([ProbeCast]()
+            {
+                ProbeCast(EBreakerAbilitySlot::Ultimate);
+            }), 7.6f, false);
+        }
+    }
+#endif
 }
 
 void UBreakerAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

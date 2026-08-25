@@ -11,6 +11,8 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 UBreakerAbility_Overdrive::UBreakerAbility_Overdrive()
 {
@@ -108,6 +110,38 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
             // Composes multiplicatively with the gear and tree multipliers and
             // expires on its own; no teardown path to get wrong.
             Movement->PushSpeedMultiplier(WindowKey(), Variant.SpeedMultiplier, Duration);
+        }
+    }
+
+    // The ignition, drawn once: a violet burst — violet is the ultimates'
+    // colour (BreakerUIStyle) — a body glow, a real light so the room
+    // answers, and six radial strokes low at the feet. The 8s window itself
+    // stays the HUD bar's job; a world aura pinned to the cast point would be
+    // a lie three steps later on the game's fastest class. Figures O2
+    // PLACEHOLDER. (Server-vs-client caveat in BreakerEffectRenderer.h.)
+    if (UWorld* EffectWorld = Character->GetWorld())
+    {
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(EffectWorld))
+        {
+            const FVector Centre = Character->GetActorLocation();
+            const FVector Feet = Centre - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+            BreakerFX::FEffectTiming BurstTiming;
+            BurstTiming.DurationSeconds = 0.55f;
+            BurstTiming.FadeInSeconds = 0.02f;
+            BurstTiming.FadeOutSeconds = 0.40f;
+            // The glow sits at the FEET, not the body centre: a primitive
+            // wrapped around the camera paints the whole screen violet for
+            // its lifetime — the probe's second photograph was a full-frame
+            // wash — and an ignition should light the room, not blind the
+            // player igniting it. The blink light stays at the body so the
+            // surroundings still answer.
+            Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
+            Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+            for (int32 Index = 0; Index < 6; ++Index)
+            {
+                const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+                Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+            }
         }
     }
 

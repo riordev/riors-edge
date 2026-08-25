@@ -8,15 +8,12 @@
 // the crosshair for 6s. Shots that hit the mark from more than 25 m away are
 // treated as weak-point hits regardless of impact location."
 //
-// GAP — the mark is currently *tracked*, not *consumed*. The spec's
-// UBreakerMarkComponent (§4.6) does not exist, and the distance-gated
-// weak-point forcing has to happen in the outgoing-damage builder, which lives
-// under Combat/ and is owned elsewhere. The faithful part that is buildable
-// here: the ability traces the target under the crosshair, records it, and
-// opens a 6s window on the SI-9 state component, with the 25 m gate expressed
-// as a pure rule (ShouldTreatAsWeakPoint) ready for the damage builder to call.
-// When UBreakerMarkComponent lands, this ability applies a mark instead of
-// holding the target itself, and the damage builder calls the same rule.
+// The mark IS consumed: UBreakerWeaponComponent::FireOnce reads it off the
+// state component per trigger pull and forces the weak point through
+// ShouldTreatAsWeakPoint beyond the 25 m gate (the O175 census caught this
+// note still claiming otherwise). The spec's UBreakerMarkComponent (§4.6)
+// remains unbuilt; when it lands, this ability applies a mark instead of
+// holding the target itself, and the weapon calls the same rule.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_Lead : public UBreakerGameplayAbility
 {

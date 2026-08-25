@@ -2,6 +2,46 @@
 
 ## Current work
 
+KIT LANE, SWIFT COMPLETES AND THE WHOLE KIT DRAWS (457 passing / 7
+expected red / 0 unexpected on the rebased tree — the three new reds
+are ENUMERATED, each naming LEDGER's two-line fix). O175-O178. The
+three missing abilities LAND: Slipcut (20/4s, 0.4s window, weapon
+cadence 2x through the weapon's new keyed PushFireRateMultiplier seam
+— composed inside GetFireRateMultiplier so all five fire-timing sites
+move together, with the automatic repeating timer RE-ARMED on
+push/pop because CanFire's gate can slow a fast timer but never speed
+a slow one; dies on reload START, and F7 Slipcut Mastery's
++0.15s-per-running-cooldown widens it); Hard Stop (30/6s, extracted
+from Skim's pitch-gated modal per O177 — Skim is the redirect whole
+again, Skim Discipline keeps twice-per-airtime, Spend to Live's
+doubled cost and true-immunity ride the standalone ability); and
+Sightline (25/6s, next shot within 2s pierces via a 64-count
+PushShotChannelBonus consumed on the first hitscan discharge; the
+cover-state clause is RECORDED ABSENT — nothing on the shot path
+consults a cover state — with the Warden shield named as the scoping
+candidate). Cadence Break's reload half pays through the new
+CompleteReloadImmediately (StartReload's gates + FinishReload's
+economy in one frame). ALL SEVEN Swift abilities now draw through
+ABreakerEffectRenderer at their cast moments, on the palette's own
+roles: cyan for movement (Skim's chevrons, Hard Stop's plant), orange
+for weapon cadence (Slipcut's rails, Cadence Break's snap), gold for
+the weak-point promise (Lead's painting line, Sightline's line), and
+the ultimates' violet for Overdrive's ignition. Cast-moment flashes
+ONLY, windows stay HUD bars — a world aura pinned to a cast point
+lies three steps later on the game's fastest class, and pooled
+primitives per cast scale with CASTS, not enemies (the crowd probe's
+engaged 34.16 ms says the enemy side has no headroom to lend).
+WAITING ON LEDGER (O176): BreakerProgressionLibrary.cpp:4180 starters
+{Swift.Slipcut, Swift.Skim}, :4186 unlockables {Swift.Lead,
+Swift.CadenceBreak, Swift.HardStop, Swift.Sightline}, plus their call
+on the now-redundant Swift.Marksman.Lead node grant and the Sightline
+node's +2 Pierce stand-in (its own comment retires it); KIT flips
+DefaultAbilityIdForSlot in the same landing. Until then the three
+new abilities are registered and honestly refused. AUDIO: no KIT
+interface needed — OnAbilityActivated is already broadcast and
+already bound by GLASS's HUD; the blocker is the owner's fifth-verb
+ruling (one ability cue vs per-ability cues), per O178's split.
+
 GLASS LANE, THE COST GETS A NUMBER AND THE BOSS ROW READS THREE (457 / 4 /
 0 on the rebased tree, up one for O135's pin, same expected-red roster,
 `Docs/STATE.md` byte-identical). O130 claimed the bar's split "cost the HUD
@@ -202,22 +242,20 @@ dispenses invisibly, and Mine Cluster's individual charges have NO
 visual, only the cluster marker, while the player must avoid the
 charges). 8 are HUD-only (Sidearm Rig, Overhaul, Bloodline, Hold,
 Metronome, Conduit, Cadence — window bars — plus Lead/Mark's target
-diamond). 9 draw NOTHING at all: Skim, CadenceBreak, Overdrive (all
-three Swift non-mark abilities), Rend, Provoke, Breach Charge (the
-charge is a bare FVector), Ground Zero, Patch, Purge. Swift's
-missing three are NAMED from the deleted Class-Kits §1.2: S1 Slipcut
-(a designed STARTER — code starters are Skim+Lead where design said
-Slipcut+Skim), S4 Hard Stop (its verb already lives as a branch
-inside BreakerAbility_Skim), S5 Sightline; population 28 intended =
-25 registered + these 3. The class-swap stale loadout
-(BreakerAbilityComponent.cpp:92) still occurs — DevForceClass never
-migrates AbilityLoadout — but the grant is guarded at
-ResolveDefinition (foreign-class id falls back to the class default)
-and no non-dev path can change a chosen class. Stale note found:
-Lead's header says the mark is "tracked, not consumed";
-BreakerWeaponComponent.cpp:1434-1579 consumes it. Nothing repaired,
-by rule; the full census with per-ability effect/presentation rows
-and the recorded-gap ledger is the session report.
+diamond). 6 still draw NOTHING at all: Rend, Provoke, Breach Charge
+(the charge is a bare FVector), Ground Zero, Patch, Purge — the
+Swift three that shared this list (Skim, CadenceBreak, Overdrive)
+draw as of the Swift pass above. Swift's formerly-missing three were
+NAMED from the deleted Class-Kits §1.2 and have since LANDED (O175);
+population 28 intended = 25 registered at census + those 3. The
+class-swap stale loadout (BreakerAbilityComponent.cpp:92) still
+occurs — DevForceClass never migrates AbilityLoadout — but the grant
+is guarded at ResolveDefinition (foreign-class id falls back to the
+class default), that is the ONLY grant site (measured: GiveAbility
+and variants have exactly one non-test call site in Source/), and no
+non-dev path can change a chosen class. The full census with
+per-ability effect/presentation rows and the recorded-gap ledger is
+the census session report.
 
 THE PLACE IS BUILT AND GATED ON THE OWNER (`f78013b`, 448 / 4 / 0):
 the Fernhall approach yard — the vertical slice's zone — landed end
