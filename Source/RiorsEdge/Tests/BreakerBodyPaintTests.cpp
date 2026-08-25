@@ -36,6 +36,45 @@ namespace
     {
         return A.R == B.R && A.G == B.G && A.B == B.B;
     }
+
+    // --- CIE Lab, for the perceptual claims only ---------------------------
+    // O145: a perceptual measurement encodes the LINEAR value to sRGB first.
+    // This lives here rather than beside the resolver on purpose — the game
+    // never needs it, and a colour-science helper on a hot path is an
+    // invitation to call it. It is the assertion's instrument, nothing else.
+    void BreakerBodyPaintToLab(const FLinearColor& Linear, double& L, double& A, double& B)
+    {
+        auto Enc = [](float C) { return static_cast<double>(BreakerBodyPaint::EncodeChannel(C)); };
+        auto ToLin = [](double C) { return C <= 0.04045 ? C / 12.92 : FMath::Pow((C + 0.055) / 1.055, 2.4); };
+        const double R = ToLin(Enc(Linear.R)), G = ToLin(Enc(Linear.G)), Bl = ToLin(Enc(Linear.B));
+        const double X = (R * 0.4124564 + G * 0.3575761 + Bl * 0.1804375) / 0.95047;
+        const double Y = (R * 0.2126729 + G * 0.7151522 + Bl * 0.0721750);
+        const double Z = (R * 0.0193339 + G * 0.1191920 + Bl * 0.9503041) / 1.08883;
+        auto F = [](double T) { return T > 0.008856451679 ? FMath::Pow(T, 1.0 / 3.0) : T / 0.1284185493 + 4.0 / 29.0; };
+        const double FX = F(X), FY = F(Y), FZ = F(Z);
+        L = 116.0 * FY - 16.0; A = 500.0 * (FX - FY); B = 200.0 * (FY - FZ);
+    }
+    double BreakerBodyPaintDeltaE(const FLinearColor& P, const FLinearColor& Q)
+    {
+        double L1, A1, B1, L2, A2, B2;
+        BreakerBodyPaintToLab(P, L1, A1, B1);
+        BreakerBodyPaintToLab(Q, L2, A2, B2);
+        return FMath::Sqrt((L1 - L2) * (L1 - L2) + (A1 - A2) * (A1 - A2) + (B1 - B2) * (B1 - B2));
+    }
+    const FLinearColor BreakerBodyPaintFamilies[] = {
+        BreakerBodyPaint::VestigeFamilyPaint,
+        BreakerBodyPaint::AlteredFamilyPaint,
+        BreakerBodyPaint::LatticeFamilyPaint };
+
+    FLinearColor BreakerBodyPaintResolveAt(const FLinearColor& Family, EBreakerMonsterRank Rank, float Fraction)
+    {
+        BreakerBodyPaint::FState State;
+        State.FamilyPaint = Family;
+        State.Rank = Rank;
+        State.HealthFraction = Fraction;
+        State.bHealthRamp = true;
+        return BreakerBodyPaint::Resolve(State);
+    }
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -256,6 +295,87 @@ bool FBreakerBodyPaintShippedFamilyTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Lattice is not the Altered paint"), BreakerBodyPaintExactlyEquals(
         BreakerBodyPaint::LatticeFamilyPaint, BreakerBodyPaint::AlteredFamilyPaint));
 
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBodyPaintDeliveredSeparationTest,
+    "RiorsEdge.Combat.BodyPaint.DeliveredSeparation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBodyPaintDeliveredSeparationTest::RunTest(const FString& Parameters)
+{
+    // O146 AS AN ASSERTION RATHER THAN A PARAGRAPH. The previous ramp test
+    // proved the authored TABLE and nothing about what the body actually
+    // wears — which is how a Vestige Champion shipped travelling 27.8 dE76
+    // behind a green suite while the row it reads from measured 34.5. This
+    // asserts the DELIVERED colour, per family, blend and clamp applied.
+    //
+    // Two pins, both O2 PLACEHOLDER, both set with margin under the measured
+    // 38.8 worst and 11.1 spread. They are not decoration: composing the
+    // offset in the linear domain again would deliver 27.7 worst and 30.8
+    // spread, and both numbers fail here.
+    constexpr double MinimumDeliveredTravel = 30.0;
+    constexpr double MaximumTravelSpread = 18.0;
+
+    double Worst = TNumericLimits<double>::Max();
+    double Best = 0.0;
+    for (const FLinearColor& Family : BreakerBodyPaintFamilies)
+    {
+        for (EBreakerMonsterRank Rank : BreakerBodyPaintAllRanks)
+        {
+            const double Travel = BreakerBodyPaintDeltaE(
+                BreakerBodyPaintResolveAt(Family, Rank, 1.0f),
+                BreakerBodyPaintResolveAt(Family, Rank, 0.10f));
+            Worst = FMath::Min(Worst, Travel);
+            Best = FMath::Max(Best, Travel);
+
+            // THE BODY REDDENS AS IT DIES — asserted on the delivered colour
+            // now, not on the table it reads from. Two claims, and the weaker
+            // one is weaker for a measured reason: red NEVER FALLS at a step,
+            // and rises strictly across the whole ramp. It cannot be strict at
+            // every step because the gamut wall flattens it — an Elite's gold
+            // base sits high in red, so its last one or two steps saturate and
+            // spend their travel in green and blue instead. That is the clamp
+            // shortening the ramp, visible here rather than argued about; it
+            // costs Elite nothing overall, which is what the travel pin below
+            // is for. Magnitude only: the delta carries no hue direction, so a
+            // Vestige Boss arrives magenta (O146), which is a known.
+            const float FullHealthRed = BreakerBodyPaintResolveAt(Family, Rank, 1.0f).R;
+            float PreviousRed = -1.0f;
+            for (int32 i = 0; i < BreakerBodyPaint::HealthStopCount; ++i)
+            {
+                const float Fraction = BreakerBodyPaint::HealthStops()[i];
+                const FLinearColor Body = BreakerBodyPaintResolveAt(Family, Rank, Fraction);
+                TestTrue(TEXT("Delivered red never falls toward death"), Body.R >= PreviousRed);
+                PreviousRed = Body.R;
+            }
+            TestTrue(TEXT("Delivered red rises strictly across the whole ramp"), PreviousRed > FullHealthRed);
+        }
+    }
+
+    TestTrue(FString::Printf(TEXT("Worst delivered travel %.1f is at least %.1f dE76"), Worst, MinimumDeliveredTravel),
+        Worst >= MinimumDeliveredTravel);
+    TestTrue(FString::Printf(TEXT("Travel spread %.1f is at most %.1f dE76"), Best - Worst, MaximumTravelSpread),
+        (Best - Worst) <= MaximumTravelSpread);
+
+    // The family read O24 spends colour on, at both ends of the ramp. The
+    // absolute form the pack asked for scores 0.0 here, which is why it did
+    // not ship.
+    for (float Fraction : { 1.0f, 0.10f })
+    {
+        for (int32 i = 0; i < 3; ++i)
+        {
+            for (int32 j = i + 1; j < 3; ++j)
+            {
+                const double Separation = BreakerBodyPaintDeltaE(
+                    BreakerBodyPaintResolveAt(BreakerBodyPaintFamilies[i], EBreakerMonsterRank::Trash, Fraction),
+                    BreakerBodyPaintResolveAt(BreakerBodyPaintFamilies[j], EBreakerMonsterRank::Trash, Fraction));
+                TestTrue(FString::Printf(TEXT("Families stay %.1f dE76 apart at %.0f%% health"), Separation, Fraction * 100.0f),
+                    Separation >= 8.0);   // O2 PLACEHOLDER, under the measured 10.2
+            }
+        }
+    }
     return true;
 }
 
