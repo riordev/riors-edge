@@ -594,6 +594,165 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Barrage->GrantedTags.AddTag(BreakerNodeTags::Node_Barrage.GetTag());
     Tree->Nodes.Add(Barrage);
 
+    // --- VECTOR: the projectile family (atlas pair B) ----------------------
+    // Multishot, pierce, chain and ricochet as shared vocabulary (O107). The
+    // inners author the LIVE mechanic-count lanes rather than tag-only rules:
+    // the channels exist end to end (GetShotChannels), so a whole projectile,
+    // a whole chain and a whole pierce are the honest currency here — the
+    // spec's "rule rewrite, no stat line" rows are upgraded to paying
+    // mechanics, not downgraded to scaffolding.
+    UBreakerProgressionNode* VecSplit = MakeNode(TEXT("Core.Vector.Split"), TEXT("Split"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecSplit, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecSplit);
+
+    UBreakerProgressionNode* VecOverpenetration = MakeNode(TEXT("Core.Vector.Overpenetration"), TEXT("Overpenetration"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecOverpenetration, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecOverpenetration);
+
+    UBreakerProgressionNode* VecCarom = MakeNode(TEXT("Core.Vector.Carom"), TEXT("Carom"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecCarom, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecCarom);
+
+    UBreakerProgressionNode* VecSpread = MakeNode(TEXT("Core.Vector.Spread"), TEXT("Spread"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecSpread, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecSpread);
+
+    UBreakerProgressionNode* VecWake = MakeNode(TEXT("Core.Vector.Wake"), TEXT("Wake"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecWake, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecWake);
+
+    UBreakerProgressionNode* VecLine = MakeNode(TEXT("Core.Vector.Line"), TEXT("Line"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Vector"));
+    AddEffect(VecLine, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecLine);
+
+    // A whole extra projectile, on the live ProjectileCount channel. The
+    // spec's "at reduced per-shot value" clause is NOT authored — extra
+    // pellets fire at full value today and the text must not promise a
+    // reduction the pipeline does not take; the reduction is a magnitude
+    // question for the day the channel grows one.
+    UBreakerProgressionNode* VecMultishot = MakeNode(TEXT("Core.Vector.Multishot"), TEXT("Multishot"),
+        TEXT("One additional projectile with every shot."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Vector"));
+    AddPrerequisite(VecMultishot, TEXT("Core.Vector.Split"));
+    AddPrerequisite(VecMultishot, TEXT("Core.Vector.Overpenetration"));
+    AddEffect(VecMultishot, EBreakerNodeStatTarget::ProjectileCount, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecMultishot);
+
+    UBreakerProgressionNode* VecChainwork = MakeNode(TEXT("Core.Vector.Chainwork"), TEXT("Chainwork"),
+        TEXT("Projectiles chain once to a nearby target."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Vector"));
+    AddPrerequisite(VecChainwork, TEXT("Core.Vector.Carom"));
+    AddPrerequisite(VecChainwork, TEXT("Core.Vector.Spread"));
+    AddEffect(VecChainwork, EBreakerNodeStatTarget::ChainCount, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecChainwork);
+
+    // The spec row wants "+14% weapon damage against a pierced target"; no
+    // pierced-target condition exists, and the pierce damage ladder already
+    // owns per-penetration pricing. The wheel's identity is the MECHANIC, so
+    // the node grants a whole pierce on the live lane instead of a
+    // conditional line the vocabulary cannot say.
+    UBreakerProgressionNode* VecPierceDiscipline = MakeNode(TEXT("Core.Vector.PierceDiscipline"), TEXT("Pierce Discipline"),
+        TEXT("Your shots pierce one additional target."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Vector"));
+    AddPrerequisite(VecPierceDiscipline, TEXT("Core.Vector.Wake"));
+    AddPrerequisite(VecPierceDiscipline, TEXT("Core.Vector.Line"));
+    AddEffect(VecPierceDiscipline, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(VecPierceDiscipline);
+
+    // Third unconditional More in the tree (Fixate and Barrage are the other
+    // two): the spec authors Splinter at x1.25 with a per-projectile theme no
+    // condition can carry, so it composes as a generalist. That an
+    // uncommitted build now finds THREE generalist Mores is a design
+    // consequence named in the pair-B report, not smuggled.
+    UBreakerProgressionNode* VecSplinter = MakeNode(TEXT("Core.Vector.Splinter"), TEXT("Splinter"),
+        TEXT("Convergence. The split shot becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Vector"));
+    AddPrerequisite(VecSplinter, TEXT("Core.Vector.Multishot"));
+    AddPrerequisite(VecSplinter, TEXT("Core.Vector.Chainwork"));
+    AddPrerequisite(VecSplinter, TEXT("Core.Vector.PierceDiscipline"));
+    AddDamageMore(VecSplinter, 25.0f); // O2 PLACEHOLDER: x1.25
+    Tree->Nodes.Add(VecSplinter);
+
+    // --- ARC: ability throughput (atlas pair B) ----------------------------
+    // The wheel the spec called CONDUIT, renamed by ruling: Conduit is the
+    // Support ultimate's name, and a Core wheel may not consume a player's
+    // verb. Its rim 3 was Hold — the Tank ultimate — and is Anchor for the
+    // same reason. Ids follow the wheel (Core.Arc.*) so id and constellation
+    // agree from birth; O103 then holds them forever.
+    UBreakerProgressionNode* ArcChannel = MakeNode(TEXT("Core.Arc.Channel"), TEXT("Channel"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcChannel, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcChannel);
+
+    UBreakerProgressionNode* ArcWiden = MakeNode(TEXT("Core.Arc.Widen"), TEXT("Widen"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcWiden, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcWiden);
+
+    UBreakerProgressionNode* ArcRecycle = MakeNode(TEXT("Core.Arc.Recycle"), TEXT("Recycle"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcRecycle, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcRecycle);
+
+    UBreakerProgressionNode* ArcAnchor = MakeNode(TEXT("Core.Arc.Anchor"), TEXT("Anchor"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcAnchor, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcAnchor);
+
+    UBreakerProgressionNode* ArcPrime = MakeNode(TEXT("Core.Arc.Prime"), TEXT("Prime"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcPrime, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcPrime);
+
+    UBreakerProgressionNode* ArcVent = MakeNode(TEXT("Core.Arc.Vent"), TEXT("Vent"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Arc"));
+    AddEffect(ArcVent, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcVent);
+
+    // The rule half — cooldowns recovering WHILE weapon hits land — needs a
+    // consumer in the cooldown system that does not exist yet. The Frenzy
+    // precedent carries the intent on the live AbilityCooldown divisor lane.
+    UBreakerProgressionNode* ArcCadenceBreak = MakeNode(TEXT("Core.Arc.CadenceBreak"), TEXT("Cadence Break"),
+        TEXT("Ability cooldowns run shorter. Their full rule — recovery paid by weapon hits — is waiting on its consumer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Arc"));
+    AddPrerequisite(ArcCadenceBreak, TEXT("Core.Arc.Channel"));
+    AddPrerequisite(ArcCadenceBreak, TEXT("Core.Arc.Widen"));
+    AddEffect(ArcCadenceBreak, EBreakerNodeStatTarget::AbilityCooldown, EBreakerNodeStatBucket::IncreasedPercent, 8.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcCadenceBreak);
+
+    // The spec's "at range" clause has no condition to say it (the vocabulary
+    // holds TargetAtCloseRange and no negation), so the line ships
+    // unconditional at a value sized for that — the range gate is recorded
+    // as waiting rather than faked with the wrong condition.
+    UBreakerProgressionNode* ArcReach = MakeNode(TEXT("Core.Arc.Reach"), TEXT("Reach"),
+        TEXT("Your abilities hit considerably harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Arc"));
+    AddPrerequisite(ArcReach, TEXT("Core.Arc.Recycle"));
+    AddPrerequisite(ArcReach, TEXT("Core.Arc.Anchor"));
+    AddEffect(ArcReach, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcReach);
+
+    UBreakerProgressionNode* ArcWidening = MakeNode(TEXT("Core.Arc.Widening"), TEXT("Widening"),
+        TEXT("Your abilities hit harder and reach wider."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Arc"));
+    AddPrerequisite(ArcWidening, TEXT("Core.Arc.Prime"));
+    AddPrerequisite(ArcWidening, TEXT("Core.Arc.Vent"));
+    AddEffect(ArcWidening, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
+    AddEffect(ArcWidening, EBreakerNodeStatTarget::AbilityArea, EBreakerNodeStatBucket::IncreasedPercent, 8.0f);    // O2 PLACEHOLDER
+    Tree->Nodes.Add(ArcWidening);
+
+    // An ABILITY-LANE More, not a shared one: the wheel is "the only wheel an
+    // ability build can build its damage on", and a shared x1.28 would hand
+    // weapon builds a fourth generalist. MorePercent on the AbilityDamage
+    // target composes in the ability lane under the same single O3 budget.
+    // The cast-inside-a-window theme has no condition to carry it yet.
+    UBreakerProgressionNode* ArcOverflow = MakeNode(TEXT("Core.Arc.Overflow"), TEXT("Overflow"),
+        TEXT("Convergence. Ability damage gains a MORE multiplier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Arc"));
+    AddPrerequisite(ArcOverflow, TEXT("Core.Arc.CadenceBreak"));
+    AddPrerequisite(ArcOverflow, TEXT("Core.Arc.Reach"));
+    AddPrerequisite(ArcOverflow, TEXT("Core.Arc.Widening"));
+    AddEffect(ArcOverflow, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::MorePercent, 28.0f); // O2 PLACEHOLDER: x1.28
+    Tree->Nodes.Add(ArcOverflow);
+
     // --- Affliction --------------------------------------------------------
     // TARGET RIDER (Stage 6, first authoring pass): the constellation that
     // CREATES Bleeding targets is the natural home of "increased damage to

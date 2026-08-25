@@ -11,17 +11,17 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 49 of 216 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 50 of 236 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 33 | ceiling 6 | ok |
-| Aggregation lanes carrying nothing | ceiling | 4 of 31 lanes | ceiling 9 | ok |
+| Aggregation lanes carrying nothing | ceiling | 2 of 31 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 142 of 204 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 24 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 38 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
-| Offered-to-spendable ratio, per tree | floor | 1.2 worst tree | floor 3.0 | **OUT** |
+| Offered-to-spendable ratio, per tree | floor | 1.66 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
-| Node-shape composition, per tree | band | 18 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 46 of 216 authored | ceiling 50 | ok |
+| Node-shape composition, per tree | band | 24 % ranked minors, all trees | no pin — measurement only | — |
+| Scaffolding nodes | ceiling | 47 of 236 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.09 | band 8.0–10.0 | **OUT** |
@@ -51,11 +51,11 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 49 of 216 authored · ceiling 54
+**ceiling** · 50 of 236 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
-- GetCoreSliceTree: 7
+- GetCoreSliceTree: 8
 - GetCasterSpellbladeTree: 7
 - GetCasterVoidWhispererTree: 7
 - GetCasterMultispellTree: 7
@@ -82,14 +82,12 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 4 of 31 lanes · ceiling 9
+**ceiling** · 2 of 31 lanes · ceiling 9
 
 Plumbing with no author, counted across BOTH authoring layers: node effects, and shipped affix lines landing in the same composed value. A lane listed here is fed by neither.
 
-- AbilityArea
 - StatusDuration
 - StatusChance
-- ChainCount
 
 ## Node tags with no consumer
 
@@ -215,14 +213,14 @@ A named test that was never written looks asserted and is not. This is worse tha
 
 ## Offered-to-spendable ratio, per tree
 
-**floor** · 1.2 worst tree · floor 3.0  ·  **OUT**
+**floor** · 1.66 worst tree · floor 3.0  ·  **OUT**
 
 Most of a build should be refusal. A CEILING here would lock the trees at their current size and report green while doing it. READ IT BESIDE the no-margin count below: for a doctrine built to the standard shape this ratio is fixed by construction and reports nothing about authoring.
 
 - GetCasterMultispellTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCasterSpellbladeTree: 9 nodes, 18 points offered, 2.25x budget
 - GetCasterVoidWhispererTree: 9 nodes, 18 points offered, 2.25x budget
-- GetCoreSliceTree: 41 nodes, 78 points offered, 1.2x budget
+- GetCoreSliceTree: 61 nodes, 108 points offered, 1.66x budget
 - GetGunsmithArmoryTree: 12 nodes, 24 points offered, 3.0x budget
 - GetGunsmithFieldTechTree: 12 nodes, 24 points offered, 3.0x budget
 - GetGunsmithTinkererTree: 12 nodes, 24 points offered, 3.0x budget
@@ -254,14 +252,14 @@ A tree here is one node-price change away from red, and the floor section report
 
 ## Node-shape composition, per tree
 
-**band** · 18 % ranked minors, all trees · no pin — measurement only
+**band** · 24 % ranked minors, all trees · no pin — measurement only
 
-A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 46 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
+A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 47 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
 - GetCasterMultispellTree: 11% ranked minor, 78% notable, 11% convergence/keystone
 - GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone
 - GetCasterVoidWhispererTree: 11% ranked minor, 78% notable, 11% convergence/keystone
-- GetCoreSliceTree: 61% ranked minor, 39% notable, 0% convergence/keystone
+- GetCoreSliceTree: 70% ranked minor, 28% notable, 2% convergence/keystone
 - GetGunsmithArmoryTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithFieldTechTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetGunsmithTinkererTree: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -277,7 +275,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 46 of 216 authored · ceiling 50
+**ceiling** · 47 of 236 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 

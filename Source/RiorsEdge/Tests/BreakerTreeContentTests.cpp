@@ -91,7 +91,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // went from four and five nodes to ten each (30 -> 41); the remaining
     // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 41);
+    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 61);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
