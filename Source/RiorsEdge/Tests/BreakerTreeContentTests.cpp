@@ -91,7 +91,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // went from four and five nodes to ten each (30 -> 41); the remaining
     // five pairs raise it to the atlas's 117 wheel nodes, then travel to 168.
     const UBreakerProgressionTree* Core = UBreakerProgressionLibrary::GetCoreSliceTree();
-    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 74);
+    TestEqual(TEXT("Core ships exactly the authored wheels"), Core->Nodes.Num(), 91);
     TestEqual(TEXT("Core slice spends Core Points"), Core->Currency, EBreakerPointCurrency::CorePoints);
 
     // SWIFT BRANCH SIZE AND CEILING, RE-PINNED DELIBERATELY (was 10 / 11 / 10,
@@ -331,7 +331,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     Ranks.Add({TEXT("Core.Precision.Lead"), 1});          // +2 crit chance (atlas rim)
     Ranks.Add({TEXT("Core.Bulwark.SetStance"), 1});       // +6 block, +90 health
     Ranks.Add({TEXT("Core.Kinesis.LightFooting"), 1});    // +5 dodge, +12% move
-    Ranks.Add({TEXT("Core.Affliction.Deepen"), 2});       // +18% DoT per rank
+    Ranks.Add({TEXT("Core.Affliction.Fester"), 1});        // +12% DoT (atlas inner)
     Ranks.Add({TEXT("Swift.Kinetic.AirWork"), 1});        // +12% air control
     Ranks.Add({TEXT("Swift.Marksman.LongLens"), 2});      // +18 crit damage per rank
 
@@ -343,7 +343,7 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Health is a flat bonus"), Stats.BonusHealth, 90.0f, 0.0001f);
     TestEqual(TEXT("Increased move speed becomes a multiplier"), Stats.MoveSpeedMultiplier, 1.12f, 0.0001f);
     TestEqual(TEXT("Increased air control becomes a multiplier"), Stats.AirControlMultiplier, 1.12f, 0.0001f);
-    TestEqual(TEXT("Increased DoT stacks additively across ranks"), Stats.DamageOverTimeMultiplier, 1.36f, 0.0001f);
+    TestEqual(TEXT("Increased DoT reaches the aggregate"), Stats.DamageOverTimeMultiplier, 1.12f, 0.0001f);
     // NOTHING UNAIMED, twice over now: Long Lens's damage line is gated on
     // Aiming (Progression.AxisOverlap), and the atlas's Sightline is a pure
     // crit rim with no damage line at all. Standing there not aiming, the
@@ -369,9 +369,9 @@ bool FBreakerNodeStatAggregationTest::RunTest(const FString& Parameters)
 
     // Ranks beyond the node's cap cannot inflate the aggregate.
     TArray<FBreakerNodeRank> OverRanks;
-    OverRanks.Add({TEXT("Core.Affliction.Deepen"), 9});
+    OverRanks.Add({TEXT("Swift.Marksman.LongLens"), 9});   // MaxRank 2, +18 crit damage per rank
     const FBreakerNodeStats ClampedStats = UBreakerProgressionComponent::AggregateStats(Nodes, OverRanks);
-    TestEqual(TEXT("Rank is clamped to the node's max"), ClampedStats.DamageOverTimeMultiplier, 1.54f, 0.0001f);
+    TestEqual(TEXT("Rank is clamped to the node's max"), ClampedStats.CriticalMultiplierBonus, 0.36f, 0.0001f);
 
     // Unknown ids in a loaded save are ignored, not fatal.
     TArray<FBreakerNodeRank> StaleRanks;

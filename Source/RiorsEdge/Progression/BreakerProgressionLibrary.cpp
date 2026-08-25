@@ -753,26 +753,155 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddEffect(ArcOverflow, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::MorePercent, 28.0f); // O2 PLACEHOLDER: x1.28
     Tree->Nodes.Add(ArcOverflow);
 
-    // --- Affliction --------------------------------------------------------
-    // TARGET RIDER (Stage 6, first authoring pass): the constellation that
-    // CREATES Bleeding targets is the natural home of "increased damage to
-    // Bleeding targets" — the gateway was a tag-only purchase (its
-    // weak-point-Bleed rule half still waits on its Weapons/ consumer), and
-    // this line is the first thing buying it does. Increased-bucket,
-    // Damage-target, per Damage-Pipeline §4a's rider canon row; resolved on
-    // the target side by ReceiveDamage, so it pays through every pellet,
-    // pierce leg and rocket.
+    // --- AFFLICTION: damage over time (atlas pair D) -----------------------
+    // TARGET RIDER PRESERVED on the gateway: the TargetBleeding line is
+    // Stage-6 authoring the rider tests pin, and the constellation that
+    // creates Bleeding targets keeps its claim on them.
     UBreakerProgressionNode* OpenWound = MakeNode(TEXT("Core.Affliction.OpenWound"), TEXT("Open Wound"),
-        TEXT("Affliction gateway. Weak-point hits apply Bleed regardless of chance, and Bleeding targets take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
-    AddEffect(OpenWound, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 10.0f, EBreakerBuildCondition::TargetBleeding); // O2 PLACEHOLDER — sized against the 9-14/rank conditional band
+        TEXT("Everything you deliver arrives a little heavier, and Bleeding targets take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(OpenWound, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    AddEffect(OpenWound, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 10.0f, EBreakerBuildCondition::TargetBleeding); // O2 PLACEHOLDER — conditional band
     OpenWound->GrantedTags.AddTag(BreakerNodeTags::Node_OpenWound.GetTag());
     Tree->Nodes.Add(OpenWound);
 
     UBreakerProgressionNode* Deepen = MakeNode(TEXT("Core.Affliction.Deepen"), TEXT("Deepen"),
-        TEXT("Damage over time hits harder and stacks deeper."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 3, 1, TEXT("Affliction"));
-    AddPrerequisite(Deepen, TEXT("Core.Affliction.OpenWound"));
-    AddEffect(Deepen, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 18.0f); // O2 PLACEHOLDER
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(Deepen, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 4.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(Deepen);
+
+    // RE-TARGETED (owner ruling, this session): StatusDuration's Affliction
+    // author. Linger is duration, in so many words.
+    UBreakerProgressionNode* AffLinger = MakeNode(TEXT("Core.Affliction.Linger"), TEXT("Linger"),
+        TEXT("Statuses you apply last longer."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(AffLinger, EBreakerNodeStatTarget::StatusDuration, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AffLinger);
+
+    UBreakerProgressionNode* AffSeep = MakeNode(TEXT("Core.Affliction.Seep"), TEXT("Seep"),
+        TEXT("Your abilities hit harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(AffSeep, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AffSeep);
+
+    UBreakerProgressionNode* AffBloodlet = MakeNode(TEXT("Core.Affliction.Bloodlet"), TEXT("Bloodlet"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(AffBloodlet, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AffBloodlet);
+
+    // RE-TARGETED (owner ruling, this session): StatusChance's Affliction
+    // author. A slow bleed is one that keeps landing.
+    UBreakerProgressionNode* AffSlowBleed = MakeNode(TEXT("Core.Affliction.SlowBleed"), TEXT("Slow Bleed"),
+        TEXT("Statuses you apply land more often."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Affliction"));
+    AddEffect(AffSlowBleed, EBreakerNodeStatTarget::StatusChance, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AffSlowBleed);
+
+    // The rule half — ticks no longer diminishing with stack depth — has
+    // nothing to rewrite: no stack-depth diminishing exists today (O10's
+    // discrete intervals are the stacking shape). The Frenzy precedent
+    // carries the intent on the live DoT lane until that shape lands.
+    UBreakerProgressionNode* AffFester = MakeNode(TEXT("Core.Affliction.Fester"), TEXT("Fester"),
+        TEXT("Damage over time hits harder. Its full rule — ticks that refuse to diminish with stack depth — is waiting on stacking having a diminish to refuse."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Affliction"));
+    AddPrerequisite(AffFester, TEXT("Core.Affliction.OpenWound"));
+    AddPrerequisite(AffFester, TEXT("Core.Affliction.Deepen"));
+    AddEffect(AffFester, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AffFester);
+
+    UBreakerProgressionNode* AffBloodwork = MakeNode(TEXT("Core.Affliction.Bloodwork"), TEXT("Bloodwork"),
+        TEXT("Bleeding targets take increased damage from your abilities."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Affliction"));
+    AddPrerequisite(AffBloodwork, TEXT("Core.Affliction.Linger"));
+    AddPrerequisite(AffBloodwork, TEXT("Core.Affliction.Seep"));
+    AddEffect(AffBloodwork, EBreakerNodeStatTarget::AbilityDamage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f, EBreakerBuildCondition::TargetBleeding); // O2 PLACEHOLDER — conditional band
+    Tree->Nodes.Add(AffBloodwork);
+
+    UBreakerProgressionNode* AffAttrition = MakeNode(TEXT("Core.Affliction.Attrition"), TEXT("Attrition"),
+        TEXT("Targets below half health take increased damage from you."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Affliction"));
+    AddPrerequisite(AffAttrition, TEXT("Core.Affliction.Bloodlet"));
+    AddPrerequisite(AffAttrition, TEXT("Core.Affliction.SlowBleed"));
+    AddEffect(AffAttrition, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f, EBreakerBuildCondition::TargetLowHealth); // O2 PLACEHOLDER — conditional band
+    Tree->Nodes.Add(AffAttrition);
+
+    // COMPOUND is the spec's Rot, renamed by ruling — Caster.Rot is a starter
+    // ability. Its "two ailments" theme is a target condition no More can
+    // carry (target-conditional Mores are warn-dropped by design), so it
+    // composes on the DOT LANE instead of the shared one: the wheel that
+    // trades burst for uptime gets its More where its damage lives, and the
+    // generalist stack does not grow a fifth member.
+    UBreakerProgressionNode* AffCompound = MakeNode(TEXT("Core.Affliction.Compound"), TEXT("Compound"),
+        TEXT("Convergence. Damage over time gains a MORE multiplier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Affliction"));
+    AddPrerequisite(AffCompound, TEXT("Core.Affliction.Fester"));
+    AddPrerequisite(AffCompound, TEXT("Core.Affliction.Bloodwork"));
+    AddPrerequisite(AffCompound, TEXT("Core.Affliction.Attrition"));
+    AddEffect(AffCompound, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 24.0f); // O2 PLACEHOLDER: x1.24
+    Tree->Nodes.Add(AffCompound);
+
+    // --- AEGIS: defensive rules (atlas pair D, no hub by design) -----------
+    // O76 shapes every line here: raw defensive percentages belong to
+    // affixes, so the wheel's rims pay in generic damage and its inners in
+    // quality — and IncomingDamageReduction, the lane this wheel's name
+    // suggests, is tree-authorless BY RULING (see the lane register).
+    UBreakerProgressionNode* AegFooting = MakeNode(TEXT("Core.Aegis.Footing"), TEXT("Footing"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegFooting, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegFooting);
+
+    UBreakerProgressionNode* AegBrace = MakeNode(TEXT("Core.Aegis.Brace"), TEXT("Brace"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegBrace, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegBrace);
+
+    UBreakerProgressionNode* AegRecover = MakeNode(TEXT("Core.Aegis.Recover"), TEXT("Recover"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegRecover, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegRecover);
+
+    UBreakerProgressionNode* AegCleanHands = MakeNode(TEXT("Core.Aegis.CleanHands"), TEXT("Clean Hands"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegCleanHands, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegCleanHands);
+
+    UBreakerProgressionNode* AegSecondOpinion = MakeNode(TEXT("Core.Aegis.SecondOpinion"), TEXT("Second Opinion"),
+        TEXT("Everything you deliver arrives a little heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegSecondOpinion, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 2.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegSecondOpinion);
+
+    UBreakerProgressionNode* AegBulk = MakeNode(TEXT("Core.Aegis.Bulk"), TEXT("Bulk"),
+        TEXT("Your shots hit a little harder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Aegis"));
+    AddEffect(AegBulk, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegBulk);
+
+    // The rule half — a successful dodge refunding resource — sits on the
+    // DECISIONS open list ("whether the dodge resource refund survives as
+    // base kit, becomes a tree rewrite, or dies"), so wiring it here would
+    // answer a question that is the owner's. The Frenzy precedent carries
+    // the intent on the regen bucket until that ruling lands.
+    UBreakerProgressionNode* AegShortCircuit = MakeNode(TEXT("Core.Aegis.ShortCircuit"), TEXT("Short Circuit"),
+        TEXT("Your class resource recovers a little on its own. Its full rule — a successful dodge refunding part of the resource — is waiting on the open dodge-refund ruling."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Aegis"));
+    AddPrerequisite(AegShortCircuit, TEXT("Core.Aegis.Footing"));
+    AddPrerequisite(AegShortCircuit, TEXT("Core.Aegis.Brace"));
+    AddEffect(AegShortCircuit, EBreakerNodeStatTarget::ClassResourceRegen, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegShortCircuit);
+
+    // The rule half — an interrupt slowing a cast instead of cancelling it —
+    // protects against a threat that does not exist: nothing interrupts a
+    // player cast today (O80's stagger is enemy-side). Flat health carries
+    // the frame's toughness meanwhile — the one defensive stat trees author.
+    UBreakerProgressionNode* AegIronFrame = MakeNode(TEXT("Core.Aegis.IronFrame"), TEXT("Iron Frame"),
+        TEXT("You carry more health. The full rule — an interrupt slows your cast instead of cancelling it — is waiting on anything that can interrupt a cast."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Aegis"));
+    AddPrerequisite(AegIronFrame, TEXT("Core.Aegis.Recover"));
+    AddPrerequisite(AegIronFrame, TEXT("Core.Aegis.CleanHands"));
+    AddEffect(AegIronFrame, EBreakerNodeStatTarget::Health, EBreakerNodeStatBucket::Flat, 40.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegIronFrame);
+
+    // The spec gates this on RecentlyTookDamage, which is one of the four
+    // conditions that CAN NEVER BE TRUE (the Recently* family has no
+    // recorder; RecentlyDashed is the working template). Authoring it would
+    // put the never-true ceiling out of band and ship a line that never
+    // pays, so it ships unconditional at a value sized for that, the gate
+    // recorded as waiting on the recorder.
+    UBreakerProgressionNode* AegAnsweringFire = MakeNode(TEXT("Core.Aegis.AnsweringFire"), TEXT("Answering Fire"),
+        TEXT("Everything you deliver arrives heavier. Its window — a surge after taking a hit — is waiting on the Recently recorder."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Aegis"));
+    AddPrerequisite(AegAnsweringFire, TEXT("Core.Aegis.SecondOpinion"));
+    AddPrerequisite(AegAnsweringFire, TEXT("Core.Aegis.Bulk"));
+    AddEffect(AegAnsweringFire, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 12.0f); // O2 PLACEHOLDER
+    Tree->Nodes.Add(AegAnsweringFire);
 
     // --- Bulwark -----------------------------------------------------------
     UBreakerProgressionNode* SetStance = MakeNode(TEXT("Core.Bulwark.SetStance"), TEXT("Set Stance"),

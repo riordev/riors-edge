@@ -141,12 +141,12 @@ bool FBreakerSkillProjectionPurchaseTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The inner lands where the projection pointed"),
         Rig.Attributes->GetDamageMultiplier(), InnerBuy[0].After, 0.0001f);
 
-    // A node with no effects still costs a point, and the point itself pays.
-    // That is the whole reason the baseline exists, so the screen must show it.
+    // A node with no damage effect still costs points, and the points pay.
+    // Threshold is the atlas's tag-only rewrite: two points, baseline only.
     const FBreakerSkillSnapshot AfterMax = BreakerSkillProjection::MakeSnapshot(Rig.Progression, Rig.Attributes);
-    const TArray<FBreakerStatLine> Inert = BreakerSkillProjection::ProjectPurchase(AfterMax, TEXT("Core.Affliction.OpenWound"), 1);
-    TestEqual(TEXT("An effectless node still projects its point-spend baseline"),
-        Inert[0].After - Inert[0].Before, 0.0025f, 0.0005f);
+    const TArray<FBreakerStatLine> Inert = BreakerSkillProjection::ProjectPurchase(AfterMax, TEXT("Core.Elements.Threshold"), 1);
+    TestEqual(TEXT("A damage-less node still projects its point-spend baseline"),
+        Inert[0].After - Inert[0].Before, 0.005f, 0.0005f);
     return true;
 }
 
