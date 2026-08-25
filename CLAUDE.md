@@ -2,6 +2,50 @@
 
 ## Current work
 
+GLASS LANE, THE BAR MOVES OUT (456 / 4 / 0 on the rebased tree, same
+expected-red roster, `Docs/STATE.md` regenerates byte-identical). The
+enemy health bar is FIELD's question and now lives in FIELD's directory:
+`Combat/BreakerEnemyHealthBars.cpp`, 273 lines out of
+`BreakerPlaytestHUD.cpp` (3,596 -> 3,323). The split cost the HUD class
+NOTHING — `DrawEnemyHealthBars` stays a private member and only its
+DEFINITION moved, which is legal in any translation unit and keeps full
+private access, so no widened access, no exported helper, no friend. The
+five visibility constants were read by nothing outside the pass and moved
+whole under `BreakerEnemyBar` rather than `BreakerHUD`: adaptive
+non-unity pulls both changed files out of the blob, so THE BUILD CANNOT
+PROVE UNITY-SAFETY HERE and the rename is the guard, not the green.
+O130 rules the ownership and the TU.
+
+The bar body was drawn twice (enemy loop, gym dummy loop) with the fill
+line and the seven-line shield block near-verbatim, plus duplicated
+distance geometry; both are now `BreakerEnemyBarPlace` +
+`BreakerEnemyBarDrawBody`. Appearance-preserving because `BreakerUI::Alpha`
+SETS the channel rather than scaling it and every token arrives from
+`Hex()` at A=1, so `Alpha(C, 1.0f)` is exactly C — had it multiplied, the
+collapse would have silently dimmed the gym. THE SEGMENTED BAR NOW LANDS
+IN ONE PLACE; before this it would have been invisible in the gym, which
+is the surface the owner actually plays.
+
+O131 records the visibility rule as ONE RULE ACROSS TWO LANES: trash
+aimed-at-only with the 0.6 s fade, and the 8%-health trash mob in a pack
+of eighty — which neither visibility rule shows — carried by the BODY's
+tint ramp and fracture mask (FIELD's O129). Focus-only is correct only
+because that half exists. The DUMMY block keeps its 1.5 s recency window
+as the stated exception and now says so at the constant: a dummy is a gym
+instrument, four of them never move, and "did that hurt" is the one
+question it exists to answer. A comment `d967342` had made false (the
+retired six-second rule) is corrected.
+
+GLASS OWES, NOT STARTED: A5, the boss phase readout — the readability
+pack contradicts itself (label `phase 2 of 4`, readout `PHASE 3 / 4`), so
+it draws phase-count-only until the encounter exposes a total, per O120.
+GLASS PICKED UP FROM KIT'S CENSUS: zero sound anywhere is an Audio item.
+
+DECISIONS.md HAS DUPLICATE O-NUMBERS: two different O125s (dash-lane
+corridor, health bands) and two O120s, from lanes allocating concurrently
+against the highest number each could see. Not rewritten — another lane's
+line — but allocation needs to happen at push time, or it recurs.
+
 GROUND LANE, THE READOUT PASS (453 / 4 / 0 on the rebased tree, same
 expected-red roster).
 THE FERNHALL LANE DEFECT IS CLOSED, AND THE ANSWER INVERTED THE
