@@ -33,12 +33,18 @@ command photograph the effect renderer (glow + Rot rim, alive at
 frame 0, gone by frame 2). Menu and CaptureHUD captures were always
 genuine (they draw on the front end by design).
 
-BLOCKED ON THE OWNER: the O82 death-allowance conflict (plate says
-3 REMAINING, O82 says solo carries two — believed to be lives vs
-deaths counting the same rule; do not render either number without
-the word); the loading-screen WIDGET (needs Archivo + IBM Plex
-imported — a download needing owner permission — and the O82 word);
-death budget mechanic (HandlePlayerDeath spends nothing today).
+THE DEATH RULES ARE IN (O82 amended, O121-O123, HEAD `c3f6760`):
+campaign respawn is unlimited from the tileset start (2 s beat, world
+survives, F1 stays the dev reset), a death during a live boss
+encounter resets it whole (O121's 20-45 s licence recorded at
+ResetBossEncounter), and the rift definition carries its tier plus
+GetDeathAllowanceReadout (campaign UNLIMITED, endgame count — always
+present, only the value moves). The ENDGAME DECREMENT IS PARKED
+behind O122's consumable-entry half by rule. Solo-only; a revive is
+additive later. BLOCKED ON THE OWNER: the loading-screen WIDGET
+(needs Archivo + IBM Plex imported — a download needing owner
+permission); the static plate PNG still prints "3 REMAINING", art
+that now disagrees with O123 until the widget replaces it.
 Fieldplate pack notes: the three plates are the same campaign frame
 (anomaly/raid states not actually exported), README margin 96 vs
 tokens' 64. Power-band fixtures still carry archetypeless items on
