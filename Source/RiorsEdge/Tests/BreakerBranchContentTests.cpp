@@ -336,16 +336,16 @@ bool FBreakerElementsConstellationTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("Reaction Chain purchases behind its three inners"), BranchContentBuyToMax(*this, Progression, Core, TEXT("Core.Elements.ReactionChain")));
 
-    // Nothing in the atlas Elements authors DoT; the wheel's damage today is
-    // its generic lines plus the hub's More.
-    TestEqual(TEXT("Elements authors no DoT line under the atlas"),
-        Attributes->GetDamageOverTimeMultiplier() - PrimedDoT, 0.0f, 0.0001f);
+    // The hub's More lives on the DOT LANE (the no-shared-hub ruling), so
+    // the wheel's only DoT contribution is exactly that multiplier...
+    TestEqual(TEXT("Reaction Chain's More composes on the DoT attribute"),
+        Attributes->GetDamageOverTimeMultiplier(), PrimedDoT * 1.26f, 0.0001f);
     TestEqual(TEXT("Catalyst's crit chance reaches the attribute set"),
         Attributes->GetCriticalChance() - PrimedCritChance, 0.04f, 0.0001f);
-    // Conductive 3 + Penetrance 3 into the additive bucket, then the hub's
-    // x1.26 More on top — the attribute composes (base + Increased) x More.
-    TestEqual(TEXT("The generic lines and the hub's More reach the damage attribute"),
-        Attributes->GetDamageMultiplier(), (PrimedDamage + 0.06f) * 1.26f, 0.0001f);
+    // ...and the damage attribute carries only the generic lines — no hub
+    // More rides the shared pool any more.
+    TestEqual(TEXT("The damage attribute carries the generic lines alone"),
+        Attributes->GetDamageMultiplier(), PrimedDamage + 0.06f, 0.0001f);
     // And the two status lanes carry the wheel's re-targeted rims plus
     // Sequence's stat half: +10% chance, +20% duration.
     TestEqual(TEXT("Attunement feeds the StatusChance lane"),
@@ -388,15 +388,15 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     // hub Convergence — and the aggregator must keep the strongest three
     // across every lane from ONE budget (O74).
     TArray<FBreakerNodeRank> Ranks;
-    Ranks.Add({TEXT("Core.Precision.Fixate"), 1});            // x1.22 unconditional, shared
-    Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 unconditional, shared
-    Ranks.Add({TEXT("Core.Vector.Splinter"), 1});             // x1.25 unconditional, shared
-    Ranks.Add({TEXT("Core.Elements.ReactionChain"), 1});      // x1.26 unconditional, shared
-    Ranks.Add({TEXT("Core.Bulwark.Set"), 1});                 // x1.20 stationary, shared
+    Ranks.Add({TEXT("Core.Precision.Fixate"), 1});            // x1.22 weapon lane
+    Ranks.Add({TEXT("Core.Volley.Barrage"), 1});              // x1.22 weapon lane
+    Ranks.Add({TEXT("Core.Vector.Splinter"), 1});             // x1.25 weapon lane
+    Ranks.Add({TEXT("Core.Elements.ReactionChain"), 1});      // x1.26 DoT lane
+    Ranks.Add({TEXT("Core.Bulwark.Set"), 1});                 // x1.20 stationary, SHARED (conditional hubs keep both lanes)
     Ranks.Add({TEXT("Core.Arc.Overflow"), 1});                // x1.28 ability lane
     Ranks.Add({TEXT("Core.Affliction.Compound"), 1});         // x1.24 DoT lane
-    Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne, shared
-    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 unconditional, shared
+    Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne, SHARED
+    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 weapon lane
     Ranks.Add({TEXT("Core.Velocity.Redline"), 1});            // DEMOTED: +14% ability line, no More
     // O95: these three author no More any more. They stay in the fixture
     // deliberately -- owning every doctrine keystone must not change the
@@ -415,12 +415,13 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 9);
     TestTrue(TEXT("More options outnumber the O3 cap, so holding three is a choice"),
         Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
-    // Strongest three across lanes: Terminal Velocity and Collapse (1.30
-    // shared) and Overflow (1.28, ability lane). The weapon lane sees only
-    // the two shared slots; the ability lane sees all three. One budget,
-    // spent once (O74).
-    TestEqual(TEXT("The weapon lane composes the two shared winners"), Stats.DamageMoreMultiplier, 1.30f * 1.30f, 0.0001f);
-    TestEqual(TEXT("The ability lane composes all three winners"), Stats.AbilityDamageMoreMultiplier, 1.30f * 1.30f * 1.28f, 0.0001f);
+    // Strongest three across lanes under the no-shared-hub ruling: Terminal
+    // Velocity (1.30 SHARED, airborne), Collapse (1.30 weapon) and Overflow
+    // (1.28 ability). The weapon lane composes the shared winner and its own;
+    // the ability lane the shared winner and its own. One budget, spent once
+    // (O74), and only conditional commitment touches both lanes at once.
+    TestEqual(TEXT("The weapon lane composes shared + weapon winners"), Stats.DamageMoreMultiplier, 1.30f * 1.30f, 0.0001f);
+    TestEqual(TEXT("The ability lane composes shared + ability winners"), Stats.AbilityDamageMoreMultiplier, 1.30f * 1.28f, 0.0001f);
     // A hard upper bound stated independently of the content, so a future node
     // authored above the ceiling fails here rather than in a playtest.
     const float AbsoluteCeiling = FMath::Pow(UBreakerProgressionComponent::SingleMoreCeiling,

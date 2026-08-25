@@ -26,8 +26,8 @@ measurement without judging it.
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 5.69 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 14.86 | band 12.0–20.0 | ok |
-| Ability lane throughput against weapon lane, at cap | band | 0.59 | band 0.85–1.15 | **OUT** |
-| Ability lane throughput against weapon lane, endgame | band | 0.36 | no pin — measurement only | — |
+| Ability lane throughput against weapon lane, at cap | band | 0.39 | band 0.85–1.15 | **OUT** |
+| Ability lane throughput against weapon lane, endgame | band | 0.24 | no pin — measurement only | — |
 | Monster damage growth against gear defence growth | ceiling | 0.63 | ceiling 1.0 | ok |
 | Worst single rewrite step on an optimized build | ceiling | 1.48 | ceiling 1.25 | **OUT** |
 | World Core Point sources with no trigger | ceiling | 14.0 | ceiling 14, target 0 | ok |

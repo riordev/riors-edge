@@ -509,7 +509,11 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddPrerequisite(Fixate, TEXT("Core.Precision.CalledShot"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.TunnelVision"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.Deadeye"));
-    AddDamageMore(Fixate, 22.0f); // O2 PLACEHOLDER: x1.22
+    // RULED (this session): no hub authors a shared-pool More — five
+    // unconditional shared hubs composed x2.0475 with zero commitment,
+    // beating the old tree's fully committed airborne build. Each hub's More
+    // moves to its wheel's identity lane, magnitude unchanged.
+    AddEffect(Fixate, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 22.0f); // O2 PLACEHOLDER: x1.22, weapon lane
     Fixate->GrantedTags.AddTag(BreakerNodeTags::Node_Fixate.GetTag());
     Tree->Nodes.Add(Fixate);
 
@@ -592,7 +596,7 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddPrerequisite(Barrage, TEXT("Core.Volley.Salvo"));
     AddPrerequisite(Barrage, TEXT("Core.Volley.LastRound"));
     AddPrerequisite(Barrage, TEXT("Core.Volley.Overrev"));
-    AddDamageMore(Barrage, 22.0f); // O2 PLACEHOLDER: x1.22
+    AddEffect(Barrage, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 22.0f); // O2 PLACEHOLDER: x1.22, weapon lane (the no-shared-hub ruling; see Fixate)
     Barrage->GrantedTags.AddTag(BreakerNodeTags::Node_Barrage.GetTag());
     Tree->Nodes.Add(Barrage);
 
@@ -664,17 +668,12 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddEffect(VecPierceDiscipline, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 1.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(VecPierceDiscipline);
 
-    // Third unconditional More in the tree (Fixate and Barrage are the other
-    // two): the spec authors Splinter at x1.25 with a per-projectile theme no
-    // condition can carry, so it composes as a generalist. That an
-    // uncommitted build now finds THREE generalist Mores is a design
-    // consequence named in the pair-B report, not smuggled.
     UBreakerProgressionNode* VecSplinter = MakeNode(TEXT("Core.Vector.Splinter"), TEXT("Splinter"),
-        TEXT("Convergence. The split shot becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Vector"));
+        TEXT("Convergence. The split shot becomes a MORE multiplier to weapon damage."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Vector"));
     AddPrerequisite(VecSplinter, TEXT("Core.Vector.Multishot"));
     AddPrerequisite(VecSplinter, TEXT("Core.Vector.Chainwork"));
     AddPrerequisite(VecSplinter, TEXT("Core.Vector.PierceDiscipline"));
-    AddDamageMore(VecSplinter, 25.0f); // O2 PLACEHOLDER: x1.25
+    AddEffect(VecSplinter, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 25.0f); // O2 PLACEHOLDER: x1.25, weapon lane (the no-shared-hub ruling; see Fixate)
     Tree->Nodes.Add(VecSplinter);
 
     // --- ARC: ability throughput (atlas pair B) ----------------------------
@@ -1216,16 +1215,15 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
 
     // COLLAPSE is the spec's Unmake, renamed by ruling — Caster.Unmake is the
     // Caster ultimate and Spellblade's Edgework rewrites it by name. Its
-    // health-band theme has no condition, so this is the game's strongest
-    // UNCONDITIONAL More, at the per-More edge with zero commitment — the
-    // sharpest consequence of the ruled nine-More roster, named in the
-    // pair-F report.
+    // health-band theme has no condition, so it is unconditional — but on the
+    // WEAPON LANE by the no-shared-hub ruling, so what it multiplies is the
+    // wheel's own delivery rather than every build's everything.
     UBreakerProgressionNode* RuinCollapse = MakeNode(TEXT("Core.Ruin.Collapse"), TEXT("Collapse"),
-        TEXT("Convergence. The finishing blow becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
+        TEXT("Convergence. The finishing blow becomes a MORE multiplier to weapon damage."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Execute"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Siege"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Overpressure"));
-    AddDamageMore(RuinCollapse, 30.0f); // O2 PLACEHOLDER: x1.30
+    AddEffect(RuinCollapse, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30, weapon lane
     Tree->Nodes.Add(RuinCollapse);
 
     // --- RESERVOIR: resource economy (atlas pair C, no hub by design) ------
@@ -1363,18 +1361,16 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddEffect(ElemSequence, EBreakerNodeStatTarget::StatusDuration, EBreakerNodeStatBucket::IncreasedPercent, 10.0f); // O2 PLACEHOLDER
     Tree->Nodes.Add(ElemSequence);
 
-    // The atlas spends the slot §2.4 used to reserve, by the owner's ruled
-    // nine-More roster. UNCONDITIONAL, and the old refusal's reasoning still
-    // holds force: "a reaction on an already-ailing target" is a TARGET
-    // condition, and a target-conditional More is warn-dropped by design —
-    // so until reactions exist this composes as the tree's fourth generalist
-    // More, a consequence named in the pair-C report rather than smuggled.
+    // The atlas spends the slot §2.4 used to reserve, on the DOT LANE by
+    // the no-shared-hub ruling: "a reaction on an already-ailing target" is
+    // a target condition no More can carry, and the wheel's damage identity
+    // is what it leaves burning on the target.
     UBreakerProgressionNode* ReactionChain = MakeNode(TEXT("Core.Elements.ReactionChain"), TEXT("Reaction Chain"),
-        TEXT("Convergence. What you leave on a target becomes a MORE multiplier to all damage dealt."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Elements"));
+        TEXT("Convergence. What you leave burning on a target gains a MORE multiplier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Elements"));
     AddPrerequisite(ReactionChain, TEXT("Core.Elements.Threshold"));
     AddPrerequisite(ReactionChain, TEXT("Core.Elements.Reaction"));
     AddPrerequisite(ReactionChain, TEXT("Core.Elements.Sequence"));
-    AddDamageMore(ReactionChain, 26.0f); // O2 PLACEHOLDER: x1.26
+    AddEffect(ReactionChain, EBreakerNodeStatTarget::DamageOverTime, EBreakerNodeStatBucket::MorePercent, 26.0f); // O2 PLACEHOLDER: x1.26, DoT lane
     ReactionChain->GrantedTags.AddTag(BreakerNodeTags::Node_ReactionChain.GetTag());
     Tree->Nodes.Add(ReactionChain);
 
