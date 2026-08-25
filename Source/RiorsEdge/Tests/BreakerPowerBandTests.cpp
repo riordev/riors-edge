@@ -298,19 +298,28 @@ namespace BreakerPowerBandTest
     {
         // Gateways, the generalist ladders at partial rank, and a lot of
         // defence and utility. No Convergence, no conditional node.
+        //
+        // EVERY CORE ROW ASKS RANK 1, re-pointed ahead of the atlas (Phase 4
+        // step 3): the atlas makes every Core node a single purchase, and a
+        // row asking more would pass the id check and be silently clamped at
+        // BreakerProgressionComponent.cpp:944 — the drift the rank assertion
+        // above exists to refuse. Six rows here gave up 10 ranks; the freed
+        // budget is NOT redistributed until the wheels exist to spend it in,
+        // so the fixture is deliberately lean until the atlas lands. Doctrine
+        // (Swift.*) rows keep their ranks — doctrine MaxRanks do not move.
         return {
             {TEXT("Core.Precision.Sightline"), 1},
-            {TEXT("Core.Precision.CalledShot"), 2},
+            {TEXT("Core.Precision.CalledShot"), 1},
             {TEXT("Core.Volley.TriggerDiscipline"), 1},
-            {TEXT("Core.Volley.Cyclic"), 3},
-            {TEXT("Core.Volley.Salvo"), 2},
+            {TEXT("Core.Volley.Cyclic"), 1},
+            {TEXT("Core.Volley.Salvo"), 1},
             {TEXT("Core.Affliction.OpenWound"), 1},
-            {TEXT("Core.Affliction.Deepen"), 3},
+            {TEXT("Core.Affliction.Deepen"), 1},
             {TEXT("Core.Bulwark.SetStance"), 1},
-            {TEXT("Core.Bulwark.Read"), 3},
+            {TEXT("Core.Bulwark.Read"), 1},
             {TEXT("Core.Bulwark.Parry"), 1},
             {TEXT("Core.Kinesis.LightFooting"), 1},
-            {TEXT("Core.Kinesis.Loft"), 3},
+            {TEXT("Core.Kinesis.Loft"), 1},
             {TEXT("Core.Kinesis.AirJump"), 1},
             {TEXT("Core.Kinesis.PhantomStep"), 1},
             {TEXT("Swift.Marksman.LongLens"), 2},
@@ -343,19 +352,26 @@ namespace BreakerPowerBandTest
 
     TArray<FBreakerNodeRank> OptimizedRanks()
     {
+        // EVERY CORE ROW ASKS RANK 1 — same re-point as BaselineRanks above,
+        // seven rows giving up 12 ranks, four of them the Velocity
+        // conditionals that are most of this build's damage. RedlineDoctrine
+        // keeps its id until the atlas's own commit renames the node
+        // (Core.Velocity.Redline) and demotes it from a x1.20 More to an
+        // increased line — that change belongs to the tree, and this fixture
+        // tracks it there, not here.
         return {
             {TEXT("Core.Precision.Sightline"), 1},
-            {TEXT("Core.Precision.CalledShot"), 2},
+            {TEXT("Core.Precision.CalledShot"), 1},
             {TEXT("Core.Precision.TunnelVision"), 1},
             {TEXT("Core.Precision.Fixate"), 1},              // More x1.22, unconditional
             {TEXT("Core.Volley.TriggerDiscipline"), 1},
-            {TEXT("Core.Volley.Cyclic"), 3},
-            {TEXT("Core.Volley.Salvo"), 3},
+            {TEXT("Core.Volley.Cyclic"), 1},
+            {TEXT("Core.Volley.Salvo"), 1},
             {TEXT("Core.Volley.Barrage"), 1},                // More x1.22, unconditional
-            {TEXT("Core.Velocity.Freefall"), 3},             // airborne
-            {TEXT("Core.Velocity.Slipstream"), 3},           // sliding: owned, not live
-            {TEXT("Core.Velocity.Traction"), 2},             // wall riding: owned, not live
-            {TEXT("Core.Velocity.Afterburn"), 3},            // recently dashed
+            {TEXT("Core.Velocity.Freefall"), 1},             // airborne
+            {TEXT("Core.Velocity.Slipstream"), 1},           // sliding: owned, not live
+            {TEXT("Core.Velocity.Traction"), 1},             // wall riding: owned, not live
+            {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
             {TEXT("Core.Velocity.TerminalVelocity"), 1},     // More x1.30, airborne
             {TEXT("Core.Velocity.RedlineDoctrine"), 1},      // More x1.20, at Redline
             {TEXT("Swift.Marksman.LongLens"), 2},
