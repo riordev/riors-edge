@@ -2,6 +2,64 @@
 
 ## Current work
 
+GLASS LANE, THE COST GETS A NUMBER AND THE BOSS ROW READS THREE (457 / 4 /
+0 on the rebased tree, up one for O135's pin, same expected-red roster,
+`Docs/STATE.md` byte-identical). O130 claimed the bar's split "cost the HUD
+class nothing" — a claim about ACCESS standing in for a claim about
+SURFACE. The moved TU reads EIGHT private members of ABreakerPlaytestHUD,
+four of them mutable state: S, DrawBorder, DrawSpecTextCentered, World,
+then EnemyBlips, DrawnLabelBounds, LastFocusBarEnemy, LastFocusBarTime.
+O130 amended to carry the number; the judgement that eight beats a context
+struct stands, but it needed the figure visible.
+
+`EnemyBlips` NAMED AT ALL THREE SITES, each pointing at the other's lane:
+producer in `Combat/BreakerEnemyHealthBars.cpp`, consumer in DrawMinimap,
+and the declaration, which said the two halves existed without saying they
+had different owners. O155 makes a change to any of the four state members
+a DECLARED CROSSING — the first place the ask-for-the-header rule cannot
+apply, because the interface IS a member variable: no header to publish,
+no compile error when it breaks, and the frame ordering (fill before read,
+or the map draws last frame's hostiles) is invisible to the suite.
+
+A5 IS BUILT AND PHOTOGRAPHED: `BOSS  PHASE 2 / 3`, top centre, no bar. The
+readability pack contradicts itself (label `phase 2 of 4`, readout `PHASE
+3 / 4`) and the fight ships THREE; the count is REFLECTED off
+`EBreakerBossPhase` so a fourth phase updates the readout by existing.
+Both halves of the fraction are exposed (`GetPhase()`, enum cardinality),
+so O120 permits the fraction. NO BAR IN THE ROW by rule — the boss already
+has a world bar and a second would be a second owner of one question. The
+boss is reached via the game mode's public `IsBossAlive()` (two pointer
+checks) and only then a cached scan; `ActiveBoss` is private with no
+accessor, and publishing one deletes `ResolveEncounterBoss` entirely. The
+capture preview grew a fourth case so the row is photographable without a
+boss.
+
+O156 RAISED THE BAND QUESTION AND LEDGER'S O135 ANSWERED IT MID-CYCLE,
+INVERTING IT. A multiple-of-three band count is the WRONG answer: the
+gates are AUTHORED floats (0.66 / 0.33), not exact thirds, so six bands
+put a boundary 0.7% of the bar from the gate — near-coincident, the very
+failure the proposal meant to avoid, and the original arithmetic had
+assumed thirds. Eight keeps every boundary ≥3.5% clear. Bands are damage
+feedback, phase gates are behaviour thresholds: two facts, two marks,
+meant to be distinguishable. What survives for the bar is phase marks
+drawn heavier and INDEPENDENTLY of the band ticks — combat lane's.
+
+AUDIO, FOR KIT: THE CENSUS IS WRONG AND KIT IS NOT BLOCKED. "Zero sound
+anywhere" is false about the project — `ABreakerSoundDirector` ships four
+verbs (fire / hit / kill / take-hit) on CC0 samples with a synth fallback,
+pooled voices, lazily spawned by the HUD. It is true of ABILITIES: nothing
+in `Abilities/` or `Classes/` touches audio. But the interface KIT would
+ask for ALREADY EXISTS AND IS ALREADY BOUND —
+`UBreakerAbilityComponent::OnAbilityActivated` drives the HUD's ability
+flash today, so an activation cue is GLASS calling GetSoundDirector()
+inside a handler already running. KIT publishes nothing and should not
+hold a cycle. Ability IMPACTS are likely already audible (one
+`OnHitDealt.Broadcast` site, the universal damage path) — inferred from
+routing, owed one playtest. THE BLOCKER IS A RULING, NOT PLUMBING:
+`BreakerSoundDirector.h` forbids a generic `PlaySound(AnyWave)` surface
+without one, so an ability cue is a FIFTH VERB — one cue for all 25, or
+per-ability cues (a content pipeline, not an interface). Owner's call.
+
 GLASS LANE, THE BAR MOVES OUT (456 / 4 / 0 on the rebased tree, same
 expected-red roster, `Docs/STATE.md` regenerates byte-identical). The
 enemy health bar is FIELD's question and now lives in FIELD's directory:
