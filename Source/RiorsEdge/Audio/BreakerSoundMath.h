@@ -28,6 +28,7 @@ namespace BreakerSound
     constexpr float FireDurationSeconds = 0.14f;   // O2 PLACEHOLDER
     constexpr float HitDurationSeconds  = 0.06f;   // O2 PLACEHOLDER
     constexpr float KillDurationSeconds = 0.30f;   // O2 PLACEHOLDER
+    constexpr float TakeHitDurationSeconds = 0.22f; // O2 PLACEHOLDER
 
     inline int32 SampleCount(float DurationSeconds)
     {
@@ -105,7 +106,19 @@ namespace BreakerSound
         }
     }
 
+    // TAKE-HIT: a dull mid thud, pitched between the hit confirm and the
+    // kill so incoming and outgoing never read as the same voice.
+    inline float TakeHitSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const float Hz = 180.0f - 400.0f * T;   // falls 180 -> ~92 over 220 ms
+        const float Body = FMath::Sin(2.0f * PI * Hz * T);
+        const float Grit = 0.25f * NoiseAt(static_cast<uint32>(Index) ^ 0x5A5Au);
+        return 0.45f * (Body + Grit) / 1.25f * Envelope(T, TakeHitDurationSeconds, 14.0f);
+    }
+
     inline void RenderWeaponFire(TArray<int16>& Out) { RenderPcm16(Out, FireDurationSeconds, &WeaponFireSample); }
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }
+    inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }
 }

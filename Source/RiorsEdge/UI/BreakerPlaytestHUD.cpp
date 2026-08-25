@@ -2690,6 +2690,17 @@ void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult&
     const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     if (Result.bDodged) LastDodgeTime = Now;
     else if (Result.bBlocked) LastBlockTime = Now;
+    // THE FOURTH SOUND (ruled: it matters more than the other three).
+    // Immediate, never on the arrival clock — being hit has no flight — and
+    // only for damage that actually landed: a dodge or a fully blocked hit
+    // already has its own readout and earned its silence.
+    if (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f)
+    {
+        if (ABreakerSoundDirector* Sound = GetSoundDirector())
+        {
+            Sound->PlayTakeHit();
+        }
+    }
 }
 
 void ABreakerPlaytestHUD::DrawDefenseFeedback(const FVector2D& Center)

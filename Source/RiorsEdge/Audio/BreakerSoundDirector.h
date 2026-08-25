@@ -8,31 +8,26 @@ class UAudioComponent;
 class USoundWaveProcedural;
 
 // ---------------------------------------------------------------------------
-// The game's first sounds, and deliberately only three of them.
+// The game's combat sounds, and deliberately only four of them.
 //
-// EXACTLY THREE: weapon fire, hit confirm, kill. The owner's brief is
-// explicit that three deliberate sounds beat a half-mixed twenty, so this
-// actor exposes three verbs and nothing generic — no PlaySound(AnyWave)
-// surface for the next caller to grow the roster through without a ruling.
+// FOUR VERBS (ruled): weapon fire, hit confirm, kill — and taking a hit,
+// which matters more than the other three. No generic PlaySound(AnyWave)
+// surface exists for the roster to grow through without a ruling.
 //
-// This is the tracer renderer's sibling and holds the same four decisions,
-// translated: POOLED VOICES rather than pooled primitives (one persistent
-// audio component per sound, allocated once, retriggered forever — an SMG at
-// 800 RPM is thirteen fire sounds a second and a component per shot would be
-// thirteen component lifecycles a second); the waveform maths PURE in
-// BreakerSoundMath.h where the suite can reach it; and like the tracer it is
-// a CLIENT-SIDE COSMETIC actor — replicates nothing, resolves nothing, its
-// absence changes no rule, spawned lazily by the HUD on the first shot.
-// (The other two tracer decisions — world placement for depth occlusion and
-// TG_PostUpdateWork — are answers to questions sound does not ask: these are
-// the player's OWN events, so all three voices play flat 2D and this actor
-// never ticks.)
+// RECORDED SAMPLES FIRST, SYNTH AS FALLBACK (ruled): a gunshot is a crack,
+// a body, a mechanical action and a tail — recorded layers, not
+// arithmetic. Each verb loads its CC0 sample from
+// Content/Breaker/Audio/<verb>.wav at BeginPlay (raw PCM WAV, parsed by
+// the pure reader in BreakerWaveFile.h); a missing or unreadable file
+// falls back to the synthesized wave in BreakerSoundMath.h, so a clone
+// with no audio assets still makes noise. Provenance lives in
+// Content/Breaker/Audio/SOURCES.txt. The synth's original job — proving
+// the audio path end to end — is done; it remains as the floor.
 //
-// RETRIGGER CUTS. A new fire sound resets its voice's queue and starts over
-// rather than overlapping the previous one. At high rates of fire that is the
-// classic retrigger every game's placeholder pass ships; true polyphony is a
-// mixing question for the owner, not a placeholder one. The three voices are
-// independent, so fire + hit + kill do overlap each other.
+// The rest is unchanged from the first pass: pooled persistent voices
+// (retrigger cuts, the four voices overlap each other), client-side
+// cosmetic actor spawned lazily by the HUD, replicates nothing, never
+// ticks.
 // ---------------------------------------------------------------------------
 UCLASS(NotBlueprintable, NotPlaceable)
 class RIORSEDGE_API ABreakerSoundDirector : public AActor
@@ -45,33 +40,40 @@ public:
     // The trigger was pulled and a round left. Per cosmetic shot, not per
     // pellet: a shotgun blast is one report.
     void PlayWeaponFire();
-    // A hit the player dealt landed — any source, weapon or ability, but
-    // never a DoT tick (the caller owns that exclusion, for the same reason
-    // the crosshair confirm does: a Bleed on three targets would strobe
-    // forever over nothing the player just did).
+    // A hit the player dealt landed — any source, never a DoT tick (the
+    // caller owns that exclusion). Scheduled by the caller on the round's
+    // arrival clock.
     void PlayHitConfirm();
     // Something the player hit died of it.
     void PlayKill();
+    // The player took real damage. Immediate — being hit has no flight.
+    void PlayTakeHit();
 
 protected:
     virtual void BeginPlay() override;
 
 private:
-    // One persistent voice per sound. The procedural wave is queued from the
-    // PCM cache on every trigger; the component is created once and reused.
+    // One persistent voice per verb; PCM cached at BeginPlay and queued
+    // verbatim per trigger.
     UPROPERTY() TObjectPtr<UAudioComponent> FireVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> HitVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> KillVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> TakeHitVoice;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
 
-    // Rendered once in BeginPlay and queued verbatim per trigger — the synth
-    // runs per sound, never per play.
     TArray<int16> FirePcm;
     TArray<int16> HitPcm;
     TArray<int16> KillPcm;
+    TArray<int16> TakeHitPcm;
 
-    USoundWaveProcedural* MakeWave();
+    USoundWaveProcedural* MakeWave(int32 SampleRate);
+    // Loads Content/Breaker/Audio/<FileName> into OutPcm and returns its
+    // sample rate, or renders the synth fallback and returns the synth
+    // rate. Logs which path each verb took, once, so a silent fallback is
+    // visible in any run's log.
+    int32 LoadOrSynth(const TCHAR* FileName, void (*Synth)(TArray<int16>&), TArray<int16>& OutPcm);
     void Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm);
 };
