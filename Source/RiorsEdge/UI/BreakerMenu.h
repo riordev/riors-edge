@@ -608,10 +608,16 @@ private:
     bool bKeybindStatusIsClash = false;
     FGuid SelectedCharacterId;
     // Two-step delete, the same arm/confirm shape the inventory's destructive
-    // cleanup and O37's COMMIT control already use. Deleting a character is
+    // cleanup and O37's COMMIT control already use. Discharging a character is
     // the most destructive button in the game and it is not getting a bare
     // single click.
     FGuid PendingDeleteCharacterId;
+    // The roster legend's verbs, factored so the DISCHARGE button, the DEL
+    // key and ENTER/second-click DEPLOY all run the same code. Deploy is a
+    // no-op without a valid selection; discharge arms on the first call for a
+    // character and commits on the second.
+    void DeploySelectedCharacter();
+    void ArmOrConfirmDischarge(const FGuid& CharacterId);
     // Create-screen state.
     EBreakerClassId PendingCreateClass = EBreakerClassId::None;
     FText PendingCreateName;

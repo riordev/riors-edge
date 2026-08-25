@@ -1340,14 +1340,22 @@ TSharedRef<SWidget> SBreakerMenu::MakeButton(const FText& Label, const FOnClicke
 
 void SBreakerMenu::HandleConfirmKey()
 {
-    // The title gate, and only the title gate. This is the path that actually
-    // fires: it comes from the player input component, which works while the
-    // game is paused, rather than from Slate keyboard focus, which the menu
-    // widget does not reliably hold in a standalone session.
+    // The title gate. This is the path that actually fires: it comes from the
+    // player input component, which works while the game is paused, rather
+    // than from Slate keyboard focus, which the menu widget does not reliably
+    // hold in a standalone session.
     if (CurrentScreen == EBreakerMenuScreen::Main && !bTitleRevealed)
     {
         bTitleRevealed = true;
         Rebuild(EBreakerMenuScreen::Main);
+        return;
+    }
+    // The roster legend's ENTER DEPLOY. Space arrives here too — both keys
+    // are bound to ConfirmMenuKey — and either deploying is fine; the call is
+    // a no-op without a valid selection.
+    if (CurrentScreen == EBreakerMenuScreen::CharacterSelect)
+    {
+        DeploySelectedCharacter();
     }
 }
 
@@ -1384,6 +1392,18 @@ FReply SBreakerMenu::OnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent
         // rebinder that refused modifiers could not reproduce the default
         // layout it starts from.
         CommitKeybind(Key);
+        return FReply::Handled();
+    }
+
+    // The roster legend's DEL DISCHARGE: the same arm/confirm the button
+    // runs, aimed at the selected row. First press arms and states the
+    // consequence; the second press is the confirm.
+    if (CurrentScreen == EBreakerMenuScreen::CharacterSelect && KeyEvent.GetKey() == EKeys::Delete)
+    {
+        if (SelectedCharacterId.IsValid())
+        {
+            ArmOrConfirmDischarge(SelectedCharacterId);
+        }
         return FReply::Handled();
     }
 
@@ -1782,6 +1802,160 @@ namespace
         AddCanvasSegment(Canvas, FVector2D(12.0, 1.0), FVector2D(7.0, 5.0), Muted, 2.0f);
         AddCanvasSegment(Canvas, FVector2D(7.0, 5.0), FVector2D(12.0, 9.0), Muted, 2.0f);
         return SNew(SBox).WidthOverride(14.0f).HeightOverride(10.0f)[Canvas];
+    }
+
+    // ---- Full-bleed screen shell ------------------------------------------
+    // The Fieldplate screens are full-screen layouts, not centred plates: an
+    // 87px header band — drawn « chevrons naming the BACK DESTINATION, the
+    // display title, an optional caption beside it and optional content
+    // pinned right — over a 1px divider, with the body beneath on bg/base.
+    // Settings, the roster and the enlist screen all draw through here; a
+    // fixed-geometry sheet cannot jitter, which is all BuildFrame's fixed
+    // plate ever existed to stop.
+    TSharedRef<SWidget> BreakerScreenShell(const FString& BackWord, const FString& Title,
+        const TSharedRef<SWidget>& TitleSuffix, const TSharedRef<SWidget>& HeaderRight,
+        const FOnClicked& OnBack, const TSharedRef<SWidget>& Body)
+    {
+        const TSharedRef<SWidget> Header = SNew(SBox).HeightOverride(87.0f)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerSettingsContentPad, 0.0f, 0.0f, 0.0f)
+            [
+                SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+                [
+                    SNew(SButton)
+                    .ButtonColorAndOpacity(Transparent)
+                    .ContentPadding(FMargin(0.0f, 0.0f, BreakerUI::Space8, 0.0f))
+                    .HAlign(HAlign_Left)
+                    .VAlign(VAlign_Center)
+                    .OnClicked(OnBack)
+                    [
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[BreakerBackChevrons()]
+                        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
+                        [
+                            BreakerMonoText(FText::FromString(BackWord), BreakerUI::TypeCaption, Muted, 0.16f)
+                        ]
+                    ]
+                ]
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+            [
+                MenuText(FText::FromString(Title), BreakerUI::TypeH1, Primary, true)
+            ]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)
+            [
+                TitleSuffix
+            ]
+            + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+                .Padding(BreakerUI::Space24, 0.0f, BreakerSettingsContentPad, 0.0f)
+            [
+                // Clipped: an SHorizontalBox draws an oversized child straight
+                // through its neighbour, and this slot holds free-length text.
+                SNew(SBox).Clipping(EWidgetClipping::ClipToBounds).HAlign(HAlign_Right)
+                [
+                    HeaderRight
+                ]
+            ]
+        ];
+
+        return SNew(SOverlay)
+            + SOverlay::Slot()
+            [
+                SNew(SBorder)
+                .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(BreakerUI::BgBase)
+            ]
+            + SOverlay::Slot()
+            [
+                SNew(SVerticalBox)
+                + SVerticalBox::Slot().AutoHeight()[Header]
+                + SVerticalBox::Slot().AutoHeight()
+                [
+                    SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+                ]
+                + SVerticalBox::Slot().FillHeight(1.0f)[Body]
+            ];
+    }
+
+    // The footer key legend: BOLD KEY then muted verb, pairs at the plate's
+    // 40px margin over a 1px divider. The keys named here are wired — a
+    // legend that promises an unbound key is the quiet lie this project
+    // hunts.
+    TSharedRef<SWidget> BreakerScreenLegend(const TArray<TPair<FString, FString>>& Pairs)
+    {
+        TSharedRef<SHorizontalBox> RowContent = SNew(SHorizontalBox);
+        for (const TPair<FString, FString>& Pair : Pairs)
+        {
+            RowContent->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space8, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(Pair.Key), BreakerUI::TypeCaption, Primary, 0.16f)
+            ];
+            RowContent->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, BreakerUI::Space40, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(Pair.Value), BreakerUI::TypeCaption, Muted, 0.16f)
+            ];
+        }
+        return SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
+            ]
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(SBox).HeightOverride(64.0f).VAlign(VAlign_Center).Padding(FMargin(BreakerSettingsContentPad, 0.0f))
+                [
+                    RowContent
+                ]
+            ];
+    }
+
+    // A vertical dashed run, the missing half of DashedLine, for the enlist
+    // row's dashed ring. Fixed height from the caller, never an allotted size.
+    TSharedRef<SWidget> BreakerDashedVLine(float Height, const FLinearColor& Color, float Dash = 6.0f, float Gap = 6.0f)
+    {
+        TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+        const int32 Count = FMath::Clamp(FMath::CeilToInt(Height / (Dash + Gap)), 1, 240);
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            Column->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, Gap)
+            [
+                SNew(SBox).WidthOverride(BreakerUI::BorderThin).HeightOverride(Dash)[SolidBlock(Color)]
+            ];
+        }
+        return Column;
+    }
+
+    // A dashed 1px ring around fixed-height content: the plate's "this row is
+    // an invitation, not a thing yet" border, used by ENLIST A BREAKER.
+    TSharedRef<SWidget> BreakerDashedRing(const TSharedRef<SWidget>& Content, float Height, const FLinearColor& Color)
+    {
+        return SNew(SBox).HeightOverride(Height)
+        [
+            // Clipped: the dash runs are laid at a fixed count and must never
+            // overhang the row in a narrow window.
+            SNew(SOverlay)
+            .Clipping(EWidgetClipping::ClipToBounds)
+            + SOverlay::Slot().Padding(FMargin(BreakerUI::BorderThin))[Content]
+            + SOverlay::Slot().VAlign(VAlign_Top)[DashedLine(1840.0f, Color, 6.0f, 6.0f)]
+            + SOverlay::Slot().VAlign(VAlign_Bottom)[DashedLine(1840.0f, Color, 6.0f, 6.0f)]
+            + SOverlay::Slot().HAlign(HAlign_Left)[BreakerDashedVLine(Height, Color)]
+            + SOverlay::Slot().HAlign(HAlign_Right)[BreakerDashedVLine(Height, Color)]
+        ];
+    }
+
+    // The + mark, drawn: two 2px bars crossing in a tile.
+    TSharedRef<SWidget> BreakerPlusMark(const FLinearColor& Color, float Arm = 16.0f)
+    {
+        return SNew(SOverlay)
+            + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                SNew(SBox).WidthOverride(Arm).HeightOverride(2.0f)[SolidBlock(Color)]
+            ]
+            + SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+            [
+                SNew(SBox).WidthOverride(2.0f).HeightOverride(Arm)[SolidBlock(Color)]
+            ];
     }
 
     // The sidebar's stub marker: a 6px drawn square and the word, both at the
@@ -3106,71 +3280,23 @@ TSharedRef<SWidget> SBreakerMenu::BuildSettingsScreen()
         ]
     ];
 
-    // ---- Header band -------------------------------------------------------
-    // 87px + its 1px divider: the drawn « chevrons and BACK, then the screen
-    // title. BACK is the same GoBack Escape drives, so the two doors agree.
-    const TSharedRef<SWidget> Header = SNew(SBox).HeightOverride(87.0f)
-    [
+    // The shared shell: « BACK is the same GoBack Escape drives, so the two
+    // doors agree.
+    return BreakerScreenShell(TEXT("BACK"), TEXT("SETTINGS"),
+        SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
+        SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
+        FOnClicked::CreateSP(this, &SBreakerMenu::GoBack),
         SNew(SHorizontalBox)
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerSettingsContentPad, 0.0f, 0.0f, 0.0f)
+        + SHorizontalBox::Slot().AutoWidth()[Sidebar]
+        + SHorizontalBox::Slot().FillWidth(1.0f)
         [
-            SNew(SBox).HeightOverride(BreakerUI::MinHitTarget)
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24,
+                BreakerSettingsContentPad, BreakerUI::Space40))
             [
-                SNew(SButton)
-                .ButtonColorAndOpacity(Transparent)
-                .ContentPadding(FMargin(0.0f, 0.0f, BreakerUI::Space8, 0.0f))
-                .HAlign(HAlign_Left)
-                .VAlign(VAlign_Center)
-                .OnClicked(FOnClicked::CreateSP(this, &SBreakerMenu::GoBack))
-                [
-                    SNew(SHorizontalBox)
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[BreakerBackChevrons()]
-                    + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-                    [
-                        BreakerMonoText(FText::FromString(TEXT("BACK")), BreakerUI::TypeCaption, Muted, 0.16f)
-                    ]
-                ]
+                Pane
             ]
-        ]
-        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
-        [
-            MenuText(FText::FromString(TEXT("SETTINGS")), BreakerUI::TypeH1, Primary, true)
-        ]
-    ];
-
-    // Full-bleed, not a centred plate: the reference is a full-screen layout
-    // — header band, sidebar, one pane at a time — and fixed-geometry zones
-    // cannot jitter, which is all BuildFrame's fixed plate existed to stop.
-    return SNew(SOverlay)
-        + SOverlay::Slot()
-        [
-            SNew(SBorder)
-            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(BreakerUI::BgBase)
-        ]
-        + SOverlay::Slot()
-        [
-            SNew(SVerticalBox)
-            + SVerticalBox::Slot().AutoHeight()[Header]
-            + SVerticalBox::Slot().AutoHeight()
-            [
-                SNew(SBox).HeightOverride(BreakerUI::BorderThin)[SolidBlock(BorderRest)]
-            ]
-            + SVerticalBox::Slot().FillHeight(1.0f)
-            [
-                SNew(SHorizontalBox)
-                + SHorizontalBox::Slot().AutoWidth()[Sidebar]
-                + SHorizontalBox::Slot().FillWidth(1.0f)
-                [
-                    SNew(SScrollBox)
-                    + SScrollBox::Slot().Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24,
-                        BreakerSettingsContentPad, BreakerUI::Space40))
-                    [
-                        Pane
-                    ]
-                ]
-            ]
-        ];
+        ]);
 }
 
 void SBreakerMenu::BeginKeybindListen(FName Action)
@@ -4915,202 +5041,355 @@ TSharedRef<SWidget> SBreakerMenu::MakeClassBanner(EBreakerClassId ClassId, bool 
 TSharedRef<SWidget> SBreakerMenu::MakeCharacterRow(const FBreakerCharacterSummary& Summary, bool bSelected)
 {
     const FBreakerClassBlurb* Blurb = FindClassBlurb(Summary.ClassId);
-
-    TSharedRef<SVerticalBox> Text = SNew(SVerticalBox);
-    Text->AddSlot().AutoHeight()
-    [
-        MenuText(FText::FromString(Summary.CharacterName.ToUpper()), BreakerUI::TypeH2,
-            bSelected ? Cyan : Primary, true)
-    ];
-    Text->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
-    [
-        MenuText(FText::FromString(FString::Printf(TEXT("LEVEL %d  ·  %s"),
-            Summary.CharacterLevel, Blurb ? Blurb->Name : TEXT("UNKNOWN"))),
-            BreakerUI::TypeCaption, SoftText, true)
-    ];
-
     const FGuid Captured = Summary.CharacterId;
     const bool bArmedForDelete = (PendingDeleteCharacterId == Summary.CharacterId);
 
-    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
-    // Half scale and no caption: at row size the caption clipped and the
-    // figure only needs to read as a figure. Full-size silhouettes are what
-    // made three characters taller than the panel.
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
-    [
-        MakeClassSilhouette(Summary.ClassId, true, 0.55f, /*bShowCaption=*/false)
-    ];
-    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space16, 0.0f, 0.0f, 0.0f)[Text];
-    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space8, 0.0f, 0.0f, 0.0f)
-    [
-        // 260, not 190. "DELETE FOREVER?" measured wider than the box and was
-        // cut off (owner: "the delete forever doesnt actually stretch or fit
-        // in the box"). Sized to the LONGEST label the button can ever carry
-        // rather than to the shortest, because the box is fixed and the label
-        // changes underneath it — sizing to "DELETE" is what created the
-        // defect. Same root cause as the skill board's clipped captions.
-        SNew(SBox).WidthOverride(260.0f)
+    // OWED AT THE SITE, not faked: the reference row leads with the
+    // character's DOCTRINE ("SKIMLINE / Vess Aldar") and carries a LAST AREA
+    // column. Neither exists in FBreakerCharacterSummary — the roster is the
+    // select screen's cache and the doctrine lives in the per-character save
+    // — so the row leads with the name and the columns are what the summary
+    // can pay: CLASS, LEVEL, LAST PLAYED. Widening the summary (doctrine
+    // display name, last area) is save-side model work, its own commit.
+
+    // LAST PLAYED is a relative reading of the one timestamp that exists. A
+    // character never deployed reads NEW, never a dash pretending to be data.
+    FString LastPlayed = TEXT("NEW");
+    if (Summary.LastPlayedUnixSeconds > 0)
+    {
+        const int64 Delta = FMath::Max<int64>(0,
+            FDateTime::UtcNow().ToUnixTimestamp() - Summary.LastPlayedUnixSeconds);
+        if (Delta < 3600) LastPlayed = FString::Printf(TEXT("%dM AGO"), FMath::Max(1, static_cast<int32>(Delta / 60)));
+        else if (Delta < 86400) LastPlayed = FString::Printf(TEXT("%dH AGO"), static_cast<int32>(Delta / 3600));
+        else LastPlayed = FString::Printf(TEXT("%dD AGO"), static_cast<int32>(Delta / 86400));
+    }
+
+    // A caption-over-value column, right-aligned by justification in a fixed
+    // box — the clipped-glyph rule, once more.
+    auto MakeColumn = [](const TCHAR* Caption, const FString& Value, float Width) -> TSharedRef<SWidget>
+    {
+        return SNew(SBox).WidthOverride(Width).HAlign(HAlign_Fill)
         [
-            // TWO-STEP DELETE. The same arm/confirm shape the inventory's bulk
-            // discard and O37's COMMIT control use. This is the most
-            // destructive button in the game — it removes hours of progress and
-            // there is no undo — so it does not get a bare single click, and
-            // the armed label states the consequence rather than saying
-            // "confirm".
-            MakeButton(FText::FromString(bArmedForDelete
-                    ? TEXT("DELETE FOREVER?")
-                    : TEXT("DELETE")),
-                FOnClicked::CreateLambda([this, Captured, bArmedForDelete]()
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                SNew(STextBlock)
+                    .Text(FText::FromString(Caption))
+                    .Justification(ETextJustify::Right)
+                    .ColorAndOpacity(Muted)
+                    .Font(BreakerMonoFont(BreakerUI::TypeCaption, 0.16f))
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                SNew(STextBlock)
+                    .Text(FText::FromString(Value))
+                    .Justification(ETextJustify::Right)
+                    .ColorAndOpacity(Primary)
+                    .Font(BreakerMonoFont(BreakerUI::TypeBody))
+            ]
+        ];
+    };
+
+    // The 58px identity tile. The pack ships class insignia as textures; they
+    // are not imported yet, so the tile holds the small drawn figure — the
+    // same honest placeholder the rest of the front end uses — and swaps to
+    // the insignia in the marks import.
+    const TSharedRef<SWidget> Tile = SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
+    [
+        BorderWrap(
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(BreakerUI::BgRaised)
+            .HAlign(HAlign_Center)
+            .VAlign(VAlign_Center)
+            [
+                MakeClassSilhouette(Summary.ClassId, true, 0.22f, /*bShowCaption=*/false)
+            ],
+            BorderEmphasis)
+    ];
+
+    // DISCHARGE, the plate's word for the two-step delete. The armed label is
+    // CONFIRM? because the box is the plate's fixed 124px and "DISCHARGE
+    // FOREVER?" does not fit it — the consequence is stated in words on the
+    // status line the arm writes, and the harm ring plus the words carry the
+    // state together, never colour alone.
+    const TSharedRef<SWidget> Discharge = SNew(SBox).WidthOverride(124.0f).HeightOverride(BreakerSettingsControlHeight)
+    [
+        BorderWrap(
+            SNew(SButton)
+            .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+            .ContentPadding(FMargin(BreakerUI::Space8, 0.0f))
+            .HAlign(HAlign_Center)
+            .VAlign(VAlign_Center)
+            .OnClicked(FOnClicked::CreateLambda([this, Captured]()
+            {
+                ArmOrConfirmDischarge(Captured);
+                return FReply::Handled();
+            }))
+            [
+                BreakerMonoText(FText::FromString(bArmedForDelete ? TEXT("CONFIRM?") : TEXT("DISCHARGE")),
+                    BreakerUI::TypeCaption, bArmedForDelete ? Harm : Muted, 0.16f)
+            ],
+            bArmedForDelete ? HarmDeep : BorderEmphasis)
+    ];
+
+    TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space4, 0.0f, 0.0f, 0.0f)[Tile];
+    Row->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        MenuText(FText::FromString(Summary.CharacterName.ToUpper()), BreakerUI::TypeH2, Primary, true)
+    ];
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        MakeColumn(TEXT("CLASS"), Blurb ? Blurb->Name : TEXT("UNKNOWN"), 110.0f)
+    ];
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        MakeColumn(TEXT("LEVEL"), FString::FromInt(Summary.CharacterLevel), 70.0f)
+    ];
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+    [
+        MakeColumn(TEXT("LAST PLAYED"), LastPlayed, 130.0f)
+    ];
+    Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)[Discharge];
+
+    // The row is the plate's 93px band: face behind a NoBorder button (the
+    // default button brush both darkens its tint and pads its content — the
+    // key cap's finding), selection carried by the 2px cyan ring AND the
+    // raised face, never colour alone.
+    return SNew(SBox).HeightOverride(93.0f)
+    [
+        BorderWrap(
+            SNew(SBorder)
+            .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(bSelected ? PanelRaised : Panel)
+            .Padding(FMargin(0.0f))
+            [
+                SNew(SButton)
+                .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                .ContentPadding(FMargin(BreakerUI::Space16, 0.0f))
+                .HAlign(HAlign_Fill)
+                .VAlign(VAlign_Center)
+                .OnClicked(FOnClicked::CreateLambda([this, Captured]()
                 {
-                    EnsureRosterLoaded();
-                    if (!Roster.IsValid()) return FReply::Handled();
-                    if (!bArmedForDelete)
+                    if (SelectedCharacterId == Captured)
                     {
-                        PendingDeleteCharacterId = Captured;
-                        CharacterScreenStatus = FText::FromString(
-                            TEXT("Click DELETE FOREVER to destroy this character. There is no undo."));
+                        // The second click on the selected row DEPLOYS — the
+                        // mouse's ENTER. A literal double-click cannot be read
+                        // here because selection rebuilds the widget between
+                        // clicks, so this is the double-click, spelled out.
+                        DeploySelectedCharacter();
+                        return FReply::Handled();
                     }
-                    else
-                    {
-                        FBreakerCharacterSummary Doomed;
-                        const bool bFound = Roster->FindCharacter(Captured, Doomed);
-                        Roster->DeleteCharacter(Captured);
-                        PendingDeleteCharacterId = FGuid();
-                        if (SelectedCharacterId == Captured)
-                        {
-                            SelectedCharacterId = Roster->Characters.Num() > 0
-                                ? Roster->Characters[0].CharacterId : FGuid();
-                        }
-                        CharacterScreenStatus = FText::FromString(bFound
-                            ? FString::Printf(TEXT("%s has been deleted."), *Doomed.CharacterName.ToUpper())
-                            : TEXT("Character deleted."));
-                    }
+                    SelectedCharacterId = Captured;
+                    // Selecting a different row disarms a pending discharge.
+                    // Otherwise an arm could survive a change of subject and
+                    // the next click would destroy a character the player had
+                    // stopped looking at.
+                    PendingDeleteCharacterId = FGuid();
                     Rebuild(EBreakerMenuScreen::CharacterSelect);
                     return FReply::Handled();
                 }))
-        ]
+                [
+                    Row
+                ]
+            ],
+            bSelected ? Cyan : BorderRest,
+            bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin)
     ];
+}
 
-    return BorderWrap(
-        SNew(SButton)
-        .ButtonColorAndOpacity(bSelected ? PanelHover : Panel)
-        .ContentPadding(FMargin(BreakerUI::Space16, BreakerUI::Space16))
-        .HAlign(HAlign_Fill).VAlign(VAlign_Center)
-        .OnClicked(FOnClicked::CreateLambda([this, Captured]()
+void SBreakerMenu::DeploySelectedCharacter()
+{
+    if (!SelectedCharacterId.IsValid() || !Roster.IsValid()) return;
+    Roster->LastPlayedCharacterId = SelectedCharacterId;
+    Roster->SaveRoster();
+    // Into the world, as this character, in the hub. The gap this replaced
+    // was real: LoadGameState was hard-wired to the single legacy slot, so
+    // entering here would have played the wrong character rather than the
+    // selected one.
+    if (Character.IsValid())
+    {
+        Character->EnterWorldAsCharacter(SelectedCharacterId);
+    }
+}
+
+void SBreakerMenu::ArmOrConfirmDischarge(const FGuid& CharacterId)
+{
+    EnsureRosterLoaded();
+    if (!Roster.IsValid() || !CharacterId.IsValid()) return;
+
+    FBreakerCharacterSummary Subject;
+    const bool bFound = Roster->FindCharacter(CharacterId, Subject);
+    if (PendingDeleteCharacterId != CharacterId)
+    {
+        // The arm half: nothing is destroyed, the consequence is stated in
+        // words, and any other interaction on the screen disarms it.
+        PendingDeleteCharacterId = CharacterId;
+        CharacterScreenStatus = FText::FromString(FString::Printf(
+            TEXT("Confirm to discharge %s forever. There is no undo."),
+            bFound ? *Subject.CharacterName.ToUpper() : TEXT("THIS BREAKER")));
+    }
+    else
+    {
+        Roster->DeleteCharacter(CharacterId);
+        PendingDeleteCharacterId = FGuid();
+        if (SelectedCharacterId == CharacterId)
         {
-            SelectedCharacterId = Captured;
-            // Selecting a different row disarms a pending delete. Otherwise an
-            // arm could survive a change of subject and the next click would
-            // destroy a character the player had stopped looking at.
-            PendingDeleteCharacterId = FGuid();
-            Rebuild(EBreakerMenuScreen::CharacterSelect);
-            return FReply::Handled();
-        }))
-        [
-            Row
-        ],
-        bSelected ? Cyan : BorderEmphasis,
-        bSelected ? BreakerUI::BorderSelected : BreakerUI::BorderThin);
+            SelectedCharacterId = Roster->Characters.Num() > 0
+                ? Roster->Characters[0].CharacterId : FGuid();
+        }
+        CharacterScreenStatus = FText::FromString(bFound
+            ? FString::Printf(TEXT("%s has been discharged."), *Subject.CharacterName.ToUpper())
+            : TEXT("Breaker discharged."));
+    }
+    Rebuild(EBreakerMenuScreen::CharacterSelect);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildCharacterSelectScreen()
 {
     EnsureRosterLoaded();
 
-    TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
     if (!Roster.IsValid())
     {
         // LoadOrCreate returns null only when it refuses a roster written by a
         // newer build. Saying so beats an empty list that reads as data loss.
-        Body->AddSlot().AutoHeight()
-        [
-            MenuText(FText::FromString(
-                TEXT("The character roster could not be read — it may have been written by a newer build. ")
-                TEXT("No file has been modified.")), BreakerUI::TypeCaption, Harm, true)
-        ];
-        return BuildFrame(FText::FromString(TEXT("CHARACTERS")), FText::FromString(TEXT("")), Body, 860.0f);
+        return BreakerScreenShell(TEXT("MAIN"), TEXT("BREAKERS"),
+            SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
+            SNew(SSpacer).Size(FVector2D(1.0f, 1.0f)),
+            FOnClicked::CreateSP(this, &SBreakerMenu::GoBack),
+            SNew(SBox).Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24))
+            [
+                BreakerMonoText(FText::FromString(
+                    TEXT("THE ROSTER COULD NOT BE READ — IT MAY HAVE BEEN WRITTEN BY A NEWER BUILD. NO FILE HAS BEEN MODIFIED.")),
+                    BreakerUI::TypeCaption, Harm, 0.16f)
+            ]);
     }
 
+    TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
     if (Roster->Characters.Num() == 0)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space16)
+        List->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
         [
-            MenuText(FText::FromString(TEXT("No characters yet. Create one to begin.")),
-                BreakerUI::TypeCaption, SoftText, true)
+            MenuText(FText::FromString(TEXT("No Breakers yet. Enlist one to begin.")),
+                BreakerUI::TypeBody, SoftText)
         ];
     }
     for (const FBreakerCharacterSummary& Summary : Roster->Characters)
     {
-        Body->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space8)
+        List->AddSlot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, BreakerUI::Space12)
         [
             MakeCharacterRow(Summary, Summary.CharacterId == SelectedCharacterId)
         ];
     }
 
-    if (!CharacterScreenStatus.IsEmpty())
-    {
-        Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-        [
-            MenuText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, true)
-        ];
-    }
-
+    // ---- ENLIST A BREAKER --------------------------------------------------
+    // The dashed invitation row from the plate. Full is PAINTED disabled and
+    // says why in words — the count and the way out — never a live-looking
+    // row that refuses silently.
     const bool bFull = Roster->IsFull();
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space16, 0.0f, 0.0f)
+    const FString EnlistCaption = bFull
+        ? FString::Printf(TEXT("%d OF %d SLOTS USED — DISCHARGE ONE TO ENLIST"),
+            Roster->Characters.Num(), UBreakerCharacterRoster::MaxCharacters)
+        : FString::Printf(TEXT("%d OF %d SLOTS USED · CLASS IS PERMANENT PER BREAKER"),
+            Roster->Characters.Num(), UBreakerCharacterRoster::MaxCharacters);
+    const TSharedRef<SWidget> EnlistContent = SNew(SHorizontalBox)
+        + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(BreakerUI::Space16 + BreakerUI::Space4, 0.0f, 0.0f, 0.0f)
+        [
+            SNew(SBox).WidthOverride(58.0f).HeightOverride(58.0f)
+            [
+                BorderWrap(
+                    SNew(SBorder)
+                    .BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                    .BorderBackgroundColor(BreakerUI::BgRaised)
+                    .HAlign(HAlign_Center)
+                    .VAlign(VAlign_Center)
+                    [
+                        BreakerPlusMark(bFull ? Disabled : SoftText)
+                    ],
+                    bFull ? BorderRest : BorderEmphasis)
+            ]
+        ]
+        + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).Padding(BreakerUI::Space24, 0.0f, 0.0f, 0.0f)
+        [
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot().AutoHeight()
+            [
+                MenuText(FText::FromString(TEXT("ENLIST A BREAKER")), BreakerUI::TypeH2,
+                    bFull ? Disabled : Primary, true)
+            ]
+            + SVerticalBox::Slot().AutoHeight().Padding(0.0f, BreakerUI::Space4, 0.0f, 0.0f)
+            [
+                BreakerMonoText(FText::FromString(EnlistCaption), BreakerUI::TypeCaption,
+                    bFull ? Disabled : Muted, 0.16f)
+            ]
+        ];
+    List->AddSlot().AutoHeight()
     [
-        MenuText(FText::FromString(FString::Printf(TEXT("%d / %d CHARACTERS"),
+        BreakerDashedRing(
+            bFull
+                ? EnlistContent
+                : StaticCastSharedRef<SWidget>(
+                    SNew(SButton)
+                    .ButtonStyle(FCoreStyle::Get(), "NoBorder")
+                    .ContentPadding(FMargin(0.0f))
+                    .HAlign(HAlign_Fill)
+                    .VAlign(VAlign_Center)
+                    .OnClicked(FOnClicked::CreateLambda([this]()
+                    {
+                        PendingCreateClass = EBreakerClassId::None;
+                        PendingCreateName = FText::GetEmpty();
+                        CharacterScreenStatus = FText::GetEmpty();
+                        Rebuild(EBreakerMenuScreen::CharacterCreate);
+                        return FReply::Handled();
+                    }))
+                    [
+                        EnlistContent
+                    ]),
+            95.0f, bFull ? BorderRest : BorderEmphasis)
+    ];
+
+    // The status line, always reserved so a discharge arm cannot reflow the
+    // list when it speaks.
+    List->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space12, 0.0f, 0.0f)
+    [
+        SNew(SBox).HeightOverride(20.0f)
+        [
+            BreakerMonoText(CharacterScreenStatus, BreakerUI::TypeCaption, Amber, 0.16f)
+        ]
+    ];
+
+    // ENTER DEPLOY / DEL DISCHARGE / ESC BACK — every key in the legend is
+    // wired: HandleConfirmKey deploys, OnPreviewKeyDown arms and confirms
+    // Delete, HandleEscape goes back.
+    const TSharedRef<SWidget> Body = SNew(SVerticalBox)
+        + SVerticalBox::Slot().FillHeight(1.0f)
+        [
+            SNew(SScrollBox)
+            + SScrollBox::Slot().Padding(FMargin(BreakerSettingsContentPad, BreakerUI::Space24,
+                BreakerSettingsContentPad, BreakerUI::Space24))
+            [
+                List
+            ]
+        ]
+        + SVerticalBox::Slot().AutoHeight()
+        [
+            BreakerScreenLegend({
+                { TEXT("ENTER"), TEXT("DEPLOY") },
+                { TEXT("DEL"), TEXT("DISCHARGE") },
+                { TEXT("ESC"), TEXT("BACK") } })
+        ];
+
+    // The header's standing facts: the slot count, and O17/O51 in one caption
+    // — gear, Riftglass and the stash are account assets.
+    return BreakerScreenShell(TEXT("MAIN"), TEXT("BREAKERS"),
+        BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d OF %d"),
             Roster->Characters.Num(), UBreakerCharacterRoster::MaxCharacters)),
-            BreakerUI::TypeCaption, bFull ? Amber : Muted, true)
-    ];
-
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        MakeButton(FText::FromString(bFull ? TEXT("ROSTER FULL — DELETE ONE TO CREATE") : TEXT("CREATE CHARACTER")),
-            FOnClicked::CreateLambda([this, bFull]()
-            {
-                if (bFull)
-                {
-                    CharacterScreenStatus = FText::FromString(
-                        TEXT("You already have five characters. Delete one first."));
-                    Rebuild(EBreakerMenuScreen::CharacterSelect);
-                    return FReply::Handled();
-                }
-                PendingCreateClass = EBreakerClassId::None;
-                PendingCreateName = FText::GetEmpty();
-                CharacterScreenStatus = FText::GetEmpty();
-                Rebuild(EBreakerMenuScreen::CharacterCreate);
-                return FReply::Handled();
-            }))
-    ];
-
-    const bool bCanPlay = SelectedCharacterId.IsValid();
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        MakeButton(FText::FromString(bCanPlay ? TEXT("PLAY") : TEXT("SELECT A CHARACTER")),
-            FOnClicked::CreateLambda([this]()
-            {
-                if (!SelectedCharacterId.IsValid() || !Roster.IsValid()) return FReply::Handled();
-                Roster->LastPlayedCharacterId = SelectedCharacterId;
-                Roster->SaveRoster();
-                // Into the world, as this character, in the hub. The gap this
-                // replaces was real: LoadGameState was hard-wired to the single
-                // legacy slot, so entering here would have played the wrong
-                // character rather than the selected one.
-                if (Character.IsValid())
-                {
-                    Character->EnterWorldAsCharacter(SelectedCharacterId);
-                }
-                return FReply::Handled();
-            }), bCanPlay)
-    ];
-
-    Body->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
-    [
-        MakeButton(FText::FromString(TEXT("BACK")), FOnClicked::CreateSP(this, &SBreakerMenu::GoBack))
-    ];
-
-    return BuildFrame(FText::FromString(TEXT("CHARACTERS")),
-        FText::FromString(TEXT("Class choice is permanent per character.")), Body, 860.0f);
+            BreakerUI::TypeCaption, Muted, 0.16f),
+        BreakerMonoText(FText::FromString(TEXT("GEAR · RIFTGLASS · STASH ARE ACCOUNT-WIDE")),
+            BreakerUI::TypeCaption, Muted, 0.16f),
+        FOnClicked::CreateSP(this, &SBreakerMenu::GoBack),
+        Body);
 }
 
 TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
