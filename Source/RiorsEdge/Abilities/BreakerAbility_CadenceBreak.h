@@ -33,15 +33,15 @@
 //    full second without a hit resets it" (node text; Class-Kits §1.3 F9).
 //    Read per shot, so a respec changes the rule mid-window honestly.
 //
-// WAITING — the reload half. "Instantly completes the current reload" needs
-// the spec's CompleteReloadImmediately hook (§4.2 MISSING HOOK) on the weapon
-// component; FinishReload is private and timer-driven, and Weapons/ is owned
-// elsewhere in this pass. The window and stacks are live without it.
+//  * The reload half: "Instantly completes the current reload", through
+//    UBreakerWeaponComponent::CompleteReloadImmediately (the §4.2 hook,
+//    landed with O175) — the normal reload's gates and economy compressed to
+//    one frame, authority-side.
 //
-// WAITING — the F7 grant. Swift.Frenzy.SlipcutMastery still authors no
-// AbilityGrant (Progression/ is read-only in this pass); the day that line is
-// added, this ability reaches the loadout. Until then it is registry-resolvable
-// and testable but not granted by any node.
+// The unlock path is the quartermaster token (O176), not a node grant — the
+// node ability-grant path is retiring (DECISIONS' open note records it with
+// readers and no writers), so Slipcut Mastery's F7 grant clause stays a rule
+// tag and the loadout entry is bought.
 UCLASS()
 class RIORSEDGE_API UBreakerAbility_CadenceBreak : public UBreakerGameplayAbility
 {

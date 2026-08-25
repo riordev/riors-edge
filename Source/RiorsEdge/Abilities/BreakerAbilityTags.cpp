@@ -5,20 +5,29 @@ namespace BreakerAbilityTags
     UE_DEFINE_GAMEPLAY_TAG(Data_AbilityCost, "Data.AbilityCost");
     UE_DEFINE_GAMEPLAY_TAG(Data_AbilityCooldown, "Data.AbilityCooldown");
 
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Slipcut, "Ability.Class.Swift.Slipcut");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Skim, "Ability.Class.Swift.Skim");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Lead, "Ability.Class.Swift.Lead");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_CadenceBreak, "Ability.Class.Swift.CadenceBreak");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_HardStop, "Ability.Class.Swift.HardStop");
+    UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Sightline, "Ability.Class.Swift.Sightline");
     UE_DEFINE_GAMEPLAY_TAG(Ability_Class_Swift_Overdrive, "Ability.Class.Swift.Overdrive");
 
+    UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Slipcut, "Cooldown.Class.Swift.Slipcut");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Skim, "Cooldown.Class.Swift.Skim");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Lead, "Cooldown.Class.Swift.Lead");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_CadenceBreak, "Cooldown.Class.Swift.CadenceBreak");
+    UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_HardStop, "Cooldown.Class.Swift.HardStop");
+    UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Sightline, "Cooldown.Class.Swift.Sightline");
     UE_DEFINE_GAMEPLAY_TAG(Cooldown_Class_Swift_Overdrive, "Cooldown.Class.Swift.Overdrive");
 
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Slipcut, "State.Ability.Slipcut");
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Skim, "State.Ability.Skim");
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_Lead, "State.Ability.Lead");
     // Spec §4.2: ActivationOwnedTags State.Ability.CadenceBreak.
     UE_DEFINE_GAMEPLAY_TAG(State_Ability_CadenceBreak, "State.Ability.CadenceBreak");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_HardStop, "State.Ability.HardStop");
+    UE_DEFINE_GAMEPLAY_TAG(State_Ability_Sightline, "State.Ability.Sightline");
     UE_DEFINE_GAMEPLAY_TAG(State_Ultimate_Overdrive, "State.Ultimate.Overdrive");
 
     UE_DEFINE_GAMEPLAY_TAG(Keystone_Swift_Bloodrhythm, "Keystone.Swift.Bloodrhythm");

@@ -13,20 +13,31 @@ namespace BreakerAbilityTags
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_AbilityCost);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_AbilityCooldown);
 
-    // Swift, the vertical-slice class (Class-Kits §1.2).
+    // Swift, the vertical-slice class (Class-Kits §1.2). The full 6+1 roster
+    // (O175): Slipcut, Skim, Lead, Cadence Break, Hard Stop, Sightline,
+    // Overdrive.
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Slipcut);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Lead);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_CadenceBreak);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_HardStop);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Sightline);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Class_Swift_Overdrive);
 
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Slipcut);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Lead);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_CadenceBreak);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_HardStop);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Sightline);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Class_Swift_Overdrive);
 
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Slipcut);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Skim);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Lead);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_CadenceBreak);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_HardStop);
+    UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ability_Sightline);
     UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Ultimate_Overdrive);
 
     // Branch keystones (spec D1). A keystone node grants a passive GE whose

@@ -3,7 +3,10 @@
 #include "Misc/AutomationTest.h"
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerAbility_CadenceBreak.h"
+#include "Abilities/BreakerAbility_HardStop.h"
+#include "Abilities/BreakerAbility_Sightline.h"
 #include "Abilities/BreakerAbility_Skim.h"
+#include "Abilities/BreakerAbility_Slipcut.h"
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Combat/BreakerCombatComponent.h"
@@ -32,31 +35,30 @@ bool FBreakerSkimAirtimeAndSpendToLiveTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Base kit skims once per airtime"), UBreakerAbility_Skim::MaxAirborneUses(false), 1);
     TestEqual(TEXT("Skim Discipline raises the ceiling to two"), UBreakerAbility_Skim::MaxAirborneUses(true), 2);
 
-    // Spend to Live's cost half: "it costs twice the Momentum" (node text) —
-    // and ONLY on a cast that resolves as Hard Stop. Everything else is the
-    // bit-identity half.
-    TestEqual(TEXT("Without the node a Hard Stop costs its authored price"),
-        UBreakerAbility_Skim::HardStopCostMultiplier(true, false), 1.0f);
-    TestEqual(TEXT("With the node a plain redirect is untouched"),
-        UBreakerAbility_Skim::HardStopCostMultiplier(false, true), 1.0f);
-    TestEqual(TEXT("With the node a Hard Stop costs twice the Momentum"),
-        UBreakerAbility_Skim::HardStopCostMultiplier(true, true), 2.0f);
+    // Spend to Live's cost half: "it costs twice the Momentum" (node text).
+    // Since O177 the payer is the standalone Hard Stop, at S4's authored 30 —
+    // the doubling is the doc's own 30 -> 60.
+    TestEqual(TEXT("Without the node Hard Stop costs its authored price"),
+        UBreakerAbility_HardStop::CostMultiplier(false), 1.0f);
+    TestEqual(TEXT("With the node Hard Stop costs twice the Momentum"),
+        UBreakerAbility_HardStop::CostMultiplier(true), 2.0f);
 
     // The protective window (§1.2 S4 base, §1.4 K10 rewrite): a reduction
     // becomes the incoming chain's own 0.0 — immunity — with the node.
     TestEqual(TEXT("Base Hard Stop reduces incoming damage for the window"),
-        UBreakerAbility_Skim::HardStopIncomingMultiplier(false, 0.30f), 0.70f);
+        UBreakerAbility_HardStop::IncomingMultiplier(false, 0.30f), 0.70f);
     TestEqual(TEXT("Spend to Live turns the window into true immunity"),
-        UBreakerAbility_Skim::HardStopIncomingMultiplier(true, 0.30f), 0.0f);
+        UBreakerAbility_HardStop::IncomingMultiplier(true, 0.30f), 0.0f);
     TestEqual(TEXT("A nonsense fraction clamps instead of inverting"),
-        UBreakerAbility_Skim::HardStopIncomingMultiplier(false, 2.0f), 0.0f);
+        UBreakerAbility_HardStop::IncomingMultiplier(false, 2.0f), 0.0f);
 
     // Structural guards: the window must expire before the next Hard Stop can
-    // exist (Skim's cooldown is 3s), or the timed removal could strip a newer
+    // exist (its cooldown is 6s), or the timed removal could strip a newer
     // window's chain entry.
-    TestTrue(TEXT("The window is shorter than Skim's cooldown"),
-        UBreakerAbility_Skim::HardStopWindowSeconds < 3.0f);
-    TestFalse(TEXT("The window's chain key is real"), UBreakerAbility_Skim::HardStopWindowKey().IsNone());
+    TestTrue(TEXT("The window is shorter than Hard Stop's cooldown"),
+        UBreakerAbility_HardStop::WindowSeconds < 6.0f);
+    TestFalse(TEXT("The window's chain key is real"), UBreakerAbility_HardStop::IncomingModifierKey().IsNone());
+    TestFalse(TEXT("The HUD window key is real"), UBreakerAbility_HardStop::WindowKey().IsNone());
     return true;
 }
 
@@ -188,6 +190,99 @@ bool FBreakerCadenceBreakStackRuleTest::RunTest(const FString& Parameters)
     // reset needs the second to have fully passed.
     TestEqual(TEXT("The boundary second itself still continues the stack"),
         FCadence::NextStackCount(3, true, true, FCadence::SecondWindResetSeconds, true), 4);
+    return true;
+}
+
+// The three O175 rows, each with §1.2's quoted numbers and its real ability
+// class — the same shape as the CadenceBreak row test above, because a row
+// whose id or class drifts resolves to nothing at the one grant site.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSwiftRosterCompleteTest,
+    "RiorsEdge.Abilities.SwiftRosterComplete",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSwiftRosterCompleteTest::RunTest(const FString& Parameters)
+{
+    const UBreakerAbilityDefinition* Slipcut = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Slipcut"));
+    if (TestNotNull(TEXT("Swift.Slipcut is a registry row"), Slipcut))
+    {
+        TestEqual(TEXT("S1 costs 20 Momentum"), Slipcut->ResourceCost, 20.0f);
+        TestEqual(TEXT("S1 cools down for 4s"), Slipcut->CooldownSeconds, 4.0f);
+        TestEqual(TEXT("S1's window is 0.4s"), Slipcut->WindowDuration, 0.4f);
+        TestEqual(TEXT("S1 belongs to Swift"), Slipcut->ClassId, EBreakerClassId::Swift);
+        TestTrue(TEXT("S1 resolves to the real ability class"),
+            Slipcut->AbilityClass == UBreakerAbility_Slipcut::StaticClass());
+    }
+
+    const UBreakerAbilityDefinition* HardStop = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.HardStop"));
+    if (TestNotNull(TEXT("Swift.HardStop is a registry row"), HardStop))
+    {
+        TestEqual(TEXT("S4 costs 30 Momentum"), HardStop->ResourceCost, 30.0f);
+        TestEqual(TEXT("S4 cools down for 6s"), HardStop->CooldownSeconds, 6.0f);
+        TestEqual(TEXT("S4's window is 0.6s"), HardStop->WindowDuration, 0.6f);
+        TestEqual(TEXT("S4 belongs to Swift"), HardStop->ClassId, EBreakerClassId::Swift);
+        TestTrue(TEXT("S4 resolves to the real ability class"),
+            HardStop->AbilityClass == UBreakerAbility_HardStop::StaticClass());
+    }
+
+    const UBreakerAbilityDefinition* Sightline = UBreakerAbilityDefinition::FindFallback(TEXT("Swift.Sightline"));
+    if (TestNotNull(TEXT("Swift.Sightline is a registry row"), Sightline))
+    {
+        TestEqual(TEXT("S5 costs 25 Momentum"), Sightline->ResourceCost, 25.0f);
+        TestEqual(TEXT("S5 cools down for 6s"), Sightline->CooldownSeconds, 6.0f);
+        TestEqual(TEXT("S5's window is 2s"), Sightline->WindowDuration, 2.0f);
+        TestEqual(TEXT("S5 belongs to Swift"), Sightline->ClassId, EBreakerClassId::Swift);
+        TestTrue(TEXT("S5 resolves to the real ability class"),
+            Sightline->AbilityClass == UBreakerAbility_Sightline::StaticClass());
+    }
+
+    // The catalogue, derived: Swift now offers six class abilities and one
+    // ultimate, which is the design's 6+1 (Docs/spec/classes-and-abilities.md:
+    // "Two abilities plus one ultimate are equipped, from six per class").
+    TestEqual(TEXT("Swift's class-slot catalogue is six"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityOne).Num(), 6);
+    TestEqual(TEXT("Swift's ultimate catalogue is one"),
+        UBreakerAbilityDefinition::GetClassAbilityIds(EBreakerClassId::Swift, EBreakerAbilitySlot::Ultimate).Num(), 1);
+    return true;
+}
+
+// Slipcut's window rule (S1 base, F7 Slipcut Mastery extension) and the
+// structural guards on its keys.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSlipcutWindowRuleTest,
+    "RiorsEdge.Abilities.SlipcutWindow",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSlipcutWindowRuleTest::RunTest(const FString& Parameters)
+{
+    using FSlipcut = UBreakerAbility_Slipcut;
+    // Base rule: the authored window, untouched — with any number of
+    // cooldowns running. The node is the only thing that reads them.
+    TestEqual(TEXT("Without Mastery the window is the authored window"),
+        FSlipcut::WindowSeconds(0.4f, 3, false), 0.4f);
+    // F7: +0.15s per running ability cooldown (deleted §1.3's figure, O2).
+    TestEqual(TEXT("Mastery with no cooldowns running adds nothing"),
+        FSlipcut::WindowSeconds(0.4f, 0, true), 0.4f);
+    TestEqual(TEXT("Mastery widens by 0.15s per running cooldown"),
+        FSlipcut::WindowSeconds(0.4f, 2, true), 0.7f);
+    TestEqual(TEXT("A negative count cannot narrow the window"),
+        FSlipcut::WindowSeconds(0.4f, -3, true), 0.4f);
+
+    // The cadence rewrite is a rate statement: 2x, and the window is shorter
+    // than the cooldown so two windows can never overlap one keyed push.
+    TestEqual(TEXT("S1 fires at 2x rate"), FSlipcut::CadenceMultiplier, 2.0f);
+    TestTrue(TEXT("The window is shorter than Slipcut's cooldown"), 0.4f < 4.0f);
+    TestFalse(TEXT("The cadence key is real"), FSlipcut::CadenceKey().IsNone());
+    TestNotEqual(TEXT("The window key is distinct from the cadence key"),
+        FSlipcut::WindowKey(), FSlipcut::CadenceKey());
+
+    // Sightline's structural guards ride here: one granted-rule pierce count,
+    // finite ("all targets in a clear line", not an overflow), and real keys.
+    TestTrue(TEXT("Sightline's pierce grant is finite and large"),
+        UBreakerAbility_Sightline::AllTargetsPierceCount >= 16 && UBreakerAbility_Sightline::AllTargetsPierceCount < 1000);
+    TestFalse(TEXT("Sightline's channel key is real"), UBreakerAbility_Sightline::ChannelKey().IsNone());
+    TestNotEqual(TEXT("Sightline's window key is distinct from its channel key"),
+        UBreakerAbility_Sightline::WindowKey(), UBreakerAbility_Sightline::ChannelKey());
     return true;
 }
 

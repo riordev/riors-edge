@@ -145,10 +145,20 @@ void UBreakerAbility_CadenceBreak::ActivateAbility(const FGameplayAbilitySpecHan
         return;
     }
 
-    // WAITING (spec §4.2 MISSING HOOK): "Instantly completes the current
-    // reload" needs UBreakerWeaponComponent::CompleteReloadImmediately, which
-    // does not exist and cannot be added from here (Weapons/ is owned
-    // elsewhere in this pass). The window and stacks below are the live half.
+    // "Instantly completes the current reload" (§1.2 S2), through the weapon's
+    // own reload path compressed to one frame — CompleteReloadImmediately
+    // routes StartReload's gates and FinishReload's economy, so the snap and a
+    // timed reload cannot disagree about what a reload pays. Authority-side,
+    // like the ammo it rewrites. NOTE the ordering: a live Slipcut window ends
+    // on reload START by design, so a Cadence Break cast mid-Slipcut trades
+    // the cadence window for the magazine — that is a real choice, not a bug.
+    if (Character->HasAuthority())
+    {
+        if (UBreakerWeaponComponent* Weapon = Character->FindComponentByClass<UBreakerWeaponComponent>())
+        {
+            Weapon->CompleteReloadImmediately();
+        }
+    }
 
     // Bound once per instance (InstancedPerActor, no BeginPlay of its own).
     if (!bDelegatesBound)

@@ -827,6 +827,54 @@ bool UBreakerWeaponComponent::IsRangeTreatmentOverridden() const
     return RangeTreatmentOverrides.Num() > 0;
 }
 
+void UBreakerWeaponComponent::PushFireRateMultiplier(FName Key, float Multiplier, float Duration)
+{
+    if (Key.IsNone() || Multiplier <= 0.0f) return;
+    FFireRateMultiplierEntry Entry;
+    Entry.Multiplier = Multiplier;
+    const UWorld* World = GetWorld();
+    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
+    // Re-pushing the same key replaces rather than stacks, matching PushSpeedMultiplier.
+    FireRateMultipliers.Add(Key, Entry);
+    RefreshAutomaticFireInterval();
+}
+
+void UBreakerWeaponComponent::PopFireRateMultiplier(FName Key)
+{
+    if (FireRateMultipliers.Remove(Key) > 0)
+    {
+        RefreshAutomaticFireInterval();
+    }
+}
+
+void UBreakerWeaponComponent::PruneFireRateMultipliers() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || FireRateMultipliers.Num() == 0) return;
+    const double Now = World->GetTimeSeconds();
+    for (auto It = FireRateMultipliers.CreateIterator(); It; ++It)
+    {
+        if (It.Value().ExpiryTime >= 0.0 && It.Value().ExpiryTime <= Now)
+        {
+            It.RemoveCurrent();
+        }
+    }
+}
+
+void UBreakerWeaponComponent::RefreshAutomaticFireInterval()
+{
+    // Only the non-burst automatic path holds a stale interval: its repeating
+    // timer was armed once at StartFire. Burst weapons re-read the interval
+    // every callback, and a released trigger has no timer to re-arm.
+    UWorld* World = GetWorld();
+    if (!World || !bTriggerHeld) return;
+    const UBreakerWeaponDefinition* Definition = ResolveDefinition();
+    if (!Definition || !Definition->bAutomatic || Definition->ShotsPerBurst > 1) return;
+    if (!World->GetTimerManager().IsTimerActive(AutomaticFireTimer)) return;
+    World->GetTimerManager().SetTimer(AutomaticFireTimer, this, &ThisClass::FireOnceTimer,
+        FBreakerWeaponMath::FireInterval(GetEffectiveRoundsPerMinute(Definition)), true);
+}
+
 void UBreakerWeaponComponent::UpdateFeelTickEnabled()
 {
     const bool bBusy = RecoilPitchAccumulated != 0.0f || RecoilYawAccumulated != 0.0f
@@ -1135,22 +1183,31 @@ float UBreakerWeaponComponent::GetFireRateMultiplier() const
     // Read live rather than cached: the player equips and unequips mid-fight,
     // and a cached cadence would keep firing at the old gun's rate until
     // something happened to invalidate it.
+    float Composed = 1.0f;
     const AActor* Owner = GetOwner();
-    if (!Owner) return 1.0f;
     if (const IAbilitySystemInterface* AbilityOwner = Cast<const IAbilitySystemInterface>(Owner))
     {
         if (const UAbilitySystemComponent* ASC = AbilityOwner->GetAbilitySystemComponent())
         {
             if (const UBreakerAttributeSet* Attributes = ASC->GetSet<UBreakerAttributeSet>())
             {
-                // Floored for the same reason PreAttributeChange floors it: a
-                // multiplier at zero turns the fire interval into an infinity,
-                // which hangs the weapon rather than slowing it.
-                return FMath::Max(0.05f, Attributes->GetFireRateMultiplier());
+                Composed = Attributes->GetFireRateMultiplier();
             }
         }
     }
-    return 1.0f;
+    // Ability windows compose MULTIPLICATIVELY on top of the attribute: the
+    // attribute is the gear/tree additive bucket already aggregated, and
+    // Slipcut's "fires at 2x rate" is a rate statement, not another line in
+    // that bucket (Class-Kits §1.2 S1).
+    PruneFireRateMultipliers();
+    for (const TPair<FName, FFireRateMultiplierEntry>& Pair : FireRateMultipliers)
+    {
+        Composed *= Pair.Value.Multiplier;
+    }
+    // Floored for the same reason PreAttributeChange floors the attribute: a
+    // multiplier at zero turns the fire interval into an infinity, which
+    // hangs the weapon rather than slowing it.
+    return FMath::Max(0.05f, Composed);
 }
 
 // Effective rounds per minute: the archetype's authored cadence times whatever
@@ -1293,6 +1350,24 @@ void UBreakerWeaponComponent::StartReload()
     bReloading = true;
     OnReloadChanged.Broadcast(true);
     GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ThisClass::FinishReload, Definition->ReloadDuration, false);
+}
+
+void UBreakerWeaponComponent::CompleteReloadImmediately()
+{
+    // Cadence Break's reload snap (spec §4.2). Authority-only: the ammo state
+    // this rewrites is server fact, and the one caller is authority-gated.
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld()) return;
+    if (!bReloading)
+    {
+        // Route through StartReload so every gate and every piece of reload
+        // economy (Loaded's refund capture, the StopFire, the broadcasts) is
+        // the normal reload's, compressed to one frame — a second reload
+        // implementation here would drift from the first.
+        StartReload();
+        if (!bReloading) return;   // a gate refused; there is nothing to complete
+    }
+    GetWorld()->GetTimerManager().ClearTimer(ReloadTimer);
+    FinishReload();
 }
 
 void UBreakerWeaponComponent::SetAimingInternal(bool bNewAiming)

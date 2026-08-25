@@ -2,12 +2,10 @@
 
 #include "Abilities/BreakerAbilityTags.h"
 #include "Characters/BreakerCharacter.h"
-#include "Combat/BreakerCombatComponent.h"
 #include "Engine/World.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
-#include "TimerManager.h"
 
 UBreakerAbility_Skim::UBreakerAbility_Skim()
 {
@@ -38,61 +36,11 @@ FName UBreakerAbility_Skim::BurstKey()
     return TEXT("Skim");
 }
 
-FName UBreakerAbility_Skim::HardStopWindowKey()
-{
-    return TEXT("HardStop");
-}
-
-bool UBreakerAbility_Skim::ShouldHardStop(bool bHasSkimDiscipline, float ViewPitchDegrees, float PitchThresholdDegrees)
-{
-    return bHasSkimDiscipline && FRotator::NormalizeAxis(ViewPitchDegrees) <= PitchThresholdDegrees;
-}
-
 int32 UBreakerAbility_Skim::MaxAirborneUses(bool bHasSkimDiscipline)
 {
     // Class-Kits §1.2 S3: "Usable airborne once per airtime." §1.4 K7:
     // "Skim may be used twice per airtime instead of once." Transcribed.
     return bHasSkimDiscipline ? 2 : 1;
-}
-
-float UBreakerAbility_Skim::HardStopCostMultiplier(bool bWouldHardStop, bool bHasSpendToLive)
-{
-    // Node text (Swift.Kinetic.SpendToLive): "it costs twice the Momentum."
-    // Only a cast that resolves as Hard Stop pays it; a redirect is untouched.
-    return (bWouldHardStop && bHasSpendToLive) ? 2.0f : 1.0f;
-}
-
-float UBreakerAbility_Skim::HardStopIncomingMultiplier(bool bHasSpendToLive, float ReductionFraction)
-{
-    // K10: "Hard Stop's window becomes true immunity" — the incoming chain's
-    // own 0.0 (UBreakerCombatComponent documents 0.0 as immune). Base S4:
-    // a reduction for the window, fraction O2 PLACEHOLDER (see header).
-    if (bHasSpendToLive)
-    {
-        return 0.0f;
-    }
-    return 1.0f - FMath::Clamp(ReductionFraction, 0.0f, 1.0f);
-}
-
-bool UBreakerAbility_Skim::WouldResolveAsHardStop() const
-{
-    const ABreakerCharacter* Character = GetBreakerCharacter();
-    if (!Character)
-    {
-        return false;
-    }
-    const UBreakerProgressionComponent* Progression = Character->FindComponentByClass<UBreakerProgressionComponent>();
-    const bool bHasSkimDiscipline = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SkimDiscipline.GetTag());
-    return ShouldHardStop(bHasSkimDiscipline, static_cast<float>(Character->GetControlRotation().Pitch), HardStopPitchDegrees);
-}
-
-float UBreakerAbility_Skim::GetResourceCost() const
-{
-    const float BaseCost = Super::GetResourceCost();
-    const ABreakerCharacter* Character = GetBreakerCharacter();
-    const UBreakerProgressionComponent* Progression = Character ? Character->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
-    const bool bHasSpendToLive = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SpendToLive.GetTag());
-    return BaseCost * HardStopCostMultiplier(WouldResolveAsHardStop(), bHasSpendToLive);
 }
 
 void UBreakerAbility_Skim::HandleLanded(const FHitResult& Hit)
@@ -143,43 +91,9 @@ void UBreakerAbility_Skim::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     const FRotator ViewRotation = Character->GetControlRotation();
 
-    if (ShouldHardStop(bHasSkimDiscipline, static_cast<float>(ViewRotation.Pitch), HardStopPitchDegrees))
-    {
-        // Hard Stop: cancels all velocity instantly. The cost is already
-        // committed — doubled by GetResourceCost when Spend to Live is owned —
-        // which is the whole point of the node: dumping Momentum to stop is a
-        // tactical option, not a free brake.
-        Movement->Velocity = FVector::ZeroVector;
-
-        // S4's protective window, through the incoming-damage chain Combat/
-        // already exposes (PushIncomingDamageModifier lands at the same stage
-        // as gear-rolled physical reduction; 0.0 is immune). Base: 0.6s of the
-        // Damage-Reduction-While-Airborne treatment on the ground (§1.2 S4;
-        // the affix value is an O2 PLACEHOLDER until the affix exists). With
-        // K10 Spend to Live: true immunity for the same 0.6s. Server-side
-        // fact, so authority only; the window is strictly shorter than Skim's
-        // cooldown, so the timed removal can never strip a newer window.
-        const bool bHasSpendToLive = Progression && Progression->HasNodeTag(BreakerNodeTags::Node_SpendToLive.GetTag());
-        UWorld* World = Character->GetWorld();
-        if (Character->HasAuthority() && World)
-        {
-            if (UBreakerCombatComponent* Combat = Character->FindComponentByClass<UBreakerCombatComponent>())
-            {
-                Combat->PushIncomingDamageModifier(HardStopWindowKey(), HardStopIncomingMultiplier(bHasSpendToLive, HardStopDamageReductionFraction));
-                TWeakObjectPtr<UBreakerCombatComponent> WeakCombat(Combat);
-                FTimerHandle RemoveHandle;
-                World->GetTimerManager().SetTimer(RemoveHandle, FTimerDelegate::CreateWeakLambda(this, [WeakCombat]()
-                {
-                    if (UBreakerCombatComponent* Restored = WeakCombat.Get())
-                    {
-                        Restored->RemoveIncomingDamageModifier(HardStopWindowKey());
-                    }
-                }), HardStopWindowSeconds, false);
-            }
-        }
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
+    // The pitch-gated Hard Stop branch that used to live here is retired
+    // (O177): Hard Stop is its own equippable ability with S4's own cost and
+    // cooldown (UBreakerAbility_HardStop). Skim is the redirect, whole.
 
     // Pure redirect: no speed floor, no bonus, and no dash charge consumed.
     // TryRedirect is allowed to fail (below walk speed) after the cost is

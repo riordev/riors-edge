@@ -415,21 +415,9 @@ bool FBreakerAbilityImpactRulesTest::RunTest(const FString& Parameters)
     // copied into the consumer.
     TestEqual(TEXT("The weapon reads the ability's own 25 m gate"), UBreakerAbility_Lead::DefaultMinimumRangeCm(), 2500.0f);
 
-    // Hard Stop (K7 Skim Discipline). Without the node the verb never fires,
-    // whatever the player is looking at.
-    TestFalse(TEXT("Without the node, looking down is still a redirect"),
-        UBreakerAbility_Skim::ShouldHardStop(false, -80.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
-    TestFalse(TEXT("With the node, a level view is still a redirect"),
-        UBreakerAbility_Skim::ShouldHardStop(true, 0.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
-    TestFalse(TEXT("With the node, looking up is still a redirect"),
-        UBreakerAbility_Skim::ShouldHardStop(true, 60.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
-    TestTrue(TEXT("With the node, a steep down-aim stops dead"),
-        UBreakerAbility_Skim::ShouldHardStop(true, -80.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
-    TestTrue(TEXT("The threshold itself qualifies"),
-        UBreakerAbility_Skim::ShouldHardStop(true, UBreakerAbility_Skim::HardStopPitchDegrees, UBreakerAbility_Skim::HardStopPitchDegrees));
-    // Control rotations arrive unwound (0-360), so the rule must normalize.
-    TestTrue(TEXT("An unwound pitch normalizes before comparison"),
-        UBreakerAbility_Skim::ShouldHardStop(true, 280.0f, UBreakerAbility_Skim::HardStopPitchDegrees));
+    // The pitch-gated Hard Stop modal that used to be asserted here is
+    // retired (O177): Hard Stop is its own ability, and its rules are pinned
+    // in BreakerSwiftRewriteConsumerTests against UBreakerAbility_HardStop.
 
     // Skim's burst must remain a burst, not a state.
     TestTrue(TEXT("Skim's burst adds speed"), UBreakerAbility_Skim::BurstSpeedMultiplier > 1.0f);

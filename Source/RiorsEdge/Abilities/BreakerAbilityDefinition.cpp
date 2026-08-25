@@ -3,6 +3,9 @@
 #include "Abilities/BreakerAbilityTags.h"
 #include "Abilities/BreakerAbility_CadenceBreak.h"
 #include "Abilities/BreakerAbility_Cleave.h"
+#include "Abilities/BreakerAbility_HardStop.h"
+#include "Abilities/BreakerAbility_Sightline.h"
+#include "Abilities/BreakerAbility_Slipcut.h"
 #include "Abilities/BreakerAbility_Closequarter.h"
 #include "Abilities/BreakerAbility_Fracture.h"
 #include "Abilities/BreakerAbility_Lead.h"
@@ -150,11 +153,30 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     }
 
     // ------------------------------------------------------------------
-    // Swift, the vertical-slice class. Costs and cooldowns are quoted from
-    // Docs/Design/Class-Kits.md §1.2; nothing here is invented balance.
-    // Anything NOT quoted from a design doc is marked O2 PLACEHOLDER and must
-    // be replaced from wave-mode instrumentation before content lock.
+    // Swift, the vertical-slice class, at the FULL designed 6+1 (O175).
+    // Costs and cooldowns are quoted from Class-Kits §1.2 (the doc is
+    // deleted with the corpus; `git show 61c2d4f^:Docs/Design/Class-Kits.md`
+    // is the provenance); nothing here is invented balance. Anything NOT
+    // quoted is marked O2 PLACEHOLDER and must be replaced from wave-mode
+    // instrumentation before content lock.
     // ------------------------------------------------------------------
+
+    // S1 Slipcut — §1.2 row S1: 20 Momentum, 4s cooldown, 0.4s window.
+    // The design's STARTER beside Skim (O176; the class-definition buckets
+    // in Progression/ execute that half).
+    UBreakerAbilityDefinition* Slipcut = MakeFallback(TEXT("FallbackAbility_Swift_Slipcut"));
+    Slipcut->AbilityId = TEXT("Swift.Slipcut");
+    Slipcut->ClassId = EBreakerClassId::Swift;
+    Slipcut->DisplayName = FText::FromString(TEXT("Slipcut"));
+    Slipcut->Description = FText::FromString(TEXT("A breath in which the trigger runs twice as fast. Ends early on reload; rewards a held magazine."));
+    Slipcut->SlotAffinity = EBreakerAbilitySlot::ClassAbilityOne;
+    Slipcut->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Slipcut;
+    Slipcut->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Slipcut;
+    Slipcut->AbilityClass = UBreakerAbility_Slipcut::StaticClass();
+    Slipcut->ResourceCost = 20.0f;
+    Slipcut->CooldownSeconds = 4.0f;
+    Slipcut->WindowDuration = 0.4f; // §1.2 S1: "0.4s window".
+    Registry.Add(Slipcut);
 
     // S3 Skim — Class-Kits §1.2 row S3: 15 Momentum, 3s cooldown.
     UBreakerAbilityDefinition* Skim = MakeFallback(TEXT("FallbackAbility_Swift_Skim"));
@@ -192,10 +214,8 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Registry.Add(Lead);
 
     // S2 Cadence Break — Class-Kits §1.2 row S2: 35 Momentum, 8s cooldown,
-    // 3s state. This row closes the "Swift.CadenceBreak does not exist in the
-    // ability fallback registry" gap that Slipcut Mastery and Second Wind both
-    // record in Progression/BreakerProgressionLibrary.cpp; the F7 grant itself
-    // still waits on that (read-only in this pass) file adding the grant line.
+    // 3s state. Reached through the quartermaster token (O176), not a node
+    // grant — Slipcut Mastery's F7 grant clause stays a rule tag.
     // ClassAbilityTwo affinity like Lead's: affinity is a preference, not an
     // exclusive claim (CanOccupySlot only fences the Ultimate slot).
     UBreakerAbilityDefinition* CadenceBreak = MakeFallback(TEXT("FallbackAbility_Swift_CadenceBreak"));
@@ -211,6 +231,41 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     CadenceBreak->CooldownSeconds = 8.0f;
     CadenceBreak->WindowDuration = 3.0f; // Class-Kits §1.2 row S2: "a 3s state".
     Registry.Add(CadenceBreak);
+
+    // S4 Hard Stop — §1.2 row S4: 30 Momentum, 6s cooldown, 0.6s window.
+    // Its own row at last (O177): until this pass the verb rode Skim as a
+    // pitch-gated modal branch behind the K7 node, at Skim's price.
+    UBreakerAbilityDefinition* HardStop = MakeFallback(TEXT("FallbackAbility_Swift_HardStop"));
+    HardStop->AbilityId = TEXT("Swift.HardStop");
+    HardStop->ClassId = EBreakerClassId::Swift;
+    HardStop->DisplayName = FText::FromString(TEXT("Hard Stop"));
+    HardStop->Description = FText::FromString(TEXT("Cancels all velocity instantly and guards the landing for a moment. Spending Momentum to stop is the point."));
+    HardStop->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    HardStop->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_HardStop;
+    HardStop->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_HardStop;
+    HardStop->AbilityClass = UBreakerAbility_HardStop::StaticClass();
+    HardStop->ResourceCost = 30.0f;
+    HardStop->CooldownSeconds = 6.0f;
+    HardStop->WindowDuration = 0.6f; // §1.2 S4: "0.6s of Damage Reduction ... treatment".
+    Registry.Add(HardStop);
+
+    // S5 Sightline — §1.2 row S5: 25 Momentum, 6s cooldown, 2s window.
+    // The "cannot be blocked by cover-state enemies" clause is RECORDED
+    // ABSENT at the ability's own header (nothing on the shot path consults
+    // a cover state), never faked.
+    UBreakerAbilityDefinition* Sightline = MakeFallback(TEXT("FallbackAbility_Swift_Sightline"));
+    Sightline->AbilityId = TEXT("Swift.Sightline");
+    Sightline->ClassId = EBreakerClassId::Swift;
+    Sightline->DisplayName = FText::FromString(TEXT("Sightline"));
+    Sightline->Description = FText::FromString(TEXT("The next shot pierces every target on its line. Two seconds to take it."));
+    Sightline->SlotAffinity = EBreakerAbilitySlot::ClassAbilityTwo;
+    Sightline->AbilityTag = BreakerAbilityTags::Ability_Class_Swift_Sightline;
+    Sightline->CooldownTag = BreakerAbilityTags::Cooldown_Class_Swift_Sightline;
+    Sightline->AbilityClass = UBreakerAbility_Sightline::StaticClass();
+    Sightline->ResourceCost = 25.0f;
+    Sightline->CooldownSeconds = 6.0f;
+    Sightline->WindowDuration = 2.0f; // §1.2 S5: "fired within 2s".
+    Registry.Add(Sightline);
 
     // Overdrive — Class-Kits §1.2 ultimate: 100 Momentum (full bar), no
     // cooldown; the cost is the cooldown. Base window 8s.

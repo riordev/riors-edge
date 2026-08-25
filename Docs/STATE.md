@@ -14,7 +14,7 @@ measurement without judging it.
 | Silent nodes | ceiling | 43 of 445 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 33 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 0 of 31 lanes | ceiling 9 | ok |
-| Node tags with no consumer | ceiling | 141 of 206 declared | ceiling 143 | ok |
+| Node tags with no consumer | ceiling | 140 of 206 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 11 of 25 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 38 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
@@ -34,8 +34,8 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 458
-- expected red: 4
+- passing: 457
+- expected red: 7
 - **unexpected red: 0**
 - asserted invariants with no test: 38
 
@@ -44,7 +44,10 @@ A test that was never written is the worst of the three: it looks asserted.
 
 **Expected red**
 
+- `RiorsEdge.Abilities.Catalogue.NoPermanentlyRefusable`
+- `RiorsEdge.Abilities.Catalogue.Partition`
 - `RiorsEdge.Items.Drops.DropChanceReachesEveryRank`
+- `RiorsEdge.Progression.AbilityUnlocks.ReachableByFifty`
 - `RiorsEdge.Progression.PowerBand.AbilityLane`
 - `RiorsEdge.Progression.PowerBand.AtCap`
 - `RiorsEdge.Progression.RuleBandImpact.Step`
@@ -88,7 +91,7 @@ Plumbing with no author, counted across BOTH authoring layers: node effects, and
 
 ## Node tags with no consumer
 
-**ceiling** · 141 of 206 declared · ceiling 143
+**ceiling** · 140 of 206 declared · ceiling 143
 
 A tag nothing reads. Some are legitimately reserved; most are a promise the game does not keep.
 
@@ -132,7 +135,7 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 - Node_Overpressure
 - Node_Deadeye
 - Node_Culling
-- …and 101 more
+- …and 100 more
 
 ## Conditions no content authors
 

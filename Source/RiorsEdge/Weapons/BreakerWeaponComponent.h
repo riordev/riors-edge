@@ -198,6 +198,15 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon") void StartFire();
     UFUNCTION(BlueprintCallable, Category="Weapon") void StopFire();
     UFUNCTION(BlueprintCallable, Category="Weapon") void StartReload();
+    // The reload snap Cadence Break (Class-Kits §1.2 S2, spec §4.2) names:
+    // an in-progress reload finishes NOW, with all of FinishReload's economy
+    // (Loaded's refund captured at reload start, effective capacity). Not
+    // reloading is not a refusal — the reload is started through StartReload's
+    // own gates and completed in the same call, so "completes the reload"
+    // works from a part magazine too. A gate that refuses (full magazine, dry
+    // reserve, mid-swap) completes nothing. Authority-only, like the ammo
+    // state it rewrites.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Weapon") void CompleteReloadImmediately();
     UFUNCTION(BlueprintCallable, Category="Weapon") void SetAiming(bool bNewAiming);
     UFUNCTION(BlueprintCallable, Category="Weapon") void EquipArchetype(EBreakerWeaponArchetype NewArchetype);
     UFUNCTION(BlueprintCallable, Category="Weapon") void EquipSlot(int32 SlotNumber);
@@ -413,6 +422,27 @@ public:
     // stacks; Duration <= 0 means no expiry, popped explicitly.
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PushShotChannelBonus(FName Key, float AdditionalProjectiles, int32 PierceBonus, int32 ChainBonus, int32 RicochetBonus, float Duration = -1.0f);
     UFUNCTION(BlueprintCallable, Category="Weapon|Channels") void PopShotChannelBonus(FName Key);
+
+    // ---- Fire cadence (ability windows) -----------------------------------
+    // Keyed MULTIPLICATIVE cadence bonus composed into GetFireRateMultiplier,
+    // so all five fire-timing sites move together — the same "one seam or the
+    // reload-lock bug" argument GetEffectiveRoundsPerMinute already makes.
+    // Slipcut (Class-Kits §1.2 S1, O175) is the first caller: 2.0 for its
+    // window. Re-pushing a key replaces; Duration <= 0 means no expiry,
+    // popped explicitly.
+    //
+    // Push and pop both re-arm a live automatic fire timer: the non-burst
+    // repeating timer is armed once at StartFire with that moment's interval,
+    // so without the re-arm a held trigger keeps the OLD cadence until
+    // released — CanFire's gate can slow a too-fast timer (every early tick
+    // is refused) but can never speed a too-slow one. Burst weapons re-read
+    // the interval each callback and need nothing. LAZY EXPIRY on a live
+    // automatic timer therefore errs slow, never fast: an expired entry stops
+    // composing immediately (CanFire and every re-read see the true rate)
+    // while the fast timer's extra ticks are refused. Callers that care pop
+    // explicitly, which Slipcut does.
+    UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PushFireRateMultiplier(FName Key, float Multiplier, float Duration = -1.0f);
+    UFUNCTION(BlueprintCallable, Category="Weapon|Damage") void PopFireRateMultiplier(FName Key);
 
     // The momentum coupling table, the identity mechanic: Momentum STATE
     // manipulates projectiles. Pure and static so the suite pins the table
@@ -643,6 +673,21 @@ private:
     // to drop expired entries, matching the movement/momentum lazy-expiry pattern.
     mutable TMap<FName, FRangeTreatmentOverrideEntry> RangeTreatmentOverrides;
     void PruneRangeTreatmentOverrides() const;
+
+    // ---- Fire-rate multiplier state ---------------------------------------
+    struct FFireRateMultiplierEntry
+    {
+        float Multiplier = 1.0f;
+        // Negative = no expiry; popped explicitly.
+        double ExpiryTime = -1.0;
+    };
+    // Mutable for the same lazy-expiry-in-const-read reason as
+    // RangeTreatmentOverrides above (GetFireRateMultiplier is const).
+    mutable TMap<FName, FFireRateMultiplierEntry> FireRateMultipliers;
+    void PruneFireRateMultipliers() const;
+    // Re-arms a live non-burst automatic timer at the current composed
+    // interval; see PushFireRateMultiplier's header note for why.
+    void RefreshAutomaticFireInterval();
 
     // ---- Projectile channel state -----------------------------------------
     // The banked sub-pellet fraction from AdditionalProjectiles. Server-side
