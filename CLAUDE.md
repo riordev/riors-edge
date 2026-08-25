@@ -359,11 +359,14 @@ beyond 15 m instead of prose, and A7 — which was a real defect: the
 focus fade held ONE body, so a crosshair sweep hard-cut every bar but
 the last. Now per-enemy; that replaced two private HUD members with a
 map and is a DECLARED CROSSING to GLASS. A4 needed no code (ARMOR 2
-was never implemented). A1's BOSS half is held: three phases at
-100/66/33 against eight bands means phases change INSIDE bands, and
-the recommendation to LEDGER is six bands plus gates derived as exact
-thirds, so a phase boundary IS a band boundary and needs no second
-mark layer.
+was never implemented). A1's boss half needed no hold in the
+end: O135 landed while this ran and rules the 8 bands DELIBERATE —
+bands are damage feedback, phase gates are behaviour thresholds, two
+facts and two marks — and names six bands as the one wrong answer,
+since a boundary 0.7% from the 0.66 gate reads as a rendering defect.
+The bar draws 8 for Boss straight off SegmentCountFor, which is what
+that ruling wants; the phase fraction is O156's field-plate row and
+carries no bar.
 
 INSTRUMENT GAPS, all three still open and one now blocking. The crowd
 probe's grid still sits at 6000 cm against a 2200 cm DetectionRange,
