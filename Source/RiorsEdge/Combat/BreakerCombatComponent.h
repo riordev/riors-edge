@@ -54,6 +54,20 @@ public:
     UFUNCTION(BlueprintPure, Category="Combat") bool IsDead() const;
     UFUNCTION(BlueprintPure, Category="Combat") float GetSecondsSinceDamage() const;
 
+    // Whether the PREVIOUS non-dodged hit on this owner removed a health band
+    // (Attributes/BreakerHealthBands.h). Written at the foot of ReceiveDamage,
+    // read by the next hit's target-rider resolution through
+    // FBreakerBuildConditionState::SupplyTargetState — the TargetBandBroken
+    // condition. A statement about the previous HIT, not about current band
+    // arithmetic: a heal can raise the bar back across the boundary while
+    // this stays true until the next hit overwrites it.
+    UFUNCTION(BlueprintPure, Category="Combat") bool WasBandBrokenByPreviousHit() const { return bBandBrokenByPreviousHit; }
+    // For the enemy pool's revive checklist: a body that died with the bit
+    // set must not hand its reused successor's first attacker a rider it did
+    // not earn. Called from ABreakerEnemy::ReviveFromPool (lane/dev owns that
+    // call), and from anything else that resets a body wholesale.
+    void ClearBandBreakTracking() { bBandBrokenByPreviousHit = false; }
+
     // Outgoing-damage modifier chain (SI-7 partial). Pushed by ability windows
     // and class nodes; applied to a request just before it is submitted.
     // Each modifier's More is clamped at the single-More ceiling on push
@@ -246,6 +260,8 @@ private:
     // armour reduction is authored FLAT.
     TMap<FName, float> ArmorReductions;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
+    // TargetBandBroken's one bit — see WasBandBrokenByPreviousHit above.
+    bool bBandBrokenByPreviousHit = false;
     bool bDeathBroadcast = false;
     double LastDamageTime = -1000.0;
     // Core.Bulwark.Interposition's clock: the moment of the last SUCCESSFUL

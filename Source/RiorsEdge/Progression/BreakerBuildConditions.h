@@ -134,7 +134,7 @@ enum class EBreakerBuildCondition : uint8
     RecentlyCastAbility,
     RecentlyAppliedStatus,
 
-    // ---- TARGET: the state of what is being hit (17-24) ------------------
+    // ---- TARGET: the state of what is being hit (17-25) ------------------
     // Owner ruling, verbatim: "Target-side conditions: YES." A node may key off
     // the TARGET's state ("more damage to bleeding enemies") and not only the
     // character's own.
@@ -188,6 +188,18 @@ enum class EBreakerBuildCondition : uint8
     // Caster.Spellblade.Close ("Weapon hits at close range generate double
     // Mana") and by the Spellblade branch's whole play-distance identity.
     TargetAtCloseRange,
+    // The PREVIOUS hit on this target removed a health band
+    // (Attributes/BreakerHealthBands.h — bands are state on every rank, Trash
+    // included). Deliberately about the previous hit, not the current one:
+    // riders evaluate on pre-damage state thirteen lines before the damage
+    // lands, so "this hit will cross a band" is a fixpoint (the rider changes
+    // the damage that decides whether the rider applies) and cannot be built
+    // honestly. One bit on the target's combat component, written after each
+    // non-dodged hit lands and read by the next — break a band, the next hit
+    // lands heavier. Per-target, previous-hit lifetime: any landed hit,
+    // a snapshotted DoT tick included, overwrites it; a dodge neither sets
+    // nor clears it; the enemy pool clears it on revive.
+    TargetBandBroken,
 
     Count UMETA(Hidden)
 };

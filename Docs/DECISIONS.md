@@ -263,3 +263,7 @@ Numbers are permanent and never reused.
 - Whether the modifier scope that disables a defensive layer also disables the class resource it generates.
 - How much bespoke geometry elite modifiers need.
 - Whether the inventory grid gets the frame width its three-across layout needs.
+
+**O125** — Health bands are state on every rank, Trash included: `BreakerHealthBands::SegmentCountFor` returns a real count everywhere and the bar draws what it can — display may show less than state knows, never disagree with it. The band condition is `TargetBandBroken`, per-target with previous-hit lifetime: the breaking hit pays nothing, the next landed hit does, and every landed hit (a snapshotted DoT tick included) overwrites the bit while a dodge touches nothing. Overpressure takes it in the conditional band. Collapse does not move yet — a target-gated More has no payment lane, since standing aggregation never holds a target bit and the rider lane is Increased-bucket only by rule — so the shared-pool move waits on the per-hit More question below.
+
+- Whether a target-gated More gets a per-hit payment lane. Collapse's intended shape (×1.30 shared, gated on TargetBandBroken) cannot pay through either existing lane; the outgoing-modifier chain's O34 budget clamp is the precedent shape for one. What it would open: TerminalVelocity × Collapse × Overflow = 1.30 × 1.30 × 1.28 = 2.1632 on an ability build — 98.5% of the 2.197 ceiling, and the weapon lane's zero-commitment unconditional product falls from 1.9825 to 1.8605.

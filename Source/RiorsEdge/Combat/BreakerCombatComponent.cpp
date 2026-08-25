@@ -3,7 +3,9 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Attributes/BreakerHealthBands.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerShieldMath.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
@@ -193,6 +195,25 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     // whole damage submission instead of only the pure resolver.
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
+    // TargetBandBroken's write: did THIS hit move the health-band index?
+    // Defense.Health is the pre-damage read from the top of this function, so
+    // the pair brackets exactly the damage that just landed. Overwritten by
+    // every landed hit (snapshotted DoT ticks included) and by nothing else:
+    // a dodge returned before this line, and a heal raising the bar back
+    // across the boundary leaves the bit true — it states a fact about the
+    // previous HIT, not about current band arithmetic. A killing hit that
+    // crossed a boundary sets it too, which matters only to a revived body:
+    // Wakeful's revive keeps it honestly ("the previous hit broke a band"),
+    // and the pool's reuse path clears it via ClearBandBreakTracking.
+    {
+        const ABreakerEnemy* OwnerEnemy = Cast<ABreakerEnemy>(GetOwner());
+        const int32 Segments = BreakerHealthBands::SegmentCountFor(
+            OwnerEnemy ? OwnerEnemy->GetMonsterRank() : EBreakerMonsterRank::Trash);
+        const float MaxHealth = Attributes->GetMaxHealth();
+        bBandBrokenByPreviousHit =
+            BreakerHealthBands::IndexOf(Result.RemainingHealth, MaxHealth, Segments)
+            < BreakerHealthBands::IndexOf(Defense.Health, MaxHealth, Segments);
+    }
     LastDamageTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     // Interposition's clock arms on the SUCCESSFUL block itself, so the
     // window measures from the block the player felt, not from the swing.

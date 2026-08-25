@@ -477,6 +477,76 @@ bool FBreakerTargetRiderLibraryAuthoringTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
+// TargetBandBroken, end to end: the previous-hit bit written at the foot of
+// ReceiveDamage (BreakerHealthBands::IndexOf on pre/post health), read by the
+// NEXT hit's rider resolution. The one-hit-late shape is the design — "this
+// hit will cross a band" is a fixpoint and cannot be built — so the sequence
+// below is the contract: the breaking hit itself pays no rider, the hit after
+// it does, and any landed hit that crosses nothing takes the bit away.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerTargetBandBrokenRiderTest,
+    "RiorsEdge.Combat.TargetRiders.BandBroken",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerTargetBandBrokenRiderTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerTargetRiderTest;
+
+    // A plain-actor victim carries no rank, so the write site uses the
+    // Trash-equivalent segment count — 4 bands of 25 on the default 100 pool.
+    AActor* Attacker = BreakerMakeRiderAttacker(
+        BreakerMakeRiderNode(TEXT("Test.Rider.BandBroken"), EBreakerBuildCondition::TargetBandBroken, {}, 25.0f), 1);
+    FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+
+    // The shared helper's BaseDamage would kill the pool in one hit; the
+    // sequence below needs the victim alive across four, so sizes are local.
+    auto MakeSizedRequest = [&](float BaseDamage)
+    {
+        FBreakerDamageRequest Request = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Request.BaseDamage = BaseDamage;
+        return Request;
+    };
+
+    TestFalse(TEXT("an unhit victim reports no band break"), Victim.Combat->WasBandBrokenByPreviousHit());
+
+    // Hit 1 crosses the 75 boundary (100 -> 70). The BREAKING hit itself pays
+    // no rider — the bit it reads is still false — then sets the bit.
+    {
+        const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(MakeSizedRequest(30.0f));
+        TestEqual(TEXT("the breaking hit itself pays no rider"), Result.RawDamage, 30.0f, 0.001f);
+        TestTrue(TEXT("crossing a boundary sets the bit"), Victim.Combat->WasBandBrokenByPreviousHit());
+    }
+
+    // Hit 2 rides the break: 10 x (1 + 25/100) = 12.5. It lands 70 -> 57.5,
+    // inside one band, so it also takes the bit away — the previous-hit
+    // lifetime, pinned.
+    {
+        const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(MakeSizedRequest(10.0f));
+        TestEqual(TEXT("the hit after a break pays the rider"), Result.RawDamage, 12.5f, 0.001f);
+        TestFalse(TEXT("a landed hit that crosses nothing clears the bit"), Victim.Combat->WasBandBrokenByPreviousHit());
+    }
+
+    // Hit 3 gets no rider (the bit is gone) and happens to cross the 50
+    // boundary (57.5 -> 47.5), re-arming it.
+    {
+        const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(MakeSizedRequest(10.0f));
+        TestEqual(TEXT("no rider without the bit"), Result.RawDamage, 10.0f, 0.001f);
+        TestTrue(TEXT("the next crossing re-arms it"), Victim.Combat->WasBandBrokenByPreviousHit());
+    }
+
+    // The pool's revive checklist calls this so a reused body cannot hand its
+    // first attacker a rider the fresh enemy never earned.
+    Victim.Combat->ClearBandBreakTracking();
+    {
+        const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(MakeSizedRequest(5.0f));
+        TestEqual(TEXT("a cleared bit pays nothing"), Result.RawDamage, 5.0f, 0.001f);
+    }
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // WHAT THIS FILE DOES NOT COVER, stated plainly (the vocabulary tests' rule)
 // ---------------------------------------------------------------------------
 //  1. Status-driven target conditions end to end. TargetBleeding is exercised

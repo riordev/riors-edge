@@ -7,6 +7,7 @@
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Classes/BreakerScrapComponent.h"
+#include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerStatusComponent.h"
 #include "Engine/World.h"
@@ -108,6 +109,7 @@ const TCHAR* FBreakerBuildConditionState::DescribeCondition(EBreakerBuildConditi
     case EBreakerBuildCondition::TargetLowHealth:       return TEXT("TargetLowHealth");
     case EBreakerBuildCondition::TargetElite:           return TEXT("TargetElite");
     case EBreakerBuildCondition::TargetAtCloseRange:    return TEXT("TargetAtCloseRange");
+    case EBreakerBuildCondition::TargetBandBroken:      return TEXT("TargetBandBroken");
     // No default. A new enum entry must fail to compile here rather than fall
     // through to a placeholder — "STAT" in UI/BreakerMenu.cpp's two label
     // switches is exactly that mistake, and it is why every damage node on the
@@ -319,6 +321,16 @@ void FBreakerBuildConditionState::SupplyTargetState(const AActor* Target, const 
     if (TryGetHealthFraction(Target, TargetHealthFraction))
     {
         Set(EBreakerBuildCondition::TargetLowHealth, TargetHealthFraction <= LowVitalFraction);
+    }
+
+    // The band-break bit lives on the target's combat component — written
+    // there after each landed hit (ReceiveDamage compares BreakerHealthBands::
+    // IndexOf on pre- and post-damage health), read here by the NEXT hit. The
+    // one-frame-earlier seam is the whole design: the previous hit is settled
+    // state, so there is no fixpoint between the rider and the damage it rides.
+    if (const UBreakerCombatComponent* TargetCombat = Target->FindComponentByClass<UBreakerCombatComponent>())
+    {
+        Set(EBreakerBuildCondition::TargetBandBroken, TargetCombat->WasBandBrokenByPreviousHit());
     }
 
     if (const ABreakerEnemy* Enemy = Cast<ABreakerEnemy>(Target))

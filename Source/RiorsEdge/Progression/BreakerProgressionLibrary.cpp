@@ -1276,21 +1276,37 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddEffect(RuinSiege, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f, EBreakerBuildCondition::TargetElite); // O2 PLACEHOLDER — conditional band
     Tree->Nodes.Add(RuinSiege);
 
-    // "On a hit that removes a health band" has no condition to say it —
-    // health bands are display, not state — so the line ships unconditional
-    // at a value sized for that, the gate recorded as waiting.
+    // The gate it always named, now real: TargetBandBroken — the previous
+    // hit removed a health band (bands became state in
+    // Attributes/BreakerHealthBands.h; the bit is written in ReceiveDamage
+    // and read by the next hit's rider resolution). Resized from the 14.0 it
+    // shipped at, which was sized for an unconditional line, into the
+    // conditional band — Core.Ruin.Siege's 16.0 on TargetElite is the
+    // comparable one row up.
     UBreakerProgressionNode* RuinOverpressure = MakeNode(TEXT("Core.Ruin.Overpressure"), TEXT("Overpressure"),
-        TEXT("Everything you deliver arrives considerably heavier. Its trigger — a hit that removes a health band — is waiting on bands becoming state."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Ruin"));
+        TEXT("After a hit that removes a health band, everything you deliver arrives considerably heavier."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 2, 1, 2, TEXT("Ruin"));
     AddPrerequisite(RuinOverpressure, TEXT("Core.Ruin.Concussion"));
     AddPrerequisite(RuinOverpressure, TEXT("Core.Ruin.Rend"));
-    AddEffect(RuinOverpressure, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 14.0f); // O2 PLACEHOLDER
+    AddEffect(RuinOverpressure, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 16.0f, EBreakerBuildCondition::TargetBandBroken); // O2 PLACEHOLDER — conditional band, comparable Core.Ruin.Siege
     Tree->Nodes.Add(RuinOverpressure);
 
     // COLLAPSE is the spec's Unmake, renamed by ruling — Caster.Unmake is the
     // Caster ultimate and Spellblade's Edgework rewrites it by name. Its
-    // health-band theme has no condition, so it is unconditional — but on the
-    // WEAPON LANE by the no-shared-hub ruling, so what it multiplies is the
-    // wheel's own delivery rather than every build's everything.
+    // health-band condition EXISTS now (TargetBandBroken, Overpressure above),
+    // and the intended shape is this More on the SHARED pool gated on it —
+    // a condition beats a lane restriction at the same "not free" property
+    // without amputating ability builds. IT CANNOT PAY YET, in either lane a
+    // conditional More could ride: standing aggregation evaluates conditions
+    // from the attacker's cached SELF state and structurally never holds a
+    // Target* bit, and the per-hit rider table is Increased-bucket only BY
+    // RULE (§3.3 — BuildTargetConditionRiders warns and drops a More row).
+    // So a target-gated More authored today is a dead line wearing a
+    // condition, the exact bug class the warn-once machinery exists for.
+    // Until a per-hit More lane is ruled (the outgoing-modifier chain's O34
+    // budget clamp is the precedent shape), Collapse stays what it shipped
+    // as: unconditional on the WEAPON LANE by the no-shared-hub ruling, so
+    // what it multiplies is the wheel's own delivery rather than every
+    // build's everything.
     UBreakerProgressionNode* RuinCollapse = MakeNode(TEXT("Core.Ruin.Collapse"), TEXT("Collapse"),
         TEXT("Convergence. The finishing blow becomes a MORE multiplier to weapon damage."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Execute"));
