@@ -223,7 +223,18 @@ def parse_lane_register(types_text):
     if rider_fn:
         rider = {m.group(1) for m in
                  re.finditer(r'EBreakerNodeStatTarget::(\w+)', rider_fn.group(1))}
-    return targets, paid, rider
+
+    # Targets whose AUTHOR is the affix layer by ruling (O76) — the tree side
+    # is barred, so their authors are counted from the affix pool instead.
+    # Parsed from the header, same as the two registers above.
+    affix_owned = set()
+    affix_fn = re.search(
+        r'BreakerStatTargetIsAffixOwned\(EBreakerNodeStatTarget Target\)\s*\{(.*?)\n\}',
+        types_text, re.S)
+    if affix_fn:
+        affix_owned = {m.group(1) for m in
+                       re.finditer(r'EBreakerNodeStatTarget::(\w+)', affix_fn.group(1))}
+    return targets, paid, rider, affix_owned
 
 
 def parse_conditions(text):
@@ -645,7 +656,7 @@ def build_sections(sources):
     conds_text = read(os.path.join(SRC, "Progression", "BreakerBuildConditions.h"))
 
     nodes = parse_nodes(lib)
-    targets, paid, rider_delivered = parse_lane_register(types)
+    targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
     conditions = parse_conditions(conds_text)
     declared_tags = parse_declared_tags(lib)
     index = build_consumer_index(sources)
@@ -683,7 +694,31 @@ def build_sections(sources):
     # a file that always shows a diff is one people stop reading diffs on.
     # Same reasoning as dropping the commit stamp — determinism is what makes
     # this file's diffs worth reading.
-    empty_lanes = [t for t in targets if t in paid and t not in authored_targets]
+    # A lane ruled affix-owned (O76 — the tree is BARRED from authoring it)
+    # counts its authors from the affix pool, or the section is a scoped
+    # measurement printed as a total: "carrying nothing" that means "carrying
+    # nothing from the tree" reports a lane OUT forever however many affixes
+    # feed its bucket. The counterpart map below names the EBreakerStatTarget
+    # the affix authors bid on, and it is VERIFIED per run: the affix must
+    # exist in the affix library today, so a deleted or renamed affix puts the
+    # lane straight back on the empty list. A lane the header declares
+    # affix-owned with no mapping here refuses the report — loud, never a
+    # silent pass.
+    AFFIX_COUNTERPARTS = {
+        "IncomingDamageReduction": "PhysicalDamageReduction",
+    }
+    affix_lib = strip_cpp_comments(sources[os.path.join(SRC, "Items", "BreakerAffixLibrary.cpp")])
+    affix_authored = set()
+    for lane in sorted(affix_owned):
+        counterpart = AFFIX_COUNTERPARTS.get(lane)
+        if counterpart is None:
+            raise ParseError(
+                f"{TYPES}: {lane} is declared affix-owned but this reporter maps no "
+                "affix counterpart for it; add the mapping so its authors can be counted.")
+        if re.search(r'EBreakerStatTarget::' + counterpart + r'\b', affix_lib):
+            affix_authored.add(lane)
+    empty_lanes = [t for t in targets
+                   if t in paid and t not in authored_targets and t not in affix_authored]
     sections.append({
         "key": "unmapped-stat-targets", "title": "Stat targets with no aggregation lane",
         "direction": CEILING, "value": len(unmapped), "unit": f"of {len(targets)}",
@@ -696,7 +731,10 @@ def build_sections(sources):
         "key": "empty-lanes", "title": "Aggregation lanes carrying nothing",
         "direction": CEILING, "value": len(empty_lanes), "unit": f"of {len(paid)} lanes",
         "detail": empty_lanes,
-        "note": "Plumbing with no author. Not harmful, but not free either.",
+        "note": "Plumbing with no author, counted across BOTH authoring layers: node "
+                "effects, and the affix pool for a lane ruled affix-owned (O76). "
+                + (f"Affix-owned and affix-authored today: {', '.join(sorted(affix_authored))}."
+                   if affix_authored else ""),
     })
 
     # --- dead tags --------------------------------------------------------

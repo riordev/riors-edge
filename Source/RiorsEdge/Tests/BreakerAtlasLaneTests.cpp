@@ -81,6 +81,16 @@ bool FBreakerAtlasLaneRegisterTest::RunTest(const FString& Parameters)
     // either layer, owed a lane or a retirement as its own ruling — not a
     // quiet sixth line in somebody else's pass.
     TestFalse(TEXT("Lifesteal stays unwired pending its own ruling"), BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget::Lifesteal));
+
+    // O76's bar, machine-readable: IncomingDamageReduction is affix-owned —
+    // the tree may never author it, and the reporter counts its authors from
+    // the affix pool. The other four atlas lanes are ordinary tree lanes.
+    TestTrue(TEXT("IncomingDamageReduction is affix-owned by O76"),
+        BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget::IncomingDamageReduction));
+    TestFalse(TEXT("RecoilRecovery is a tree lane"), BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget::RecoilRecovery));
+    TestFalse(TEXT("WeaponSpread is a tree lane"), BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget::WeaponSpread));
+    TestFalse(TEXT("StatusChance is a tree lane"), BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget::StatusChance));
+    TestFalse(TEXT("StatusDuration is a tree lane"), BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget::StatusDuration));
     return true;
 }
 

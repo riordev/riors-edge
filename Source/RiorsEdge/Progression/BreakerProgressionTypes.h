@@ -376,7 +376,12 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     // IncomingDamageReduction: FLAT percentage points, joining gear's
     // family-reduction bucket in UBreakerCombatComponent::ReceiveDamage —
     // (gear + tree) summed, ONE 1-R application, never two multipliers.
-    // TrueDamage answers to neither layer.
+    // TrueDamage answers to neither layer. AUTHORLESS FROM THE TREE BY
+    // RULING: O76 gives raw defensive percentages to affixes outright, and a
+    // conditional raw percentage is still a raw percentage. Do not author
+    // this target from a node, now or later — see
+    // BreakerStatTargetIsAffixOwned below, which is where that ruling is
+    // machine-readable.
     //
     // RecoilRecovery / StatusChance / StatusDuration: one additive Increased
     // bucket each, composed to a 1.0-based multiplier floored at 0. Consumed
@@ -454,6 +459,31 @@ inline EBreakerDamagePool BreakerDamagePoolFor(EBreakerNodeStatTarget Target)
 inline bool BreakerStatTargetIsRiderDelivered(EBreakerNodeStatTarget Target)
 {
     return Target == EBreakerNodeStatTarget::MeleeDamage;
+}
+
+// True for a target whose AUTHOR is the affix layer by ruling, so the tree
+// side of its lane is authorless FOREVER — a bar, not a backlog.
+//
+// O76: "Affixes own the raw defensive chances and percentages; trees own
+// defensive rule changes and quality." A conditional raw percentage is still
+// a raw percentage — the condition changes when it pays, not what it is — so
+// IncomingDamageReduction may never be authored from a node. The lane was
+// still right to build: its consumer read joins the tree bucket to gear's in
+// ReceiveDamage, and its authors are affix lines — Core.PhysicalDR today,
+// the conditional DR affixes queued on the affix side tomorrow, all landing
+// in the same summed bucket.
+//
+// This register exists for the same reason BreakerStatTargetIsRiderDelivered
+// does: "has no author" was doing two jobs. A lane waiting on a content pass
+// ratchets down when the pass lands; a lane the tree is barred from can only
+// leave the empty-lanes report by counting the layer that IS allowed to
+// author it. The reporter reads this function and, for a target it names,
+// counts affix authors from BreakerAffixLibrary.cpp instead of node effects
+// — verified per run, so a deleted affix puts the lane straight back on the
+// list rather than being remembered as an author it no longer has.
+inline bool BreakerStatTargetIsAffixOwned(EBreakerNodeStatTarget Target)
+{
+    return Target == EBreakerNodeStatTarget::IncomingDamageReduction;
 }
 
 // True for the pools a DIRECT hit reads — the two delivery lanes and the shared
