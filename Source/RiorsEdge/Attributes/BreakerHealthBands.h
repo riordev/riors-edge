@@ -27,6 +27,21 @@ namespace BreakerHealthBands
     // length (O18: trash sub-second, elite ~3 s, boss 20-45 s): a band break
     // is the "chunk" beat of a fight, so short fights get few and the boss
     // gets more. All O2 PLACEHOLDER.
+    //
+    // THE BOSS COUNT DELIBERATELY MISMATCHES THE THREE PHASES (O135). Bands
+    // are damage feedback and phase gates are behaviour thresholds — two
+    // different facts, drawn as two different marks — and the gates are
+    // AUTHORED floats (FBreakerBossPhaseParams: 0.66 / 0.33), not exact
+    // thirds. A multiple-of-three count is therefore the one WRONG answer:
+    // six bands put a boundary at 0.6667, seven tenths of one percent of the
+    // bar from the 0.66 gate, and two near-coincident marks read as a
+    // rendering defect. Eight keeps every band boundary at least 3.5% of the
+    // bar away from both shipped gates — pinned against the default-
+    // constructed params in HealthBands.BossBandsAvoidPhaseGates, so a
+    // retune of either number renegotiates this on purpose. If the gates
+    // ever move to exact thirds and coincidence is wanted instead, that is a
+    // joint ruling: gates, this count, and the bar's heavy/light marks move
+    // together.
     inline int32 SegmentCountFor(EBreakerMonsterRank Rank)
     {
         switch (Rank)
@@ -34,7 +49,7 @@ namespace BreakerHealthBands
         case EBreakerMonsterRank::Trash:           return 4;   // O2 PLACEHOLDER
         case EBreakerMonsterRank::Elite:           return 4;   // O2 PLACEHOLDER
         case EBreakerMonsterRank::ModifierBearing: return 4;   // O2 PLACEHOLDER
-        case EBreakerMonsterRank::Boss:            return 8;   // O2 PLACEHOLDER
+        case EBreakerMonsterRank::Boss:            return 8;   // O2 PLACEHOLDER (O135: never a multiple of three while the gates are 0.66/0.33)
         }
         return 4;
     }

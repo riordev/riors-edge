@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Attributes/BreakerHealthBands.h"
+#include "Combat/BreakerBossPhases.h"
 
 // ---------------------------------------------------------------------------
 // The health-band arithmetic, proven where it lives. The band index is about
@@ -91,6 +92,44 @@ bool FBreakerHealthBandSegmentCountTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("the boss carries at least trash's band count"),
         SegmentCountFor(EBreakerMonsterRank::Boss) >= SegmentCountFor(EBreakerMonsterRank::Trash));
 
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBossBandsAvoidPhaseGatesTest,
+    "RiorsEdge.Attributes.HealthBands.BossBandsAvoidPhaseGates",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBossBandsAvoidPhaseGatesTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerHealthBands;
+
+    // O135: bands are damage feedback, phase gates are behaviour thresholds,
+    // and the boss bar draws both — so no band boundary may sit NEAR a phase
+    // gate, where "near" would render as two almost-coincident marks and read
+    // as a defect. Exact coincidence would be a different, deliberate design
+    // (gates at exact thirds, bands a multiple of three, ruled jointly);
+    // near-coincidence is only ever an accident, and this pin is what keeps a
+    // future retune of either number from arriving at one unargued.
+    //
+    // Asserted against the DEFAULT-CONSTRUCTED params — the shipped
+    // configuration, which is the one the fielded Field Marshal runs.
+    const FBreakerBossPhaseParams Params;
+    const int32 Segments = SegmentCountFor(EBreakerMonsterRank::Boss);
+    // 3% of the bar: ~12px of separation on a 400px boss bar. O2 PLACEHOLDER.
+    constexpr float MinimumGateClearance = 0.03f;
+
+    for (const float Gate : { Params.SuppressionGate, Params.CommitmentGate })
+    {
+        for (int32 Boundary = 1; Boundary < Segments; ++Boundary)
+        {
+            const float BandFraction = static_cast<float>(Boundary) / static_cast<float>(Segments);
+            TestTrue(*FString::Printf(
+                TEXT("boss band boundary %.4f keeps %.0f%% clearance from phase gate %.2f"),
+                BandFraction, MinimumGateClearance * 100.0f, Gate),
+                FMath::Abs(BandFraction - Gate) >= MinimumGateClearance);
+        }
+    }
     return true;
 }
 
