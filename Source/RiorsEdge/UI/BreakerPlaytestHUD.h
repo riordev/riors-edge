@@ -246,10 +246,17 @@ private:
     // Skim, not only the first three.
     double SkimBurstTime = -1000.0;
 
-    // The trash-bar focus linger (selective bars, ruled): the one enemy the
-    // aim last left, and when it left, so its bar fades instead of blinking.
-    TWeakObjectPtr<const class ABreakerEnemy> LastFocusBarEnemy;
-    double LastFocusBarTime = -1000.0;
+    // The trash-bar focus linger (selective bars, ruled): when the aim last
+    // left each enemy, so its bar fades instead of blinking.
+    //
+    // DECLARED CROSSING (FIELD -> GLASS). Written and read only by
+    // Combat/BreakerEnemyHealthBars.cpp, which owns the bar. This was
+    // LastFocusBarEnemy + LastFocusBarTime — ONE slot — and one slot meant a
+    // crosshair sweep across a pack overwrote the previous body's clock the
+    // same frame, so only the most recently released enemy could fade and
+    // only until the next was focused. Per-enemy now, pruned every frame by
+    // the same clock that reads it, so it cannot grow.
+    TMap<TWeakObjectPtr<const class ABreakerEnemy>, double> FocusBarReleaseTimes;
 
     UPROPERTY() TObjectPtr<ABreakerTracerRenderer> TracerRenderer;
     UPROPERTY() TObjectPtr<ABreakerSoundDirector> SoundDirector;

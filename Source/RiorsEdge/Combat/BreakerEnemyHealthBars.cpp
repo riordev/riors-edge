@@ -28,7 +28,10 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Characters/BreakerCharacter.h"
+#include "Attributes/BreakerHealthBands.h"
 #include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerTargetDummy.h"
 #include "EngineUtils.h"
@@ -51,6 +54,33 @@ namespace BreakerEnemyBar
     // How long a trash bar lingers after the aim leaves it (selective bars;
     // above-Trash ranks are always barred). O2 PLACEHOLDER.
     static constexpr float FocusFadeSeconds = 0.6f;
+
+    // --- A1: how narrow a band may get before it stops being drawn --------
+    // BreakerHealthBands::SegmentCountFor is the ONE source of the count and
+    // is never second-guessed here. This is a DISPLAY limit and it is keyed on
+    // PIXELS, never on rank: LEDGER's header rules that display may show less
+    // than state knows but the two may never disagree, and a rank test here
+    // would be display quietly editing state. It also gives the distance
+    // behaviour for free — the bar shrinks with range, so bands fade out as a
+    // pack gets further away rather than at an authored cutoff. O2 PLACEHOLDER.
+    static constexpr float MinimumSegmentPixels = 7.0f;
+
+    // --- A9: the three label bands ----------------------------------------
+    // Words up close, marks beyond. O2 PLACEHOLDER, and the NEAR edge is the
+    // one that matters: past it a modifier is announced by SHAPE rather than
+    // by a word, which is what stops eighty enemies printing prose at range.
+    static constexpr float NearDistance = 1500.0f;
+    static constexpr float MidDistance = 3000.0f;
+    // At most this many marks. Encounter-Design caps a body at three
+    // modifiers, so this is the cap and not a truncation nobody stated.
+    static constexpr int32 MaximumMarks = 3;
+
+    // --- A8: the shield hatch ---------------------------------------------
+    // The shield must read as a different MATERIAL than health, not a
+    // different hue: colour is already carrying rank, health and family, and
+    // a fourth claim on it would not be heard. O2 PLACEHOLDER.
+    static constexpr float HatchTickPixels = 2.0f;
+    static constexpr float HatchGapPixels = 3.0f;
 
     // --- The dummy block's own two constants -------------------------------
     // These feed the TARGET DUMMY loop and nothing else, and that is a ruling
@@ -120,20 +150,62 @@ namespace
     // Hex() at A=1, so Alpha(C, 1.0f) is exactly C — the dummy's appearance is
     // unchanged by routing it through the fading path.
     void BreakerEnemyBarDrawBody(AHUD& HUD, const FBreakerEnemyBarRect& Bar,
-        float Health, float MaxHealth, float Shield, float MaxShield, float ScaleUnit, float BarAlpha)
+        float Health, float MaxHealth, float Shield, float MaxShield, float ScaleUnit, float BarAlpha,
+        int32 SegmentCount)
     {
         if (Shield > 0.0f && MaxShield > UE_SMALL_NUMBER)
         {
+            // A8: HATCHED, above, depletes first. The hatch is the point — a
+            // shield is a different MATERIAL than health, and saying so in
+            // hue would be a fourth claim on a channel already carrying rank,
+            // family and health. Ticks read as "mesh" at every distance the
+            // bar is legible at, and when they get too fine to resolve the
+            // fill degrades to a solid cyan bar, which is where it started.
             const float ShieldH = FMath::Max(Bar.H * 0.45f, 2.0f * ScaleUnit);
             const float ShieldY = Bar.Y - ShieldH - ScaleUnit;
+            const float FilledW = Bar.W * FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f);
             HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), Bar.X, ShieldY, Bar.W, ShieldH);
-            HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Cyan, BarAlpha), Bar.X, ShieldY,
-                Bar.W * FMath::Clamp(Shield / MaxShield, 0.0f, 1.0f), ShieldH);
+
+            const float Tick = BreakerEnemyBar::HatchTickPixels * ScaleUnit * Bar.Scale;
+            const float Period = Tick + BreakerEnemyBar::HatchGapPixels * ScaleUnit * Bar.Scale;
+            if (Tick < 1.0f || Period < 2.0f)
+            {
+                HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Cyan, BarAlpha), Bar.X, ShieldY, FilledW, ShieldH);
+            }
+            else
+            {
+                for (float Offset = 0.0f; Offset < FilledW; Offset += Period)
+                {
+                    HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Cyan, BarAlpha),
+                        Bar.X + Offset, ShieldY, FMath::Min(Tick, FilledW - Offset), ShieldH);
+                }
+            }
         }
 
         HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha), Bar.X, Bar.Y, Bar.W, Bar.H);
         HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Harm, BarAlpha), Bar.X, Bar.Y,
             Bar.W * FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f), Bar.H);
+
+        // A1: THE BANDS, DRAWN FROM THE ONE COUNT THAT DEFINES THEM. The
+        // divider index the bar paints and the band index the damage path
+        // counts come out of BreakerHealthBands and nowhere else — a local
+        // constant that agreed today is exactly the disagreement this exists
+        // to prevent. Dividers are cut OUT of the fill in the track colour, so
+        // a band boundary is a gap rather than an added line and the bar never
+        // grows when it segments.
+        if (SegmentCount > 1)
+        {
+            const float SegmentW = Bar.W / static_cast<float>(SegmentCount);
+            if (SegmentW >= BreakerEnemyBar::MinimumSegmentPixels * ScaleUnit)
+            {
+                const float DividerW = FMath::Max(1.0f, ScaleUnit * Bar.Scale);
+                for (int32 i = 1; i < SegmentCount; ++i)
+                {
+                    HUD.DrawRect(BreakerUI::Alpha(BreakerUI::Panel10, BarAlpha),
+                        Bar.X + SegmentW * i - DividerW * 0.5f, Bar.Y, DividerW, Bar.H);
+                }
+            }
+        }
     }
 }
 
@@ -188,6 +260,21 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     // Reset per frame: these are screen-space rectangles, and last frame's are
     // meaningless the moment the camera moves.
     DrawnLabelBounds.Reset();
+
+    // The fade map is the one piece of state here that outlives a frame, so it
+    // is the one that can grow without a bound. Pruned by the same clock that
+    // reads it: an entry older than the fade is finished, and a body that died
+    // or was parked for the pool goes stale and drops on the same pass.
+    {
+        const double Now = World->GetTimeSeconds();
+        for (auto It = FocusBarReleaseTimes.CreateIterator(); It; ++It)
+        {
+            if (!It.Key().IsValid() || Now - It.Value() >= BreakerEnemyBar::FocusFadeSeconds)
+            {
+                It.RemoveCurrent();
+            }
+        }
+    }
 
     for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
     {
@@ -251,6 +338,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         // crosshaired on it. That read lives on the BODY — the tint ramp and
         // the fracture mask — not on the bar. Focus-only is correct here
         // BECAUSE the body carries near-death; the two are halves of one rule.
+        // A7: THE FADE IS PER ENEMY, and it was not. LastFocusBarEnemy held
+        // ONE body, so sweeping the crosshair from A to B overwrote A's clock
+        // the same frame — A hard-cut to nothing while B lit, which is the
+        // strobe the fade exists to prevent and is visible any time the aim
+        // crosses a pack. Only the most recently released enemy could fade,
+        // and only until the next one was focused. A map gives every body its
+        // own clock, so a sweep across six trash mobs leaves six trails.
         const bool bAboveTrash = Enemy->IsEliteOrBetter();
         float BarAlpha = 1.0f;
         if (!bAboveTrash)
@@ -258,13 +352,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             const double Now = World->GetTimeSeconds();
             if (Enemy == FocusedEnemy)
             {
-                LastFocusBarEnemy = Enemy;
-                LastFocusBarTime = Now;
+                FocusBarReleaseTimes.Add(Enemy, Now);
             }
-            else if (Enemy == LastFocusBarEnemy.Get()
-                && Now - LastFocusBarTime < BreakerEnemyBar::FocusFadeSeconds)
+            else if (const double* Released = FocusBarReleaseTimes.Find(Enemy))
             {
-                BarAlpha = 1.0f - static_cast<float>((Now - LastFocusBarTime) / BreakerEnemyBar::FocusFadeSeconds);
+                const double Elapsed = Now - *Released;
+                if (Elapsed >= BreakerEnemyBar::FocusFadeSeconds) continue;
+                BarAlpha = 1.0f - static_cast<float>(Elapsed / BreakerEnemyBar::FocusFadeSeconds);
             }
             else
             {
@@ -284,7 +378,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit);
         BreakerEnemyBarDrawBody(*this, Bar, Health, MaxHealth,
-            EnemyAttributes->GetShield(), EnemyAttributes->GetMaxShield(), ScaleUnit, BarAlpha);
+            EnemyAttributes->GetShield(), EnemyAttributes->GetMaxShield(), ScaleUnit, BarAlpha,
+            BreakerHealthBands::SegmentCountFor(Enemy->GetMonsterRank()));
         if (bElite)
         {
             // Gold edge, not a gold fill: the health colour must stay readable.
@@ -313,14 +408,43 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         //    words, six times over, something the world was already saying.
         //  - ELITE prints; HOSTILE does not. "HOSTILE" on every hostile is not
         //    information — the health bar already says it is an enemy.
+        // A9: THE MODIFIER ANNOUNCEMENT GOES DISTANCE-PROGRESSIVE. It printed
+        // in full at every range and was most of the text bloat at distance —
+        // "OVERCHARGE | WARDED | CAUTERIZE" is three words of prose on a body
+        // forty metres away, times eighty bodies. The rule keeps §1.2's
+        // acceptance test (a modifier identifiable within 1.5s of entering
+        // view) and pays for it in the currency the range can afford:
+        //  * NEAR — the words, unchanged. Close enough to read prose.
+        //  * MID and FAR — one MARK per modifier: a square and the modifier
+        //    name's first letter, drawn below. Shape carries the count, which
+        //    is the read that actually matters at range ("that one has three
+        //    of something"), and the letter disambiguates on approach.
+        // The letter comes from GetModifierName, never a second table: a mark
+        // alphabet authored here would be a second source for a name the
+        // modifier layer already owns.
         const bool bFocused = (Enemy == FocusedEnemy);
+        const bool bNear = Distance <= BreakerEnemyBar::NearDistance;
         const FString ModifierBanner = Enemy->GetEnemyModifierBanner();
         TArray<FString> Lines;
         if (bElite) Lines.Add(bBossRank ? TEXT("BOSS") : TEXT("ELITE"));
-        if (!ModifierBanner.IsEmpty()) Lines.Add(ModifierBanner);
+        if (bNear && !ModifierBanner.IsEmpty()) Lines.Add(ModifierBanner);
         if (bFocused) Lines.Add(Enemy->GetEnemyStateLabel());
 
-        if (Lines.Num() > 0)
+        TArray<FString> Marks;
+        if (!bNear)
+        {
+            if (const UBreakerEnemyModifierComponent* Modifiers = Enemy->GetModifierComponent())
+            {
+                for (EBreakerEnemyModifier Modifier : Modifiers->GetModifiers())
+                {
+                    if (Marks.Num() >= BreakerEnemyBar::MaximumMarks) break;
+                    const FString Name = UBreakerEnemyModifierLibrary::GetModifierName(Modifier);
+                    Marks.Add(Name.IsEmpty() ? TEXT("?") : Name.Left(1).ToUpper());
+                }
+            }
+        }
+
+        if (Lines.Num() > 0 || Marks.Num() > 0)
         {
             const FString Label = FString::Join(Lines, TEXT("\n"));
             const float LabelY = Bar.Y + Bar.H + S(3.0f);
@@ -329,9 +453,15 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             // label lands on top of the first — unreadable, and worse than
             // showing one. The focused enemy is drawn regardless, because it is
             // the one the player is deliberately asking about.
+            // The mark row is part of the label for occlusion purposes: it
+            // occupies the same column under the same bar, so letting it out
+            // of the bounds test would reintroduce the overlap the test
+            // exists for, in glyphs instead of words.
+            const float MarkPitch = S(11.0f) * Bar.Scale;
+            const float MarkRowH = Marks.Num() > 0 ? S(9.0f) * Bar.Scale : 0.0f;
             const float LineCount = static_cast<float>(Lines.Num());
-            const float LabelH = S(13.0f) * Bar.Scale * LineCount;
-            const float LabelW = Bar.W;
+            const float LabelH = S(13.0f) * Bar.Scale * LineCount + MarkRowH;
+            const float LabelW = FMath::Max(Bar.W, MarkPitch * Marks.Num());
             bool bOccluded = false;
             if (!bFocused)
             {
@@ -348,8 +478,24 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             if (!bOccluded)
             {
                 DrawnLabelBounds.Emplace(Projected.X, LabelY, LabelW, LabelH);
-                DrawSpecTextCentered(Label, Projected.X, LabelY,
-                    bElite ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f * Bar.Scale);
+                const FLinearColor LabelColor = bElite ? BreakerUI::Gold : BreakerUI::TextMuted;
+                if (Lines.Num() > 0)
+                {
+                    DrawSpecTextCentered(Label, Projected.X, LabelY, LabelColor, 11.0f * Bar.Scale);
+                }
+                if (Marks.Num() > 0)
+                {
+                    const float MarkY = LabelY + S(13.0f) * Bar.Scale * LineCount;
+                    const float Square = FMath::Max(2.0f, S(4.0f) * Bar.Scale);
+                    const float RowX = Projected.X - MarkPitch * Marks.Num() * 0.5f;
+                    for (int32 i = 0; i < Marks.Num(); ++i)
+                    {
+                        const float CellX = RowX + MarkPitch * i;
+                        DrawRect(BreakerUI::Alpha(LabelColor, BarAlpha), CellX, MarkY + Square * 0.25f, Square, Square);
+                        DrawSpecTextCentered(Marks[i], CellX + MarkPitch * 0.68f, MarkY,
+                            LabelColor, 9.0f * Bar.Scale);
+                    }
+                }
             }
         }
     }
@@ -384,8 +530,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
 
         const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit);
         // Full opacity: a dummy never fades, and Alpha(C, 1.0f) is exactly C.
+        // UNSEGMENTED, and that is the same ruling as the dummy's paint: a
+        // band is a fight beat, a dummy is an instrument, and dividing its bar
+        // into four would be the gym telling the player something about the
+        // gym. It shares the body so the bar stays one implementation; it
+        // passes 1 because it has no rank to ask about.
         BreakerEnemyBarDrawBody(*this, Bar, Health, MaxHealth,
-            DummyAttributes->GetShield(), DummyAttributes->GetMaxShield(), ScaleUnit, 1.0f);
+            DummyAttributes->GetShield(), DummyAttributes->GetMaxShield(), ScaleUnit, 1.0f, 1);
         DrawSpecTextCentered(Dummy->GetProfileLabel(), Projected.X, Bar.Y + Bar.H + S(3.0f),
             BreakerUI::TextMuted, 10.0f * Bar.Scale);
     }
