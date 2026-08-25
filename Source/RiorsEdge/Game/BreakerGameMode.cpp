@@ -30,7 +30,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerPlaytestHUD.h"
+#include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "EngineUtils.h"
 #include "UObject/UObjectGlobals.h"
@@ -73,6 +75,11 @@ void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
     {
         IConsoleManager::Get().UnregisterConsoleObject(BossConsoleCommand);
         BossConsoleCommand = nullptr;
+    }
+    if (EffectProbeConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(EffectProbeConsoleCommand);
+        EffectProbeConsoleCommand = nullptr;
     }
     Super::EndPlay(Reason);
 }
@@ -290,6 +297,55 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             TEXT("Spawns THE FIELD MARSHAL at the elite arena (Encounter-Design 3)."),
             FConsoleCommandDelegate::CreateUObject(this, &ABreakerGameMode::SpawnBossTest));
     }
+    // -BreakerEffectProbe: the Phase B proof. One glow, fixed spot in the
+    // spawn view, fixed clock, placed during the gym build so the capture
+    // cadence (first frame at 6.0 s, then every 2.0 s) straddles its death:
+    // it must be IN the first frame and GONE from the third. Same dev-only
+    // construction as -BreakerBossOnStart.
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerEffectProbe")))
+    {
+        SpawnEffectProbe();
+    }
+    if (!EffectProbeConsoleCommand)
+    {
+        EffectProbeConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.EffectProbe"),
+            TEXT("Places one 7 s test glow ahead of the gym spawn (ability-effect renderer probe)."),
+            FConsoleCommandDelegate::CreateUObject(this, &ABreakerGameMode::SpawnEffectProbe));
+    }
+}
+
+void ABreakerGameMode::SpawnEffectProbe()
+{
+    UWorld* World = GetWorld();
+    if (!World || !bFieldFrameSet) return;
+    if (!EffectProbeRenderer)
+    {
+        FActorSpawnParameters Params;
+        Params.Owner = this;
+        Params.ObjectFlags |= RF_Transient;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        EffectProbeRenderer = World->SpawnActor<ABreakerEffectRenderer>(
+            ABreakerEffectRenderer::StaticClass(), FTransform::Identity, Params);
+    }
+    if (!EffectProbeRenderer) return;
+
+    // 5 m ahead of the field origin at chest height: dead centre of the spawn
+    // view, close enough that a 50 cm sphere is unmistakably in frame. Cyan,
+    // the player-system token — this pool exists for the player's abilities.
+    // Duration 7.0 s against the 6.0/8.0/10.0 s capture frames: alive in the
+    // first, dying or dead at the second, unarguably gone by the third. All
+    // O2 PLACEHOLDER except the 7.0, which is derived from the cadence.
+    const FVector ProbeSpot = Frame.At(500.0f, 0.0f, 140.0f);
+    BreakerFX::FEffectTiming Timing;
+    Timing.DurationSeconds = 7.0f;
+    Timing.FadeInSeconds = 0.15f;
+    Timing.FadeOutSeconds = 0.5f;
+    EffectProbeRenderer->AddGlow(ProbeSpot, 50.0f, BreakerUI::Cyan, 6.0f, Timing);
+    // The log half of the proof: a headless reader greps this line for WHERE
+    // and UNTIL WHEN, then reads the screenshots for whether the world agreed.
+    UE_LOG(LogTemp, Log, TEXT("[BreakerGym] effect probe: glow at (%.0f, %.0f, %.0f) for %.1f s."),
+        ProbeSpot.X, ProbeSpot.Y, ProbeSpot.Z, Timing.DurationSeconds);
 }
 
 bool ABreakerGameMode::IsBossAlive() const

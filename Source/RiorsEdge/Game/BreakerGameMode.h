@@ -9,6 +9,8 @@
 #include "Game/BreakerCoverRegistry.h"
 #include "BreakerGameMode.generated.h"
 
+class ABreakerEffectRenderer;
+
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerGameMode : public AGameModeBase
 {
@@ -461,6 +463,14 @@ private:
     // unregistered on EndPlay — a stale IConsoleCommand outliving its game mode
     // is a dangling this pointer the next PIE session walks straight into.
     IConsoleCommand* BossConsoleCommand = nullptr;
+    // The effect-probe proof instrument (Phase B of the perceptibility
+    // brief): one glow, fixed spot, fixed clock, so the capture harness can
+    // photograph a primitive existing and then photograph it gone. Console
+    // command for a controller-in-hand rerun; -BreakerEffectProbe for the
+    // headless capture. Same unregister-on-EndPlay contract as Breaker.Boss.
+    IConsoleCommand* EffectProbeConsoleCommand = nullptr;
+    UPROPERTY() TObjectPtr<ABreakerEffectRenderer> EffectProbeRenderer;
+    void SpawnEffectProbe();
     FVector SafeZoneCenter = FVector::ZeroVector;
     bool bSafeZoneSet = false;
     FVector SupplyCrateLocation = FVector::ZeroVector;

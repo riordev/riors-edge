@@ -1504,6 +1504,18 @@ void ABreakerCharacter::ShowInitialMenu()
         {
             OpenMenuScreenForCapture(CaptureScreen);
         }
+        else if (UBreakerGameInstance::IsFrontEndMap(this))
+        {
+            // "Entering the gym" has to be a TRAVEL now. This branch predates
+            // the map split: in the one-map world, suppressing the menu left
+            // you standing in an already-built gym, so returning here WAS
+            // entering it. After the split the front end is its own empty map,
+            // and returning here left every autoplay run sitting in it — the
+            // harness photographed the void three frames in a row and exited
+            // green. The menu's own play path is one TravelTo, so autoplay
+            // now takes exactly that step itself.
+            UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
+        }
         return;
     }
     OpenMenu(true);
