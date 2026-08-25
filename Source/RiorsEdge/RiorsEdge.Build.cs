@@ -9,7 +9,10 @@ public class RiorsEdge : ModuleRules
         PublicDependencyModuleNames.AddRange(new[]
         {
             "Core", "CoreUObject", "Engine", "InputCore", "ApplicationCore", "EnhancedInput",
-            "GameplayAbilities", "GameplayTags", "GameplayTasks", "Slate", "SlateCore"
+            "GameplayAbilities", "GameplayTags", "GameplayTasks", "Slate", "SlateCore",
+            // The crowd probe's dominance readout: thread clocks live in
+            // RenderCore (RenderTimer.h), the GPU cycle counter in RHI.
+            "RHI", "RenderCore"
         });
         if (Target.bBuildEditor)
         {

@@ -174,6 +174,7 @@ void ABreakerEnemy::BeginPlay()
     if (BaseMoveSpeed < 0.0f) BaseMoveSpeed = MoveSpeed;
     if (BaseWeaveStrength < 0.0f) BaseWeaveStrength = WeaveStrength;
     if (WeakPointVisual) WeakPointBaseScale = WeakPointVisual->GetRelativeScale3D().X;
+    PooledBaseScale = GetActorScale3D();
     // Health was the literal constant 220 here at every level until O27. It is
     // now a function of the area level this monster belongs to.
     ApplyChassis();
@@ -215,6 +216,69 @@ void ABreakerEnemy::ApplyChassis()
         Attributes->ApplyMaxHealth(UBreakerMonsterChassisLibrary::GetMonsterHealth(
             AreaLevel, MonsterRank, Chassis, ArchetypeHealthMultiplier * ModifierCountHealthMultiplier));
         if (Combat) Combat->RestoreVitals();
+    }
+
+    // Rank colour, one tick later: subclass identity paints (the Warden's
+    // plate, the Altered's severance tint) run through BeginPlay, and a
+    // repaint racing them would be overwritten or would capture a
+    // half-painted body as its base.
+    if (UWorld* World = GetWorld())
+    {
+        TWeakObjectPtr<ABreakerEnemy> WeakThis(this);
+        World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakThis]()
+        {
+            if (ABreakerEnemy* Enemy = WeakThis.Get()) Enemy->ApplyRankPresentation();
+        }));
+    }
+}
+
+void ABreakerEnemy::ApplyRankPresentation()
+{
+    // "WHICH ONE IS THE ELITE" IN A GLANCE (ruled): silhouette carries
+    // FAMILY, colour carries RANK, and in a fight of eighty nobody reads a
+    // bar edge. The blend starts from a CAPTURED base — the family's own
+    // paint, captured once after the subclass finished painting — so
+    // repeated chassis passes (SetAreaLevel then SetMonsterRank) can never
+    // compound the tint toward solid gold. Trash keeps its family paint
+    // untouched; the Boss subclass owns its whole identity and is skipped.
+    // Blend weights O2 PLACEHOLDER — legibility first, beauty later.
+    // A DEMOTION restores the family paint — GrantModifiers'
+    // capture-and-restore path and a pooled reuse both send a body back to
+    // Trash, and an early-return here left it gold forever (found by the
+    // pooling recon, not by a playtest, which is the cheap time to find it).
+    if (MonsterRank == EBreakerMonsterRank::Trash || MonsterRank == EBreakerMonsterRank::Boss)
+    {
+        for (const auto& Pair : RankBaseColors)
+        {
+            if (Pair.Key.IsValid()) Pair.Key->SetVectorParameterValue(TEXT("Color"), Pair.Value);
+        }
+        return;
+    }
+    if (RankBaseColors.Num() == 0)
+    {
+        for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
+            RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
+        {
+            UMaterialInstanceDynamic* Dynamic = Part ? Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)) : nullptr;
+            if (!Dynamic) continue;
+            FLinearColor Base = FLinearColor::White;
+            Dynamic->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Base);
+            RankBaseColors.Emplace(Dynamic, Base);
+        }
+    }
+    const bool bElite = MonsterRank == EBreakerMonsterRank::Elite;
+    // Elite is the reward gold; ModifierBearing the ultimate violet's cooler
+    // cousin — both read at crowd distance on the largest surfaces the enemy
+    // owns, and both survive the hit flash because the flash restores from
+    // the CURRENT colour it captured.
+    const FLinearColor RankHue = bElite ? FLinearColor(1.0f, 0.72f, 0.25f) : FLinearColor(0.62f, 0.38f, 0.95f);
+    const float Blend = bElite ? 0.45f : 0.40f;   // O2 PLACEHOLDER
+    for (const auto& Pair : RankBaseColors)
+    {
+        if (Pair.Key.IsValid())
+        {
+            Pair.Key->SetVectorParameterValue(TEXT("Color"), FMath::Lerp(Pair.Value, RankHue, Blend));
+        }
     }
 }
 
@@ -805,12 +869,86 @@ void ABreakerEnemy::HandleDeath()
     if (HasAuthority() && ModifierComponent) ModifierComponent->NotifyOwnerDied();
 
     if (bRespawns) GetWorldTimerManager().SetTimerForNextTick(this, &ThisClass::RespawnEnemy);
-    // Long enough for a Volatile fuse to finish before the actor goes away. The
-    // old 2.0s was already comfortably past the 1.2s placeholder fuse; this
-    // makes the dependency explicit instead of a coincidence.
-    else SetLifeSpan(FMath::Max(2.0f,
-        ModifierComponent && ModifierComponent->HasModifier(EBreakerEnemyModifier::Volatile)
-            ? ModifierComponent->Params.VolatileFuseSeconds + 1.0f : 0.0f));
+    else
+    {
+        // Long enough for a Volatile fuse to finish before the actor goes
+        // away. The old 2.0s was already comfortably past the 1.2s placeholder
+        // fuse; this makes the dependency explicit instead of a coincidence.
+        const float CorpseSeconds = FMath::Max(2.0f,
+            ModifierComponent && ModifierComponent->HasModifier(EBreakerEnemyModifier::Volatile)
+                ? ModifierComponent->Params.VolatileFuseSeconds + 1.0f : 0.0f);
+        // A poolable body parks on the same corpse clock instead of dying for
+        // real — the fuse, the crumple and the loot beat all finish first
+        // either way.
+        if (bPooledByGameMode)
+        {
+            GetWorldTimerManager().SetTimer(PoolParkTimer, this, &ThisClass::ParkPooledBody, CorpseSeconds, false);
+        }
+        else SetLifeSpan(CorpseSeconds);
+    }
+}
+
+void ABreakerEnemy::ParkPooledBody()
+{
+    // The corpse becomes a reserve body: still bDead, hidden, inert, and
+    // stripped of everything a reuse could inherit.
+    SetActorHiddenInGame(true);
+    SetActorEnableCollision(false);
+    SetActorTickEnabled(false);
+    // Statuses stop the silent way: zeroing durations lets each expire
+    // through its own teardown on the component's next tick (popping the
+    // seam-lane keys it pushed), where ConsumeAllStatuses would broadcast
+    // consumption feedback over a corpse.
+    if (Status) Status->ScaleRemainingDurations(0.0f);
+    // Modifier teardown releases the aura and hazards, but not the Warded
+    // ward — MaxShield is the one stat SetModifiers({}) leaves standing.
+    if (ModifierComponent) ModifierComponent->SetModifiers({});
+    SetModifierShield(0.0f);
+    // KNOWN EDGE, accepted: a seam-lane push whose owner was destroyed the
+    // same frame as this park has nobody left to pop it. The lanes are
+    // emptied wholesale at revive, so nothing can cross into a reuse.
+    if (OnParkedForPool.IsBound()) OnParkedForPool.Execute(this);
+    else Destroy();
+}
+
+void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
+{
+    // RespawnEnemy's checklist, plus everything a PROMOTED body has to give
+    // back. The caller replays the wave config sequence afterwards
+    // (ConfigureEncounter, ConfigureWave, promotions, loot flag, telemetry),
+    // so this only has to return a fresh, unranked body.
+    SetActorHiddenInGame(false);
+    SetActorEnableCollision(true);
+    SetActorTickEnabled(true);
+    SetActorLocation(SpawnLocation);
+    SetActorScale3D(PooledBaseScale);
+    BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    ResetDeathPresentation();
+    SetBodyVisible(true);
+    bDead = false;
+    StateLabel = TEXT("PATROL");
+    bLastHitWasWeakPoint = false;
+    FirstDamageTime = -1.0;
+    LastDamageEventTime = -1.0;
+    EngagedSeconds = 0.0f;
+    LastAttackTime = -1000.0;
+    WeaveTime = 0.0f;
+    LungeStartTime = -1000.0;
+    LungeWindupStartTime = -1000.0;
+    LungeLockedDirection = FVector::ZeroVector;
+    bLungeWindingUp = false;
+    if (BaseMoveSpeed >= 0.0f) MoveSpeed = BaseMoveSpeed;
+    if (BaseWeaveStrength >= 0.0f) WeaveStrength = BaseWeaveStrength;
+    WindupDurationMultipliers.Empty();
+    AimErrorMultipliers.Empty();
+    OutgoingDamageMultipliers.Empty();
+    // Demoted BEFORE the caller's ConfigureWave: that chassis pass re-derives
+    // health for rank Trash, and its next-tick repaint restores the family
+    // paint from the captured base.
+    MonsterRank = EBreakerMonsterRank::Trash;
+    ModifierCountHealthMultiplier = 1.0f;
 }
 
 void ABreakerEnemy::EnterWakefulDowned()

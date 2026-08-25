@@ -30,7 +30,13 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Combat/BreakerZoneActor.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "HAL/PlatformMisc.h"
+#include "RHI.h"
+#include "RenderTimer.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerPlaytestHUD.h"
 #include "UI/BreakerUIStyle.h"
@@ -65,6 +71,7 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     TickSupplyCrate(DeltaSeconds);
+    TickCrowdSampler(DeltaSeconds);
 }
 
 void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -320,6 +327,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     {
         SpawnEffectProbe();
     }
+    // -BreakerCrowdProbe=N: the density instrument (see the header block).
+    int32 CrowdCount = 0;
+    if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCrowdProbe="), CrowdCount) && CrowdCount > 0)
+    {
+        SpawnCrowdProbe(FMath::Clamp(CrowdCount, 1, 200),
+            FParse::Param(FCommandLine::Get(), TEXT("BreakerCrowdSkeletal")));
+    }
     if (!EffectProbeConsoleCommand)
     {
         EffectProbeConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
@@ -379,6 +393,98 @@ void ABreakerGameMode::SpawnEffectProbe()
         Zone->ConfigureZone(ProbeZone, nullptr);
         UE_LOG(LogTemp, Log, TEXT("[BreakerGym] effect probe: zone rim r=%.0f for %.1f s."),
             ProbeZone.RadiusCm, ProbeZone.Duration);
+    }
+}
+
+void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal)
+{
+    UWorld* World = GetWorld();
+    if (!World || !bFieldFrameSet) return;
+
+    // A far grid, ten to a row, 800 cm pitch, starting 60 m downfield: the
+    // pack pursues (a real crowd moves — an idle crowd under-measures), but
+    // at trash speed it cannot reach the pawn inside the sampling window.
+    // Loot and respawn are off so the measurement is enemies, not pickups.
+    USkeletalMesh* ProbeManny = bSkeletal ? LoadObject<USkeletalMesh>(nullptr,
+        TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")) : nullptr;
+    UClass* ProbeAnim = bSkeletal ? LoadClass<UAnimInstance>(nullptr,
+        TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed.ABP_Unarmed_C")) : nullptr;
+
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        const int32 Row = Index / 10;
+        const int32 Col = Index % 10;
+        const FVector Spot = Frame.At(6000.0f + Row * 800.0f, (Col - 4.5f) * 800.0f, 100.0f);
+        FActorSpawnParameters Params;
+        Params.ObjectFlags |= RF_Transient;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        ABreakerEnemy* Enemy = World->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(),
+            Spot, (-Frame.Forward).Rotation(), Params);
+        if (!Enemy) continue;
+        Enemy->ConfigureCrowdProbe();
+        Enemy->SetAreaLevel(GymAreaLevel);
+        // A sprinkle of rank so the crowd IS the glance test: can you find
+        // the gold and the violet in a field of eighty grey-violet trash?
+        if (Index % 25 == 0) Enemy->SetMonsterRank(EBreakerMonsterRank::ModifierBearing);
+        else if (Index % 10 == 0) Enemy->SetMonsterRank(EBreakerMonsterRank::Elite);
+        if (ProbeManny)
+        {
+            // PROBE-ONLY SURGERY, from outside: hide every primitive part
+            // and strap on an animating mannequin, so the skeletal run is
+            // the primitive run plus exactly one variable. Not a shipping
+            // path — the measurement decides whether one ever exists.
+            TArray<UStaticMeshComponent*> Parts;
+            Enemy->GetComponents<UStaticMeshComponent>(Parts);
+            for (UStaticMeshComponent* Part : Parts) Part->SetVisibility(false);
+            USkeletalMeshComponent* Skel = NewObject<USkeletalMeshComponent>(Enemy, TEXT("CrowdProbeBody"));
+            Skel->SetupAttachment(Enemy->GetRootComponent());
+            Skel->RegisterComponent();
+            Skel->SetSkeletalMesh(ProbeManny);
+            if (ProbeAnim) Skel->SetAnimInstanceClass(ProbeAnim);
+            Skel->SetRelativeLocation(FVector(0.0f, 0.0f, -88.0f));
+            Skel->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+            Skel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        }
+        ++CrowdSpawned;
+    }
+    bCrowdProbeArmed = true;
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCrowd] probe armed: %d/%d enemies spawned, skeletal=%d, area level %d."),
+        CrowdSpawned, Count, ProbeManny != nullptr, GymAreaLevel);
+}
+
+void ABreakerGameMode::TickCrowdSampler(float DeltaSeconds)
+{
+    if (!bCrowdProbeArmed) return;
+    if (CrowdWarmupRemaining > 0.0f)
+    {
+        CrowdWarmupRemaining -= DeltaSeconds;
+        return;
+    }
+    if (CrowdSampleRemaining > 0.0f)
+    {
+        CrowdSampleRemaining -= DeltaSeconds;
+        ++CrowdFrames;
+        const float FrameMs = DeltaSeconds * 1000.0f;
+        CrowdFrameMsSum += FrameMs;
+        CrowdFrameMsMax = FMath::Max(CrowdFrameMsMax, FrameMs);
+        // The engine's own thread clocks, cycles converted to ms — the
+        // dominance answer (game vs render vs GPU) in four numbers.
+        CrowdGameMsSum += FPlatformTime::ToMilliseconds(GGameThreadTime);
+        CrowdRenderMsSum += FPlatformTime::ToMilliseconds(GRenderThreadTime);
+        CrowdGpuMsSum += FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles());
+        return;
+    }
+    bCrowdProbeArmed = false;
+    const float N = FMath::Max(1, CrowdFrames);
+    UE_LOG(LogTemp, Display,
+        TEXT("[BreakerCrowd] SUMMARY enemies=%d frames=%d avg=%.2fms worst=%.2fms fps=%.0f game=%.2fms render=%.2fms gpu=%.2fms"),
+        CrowdSpawned, CrowdFrames, CrowdFrameMsSum / N, CrowdFrameMsMax,
+        1000.0f / FMath::Max(CrowdFrameMsSum / N, 0.01f),
+        CrowdGameMsSum / N, CrowdRenderMsSum / N, CrowdGpuMsSum / N);
+    if (FApp::IsUnattended())
+    {
+        // A scripted run has its number; let the script harvest the log.
+        FPlatformMisc::RequestExitWithStatus(false, 0);
     }
 }
 
@@ -2255,7 +2361,11 @@ void ABreakerGameMode::StartNextWave()
     if (CurrentWave > 0) RefillPlayerAmmo();
 
     ++CurrentWave;
-    WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy); });
+    // Dead entries pruned too, not just stale pointers: a parked pool body is
+    // a VALID actor still sitting in last wave's list, and reviving it into
+    // this wave would give it two entries — one enemy counted twice by every
+    // walker of this array.
+    WaveEnemies.RemoveAll([](const TObjectPtr<ABreakerEnemy>& Enemy) { return !IsValid(Enemy) || Enemy->IsDeadEnemy(); });
 
     const FVector Origin = PlayerPawn->GetActorLocation();
     const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
@@ -2353,9 +2463,7 @@ void ABreakerGameMode::StartNextWave()
             }
             continue;
         }
-        FActorSpawnParameters Params;
-        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(ABreakerEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, Params);
+        ABreakerEnemy* Enemy = AcquirePooledEnemy(ABreakerEnemy::StaticClass(), SpawnLocation);
         if (!Enemy) continue;
         Enemy->ConfigureEncounter(SpawnLocation, Index * 1.3f);
         Enemy->ConfigureWave(AreaLevel);
@@ -2390,10 +2498,7 @@ void ABreakerGameMode::StartNextWave()
         const float Angle = 360.0f * Index / FMath::Max(1, Composition.Lattices) + 45.0f;
         const FVector SpawnLocation = ArenaCenter
             + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Angle, FVector::UpVector) * CombatPocketRadius;
-        FActorSpawnParameters RangedParams;
-        RangedParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        ABreakerRangedEnemy* Ranged = GetWorld()->SpawnActor<ABreakerRangedEnemy>(
-            ABreakerRangedEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, RangedParams);
+        ABreakerEnemy* Ranged = AcquirePooledEnemy(ABreakerRangedEnemy::StaticClass(), SpawnLocation);
         if (!Ranged) continue;
         Ranged->ConfigureEncounter(SpawnLocation, Index * 0.9f);
         Ranged->ConfigureWave(AreaLevel);
@@ -2429,10 +2534,7 @@ void ABreakerGameMode::StartNextWave()
     {
         const FVector SpawnLocation = ArenaCenter - Forward * (CombatPocketRadius * 0.6f)
             + FVector(1.0f, 0.0f, 0.0f).RotateAngleAxis(Index * 90.0f, FVector::UpVector) * 300.0f;
-        FActorSpawnParameters WardenParams;
-        WardenParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        ABreakerWardenEnemy* Warden = GetWorld()->SpawnActor<ABreakerWardenEnemy>(
-            ABreakerWardenEnemy::StaticClass(), SpawnLocation, FRotator::ZeroRotator, WardenParams);
+        ABreakerEnemy* Warden = AcquirePooledEnemy(ABreakerWardenEnemy::StaticClass(), SpawnLocation);
         if (!Warden) continue;
         Warden->ConfigureEncounter(SpawnLocation, 1.7f + Index);
         Warden->ConfigureWave(AreaLevel);
@@ -2452,6 +2554,40 @@ void ABreakerGameMode::StartNextWave()
             TEXT("[BreakerGym] wave %d is a REST wave: half budget, no elites, loot enabled, ammo restocked. Take %.0fs before F4."),
             CurrentWave, WaveBudget.RestBreatherSeconds);
     }
+}
+
+ABreakerEnemy* ABreakerGameMode::AcquirePooledEnemy(UClass* EnemyClass, const FVector& SpawnLocation)
+{
+    // Pop-until-valid: the weak pointers go stale whenever something outside
+    // the pool destroys a reserve body (ResetPlaytestTargets nukes every
+    // enemy in the world), and a stale entry just means "spawn fresh".
+    if (TArray<TWeakObjectPtr<ABreakerEnemy>>* Reserve = WaveEnemyPool.Find(EnemyClass))
+    {
+        while (Reserve->Num() > 0)
+        {
+            ABreakerEnemy* Parked = Reserve->Pop().Get();
+            if (!Parked) continue;
+            Parked->ReviveFromPool(SpawnLocation);
+            return Parked;
+        }
+    }
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    ABreakerEnemy* Enemy = GetWorld()->SpawnActor<ABreakerEnemy>(EnemyClass, SpawnLocation, FRotator::ZeroRotator, Params);
+    if (Enemy)
+    {
+        Enemy->SetPooledByGameMode(true);
+        Enemy->OnParkedForPool.BindUObject(this, &ABreakerGameMode::HandleEnemyParkedForPool);
+    }
+    return Enemy;
+}
+
+void ABreakerGameMode::HandleEnemyParkedForPool(ABreakerEnemy* Enemy)
+{
+    if (!Enemy) return;
+    // Keyed by the EXACT class the body was spawned as, so a Lattice can only
+    // ever come back as a Lattice.
+    WaveEnemyPool.FindOrAdd(Enemy->GetClass()).Add(Enemy);
 }
 
 void ABreakerGameMode::SetEnemyDropsLoot(ABreakerEnemy* Enemy, bool bDrops) const
@@ -2516,6 +2652,10 @@ void ABreakerGameMode::ResetPlaytestTargets()
     if (!GetWorld()) return;
     for (TActorIterator<ABreakerTargetDummy> It(GetWorld()); It; ++It) It->Destroy();
     for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It) It->Destroy();
+    // The destroy loop above just killed the parked reserve too; the weak
+    // pointers would skip themselves at the next acquire anyway, but an
+    // empty map says what actually happened.
+    WaveEnemyPool.Empty();
     bPlaytestTargetsSpawned = false;
     for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {

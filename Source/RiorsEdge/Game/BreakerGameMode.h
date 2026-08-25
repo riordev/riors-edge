@@ -461,6 +461,20 @@ private:
     FBreakerCoverRegistry CoverRegistry;
     int32 CurrentWave = 0;
     UPROPERTY() TArray<TObjectPtr<class ABreakerEnemy>> WaveEnemies;
+    // --- The wave-mode enemy pool ------------------------------------------
+    // Wave churn is the game's only spawn-and-destroy loop (~12 bodies each
+    // way per wave), and at crowd density that churn is a real cost — the
+    // tracer renderer's pooling is the precedent. Keyed by exact class,
+    // because a subclass's BeginPlay does one-time captures (paint, scale,
+    // speed) that make a body reusable only as what it already is. Weak
+    // pointers on purpose: ResetPlaytestTargets destroys every enemy in the
+    // world, reserve included, and the pool must shrug that off. SCOPE: the
+    // three direct wave spawns (Skitter, Lattice, Warden). The Skirmisher and
+    // the Drudge go through bespoke spawn helpers (cover anchoring, severance
+    // config) and still churn; the boss was never churn.
+    TMap<UClass*, TArray<TWeakObjectPtr<class ABreakerEnemy>>> WaveEnemyPool;
+    class ABreakerEnemy* AcquirePooledEnemy(UClass* EnemyClass, const FVector& SpawnLocation);
+    void HandleEnemyParkedForPool(class ABreakerEnemy* Enemy);
     UPROPERTY() TObjectPtr<class ABreakerBossEnemy> ActiveBoss;
     // Console fallback for the boss key, registered once. Held so it is
     // unregistered on EndPlay — a stale IConsoleCommand outliving its game mode
@@ -472,6 +486,28 @@ private:
     // command for a controller-in-hand rerun; -BreakerEffectProbe for the
     // headless capture. Same unregister-on-EndPlay contract as Breaker.Boss.
     IConsoleCommand* EffectProbeConsoleCommand = nullptr;
+
+    // --- The crowd probe (vertical-slice density instrument) --------------
+    // -BreakerCrowdProbe=N spawns N trash enemies in a far grid during the
+    // gym build; -BreakerCrowdSkeletal gives each a dev-only mannequin body
+    // so "100 primitive enemies" and "100 skeletal enemies" are the same
+    // run with one flag flipped. A frame sampler warms up, samples, then
+    // logs [BreakerCrowd] frame/game/render/GPU milliseconds — the numbers
+    // that decide whether the crowd can wear the mannequin at all. In an
+    // -unattended run it exits after the summary so a script can harvest
+    // the log; with a controller in hand it keeps running.
+    void SpawnCrowdProbe(int32 Count, bool bSkeletal);
+    void TickCrowdSampler(float DeltaSeconds);
+    bool bCrowdProbeArmed = false;
+    float CrowdWarmupRemaining = 5.0f;    // O2: past the shader-compile hitches
+    float CrowdSampleRemaining = 10.0f;
+    int32 CrowdFrames = 0;
+    float CrowdFrameMsSum = 0.0f;
+    float CrowdFrameMsMax = 0.0f;
+    float CrowdGameMsSum = 0.0f;
+    float CrowdRenderMsSum = 0.0f;
+    float CrowdGpuMsSum = 0.0f;
+    int32 CrowdSpawned = 0;
     UPROPERTY() TObjectPtr<ABreakerEffectRenderer> EffectProbeRenderer;
     void SpawnEffectProbe();
     FVector SafeZoneCenter = FVector::ZeroVector;

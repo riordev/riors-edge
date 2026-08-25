@@ -41,6 +41,21 @@ public:
     // its chassis. This is the ONLY input to monster difficulty; nothing about
     // the player is ever consulted (O27).
     UFUNCTION(BlueprintCallable, Category="Enemy") void SetAreaLevel(int32 NewAreaLevel);
+    // Dev-only: a crowd-probe enemy measures frame cost and nothing else —
+    // no loot, no respawn — so the measurement is enemies, not pickups.
+    void ConfigureCrowdProbe() { bDropsLoot = false; bRespawns = false; }
+    // --- Pooling (wave mode's churn path) ----------------------------------
+    // The game mode marks a wave body poolable at spawn. A poolable corpse
+    // PARKS itself after the same fuse-safe corpse window SetLifeSpan used to
+    // grant, instead of destroying, and the game mode revives it in place of
+    // the next SpawnActor. Parked bodies stay bDead — the wave alive-count,
+    // the HUD blips and chain detonation all filter on that flag.
+    void SetPooledByGameMode(bool bInPooled) { bPooledByGameMode = bInPooled; }
+    // Bound by the game mode when it marks the body poolable; a park with no
+    // listener falls back to Destroy, so an unbound body cannot leak.
+    TDelegate<void(ABreakerEnemy*)> OnParkedForPool;
+    void ParkPooledBody();
+    void ReviveFromPool(const FVector& SpawnLocation);
     UFUNCTION(BlueprintCallable, Category="Enemy") void SetMonsterRank(EBreakerMonsterRank NewRank);
     UFUNCTION(BlueprintPure, Category="Enemy") int32 GetAreaLevel() const { return AreaLevel; }
     // The item level this monster's drop rolls at. Public because the loot path
@@ -269,6 +284,11 @@ protected:
     // authored parameters. That property is what the "same area level always
     // produces the same chassis" test checks.
     void ApplyChassis();
+    // Rank colour over family silhouette (crowd legibility, ruled): blends
+    // the captured family paint toward the rank hue, one tick after the
+    // chassis so subclass identity paints have already landed.
+    void ApplyRankPresentation();
+    TArray<TPair<TWeakObjectPtr<class UMaterialInstanceDynamic>, FLinearColor>> RankBaseColors;
 
     // The per-frame decision an enemy makes while it has a live target. The
     // base implementation is the melee three-gear chase below; ranged
@@ -478,6 +498,12 @@ private:
     FVector LungeLockedDirection = FVector::ZeroVector;
     bool bLungeWindingUp = false;
     float WeakPointBaseScale = 0.4f;
+    // Actor scale as spawned, captured in BeginPlay before any promotion can
+    // touch it: ConfigureElite's 1.25x multiplies the CURRENT scale, so a
+    // pooled body revived without this restore would grow every reuse.
+    bool bPooledByGameMode = false;
+    FVector PooledBaseScale = FVector::OneVector;
+    FTimerHandle PoolParkTimer;
 
     // The three seam lanes. Plain maps, not UPROPERTYs: entries are pushed and
     // popped by live effects that also own the teardown (the armour lane's
