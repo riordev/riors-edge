@@ -94,7 +94,15 @@ void UBreakerGameInstance::HandlePreLoadMap(const FString& MapName)
     FLoadingScreenAttributes Attributes;
     Attributes.bAutoCompleteWhenLoadingCompletes = true;
     Attributes.bWaitForManualStop = false;
-    Attributes.MinimumLoadingScreenDisplayTime = -1.0f;
+    // MEASURED, not guessed: the Gym travel loads in 0.26s, so with no
+    // minimum the plate was a subliminal flash — which, with PIE where the
+    // engine's IsMoviePlayerEnabled() requires !GIsEditor and hands back the
+    // null player, is the whole reason nobody had ever seen it. Two seconds
+    // is long enough to read the area name and short enough not to feel like
+    // a wait; the plate is a place read, and a place read takes a moment.
+    // PIE stays plateless by engine construction — only -game and packaged
+    // builds can show a MoviePlayer screen at all.
+    Attributes.MinimumLoadingScreenDisplayTime = 2.0f;   // O2 PLACEHOLDER
     // Uniform scale-to-fit on a letterboxing background the plate's own
     // void colour, so an ultrawide gets bars rather than a stretch.
     Attributes.WidgetLoadingScreen =
