@@ -94,6 +94,11 @@ public:
     // Dynamic material instances need a live world, so this cannot happen in
     // the constructor (which also runs on the CDO).
     virtual void BeginPlay() override;
+    // Swaps the primitive assembly for BodyMeshAsset when it resolves.
+    // Called by BeginPlay (editor-placed NPCs) and by the runtime spawners
+    // after they set the path — BeginPlay has already run inside SpawnActor
+    // by the time a spawner can set anything.
+    UFUNCTION(BlueprintCallable, Category="NPC") void ApplyBodyMesh();
 
     UFUNCTION(BlueprintPure, Category="NPC") FText GetDisplayName() const { return DisplayName; }
     UFUNCTION(BlueprintPure, Category="NPC") FName GetStartNodeId() const { return StartNodeId; }
@@ -118,6 +123,18 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") TArray<FBreakerDialogueEntry> EntryOverrides;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC", meta=(ClampMin="50")) float InteractionRange = 300.0f;
 
+    // THE NAMED BODY (ruled): the designer's blockout shipped npc_kess and
+    // npc_quartermaster meshes and nothing referenced them, so Kess and the
+    // Quartermaster were visually identical objects distinguished only by
+    // DisplayName. The spawners set this path; BeginPlay loads it and, on
+    // success, swaps the primitive assembly for the named mesh — on failure
+    // (a clone without the imported blockout) the primitives remain, same
+    // fallback shape as the audio samples. Offset/rotation exist because a
+    // GLB import's pivot is the artist's, not ours; corrected from capture.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FSoftObjectPath BodyMeshAsset;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FVector BodyMeshOffset = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FRotator BodyMeshRotation = FRotator::ZeroRotator;
+
     // Zero-setup placeholder conversations for the gym camp. The content is
     // split out of the spawners so automation can validate and walk it with no
     // world — a conversation that needs an actor cannot be unit-tested.
@@ -133,6 +150,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> Body;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Visual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Head;
+    // The named-mesh body; hidden until BodyMeshAsset resolves in BeginPlay.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> BodyMesh;
     // NPC READABILITY (owner playtest 2026-08-17: "no visual indicator that
     // the npcs are people"). Enemies read as cool grey-violet silhouettes with
     // harm-red bars; a person reads WARM: a bright amber sash across the

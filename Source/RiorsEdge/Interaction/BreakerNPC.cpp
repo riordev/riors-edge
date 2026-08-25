@@ -78,6 +78,13 @@ ABreakerNPC::ABreakerNPC()
         Trim->SetStaticMesh(TrimCube);
     }
 
+    // The named body (see BodyMeshAsset): created hidden; BeginPlay shows it
+    // and hides the primitives when the asset resolves.
+    BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
+    BodyMesh->SetupAttachment(Body);
+    BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    BodyMesh->SetVisibility(false);
+
     // The idle glow: a soft warm pool, same idiom as the hub's prop lights
     // (HubAttachPropLight) but owned by the NPC so it travels with them.
     // Deliberately dimmer than the forge/crate props — a person is lit, not a
@@ -97,6 +104,54 @@ void ABreakerNPC::BeginPlay()
     ApplyPersonColor(Visual, NPCCoat);
     ApplyPersonColor(Head, NPCFace);
     ApplyPersonColor(Trim, NPCSash);
+
+    // Editor-placed NPCs carry BodyMeshAsset as a property; runtime spawners
+    // set it AFTER SpawnActor (BeginPlay has already run by then) and call
+    // ApplyBodyMesh themselves.
+    ApplyBodyMesh();
+}
+
+void ABreakerNPC::ApplyBodyMesh()
+{
+    // THE NAMED BODY. When the designer's mesh resolves, it replaces the
+    // cubes-and-a-sphere assembly whole; the warm glow stays either way (a
+    // person is lit, whatever they are made of). A clone without the
+    // imported blockout keeps the primitives — the same "the floor still
+    // works" shape as the audio samples over the synth.
+    if (!BodyMesh || !BodyMeshAsset.IsValid()) return;
+    if (UStaticMesh* Named = Cast<UStaticMesh>(BodyMeshAsset.TryLoad()))
+    {
+        BodyMesh->SetStaticMesh(Named);
+        // MEASURED, NOT ASSUMED: the blockout GLB imported at 100x (an NPC
+        // 18,000 cm tall) with its geometry baked at SCENE position and the
+        // pivot at the scene origin — npc_kess's bounds centre is exactly
+        // the hub layout's vendor spot at 100x. So the placement is derived
+        // from the mesh's own bounds: scale it to author intent, cancel the
+        // baked offset so the bounds centre lands on the actor, and drop it
+        // so the feet touch the capsule bottom. Generic — any re-export
+        // with a different bake keeps working. The first wiring hard-coded
+        // an identity transform and the capture showed a mesh the size of a
+        // hill filling the plaza.
+        constexpr float BreakerBlockoutScale = 0.01f;   // the 100x undone
+        const FBoxSphereBounds MeshBounds = Named->GetBounds();
+        const FVector Centred = -MeshBounds.Origin * BreakerBlockoutScale;
+        // After centring, the feet sit at -scaledHalfZ; lift by the surplus
+        // over the capsule's half height so they touch its bottom instead.
+        const float FeetLift = static_cast<float>(MeshBounds.BoxExtent.Z) * BreakerBlockoutScale
+            - Body->GetScaledCapsuleHalfHeight();
+        BodyMesh->SetRelativeScale3D(FVector(BreakerBlockoutScale));
+        BodyMesh->SetRelativeLocation(Centred + FVector(0.0f, 0.0f, FeetLift) + BodyMeshOffset);
+        BodyMesh->SetRelativeRotation(BodyMeshRotation);
+        BodyMesh->SetVisibility(true);
+        Visual->SetVisibility(false);
+        Head->SetVisibility(false);
+        Trim->SetVisibility(false);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerNPC] %s: body mesh %s did not resolve — primitive fallback."),
+            *DisplayName.ToString(), *BodyMeshAsset.ToString());
+    }
 }
 
 bool ABreakerNPC::FindDialogueNode(FName NodeId, FBreakerDialogueNode& OutNode) const
@@ -478,6 +533,9 @@ ABreakerNPC* ABreakerNPC::SpawnForgeKeeper(UWorld* World, const FVector& Locatio
     NPC->DisplayName = FText::FromString(TEXT("KESS — FORGE KEEPER"));
     NPC->DialogueNodes = MakeForgeKeeperDialogue();
     NPC->EntryOverrides = MakeForgeKeeperEntries();
+    // The blockout's own Kess, by name (ruled).
+    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/anchor_hub/StaticMeshes/npc_kess.npc_kess"));
+    NPC->ApplyBodyMesh();
     return NPC;
 }
 
@@ -488,5 +546,7 @@ ABreakerNPC* ABreakerNPC::SpawnQuartermaster(UWorld* World, const FVector& Locat
     NPC->DisplayName = FText::FromString(TEXT("QUARTERMASTER"));
     NPC->DialogueNodes = MakeQuartermasterDialogue();
     NPC->EntryOverrides = MakeQuartermasterEntries();
+    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/anchor_hub/StaticMeshes/npc_quartermaster.npc_quartermaster"));
+    NPC->ApplyBodyMesh();
     return NPC;
 }
