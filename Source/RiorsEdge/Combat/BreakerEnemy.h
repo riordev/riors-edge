@@ -19,6 +19,26 @@ class UStaticMeshComponent;
 class USphereComponent;
 class UBoxComponent;
 
+// ---------------------------------------------------------------------------
+// THE RIFT TERMINATOR'S RAISE (O168). FIELD raises, GROUND consumes and owns
+// the completion state, LEDGER binds GROUND's completion event and pays.
+//
+// THIS DELEGATE CARRIES THE TERMINATOR AND NOTHING ELSE. It deliberately does
+// not carry an FBreakerRiftDefinition, does not know what a rift is, and
+// references nothing in `Game/` — that struct lives in Game/BreakerRiftDefinition.h
+// and pulling it in here is exactly the coupling O168 exists to prevent. The
+// definition rides GROUND's COMPLETION event, one layer up, which is the event
+// O168 says carries the whole struct.
+//
+// Same division of labour ABreakerRiftDoor already keeps at the other end of
+// the loop: the door does not travel, it raises and the game mode decides what
+// travel means. This is that reversed — the terminator does not complete
+// anything, it reports that it died while holding something open, and the game
+// mode decides what completion means.
+// ---------------------------------------------------------------------------
+class ABreakerEnemy;
+DECLARE_MULTICAST_DELEGATE_OneParam(FBreakerRiftTerminatorDefeated, ABreakerEnemy* /*Terminator*/);
+
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerEnemy : public APawn, public IAbilitySystemInterface
 {
@@ -45,6 +65,22 @@ public:
     // Dev-only: a crowd-probe enemy measures frame cost and nothing else —
     // no loot, no respawn — so the measurement is enemies, not pickups.
     void ConfigureCrowdProbe() { bDropsLoot = false; bRespawns = false; }
+
+    // --- The rift terminator seam (O168) ----------------------------------
+    // WHAT A TERMINATOR IS is FIELD's to decide and this is deliberately the
+    // whole of it for now: a MARK, settable on any enemy, carrying no rank and
+    // no behaviour. O168 leaves "an enemy, a rank, a behaviour" open, and
+    // authoring a rank or a behaviour before one rift has been stood in would
+    // be designing against plumbing that does not exist. A mark is the least
+    // that makes the seam real, and the seam is what two other lanes are
+    // waiting on.
+    void SetRiftTerminator(bool bInRiftTerminator) { bRiftTerminator = bInRiftTerminator; }
+    bool IsRiftTerminator() const { return bRiftTerminator; }
+
+    // Fires ONCE, on a true death, only when this body is marked. Never on a
+    // Wakeful down (that is not a death), never on a pooled park, and never on
+    // a body whose mark was cleared by reuse.
+    FBreakerRiftTerminatorDefeated OnRiftTerminatorDefeated;
 
     // DEV INSTRUMENT ONLY, and the narrowest thing that unblocks the capture.
     // O129's health ramp and the whole enemy bar are visual rules with no way
@@ -308,6 +344,10 @@ protected:
     // its parts from the same value; nothing reads a material to find out
     // what a body "was". Vestige grey-violet by default (O24).
     FLinearColor FamilyPaint = BreakerBodyPaint::VestigeFamilyPaint;
+
+    // O168's mark. Cleared by ReviveFromPool with the rest of the promoted
+    // state — a reused body is a fresh body and holds nothing open.
+    bool bRiftTerminator = false;
 public:
     // Read-only, and it exists so the shipped configuration is assertable: a
     // subclass that DECLARES one colour and PAINTS another is exactly the

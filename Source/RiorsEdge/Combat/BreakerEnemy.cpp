@@ -811,6 +811,19 @@ void ABreakerEnemy::HandleDeath()
     if (HasAuthority()) GrantAmmo();
     if (HasAuthority()) GrantExperience();
 
+    // O168's RAISE, and its position in this function is the contract. It
+    // fires AFTER loot and XP so the kill's own payouts are booked first — a
+    // consumer that reacts by tearing the interior down must not be able to
+    // beat this body's own drop out of the world — and BEFORE the respawn and
+    // pool-park scheduling below, both of which are deferred anyway.
+    //
+    // Guarded on the mark, so an unmarked enemy costs one bool. Wakeful has
+    // already returned above, which is why a down is not a death here.
+    if (bRiftTerminator)
+    {
+        OnRiftTerminatorDefeated.Broadcast(this);
+    }
+
     // On-death chain detonation: hurts other enemies only, so packed
     // spawns cascade without turning the player's own kills against them.
     if (HasAuthority() && bExplodesOnDeath && Attributes)
@@ -939,6 +952,11 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     // inside the function that promises a fresh, unranked body.
     MonsterRank = EBreakerMonsterRank::Trash;
     ModifierCountHealthMultiplier = 1.0f;
+    // O168's mark goes back with the gold. A reused body holds nothing open,
+    // and a terminator that survived into a wave spawn would raise a
+    // completion for a rift the player is no longer in.
+    bRiftTerminator = false;
+    OnRiftTerminatorDefeated.Clear();
     RefreshBodyPaint();
     // A parked body's health is still zero until the caller's chassis pass
     // refills it, and O129's ramp would read that corpse figure. This

@@ -4,6 +4,11 @@
 #include "Abilities/BreakerSupportAbilities.h"
 #include "Combat/BreakerDeployable.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerWardenEnemy.h"
+#include "Combat/BreakerSkirmisherEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
+#include "Combat/BreakerBossEnemy.h"
+#include "Combat/BreakerAlteredEnemy.h"
 
 // ---------------------------------------------------------------------------
 // THE THREE ENEMY-SIDE SEAMS (2026-08-16): keyed wind-up duration, keyed aim
@@ -177,6 +182,50 @@ bool FBreakerEnemySeamConsumerTest::RunTest(const FString& Parameters)
     Enemy->PopOutgoingDamageMultiplier(UBreakerAbility_Mark::TellModifierKey());
     TestTrue(TEXT("WA6: the mark ends and the damage build is bit-identical again"),
         Enemy->GetEffectiveAttackDamage() == Enemy->GetAttackDamage());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRiftTerminatorMarkTest,
+    "RiorsEdge.Combat.EnemySeams.RiftTerminatorMark",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRiftTerminatorMarkTest::RunTest(const FString& Parameters)
+{
+    // O168's raise, asserted where it can be: the SHIPPED CONFIGURATION.
+    // The failure this pins is the one that would actually happen — every
+    // enemy in the game raising a rift completion because the mark defaulted
+    // on, or because a subclass set it. A rift that completes when any trash
+    // mob dies is worse than one that never completes, because it pays.
+    //
+    // The raise itself needs a world (HandleDeath drops loot, feeds telemetry
+    // and schedules timers), so it is not exercised here. What IS pinned is
+    // that nothing is a terminator until something says so, across every class
+    // the game fields — which is the half a world-free test can hold and the
+    // half that a mistake would live in.
+    for (UClass* EnemyClass : { ABreakerEnemy::StaticClass(), ABreakerAlteredEnemy::StaticClass(),
+        ABreakerRangedEnemy::StaticClass(), ABreakerSkirmisherEnemy::StaticClass(),
+        ABreakerWardenEnemy::StaticClass(), ABreakerBossEnemy::StaticClass() })
+    {
+        const ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), EnemyClass);
+        if (!Enemy)
+        {
+            AddError(FString::Printf(TEXT("%s failed to construct"), *EnemyClass->GetName()));
+            continue;
+        }
+        TestFalse(FString::Printf(TEXT("%s is not a rift terminator until something marks it"),
+            *EnemyClass->GetName()), Enemy->IsRiftTerminator());
+        TestFalse(FString::Printf(TEXT("%s raises nothing, because nothing has bound it"),
+            *EnemyClass->GetName()), Enemy->OnRiftTerminatorDefeated.IsBound());
+    }
+
+    // The mark round-trips, and it is the only way in. No constructor, no
+    // spawn parameter, no rank: whoever builds the rift marks the body.
+    ABreakerEnemy* Marked = NewObject<ABreakerEnemy>();
+    Marked->SetRiftTerminator(true);
+    TestTrue(TEXT("The mark is settable"), Marked->IsRiftTerminator());
+    Marked->SetRiftTerminator(false);
+    TestFalse(TEXT("And clearable"), Marked->IsRiftTerminator());
     return true;
 }
 
