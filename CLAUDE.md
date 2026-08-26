@@ -605,58 +605,43 @@ line in Movement/) against the seat's "one entry and one wire" line;
 Swift pacing (1b) is HELD by order, nothing acted.
 
 
-THE FIELD LANE (this pass): TWO WRONG SPACES, AND THE BAR LANDS. HEAD
-`e8b2349`, 457 passing / 4 expected red (same roster) / 0 unexpected.
-O145: FLinearColor is LINEAR and the perceived colour is its sRGB
-ENCODING. Every dE76 this lane reported last cycle read the stored
-value as though it were already sRGB and inflated all of them — a
-Vestige trash ramp measured 44.7 where it delivers 27.7. The error
-survived because the figures were quoted ONE PER RANK, which the
-delta form cannot have: travel starts from a family base, so it
-differs per family by construction, and the per-rank average is
-exactly the format that hides it. Scope is now part of every figure.
-O146: the same mistake was in the COMPOSITION. The pack's hexes are
-display colours; added to a linear value they deliver a travel that
-depends on where the family base sits, spread 30.8 dE76 across the
-twelve (family, rank) pairs with Champion the worst rank in the game
-to read. Encoding the base, adding the authored offset in its own
-domain, decoding back: spread 11.1, worst case 38.8, and NOTHING
-retuned — the twenty hexes, both rank hues and both blend weights
-stand. Champion was never a blend problem. Gain was measured and
-rejected (inflates Boss to 91 dE76, washes every swatch pastel).
-Known and open: the delta carries magnitude, not hue direction, so a
-Vestige Boss dies MAGENTA. DeliveredSeparation is the new test and it
-asserts the delivered colour, not the authored table — the old ramp
-test would have passed with Champion at 27.8 forever.
+THE FIELD LANE (this pass): THE DENSITY SWEEP, AND THE COST IS NOT
+PER-BODY. Twelve engaged runs plus a four-point patrol control, all on
+`1260c88`, three reps at each engaged N, spread +-0.7% or better.
+Engaged game thread: N=25 4.83 ms, N=50 12.20, N=75 21.89, N=100
+35.72 — the seat's 34.16 reproduces. THE LINEAR FIT IS REFUTED, not
+merely beaten: it wants an intercept of MINUS 6.74 ms, which is not a
+frame, and its residuals alternate sign. Quadratic fits at R2=0.99975:
+`t = 1.14 + 0.0864 N + 0.002584 N^2` on the game thread. The N^2 term
+is 33% of the cost at 25 and 73% at 100. Budget on that fit: 60 fps at
+N=63, 120 fps at N=38 — the 50-100 target is NOT met.
 
-THE ENEMY BAR IS FIELD'S NOW (Combat/BreakerEnemyHealthBars.cpp) and
-four of its five items landed: bands from
-BreakerHealthBands::SegmentCountFor with a PIXEL-keyed draw limit
-rather than a rank-keyed one, a hatched shield fill, modifier marks
-beyond 15 m instead of prose, and A7 — which was a real defect: the
-focus fade held ONE body, so a crosshair sweep hard-cut every bar but
-the last. Now per-enemy; that replaced two private HUD members with a
-map and is a DECLARED CROSSING to GLASS. A4 needed no code (ARMOR 2
-was never implemented). A1's boss half needed no hold in the
-end: O135 landed while this ran and rules the 8 bands DELIBERATE —
-bands are damage feedback, phase gates are behaviour thresholds, two
-facts and two marks — and names six bands as the one wrong answer,
-since a boundary 0.7% from the 0.66 gate reads as a rendering defect.
-The bar draws 8 for Boss straight off SegmentCountFor, which is what
-that ruling wants; the phase fraction is O156's field-plate row and
-carries no bar.
+WHAT THE N^2 IS, by elimination rather than by guess. The patrol
+control runs the SAME per-enemy `TActorIterator<ABreakerCharacter>`
+scan and the SAME 40 m ground trace, and it is linear at 0.036 ms per
+body (2.76 + 0.0355 N) — so the iterator I suspected before the sweep
+is exonerated, and so is per-body AI. Neither `PerformAttack` nor
+`TickEngagedBehaviour` contains an overlap, a trace or a loop. The
+only body-body interaction in the entire tick is the swept
+`AddActorWorldOffset` in the shared tail, which both branches run:
+patrol bodies sit on an 800 cm grid and never touch, engaged bodies
+converge to `nearest=1-5cm` and sweep against every neighbour. THE
+COST IS CROWD COLLISION, and it exists because nothing in `Combat/`
+holds spacing — there is no avoidance, no separation, no LOD and no
+sleep anywhere, so a hundred engaged enemies converge on one point.
 
-INSTRUMENT GAPS, all three still open and one now blocking. The crowd
-probe's grid still sits at 6000 cm against a 2200 cm DetectionRange,
-so BreakerEnemy.cpp:507 takes the PATROL branch and the hundred has
-never pursued — b414d5c did not move the grid, it added
-`load=pursuing-unengaged` to the summary line, so the claim now
-prints in the measurement output a script harvests. A GPU column
-moving 0.22 ms across a hundred skeletal meshes is still not drawing
-them. And the enemy bar cannot be photographed at all: autoplay faces
-a berm, the crowd grid is past the 50 m cull, and the capture tour
-moves the CAMERA while the cull measures from the PLAYER. The bar
-work above shipped unphotographed and says so.
+WHAT THAT MEANS FOR THE OPTIMISATION: making each body cheaper is the
+wrong lever. The same fit with the quadratic term gone puts N=100 at
+9.79 ms (102 fps) and N=200 at 18.43 ms — better than any per-body
+saving available. But separation changes how a fight FEELS, so
+whether the stacking is a bug or a look is now a question in
+Docs/reports/FIELD.md rather than something this lane picks.
+
+SCOPE, stated because the last two of these needed it: `engaged`
+measures convergence and attack. No hit reactions, no damage numbers,
+no flashes, no death effects, no player fire. It is HALF A FIGHT and
+the figures above are a floor. Frame cost is 100% game thread at
+N=100 (render 6.84, GPU 3.51, both nearly flat across the sweep).
 
 Update this section as the last step of each session.
 

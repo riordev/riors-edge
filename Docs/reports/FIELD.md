@@ -82,6 +82,29 @@ has no reason to fire.
 **Question:** do enemies get elements. It changes the damage pipeline's shape
 rather than a table, which is why it has sat unanswered rather than being cheap.
 
+## Does the crowd get separation, and is stacking a bug or a look?
+
+The density sweep says the cost at N=100 is **73% a quadratic term**, and the
+only body-body interaction in the whole enemy tick is the swept
+`AddActorWorldOffset`. Patrol — same actor-iterator scan, same ground trace,
+bodies spread on an 800 cm grid — is linear at 0.036 ms/body. Engaged bodies
+converge to `nearest=1-5cm` and go quadratic. There is no avoidance, no
+separation and no spacing behaviour anywhere in `Combat/`, so a hundred engaged
+enemies converge on one point and pay collision against each other forever.
+
+Removing that term is worth more than any per-body saving available: the same fit
+without it puts N=100 at 9.79 ms (102 fps) and N=200 at 18.43 ms.
+
+But **separation is a fight-feel change, not only an optimisation.** Enemies that
+hold spacing surround the player instead of stacking; they become individually
+readable and collectively less oppressive, and a melee pack that refuses to
+overlap is a different encounter from one that piles. That is a design call.
+
+**Question:** is a hundred enemies stacking into one body at 1 cm a bug to fix or
+a look to keep? If it is a bug, FIELD builds separation and the density target
+falls out of it. If the stacking is wanted, the target needs a different answer,
+because the collision cost is what stacking IS.
+
 ## Two claims dropped rather than assembled
 
 Recorded because "I checked and it is not true any more" is worth as much as a
