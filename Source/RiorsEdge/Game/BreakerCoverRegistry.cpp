@@ -841,6 +841,52 @@ bool UBreakerCoverLayoutLibrary::IsLayoutLegal(const TArray<FBreakerCoverPiece>&
     return true;
 }
 
+bool UBreakerCoverLayoutLibrary::IsZoneLegal(const TArray<FBreakerZoneField>& Yards, FString& OutReason)
+{
+    // A zone with no yards is not an empty zone, it is a build that produced
+    // nothing — the same reading CollectZonePieces takes of an empty mesh
+    // folder. Passing it would report the strongest possible verdict on the
+    // least possible evidence.
+    if (Yards.Num() == 0)
+    {
+        OutReason = TEXT("a zone with no yards in it; the build produced nothing to measure");
+        return false;
+    }
+
+    // No two yards may share a name. Yard names key the marker contract, so a
+    // duplicate would make "the north yard's door" ambiguous, and the first
+    // match would silently win.
+    for (int32 A = 0; A < Yards.Num(); ++A)
+    {
+        for (int32 B = A + 1; B < Yards.Num(); ++B)
+        {
+            if (Yards[A].Yard == Yards[B].Yard)
+            {
+                OutReason = FString::Printf(TEXT("two yards named '%s'"),
+                    Yards[A].Yard.IsNone() ? TEXT("<entry>") : *Yards[A].Yard.ToString());
+                return false;
+            }
+        }
+    }
+
+    // EVERY yard, and the failing one is NAMED. A zone-level "illegal" with no
+    // yard on it would send the reader to search a whole world for a number
+    // that belongs to one room.
+    for (const FBreakerZoneField& Yard : Yards)
+    {
+        FString Reason;
+        if (!IsLayoutLegal(Yard.Pieces, Yard.Params, Reason))
+        {
+            OutReason = FString::Printf(TEXT("yard '%s' is grammar-illegal: %s"),
+                Yard.Yard.IsNone() ? TEXT("<entry>") : *Yard.Yard.ToString(), *Reason);
+            return false;
+        }
+    }
+
+    OutReason.Reset();
+    return true;
+}
+
 FString UBreakerCoverLayoutLibrary::DescribeCoverField(const TArray<FBreakerCoverPiece>& Pieces,
     const FBreakerCoverFieldParams& Params)
 {

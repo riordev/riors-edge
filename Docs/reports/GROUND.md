@@ -43,6 +43,40 @@ asking about length and sightline rather than cover pitch, with
   no-through-sight recommendation. Magnitudes are O2 and get authored in the
   cycle after, against a walked yard.
 
+## What anchors a NON-ENTRY yard's frame? (blocks the rest of Q3)
+
+Hit while landing the zone rule. `FBreakerCoverPiece` is field-space by
+construction — *"nothing here is world space, which is the whole reason it can
+be tested"* — so two yards are two coordinate systems, not two regions of one.
+Each yard's grammar has to be measured in its own frame.
+
+The entry yard's frame is derived from its player start and its rift marker.
+**A zone has exactly one player start** (Q4, just landed), so a second yard has
+no anchor under that rule, and the rift marker is optional per yard so it
+cannot be the anchor either.
+
+Three shapes, and I recommend the first:
+
+- **A `yard` marker role, one per yard, carrying origin and facing.**
+  `marker_yard_north` anchors the north yard the way the player start anchors
+  the entry one. It fits the contract that just landed at no cost — a new role
+  string, and `IsComplete` gains "every yard named by any marker has a yard
+  marker". **Recommended:** the anchor is authored where the yard is authored,
+  and it is one mesh in the composer.
+- **Two markers per yard** (origin plus a forward point), mirroring
+  playerstart-plus-rift exactly. More faithful to how the entry frame works,
+  but it doubles the authoring and the second marker means nothing on its own.
+- **Drop frames for non-entry yards** and measure them in world axes. Cheapest
+  today, and it makes every yard's grammar depend on how the composer happened
+  to be rotated — the thing the derived frame was built to avoid.
+
+Until this is answered the zone rule is landed but only ever holds one yard:
+`IsZoneLegal` takes yards whose pieces are ALREADY in a frame, so it is correct
+and unblocked, and the thing that cannot be written is the builder that
+produces a second yard's pieces.
+
+- **Question:** confirm the `yard` marker role, or name a different anchor.
+
 ## The rift door announces itself as TRAVEL (needs one line in GLASS's file)
 
 Found by capture, not by the suite — the door is placed geometry and

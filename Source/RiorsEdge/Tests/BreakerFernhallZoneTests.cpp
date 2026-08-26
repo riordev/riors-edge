@@ -54,14 +54,90 @@ bool FBreakerFernhallGrammarTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("Fernhall yard: %s"),
         *UBreakerCoverLayoutLibrary::DescribeCoverField(Cover, Params)));
 
+    // VALIDATED AS A ZONE, which today is a one-yard zone (Q3). The verdict is
+    // identical to the field call it replaces — that is the point of landing
+    // the level above the field before a second yard exists rather than after,
+    // when the change would be tangled up with whatever that yard needs.
+    TArray<FBreakerZoneField> Zone;
+    FBreakerZoneField& Entry = Zone.AddDefaulted_GetRef();
+    Entry.Yard = NAME_None;   // the entry yard, matching the marker contract
+    Entry.Params = Params;
+    Entry.Pieces = Cover;
+
     FString Reason;
-    const bool bLegal = UBreakerCoverLayoutLibrary::IsLayoutLegal(Cover, Params, Reason);
+    const bool bLegal = UBreakerCoverLayoutLibrary::IsZoneLegal(Zone, Reason);
     if (!bLegal)
     {
-        AddError(FString::Printf(TEXT("the placed yard is grammar-illegal: %s | %s"),
+        AddError(FString::Printf(TEXT("the placed zone is grammar-illegal: %s | %s"),
             *Reason, *UBreakerCoverLayoutLibrary::DescribeCoverField(Cover, Params)));
     }
+
+    // AND THE TWO AGREE. A zone rule that could disagree with the field rule
+    // about the same single yard would be a second opinion rather than a level
+    // above it, so the equivalence is asserted rather than assumed.
+    FString FieldReason;
+    TestEqual(TEXT("the zone rule and the field rule agree about a one-yard zone"),
+        bLegal, UBreakerCoverLayoutLibrary::IsLayoutLegal(Cover, Params, FieldReason));
     return bLegal;
+}
+
+// THE ZONE RULE'S OWN BEHAVIOUR, world-free. The Fernhall test above proves it
+// agrees with the field rule on the shipped yard; this proves it does the
+// things a level above the field has to do, which one passing yard cannot show.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerZoneLegalityTest,
+    "RiorsEdge.Zone.Grammar.ZoneLegality",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerZoneLegalityTest::RunTest(const FString& Parameters)
+{
+    FString Reason;
+
+    // An empty zone is a build that produced nothing, not a zone with nothing
+    // wrong with it. Passing it would be the strongest verdict on the least
+    // evidence — the same reading CollectZonePieces takes of an empty folder.
+    TArray<FBreakerZoneField> Empty;
+    TestFalse(TEXT("a zone with no yards is refused"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Empty, Reason));
+
+    // A yard whose field is illegal fails the zone, AND THE REASON NAMES THE
+    // YARD. Two full-height pieces closer than the dash-corridor floor is the
+    // maze rule, which is the cheapest way to author a guaranteed-illegal
+    // field without depending on a whole placed layout.
+    FBreakerCoverFieldParams Params;
+    Params.BandNearCm = 1000.0f;
+    Params.BandFarCm = 4000.0f;
+    Params.BandHalfWidthCm = 2000.0f;
+
+    FBreakerCoverPiece A;
+    A.Forward = 2000.0f; A.Right = -200.0f; A.HeightCm = Params.FullHeightCm;
+    A.HalfLengthCm = 150.0f; A.HalfDepthCm = 150.0f;
+    A.Class = EBreakerCoverClass::FullHeight; A.ClusterIndex = 0;
+    FBreakerCoverPiece B = A;
+    B.Right = 200.0f; B.ClusterIndex = 1;   // 400 cm apart, far under the 1600 floor
+
+    TArray<FBreakerZoneField> Zone;
+    FBreakerZoneField& Bad = Zone.AddDefaulted_GetRef();
+    Bad.Yard = FName(TEXT("north"));
+    Bad.Params = Params;
+    Bad.Pieces = { A, B };
+
+    TestFalse(TEXT("a zone containing one illegal yard is illegal"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Zone, Reason));
+    TestTrue(FString::Printf(TEXT("and the reason names the yard that failed: %s"), *Reason),
+        Reason.Contains(TEXT("north")));
+
+    // Two yards may not share a name: yard names key the marker contract, so a
+    // duplicate makes "the north yard's door" ambiguous and the first match
+    // would silently win.
+    TArray<FBreakerZoneField> Duplicate;
+    FBreakerZoneField& One = Duplicate.AddDefaulted_GetRef();
+    One.Yard = FName(TEXT("north"));
+    FBreakerZoneField& Two = Duplicate.AddDefaulted_GetRef();
+    Two.Yard = FName(TEXT("north"));
+    TestFalse(TEXT("two yards may not share a name"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Duplicate, Reason));
+    return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

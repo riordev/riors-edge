@@ -395,6 +395,25 @@ struct RIORSEDGE_API FBreakerCoverRegistry
     }
 };
 
+// ONE YARD'S MEASURED FIELD: its name, the grammar it answers to, and its
+// pieces IN ITS OWN FRAME. The frame is what makes this per-yard rather than
+// per-zone — FBreakerCoverPiece is field-space by construction ("nothing here
+// is world space, which is the whole reason it can be tested"), so two yards
+// are two coordinate systems and not two regions of one.
+//
+// WHO BUILDS A NON-ENTRY YARD'S FRAME IS NOT DECIDED. The entry yard's frame
+// is derived from the player start and the rift marker; a zone has exactly one
+// player start, so a second yard has no anchor by that rule. That is a design
+// question in the lane's report, not something to invent here — which is why
+// this struct takes pieces already in a frame rather than deriving one.
+struct FBreakerZoneField
+{
+    // NAME_None is the entry yard, matching the marker contract.
+    FName Yard = NAME_None;
+    FBreakerCoverFieldParams Params;
+    TArray<FBreakerCoverPiece> Pieces;
+};
+
 UCLASS()
 class RIORSEDGE_API UBreakerCoverLayoutLibrary : public UBlueprintFunctionLibrary
 {
@@ -498,6 +517,27 @@ public:
     UFUNCTION(BlueprintPure, Category="Cover")
     static bool IsLayoutLegal(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params,
         FString& OutReason);
+
+    // THE ZONE RULE (Q3): a zone is legal when EVERY YARD is legal in its own
+    // frame. IsLayoutLegal validates one open combat field — one band, one
+    // corridor, one safe circle — and every rule in it is correct about that
+    // and has no concept of a room boundary. Handed a rectangle containing
+    // several yards it measures the dead ground between them, finds no cover
+    // there, and reports an exposed crossing over ground no player can stand
+    // on. So the fix is not a wider band; it is one field per yard.
+    //
+    // AT ONE YARD THIS IS EXACTLY IsLayoutLegal, and that is deliberate: the
+    // shipped yard's verdict does not move, and what changes is that the zone
+    // now has a level above the field for a second yard to be added to.
+    //
+    // CONNECTIONS ARE NOT CHECKED HERE. Q3 ruled them a distinct kind of
+    // space with their own rule, asking about length and sightline rather than
+    // cover pitch, and their magnitudes are not authored yet — so this
+    // function deliberately says nothing about the ground BETWEEN yards rather
+    // than pretending the field rules cover it. A zone becomes fully legal
+    // when this passes AND the connection rule passes; only the first half
+    // exists.
+    static bool IsZoneLegal(const TArray<struct FBreakerZoneField>& Yards, FString& OutReason);
 
     UFUNCTION(BlueprintPure, Category="Cover")
     static FString DescribeCoverField(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params);
