@@ -1113,6 +1113,227 @@ owner's, in the affix layer.
 
 ---
 
+# PART ONE-N — PARITY IS 0.621, NOT 0.27, AND THE CRISIS WAS THE FIXTURE
+
+O142 landed the ability-built fixture. **0.27 → 0.621 at cap**, 0.20 → 0.356
+endgame. The prediction was 0.48–0.51 and **LEDGER said plainly that it was low**,
+with the reason: the ring-legal mirror buys **14 ability picks where the estimate
+assumed 8**.
+
+That is a prediction stated, missed, and owned — which is worth more than a
+prediction that happened to land, because it is the second time in this thread
+that a number nobody committed to in advance would have gone unexamined.
+
+## The four-ratio decomposition is complete and it multiplies
+
+```
+  increased  0.965    costs   3.5%   nearly closed by the re-base alone
+  More       0.860    costs  14.0%   two ability-reaching standing Mores against three
+  crit       0.863    costs  13.7%   the ability spend forgoes Precision's flats
+  flat       0.867    costs  13.3%   structural — the owner's affix-layer question
+
+  product = 0.6209 against 0.621 reported
+```
+
+Verified independently: the four multiply to the figure. This is what a
+decomposition looks like when it stops claiming and starts asserting.
+
+## What this changes, and the seat's own number was wrong
+
+**The crisis was the measurement.** Parity did not halve to 0.27 as a property of
+the game — it read 0.27 because both fixtures shared one weapon-leaning tree
+spend and the ability build was handed a tree built for somebody else.
+
+The remaining gap to the 0.85 floor is **1.37×**. Part One-M told LEDGER content
+needed **1.73×**. That was computed against a 0.49 estimate that came in high, so
+**the seat's figure is superseded and content needs materially less than it was
+told.** Anyone tuning against 1.73 would now overshoot.
+
+## Three of the four shortfalls are explained rather than deficient
+
+Read the table again with what each one *is*:
+
+- **`increased` 0.965** — effectively closed. Nothing to do.
+- **`More` 0.860** — two ability-reaching standing Mores against three, **and
+  Collapse's hit-time ×1.30 sits outside standing measurement by design.** So an
+  ability build that buys Collapse gets a multiplier this metric structurally
+  cannot see. The lived figure is better than 0.860 and the fixture cannot say by
+  how much.
+- **`crit` 0.863** — the ability spend *forgoes* Precision's flats. That is a
+  **choice the mirrored fixture made**, not a hole in the content. A different
+  legal ability build that bought crit would move this and lose elsewhere.
+- **`flat` 0.867** — structural, and the only one that is unambiguously a gap.
+  Nothing in the game fills the law's `sum(Flat)` term. Owner's, affix layer,
+  unchanged by any fixture.
+
+**So the honest reading is one real content gap (flat), one invisible-by-design
+multiplier (More), one fixture spend choice (crit), and one closed axis
+(increased).** That is a very different project from the one a single 0.27
+described, and no content should be authored against 0.27 again.
+
+## What the seat rules from here
+
+**Nothing yet, deliberately.** The number moved by a factor of 2.3 in one commit
+and the right response to that is to let it settle rather than immediately tune
+against the new one — the same mistake in the other direction.
+
+**LEDGER: report what a legal ability build that DOES buy crit measures**, before
+anything is authored. If `crit` moves and `More` or `increased` falls to pay for
+it, the 0.863 was a spend choice and the real gap is smaller still. If it moves
+and nothing falls, the ability wheels have slack the weapon wheels do not and
+that is a finding of its own.
+
+The flat question stays where Part One-K put it: with the owner, in the affix
+layer, untouched by any of this.
+
+---
+
+# PART ONE-O — THE LOOP HAS AN ENDING
+
+Part Three-E opened with a recon's finding: *"Closing does not exist. There is no
+close-rift verb anywhere in the module... The game's atomic loop currently has no
+ending."*
+
+It has one. Three commits, three lanes, one interface each way, verified end to
+end:
+
+```
+  MarkRiftTerminator      Game/          GROUND marks and binds in one act
+  terminator raise        Combat/        FIELD raises, knowing nothing of rifts
+  CompleteRiftRun         Game/          GROUND consumes, latches, broadcasts
+  HandleRiftCompleted     Progression/   LEDGER pays
+```
+
+**No lane entered another's files.** `Combat/` gained no `Game/` include. The
+payout binds an event rather than reaching for state. The seam held under its own
+rules for its whole length, which is the first time this project has run a
+three-lane feature.
+
+## Three details worth keeping
+
+**The latch was proven in play, not asserted.** `Breaker.Field.VerifyRiftChain 2`
+shows a second raise reaching the consume site and being refused — one
+completion, one broadcast. LEDGER bound on the strength of an exercised
+guarantee.
+
+**The payout does NOT deduplicate, on purpose.** O168's per-world latch already
+makes every broadcast a distinct run, and *"a payout that second-guessed the
+seam's guarantee would be two owners of one question."* That is the session's
+central discipline applied at the last joint, by the lane with the most to lose
+from trusting it.
+
+**Reward-per-minute stays flat by construction.** `BreakerRiftRewardMath.h` reads
+`FBreakerMonsterChassisParams{}.HealthGrowthPerLevel` — the chassis's own
+constant, read rather than restated — so payout and monster health ride one
+curve. Retune monster growth and the reward follows. Verified at the site.
+
+## What this unblocks
+
+**The rift interior is now next in that thread and it is the owner's.** GROUND's
+costing said the yard-instance route is cheap — `StartNextWave` spawns around the
+player, so the wave system has no gym dependency, and `Lvl_Fernhall` with
+`PendingRift` set already IS a different instance of the same tileset — and
+recommended taking it *after* the close verb, because *"a populated rift with no
+ending is a louder version of the problem."*
+
+The close verb is done. That sequencing argument has expired in the good way.
+
+**Still pending and unchanged:** first-clears (O117) wait on an archetype
+existing on the rift definition; the spawner still does not know a boundary
+exists; separation is unbuilt; and the flat term still has no author.
+
+---
+
+# PART ONE-P — SIX REDS WHERE THERE WERE TWO, AND NOTHING REGRESSED
+
+Read this before chasing one. `status.py` now reports **six** out-of-band rows
+where it reported two earlier tonight, and **not one of them is new breakage**.
+
+```
+  Resource generation entry points with no caller   3 of 18    already out
+  Offered-to-spendable ratio, per tree              2.25       already out
+  Build variance band, at cap                       6.01       NEWLY VISIBLE
+  Ability lane throughput, at cap                   0.62       NEWLY VISIBLE
+```
+
+The last two read **"not emitted"** for most of the session, because the fixtures
+that produce them had not run. Variance at 6.01 against a band of 8–10, and
+parity at 0.62 against 0.85–1.15, were both true the whole time. They were simply
+unmeasured.
+
+**The count rose because COVERAGE rose.** That is the opposite of a regression and
+it is exactly the kind of figure a person reads backwards at a glance.
+
+Recorded here because this project has been bitten by this shape four times in
+one session — the parity "collapse" that was a fixture, the census's 25 that was
+a dropped term, the crowd probe measuring a scene it had not named, and a bar
+that was "one flat red stripe" for a reason nobody guessed. **A number that moved
+is not evidence about the thing it measures until you know why it moved.**
+
+If you open a red tomorrow, check whether it was emitting yesterday before you
+treat it as damage.
+
+---
+
+# PART ONE-Q — RULED: THE RIFT INTERIOR IS THE YARD, AS ITS OWN INSTANCE
+
+Owner, 2026-08-26: *"i wanted it to be its own instance so you can actually feel
+the loop."*
+
+**RULED.** The gym stops being the rift interior. A rift run is an instance of
+Fernhall's own geometry, populated — same ground, separate run, which is what an
+instanced rift is.
+
+GROUND's costing stands and the reason it is cheap is worth restating: **the wave
+system spawns around the PLAYER, not at an authored arena**, so it has no
+dependency on gym geometry, and `Lvl_Fernhall` with `PendingRift` set already IS
+a different instance of the same tileset. No new map, no new art.
+
+**The success test is in the owner's own words: the loop should be FELT.** Not
+technically closed — it already is. A run that can be walked, fought and finished
+in one sitting is what this ruling is for, and anything that makes the run
+complete-but-unpleasant has missed it.
+
+## This promotes the spawn containment bug from annoyance to BLOCKER
+
+Part One-L found the spawner places its pack **44 m from the player** with no idea
+a boundary exists, and Fernhall is **100 x 50 m**. Today that misfires in a yard
+nobody fights in. **Once the yard IS the rift interior, every single rift run hits
+it** — enemies materialising outside the walls and walking in is the first thing
+the owner will see and the last thing a "felt loop" survives.
+
+**GROUND: containment lands BEFORE or WITH the interior, not after.** The report
+was already ordered; this makes it the gate. The band fix that already landed is
+not enough — 4000 cm still spawns outside a 50 m width, as that commit itself
+said.
+
+## The order, and it is short
+
+1. **Spawn containment** — a pack belongs to the yard the player is in, at a
+   distance the yard affords. Report the shape, then author it.
+2. **The interior swap** — `PendingRift` set, the yard's geometry, waves live.
+3. **Walk it.** The owner rules whether it feels like a loop, which is the only
+   test this ruling has.
+
+Everything else in GROUND's queue waits behind those three. Yard growth to five
+yards, the connection rule, the First Contract — all of it is worth more once one
+rift run feels like a run, and worth less before.
+
+## What the other lanes should know
+
+**FIELD:** the interior is where separation gets felt rather than measured. A
+walled yard with a real fight in it is the first place the N² term is something
+the owner experiences instead of a number in a report.
+
+**LEDGER:** the payout fires on a completion the owner will now actually reach.
+`BreakerRiftRewardMath`'s bases are `O2 PLACEHOLDER` and this is the first time
+anyone can say whether finishing a run *feels* paid.
+
+**GLASS:** a rift run that can be finished means the deployment briefing and the
+completion moment both get seen for the first time.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
