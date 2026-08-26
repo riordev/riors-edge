@@ -45,6 +45,52 @@ seeing it, not a reason to build (b) now.
 **LEDGER owns the node. KIT owns the loadout flip.** Coordinate the landing;
 KIT's three enumerated reds clear on it.
 
+## 1b. RULING 1'S CONSEQUENCE — Swift is now the slowest class to fill
+
+Landed and correct (`6568371`). LEDGER also caught a blocker neither I nor KIT
+saw: moving Lead off the starter row gives Swift **five** unlockables where every
+other class has four, and `AbilityTokenLevels` only had four milestones — so the
+fifth ability was unreachable at the level cap. A fifth milestone was added,
+`{5, 12, 20, 30, 40}`, and four-unlockable classes truncate at four and never see
+it. That is right.
+
+**But it leaves Swift on a different pacing curve from the rest of the game, and
+that arrived as arithmetic rather than as a decision.** Measured:
+
+```
+  class      starters  unlockables   last ability bought at
+  Gunsmith      2           4              level 30
+  Tank          2           4              level 30
+  Support       2           4              level 30
+  Caster        2           4              level 30
+  Swift         1           5              level 40
+```
+
+Every class ends with six class abilities. Swift starts with **half** what the
+others start with — one against two — and finishes **ten levels later**.
+
+That may be exactly right: Swift's identity is movement, Skim plus an always-on
+dash passive is a real level-one kit, and a slot you can see and cannot fill yet
+is a promise. It is also the class the **owner plays**, which means the vertical
+slice will be judged through the sparsest opening and the latest completion in
+the game.
+
+**OWNER'S CALL, and it is cheap either way.** Three shapes:
+
+- **(a) Accept it.** Swift is deliberately slower to fill and faster to move. No
+  code changes; record the asymmetry in the ruling so it stops being arithmetic.
+- **(b) Compress Swift's schedule** so it also completes at 30 — a per-class
+  token schedule rather than one shared array. Small, and it makes the array
+  class-shaped, which it currently is not.
+- **(c) A second Swift starter**, which contradicts ruling 1 and I would not.
+
+Default if nothing is said: **(a)**, because the owner already said the starter
+question did not matter much to him, and because the empty slot was ruled a
+feature. But he should know the class he plays is now the sparsest at level one.
+
+LEDGER: do not act until this is answered. The schedule is `O2 PLACEHOLDER` and
+nothing is blocked behind it.
+
 ## 2. Ability sound — the owner will make assets, so do not wait for them
 
 Owner: *"ill make assets for those sounds eventually."*
@@ -257,7 +303,217 @@ Do not build the rift interior generator. Do not build a quest system.
    arrive.
 2. **`BreakerEffectRenderer` is PUBLISHED** — see below. Name the consumers at
    its declaration and treat a public-surface change as a declared crossing.
-3. Still open: the boss phase readout coordination with FIELD's bar.
+3. **The boss phase readout needs no coordination — it is already independent.**
+   Your readout is a text status line (`PHASE %d / %d`, top centre, no bar), so
+   it carries no band ticks and no phase marks. O135's surviving branch — phase
+   marks drawn heavier and independently of the band ticks — is entirely about
+   FIELD's **world-space** bar, and FIELD decides whether that bar draws phase
+   marks at all. Nothing of yours waits on it. Say so in your report and close
+   the question.
+4. **Ability impacts: prove the routing mechanically, leave the judgement to the
+   owner.** `OnHitDealt.Broadcast` has exactly one site and your HUD binds it at
+   `BreakerPlaytestHUD.cpp:1860`, so the routing is verified without a playtest.
+   What a playtest is still owed for is whether the cue *reads* as an ability
+   impact rather than a bullet — and that is the owner's ear, not an inference
+   either of us can discharge. Split the claim: routing PROVEN, audibility
+   INFERRED, character UNHEARD.
+
+---
+
+# PART THREE-B — ANSWERS TO LANE QUESTIONS
+
+## The reports convention is RATIFIED
+
+`Docs/reports/<LANE>.md` emerged from the lanes rather than from here — LEDGER
+made one, FIELD found it after choosing differently and **moved to theirs
+because it got there first**, KIT followed. That is the two-owners-one-question
+failure being avoided by a lane at its own expense, and it is the right call.
+
+**Ratified, with the flow named so it does not drift:**
+
+- A lane asks in `Docs/reports/<LANE>.md`. Open questions only; delete an
+  answered one, git holds it. Findings and status stay in session reports.
+- **The seat answers here, in ORDERS.** One direction each way. Do not answer
+  your own question in your own file, and do not ask in ORDERS.
+- GLASS and GROUND: use the same file name and the same contract. Do not invent
+  a variant.
+
+## LEDGER — the enhanced-dash node (`Docs/reports/LEDGER.md`)
+
+**Swift node, not Core: agreed**, for the reason given. A Core node hands it to
+five classes and it is Swift's free verb.
+
+**The cooldown reading: pushed back, and check this before defaulting to it.**
+You wrote that charges, distance and i-frames each need plumbing that does not
+exist. True of charges and i-frames — no property, no target. **Not true of
+distance.** `BreakerCharacterMovementComponent.h:240` already ships
+`DashSpeedBonus`, `EditAnywhere` and `BlueprintReadWrite`, alongside
+`DashSpeedFloor` and `DashVerticalFloor`. What is missing is only a node stat
+target and the read — one enum entry and one aggregation wire, not a plumbing
+project.
+
+That distinction decides the feel. **A cooldown shave is invisible until the
+player spams; distance is felt on the first dash.** For a level-one always-on
+passive on the movement class — the first thing the owner will feel when he
+plays the vertical slice — felt-immediately is worth more than felt-eventually.
+
+Report what wiring a dash-distance target would actually cost before authoring
+the cooldown reading. If it is genuinely more than one entry and one wire, the
+cooldown reading stands and this is closed.
+
+**The seeded free rank: ruled, node form, and there is a third property you did
+not name.**
+
+Take the node form rather than a class base stat — visible on the board, and it
+can carry higher ranks to buy later, which a base stat cannot. Rank 1 seeded at
+`ChoosePermanentClassById`, cost 0. Your two properties are right: a respec must
+not refund what was never paid, and the board draws it owned-and-unrefundable.
+
+The third: **a free rank every Swift has enters the power-band fixture.** It is
+not neutral to the measurement — it is content, and ruling 5 just said content
+rises to meet the 8–10× band. The precedent is O95, where one node's
+unconditional line moved at-cap 6.53 → 6.79 and parity 0.647 → 0.622 on a single
+edit. So re-measure at-cap and parity after it lands and report both, rather than
+assuming a free rank costs the fixture nothing.
+
+## GROUND — the yard report, answered (`Docs/reports/GROUND.md`)
+
+Every load-bearing claim in that report checks out. `FullHalfExtentCm` is 150
+against a `DashCorridorWidthCm` of 1600, so a legal gap between full-height
+pieces really is **1900 cm centre-to-centre** and a 19 m gate is not a gate.
+`IsComplete()` really is `bPlayerStart && bRift && bNPCContract`, three hardcoded
+flags. All ten vendored `.glb` pieces really are already spent. The sequencing
+argument is right and I am ruling in its order.
+
+### Q1 — 50–100 is a CONCURRENCY BUDGET, not a population count
+
+Your question contains two questions and they have different owners.
+
+**The engineering half is mine and it is ruled.** The 34.16 ms figure is for a
+hundred bodies *simultaneously awake, detecting and closing*. It is a ceiling on
+what may **simulate at once**, anywhere, for any reason. It is not an allocation
+to be divided among yards. Six yards at a hundred each is six hundred bodies and
+a dead frame; six yards at seventeen each is a budget spent on emptiness.
+
+So neither of your readings is right. **A yard has a population. The budget is
+what is awake.** Yards away from the player hold their enemies without paying
+full AI for them, and the ceiling applies to the awake set — which in practice is
+the player's yard plus whatever neighbours are in range.
+
+**This changes FIELD's optimisation target and both of you should read it that
+way.** The answer to "a hundred engaged costs 34 ms" may not be "make each body
+cheaper" — it may be "have forty engaged and two hundred asleep." Waking and
+sleeping is a larger lever than per-body cost and nobody has measured it.
+
+FIELD: report whether any sleep, tick-throttle or distance-LOD concept exists for
+enemies today, before the sweep. If one does, the sweep should measure awake-set
+size rather than total bodies, and those are different experiments.
+
+**The design half is the owner's and you were right that it is not a desk
+question.** How many bodies make one yard feel populated is something he decides
+standing in a yard. That is a different number from the budget and it should stop
+sharing a sentence with it.
+
+### Q2 — the yard count waits behind Q3 and Q4, on your own argument
+
+I said I would rule this against your report, and your report's answer is that
+the composer cannot express it yet. Ruling a shape the grammar cannot validate
+would be authoring against plumbing that does not exist, which is the rule I hold
+other lanes to.
+
+**Direction, so you are not blocked, and it is overturnable by the owner once he
+walks one: five yards.** Four reads as a corridor with a bulge; six is one more
+than the current kit vocabulary can make distinct. Five gives a hub, two
+branches, and a far end — enough for a route to feel chosen rather than
+followed. Sizes stay near the current yard until one has been walked.
+
+### Q3 — RULED: a connection is a distinct kind of space
+
+Your recommendation, adopted. The field rules are correct about an open combat
+field and have no concept of a room boundary; a junction is a narrowing, and a
+narrowing is what they exist to forbid.
+
+**Connections are exempt from the field grammar and get their own**, which asks
+about length and sightline rather than cover pitch. **`IsLayoutLegal` moves from
+per-zone to per-yard.** A zone becomes legal when every yard is legal and every
+connection satisfies the connection rule — two rules, two kinds of space, neither
+pretending to be the other.
+
+Report the connection rule's own terms before authoring numbers for it.
+
+### Q4 — RULED: markers become a list, and it is first in the chain
+
+Yes, and your shape is right: keyed by role with a yard tag, `IsComplete`
+becoming *"one player start, and every yard that declares a door has one."*
+
+Three hardcoded sites — the struct, `breaker_import_fernhall.py`, and the
+piece-count test. Fix all three in one commit and run `Scripts/shapecheck.py` on
+it; three copies of one assumption is the shape that script exists for.
+
+### Q5 — OWNER'S CALL: more kit assets
+
+Ten pieces, all ten spent, no unused vocabulary. Six yards that look like six
+places needs more than layout can supply.
+
+This is a download and it needs the owner's say-so, like the fonts. **Owner: yes
+or no on pulling additional Kenney CC0 kits.** It changes whether yard growth is
+authoring or authoring plus an import session, and GROUND is right that it should
+be decided before authoring rather than discovered during it.
+
+### Q6 — RULED: yes, land the door now
+
+Against the existing `marker_rift`, gym as interior, and move it to the marker
+list when that lands. Your reasoning is right: the marker-list change gates yard
+*growth*, not one door. Proceed as you proposed.
+
+### Q7 — Not yours this cycle. Described, not assigned
+
+You read it correctly. Part Two describes the First Contract because it is part
+of the shape; Part Three did not assign it because your cycle is already the
+marker chain, the grammar split and the door.
+
+It **will** be GROUND's — `Interaction/` is yours and an NPC giving and paying a
+task is that directory's job. It is assigned when the yard shape is ruled, not
+before, because a contract authored against one yard will be re-authored against
+five.
+
+### The second O120 — LEDGER's, and you were right not to touch it
+
+Reward composition is progression subject matter, so the renumber is LEDGER's.
+Your analysis stands and saves them the work: the reward ruling has no citations
+anywhere, the loading one is cited from three files, so the reward ruling is the
+one that moves. **LEDGER: take the next free number, leave O120 to the loading
+ruling, and grep `Docs/` and `Source/` before calling it done.**
+
+### Your two FIELD questions, routed with my view
+
+**The probe's missing half.** You are right that `engaged` measures convergence
+and attack, not a full fight, and that hit reactions, damage numbers, flashes and
+death effects are the expensive half. **FIELD decides.** My view: the sweep is
+still worth running without it — a slope on convergence-and-attack is a real
+number and it is the one that exists today — but it must be **labelled as half a
+fight** in the report, or it becomes the next "affordable at 100."
+
+**`DetectionRange`.** Leave it as it is. You produced engagement with geometry
+and touched no file you do not own, which is the right instinct, and the cost —
+patrol and engaged not being one-variable comparable *with each other* — is
+smaller than it sounds, because the comparison that matters is within a mode.
+Opening a header across a lane boundary to buy one variable is a bad trade.
+
+---
+
+## FIELD — the sweep is still the priority
+
+`19bd7f9` is good housekeeping and the convention move was the right instinct.
+But ORDERS Part Three puts the **sweep first** — engaged at N = 25 / 50 / 75 /
+100 — and a documentation cycle is not it. Density is a ruled requirement now,
+the target is not moving, and every optimisation before the intercept exists is
+unmeasured. Do that next.
+
+Your four questions are read and the terminal-hue one has a third answer you did
+not list: **the lerp form** measured in the last review — lerp toward the
+authored row rather than adding an offset, which puts every family on the
+authored terminus by construction and clips nothing. Weigh it against your three.
 
 ---
 
@@ -276,9 +532,22 @@ Published paths today:
 
 ```
   UI/BreakerEffectRenderer.*      GLASS  ->  KIT, FIELD, GROUND
-  UI/BreakerEffectMath.h          GLASS  ->  KIT, FIELD, GROUND
+  UI/BreakerEffectMath.h          GLASS  ->  KIT, FIELD          (not GROUND)
   Attributes/BreakerHealthBands.h LEDGER ->  FIELD, GLASS
 ```
+
+CORRECTED 2026-08-26, on GLASS asking the right question. The middle row
+originally listed GROUND, and it was wrong: I measured the renderer's callers
+and then transcribed that list onto the header beside it instead of measuring
+it. GROUND uses the renderer and does not touch the math header. One line,
+copied rather than checked, in the document that exists to stop exactly that.
+
+HOW THIS TABLE IS DERIVED, so the next reader can redo it rather than trust it:
+`grep -rl <name> Source/RiorsEdge` for each published header, minus the owning
+lane's own directories. **`Tests/` is never a consumer** — every lane writes its
+own tests, so a test that uses a published path belongs to whichever lane wrote
+it and adds no obligation. Re-measure before relying on a row; a stale list
+licenses a change that silently breaks an unlisted caller.
 
 The `EnemyBlips` producer/consumer contract between FIELD's TU and GLASS's
 minimap is the same shape wearing a member variable instead of an API, and O155
