@@ -82,11 +82,12 @@ void ABreakerSoundDirector::BeginPlay()
     const int32 KillRate = LoadOrSynth(TEXT("kill_confirm.wav"), &BreakerSound::RenderKill, KillPcm);
     const int32 TakeHitRate = LoadOrSynth(TEXT("take_hit.wav"), &BreakerSound::RenderTakeHit, TakeHitPcm);
 
-    // The ability DEFAULT loads here with the other four. Per-ability
-    // overrides do NOT: there are twenty-five abilities, the owner has authored
-    // none of them yet, and opening twenty-five files that are expected to be
-    // missing at every level load is a cost paid for nothing. They resolve on
-    // first cast instead.
+    // The ability DEFAULT loads here with the other four. Per-ability overrides
+    // do NOT: there are THIRTY-FIVE abilities — seven per class across five —
+    // the owner has authored none of them yet, and opening thirty-five files
+    // that are expected to be missing at every level load is a cost paid for
+    // nothing. They resolve on first cast instead. Nothing here is sized to
+    // that count: resolution is per-id and lazy, so the number is prose.
     const int32 AbilityRate = LoadOrSynth(TEXT("ability_cast.wav"), &BreakerSound::RenderAbilityCast, AbilityDefaultPcm);
 
     FireWave = MakeWave(FireRate);

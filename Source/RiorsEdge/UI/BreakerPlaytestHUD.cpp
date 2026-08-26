@@ -1738,8 +1738,17 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         if (Projected.Z <= 0.0f) continue;
         // Rift-teal, because travel is the rift verb — the one text colour the
         // reserve permits, on the one label describing a rift object.
+        //
+        // THE GETTER, NOT A LITERAL. This line printed TEXT("TRAVEL") while the
+        // prompt directly beneath it called GetPromptLabel(), so the rift door —
+        // the first new interactable in the world, whose label is "Enter Rift" —
+        // said TRAVEL over F ENTER RIFT: two verbs, stacked, one of them wrong.
+        // Found by GROUND's capture, not by the suite, because automation cannot
+        // read a label. A hardcoded verb sitting beside a getter that already
+        // returns the right answer is the shape; the other interactable sites
+        // were checked for it and do not have it (see the report).
         const float GateScale = DistanceScaleFor(Distance);
-        DrawSpecTextCentered(TEXT("TRAVEL"),
+        DrawSpecTextCentered(TravelPoint->GetPromptLabel().ToString().ToUpper(),
             Projected.X, Projected.Y, BreakerUI::TealAnomalous, 13.0f * GateScale);
         // GetPromptLabel finally gets its caller (ruled: a dead API that
         // already knew the answer). Same always-drawn verb rule as the NPCs.
