@@ -457,6 +457,208 @@ convertible to cooldown in one commit. `COST 0` making the no-refund property
 
 ---
 
+# PART ONE-E — THE PLAYER STARTS IN THE ANCHOR. THE GYM IS TEST-ONLY
+
+Owner, 2026-08-26: *"i dont really want to go into the gym aside from for testing
+the player should spawn in the anchor and move from there honestly."*
+
+**RULED.** The gym leaves the play loop. It stays a test bench, reachable
+deliberately, never arrived at.
+
+## Why he keeps landing there, which is not his fault
+
+Two defaults both lead to the gym, and one of them is invisible.
+
+`EditorStartupMap = /Game/FirstPerson/Lvl_FirstPerson` — the old template map.
+`IsGymMapName` returns true for **anything that is not FrontEnd, Anchor or
+Fernhall**, so the template map builds the full gym. Play In Editor therefore
+lands in the gym by way of a map nobody named. That fall-through is load-bearing
+by design (`BreakerGameInstance.cpp:54` says so) and it is why the loop has
+always "worked in PIE".
+
+And `-BreakerAutoPlay` is documented as dropping *"straight into the gym"*.
+
+**`DefaultEngine.ini` already named the condition for changing this**, at the
+comment above the line: *"it should be a decision with a playtest behind it, not
+a config cleanup."* There is now a playtest behind it. The condition the file set
+is met, which is the honest reason this is a ruling rather than a tidy-up.
+
+## What changes
+
+- **`EditorStartupMap` points at `Lvl_Anchor`.** PIE starts in the hub.
+- **`-BreakerAutoPlay` lands in the Anchor**, not the gym. Its purpose — skip the
+  title menu so a smoke run exercises real systems — is unchanged; the map it
+  exercises changes.
+- **The gym keeps a deliberate entrance and loses its accidental one.** It stays
+  in the travel registry (it is how you get *out* of it) and keeps whatever
+  explicit flag testing wants. Nothing should ARRIVE there without asking.
+
+GROUND owns the game-mode branch and the config. **Report before changing PIE's
+map**: the file warns this is "an untested change to the only loop anyone
+playtests in", and that warning survives the ruling — what changes is that the
+change is now wanted, not that it is free. Say what breaks.
+
+## And it collides with the rift placeholder — deliberately raised, not ruled
+
+**If the player should not be in the gym, then a rift whose interior IS the gym
+puts them there during normal play.** That placeholder was ruled when the gym was
+still where everyone lived. It is now the one remaining path that arrives at a
+test bench, and it arrives at the most fiction-breaking moment available: you
+step through a tear in the world and land in a room with target dummies and a
+safe pad.
+
+The seat's proposal, for GROUND to cost and the owner to overturn:
+
+**Make the rift interior an instance of the YARD'S geometry, populated.**
+
+- The yard exists, has a validated cover grammar, and currently spawns **zero
+  enemies**. The wave system exists and is unused there.
+- Same tileset, different instance, is what an instanced rift *is* — it is how
+  the games this is shaped after do it, and reusing authored space is the whole
+  reason a tileset is worth building.
+- It kills two things at once: the gym leaves the loop entirely, and Fernhall
+  gets something to fight in it — which is also the only way the density work
+  gets exercised anywhere real.
+- Entering the yard's geometry *from* the yard is not odd once it is an instance.
+  It is the same ground, a different run.
+
+This is not ruled. **GROUND: cost it against "leave the gym as interior until a
+real room exists" and report both.** If the instance route is more than a cycle,
+the placeholder stands and the collision is recorded rather than fixed — a known
+contradiction is cheaper than a rushed room.
+
+---
+
+# PART ONE-F — THE BAR PROBE CORRECTS THE SEAT, TWICE
+
+`d10a023`. Part One-B told FIELD to photograph the bar before touching it.
+Nothing in the project could take that frame, so FIELD built the probe — four
+rank rows by five health columns at 12 m and 35 m, ticks frozen so the tableau
+does not drift, F3 suppressed because the overlay is not the shipping read.
+
+**Both of the seat's readings of the owner's screenshot were wrong.** Each was a
+plausible inference from a still, and each named the wrong cause.
+
+## 1. The label collision is NOT the bar's — A9 was never the fix
+
+`bDiagnosticsVisible` defaults on, and the F3 overlay draws a **second enemy-label
+pass** at `BreakerPlaytestHUD.cpp:693`: every enemy within 25 m,
+`GetEnemyStateLabel` in orange, **no focus gate, no occlusion suppression, no
+cap**. PATROL printed fifteen times over twenty bodies. Verified — the loop is
+there, ungated, and a dummy pass sits above it.
+
+The seat read the collision as bar labels and promoted A9 to the top of FIELD's
+queue on that basis. **A9 disciplined the bar TU's label block; the collision is
+in a different drawer entirely.** A9 remains worth doing at density; it was never
+the answer to what the owner saw.
+
+**The fix is GLASS's** — `UI/` — and the root question is not the labels but the
+default: a debug overlay that ships visible is a debug overlay that is not a
+debug overlay. FIELD reports `Playtest/` as unassigned; ORDERS assigns it to
+GROUND, so whichever of you reads this first, say which is right rather than
+both assuming.
+
+## 2. "Every bar reads as one flat red stripe" is bar WIDTH, not rank or bands
+
+`HudEnemyBarWidth` is a fixed 180 px scaled only by a 1.0 → 0.55 lerp across the
+whole 50 m, so the bar is **very nearly distance-invariant while the body shrinks
+with 1/d**:
+
+```
+  12 m   167 px bar   against a ~72 px silhouette   2.3x
+  35 m   126 px bar   against a ~25 px silhouette   5.0x
+```
+
+Adjacent bars butt together into continuous horizontal stripes. **Rank and
+segmentation both draw correctly** — the seat guessed a stale build or bands not
+reading at range, and it was neither. The bar is simply too wide for the thing it
+describes, and gets worse with distance because it barely shrinks.
+
+It is in FIELD's own TU and FIELD has it next. That is the right order: it is the
+cause, A9 is a symptom at density, and the glyphs are a separate gap.
+
+## 3. O129's ramp READS, and that closes a question
+
+Left to right the bodies run grey-violet to red-maroon and the health axis is
+legible at 12 m without reference. **The delta form survives contact with a
+frame**, which no swatch measurement could establish and two rounds of dE76
+argument did not settle.
+
+The terminal-hue question stays open on its own terms — a Boss dying magenta is
+still a look question — but the ramp itself is answered and should stop being
+re-litigated.
+
+## The rule this vindicates
+
+*Capture wins over the swatch* was written for the lanes. It just won against the
+seat, twice, in one commit — and both wrong readings were confident inferences
+from a screenshot the seat could not have read correctly, because the information
+needed was not in it. **A still frame of a live system is evidence about the
+frame, not about the system.**
+
+---
+
+# PART ONE-G — PARITY HALVED, AND THE PIN THAT SHOULD HAVE SAID SO IS STALE
+
+**The recon was right and the seat was wrong to hedge it.** Told that parity is
+0.27 against a pinned 0.647, the seat suggested the two might measure different
+things. They do not. From the tree as it stands:
+
+```
+  the pin's own PROSE       "parity measures 0.641x at the cap ... 0.38x at endgame"
+  STATE.md, freshly run     at cap 0.27  **OUT**      endgame 0.2
+```
+
+**Same measurement. Parity fell from 0.641 to 0.27 at the cap, and 0.38 to 0.2 at
+endgame.** More than half, and against a ruled band of 0.85–1.15 it was already
+failing at the higher figure.
+
+## The reason nobody caught it is a defect in the instrument layer
+
+The pin's **measurement** is live and its **explanation** is frozen. `status.py`
+recomputes 0.27 and flags OUT every run — that part works. But the narrative
+inside the pin still tells the story of 0.641, and the narrative is what a reader
+uses to decide whether a number matters. Anyone who opened that pin for context
+got a confident account of a state that no longer holds.
+
+**A pin whose number updates and whose reason does not is worse than no pin**,
+because it launders a stale conclusion through a fresh measurement. It is the
+same shape this project keeps finding — a justification outliving its cause —
+sitting inside the instrument built to find that shape.
+
+**LEDGER owns this pin. Two things:** rewrite the narrative to the measurement it
+now carries, and say in the pin how a reader can tell prose from figure next time.
+
+## What halved it is findable and should be found before anything else in this area
+
+Between the pin's 0.641 and today's 0.27 lies about a week of commits. That is a
+bisect, not an investigation. **LEDGER: find the edit and report it before
+proposing any parity work.** A remedy authored against an unknown cause is how
+0.27 becomes 0.15.
+
+Note what it is NOT: `51b35cc` landed Collapse and re-measured parity as
+**0.268 UNCHANGED**, so the hit-time More neither caused nor fixed this.
+
+## And the seat's prediction was wrong, measured
+
+Part One-D predicted parity would improve when Collapse moved. It did not, and
+LEDGER's explanation is the right one: the power-band fixtures run 65-point
+budgets and cannot afford Collapse's chain, so the fixture never buys the thing
+that changed.
+
+The ruling's benefit is real and sits where the ruling put it — a build that buys
+Collapse now gets a full ×1.30 on its ability lane where the weapon-lane shape
+gave it nothing there. But the metric could not have moved, and the seat should
+have known that before predicting it.
+
+**The shape, named:** *predicting a measurement will move without checking
+whether that measurement's fixture exercises the change.* It is the mirror of an
+instrument whose scope is narrower than its name — here the scope was narrower
+than the prediction. Before any lane predicts a pinned number will move, check
+that the fixture reaches the edit.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
@@ -1043,6 +1245,77 @@ it; it is in GLASS's list below.
    either; your refusal to add a sixth verb on inference was correct.
 3. **Enemy telegraph audio** stays held until FIELD's sweep exists — it is
    density-coupled and would otherwise be authored twice.
+
+---
+
+# PART THREE-E — THE LOOP HAS NO ENDING
+
+A recon found it and the seat verified it: **there is no close-rift verb.** Six
+naming patterns across the whole module, nothing. Entry works — the door hands a
+real `FBreakerRiftDefinition` across travel. Killing works — waves, budget
+solver, elite modifiers, a boss at wave 12, per-kill drops. **Closing does not
+exist**: no completion state, no run terminator, no payout for finishing. You
+walk in, fight escalating waves, and leave by the door you came through.
+
+All reward is per-kill. There is no moment where a run RESOLVES, which is the
+difference between a shooting range and a run.
+
+**This is queued, not preempting.** Every lane finishes its current item first —
+the owner's call. But it goes in the queue above everything that comes after,
+because items like parity, variance and content depth are all *"the loop does not
+survive repetition"* — and a loop with no ending is not repeated, so tuning it is
+tuning a shooting range.
+
+## It is three lanes and the seam matters
+
+- **GROUND** owns the completion state and the run terminator hook: what "this
+  rift is closed" IS, where it is stored, and what ends the run. `Game/`.
+- **FIELD** owns whatever holds the rift open — the thing that dies. An enemy,
+  a rank, a behaviour. `Combat/`.
+- **LEDGER** owns the payout: what a resolved run pays that a kill does not.
+  `Items/`, drop tables.
+
+**Report the seam before any of you build.** Specifically: does the terminator's
+death write the completion state directly, or raise something GROUND consumes?
+That is the header-rule question again and it decides whether this is one commit
+across three lanes or three commits with two interfaces.
+
+## Two cautions from the recon's own numbers
+
+The finding is right. Some of its evidence is not, and the same care applies to
+whatever measures this work.
+
+**Parity 0.27 contradicts a pinned 0.647 → 0.622**, and `status.py` cannot emit
+the live figure ("needs `PowerBand.AbilityLane` to emit it"). Either parity
+collapsed and the cause is findable in a week of commits, or the two figures
+measure different things and the "worse than four days ago" comparison is
+invalid. **Resolve which before anyone acts on it.**
+
+**Two cited symptoms are pinned and passing.** Silent nodes 43 of 446 against a
+ceiling of 54 — ok. Node tags with no consumer 140 of 206 — ok, a ratio already
+ruled acceptable. Citing passing measurements as evidence is how a true
+conclusion gets an unsound argument.
+
+**And it omits one of only two live OUT flags.** `Offered-to-spendable ratio,
+2.25 worst tree against a floor of 3.0` is failing right now and is squarely the
+"builds do not diverge" case the recon was making. It argued without its best
+evidence.
+
+## Fernhall is NOT the gym, and it is empty
+
+Recorded because it has caused confusion twice. The Fernhall branch returns
+before the gym build — verified — so the yard gets **no dummies, no waves, no
+safe pad, no elite arena**. It is a walled yard with a cover lattice, a rift
+door, a travel gate and an NPC marker.
+
+**It also spawns zero enemies.** Nothing to fight is authored there at all. What
+IS the gym is the **rift interior** — walking through Fernhall's door lands you
+in the gym, which is the ruled placeholder.
+
+So walking Fernhall today is walking an empty lot with a door in it. That is
+worth knowing before it is judged: it answers "does the pad read as somewhere to
+go" and "does the lattice change how I move", and it cannot yet answer anything
+about a fight.
 
 ---
 
