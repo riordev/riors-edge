@@ -47,14 +47,18 @@ bool FBreakerForgeRespecTest::RunTest(const FString& Parameters)
     FBreakerProgressionState Initial;
     Initial.PermanentClass = EBreakerClassId::Swift;
     Initial.UnspentClassPoints = 3;
-    Initial.DoctrineNodeRanks.Add({TEXT("KineticEntry"), 2});
+    // A REAL doctrine node (MaxRank 2), because a hand-made id no longer
+    // survives a load: the drop-and-credit sweep (Part One-U item 20) treats
+    // any unresolvable id as removed content and converts it to points,
+    // which is the ruled behaviour and not what this test is about.
+    Initial.DoctrineNodeRanks.Add({TEXT("Swift.Kinetic.ReadTheRoom"), 2});
     Progression->LoadProgressionState(Initial);
 
     FText Failure;
     TestFalse(TEXT("Respec away from Forge is rejected"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, false, Failure));
-    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 2);
+    TestEqual(TEXT("Rejected respec preserves allocation"), Progression->GetNodeRank(TEXT("Swift.Kinetic.ReadTheRoom"), EBreakerPointCurrency::DoctrinePoints), 2);
     TestTrue(TEXT("Respec at Forge succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
-    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("KineticEntry"), EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("Forge respec clears allocation"), Progression->GetNodeRank(TEXT("Swift.Kinetic.ReadTheRoom"), EBreakerPointCurrency::DoctrinePoints), 0);
     // O111: A DOCTRINE RESPEC REFUNDS, AND IT USED TO ZERO. Zeroing was right
     // while the pool arrived whole at commitment -- the points belonged to the
     // commitment being cleared. They are earned at four benchmarks now, so

@@ -332,6 +332,17 @@ private:
     // (whose clear would otherwise take a grant a refund never paid for).
     void SeedGrantedNodes();
 
+    // Ruled in the blocked-questions pass (Part One-U item 20, ahead of any
+    // node deletion): a loaded rank row whose id no longer resolves is
+    // DROPPED AND CREDITED to its currency's wallet at the same fallback
+    // cost the spent recompute charges (1 per rank) — exactly undoing what
+    // that charge took. Before this, a removed node silently taxed every
+    // save that had bought it, permanently: charged at fallback, granted
+    // nothing, invisible. Load-time only, loud per row, and skipped (loudly)
+    // when no class definition is resolvable — a sweep that cannot resolve
+    // anything must not read "wipe everything to the wallet".
+    void DropUnknownRanksAndCredit();
+
     UPROPERTY(VisibleInstanceOnly, Category="Progression") FBreakerProgressionState State;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
 

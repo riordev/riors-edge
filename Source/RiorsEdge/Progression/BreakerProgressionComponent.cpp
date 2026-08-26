@@ -95,6 +95,39 @@ void UBreakerProgressionComponent::BindAttributes(UBreakerAttributeSet* InAttrib
 
 const FName UBreakerProgressionComponent::SwiftGrantedDashNodeId(TEXT("Swift.Kinetic.Longstride"));
 
+void UBreakerProgressionComponent::DropUnknownRanksAndCredit()
+{
+    // See the declaration. The sweep resolves through the same
+    // FindOwnedNodeDefinition the spent recompute uses, so the two can never
+    // disagree about what "unknown" means.
+    if (!ClassDefinition)
+    {
+        const bool bAnyRanks = State.CoreNodeRanks.Num() > 0 || State.DoctrineNodeRanks.Num() > 0;
+        if (bAnyRanks)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] unknown-rank sweep skipped: no class definition resolvable, so nothing can be told apart from everything."));
+        }
+        return;
+    }
+    for (const EBreakerPointCurrency Currency : { EBreakerPointCurrency::CorePoints, EBreakerPointCurrency::DoctrinePoints })
+    {
+        TArray<FBreakerNodeRank>& Ranks = RanksFor(Currency);
+        for (int32 Index = Ranks.Num() - 1; Index >= 0; --Index)
+        {
+            const FBreakerNodeRank& Rank = Ranks[Index];
+            if (Rank.Rank <= 0 || FindOwnedNodeDefinition(Rank.NodeId, Currency)) continue;
+            // Fallback cost 1 per rank — the exact figure the recompute
+            // would have charged for this row, credited instead of taken.
+            const int32 Credit = Rank.Rank;
+            WalletFor(Currency) += Credit;
+            UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] '%s' (x%d, %s) no longer resolves: row dropped, %d point(s) credited (Part One-U item 20 — a removed node must not tax the save that bought it)."),
+                *Rank.NodeId.ToString(), Rank.Rank,
+                Currency == EBreakerPointCurrency::CorePoints ? TEXT("Core") : TEXT("Doctrine"), Credit);
+            Ranks.RemoveAt(Index);
+        }
+    }
+}
+
 void UBreakerProgressionComponent::SeedGrantedNodes()
 {
     // See the declaration. Swift-only today; a second class earning a granted
@@ -553,6 +586,11 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
         if (ClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StarterAbilityIds[1];
         State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
+    // The unknown-rank sweep runs after the definition refetch (it needs a
+    // resolver) and before the seed and the spent rebuild, so the totals are
+    // built from rows that all resolve and the credit lands before anything
+    // reads the wallet.
+    DropUnknownRanksAndCredit();
     // A migrated or roster-written Swift save carries no granted rank; a
     // save that has one is left untouched. Before the spent rebuild so the
     // totals see the final ranks (the granted rank is cost 0 either way).

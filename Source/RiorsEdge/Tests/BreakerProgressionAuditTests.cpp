@@ -385,16 +385,24 @@ bool FBreakerSpentPointsPerfTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Doctrine respec succeeds"), Progression->RespecAtForge(EBreakerPointCurrency::DoctrinePoints, true, Failure));
     TestEqual(TEXT("Both running totals are zero after both respecs"), Progression->GetSpentPoints(), 0.0f, 0.0001f);
 
-    // A LOADED state carrying a stale/unknown node id: the running total is
-    // rebuilt from scratch (RecomputeSpentPointsFromState), using the same
-    // fallback-cost-1 rule GetRefundValue always used for content that no
-    // longer resolves.
+    // A LOADED state carrying a stale/unknown node id: RULED in the
+    // blocked-questions pass (Part One-U item 20) — the row is DROPPED AND
+    // CREDITED at the fallback cost the recompute would have charged, so a
+    // removed node can never silently tax the save that bought it. This
+    // assertion used to RECORD the tax (spent 4.0, the unknown row charged
+    // 1 x 3 and granted nothing, forever); it now pins the repair, ahead of
+    // the first real deletion.
     FBreakerProgressionState Loaded;
     Loaded.PermanentClass = EBreakerClassId::Swift;
     Loaded.CoreNodeRanks.Add({TEXT("Core.Precision.Sightline"), 1});    // real, cost 1
-    Loaded.DoctrineNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown, fallback cost 1 x 3
+    Loaded.DoctrineNodeRanks.Add({TEXT("Some.Removed.Node"), 3});          // unknown: dropped, +3 credited
+    const int32 DoctrineWalletBefore = Loaded.UnspentDoctrinePoints;
     Progression->LoadProgressionState(Loaded);
-    TestEqual(TEXT("A freshly loaded state recomputes both totals correctly"), Progression->GetSpentPoints(), 4.0f, 0.0001f);
+    TestEqual(TEXT("the resolving row alone is charged"), Progression->GetSpentPoints(), 1.0f, 0.0001f);
+    TestEqual(TEXT("the unknown row is gone from the loaded state"),
+        Progression->GetNodeRank(TEXT("Some.Removed.Node"), EBreakerPointCurrency::DoctrinePoints), 0);
+    TestEqual(TEXT("its ranks came back as doctrine points, at the fallback cost"),
+        Progression->GetUnspentPoints(EBreakerPointCurrency::DoctrinePoints), DoctrineWalletBefore + 3);
     return true;
 }
 
