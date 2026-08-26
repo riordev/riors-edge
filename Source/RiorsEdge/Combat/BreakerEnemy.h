@@ -80,6 +80,18 @@ public:
     // Fires ONCE, on a true death, only when this body is marked. Never on a
     // Wakeful down (that is not a death), never on a pooled park, and never on
     // a body whose mark was cleared by reuse.
+    //
+    // WHY THE MARK GUARD IS LOAD-BEARING AND NOT AN OPTIMISATION. GROUND marks
+    // and BINDS in one act, which is only safe because this raise is
+    // mark-guarded: an unconditional raise would force binding every enemy in
+    // the world, and ReviveFromPool clearing the mark AND the bindings would
+    // stop being tidiness and become the only thing preventing a pooled body,
+    // reused in a later wave, from completing a rift the player already left.
+    // Two lanes' invariants compose here. If either side changes — this guard
+    // going away, or the pool reuse stopping clearing — the other lane breaks
+    // silently and pays out for it. VERIFIED IN PLAY: mark, kill, and the
+    // completion broadcasts; mark and kill a second body and it is refused,
+    // one completion one broadcast (Breaker.Field.VerifyRiftChain 2).
     FBreakerRiftTerminatorDefeated OnRiftTerminatorDefeated;
 
     // DEV INSTRUMENT ONLY, and the narrowest thing that unblocks the capture.

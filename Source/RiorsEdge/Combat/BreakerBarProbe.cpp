@@ -344,16 +344,42 @@ namespace
     // enemy (the bar probe supplies them), marks, then kills on a LATER tick —
     // the mark must be committed before the damage lands or the kill arrives at
     // an unmarked body and the whole run silently proves nothing.
-    void BreakerFieldVerifyRiftChain()
+    // ARMED ONCE AT A TIME, AND IT SAYS SO. GROUND invoked this twice in one
+    // -ExecCmds to try to prove the one-completion latch in play and got NO
+    // chain lines at all — not "the second did not run", nothing from either.
+    // A verification instrument that silently does nothing is worse than no
+    // instrument, which is a lesson this lane has now learned three times, so
+    // the second arm is REFUSED OUT LOUD rather than left to be discovered.
+    //
+    // And the repeat it was reaching for is a parameter rather than a second
+    // invocation: `Breaker.Field.VerifyRiftChain 2` marks and kills twice, a
+    // tick apart, which is what actually exercises GROUND's latch — the second
+    // completion must be refused because the run is already complete.
+    bool GBreakerFieldChainArmed = false;
+
+    void BreakerFieldVerifyRiftChain(int32 Repeats)
     {
+        if (GBreakerFieldChainArmed)
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("[BreakerField] rift-chain check is already armed; refusing a second arm. ")
+                TEXT("Pass a repeat count instead: Breaker.Field.VerifyRiftChain 2"));
+            return;
+        }
+        GBreakerFieldChainArmed = true;
+
         TSharedPtr<int32> Stage = MakeShared<int32>(0);
         TSharedPtr<int32> Attempt = MakeShared<int32>(0);
+        TSharedPtr<int32> Remaining = MakeShared<int32>(FMath::Max(1, Repeats));
+        TSharedPtr<int32> Passes = MakeShared<int32>(0);
+        const int32 Total = FMath::Max(1, Repeats);
         FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
-            [Stage, Attempt](float) -> bool
+            [Stage, Attempt, Remaining, Passes, Total](float) -> bool
             {
                 if ((*Attempt)++ > BreakerBarProbeMaxAttempts)
                 {
                     UE_LOG(LogTemp, Warning, TEXT("[BreakerField] rift-chain check gave up waiting for a live enemy."));
+                    GBreakerFieldChainArmed = false;
                     return false;
                 }
                 UWorld* World = BreakerBarProbeCurrentWorld();
@@ -366,27 +392,60 @@ namespace
                     {
                         if (*It && !It->IsDeadEnemy()) { bHasLiveEnemy = true; break; }
                     }
-                    if (!bHasLiveEnemy) return true;
+                    if (!bHasLiveEnemy)
+                    {
+                        // WAIT before the first pass, STOP after one. The world
+                        // is empty for the first few seconds — the gym is still
+                        // building — so giving up here on pass one is giving up
+                        // before the subject exists, which is what the first
+                        // version of this did and it reported the stop as
+                        // though it were a result. After a pass has run,
+                        // running out of bodies is a real end.
+                        if (*Passes == 0) return true;
+                        UE_LOG(LogTemp, Warning,
+                            TEXT("[BreakerField] rift-chain check: %d pass(es) ran, then no live enemy left; stopping."),
+                            *Passes);
+                        GBreakerFieldChainArmed = false;
+                        return false;
+                    }
                     GEngine->Exec(World, TEXT("Breaker.MarkTerminator"));
-                    UE_LOG(LogTemp, Display, TEXT("[BreakerField] rift-chain check: marked, killing next tick."));
+                    UE_LOG(LogTemp, Display,
+                        TEXT("[BreakerField] rift-chain check pass %d of %d: marked, killing next tick."),
+                        *Passes + 1, Total);
                     *Stage = 1;
                     return true;
                 }
 
                 GEngine->Exec(World, TEXT("Breaker.Field.Damage"));
                 UE_LOG(LogTemp, Display,
-                    TEXT("[BreakerField] rift-chain check: kill issued. A [Rift] line below is the seam firing — ")
-                    TEXT("'run complete' if a rift is set, 'completion refused' if none is, and EITHER proves ")
-                    TEXT("the raise reached the consume site."));
+                    TEXT("[BreakerField] rift-chain check pass %d of %d: kill issued. A [Rift] line is the seam firing — ")
+                    TEXT("'run complete' if a rift is set, 'completion refused' if none is or if the run is ")
+                    TEXT("ALREADY complete, and every one of those proves the raise reached the consume site."),
+                    *Passes + 1, Total);
+                ++(*Passes);
+                if (--(*Remaining) > 0)
+                {
+                    // A SECOND PASS IS THE LATCH TEST: the raise fires again,
+                    // the consume site runs again, and the completion must be
+                    // REFUSED because one run pays once. A second "run
+                    // complete" here would be the defect.
+                    *Stage = 0;
+                    return true;
+                }
+                GBreakerFieldChainArmed = false;
                 return false;
             }), BreakerBarProbeRetrySeconds);
     }
 
-    FAutoConsoleCommandWithWorld GBreakerFieldVerifyRiftChainCommand(
+    FAutoConsoleCommandWithWorldAndArgs GBreakerFieldVerifyRiftChainCommand(
         TEXT("Breaker.Field.VerifyRiftChain"),
-        TEXT("Marks the nearest enemy and kills it, driving O168's raise-consume-pay chain end to end."),
-        FConsoleCommandWithWorldDelegate::CreateStatic(
-            [](UWorld*) { BreakerFieldVerifyRiftChain(); }));
+        TEXT("Marks the nearest enemy and kills it, driving O168's raise-consume-pay chain end to end. ")
+        TEXT("Optional repeat count; 2 or more exercises the one-completion latch."),
+        FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(
+            [](const TArray<FString>& Args, UWorld*)
+            {
+                BreakerFieldVerifyRiftChain(Args.Num() > 0 ? FCString::Atoi(*Args[0]) : 1);
+            }));
 
     FAutoConsoleCommandWithWorld GBreakerBarProbeCommand(
         TEXT("Breaker.Field.BarProbe"),
