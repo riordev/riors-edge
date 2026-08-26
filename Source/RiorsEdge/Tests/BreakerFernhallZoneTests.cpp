@@ -405,3 +405,95 @@ bool FBreakerFernhallRegistrationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("the Fernhall destination is enabled"), Destination.bEnabled);
     return true;
 }
+
+// SPAWN CONTAINMENT, against the yard's REAL dimensions (Part One-L/One-Q).
+// The owner watched enemies spawn outside the tileset and walk in; once the
+// yard IS the rift interior, every run hits it. These prove the placement is
+// inside the field rather than merely offset from the player — which is the
+// distinction the old spawner could not make, because it had no boundary.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSpawnContainmentTest,
+    "RiorsEdge.Zone.Fernhall.SpawnContainment",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSpawnContainmentTest::RunTest(const FString& Parameters)
+{
+    const FBreakerCoverFieldParams Params = UBreakerZoneBuilder::FernhallFieldParams();
+    const float BandMin = 1500.0f;
+    const float BandMax = 4000.0f;
+    const float PackRadius = 900.0f;
+
+    // The pack must sit inside the band with its own radius to spare, from
+    // anywhere in the yard and facing anywhere. THE SWEEP IS THE TEST: the
+    // defect was intermittent precisely because it depended on position and
+    // facing, so a single sample would have passed while the yard was broken.
+    int32 Placements = 0;
+    int32 Starved = 0;
+    for (float F = Params.BandNearCm; F <= Params.BandFarCm; F += 500.0f)
+    {
+        for (float R = -Params.BandHalfWidthCm; R <= Params.BandHalfWidthCm; R += 500.0f)
+        {
+            for (int32 Degrees = 0; Degrees < 360; Degrees += 15)
+            {
+                const float Theta = FMath::DegreesToRadians(static_cast<float>(Degrees));
+                float CentreF = 0.0f;
+                float CentreR = 0.0f;
+                float Afforded = 0.0f;
+                const bool bFits = UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(
+                    Params, F, R, FMath::Cos(Theta), FMath::Sin(Theta),
+                    BandMin, BandMax, PackRadius, CentreF, CentreR, Afforded);
+                ++Placements;
+                if (!bFits) ++Starved;
+
+                // THE INVARIANT THAT MATTERS, asserted for EVERY placement
+                // including the starved ones: whatever the yard afforded, the
+                // pack is inside the field. A fallback that placed the pack
+                // outside would be the original defect wearing a log line.
+                const bool bInside =
+                    CentreF >= Params.BandNearCm + PackRadius - 1.0f
+                    && CentreF <= Params.BandFarCm - PackRadius + 1.0f
+                    && FMath::Abs(CentreR) <= Params.BandHalfWidthCm - PackRadius + 1.0f;
+                if (!bInside)
+                {
+                    AddError(FString::Printf(
+                        TEXT("pack centre (%.0f, %.0f) is outside the field from (%.0f, %.0f) facing %d deg"),
+                        CentreF, CentreR, F, R, Degrees));
+                    return false;
+                }
+            }
+        }
+    }
+
+    TestTrue(TEXT("the sweep actually placed packs"), Placements > 1000);
+
+    // I PREDICTED THIS WOULD STARVE AND IT DOES NOT. The lane's report told the
+    // seat the 100 x 50 yard was already the case where a yard cannot hold the
+    // authored band; this assertion was written expecting Starved > 0 and went
+    // red. THE PREDICTION WAS WRONG FOR A REASON WORTH KEEPING: it was true
+    // only while direction was FORCED to the player's facing, which is exactly
+    // the defect containment removes. Once a heading may rotate, a 50 m width
+    // affords a 15 m floor from everywhere in the yard — the yard was never too
+    // small, the spawner was too rigid.
+    //
+    // So this is pinned the strong way round: the shipped yard NEVER starves.
+    // It goes red if the band's floor rises past what the yard can hold or a
+    // future yard is authored smaller, which is the build-time signal the
+    // report asked for, arriving from a passing test rather than a design
+    // argument.
+    TestEqual(TEXT("the shipped yard affords the authored band from every position and facing"),
+        Starved, 0);
+
+    // The facing is HONOURED where the yard affords it: standing near the near
+    // edge looking down the long axis is the case with the most room, and the
+    // solved centre should sit ahead of the player rather than off to a side.
+    float AheadF = 0.0f;
+    float AheadR = 0.0f;
+    float AheadAfforded = 0.0f;
+    const bool bAheadFits = UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(
+        Params, Params.BandNearCm + 500.0f, 0.0f, 1.0f, 0.0f,
+        BandMin, BandMax, PackRadius, AheadF, AheadR, AheadAfforded);
+    TestTrue(TEXT("the long axis affords the band"), bAheadFits);
+    TestTrue(TEXT("and the pack lands ahead of the player, not beside them"),
+        AheadF > Params.BandNearCm + 500.0f && FMath::Abs(AheadR) < 1.0f);
+    return true;
+}

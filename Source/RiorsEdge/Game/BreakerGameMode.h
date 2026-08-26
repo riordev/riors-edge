@@ -125,6 +125,12 @@ public:
     // and cannot silently leave the band again when it is retuned.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves", meta=(ClampMin="0")) float WaveSpawnBandMinCm = 1500.0f;   // O2 PLACEHOLDER (5.2)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves", meta=(ClampMin="0")) float WaveSpawnBandMaxCm = 4000.0f;   // O2 PLACEHOLDER (5.2)
+    // How much room the PACK needs around its centre, not just the centre
+    // itself. Containment that only kept the centre inside would still put half
+    // a wave through a wall, which is the difference between "the spawn point
+    // is in the yard" and "the pack is in the yard". Sized above the widest
+    // body in the project (120 cm) plus the ring the composition spreads over.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves", meta=(ClampMin="0")) float WaveSpawnPackRadiusCm = 900.0f;   // O2 PLACEHOLDER
 
     // Minimum width of a corridor a player is expected to SPRINT down. A wall
     // at lateral distance d passing at speed v produces peak peripheral optical

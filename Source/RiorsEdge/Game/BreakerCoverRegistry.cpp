@@ -841,6 +841,160 @@ bool UBreakerCoverLayoutLibrary::IsLayoutLegal(const TArray<FBreakerCoverPiece>&
     return true;
 }
 
+float UBreakerCoverLayoutLibrary::DistanceAffordedInField(const FBreakerCoverFieldParams& Params,
+    float FromForward, float FromRight, float DirForward, float DirRight, float PackRadiusCm)
+{
+    float Enter = 0.0f;
+    float Exit = 0.0f;
+    if (!SolveFieldRayInterval(Params, FromForward, FromRight, DirForward, DirRight, PackRadiusCm, Enter, Exit))
+    {
+        return 0.0f;
+    }
+    return FMath::Max(Exit, 0.0f);
+}
+
+bool UBreakerCoverLayoutLibrary::SolveFieldRayInterval(const FBreakerCoverFieldParams& Params,
+    float FromForward, float FromRight, float DirForward, float DirRight, float PackRadiusCm,
+    float& OutEnter, float& OutExit)
+{
+    // The band, shrunk by the pack's own radius: a centre inside THIS keeps the
+    // whole pack inside the yard, which is the difference between "the spawn
+    // point is in the yard" and "the pack is in the yard".
+    const float Radius = FMath::Max(PackRadiusCm, 0.0f);
+    const float NearEdge = Params.BandNearCm + Radius;
+    const float FarEdge = Params.BandFarCm - Radius;
+    const float SideEdge = Params.BandHalfWidthCm - Radius;
+    OutEnter = 0.0f;
+    OutExit = 0.0f;
+    if (NearEdge > FarEdge || SideEdge <= 0.0f) return false;
+
+    // BOTH ENDS OF THE SLAB, and the ENTRY half is the one that matters.
+    // Clipping only the exit is wrong whenever the ray starts outside the
+    // shrunk band, which happens constantly: a player at the yard's edge is
+    // inside the wall and outside the pack's margin. The first version of this
+    // did exactly that and returned a centre short of the near edge; the
+    // containment sweep caught it, and a single sample from mid-yard would not
+    // have.
+    float Enter = 0.0f;
+    float Exit = TNumericLimits<float>::Max();
+    auto ClipAxis = [&Enter, &Exit](float From, float Dir, float MinEdge, float MaxEdge) -> bool
+    {
+        if (FMath::Abs(Dir) < KINDA_SMALL_NUMBER)
+        {
+            // Parallel to this slab: either always inside it, or never.
+            return From >= MinEdge && From <= MaxEdge;
+        }
+        float T0 = (MinEdge - From) / Dir;
+        float T1 = (MaxEdge - From) / Dir;
+        if (T0 > T1) { const float Swap0 = T0; T0 = T1; T1 = Swap0; }
+        Enter = FMath::Max(Enter, T0);
+        Exit = FMath::Min(Exit, T1);
+        return Exit >= Enter;
+    };
+    if (!ClipAxis(FromForward, DirForward, NearEdge, FarEdge)) return false;
+    if (!ClipAxis(FromRight, DirRight, -SideEdge, SideEdge)) return false;
+    if (Exit < Enter || Exit <= 0.0f) return false;
+
+    OutEnter = FMath::Max(Enter, 0.0f);
+    OutExit = Exit;
+    return OutExit >= OutEnter;
+}
+
+bool UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(const FBreakerCoverFieldParams& Params,
+    float PlayerForward, float PlayerRight, float FacingForward, float FacingRight,
+    float BandMinCm, float BandMaxCm, float PackRadiusCm,
+    float& OutForward, float& OutRight, float& OutAffordedCm)
+{
+    const float Low = FMath::Min(BandMinCm, BandMaxCm);
+    const float High = FMath::Max(BandMinCm, BandMaxCm);
+
+    float FacingLength = FMath::Sqrt(FacingForward * FacingForward + FacingRight * FacingRight);
+    if (FacingLength < KINDA_SMALL_NUMBER) { FacingForward = 1.0f; FacingRight = 0.0f; FacingLength = 1.0f; }
+    const float BaseF = FacingForward / FacingLength;
+    const float BaseR = FacingRight / FacingLength;
+
+    // THE LAST-RESORT CENTRE is the band's own middle, inside by construction.
+    // Set before the search so every path out of this function is contained,
+    // including the one where the player stands somewhere no heading fits.
+    OutForward = 0.5f * (Params.BandNearCm + Params.BandFarCm);
+    OutRight = 0.0f;
+    OutAffordedCm = 0.0f;
+
+    // ROTATE AWAY FROM THE FACING ONLY AS FAR AS CONTAINMENT REQUIRES, and try
+    // both ways at each step so the pack does not consistently drift to one
+    // side. A spawner that always rotated clockwise would put every fight in a
+    // walled yard on the same flank, which is a tell nobody would trace back to
+    // here. 24 steps is 15 degrees apart: fine enough that the honoured facing
+    // is visibly the player's, coarse enough to stay cheap.
+    const int32 Steps = 24;
+    float BestRoom = -1.0f;
+    float BestF = 0.0f;
+    float BestR = 0.0f;
+    float BestDistance = 0.0f;
+    bool bBestFound = false;
+
+    for (int32 Step = 0; Step <= Steps / 2; ++Step)
+    {
+        const float Angle = FMath::DegreesToRadians(360.0f * Step / Steps);
+        for (int32 Sign = 0; Sign < (Step == 0 ? 1 : 2); ++Sign)
+        {
+            const float Theta = Sign == 0 ? Angle : -Angle;
+            const float CosT = FMath::Cos(Theta);
+            const float SinT = FMath::Sin(Theta);
+            const float DirF = BaseF * CosT - BaseR * SinT;
+            const float DirR = BaseF * SinT + BaseR * CosT;
+
+            float Enter = 0.0f;
+            float Exit = 0.0f;
+            if (!SolveFieldRayInterval(Params, PlayerForward, PlayerRight, DirF, DirR, PackRadiusCm, Enter, Exit))
+            {
+                continue;
+            }
+
+            // The containable stretch of the authored band along this heading.
+            const float DLow = FMath::Max(Low, Enter);
+            const float DHigh = FMath::Min(High, Exit);
+            if (DLow <= DHigh)
+            {
+                // FURTHEST ALLOWED, up to the authored distance: the band's top
+                // is "one dash-cooldown of ground away" and is kept whenever
+                // the yard has room for it. The first heading that fits wins,
+                // because this search exists to honour the facing rather than
+                // to find the roomiest corner of the yard.
+                OutForward = PlayerForward + DirF * DHigh;
+                OutRight = PlayerRight + DirR * DHigh;
+                OutAffordedCm = DHigh;
+                return true;
+            }
+
+            // This heading cannot hold the band. Remember the roomiest one so
+            // the fallback is the best the yard has rather than the first thing
+            // tried.
+            const float Room = Exit - Enter;
+            if (Room > BestRoom)
+            {
+                BestRoom = Room;
+                BestF = DirF;
+                BestR = DirR;
+                BestDistance = 0.5f * (Enter + Exit);
+                bBestFound = true;
+            }
+        }
+    }
+
+    // NOTHING AFFORDED THE BAND. Place at the middle of the roomiest heading
+    // rather than refusing: a rift run that cannot spawn is worse than one that
+    // spawns close, and the caller is handed the figure so it can say so out
+    // loud. Whatever happens, the centre is inside the field.
+    if (bBestFound)
+    {
+        OutForward = PlayerForward + BestF * BestDistance;
+        OutRight = PlayerRight + BestR * BestDistance;
+        OutAffordedCm = BestDistance;
+    }
+    return false;
+}
+
 bool UBreakerCoverLayoutLibrary::IsZoneLegal(const TArray<FBreakerZoneField>& Yards, FString& OutReason)
 {
     // A zone with no yards is not an empty zone, it is a build that produced

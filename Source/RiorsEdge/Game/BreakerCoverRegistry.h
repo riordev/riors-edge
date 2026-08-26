@@ -518,6 +518,50 @@ public:
     static bool IsLayoutLegal(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params,
         FString& OutReason);
 
+    // SPAWN CONTAINMENT (Part One-L/One-Q). Where a pack may be placed so that
+    // it lands INSIDE the yard, rather than at a fixed offset from the player
+    // that happens to fit the gym.
+    //
+    // THE DEFECT THIS REPLACES: the spawner placed its pack at a fixed distance
+    // along the player's FACING, with no idea a boundary exists. Facing the long
+    // axis of a 100 x 50 m yard that lands mid-yard; facing across the short
+    // axis it lands outside the wall, and the pack walks in. It read as
+    // intermittent because it depended on where the player stood and which way
+    // they looked — which is the signature of a rule that is right about an
+    // open field and wrong about a room.
+    //
+    // Returns the arena centre in FIELD COORDINATES. Direction is chosen as
+    // close to the player's facing as the yard affords: the facing is honoured
+    // when it fits, and rotated only as far as containment requires, so a
+    // player who turns to fight still fights roughly where they were looking.
+    //
+    // OutAffordedCm reports what the yard actually gave. When it is under
+    // BandMinCm the yard could not hold the authored band at all and the
+    // nearest containable distance was used instead — a REPORT, not a refusal:
+    // a rift run that cannot spawn is worse than one that spawns close, and the
+    // build-time question of whether a yard is big enough to fight in is a
+    // different question from what to do at runtime when it is not.
+    static bool SolveContainedSpawnCentre(const FBreakerCoverFieldParams& Params,
+        float PlayerForward, float PlayerRight, float FacingForward, float FacingRight,
+        float BandMinCm, float BandMaxCm, float PackRadiusCm,
+        float& OutForward, float& OutRight, float& OutAffordedCm);
+
+    // How far a point may travel along a direction before the pack's own radius
+    // leaves the band. Exposed because it is the whole of the containment
+    // arithmetic and is worth testing on its own.
+    static float DistanceAffordedInField(const FBreakerCoverFieldParams& Params,
+        float FromForward, float FromRight, float DirForward, float DirRight, float PackRadiusCm);
+
+    // Where a ray ENTERS and EXITS the pack-safe band. The entry half is the
+    // one that is easy to forget and the one the containment sweep caught
+    // missing: a player standing at the yard's edge is inside the wall but
+    // OUTSIDE the pack's margin, so a heading from there only becomes
+    // containable after some distance. Computing the exit alone put a pack
+    // centre short of the near edge from exactly that position.
+    static bool SolveFieldRayInterval(const FBreakerCoverFieldParams& Params,
+        float FromForward, float FromRight, float DirForward, float DirRight, float PackRadiusCm,
+        float& OutEnter, float& OutExit);
+
     // THE ZONE RULE (Q3): a zone is legal when EVERY YARD is legal in its own
     // frame. IsLayoutLegal validates one open combat field — one band, one
     // corridor, one safe circle — and every rule in it is correct about that

@@ -2882,7 +2882,41 @@ void ABreakerGameMode::StartNextWave()
     const float SpawnDistance = FMath::Clamp(DashRefreshDistance,
         FMath::Min(WaveSpawnBandMinCm, WaveSpawnBandMaxCm),
         FMath::Max(WaveSpawnBandMinCm, WaveSpawnBandMaxCm));
-    const FVector ArenaCenter = Origin + Forward * SpawnDistance;
+
+    // CONTAINED IN THE FIELD, not merely offset from the player. The band above
+    // still says how far a fight should start; the field says where there is
+    // room for one. Solved in FIELD coordinates because that is the frame the
+    // grammar speaks and the only one a yard's boundary exists in.
+    FVector ArenaCenter = Origin + Forward * SpawnDistance;
+    if (bFieldFrameSet)
+    {
+        const FBreakerCoverFieldParams FieldParams = MakeCoverFieldParams();
+        const FVector Offset = Origin - Frame.Ground;
+        const float PlayerF = static_cast<float>(FVector::DotProduct(Offset, Frame.Forward));
+        const float PlayerR = static_cast<float>(FVector::DotProduct(Offset, Frame.Right));
+        const float FacingF = static_cast<float>(FVector::DotProduct(Forward, Frame.Forward));
+        const float FacingR = static_cast<float>(FVector::DotProduct(Forward, Frame.Right));
+
+        float CentreF = 0.0f;
+        float CentreR = 0.0f;
+        float Afforded = 0.0f;
+        const bool bFits = UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(
+            FieldParams, PlayerF, PlayerR, FacingF, FacingR,
+            WaveSpawnBandMinCm, SpawnDistance, WaveSpawnPackRadiusCm,
+            CentreF, CentreR, Afforded);
+        ArenaCenter = Frame.At(CentreF, CentreR, 0.0f);
+        if (!bFits)
+        {
+            // THE YARD COULD NOT HOLD THE BAND. Said out loud rather than
+            // absorbed: this is the case GROUND's report predicted for a
+            // 100 x 50 yard, and it is a design signal about the yard's size or
+            // the band's floor, not a runtime error to swallow.
+            UE_LOG(LogTemp, Warning,
+                TEXT("[BreakerWave] the field afforded only %.0f cm against a %.0f cm spawn floor; ")
+                TEXT("the pack is placed as far out as it fits. The yard is too small for the authored band."),
+                Afforded, WaveSpawnBandMinCm);
+        }
+    }
 
     // THE WAVE IS SOLVED, NOT RAMPED. What was here was `4 + wave * 3` capped
     // at 24, an elite every third wave and `wave/2` Lattices: no budget, no
