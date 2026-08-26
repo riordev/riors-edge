@@ -2,6 +2,46 @@
 
 ## Current work
 
+GLASS LANE, THE DOOR STOPS SAYING TWO THINGS (465 / 3 / 0, upstream's
+own baseline at `fde7a60`, `Docs/STATE.md` byte-identical). Line 1742
+calls `GetPromptLabel()` instead of the literal `TEXT("TRAVEL")`, so the
+rift door no longer says TRAVEL over F ENTER RIFT. GROUND's capture found
+it; the suite could not, because automation cannot read a label.
+
+A CORRECTION TO THIS LANE'S OWN OBJECTION. GLASS argued last cycle that
+reusing the prompt getter would print the verb twice. It does — but it
+ALREADY DID at every ordinary gate (TRAVEL over F TRAVEL), so the
+redundancy is pre-existing and what the fix removes is the
+CONTRADICTION, which only the door had. The objection treated a standing
+condition as a new cost.
+
+THE SIBLING SURVEY: exactly one instance, the one fixed. The shape is a
+hardcoded verb beside a getter that already returns the right answer.
+NPC's `F TALK` is a literal with NO verb getter on `ABreakerNPC` — an
+absent getter, not a bypassed one, and correct while NPCs have one verb.
+Loot's `F TAKE` sits beside `GetDisplayLabel()`, which returns the ITEM
+NAME: a noun, not a bypassed verb. Neither is the defect. `shapecheck`
+matched nothing on the commit, which for this shape means "not looked
+for" rather than "not present" — the survey was done by hand.
+
+Left standing and filed as a question rather than acted on: the NPC block
+is noun-then-verb, travel is now verb-then-verb.
+`ABreakerTravelPoint::DisplayName` exists as a bare UPROPERTY with no
+getter, so the noun is there and unreachable — GROUND's actor, GROUND's
+original proposal, so it is an ask and not an edit.
+
+THE ABILITY COUNT IS 35, not 25 — seven per class across five, corrected
+where this lane wrote it twice, with a note that nothing is SIZED to it:
+override resolution is per-id and lazy, so the number was only prose.
+
+PROCESS, ACCEPTED: the death-beat commit subtracted two things from one
+moment — the sting and the banner's weight — with no look between them.
+One concern per commit from here, or the report names which edit is doing
+the work. The owner's death-beat verdict is now three-way and is his to
+give: reads fine (silence stands), reads weak (the banner comes back
+partway, cheap and GLASS's), reads absent (a sixth verb, needing its own
+ruling). Holding at no sixth verb.
+
 GLASS LANE, THE DEATH BEAT GOES QUIET (464 / 3 / 0, same roster,
 `Docs/STATE.md` byte-identical). Both of ORDERS Part One-B's GLASS
 items, from the owner's first hands-on.
