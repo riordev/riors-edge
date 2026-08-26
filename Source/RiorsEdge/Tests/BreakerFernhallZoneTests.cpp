@@ -140,6 +140,120 @@ bool FBreakerZoneLegalityTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// THE CONNECTION RULE (ruled). A connection is a DISTINCT KIND OF SPACE, not a
+// thin yard: the field grammar is exempt, and every term here is the opposite
+// shape to the field's. The terms are what is ruled; every magnitude is O2 and
+// none has been walked.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerConnectionRuleTest,
+    "RiorsEdge.Zone.Grammar.ConnectionRule",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerConnectionRuleTest::RunTest(const FString& Parameters)
+{
+    const FBreakerConnectionRuleParams Params;
+    FString Reason;
+
+    FBreakerZoneConnection Good;
+    Good.Name = FName(TEXT("plaza-north"));
+    Good.FromYard = NAME_None;
+    Good.ToYard = FName(TEXT("north"));
+    Good.MouthWidthCm = 800.0f;
+    Good.LengthCm = 1500.0f;
+    Good.bThroughSight = false;
+    TestTrue(TEXT("an ordinary seam is legal"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Good, Params, Reason));
+
+    // MOUTH WIDTH IS A CEILING, and this is the assertion that proves the
+    // inversion rather than restating it: a width the FIELD rule would demand
+    // as a minimum (the 1600 dash corridor) is ILLEGAL here.
+    FBreakerZoneConnection Wide = Good;
+    Wide.MouthWidthCm = 1600.0f;
+    TestFalse(TEXT("a mouth as wide as the field's dash-corridor FLOOR is too wide for a connection"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Wide, Params, Reason));
+    TestTrue(FString::Printf(TEXT("and the reason says why: %s"), *Reason),
+        Reason.Contains(TEXT("two yards touching")));
+
+    // The floor it still needs is PATHING, not movement.
+    FBreakerZoneConnection Narrow = Good;
+    Narrow.MouthWidthCm = 100.0f;
+    TestFalse(TEXT("a mouth the widest body cannot fit through is a wall"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Narrow, Params, Reason));
+
+    // LENGTH IS A CEILING: past it the connection is a place, and a place is a
+    // yard.
+    FBreakerZoneConnection Long = Good;
+    Long.LengthCm = 6000.0f;
+    TestFalse(TEXT("a connection long enough to walk is a yard, not a seam"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Long, Params, Reason));
+
+    // NO THROUGH-SIGHT.
+    FBreakerZoneConnection Straight = Good;
+    Straight.bThroughSight = true;
+    TestFalse(TEXT("a seam you can see through lets the far yard be shot into"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Straight, Params, Reason));
+
+    // TWO MOUTHS, AND THEY ARE DIFFERENT PLACES. A third end is
+    // unrepresentable by construction — the struct has two fields, because the
+    // count IS the rule — so what is left to catch is the degenerate pair.
+    FBreakerZoneConnection Loop = Good;
+    Loop.ToYard = Loop.FromYard;
+    TestFalse(TEXT("a connection from a yard to itself is a loop, not a threshold"),
+        UBreakerCoverLayoutLibrary::IsConnectionLegal(Loop, Params, Reason));
+
+    // --- The zone rule composes both kinds -------------------------------
+    // THE YARDS HAVE TO BE REAL FIELDS, which the first draft of this test got
+    // wrong: two EMPTY FBreakerZoneFields are not two trivially-legal yards,
+    // they are two yards with no cover, and a field with no full-height piece
+    // fails the line-break rule. The zone rule caught it, which is the level
+    // above the field doing its job on its own test. Generated from the shipped
+    // params, so what these yards are is what the gym is.
+    const FBreakerCoverFieldParams FieldParams;
+    const TArray<FBreakerCoverPiece> GeneratedField =
+        UBreakerCoverLayoutLibrary::BuildCoverField(FieldParams);
+
+    TArray<FBreakerZoneField> Yards;
+    FBreakerZoneField& Entry = Yards.AddDefaulted_GetRef();
+    Entry.Yard = NAME_None;
+    Entry.Params = FieldParams;
+    Entry.Pieces = GeneratedField;
+    FBreakerZoneField& North = Yards.AddDefaulted_GetRef();
+    North.Yard = FName(TEXT("north"));
+    North.Params = FieldParams;
+    North.Pieces = GeneratedField;
+
+    FString YardReason;
+    if (!TestTrue(TEXT("the generated yards are themselves legal, or this proves nothing about seams"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, YardReason)))
+    {
+        AddError(FString::Printf(TEXT("yard setup is illegal: %s"), *YardReason));
+        return false;
+    }
+
+    TArray<FBreakerZoneConnection> Connections;
+    Connections.Add(Good);
+    TestTrue(TEXT("a zone of two yards and a legal seam is legal"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
+
+    Connections[0] = Wide;
+    TestFalse(TEXT("and one illegal seam fails the whole zone"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
+
+    // A SEAM TO A YARD NOBODY AUTHORED passes every term above and leads
+    // nowhere, so the zone rule is where it has to be caught.
+    Connections[0] = Good;
+    Connections[0].ToYard = FName(TEXT("nowhere"));
+    TestFalse(TEXT("a seam to a yard that does not exist is refused"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
+    TestTrue(FString::Printf(TEXT("and the reason names it: %s"), *Reason),
+        Reason.Contains(TEXT("nowhere")));
+
+    // A zone with no connections is still a zone: one yard needs no seams.
+    TestTrue(TEXT("a zone with no connections is legal"),
+        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, TArray<FBreakerZoneConnection>(), Reason));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerFernhallPieceContractTest,
     "RiorsEdge.Zone.Fernhall.PieceContract",

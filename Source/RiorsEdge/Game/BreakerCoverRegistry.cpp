@@ -995,6 +995,114 @@ bool UBreakerCoverLayoutLibrary::SolveContainedSpawnCentre(const FBreakerCoverFi
     return false;
 }
 
+bool UBreakerCoverLayoutLibrary::IsConnectionLegal(const FBreakerZoneConnection& Connection,
+    const FBreakerConnectionRuleParams& Params, FString& OutReason)
+{
+    const FString Named = Connection.Name.IsNone() ? TEXT("<unnamed>") : Connection.Name.ToString();
+
+    // TWO MOUTHS, AND THEY ARE DIFFERENT PLACES. The struct makes a third
+    // unrepresentable; this catches the degenerate pair — a connection from a
+    // yard to itself is a loop, not a threshold, and one with an unnamed end
+    // joins nothing.
+    if (Connection.FromYard == Connection.ToYard)
+    {
+        OutReason = FString::Printf(TEXT("connection '%s' joins a yard to itself"), *Named);
+        return false;
+    }
+
+    // MOUTH WIDTH IS A CEILING. Wider than this and it is not a gate; it is two
+    // yards touching, with no threshold between them for the player to cross.
+    if (Connection.MouthWidthCm > Params.MaximumMouthWidthCm)
+    {
+        OutReason = FString::Printf(
+            TEXT("connection '%s' mouth is %.0f cm against a CEILING of %.0f: that is not a gate, ")
+            TEXT("it is two yards touching"),
+            *Named, Connection.MouthWidthCm, Params.MaximumMouthWidthCm);
+        return false;
+    }
+    // And the floor it still needs is PATHING, not movement.
+    if (Connection.MouthWidthCm < Params.MinimumMouthWidthCm)
+    {
+        OutReason = FString::Printf(
+            TEXT("connection '%s' mouth is %.0f cm against a FLOOR of %.0f: the widest body in the ")
+            TEXT("project cannot fit through it"),
+            *Named, Connection.MouthWidthCm, Params.MinimumMouthWidthCm);
+        return false;
+    }
+
+    // LENGTH IS A CEILING. Past it the player is WALKING a corridor rather than
+    // crossing a threshold, and a corridor that is walked is a place — which
+    // needs population and cover, which makes it a yard.
+    if (Connection.LengthCm > Params.MaximumLengthCm)
+    {
+        OutReason = FString::Printf(
+            TEXT("connection '%s' is %.0f cm long against a CEILING of %.0f: that is a corridor to walk, ")
+            TEXT("and a walked corridor is a yard"),
+            *Named, Connection.LengthCm, Params.MaximumLengthCm);
+        return false;
+    }
+
+    // NO THROUGH-SIGHT. O1 makes movement the only active defence, so a
+    // straight seam lets a ranged enemy in the far yard hold a player who has
+    // no cover authored for that angle — the yard's cover was laid against
+    // fights inside it. It is also what makes each yard a self-contained
+    // encounter, which is what lets a per-yard population be a per-yard
+    // decision at all.
+    if (Connection.bThroughSight)
+    {
+        OutReason = FString::Printf(
+            TEXT("connection '%s' has through-sight: the far yard can be shot into from this one, ")
+            TEXT("against cover that was never laid for that angle"),
+            *Named);
+        return false;
+    }
+
+    OutReason.Reset();
+    return true;
+}
+
+bool UBreakerCoverLayoutLibrary::IsZoneLegal(const TArray<FBreakerZoneField>& Yards,
+    const TArray<FBreakerZoneConnection>& Connections, FString& OutReason)
+{
+    if (!IsZoneLegal(Yards, OutReason)) return false;
+
+    const FBreakerConnectionRuleParams ConnectionParams;
+    for (const FBreakerZoneConnection& Connection : Connections)
+    {
+        FString Reason;
+        if (!IsConnectionLegal(Connection, ConnectionParams, Reason))
+        {
+            OutReason = Reason;
+            return false;
+        }
+    }
+
+    // A CONNECTION JOINS YARDS THAT EXIST. A seam to a yard nobody authored is
+    // a layout that cannot be walked, and it would otherwise pass every term
+    // above while leading nowhere.
+    for (const FBreakerZoneConnection& Connection : Connections)
+    {
+        for (const FName& End : { Connection.FromYard, Connection.ToYard })
+        {
+            bool bFound = false;
+            for (const FBreakerZoneField& Yard : Yards)
+            {
+                if (Yard.Yard == End) { bFound = true; break; }
+            }
+            if (!bFound)
+            {
+                OutReason = FString::Printf(TEXT("connection '%s' leads to yard '%s', which does not exist"),
+                    Connection.Name.IsNone() ? TEXT("<unnamed>") : *Connection.Name.ToString(),
+                    End.IsNone() ? TEXT("<entry>") : *End.ToString());
+                return false;
+            }
+        }
+    }
+
+    OutReason.Reset();
+    return true;
+}
+
 bool UBreakerCoverLayoutLibrary::IsZoneLegal(const TArray<FBreakerZoneField>& Yards, FString& OutReason)
 {
     // A zone with no yards is not an empty zone, it is a build that produced

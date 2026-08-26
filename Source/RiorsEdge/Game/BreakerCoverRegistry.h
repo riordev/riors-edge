@@ -395,6 +395,55 @@ struct RIORSEDGE_API FBreakerCoverRegistry
     }
 };
 
+// A CONNECTION BETWEEN TWO YARDS, and it is a DISTINCT KIND OF SPACE rather
+// than a thin yard (ruled). The field grammar is exempt here and does not
+// apply: its rules are all about answering a telegraph by moving, and nothing
+// telegraphs in a seam nothing fights in. Applying them is what made a lane
+// between yards triply illegal — too narrow for the dash corridor, no line
+// break, and an exposed crossing — when all three rules were simply being asked
+// about the wrong kind of place.
+//
+// EXACTLY TWO MOUTHS, and the struct is shaped so a third is unrepresentable.
+// Three ends is a JUNCTION, and a junction is a place a fight can be flanked
+// from a direction the yard's cover was never laid against. If a layout wants a
+// hub, that hub is a YARD WITH NO POPULATION, not a connection with three ends.
+struct FBreakerZoneConnection
+{
+    FName Name = NAME_None;
+    // The two yards it joins. Two fields rather than an array: the count is the
+    // rule, so the type carries it.
+    FName FromYard = NAME_None;
+    FName ToYard = NAME_None;
+    // Clear width at the narrowest point, and the walked length between mouths.
+    float MouthWidthCm = 0.0f;
+    float LengthCm = 0.0f;
+    // Whether a player standing at one mouth can see into the far yard.
+    bool bThroughSight = false;
+};
+
+// THE CONNECTION RULE'S OWN TERMS. Every magnitude is O2 PLACEHOLDER and none
+// has been walked; the SHAPE is what is ruled, and the shape is what makes this
+// a different rule rather than the field rule with different numbers.
+struct FBreakerConnectionRuleParams
+{
+    // MOUTH WIDTH IS A CEILING, and that inversion is the whole thing. The
+    // field's dash-corridor rule is a FLOOR — open ground must be at least
+    // this wide. A connection is recognisable BECAUSE it narrows, so wider than
+    // this and it is not a gate, it is two yards touching with no threshold
+    // between them.
+    float MaximumMouthWidthCm = 1200.0f;   // O2 PLACEHOLDER
+    // The floor it still needs is the PATHING one, not a movement one: a mouth
+    // the widest body in the project cannot fit through is a wall.
+    float MinimumMouthWidthCm = 120.0f;   // O2 PLACEHOLDER (widest body)
+    // LENGTH IS A CEILING. Long enough and a connection stops being a threshold
+    // the player crosses and becomes a corridor they walk — and a corridor that
+    // is walked is a place, which needs population and cover, which makes it a
+    // yard. This term is what keeps the two kinds from collapsing into one.
+    float MaximumLengthCm = 3000.0f;   // O2 PLACEHOLDER
+};
+
+// Legal when the shape holds. OutReason names the term, in the precedent of
+// IsLayoutLegal and IsCompositionLegal.
 // ONE YARD'S MEASURED FIELD: its name, the grammar it answers to, and its
 // pieces IN ITS OWN FRAME. The frame is what makes this per-yard rather than
 // per-zone — FBreakerCoverPiece is field-space by construction ("nothing here
@@ -582,6 +631,15 @@ public:
     // when this passes AND the connection rule passes; only the first half
     // exists.
     static bool IsZoneLegal(const TArray<struct FBreakerZoneField>& Yards, FString& OutReason);
+
+    // A zone is fully legal when every YARD is legal AND every CONNECTION
+    // satisfies its own rule. Two rules, two kinds of space, neither pretending
+    // to be the other.
+    static bool IsZoneLegal(const TArray<struct FBreakerZoneField>& Yards,
+        const TArray<struct FBreakerZoneConnection>& Connections, FString& OutReason);
+
+    static bool IsConnectionLegal(const struct FBreakerZoneConnection& Connection,
+        const struct FBreakerConnectionRuleParams& Params, FString& OutReason);
 
     UFUNCTION(BlueprintPure, Category="Cover")
     static FString DescribeCoverField(const TArray<FBreakerCoverPiece>& Pieces, const FBreakerCoverFieldParams& Params);
