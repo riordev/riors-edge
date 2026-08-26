@@ -719,9 +719,19 @@ O143 — O168's payout closes the rift chain end to end
 (BreakerRiftRewardMath rides the chassis's own growth constant, the
 listener binds GROUND's event, and GROUND's live triple-lane run
 proved definition-intact, one payment, and the refused second
-completion paying nothing). 476 / 3 / 0 on the tip. Open on the
-seat/owner: Longstride reading confirmation, allocation-at-push-time,
-the parity content routes now aimed at 0.62. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
+completion paying nothing). 476 / 3 / 0 on the tip. SINCE: O144 closed
+the wall-ride window (WallRiding retired as a NEW kind of never-true,
+census 4->5, Traction silent awaiting a verb that records state);
+Part One-N's crit variant measured 0.802 unpinned (slack, not a
+trade — the ability wheels absorb a crit purchase free); Part One-U
+answered everything open (Longstride stays distance; allocation is
+at PUSH TIME, ruled, the seat folds the line into this file) and
+O180 landed as two ruled-order commits: unknown rank rows DROP AND
+CREDIT at load (the removed-node tax is repaired, the audit test now
+pins the repair) and then Grind is DELETED onto that safe path,
+Kinetic fifteen -> fourteen. O180 was allocated at push time from
+the rebased ledger. Awaiting: KIT's RecentlyMantled recorder (then
+Traction re-targets), the owner's payout feel check. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
 hit-time More — x1.30 shared, gated on TargetBandBroken, paid by the
 rider path under the one O34 ceiling (headroom, never a slot; the
 clamp is exact because the window chain already folds into
