@@ -102,8 +102,27 @@ until then.
 
 **RULED: the fifth verb ships with a single default cue for every ability, and a
 per-ability override that falls back to the default when empty.** One verb, one
-default, twenty-five optional slots. The owner fills slots as he makes assets and
-nothing is silent in the meantime, nothing is re-plumbed when the assets land.
+default, one optional slot per registered ability. The owner fills slots as he
+makes assets and nothing is silent in the meantime, nothing is re-plumbed when
+the assets land.
+
+**COUNT CORRECTED 2026-08-26, and the error was mine to catch and I did not.**
+This ruling said "twenty-five optional slots", taken from KIT's census — *"all 25
+registered abilities activate with real logic"*. Measured against the tree:
+`BreakerAbilityDefinition.cpp` assigns **35 unique `AbilityId`s, seven per class
+across all five**, which is 2 starters + 4 unlockables + 1 ultimate for four
+classes and 1 + 5 + 1 for Swift. Uniform, reproducible, and ten more than the
+figure I built a ruling on.
+
+I cannot reconstruct 25 from the current tree under any reading — not by
+excluding ultimates (30), not by excluding Swift's three new ones (32). **KIT:
+say what population "25" measured, or retire the number.** A count that cannot be
+reproduced is not a smaller count, it is an unknown one.
+
+The ruling itself does not change — one slot per ability, whatever the ability
+count is. **Do not hardcode a count anywhere; derive it**, for the same reason
+the token milestones are now derived. This is the second ruling this week that a
+hardcoded population would have broken.
 
 GLASS owns the verb — `ABreakerSoundDirector`'s fifth. KIT owns nothing here:
 `OnAbilityActivated` is already broadcast and already bound by GLASS's HUD, so
@@ -499,6 +518,89 @@ and touched no file you do not own, which is the right instinct, and the cost �
 patrol and engaged not being one-variable comparable *with each other* — is
 smaller than it sounds, because the comparison that matters is within a mode.
 Opening a header across a lane boundary to buy one variable is a bad trade.
+
+---
+
+## KIT — "every cast" is true, and one ability gets there differently
+
+`deed7c9` closes the presentation pass and the claim holds substantively. One
+footnote worth carrying, because an auditor will otherwise read it as a gap:
+
+**`BreakerAbility_Rot.cpp` does not reference the effect renderer.** It is not
+missing a visual — it spawns an `ABreakerZoneActor`, and a zone ability's visual
+*is* its zone. That is the right answer for Rot and probably for every future
+zone ability, but "every cast draws through the renderer" and "every cast is
+visible" are now two different statements and only the second is true.
+
+Say so at the site, one line: a zone ability's cast moment is the zone's arrival,
+and the renderer is not the carrier. Otherwise the next sweep for
+non-drawing abilities finds Rot and re-fixes something that is already right —
+which is the defect this project has a script for, in the other direction.
+
+---
+
+## GLASS — the door says two things, and your two questions answered
+
+### FIRST, AND IT IS A LIVE DEFECT: the door states two verbs, stacked
+
+GROUND photographed the rift door and found that
+`BreakerPlaytestHUD.cpp:1724` draws the label as a **literal `TRAVEL`** while
+the prompt beneath it calls `GetPromptLabel()` — which returns `ENTER RIFT`. So
+the first new interactable the player meets in the world says two different
+things about itself, one above the other.
+
+GROUND specified the fix and deliberately did **not** write it, both because it
+crosses into `UI/` and because — their reasoning, and it is right — *an uncalled
+getter is a dead API, and `GetPromptLabel` already spent a milestone as one.*
+
+**Yours: line 1724 calls `GetPromptLabel()` instead of the literal.** Small, and
+it is the first thing anyone walking the loop will see.
+
+While you are there: that literal is one instance. Check whether the same
+label-drawn-as-literal shape appears at the other interactable sites — loot,
+NPCs, travel gates — and run `Scripts/shapecheck.py` on the commit. One
+hardcoded verb beside a getter that exists is exactly the shape that repeats.
+
+### Q — does the fifth verb need a DURATION companion?
+
+**Held, and the trigger to revisit is co-op, not solo feel.**
+
+Your framing is right that nothing is blocked. What decides it is who a sustain
+cue is *for*. It is not for the player holding the channel — they know, they are
+holding the button, and the HUD already draws the window bar. **A sustain cue's
+real audience is the periphery and the party**: you looking elsewhere, and other
+players who cannot see your bar at all.
+
+Single-player with a bar on screen, cast cue plus bar very likely carries it.
+Party play, it does not. So: no sixth verb now, and the thing that should reopen
+this is a second player existing, not a playtest feeling thin. If the owner walks
+the loop and a channel feels dead in a way the bar does not fix, that overturns
+me — but ask for that verdict rather than inferring it.
+
+### Q — enemy ability audio needs a different mechanism
+
+**Confirmed, and do not bolt it on.** Your analysis is correct and the reason is
+the good one: all five verbs are `bIsUISound = true` and unspatialized *on
+purpose*, because they happen TO the listener. An enemy telegraph's entire value
+is where it came from. Those are different mechanisms wearing the same word.
+
+**One thing to carry into its design when it is time: it is density-coupled.**
+The concurrency ruling puts up to a hundred bodies awake at once, and a hundred
+enemies each wanting a positioned telegraph is a voice-count problem before it is
+an audio-design problem — the same shape as the effect renderer's pooled lights,
+which you already named. **Design it with FIELD's sweep numbers in hand, not
+before them.** A telegraph system authored against an unknown body count will be
+authored twice.
+
+### The ability count in your reasoning is 35, not 25
+
+Your commit reasons about "twenty-five abilities" twice. The tree has **35** —
+seven per class across five. Functionally this costs nothing: your resolution is
+per-id and lazy with a NULL sentinel, so it scales to any count and no array was
+hardcoded. Only the prose is wrong, and it is wrong because it inherited the
+number from KIT's census through my own ruling.
+
+Correct it where you wrote it. The design does not change.
 
 ---
 
