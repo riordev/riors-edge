@@ -4193,13 +4193,22 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     Swift->Description = LOCTEXT("SwiftDescription", "Momentum: a decaying state built by moving and spent on short-cooldown bursts.");
     // Ids must match the ability fallback registry exactly, or a loadout
     // seeded from them resolves to nothing.
-    Swift->StarterAbilityIds = {TEXT("Swift.Skim"), TEXT("Swift.Lead")};
-    // The id that was stranded: registered, offered by the picker, and refused
-    // by every unlock path because Swift's old single list held only the two
-    // starters. It is Swift's whole unlockable kit until its three missing
-    // abilities land, and the token schedule truncates to this count rather
-    // than paying four against one.
-    Swift->UnlockableAbilityIds = {TEXT("Swift.CadenceBreak")};
+    //
+    // ONE starter, by ruling (ORDERS ruling 1, overturning O176 as written):
+    // Swift starts with Skim alone, its second free verb is the enhanced-dash
+    // tree node granted at level one — a node, never a slot occupant — and
+    // ClassAbilityTwo ships EMPTY until the first quartermaster unlock. The
+    // visibly empty slot is the feature: it is the first thing a token fills.
+    Swift->StarterAbilityIds = {TEXT("Swift.Skim")};
+    // All six remaining class abilities are unlockables — Slipcut first in
+    // the list because the quartermaster offers in this order and Slipcut is
+    // Frenzy's ignition, the fantasy the ruling moved off the starter row;
+    // Lead joins them (it was only ever a starter because the old single
+    // list held two). Five purchases against the five-milestone token
+    // schedule below (AbilityTokenLevels), all reachable by 50.
+    Swift->UnlockableAbilityIds = {
+        TEXT("Swift.Slipcut"), TEXT("Swift.Lead"), TEXT("Swift.CadenceBreak"),
+        TEXT("Swift.HardStop"), TEXT("Swift.Sightline")};
     Swift->BaseUltimateId = TEXT("Swift.Overdrive");
     // Class-Kits §1.3-1.5 order: Frenzy, Kinetic, Marksman. The branch strip
     // reads this list, so it now shows the three chips the design names.

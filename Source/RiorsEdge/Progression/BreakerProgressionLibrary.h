@@ -442,14 +442,17 @@ public:
     // player can open and never use, which is the reachability rule's own
     // example. When the campaign lands, these levels are replaced by the
     // milestones and the cumulative counter means no character is paid twice.
-    // O2 PLACEHOLDER: the four levels are shape, not balance.
+    // O2 PLACEHOLDER: the five levels are shape, not balance.
     //
-    // TRUNCATED PER CLASS to UnlockableAbilityIds.Num(). A flat four would pay
-    // Swift four tokens against one unlockable and strand three of them
-    // permanently on a shipped class — the same kind of unreachable content
-    // this whole pass exists to delete. Swift pays one today and grows to four
-    // the day its three missing abilities land, with nothing here to edit.
-    static constexpr int32 AbilityTokenLevels[] = {5, 12, 20, 30};
+    // TRUNCATED PER CLASS to UnlockableAbilityIds.Num(). A flat count would
+    // pay a class more tokens than it has unlockables and strand the excess
+    // permanently — the same kind of unreachable content this whole pass
+    // exists to delete. The FIFTH milestone exists because ruling 1 made
+    // Swift a one-starter class with FIVE unlockables (Lead joined them):
+    // four milestones against five purchases would leave the last ability
+    // unreachable by 50, which is the exact red ReachableByFifty holds. The
+    // four-unlockable classes truncate to four and never see it.
+    static constexpr int32 AbilityTokenLevels[] = {5, 12, 20, 30, 40};   // O2 PLACEHOLDER
 
     // How many tokens a character of this level and this many unlockables has
     // earned in total. The component pays the difference against what it has

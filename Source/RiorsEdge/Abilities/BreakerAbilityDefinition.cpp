@@ -1042,11 +1042,17 @@ FName UBreakerAbilityDefinition::DefaultAbilityIdForSlot(EBreakerClassId ClassId
     // missing from this switch has three dead keys.
     switch (ClassId)
     {
+    // Ruling 1 (ORDERS, overturning O176-as-written): Swift's second slot
+    // ships EMPTY until the first quartermaster unlock — the empty slot is
+    // the feature, the first thing the token fills. NAME_None here means a
+    // stale foreign-class id in slot two now repairs to EMPTY rather than
+    // to a playable default; for Swift that is the ruled shape, not a
+    // regression of the stale-save repair.
     case EBreakerClassId::Swift:
         switch (Slot)
         {
         case EBreakerAbilitySlot::ClassAbilityOne: return TEXT("Swift.Skim");
-        case EBreakerAbilitySlot::ClassAbilityTwo: return TEXT("Swift.Lead");
+        case EBreakerAbilitySlot::ClassAbilityTwo: return NAME_None;
         case EBreakerAbilitySlot::Ultimate:        return TEXT("Swift.Overdrive");
         default: return NAME_None;
         }

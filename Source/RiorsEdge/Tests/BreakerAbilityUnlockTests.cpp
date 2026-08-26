@@ -133,7 +133,12 @@ bool FBreakerAbilityNoPermanentlyRefusableTest::RunTest(const FString& Parameter
     return true;
 }
 
-// (c) Exactly two starters, and they are what a fresh character holds.
+// (c) The authored starter shape per class, and it is what a fresh character
+// holds. This was "exactly two starters" universally until ORDERS ruling 1:
+// Swift is a ONE-starter class — Skim plus the enhanced-dash tree node, with
+// ClassAbilityTwo shipping EMPTY until the first quartermaster unlock. The
+// empty slot is the feature, so it is asserted as EMPTY rather than skipped:
+// a default leaking back into slot two would silently retire the ruling.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilityStarterPairTest,
     "RiorsEdge.Abilities.StarterPair",
@@ -147,17 +152,29 @@ bool FBreakerAbilityStarterPairTest::RunTest(const FString& Parameters)
         const UBreakerClassDefinition* Definition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
         const FString Context = UEnum::GetValueAsString(ClassId);
         if (!Definition) continue;
-        TestEqual(*(Context + TEXT(" has exactly two starters")), Definition->StarterAbilityIds.Num(), 2);
+        const bool bOneStarterClass = ClassId == EBreakerClassId::Swift;
+        TestEqual(*(Context + TEXT(" has its authored starter count")),
+            Definition->StarterAbilityIds.Num(), bOneStarterClass ? 1 : 2);
 
         UBreakerProgressionComponent* Progression = UnlockTestMakeAt(ClassId, 1);
         const FBreakerAbilityLoadout& Loadout = Progression->GetProgressionState().AbilityLoadout;
         TestEqual(*(Context + TEXT(" seeds slot one from its first starter")), Loadout.ClassAbilityOne, Definition->StarterAbilityIds[0]);
-        TestEqual(*(Context + TEXT(" seeds slot two from its second starter")), Loadout.ClassAbilityTwo, Definition->StarterAbilityIds[1]);
+        if (bOneStarterClass)
+        {
+            TestEqual(*(Context + TEXT(" seeds slot two EMPTY (ruling 1: the first token fills it)")),
+                Loadout.ClassAbilityTwo, FName(NAME_None));
+        }
+        else
+        {
+            TestEqual(*(Context + TEXT(" seeds slot two from its second starter")), Loadout.ClassAbilityTwo, Definition->StarterAbilityIds[1]);
+        }
         TestEqual(*(Context + TEXT(" seeds the ultimate")), Loadout.Ultimate, Definition->BaseUltimateId);
-        // Free at level one means free: both starters and the ultimate answer
+        // Free at level one means free: every starter and the ultimate answer
         // unlocked with nothing bought.
-        TestTrue(*(Context + TEXT(" starter one is free")), Progression->IsAbilityUnlocked(Definition->StarterAbilityIds[0]));
-        TestTrue(*(Context + TEXT(" starter two is free")), Progression->IsAbilityUnlocked(Definition->StarterAbilityIds[1]));
+        for (const FName Starter : Definition->StarterAbilityIds)
+        {
+            TestTrue(*(Context + TEXT(" starter is free: ") + Starter.ToString()), Progression->IsAbilityUnlocked(Starter));
+        }
         TestTrue(*(Context + TEXT(" the ultimate is free")), Progression->IsAbilityUnlocked(Definition->BaseUltimateId));
         for (const FName Id : Definition->UnlockableAbilityIds)
         {

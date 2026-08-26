@@ -96,18 +96,27 @@ bool FBreakerAbilityDefinitionValuesTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Overdrive is implemented"), Overdrive->IsImplemented());
     TestEqual(TEXT("Overdrive's base window is 8s"), Overdrive->WindowDuration, 8.0f);
 
-    // The whole Swift kit is now activatable: E, T and G all resolve to an
-    // ability class rather than a designed-but-unbuilt slot.
-    for (const EBreakerAbilitySlot Slot : { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::ClassAbilityTwo, EBreakerAbilitySlot::Ultimate })
+    // The whole Swift kit is activatable — but the DEFAULT table no longer
+    // fills every key: ruling 1 (ORDERS) ships ClassAbilityTwo EMPTY until
+    // the first quartermaster unlock, so E and G resolve from defaults while
+    // T resolves only once something is equipped. Asserted in all three
+    // directions, so neither a default leaking back into the empty slot nor
+    // the slot going dead to equipped ids can arrive silently.
+    for (const EBreakerAbilitySlot Slot : { EBreakerAbilitySlot::ClassAbilityOne, EBreakerAbilitySlot::Ultimate })
     {
         const UBreakerAbilityDefinition* Definition = UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, Slot, NAME_None);
-        TestNotNull(TEXT("Every Swift slot resolves"), Definition);
+        TestNotNull(TEXT("Every defaulted Swift slot resolves"), Definition);
         if (Definition)
         {
-            TestTrue(TEXT("Every Swift slot is implemented"), Definition->IsImplemented());
+            TestTrue(TEXT("Every defaulted Swift slot is implemented"), Definition->IsImplemented());
             TestTrue(TEXT("Every Swift ability derives from the Breaker base"), Definition->AbilityClass->IsChildOf(UBreakerGameplayAbility::StaticClass()));
         }
     }
+    TestNull(TEXT("Swift's second slot resolves to nothing at defaults — empty by ruling 1, the first token fills it"),
+        UBreakerAbilityComponent::ResolveDefinition(EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, NAME_None));
+    const UBreakerAbilityDefinition* EquippedTwo = UBreakerAbilityComponent::ResolveDefinition(
+        EBreakerClassId::Swift, EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Lead"));
+    TestTrue(TEXT("An equipped id still resolves in the second slot"), EquippedTwo && EquippedTwo->IsImplemented());
     return true;
 }
 

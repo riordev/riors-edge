@@ -45,13 +45,17 @@ present is a class that does not work alone.
 excel in some situations and be weak in others; none may be unable to
 participate.
 
-**Two abilities plus one ultimate are equipped**, from six per class, two of
-them free at level one. Six against two slots is a loadout decision rather than
-a rotation.
+**Two abilities plus one ultimate are equipped**, from the class's registered
+kit. Starters are per-class authored — one or two free at level one. Swift is
+the one-starter class: Skim plus an enhanced-dash tree node granted at level
+one, and its second slot stands visibly empty until the first unlock — the
+empty slot is the first thing the quartermaster fills. Many against two slots
+is a loadout decision rather than a rotation.
 
-**The other four unlock one at a time, per character.** The ultimate and the two
-starters are free and never unlock; every remaining class ability is bought with
-a one-time token at the quartermaster, an Anchor interaction. Tokens rather than
+**The remaining class abilities unlock one at a time, per character.** The
+ultimate and the starters are free and never unlock; every remaining class
+ability is bought with a one-time token at the quartermaster, an Anchor
+interaction. Tokens rather than
 the crafting currency, because that currency is account-wide and would let an
 established account buy out a new character's kit at level one. One token per
 unlockable means acquisition is an ordering choice — which ability first —
@@ -178,7 +182,7 @@ own:
 | Every class's resource generates in every state that class is expected to fight in | `Classes.GenerationReachability` |
 | Starters, unlockables and the ultimate partition the class's registered abilities exactly | `Abilities.Catalogue.Partition` |
 | No registered ability is offered and permanently refusable | `Abilities.Catalogue.NoPermanentlyRefusable` |
-| Exactly two starters per class, and they seed both class slots | `Abilities.StarterPair` |
+| Each class's authored starter count seeds its slots — two for most, one for Swift with slot two empty | `Abilities.StarterPair` |
 | Every ability of every class is reachable by level 50 at the shipped token entitlement | `Progression.AbilityUnlocks.ReachableByFifty` |
 | No class is ever paid a token it cannot spend | `Progression.AbilityUnlocks.NoUnspendableTokens` |
 | A refused unlock costs nothing | `Progression.AbilityUnlocks.SpendRefusals` |
