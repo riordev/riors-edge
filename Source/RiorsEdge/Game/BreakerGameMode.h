@@ -112,6 +112,20 @@ public:
     // The template courtyard is 4000 cm across, which is why it is.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Field", meta=(ClampMin="100")) float DashRefreshDistance = 4400.0f;   // O2 PLACEHOLDER
 
+    // ENCOUNTER-DESIGN 5.2'S SPAWN BAND, as values rather than as a number in a
+    // comment. The wave spawner used to place the pack at DashRefreshDistance
+    // (4400) while its own comment claimed that was "inside 5.2's 1500-4000 cm
+    // band" — a justification and a value disagreeing where both were visible,
+    // and 400 cm outside the top of the band it named in the same sentence.
+    //
+    // The band wins, and it wins for the reason the wave budget's caps beat its
+    // curve: it is the one with a document behind it. The spawn distance is now
+    // DERIVED — DashRefreshDistance clamped into this band — so the movement
+    // constant still expresses the intent ("one dash-cooldown of ground away")
+    // and cannot silently leave the band again when it is retuned.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves", meta=(ClampMin="0")) float WaveSpawnBandMinCm = 1500.0f;   // O2 PLACEHOLDER (5.2)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Waves", meta=(ClampMin="0")) float WaveSpawnBandMaxCm = 4000.0f;   // O2 PLACEHOLDER (5.2)
+
     // Minimum width of a corridor a player is expected to SPRINT down. A wall
     // at lateral distance d passing at speed v produces peak peripheral optical
     // flow of v/d rad/s; sustained flow above ~2.2 rad/s (126 deg/s) at the

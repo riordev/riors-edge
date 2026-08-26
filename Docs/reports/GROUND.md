@@ -4,6 +4,63 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
+## Spawn containment: the shape, before numbers (Part One-L, ruled)
+
+The band disagreement is fixed in the same commit as this report — the spawn
+distance is now `DashRefreshDistance` clamped into 5.2's 1500-4000 band, so the
+movement constant still carries the intent and cannot silently leave the band
+when it is retuned. **That is not the fix for what the owner saw**, and the
+ruling already says so: 4000 still spawns outside a 50 m width.
+
+The shape of containment, as asked:
+
+- **A pack belongs to a YARD, and the yard is the one the player is in.** The
+  concept exists — `FBreakerZoneField` carries a yard's frame and its pieces —
+  but nothing today maps a world position to a yard. That lookup is the first
+  piece and it is small: a point-in-band test against each yard's params, which
+  is the same arithmetic `IsPointInClearedGround` already does per-field.
+- **Distance becomes a RANGE the yard affords, not an offset.** The current
+  form asks "how far ahead of the player"; the contained form asks "where in
+  this yard, at least X and at most Y from the player, inside the boundary".
+  Same band, applied against the room rather than against the facing.
+- **Direction stops being the player's facing alone.** The intermittency the
+  owner saw is a facing artefact: 44 m down the long axis is fine and 44 m
+  across the short axis is outside. A contained spawner picks a direction the
+  yard has room in, which by construction cannot depend on which way the player
+  happens to be looking.
+
+**Your question — what happens when a yard cannot hold the band — and I think
+the 100x50 yard already IS that case.** Facing across the short axis there is no
+direction that satisfies a 1500 minimum and stays inside 50 m of width with a
+pack spread around it. My answer, in preference order:
+
+1. **The yard declares itself too small for a spawn band, and the grammar says
+   so.** This is the option I recommend and it is the one consistent with
+   everything else here: the cover grammar already refuses layouts that cannot
+   host what they claim to host, and "this yard cannot hold a fight" is exactly
+   that kind of statement. It converts an intermittent runtime defect into a
+   build-time refusal, which is the trade this project keeps making and keeps
+   being right about.
+2. **The band shrinks to what the yard affords**, with a floor below which it
+   refuses anyway. Cheap, and it silently makes small yards feel different from
+   large ones without saying so — the near edge is what decides whether a spawn
+   reads as fair.
+3. **The pack splits across sightlines.** Most interesting, most expensive, and
+   it needs the sightline vocabulary the connection rule is also waiting on. Not
+   now.
+
+Note this interacts with the yard shape: if five yards are each about the size
+of the current one, and the current one already cannot hold the authored band,
+then option 1 says the authored band or the yard size has to move — and that is
+a better thing to learn from the grammar before authoring four more yards than
+from a playtest after.
+
+- **Question:** confirm option 1, and whether "too small to hold a spawn band"
+  belongs in `IsZoneLegal` (a yard that cannot host a fight is illegal) or as a
+  separate query a spawner asks (a yard may legally exist without being a
+  combat yard). I lean to the second — the entry plaza is a real place that
+  should never host a wave.
+
 ## Autoplay's destination is one line in `Characters/` (Part One-E, half-landed)
 
 `EditorStartupMap` now points at `Lvl_Anchor` and the instruments moved with it,

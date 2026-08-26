@@ -2828,12 +2828,30 @@ void ABreakerGameMode::StartNextWave()
     const FVector Forward = PlayerPawn->GetActorForwardVector().GetSafeNormal2D();
     // Wave mode deliberately spawns around the PLAYER rather than at the
     // authored arena: the instrument has to work wherever a playtest happens
-    // to be standing. What changed is the distance, which is now derived
-    // instead of the old SafeZoneRadius + 4200. One DashRefreshDistance out
-    // means the pack is exactly one dash-cooldown of ground away — inside
-    // Encounter-Design 5.2's 1500-4000 cm spawn band at the near packs and
-    // still far enough that nothing materialises in the player's face.
-    const FVector ArenaCenter = Origin + Forward * DashRefreshDistance;
+    // to be standing. THAT IS CORRECT FOR AN INSTRUMENT IN AN OPEN FIELD AND
+    // WRONG FOR A WALLED YARD — the owner watched enemies spawn outside the
+    // tileset and walk in, because 44 m from a player facing across a 50 m
+    // width lands outside it. The missing concept is that this spawner has no
+    // idea a boundary exists; containment is GROUND's and is reported before
+    // any number is authored for it. What is fixed HERE is the narrower defect
+    // underneath it.
+    //
+    // THE VALUE AND ITS OWN JUSTIFICATION DISAGREED. The comment cited
+    // Encounter-Design 5.2's 1500-4000 cm band and then used 4400, 400 cm above
+    // the top of the band it named in the same sentence. The band wins, for the
+    // reason the wave budget's caps beat its curve: it is the one with a
+    // document behind it. So the distance is DERIVED rather than either number
+    // being quietly rewritten — DashRefreshDistance still expresses the intent
+    // ("one dash-cooldown of ground away") and the clamp stops it leaving the
+    // band again the next time movement is retuned.
+    //
+    // Lowering the constant to 4000 would have satisfied the band and still
+    // spawned outside a 50 m yard, which is why this is not the fix for what
+    // the owner saw. It is the fix for a justification that was not true.
+    const float SpawnDistance = FMath::Clamp(DashRefreshDistance,
+        FMath::Min(WaveSpawnBandMinCm, WaveSpawnBandMaxCm),
+        FMath::Max(WaveSpawnBandMinCm, WaveSpawnBandMaxCm));
+    const FVector ArenaCenter = Origin + Forward * SpawnDistance;
 
     // THE WAVE IS SOLVED, NOT RAMPED. What was here was `4 + wave * 3` capped
     // at 24, an elite every third wave and `wave/2` Lattices: no budget, no
