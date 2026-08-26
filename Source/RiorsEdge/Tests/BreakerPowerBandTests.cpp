@@ -470,6 +470,99 @@ namespace BreakerPowerBandTest
         };
     }
 
+    // THE ABILITY-BUILT TREE SPEND (Part One-M, ruled on the 0.48-0.51
+    // estimate now standing as a prediction). Until this existed the parity
+    // test's ability build swapped GEAR ONLY and rode the weapon build's
+    // tree, so the measurement asked "what does an ability loadout get from
+    // a weapon build's tree" — a real number, and not the question O99's
+    // band was written about; the atlas then handed that shared spend eight
+    // weapon travel picks and parity halved announced-but-unsummed.
+    //
+    // A FULL 65-POINT at-cap character, spent WELL for abilities, and a
+    // STRUCTURAL MIRROR of OptimizedRanks: three wheels bought whole, the
+    // same Velocity chain for the same shared More, the same Ruin dip, and
+    // travel taken on Ability picks where the weapon build took Weapon.
+    // RING-LEGAL from the Reservoir ENTRY (Core.Reservoir.Draw is one of
+    // the atlas's three entries): Reservoir complete (12, hubless), Ring3
+    // to ARC (3), ARC complete to Overflow (15 — the ability More), Chord2
+    // to Velocity (5), Velocity complete to Terminal Velocity (15 — the
+    // shared More, airborne like the measurement state), Ring10 to Ruin
+    // (3), the weapon fixture's own Ruin dip (8 — Execute and Siege, with
+    // ShapedCharge's weapon line carried as the honest cost of the mirror),
+    // Ring4 toward Elements (3) and Rend (1). 65 exactly.
+    TArray<FBreakerNodeRank> AbilityOptimizedRanks()
+    {
+        return {
+            // Reservoir, from its entry, complete (no hub exists): 12
+            {TEXT("Core.Reservoir.Draw"), 1},
+            {TEXT("Core.Reservoir.Wellspring"), 1},
+            {TEXT("Core.Reservoir.Capacity"), 1},
+            {TEXT("Core.Reservoir.Tithe"), 1},
+            {TEXT("Core.Reservoir.DeepPockets"), 1},
+            {TEXT("Core.Reservoir.SecondShift"), 1},
+            {TEXT("Core.Reservoir.ConvergencePoint"), 1},
+            {TEXT("Core.Reservoir.Spillover"), 1},
+            {TEXT("Core.Reservoir.Reserve"), 1},
+            // The run to ARC, ability picks: 3
+            {TEXT("Core.Travel.Ring3P1Ability"), 1},
+            {TEXT("Core.Travel.Ring3P2Ability"), 1},
+            {TEXT("Core.Travel.Ring3P3Ability"), 1},
+            // ARC, complete: 15
+            {TEXT("Core.Arc.Channel"), 1},
+            {TEXT("Core.Arc.Widen"), 1},
+            {TEXT("Core.Arc.Recycle"), 1},
+            {TEXT("Core.Arc.Anchor"), 1},
+            {TEXT("Core.Arc.Prime"), 1},
+            {TEXT("Core.Arc.Vent"), 1},
+            {TEXT("Core.Arc.CadenceBreak"), 1},
+            {TEXT("Core.Arc.Reach"), 1},
+            {TEXT("Core.Arc.Widening"), 1},
+            {TEXT("Core.Arc.Overflow"), 1},               // More x1.28, ability lane
+            // The chord from Reservoir's entry to Velocity, ability picks: 5
+            {TEXT("Core.Travel.Chord2P1Ability"), 1},
+            {TEXT("Core.Travel.Chord2P2Ability"), 1},
+            {TEXT("Core.Travel.Chord2P3Ability"), 1},
+            {TEXT("Core.Travel.Chord2P4Ability"), 1},
+            {TEXT("Core.Travel.Chord2P5Ability"), 1},
+            // Velocity, complete — the same chain the weapon build buys, for
+            // the same shared airborne More: 15
+            {TEXT("Core.Velocity.Freefall"), 1},
+            {TEXT("Core.Velocity.Afterburn"), 1},
+            {TEXT("Core.Velocity.Traction"), 1},
+            {TEXT("Core.Velocity.Slipstream"), 1},
+            {TEXT("Core.Velocity.Grind"), 1},
+            {TEXT("Core.Velocity.Downforce"), 1},
+            {TEXT("Core.Velocity.TerminalDescent"), 1},
+            {TEXT("Core.Velocity.Redline"), 1},
+            {TEXT("Core.Velocity.NoGround"), 1},
+            {TEXT("Core.Velocity.TerminalVelocity"), 1},  // More x1.30, airborne, SHARED
+            // The run into Ruin and the same finisher pair: 3 + 8
+            {TEXT("Core.Travel.Ring10P1Ability"), 1},
+            {TEXT("Core.Travel.Ring10P2Ability"), 1},
+            {TEXT("Core.Travel.Ring10P3Ability"), 1},
+            {TEXT("Core.Ruin.WeightofIt"), 1},
+            {TEXT("Core.Ruin.Cull"), 1},
+            {TEXT("Core.Ruin.Break"), 1},
+            {TEXT("Core.Ruin.ShapedCharge"), 1},
+            {TEXT("Core.Ruin.Execute"), 1},
+            {TEXT("Core.Ruin.Siege"), 1},                 // TargetElite rider
+            // The spare four: Ring4 ability picks and Rend. 3 + 1
+            {TEXT("Core.Travel.Ring4P1Ability"), 1},
+            {TEXT("Core.Travel.Ring4P2Ability"), 1},
+            {TEXT("Core.Travel.Ring4P3Ability"), 1},
+            {TEXT("Core.Ruin.Rend"), 1},
+            // The doctrine layer, IDENTICAL to the weapon fixture's on
+            // purpose: the comparison isolates the Core spend, and doctrine
+            // rows are the class layer, not the question.
+            {TEXT("Swift.Marksman.LongLens"), 2},
+            {TEXT("Swift.Marksman.Deadeye"), 2},
+            {TEXT("Swift.Marksman.PierceDiscipline"), 2},
+            {TEXT("Swift.Marksman.Culling"), 1},
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
+            {TEXT("Swift.Kinetic.Downforce"), 2},
+        };
+    }
+
     // Airborne, recently dashed, at Redline: the rotation the optimized build is
     // organised around, and the state both builds are measured in.
     FBreakerBuildConditionState MeasurementState()
@@ -710,10 +803,11 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
     int32 Checked = 0;
     TArray<FString> Missing;
     TArray<FString> Overdrawn;
-    for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized")})
+    for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized"), TEXT("ability-optimized")})
     {
         const TArray<FBreakerNodeRank> Ranks =
-            FString(Label) == TEXT("baseline") ? BaselineRanks() : OptimizedRanks();
+            FString(Label) == TEXT("baseline") ? BaselineRanks()
+            : FString(Label) == TEXT("optimized") ? OptimizedRanks() : AbilityOptimizedRanks();
         for (const FBreakerNodeRank& Rank : Ranks)
         {
             ++Checked;
@@ -1395,6 +1489,7 @@ namespace BreakerPowerBandTest
     }
 }
 
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerPowerBandAbilityLaneTest,
     "RiorsEdge.Progression.PowerBand.AbilityLane",
@@ -1408,7 +1503,10 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     const FBreakerBuildConditionState State = MeasurementState();
 
     const FComposedBuild WeaponBuild = Compose(OptimizedLoadout(AtCapItemLevel, Tier), OptimizedRanks(), State);
-    const FComposedBuild AbilityBuild = Compose(AbilityOptimizedLoadout(AtCapItemLevel, Tier), OptimizedRanks(), State);
+    // Part One-M: the ability build owns an ability-built TREE as well as its
+    // gear. Until this, it rode the weapon build's ranks and the measurement
+    // asked what an ability loadout gets from a weapon tree.
+    const FComposedBuild AbilityBuild = Compose(AbilityOptimizedLoadout(AtCapItemLevel, Tier), AbilityOptimizedRanks(), State);
     const FComposedBuild Baseline = Compose(BaselineLoadout(AtCapItemLevel, BaselineTierFor(AtCapItemLevel)), BaselineRanks(), State);
 
     AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
@@ -1475,7 +1573,7 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     {
         const int32 EndgameTier = OptimizedTierFor(EndgameItemLevel);
         const FComposedBuild EndgameWeapon = Compose(OptimizedLoadout(EndgameItemLevel, EndgameTier), OptimizedRanks(), State);
-        const FComposedBuild EndgameAbility = Compose(AbilityOptimizedLoadout(EndgameItemLevel, EndgameTier), OptimizedRanks(), State);
+        const FComposedBuild EndgameAbility = Compose(AbilityOptimizedLoadout(EndgameItemLevel, EndgameTier), AbilityOptimizedRanks(), State);
         const float EndgameParity = EndgameAbility.AbilityTotal / EndgameWeapon.Total;
         AddInfo(FString::Printf(TEXT("ABILITY LANE  weapon build, weapon lane   (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
             EndgameItemLevel, EndgameTier, EndgameWeapon.FlatLayer, EndgameWeapon.IncreasedLayer, EndgameWeapon.MoreLayer, EndgameWeapon.Total));
