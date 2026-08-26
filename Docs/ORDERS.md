@@ -1065,6 +1065,54 @@ One of the two is wrong and it should stop being both.
 
 ---
 
+# PART ONE-M — THE ABILITY-BUILT FIXTURE IS AUTHORISED, AND BOTH CAUSES ARE REAL
+
+LEDGER estimated before authoring, as ordered: an ability-built tree fixture
+would measure parity at roughly **0.49 (0.48–0.51)**, against today's 0.27 and a
+band floor of 0.85.
+
+**RULED: author it.** The estimate is now a prediction on the record, which is
+the discipline the seat failed at with Collapse — a number stated before the
+measurement is worth more than one fitted after it.
+
+## Both causes are real, and the split depends on which frame you use
+
+```
+  ADDITIVE   fixture closes 0.22 of the 0.58 gap   38%
+             content closes 0.36                   62%
+
+  RATIO      fixture   1.81x
+             content   1.73x                       near-equal
+```
+
+LEDGER's *"about half and half"* is **true in the ratio frame and not the
+additive one**, and the ratio frame is the correct one because **parity IS a
+ratio** — an ability lane's throughput against a weapon lane's. Recorded because
+someone will re-derive this additively, get 38/62, and think one of us was
+wrong. Neither is; they are answers to different questions and only one of the
+questions is the metric's own.
+
+## The consequence is the actionable part and it checks out
+
+*"Tuning against the current figure would overshoot by about 2x."* Verified:
+closing 0.27 → 0.85 by content alone is a 3.15× move, while the content half
+actually needs 1.73× — an overshoot of **1.81×**.
+
+So the sequencing is forced, not preferred: **re-base the fixture first, then
+tune against what it reports.** Content authored against 0.27 would land parity
+near 1.6 and the band would fail from the other side, which is a worse failure
+than the current one because it looks like success until someone reads the
+number.
+
+## What stays true regardless of the fixture
+
+The flat half is unchanged by any of this. The ability lane has no flat line,
+nothing in the game fills the law's `sum(Flat)` term, and a re-based fixture
+measures the same zero. Part One-K's finding stands untouched and remains the
+owner's, in the affix layer.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
