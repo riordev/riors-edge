@@ -16,13 +16,13 @@
 // rewrite), and world geometry still stops the round — all targets in a
 // clear line, never through walls.
 //
-// RECORDED ABSENT, not faked (O175): the "cannot be blocked by cover-state
-// enemies" clause. Nothing on the shot path consults a cover state — a
-// Skirmisher's InCover is a position behind ordinary geometry, not a
-// collision or damage rule — so there is no blocker for this clause to
-// bypass. The one actor-attached shot blocker in the game is the Warden's
-// shield; scoping the clause to it is the candidate when a ruling wants the
-// sentence to pay.
+// THE COVER CLAUSE IS RETIRED (Part One-U item 15, amending O175): "cannot
+// be blocked by cover-state enemies" was about bodies in cover, nothing on
+// the shot path ever consulted a cover state, and the seat ruled against
+// re-pointing the sentence at the Warden's shield — that enemy's whole
+// identity is a defence you must move around, and buying it away in a
+// clause's small print is not a rescue, it is a new node wearing an old
+// sentence. Sightline is the pierce window, whole.
 //
 // NAME NOTE: the Marksman node Swift.Marksman.Sightline currently grants a
 // flat +2 Pierce as an explicit stand-in for this ability (its own comment

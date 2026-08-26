@@ -250,9 +250,8 @@ const TArray<UBreakerAbilityDefinition*>& UBreakerAbilityDefinition::GetFallback
     Registry.Add(HardStop);
 
     // S5 Sightline — §1.2 row S5: 25 Momentum, 6s cooldown, 2s window.
-    // The "cannot be blocked by cover-state enemies" clause is RECORDED
-    // ABSENT at the ability's own header (nothing on the shot path consults
-    // a cover state), never faked.
+    // The design's cover-state clause is RETIRED (Part One-U item 15) — see
+    // the ability header. Sightline is the pierce window, whole.
     UBreakerAbilityDefinition* Sightline = MakeFallback(TEXT("FallbackAbility_Swift_Sightline"));
     Sightline->AbilityId = TEXT("Swift.Sightline");
     Sightline->ClassId = EBreakerClassId::Swift;

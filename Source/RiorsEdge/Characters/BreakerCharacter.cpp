@@ -398,6 +398,18 @@ void ABreakerCharacter::SaveGameState()
     // would stamp THIS pawn's state over that character's save — the exact
     // clobber that turned a freshly created Caster into Swift.
     if (bRefuseSavesForPendingCharacter) return;
+    // THE PROBE NEVER TOUCHES A SAVE (Part One-U item 16's guard, stated as
+    // its own refusal): an ability-probe session dev-forces classes and — once
+    // the dev equip surface lands — loadouts a real character has not earned,
+    // and a persisted probe state is save corruption wearing a convenience.
+    // The whole session refuses character-state writes, not just the probe
+    // frames, because the corrupting write is whichever one happens LAST.
+    FString ProbeValueScratch;
+    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe"))
+        || FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeValueScratch))
+    {
+        return;
+    }
     // A FRONT-END pawn with no character has nothing worth persisting: its
     // state is BeginPlay's fresh seeding, and writing it to the legacy slot
     // is what AdoptLegacySaveIfPresent later adopts into an empty roster as a

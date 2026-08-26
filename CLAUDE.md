@@ -2,6 +2,24 @@
 
 ## Current work
 
+KIT LANE, ONE-U'S FOUR ANSWERS LAND: the seat's blocked-question pass
+(6fac190, missed by this lane's truncated diff reads for several
+checks — the loop's check now reads full diffs) answered all four
+original KIT questions. Landed this commit: SIGHTLINE'S COVER CLAUSE
+RETIRES per item 15 (a dead sentence gets no new referent; the
+Warden's shield stays the puzzle you flank — header, registry row
+and O175's line all say so), and the NEVER-SAVE GUARD per item 16's
+condition (any -BreakerAbilityProbe session refuses character-state
+writes wholesale — the corrupting write is whichever one happens
+last). Item 14 confirms the empty-slot repair as the ruled shape —
+nothing changes; item 17 sends the deliberate ultimate tint to
+GLASS. The probe equip surface (item 16's other half) waits on
+LEDGER publishing a dev-only DevForceEquipAbility (requested,
+message sent); the probe's =Class:AbilityId form wires up then.
+KIT.md is down to the three One-R flagged-defaults awaiting seat
+confirmation (extract shape, wall-jump retirement, the 145) plus
+the probe-surface tracking note.
+
 KIT LANE, WALL-RIDE IS OUT (Part One-R's removal window, LEDGER one
 rebase behind by agreement). The ride's ~48-line state machine, its
 nine parameters, the suspension chain, FindRunnableWall, and

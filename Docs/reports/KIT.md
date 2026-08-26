@@ -4,23 +4,6 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
-## The empty second slot's repair semantics (O176 as landed)
-
-A stale foreign-class id in Swift's slot two now repairs to EMPTY rather than
-to a playable default — for every other class the stale-save repair hands the
-class default so the slice stays playable, and for Swift it now hands the
-ruled empty slot. **Question:** ruled shape, or unwanted side effect of the
-empty-slot feature? (KIT read the ruling as covering it; flagged because the
-repair path predates the ruling.)
-
-## Sightline's cover clause (O175)
-
-"Cannot be blocked by cover-state enemies" is recorded absent — nothing on
-the shot path consults a cover state; a Skirmisher's InCover is a position
-behind ordinary geometry. The one actor-attached shot blocker in the game is
-the Warden's shield. **Question:** scope the clause to Warden-shield
-penetration, or retire it?
-
 ## Part One-R, corrected by the movement recon: a mantle already EXISTS
 
 `ABreakerCharacter::TryMantle` (BreakerCharacter.cpp:798-846) is a working
@@ -57,17 +40,12 @@ Docs/Movement-Design.md contains no such text. **Question:** rule the
 value (KIT proposes 145, the grammar's, since a yard was validated against
 it) and whether MaxStepHeight gets authored to agree.
 
-## Photographing unlockable abilities
+## The probe equip surface (One-U item 16, approved — waiting on LEDGER)
 
-`-BreakerAbilityProbe[=Class]` casts only DEFAULT loadouts through the real
-grant site, so an unlockable ability (five of Swift's six class abilities,
-and every non-starter elsewhere) cannot be photographed headlessly until a
-character has levels and tokens. **Question:** acceptable — or rule a
-probe-only dev token grant so the capture harness can reach the whole kit?
-
-## Ultimate screen feel
-
-Overdrive's accidental full-screen violet wash (camera inside an additive
-primitive) was removed as a blind. If a deliberate brief tint on ultimate
-ignition is WANTED as a cue, that is a GLASS post-process question, not
-pooled primitives. Flagged only.
+The probe-only grant is ruled YES with the never-touch-a-save guard. KIT's
+half is landed (the guard refuses character-state writes for any probe
+session; Sightline's clause retirement rode the same commit). The equip path
+dead-ends at Progression's one-writer unlock refusal, so a dev-only
+DevForceEquipAbility surface is requested from LEDGER (message sent,
+2026-08-26); the probe's =Class:AbilityId form wires up when it lands. Not a
+seat question — recorded here so the mirror stays complete.
