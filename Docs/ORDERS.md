@@ -1334,6 +1334,90 @@ completion moment both get seen for the first time.
 
 ---
 
+# PART ONE-R — WALL-RIDE OUT, VAULT AND MANTLE IN. THE GRAMMAR ALREADY ASSUMED IT
+
+Owner, 2026-08-26: *"i think we should remove wall riding honestly and just do
+vaulting and mantling."*
+
+**RULED.** And measuring the blast radius turned up the reason this is not a
+preference.
+
+## THE COVER GRAMMAR HAS BEEN VALIDATING AGAINST A VERB THAT DOES NOT EXIST
+
+`MantleStepHeight = 145` is declared on `ABreakerGameMode` and is cited in five
+places as the reason the cover rules are shaped as they are:
+
+> *"Chest-high cover is 120 cm, which is under MantleStepHeight (145): a player
+> does not go around it, they go over it, so it does not close a lane."*
+> — `BreakerCoverRegistry.cpp:638`
+
+**The movement component implements no mantle.** Two mentions of mantle, vault,
+climb or ledge in the whole `.cpp` and zero in the header. **A player cannot go
+over chest cover.**
+
+So `MinimumOpenLaneWidth` being full-height-only — the rule GROUND defended, that
+the seat verified, that a whole yard's lattice was validated against — **is
+correct only if mantling works.** It does not. Chest cover DOES close lanes
+today, and the corridor validation has been measuring a game that was never
+built.
+
+**This ruling does not add a feature. It makes the level grammar true.** That
+moves it from a movement preference to a correctness fix for the space the rift
+interior is about to be played in.
+
+## The blast radius, measured
+
+```
+  Movement/BreakerCharacterMovementComponent.cpp   51 wall-ride references
+  Core.Velocity.Traction                           node authored on WallRiding
+  Swift.Kinetic.Grind                              node authored on WallRiding
+  WallRideDamage                                   2 authored affix lines
+  EBreakerBuildCondition::WallRiding               1 enumerator
+```
+
+**The enumerator is RETIRED, not deleted, and this is not negotiable.**
+`EBreakerBuildCondition` is serialized by value and its header carries a
+`static_assert` against a 32-entry mask. Removing an entry shifts every later
+value and silently re-points every saved character's conditional lines at the
+wrong predicate. It stays, unused, with a comment saying why — the same rule as
+O-numbers being permanent.
+
+## Who does what
+
+**KIT — the verbs.** Wall-ride out of `Movement/`, vault and mantle in. This
+folds into the movement recon already assigned in Part Three-F: the recon now has
+a specific question to answer, which is what a mantle needs from the movement
+component that is not already there.
+
+**KIT — and `MantleStepHeight` becomes a real threshold, not a level-design
+number.** It lives on the game mode because the grammar needed a figure. Once a
+mantle exists, the movement side needs its own and the two must not disagree —
+**publish it from wherever the verb lives and have the grammar read it**, per the
+published-path rule. Two copies of that number is the defect this project has
+found five times tonight.
+
+**LEDGER — the two nodes.** `Core.Velocity.Traction` and `Swift.Kinetic.Grind`
+re-target onto whatever the new verbs offer, or retire with their reason
+recorded. Do not leave a node pointing at a retired condition.
+
+**GROUND — nothing yet, and that is deliberate.** The lane grammar becomes
+*correct* rather than changing. Re-validate Fernhall once the mantle lands and
+report whether the lattice still passes — if chest cover has been closing lanes
+all along, some of what passed may not.
+
+**OWNER — `WallRideDamage`.** Two authored affix lines in your file, which no
+lane may touch.
+
+## Sequencing against the interior
+
+Part One-Q put the rift interior behind spawn containment. **This goes after
+both.** A mantle that lands mid-interior-swap means a yard being re-validated
+while the thing it validates against is changing underneath it. Containment,
+then the interior, then the verbs — and the yard gets re-validated once, at the
+end, against a grammar that is finally true.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
@@ -1991,6 +2075,67 @@ So walking Fernhall today is walking an empty lot with a door in it. That is
 worth knowing before it is judged: it answers "does the pad read as somewhere to
 go" and "does the lattice change how I move", and it cannot yet answer anything
 about a fight.
+
+---
+
+# PART THREE-F — KIT'S REFILL, AND THE DIRECTORY NOBODY OPENED
+
+KIT is out of work again. Weapon feel landed — recoil differentiated per
+archetype, the viewmodel's bob and sway and landing dip, three dead levers woken.
+Its queue is four small questions and nothing substantial.
+
+Measured across the session: **`Movement/` took ONE commit out of fifty-six.** It
+is the least-touched directory in KIT's territory and it holds the verbs the
+owner's hands are on most.
+
+## 1. The autoplay line, first, because it blocks the owner's own workflow
+
+`Characters/BreakerCharacter.cpp:1753` still sends `-BreakerAutoPlay` to the gym
+from the front end. GROUND landed the other half — `EditorStartupMap` is the
+Anchor now — and reported this one rather than reaching into `Characters/`, which
+is KIT's.
+
+**So the Anchor ruling is half-landed, and the missing half is the half the owner
+uses.** He runs the standalone command line, not PIE. Until this moves, Part
+One-E has changed nothing for him.
+
+Small, concrete, and it is the only thing in this file that is costing the owner
+something every time he plays.
+
+## 2. Movement feel, and the timing is not a coincidence
+
+Weapon feel got a recon and a pass. **Movement feel has had neither**, and
+`Movement/` is 1,493 lines nobody opened.
+
+The reason it matters now rather than later: **the rift interior is about to
+become a walled 100 x 50 m yard** (Part One-Q). Every movement verb in this game
+has only ever been felt in an open field with no boundaries. Dash distance
+against a wall, wall-ride against an actual wall, slide into cover that exists —
+none of it has been experienced in the space the game is about to be played in.
+
+And Swift is the vertical slice, the movement class, and what the owner plays.
+
+**Recon first, as with weapons.** What the movement component already exposes,
+what is authored versus defaulted, and — specifically — **which verbs have never
+been exercised against geometry.** The weapon recon found a complete unit-tested
+model that was mostly unwired; do not assume this one is thin before looking.
+
+## 3. Your four open questions are yours to sequence
+
+The empty second slot's repair semantics, Sightline's cover clause, photographing
+unlockable abilities, ultimate screen feel. None blocks anything. Take them
+between the two above or after, as they fit.
+
+## The pattern worth naming, because it has now happened twice
+
+**KIT's queue has drained twice and nobody noticed either time.** Once at eleven
+commits behind, once here. Both times the lane finished what it was given and
+stopped, correctly, rather than inventing work.
+
+That is the lane behaving well and the seat failing to keep a queue. **The fix is
+not for KIT to self-assign** — that is how a self-executing default became a
+ruling earlier tonight. It is for the seat to check queue depth when a lane
+reports, not only when it goes quiet.
 
 ---
 
