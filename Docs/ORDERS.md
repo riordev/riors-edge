@@ -793,6 +793,278 @@ one you are pushing onto.
 
 ---
 
+# PART ONE-J — THE HALVING IS FOUND, AND THE DECOMPOSITION STOPS ONE STEP SHORT
+
+`2dc2e8c` answers Part One-G and the answer is better than a bisect. **No rogue
+edit exists.** The decline was announced at every step, in the commit bodies,
+stated each time: `0.64 → 0.61 → 0.56 → 0.39` across the atlas pairs and the
+no-shared-hub retarget, then `0.39 → 0.27` at `983b925`.
+
+**So parity did not fall silently. It fell in public, one announced step at a
+time, and nobody summed the announcements.** That is a different failure from the
+one the seat assumed and a more uncomfortable one: every individual disclosure
+was honest, and the aggregate went unread because nothing was responsible for
+aggregating it.
+
+The pin fix is the right general remedy: both narratives now carry **the rule
+instead of a number** — *the live figure lives only in the emit; a number typed
+into pin prose is frozen at writing and is history, dated.*
+
+## The decomposition is arithmetically right and does not reach 0.27
+
+Stated: the flat ratio is byte-identical across the halving at **0.867**, and the
+increased ratio alone collapsed **0.746 → 0.461**. Multiplying:
+
+```
+  0.867 x 0.746 = 0.6468     ~ the 0.641 the pin recorded BEFORE      ok
+  0.867 x 0.461 = 0.3997     ~ the 0.39 step, NOT the 0.27 reported
+```
+
+**The decomposition explains the fall to 0.39 and stops there.** The last step —
+`0.39 → 0.27` at `983b925`, the fixture rewrite — is the one it does not cover,
+and it is the step whose cause the same commit calls structural.
+
+Two readings, and LEDGER should say which:
+
+- **The 0.461 is measured at the 0.39 point**, not at the tip. Then the sentence
+  "byte-identical across the halving" is scoped to the part before the fixture
+  rewrite and reads as covering all of it.
+- **Or the flat ratio is not byte-identical through the last step**, in which case
+  `0.27 / 0.867 = 0.311` is where the increased ratio actually sits and 0.461 is
+  stale.
+
+Either way the figures are right and the **coverage claim is not** — a scoped
+result presented as total, in the commit that fixes a stale-narrative defect.
+That is the shape this project finds most often, and it is worth noticing that
+it survives inside a fix for its own cousin.
+
+## What this changes about the number itself
+
+The two halves are not the same kind of problem and should stop being one figure
+in conversation.
+
+**The flat half (0.867) is real content.** The ability lane has no flat line at
+all — O54 names three Increased pools and is silent on flat. That is a genuine
+gap and no fixture change touches it.
+
+**The increased half is substantially the FIXTURE.** Both power-band fixtures
+share one weapon-leaning tree spend; the atlas hands it eight +15% weapon travel
+picks; the ability wheels (ARC, RESERVOIR) go unbought by either; and the parity
+test's ability loadout **swaps gear, not tree**. So the measurement asks *what
+does an ability loadout get from a weapon build's tree* — a real number, and not
+the question the 0.85–1.15 band was written about.
+
+**You cannot tune against a number that is answering a different question.** Of
+LEDGER's three honest routes, the **owner-ruled ability-built tree fixture** is
+the one to take first — not because the content gap is imaginary, but because
+until the fixture buys an ability build, nobody can tell how much of 0.27 is
+content and how much is the question.
+
+**LEDGER: report what an ability-built fixture would measure, before authoring
+it.** If parity against an ability-built tree is still far below band, the content
+gap is the whole story and the other two routes get their turn. If it is close,
+the band has been failing a measurement rather than the game.
+
+---
+
+# PART ONE-K — THE SECOND PLAYTEST: THREE THINGS, NONE OF THEM OWNED
+
+Owner, 2026-08-26, playing the tip: *"the death sound is still there but your
+model looks the same / all of the enemies are just basic fucking human bodies as
+well / this damage issue is also caused by the affixes not being updated dont you
+think?"*
+
+All three check out. None of the three currently has a lane.
+
+## 1. There are TWO death sounds and only one was ruled
+
+`BreakerPlaytestHUD.cpp:2794` carries GLASS's fix — `if (!Result.bKilled && ...)`
+guards `PlayTakeHit`, so the **player's** death is silent and the ruling landed.
+
+**`PlayKill()` at `:2475` and `:2489` fires when the player kills something**, and
+nothing has ever ruled on it. GLASS answered "the death sound" as the player's;
+the owner may have meant the noise an enemy makes dying — which he hears far more
+often, and which is still there.
+
+**ANSWERED 2026-08-26: NO DEATH SOUND FOR NOW.** The owner: *"no death sound for
+now."* Both of them go — the player's already did, and `PlayKill` follows.
+
+**GLASS: a kill falls through to `PlayHitConfirm`, it does not go silent.** The
+site is `if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();` at `:2475`
+and `:2489`, so deleting the kill branch has two readings and only one is the
+ruling:
+
+- **RULED — the kill plays the hit-confirm.** No death *sting*; the shot still
+  confirms it connected. That is what "no death sound" means and it costs
+  nothing.
+- **NOT RULED — the kill plays nothing.** That makes the **last shot on an enemy
+  silent**, which removes the feedback that the shot landed at all. Losing hit
+  confirmation is a worse defect than a bad sting, and it is not what was asked
+  for.
+
+Take the first. If the fall-through reads oddly in play — a kill sounding
+identical to a graze — say so and it becomes a ruling about what a kill should
+sound like, which is a different question from whether it should have a sting.
+
+## 2. There is exactly ONE model in this project, and nobody owns that
+
+`SKM_Manny_Simple`, four references, and **only two files in the entire project
+set a skeletal mesh at all**. The player is the mannequin. Every enemy that is
+not a primitive shape is the same mannequin.
+
+This is not late work — **enemy silhouettes have never been assigned to any
+lane.** The readability pack was about *reading* enemies (bars, tint ramps,
+glyphs) and never touched body. Same shape as the rank glyphs, and larger.
+
+**And it explains a load the colour system should not be carrying.** O24 spends
+family colour distinguishing Vestige from Altered from Lattice — and FIELD has
+spent two cycles on ΔE separation between them — **because they are the same
+body.** Silhouette is carrying nothing, so colour carries everything. Give the
+families different shapes and half the colour problem dissolves rather than being
+optimised.
+
+**RULED: FIELD owns which mesh an enemy uses** — the actors are its files. The
+**assets** are a content question with a precedent the owner already approved:
+GROUND pulled CC0 kit assets for the yard, vendored with a licence note in the
+same commit. The same route is open for CC0 character and creature meshes.
+
+**ANSWERED 2026-08-26: YES, and the phrasing carries a condition.** The owner:
+*"yes on cc enemy meshes for the time being."*
+
+The three zone-kit conditions apply unchanged — licence note in the same commit
+as the assets, pull for the families that exist rather than a library, and report
+which silhouettes became distinguishable and how.
+
+**"For the time being" adds a fourth, and it is the one that costs money if
+missed: the family-to-mesh mapping is DATA, not code.** These meshes are
+explicitly placeholders. If FIELD bakes a mesh choice into an actor's
+constructor, or branches behaviour on which mesh a family has, replacing them
+later stops being an asset swap and becomes a refactor. One table, one lookup,
+and swapping a family's silhouette is editing a row.
+
+The test for whether it is done right: **replacing every mesh should be a
+content change with no C++ diff.**
+
+**FIELD: report what swapping a family's mesh actually costs** before anything is
+pulled. Three families, one mannequin today, and the crowd sweep says the cost is
+crowd collision rather than per-body — so a different mesh may be nearly free, or
+may not be. Measure it.
+
+## 3. The owner's affix read is right, and it is half the problem
+
+*"this damage issue is also caused by the affixes not being updated"* — yes, and
+the pool is **28 lines against a planned 56**. Half the variety that was designed
+is unauthored. That is a real cause of builds feeling alike and it is squarely
+where he says it is.
+
+**It is not the whole cause, and the other half is structural.** Measured across
+all 99 damage-bearing node effects:
+
+```
+  target            Flat  Increased   More
+  Damage               0         53      2
+  WeaponDamage         0         16      3
+  AbilityDamage        0         15      1
+  MeleeDamage          0          1      0
+  DamageOverTime       0          1      2
+  CriticalDamage       5          0      0
+  TOTAL                5         86      8
+```
+
+**Zero flat damage lines in the tree.** The five flats sit on CriticalDamage,
+which is a multiplier.
+
+And the affix layer does not fill it either: `AddedDamage` is authored five times
+and reaches the damage path as **`AddedDamagePercent`**, folded into
+`TotalIncreasedDamagePercent` under `Rules.bAddedDamageAlsoIncreased`
+(`BreakerEquipmentComponent.cpp:805`). It is stored in an array named
+`FlatByTarget` and expressed as a percent.
+
+**So the aggregation law's `sum(Flat)` term is structurally always zero.** Every
+build in this game is `Base x (1 + Increased) x More` — nothing changes the SHAPE
+of damage, only its size. That is one explanation for three separate open
+problems: variance at 6.01 against a band of 8–10 because all builds are one
+build at different scales; the 87th Increased line being worth exactly what the
+first was, since the bucket is additive; and parity's flat half sitting at 0.867
+*structurally*, because the ability lane has no flat line for the reason that
+nothing does.
+
+**Finishing the affix pool as designed would give 56 ways to multiply one base.**
+Whether the Flat term is supposed to have an author at all is an owner ruling and
+it sits in the affix layer, which has one owner and is being worked
+independently. **Recorded, not prescribed.** LEDGER: do not author a flat lane in
+the tree to route around this.
+
+---
+
+# PART ONE-L — ENEMIES SPAWN OUTSIDE THE TILESET, AND THE SPAWNER IS GYM-SHAPED
+
+Owner, playing: *"enemies spawn outside of the tile set and walk in."* Verified,
+and the cause is the same shape this project has now found four times.
+
+## The arithmetic
+
+`StartNextWave` places the pack at
+
+```
+  ArenaCenter = player position + forward * DashRefreshDistance
+  DashRefreshDistance = 4400 cm = 44 m
+```
+
+**Fernhall is 100 x 50 m.**
+
+```
+  facing the long axis from the entry plaza   44 m lands mid-yard      fine
+  facing the long axis from 60 m along        44 m lands at 104 m      OUTSIDE
+  facing across the short axis, anywhere      44 m against 50 m wide   OUTSIDE
+```
+
+So it is not always wrong, which is exactly why it reads as intermittent: it
+depends where the player stands and which way they face when the wave starts.
+The pack's own spread around that centre puts more of it out.
+
+**And the value exceeds its own stated band.** The comment at the site cites
+Encounter-Design 5.2's spawn band as **1500–4000 cm** and then uses **4400** —
+400 cm above the top of the band it names in the same sentence. That is a
+justification and a value disagreeing where both are visible.
+
+## The cause is a rule correct about one space, applied to another
+
+The comment says why it is player-relative: *"the instrument has to work wherever
+a playtest happens to be standing."* **That is correct — for an instrument, in an
+open field, with no walls.** It is wrong for a rift run in authored geometry with
+a boundary.
+
+This is the fourth instance of one shape tonight: `IsLayoutLegal` measuring the
+dead ground between yards; the crowd probe measuring a scene it did not name; the
+harness blocks that were gym-located and read as gym-dependent; and now a spawner
+that is gym-shaped being asked about a walled yard. **A rule that is right about
+the gym is not thereby right about a place.**
+
+## RULED — GROUND owns it, and the fix is containment, not a smaller number
+
+**Do not just lower `DashRefreshDistance` to 4000.** That brings it inside its own
+band and still spawns outside a 50 m width. The number is a symptom; the missing
+concept is that **the spawner has no idea a boundary exists.**
+
+Spawn placement must be constrained by the space, not by the player alone — and
+GROUND already has the concept, because `FBreakerZoneField` carries a yard's
+frame and its pieces. A pack belongs **inside the yard the player is in**, at a
+distance chosen within what that yard affords, rather than at a fixed offset that
+happens to fit the gym.
+
+**Report the shape before authoring numbers**, as with the connection rule. In
+particular: what happens when a yard is too small to hold the authored spawn
+band at all — the band shrinks, the pack splits across sightlines, or the yard is
+declared too small and the grammar says so. That is a real design question and a
+100 x 50 yard may already be the case that answers it.
+
+**And fix the band disagreement while you are in there**, either by moving the
+value inside 1500–4000 or by correcting the comment if the band itself has moved.
+One of the two is wrong and it should stop being both.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
