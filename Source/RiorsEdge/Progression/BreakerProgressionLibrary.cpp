@@ -1174,9 +1174,16 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Afterburn->GrantedTags.AddTag(BreakerNodeTags::Node_Afterburn.GetTag());
     Tree->Nodes.Add(Afterburn);
 
+    // THE LINE RETIRED WITH ITS VERB (Part One-R): the Damage line was gated
+    // on WallRiding, wall-ride left Movement/ for vault and mantle, and a
+    // line on a never-true condition is the dead-lane bug wearing a node. It
+    // RE-TARGETS onto whichever new verb offers the same narrow-window
+    // fantasy THE DAY that verb records state (a mantle window is the obvious
+    // candidate) — never before, per the design rule against authoring at
+    // absent plumbing. Until then the node is deliberately silent (the tag is
+    // spare capacity) and the census carries it.
     UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
-        TEXT("Increased damage while wall riding — the narrowest window in the wheel."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
-    AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
+        TEXT("Its window retired with the wall ride; a new one arrives with the new movement verbs."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
     Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
     Tree->Nodes.Add(Traction);
 
@@ -1792,15 +1799,19 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Downforce.GetTag());
     Tree->Nodes.Add(Node);
 
-    // Kinetic's wall-ride payoff, and one of the branch's three conditional
-    // damage lines - the WallRiding condition is what keeps it from being a
-    // flat percentage doing the affix layer's job. Live: the conditional damage
-    // line pays whenever the condition holds. The tag is spare capacity for a
-    // rule half that has not been designed.
+    // RETIRED WITH ITS VERB, AND MARKED FOR FULL RETIREMENT (Part One-R,
+    // O144): Grind's whole fantasy was the wall — "shots fired off a wall
+    // ride" — so unlike Traction there is no narrow-window idea to carry onto
+    // a mantle, and re-targeting it would be the name dragging the node onto
+    // a verb it does not mean (KIT's own flag). The conditional line is gone
+    // now; the NODE deletion is deferred to its own deliberate act because a
+    // purchasable node's removal owes a save story — a paid rank on a deleted
+    // id refunds nothing through GetRefundValue — plus the Kinetic count pin
+    // and any fixture rows, and doing that as a rider on tonight's window
+    // would be three decisions hiding in one commit.
     Node = MakeNode(TEXT("Swift.Kinetic.Grind"), TEXT("Grind"),
-        TEXT("Shots fired off a wall ride land significantly harder."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
+        TEXT("Its wall retired. This node is marked for removal."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
     AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
-    AddEffect(Node, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 13.0f, EBreakerBuildCondition::WallRiding); // O2 PLACEHOLDER
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Grind.GetTag());
     Tree->Nodes.Add(Node);
 

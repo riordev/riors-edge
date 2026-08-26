@@ -139,6 +139,12 @@ bool FBreakerBuildConditionState::IsSelfEvaluable(EBreakerBuildCondition Conditi
     case EBreakerBuildCondition::RecentlyCastAbility:
     case EBreakerBuildCondition::RecentlyAppliedStatus:
         return false;
+    // A different KIND of never-true (Part One-R): not a missing recorder but
+    // a RETIRED VERB — wall-ride left Movement/ for vault and mantle and the
+    // evaluator line went with it. Permanently false; the enum entry carries
+    // the rule that nothing re-authors against it.
+    case EBreakerBuildCondition::WallRiding:
+        return false;
     default:
         return true;
     }

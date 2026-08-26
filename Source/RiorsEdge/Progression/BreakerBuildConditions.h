@@ -57,7 +57,11 @@ enum class EBreakerBuildCondition : uint8
     Airborne,
     // UBreakerCharacterMovementComponent::IsSliding().
     Sliding,
-    // UBreakerCharacterMovementComponent::IsWallRiding().
+    // RETIRED WITH THE VERB (Part One-R): wall-ride left Movement/ for vault
+    // and mantle, so nothing evaluates this any more — the enumerator stays
+    // by the append-only rule, IsSelfEvaluable answers false, and nothing may
+    // re-author against it. A vault or mantle condition is authored the day
+    // those verbs record state, as its own entry at the end.
     WallRiding,
     // UBreakerMomentumComponent::GetMomentumState() == Redline. Swift only by
     // construction — the momentum loop is inert for every other class, so a

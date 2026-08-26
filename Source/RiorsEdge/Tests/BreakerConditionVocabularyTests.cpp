@@ -211,23 +211,33 @@ bool FBreakerConditionVocabularyEvaluabilityTest::RunTest(const FString& Paramet
         EBreakerBuildCondition::RecentlyCastAbility,
         EBreakerBuildCondition::RecentlyAppliedStatus,
     };
+    // The DIFFERENT kind the count below was written to make visible, and it
+    // arrived (Part One-R / O144): WallRiding is unevaluable because its VERB
+    // retired — wall-ride left Movement/ for vault and mantle — not because a
+    // recorder is missing. It awaits nothing and never leaves this list; the
+    // enum entry carries the no-re-authoring rule.
+    const TArray<EBreakerBuildCondition> RetiredSelf = {
+        EBreakerBuildCondition::WallRiding,
+    };
 
     for (int32 Index = 0; Index < FBreakerBuildConditionState::ConditionCount; ++Index)
     {
         const EBreakerBuildCondition Condition = static_cast<EBreakerBuildCondition>(Index);
         if (FBreakerBuildConditionState::IsTargetCondition(Condition)) continue;  // covered by the partition test
 
-        const bool bExpectedEvaluable = !ExpectedUnevaluableSelf.Contains(Condition);
+        const bool bExpectedEvaluable = !ExpectedUnevaluableSelf.Contains(Condition)
+            && !RetiredSelf.Contains(Condition);
         TestEqual(
             *FString::Printf(TEXT("self condition '%s' evaluability matches the recorded state"),
                 FBreakerBuildConditionState::DescribeCondition(Condition)),
             FBreakerBuildConditionState::IsSelfEvaluable(Condition), bExpectedEvaluable);
     }
 
-    // The four unevaluable entries all belong to one family with one fix — a
+    // The four unevaluable entries of the RECORDER kind all share one fix — a
     // recorder binding the delegates that already exist. Stated as a count so
-    // that adding a fifth orphan of a DIFFERENT kind is visible.
+    // that a fifth orphan of yet another kind stays visible.
     TestEqual(TEXT("exactly four self conditions await a recorder"), ExpectedUnevaluableSelf.Num(), 4);
+    TestEqual(TEXT("exactly one self condition is retired with its verb (O144)"), RetiredSelf.Num(), 1);
     return true;
 }
 

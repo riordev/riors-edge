@@ -442,7 +442,7 @@ namespace BreakerPowerBandTest
             // Velocity, complete: 15
             {TEXT("Core.Velocity.Freefall"), 1},             // airborne
             {TEXT("Core.Velocity.Afterburn"), 1},            // recently dashed
-            {TEXT("Core.Velocity.Traction"), 1},             // wall riding: owned, not live
+            {TEXT("Core.Velocity.Traction"), 1},             // silent since Part One-R: its verb retired
             {TEXT("Core.Velocity.Slipstream"), 1},           // sliding: owned, not live
             {TEXT("Core.Velocity.Grind"), 1},
             {TEXT("Core.Velocity.Downforce"), 1},            // airborne, weapon

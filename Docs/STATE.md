@@ -11,18 +11,18 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 43 of 446 authored | ceiling 54 | ok |
+| Silent nodes | ceiling | 45 of 446 authored | ceiling 54 | ok |
 | Stat targets with no aggregation lane | ceiling | 1 of 34 | ceiling 6 | ok |
 | Aggregation lanes carrying nothing | ceiling | 0 of 32 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 140 of 206 declared | ceiling 143 | ok |
-| Conditions no content authors | ceiling | 11 of 25 | ceiling 12 | ok |
+| Conditions no content authors | ceiling | 12 of 25 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
 | Asserted invariants with no test | ceiling | 38 of 104 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 57 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 42 of 446 authored | ceiling 50 | ok |
-| Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
+| Scaffolding nodes | ceiling | 44 of 446 authored | ceiling 50 | ok |
+| Conditions that can never be true | ceiling | 5.0 | ceiling 5, target 1 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.01 | band 8.0–10.0 | **OUT** |
 | Build variance band, endgame | band | 14.46 | band 12.0–20.0 | ok |
@@ -34,7 +34,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 478
+- passing: 477
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 38
@@ -50,19 +50,19 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 43 of 446 authored · ceiling 54
+**ceiling** · 45 of 446 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
 - GetCasterSpellbladeTree: 7
 - GetCasterVoidWhispererTree: 7
 - GetCasterMultispellTree: 7
+- GetSwiftKineticTree: 4
 - GetSupportConductorTree: 4
-- GetSwiftKineticTree: 3
 - GetTankDemolitionistTree: 3
+- GetCoreSliceTree: 2
 - GetGunsmithTinkererTree: 2
 - GetSupportWardenTree: 2
-- GetCoreSliceTree: 1
 - GetSwiftMarksmanTree: 1
 - GetSwiftFrenzyTree: 1
 - GetGunsmithArmoryTree: 1
@@ -135,10 +135,11 @@ A tag nothing reads. Some are legitimately reserved; most are a promise the game
 
 ## Conditions no content authors
 
-**ceiling** · 11 of 25 · ceiling 12
+**ceiling** · 12 of 25 · ceiling 12
 
 Vocabulary that exists and pays for nothing. Widening the vocabulary ahead of its consumers is what produced most of this list.
 
+- WallRiding
 - HealthHigh
 - HealthLow
 - ResourceLow
@@ -249,7 +250,7 @@ A tree here is one node-price change away from red, and the floor section report
 
 **band** · 57 % ranked minors, all trees · no pin — measurement only
 
-A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 42 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
+A tree that is almost entirely notable-shaped has nothing to fill a constellation with between the interesting picks. Of these, 44 are SCAFFOLDING — no stat line, no condition, and no rule anything reads — a strict subset of the silent nodes above, where the remainder are shaped and merely unpaid. UNPINNED pending a re-derived band: 60% ranked minors means 60% unconditional stat lines, and O76 gives raw percentages to affixes outright, so the authored 55-65 target cannot be reached without breaking another rule. Until it is re-derived this section reports and judges nothing.
 
 - GetCasterMultispellTree: 11% ranked minor, 78% notable, 11% convergence/keystone
 - GetCasterSpellbladeTree: 0% ranked minor, 89% notable, 11% convergence/keystone
@@ -270,7 +271,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 42 of 446 authored · ceiling 50
+**ceiling** · 44 of 446 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 
