@@ -79,6 +79,16 @@ public:
     // Dev-only escape hatch behind the menu's dev toggle: swaps the class
     // regardless of the permanent-selection rule. Never ship a path to this.
     UFUNCTION(BlueprintCallable, Category="Progression|Dev") void DevForceClass(EBreakerClassId ClassId);
+    // Dev-only, the ability probe's entry (Part One-U item 16; the ruling's number is allocated at push): writes
+    // the loadout WITHOUT the unlock check, mirroring DevForceClass's
+    // escape-hatch shape — the probe photographs unlockable abilities a fresh
+    // character cannot equip. Class membership STILL refuses (the probe must
+    // never photograph an impossible loadout: a foreign-class id, or a
+    // non-ultimate in the ultimate slot) and the duplicate rule holds so the
+    // frame matches what a real loadout could show. Never persisted: KIT's
+    // never-save guard refuses character-state writes for the probe session,
+    // which is the ruling's own condition. Never ship a path to this.
+    UFUNCTION(BlueprintCallable, Category="Progression|Dev") void DevForceEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId);
     UFUNCTION(BlueprintCallable, Category="Progression") bool PurchaseNode(const UBreakerProgressionTree* Tree, FName NodeId, FText& OutFailureReason);
     // Same validation PurchaseNode runs, without spending. The tree UI calls
     // this per node to decide enabled/disabled state and its tooltip reason.

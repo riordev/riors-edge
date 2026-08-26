@@ -214,6 +214,39 @@ bool FBreakerAbilityNoUnspendableTokensTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// (d1b) The probe's dev equip (Part One-U item 16): unlock deliberately
+// bypassed, every impossibility still refused — the probe photographs
+// loadouts a levelled character COULD hold, never ones nobody could.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDevForceEquipTest,
+    "RiorsEdge.Progression.AbilityUnlocks.DevForceEquip",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDevForceEquipTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerUnlockTest;
+    UBreakerProgressionComponent* Progression = UnlockTestMakeAt(EBreakerClassId::Swift, 1);
+
+    // An un-unlocked unlockable equips through the dev surface — the whole
+    // point — while the real path still refuses it.
+    FText Failure;
+    TestFalse(TEXT("the real path still refuses an un-unlocked id"),
+        Progression->EquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Slipcut"), Failure));
+    Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityTwo, TEXT("Swift.Slipcut"));
+    TestEqual(TEXT("the dev surface equips it"),
+        Progression->GetProgressionState().AbilityLoadout.ClassAbilityTwo, FName(TEXT("Swift.Slipcut")));
+
+    // Impossibilities still refuse: a foreign-class id, and a non-ultimate in
+    // the ultimate slot.
+    Progression->DevForceEquipAbility(EBreakerAbilitySlot::ClassAbilityOne, TEXT("Caster.Rot"));
+    TestEqual(TEXT("a foreign-class id is refused even by the dev surface"),
+        Progression->GetProgressionState().AbilityLoadout.ClassAbilityOne, FName(TEXT("Swift.Skim")));
+    Progression->DevForceEquipAbility(EBreakerAbilitySlot::Ultimate, TEXT("Swift.Lead"));
+    TestEqual(TEXT("a non-ultimate is refused from the ultimate slot"),
+        Progression->GetProgressionState().AbilityLoadout.Ultimate, FName(TEXT("Swift.Overdrive")));
+    return true;
+}
+
 // (d2) The derived schedule (O138). The count is read from the thing it
 // counts, so the four-against-five disagreement that stranded Swift's last
 // ability cannot recur — and the derivation must not silently retune the four

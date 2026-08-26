@@ -1,5 +1,6 @@
 #include "Progression/BreakerProgressionComponent.h"
 
+#include "Abilities/BreakerAbilityDefinition.h"
 #include "Game/BreakerGameMode.h"
 #include "Game/BreakerRiftDefinition.h"
 #include "Items/BreakerEquipmentComponent.h"
@@ -391,6 +392,35 @@ bool UBreakerProgressionComponent::PurchaseNode(const UBreakerProgressionTree* T
     RecalculateStats();
     OnProgressionChanged.Broadcast();
     return true;
+}
+
+void UBreakerProgressionComponent::DevForceEquipAbility(EBreakerAbilitySlot Slot, FName AbilityId)
+{
+    // See the declaration. Every refusal here is LOUD: a silent dev no-op is
+    // a photograph of the wrong loadout labelled as the right one.
+    if (AbilityId.IsNone()) return;
+    if (!UBreakerAbilityDefinition::ClassGrantsAbility(State.PermanentClass, AbilityId))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("DevForceEquipAbility refused '%s': not a class %d ability — the probe must not photograph an impossible loadout."),
+            *AbilityId.ToString(), static_cast<int32>(State.PermanentClass));
+        return;
+    }
+    if (State.AbilityLoadout.Contains(AbilityId))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("DevForceEquipAbility refused '%s': already equipped."), *AbilityId.ToString());
+        return;
+    }
+    const bool bIsUltimate = ClassDefinition && AbilityId == ClassDefinition->BaseUltimateId;
+    if ((Slot == EBreakerAbilitySlot::Ultimate) != bIsUltimate)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("DevForceEquipAbility refused '%s': the ultimate slot and the ultimate id go together, in both directions."),
+            *AbilityId.ToString());
+        return;
+    }
+    if (Slot == EBreakerAbilitySlot::Ultimate) State.AbilityLoadout.Ultimate = AbilityId;
+    else if (Slot == EBreakerAbilitySlot::ClassAbilityOne) State.AbilityLoadout.ClassAbilityOne = AbilityId;
+    else State.AbilityLoadout.ClassAbilityTwo = AbilityId;
+    OnProgressionChanged.Broadcast();
 }
 
 bool UBreakerProgressionComponent::EquipAbility(EBreakerAbilitySlot Slot, FName AbilityId, FText& OutFailureReason)
