@@ -20,6 +20,12 @@
 //
 // The BreakerShieldMath/BreakerMonsterChassis shape: no actor, no world, no
 // subsystem — only the rank enum, which lives in the same module.
+//
+// PUBLISHED PATH (ORDERS Part Four). Owner: LEDGER. Named consumers: FIELD
+// (the ReceiveDamage band-broken write, the segmented enemy bar) and GLASS
+// (bar drawing against the same counts). LEDGER changes the arithmetic's
+// implementation freely and DECLARES any change to these two signatures or
+// their meaning before landing it.
 // ---------------------------------------------------------------------------
 namespace BreakerHealthBands
 {

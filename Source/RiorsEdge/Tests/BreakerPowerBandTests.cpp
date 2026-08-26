@@ -1079,33 +1079,29 @@ bool FBreakerRuleBandImpactTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The measured band is untouched by the rarity pass"),
         Compose(Untouched, OptimizedRanks(), State).Total / EndgameBaseline.Total,
         EndgameOptimized.Total / EndgameBaseline.Total, 0.0001f);
-    // ---- DOES THE LAYER FIT THE BAND IT MULTIPLIES? -----------------------
-    // The question O96 asks and nothing asked before. Every ceiling above
-    // bounds a rewrite against OTHER REWRITES; this bounds the composed result
-    // against the band the game actually promises. A rewrite multiplies the
-    // endgame band rather than living inside it, so the honest check is the
-    // band WITH the worst rewrite on it.
+    // ---- THE LAYER-FIT PAIR IS RETIRED BY RULING (O136) -------------------
+    // This foot used to assert two things: the band with the worst rewrite
+    // stays inside the authored endgame maximum, and the worst single step
+    // fits a layer ceiling derived from the band's edges. Both fired on
+    // Prolific (22.64x composed against 12-20x, step 1.4634 against 1.2500)
+    // and the owner ruled the breach is the INTENDED FEEL: the band is where
+    // most builds land, its upper edge is a target and not a ceiling, and a
+    // rewrite stacking past it is the point of the rewrite. An assertion that
+    // fires on the intended outcome is an assertion pointed the wrong way, so
+    // the pair is gone rather than widened — what bounds a rollable rewrite
+    // now is its AUTHORED per-step ceiling alone (asserted per rule above:
+    // 1.35, Prolific's own 1.5), and `rewrite-impact` pins against
+    // MaximumProlificRuleStep. The composed figure stays LOGGED so the report
+    // keeps saying where a Prolific build actually lands.
     //
-    // EXPECTED RED, and it is red on shipped content rather than on anything
-    // the restructure adds: at 15.47x measured, one Prolific at 1.4634 composes
-    // to 22.6x against an authored 12-20x. O96 predicted the restructure would
-    // guarantee a breach. The breach predates it, and the first derivation of
-    // these ceilings hid it by giving the rewrite layer a quarter-share of a
-    // band measured without any rewrite in it -- a budget 1.55x larger than the
-    // headroom that exists.
+    // RewriteLayerCeilingValue itself survives for O96's OTHER use: the
+    // major/minor-stack partition in RuleBandImpact.Major is an authored
+    // budget ruling 6 did not touch.
     const float BandWithWorstRewrite = (EndgameOptimized.Total / EndgameBaseline.Total) * WorstRuleStep;
     AddInfo(FString::Printf(
-        TEXT("ENDGAME BAND with the worst rewrite: %.2fx x %.4f = %.2fx (authored %.0f-%.0fx, layer ceiling %.4f)"),
+        TEXT("ENDGAME BAND with the worst rewrite: %.2fx x %.4f = %.2fx (authored %.0f-%.0fx is where most builds land, O136 — a rewrite past the edge is intended)"),
         EndgameOptimized.Total / EndgameBaseline.Total, WorstRuleStep, BandWithWorstRewrite,
-        EndgameBandMinimum, EndgameBandMaximum, RewriteLayerCeiling()));
-    TestTrue(*FString::Printf(
-        TEXT("the worst rewrite leaves the endgame band inside its authored maximum (%.2fx vs %.0fx)"),
-        BandWithWorstRewrite, EndgameBandMaximum),
-        BandWithWorstRewrite <= EndgameBandMaximum);
-    TestTrue(*FString::Printf(
-        TEXT("...and the worst single rewrite fits the rewrite layer (%.4f vs %.4f)"),
-        WorstRuleStep, RewriteLayerCeiling()),
-        WorstRuleStep <= RewriteLayerCeiling() + 0.0001f);
+        EndgameBandMinimum, EndgameBandMaximum));
 
     BreakerStatus::Emit(TEXT("rewrite-impact"), WorstRuleStep);
     return true;
