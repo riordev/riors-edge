@@ -85,12 +85,32 @@ the game.
   class-shaped, which it currently is not.
 - **(c) A second Swift starter**, which contradicts ruling 1 and I would not.
 
-Default if nothing is said: **(a)**, because the owner already said the starter
-question did not matter much to him, and because the empty slot was ruled a
-feature. But he should know the class he plays is now the sparsest at level one.
+### ANSWERED — (b), and the milestone list becomes DERIVED rather than authored
 
-LEDGER: do not act until this is answered. The schedule is `O2 PLACEHOLDER` and
-nothing is blocked behind it.
+Owner, 2026-08-26: *"i think all classes should finish at the same time."*
+
+Every class completes its kit at the same level. Four do that at 30 today, so
+**30 is the completion level** and Swift compresses to meet it rather than four
+classes stretching to 40. All `O2 PLACEHOLDER`.
+
+**Do not add a second hand-authored array.** The shipped defect — four milestones
+against five purchases, leaving Swift's last ability unreachable — happened
+because an authored list and a derived count were two facts that could disagree.
+A per-class array is the same defect with more places to hold it.
+
+**Derive the schedule instead:** author the first-token level and the completion
+level; derive the milestone count from the class's unlockable count and space
+them between. Then a class gaining or losing an unlockable re-spaces itself, and
+the disagreement that caused this cannot recur — the count is read from the thing
+it counts.
+
+LEDGER: report the spacing shape before authoring magnitudes, per your own
+pattern. Even spacing is the obvious candidate and may be wrong — a kit probably
+wants its first two unlocks close together and its last two apart, since early
+abilities change the game more than late ones. Say which and why.
+
+Re-measure at-cap and parity after it lands, for the same reason the seeded dash
+rank gets re-measured: this moves when a Swift character has what.
 
 ## 2. Ability sound — the owner will make assets, so do not wait for them
 
@@ -105,6 +125,28 @@ until then.
 per-ability override that falls back to the default when empty.** One verb, one
 default, twenty-five optional slots. The owner fills slots as he makes assets and
 nothing is silent in the meantime, nothing is re-plumbed when the assets land.
+
+GLASS owns the verb — `ABreakerSoundDirector`'s fifth. KIT owns nothing here:
+`OnAbilityActivated` is already broadcast and already bound by GLASS's HUD, so
+the cue is GLASS calling `GetSoundDirector()` in a handler that already runs.
+
+**COUNT CORRECTED 2026-08-26, and the error was mine to catch and I did not.**
+This ruling said "twenty-five optional slots", taken from KIT's census — *"all 25
+registered abilities activate with real logic"*. Measured against the tree:
+`BreakerAbilityDefinition.cpp` assigns **35 unique `AbilityId`s, seven per class
+across all five**, which is 2 starters + 4 unlockables + 1 ultimate for four
+classes and 1 + 5 + 1 for Swift. Uniform, reproducible, and ten more than the
+figure I built a ruling on.
+
+I cannot reconstruct 25 from the current tree under any reading — not by
+excluding ultimates (30), not by excluding Swift's three new ones (32). **KIT:
+say what population "25" measured, or retire the number.** A count that cannot be
+reproduced is not a smaller count, it is an unknown one.
+
+The ruling itself does not change — one slot per ability, whatever the ability
+count is. **Do not hardcode a count anywhere; derive it**, for the same reason
+the token milestones are now derived. This is the second ruling this week that a
+hardcoded population would have broken.
 
 GLASS owns the verb — `ABreakerSoundDirector`'s fifth. KIT owns nothing here:
 `OnAbilityActivated` is already broadcast and already bound by GLASS's HUD, so
@@ -226,6 +268,46 @@ it worked on the first opportunity.
 The seat's defect, named so it is not repeated: **editing a file without
 re-reading its current state.** The same rule every lane is held to — measure the
 base, do not assume it — applied to a document instead of to code.
+
+---
+
+## THE DEATH BEAT — GLASS asked the wrong version of a right question
+
+`972373d` is good work and the finding inside it is the important part: **there
+was never a death sound to delete.** Every audio site is
+`ABreakerSoundDirector`, and the verb that fired when the player died was
+`PlayTakeHit`, because the fatal hit is a hit. Deleting the call would have taken
+being-hit out of the entire game to silence one moment of it. One condition,
+`!Result.bKilled`, is the correct shape and finding that before cutting is what
+the ruling was owed.
+
+GLASS asks: *is silence the intended end state, or did "needs to go" mean
+different rather than absent?*
+
+**That is not quite the question, because two things were subtracted from one
+moment in one commit.** The sting went, and the banner went from Harm red at
+16px through dead centre to Cyan, smaller, with its rule half dropped to caption
+and moved below the crosshair. Each is defensible on its own. Together they are
+two quieting edits to the same frame with no look between them, and the owner's
+complaint was that feedback was *not good enough* — over-correcting it is the
+one failure mode nobody would notice until he died and felt nothing happened.
+
+**So the question for the owner is not "is silence right".** It is: **die once
+and say whether the moment now reads at all.** Three outcomes and they want
+different fixes:
+
+- *Reads fine* — silence stands, no sixth verb, and the beat is done.
+- *Reads weak* — the banner went too far and comes back partway. Cheap, GLASS's,
+  no ruling needed beyond this one.
+- *Reads absent* — a death cue is wanted after all, and per GLASS's own rule
+  that is a **sixth verb needing its own ruling**, not an inference.
+
+GLASS was right to refuse to add one on inference. Hold there.
+
+**One note for the next time two changes land on one moment:** they should land
+in two commits, or the report should say which one is doing the work. This one
+is recoverable because both edits are small and reversible; a bigger pair would
+not be.
 
 ---
 
@@ -537,10 +619,22 @@ it; three copies of one assumption is the shape that script exists for.
 Ten pieces, all ten spent, no unused vocabulary. Six yards that look like six
 places needs more than layout can supply.
 
-This is a download and it needs the owner's say-so, like the fonts. **Owner: yes
-or no on pulling additional Kenney CC0 kits.** It changes whether yard growth is
-authoring or authoring plus an import session, and GROUND is right that it should
-be decided before authoring rather than discovered during it.
+**ANSWERED 2026-08-26: YES.** The owner: *"we can pull more for now we can always
+get rid of them later."* Pull what the five yards need.
+
+Three conditions, because a vendored asset is easier to add than to remove:
+
+- **The licence note travels with them.** `Assets/zones/kit/LICENSE-NOTE.txt`
+  already records CC0 per source repo. Every new pack gets the same entry in the
+  same file, written in the same commit as the `.glb` files — not after.
+- **Pull for the yards you are building, not for a library.** "We can get rid of
+  them later" is true of the working tree and not of git history, so the cost of
+  an unused pack is permanent and the benefit is zero. Import what five distinct
+  yards need and stop.
+- **Report what the new vocabulary bought.** The reason for this pull is that six
+  yards cannot look like six places out of ten pieces. Say in the report which
+  yards became distinguishable and how, so the next pull has a measurement behind
+  it rather than an instinct.
 
 ### Q6 — RULED: yes, land the door now
 
@@ -581,6 +675,71 @@ and touched no file you do not own, which is the right instinct, and the cost �
 patrol and engaged not being one-variable comparable *with each other* — is
 smaller than it sounds, because the comparison that matters is within a mode.
 Opening a header across a lane boundary to buy one variable is a bad trade.
+
+---
+
+## GLASS — the door says two things, and your two questions answered
+
+### FIRST, AND IT IS A LIVE DEFECT: the door states two verbs, stacked
+
+GROUND photographed the rift door and found that
+`BreakerPlaytestHUD.cpp:1724` draws the label as a **literal `TRAVEL`** while
+the prompt beneath it calls `GetPromptLabel()` — which returns `ENTER RIFT`. So
+the first new interactable the player meets in the world says two different
+things about itself, one above the other.
+
+GROUND specified the fix and deliberately did **not** write it, both because it
+crosses into `UI/` and because — their reasoning, and it is right — *an uncalled
+getter is a dead API, and `GetPromptLabel` already spent a milestone as one.*
+
+**Yours: line 1724 calls `GetPromptLabel()` instead of the literal.** Small, and
+it is the first thing anyone walking the loop will see.
+
+While you are there: that literal is one instance. Check whether the same
+label-drawn-as-literal shape appears at the other interactable sites — loot,
+NPCs, travel gates — and run `Scripts/shapecheck.py` on the commit. One
+hardcoded verb beside a getter that exists is exactly the shape that repeats.
+
+### Q — does the fifth verb need a DURATION companion?
+
+**Held, and the trigger to revisit is co-op, not solo feel.**
+
+Your framing is right that nothing is blocked. What decides it is who a sustain
+cue is *for*. It is not for the player holding the channel — they know, they are
+holding the button, and the HUD already draws the window bar. **A sustain cue's
+real audience is the periphery and the party**: you looking elsewhere, and other
+players who cannot see your bar at all.
+
+Single-player with a bar on screen, cast cue plus bar very likely carries it.
+Party play, it does not. So: no sixth verb now, and the thing that should reopen
+this is a second player existing, not a playtest feeling thin. If the owner walks
+the loop and a channel feels dead in a way the bar does not fix, that overturns
+me — but ask for that verdict rather than inferring it.
+
+### Q — enemy ability audio needs a different mechanism
+
+**Confirmed, and do not bolt it on.** Your analysis is correct and the reason is
+the good one: all five verbs are `bIsUISound = true` and unspatialized *on
+purpose*, because they happen TO the listener. An enemy telegraph's entire value
+is where it came from. Those are different mechanisms wearing the same word.
+
+**One thing to carry into its design when it is time: it is density-coupled.**
+The concurrency ruling puts up to a hundred bodies awake at once, and a hundred
+enemies each wanting a positioned telegraph is a voice-count problem before it is
+an audio-design problem — the same shape as the effect renderer's pooled lights,
+which you already named. **Design it with FIELD's sweep numbers in hand, not
+before them.** A telegraph system authored against an unknown body count will be
+authored twice.
+
+### The ability count in your reasoning is 35, not 25
+
+Your commit reasons about "twenty-five abilities" twice. The tree has **35** —
+seven per class across five. Functionally this costs nothing: your resolution is
+per-id and lazy with a NULL sentinel, so it scales to any count and no array was
+hardcoded. Only the prose is wrong, and it is wrong because it inherited the
+number from KIT's census through my own ruling.
+
+Correct it where you wrote it. The design does not change.
 
 ---
 
@@ -649,6 +808,95 @@ what makes it cheap to fix.
 **One standing rule that outranks the rest.** You have no source directories, so
 **a commit from you touching `Source/` is always wrong**, including when
 something in ORDERS seems to ask for it. Report instead.
+
+---
+
+# PART THREE-D — WHAT EACH LANE DOES NEXT, 2026-08-26
+
+Measured, not recalled. Last real code commit per lane, distance from HEAD:
+
+```
+  GROUND     0 back    active
+  GLASS      2 back    active
+  KIT       11 back    idle — queue DRAINED, nobody refilled it
+  LEDGER    17 back    idle — its orders were written but not published
+  FIELD     25 back    idle — largest queue in the project, nothing blocking it
+```
+
+Two of those are the seat's fault and one is not.
+
+## FIELD — nothing blocks you, and you are the furthest behind
+
+Five items, all unblocked, in this order:
+
+1. **The density sweep.** Engaged at N = 25 / 50 / 75 / 100. **First report
+   whether any sleep, tick-throttle or distance-LOD concept exists** — the
+   concurrency ruling means the experiment may need to be awake-set size rather
+   than total bodies, and those are different measurements.
+2. **A9, the modifier marks.** The owner's playtest puts this above everything
+   else in your queue: at four enemies the labels already collide, and the target
+   is fifty to a hundred. Words at NEAR, glyph-plus-letter at MID and FAR.
+3. **The rank glyphs** — Part One-B item 4, the one the seat never routed. Beside
+   A9, not behind it: past 35 m the glyph is the only rank carrier that survives.
+4. **The terminal hue.** Your report lists three answers; the review gave a
+   fourth — the lerp form, measured, putting every family on the authored
+   terminus. Weigh it against your three and pick.
+5. **The fracture mask** — still a material query, not code.
+
+## KIT — your queue is empty and that is the finding
+
+Three of your four ORDERS items are closed or reassigned: O176 was overturned,
+the dash passive is LEDGER's, and the six invisible abilities all draw as of
+`deed7c9`. The fourth — the loadout flip — waits on a LEDGER landing.
+
+So you have no work, and that went unnoticed for eleven commits. New assignment:
+
+**Weapon feel is yours and nobody has touched it.** `Weapons/` is your directory,
+and the owner's first complaint list opened with *"all of the sound is bad … does
+not sound like real guns"* and never got past the sound half. The cue is GLASS's;
+**the weapon's behaviour is yours** — recoil pattern, recovery, the kick that
+makes a rifle read as a rifle, and what separates the archetypes when fired
+rather than on paper.
+
+**Report before building.** What the weapon component already exposes, what a
+recoil model would need, and what distinguishes the archetypes today besides
+their numbers.
+
+Do your own report's item first: *presentation colour law, before more classes
+bake it in*. It is a good catch, it is cheap, and it stops five classes
+inheriting a convention nobody wrote down.
+
+## LEDGER — two of your three are unblocked right now
+
+The dash node and the derived milestone schedule are in orders that had not
+reached you. They have now. Beyond those:
+
+**The rider More question is the substantial one and needs no permission.** Can
+`ApplyTargetConditionRiders` carry a More bucket, or is a target-gated More
+structurally impossible here? That is not Collapse's blocker — it is a whole
+class of ARPG line, and the answer decides whether Collapse gets redesigned or
+the system grows. Report it.
+
+**The dash-distance wiring cost** — you asked which side of the line it falls on.
+Count it: one enum entry and one read, or more.
+
+## GROUND — the chain continues, and one item is not yours
+
+Next in your own sequence: **the connection rule's own terms**, reported before
+numbers. Then the yard shape, which the seat rules against that report.
+
+**The rift door saying TRAVEL is GLASS's one line.** You were right not to write
+it; it is in GLASS's list below.
+
+## GLASS — one line unblocks GROUND, two questions wait on the owner
+
+1. **`BreakerPlaytestHUD.cpp:1724`** — the literal `TRAVEL` above `F ENTER RIFT`.
+   One line, your file, and it is the first thing anyone walking the loop reads.
+   Check the same shape at the other interactable sites while you are there.
+2. **The death beat and the duration verb both wait on the owner.** Do not infer
+   either; your refusal to add a sixth verb on inference was correct.
+3. **Enemy telegraph audio** stays held until FIELD's sweep exists — it is
+   density-coupled and would otherwise be authored twice.
 
 ---
 
