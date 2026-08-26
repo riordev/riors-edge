@@ -55,6 +55,39 @@ namespace BreakerEnemyBar
     // above-Trash ranks are always barred). O2 PLACEHOLDER.
     static constexpr float FocusFadeSeconds = 0.6f;
 
+    // --- THE BAR BELONGS TO A BODY, SO IT IS SIZED BY THAT BODY -----------
+    // The bar was a fixed 180 px scaled only by a 1.0 -> 0.55 lerp across the
+    // whole 50 m, which makes it very nearly distance-INVARIANT while the body
+    // it describes shrinks with 1/d. Measured off the bar probe: 167 px of bar
+    // against a ~72 px silhouette at 12 m, and 126 px against ~25 px at 35 m.
+    // Adjacent bars butt together into one continuous horizontal stripe, which
+    // is exactly what the owner reported seeing, and it gets WORSE with
+    // distance because the bar barely shrinks. Rank and segmentation were both
+    // drawing correctly the whole time.
+    //
+    // WIDTH ONLY. Height, text and border keep the gentle scale: a bar 25 px
+    // wide at 35 m is correct, a bar 1 px TALL at 35 m is gone. The defect was
+    // never that the bar is too big, it is that its width does not belong to
+    // anything — so width becomes a function of the silhouette and the other
+    // axes stay as they were.
+    //
+    // A ratio of 1.0 means the bar spans the body exactly, which is what makes
+    // it read as THAT enemy's bar rather than as screen furniture. O2
+    // PLACEHOLDER, and the first number the owner will want to move.
+    static constexpr float WidthToBodyRatio = 1.0f;
+    // Below this a bar stops being a bar — no fill is legible and no band can
+    // draw. The floor is what keeps a distant enemy readable at all, and it is
+    // also the reason the rank GLYPH exists: past the distance where the floor
+    // binds, width has stopped carrying information and something else must.
+    // O2 PLACEHOLDER.
+    static constexpr float MinimumWidthPixels = 32.0f;
+    // Half the humanoid silhouette, matching BodyCollision's 45 cm capsule
+    // radius. Not read off the component: the probe's frozen bodies and the
+    // dummy share this path, and a per-actor query here would cost a component
+    // fetch per enemy per frame to recover a number that is the same for every
+    // body in the game.
+    static constexpr float BodyHalfWidthCm = 45.0f;
+
     // --- A1: how narrow a band may get before it stops being drawn --------
     // BreakerHealthBands::SegmentCountFor is the ONE source of the count and
     // is never second-guessed here. This is a DISPLAY limit and it is keyed on
@@ -123,19 +156,38 @@ namespace
         float Scale = 1.0f;
     };
 
-    FBreakerEnemyBarRect BreakerEnemyBarPlace(const FVector& Projected, float Distance, float ScaleUnit)
+    FBreakerEnemyBarRect BreakerEnemyBarPlace(const FVector& Projected, float Distance,
+        float ScaleUnit, float BodyWidthPixels)
     {
         // Gentle distance scaling: readable up close, unobtrusive far away.
+        // This still drives HEIGHT, text and border — see the width block above
+        // for why width left it.
         const float DistanceAlpha = FMath::Clamp(
             (Distance - 500.0f) / (BreakerEnemyBar::MaxDistance - 500.0f), 0.0f, 1.0f);
 
         FBreakerEnemyBarRect Rect;
         Rect.Scale = FMath::Lerp(1.0f, 0.55f, DistanceAlpha);
-        Rect.W = BreakerUI::HudEnemyBarWidth * ScaleUnit * Rect.Scale;
         Rect.H = BreakerUI::HudEnemyBarHeight * ScaleUnit * Rect.Scale;
+        // Capped at what the bar used to be, so nothing grows: this change only
+        // ever makes a bar narrower. Floored so it stays a bar.
+        const float Ceiling = BreakerUI::HudEnemyBarWidth * ScaleUnit * Rect.Scale;
+        Rect.W = FMath::Clamp(BodyWidthPixels * BreakerEnemyBar::WidthToBodyRatio,
+            FMath::Min(BreakerEnemyBar::MinimumWidthPixels * ScaleUnit, Ceiling), Ceiling);
         Rect.X = Projected.X - Rect.W * 0.5f;
         Rect.Y = Projected.Y;
         return Rect;
+    }
+
+    // The silhouette's on-screen width, by projecting its edge rather than by
+    // trigonometry. Projection is already correct under any FOV and aspect —
+    // including the aim-down-sights FOV change, which a hand-rolled tangent
+    // would have to be told about and would silently miss.
+    float BreakerEnemyBarBodyWidthPixels(const FVector& Projected, const FVector& CameraRight,
+        const FVector& WorldAnchor, TFunctionRef<FVector(const FVector&)> ProjectFn)
+    {
+        const FVector Edge = ProjectFn(WorldAnchor + CameraRight * BreakerEnemyBar::BodyHalfWidthCm);
+        if (Edge.Z <= 0.0f) return 0.0f;
+        return FMath::Abs(Edge.X - Projected.X) * 2.0f;
     }
 
     // ONE bar body, drawn by both loops below. It was two: the enemy loop and
@@ -236,6 +288,17 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
     // the verbose state line; see the label block below for that split. Same
     // aim-cone shape DrawLootPickups already uses to pick its focused pickup,
     // so "what am I pointing at" means one thing across the whole HUD.
+    // The camera's right, resolved once per frame: every bar's width is the
+    // projected width of its own silhouette, and that needs a screen-space
+    // direction to measure across. Defaults to world Y so a missing camera
+    // manager degrades to a floored bar rather than to no bar.
+    FVector CameraRight = FVector::RightVector;
+    if (PlayerOwner && PlayerOwner->PlayerCameraManager)
+    {
+        CameraRight = FRotationMatrix(PlayerOwner->PlayerCameraManager->GetCameraRotation())
+            .GetScaledAxis(EAxis::Y);
+    }
+
     const ABreakerEnemy* FocusedEnemy = nullptr;
     if (PlayerOwner && PlayerOwner->PlayerCameraManager)
     {
@@ -376,7 +439,10 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const bool bElite = Enemy->IsEliteOrBetter();
         const bool bBossRank = Enemy->GetMonsterRank() == EBreakerMonsterRank::Boss;
 
-        const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit);
+        const float BodyWidthPixels = BreakerEnemyBarBodyWidthPixels(Projected, CameraRight,
+            Enemy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f),
+            [this](const FVector& P) { return Project(P, false); });
+        const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit, BodyWidthPixels);
         BreakerEnemyBarDrawBody(*this, Bar, Health, MaxHealth,
             EnemyAttributes->GetShield(), EnemyAttributes->GetMaxShield(), ScaleUnit, BarAlpha,
             BreakerHealthBands::SegmentCountFor(Enemy->GetMonsterRank()));
@@ -528,7 +594,10 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const FVector Projected = Project(Dummy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), false);
         if (Projected.Z <= 0.0f) continue;
 
-        const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit);
+        const float BodyWidthPixels = BreakerEnemyBarBodyWidthPixels(Projected, CameraRight,
+            Dummy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f),
+            [this](const FVector& P) { return Project(P, false); });
+        const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit, BodyWidthPixels);
         // Full opacity: a dummy never fades, and Alpha(C, 1.0f) is exactly C.
         // UNSEGMENTED, and that is the same ruling as the dummy's paint: a
         // band is a fight beat, a dummy is an instrument, and dividing its bar
