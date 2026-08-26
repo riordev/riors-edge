@@ -386,28 +386,32 @@ display rename the pack proposes (Skimline et al., level-3 wording) is
 with the owner; the UI prints the trees' real names and O86's Forge
 until ruled.
 
-THE LEDGER LANE (this pass): HEALTH BANDS ARE STATE. HEAD `c486214`,
-451 passing / 4 expected red (same roster) / 0 unexpected.
-Attributes/BreakerHealthBands.h is the one segment-count source
-(IndexOf/SegmentCountFor, pure; every rank returns a real count,
-Trash included — O125; the bar draws what it can, the display limit
-is never in the state function). TargetBandBroken is the 25th
-condition (target block end, mask 25/32): per-target, previous-hit
-lifetime — the bit sits on the target's combat component, written at
-ReceiveDamage's foot (hunks agreed with lane/dev), read by the next
-hit's rider resolution; ClearBandBreakTracking is published and
-lane/dev owes the one-line ReviveFromPool call for pooled corpses.
-Overpressure re-gated conditional at 16.0 (Siege's comparable).
-COLLAPSE DID NOT MOVE: its intended shared-pool More gated on
-TargetBandBroken has NO payment lane — standing aggregation never
-holds a target bit and the rider lane is Increased-bucket only by
-rule — so authoring it is a dead line; the per-hit More lane is
-O125's open bullet, with the composition it would open (TV x
-Collapse x Overflow = 2.1632 against the 2.197 ceiling, and the
-weapon lane's zero-commitment unconditional product falling 1.9825
--> 1.8605). Ability parity measured 0.268x at cap / 0.202x endgame,
-unchanged by any of this — neither power-band fixture can afford
-Collapse's chain.
+THE LEDGER LANE (this pass): TWO RULINGS CLOSE, ONE LANDING WITH KIT.
+Ruling 6 closed: the layer-fit pair in RuleBandImpact.Step is retired
+by O136 (the endgame band is where MOST builds land; Prolific's
+22.64x is intended feel), `rewrite-impact` re-pins against
+MaximumProlificRuleStep 1.5, and the derived layer ceiling survives
+only for O96's major/minor partition. Ruling 5: the at-cap red's
+deletion condition now points at content ("we will tune power up");
+the band and assertion do not move. THE PARTITION LANDED, KIT-agreed
+(vehicle: this lane, their hunks): Swift is a ONE-starter class —
+StarterAbilityIds {Skim}, five unlockables {Slipcut, Lead,
+CadenceBreak, HardStop, Sightline}, slot two EMPTY by ruling 1 and
+asserted empty; DefaultAbilityIdForSlot's Swift slot-two arm returns
+NAME_None; AbilityTokenLevels grew a fifth milestone {5,12,20,30,40}
+(KIT's blocker: four tokens against five purchases left the last
+ability unreachable); the three partition reds are deleted; the spec
+carries ruling 1's shape. The enhanced-dash NODE is not authored —
+its shape report is in Docs/reports/LEDGER.md (Swift node,
+DashCooldown target, and "granted at level one" has NO mechanism yet:
+the seeded-free-rank grant needs confirming, with respec-no-refund
+and board display ruled beside it). O135 rules the boss bands
+deliberately off the phase gates (0.66/0.33 are not thirds; a
+multiple of three is the one wrong answer), pinned in
+BossBandsAvoidPhaseGates. LEDGER's standing questions live in
+Docs/reports/LEDGER.md — the per-hit More ruling (Collapse) and the
+dash grant are the two open ones. BreakerHealthBands.h now names its
+consumers (published path, ORDERS Part Four).
 
 THE FIELD LANE (this pass): TWO WRONG SPACES, AND THE BAR LANDS. HEAD
 `e8b2349`, 457 passing / 4 expected red (same roster) / 0 unexpected.
