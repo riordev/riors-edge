@@ -748,6 +748,29 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
                 if (FApp::IsUnattended()) FPlatformMisc::RequestExitWithStatus(false, 1);
             }
         }
+        // THE PROBE NEEDS A RUNNING WORLD, and -BreakerAutoPlay is how a
+        // headless run gets one. Without it the title menu is up, the menu
+        // PAUSES THE WORLD, and TickCrowdSampler rides the game mode's actor
+        // tick — so the sampler never advances, no summary is logged, and the
+        // exit wired to that summary never fires. The run hangs after printing
+        // "probe armed" and "safe ring suppressed", which are the same two
+        // lines a working run prints: the failure is indistinguishable from
+        // success until the summary does not arrive.
+        //
+        // NOT FIXED BY MOVING THE SAMPLER TO A CORE TICKER, which is how the
+        // capture harness solved the same pause. A core ticker would let the
+        // probe sample a PAUSED crowd and report it as a measurement, which is
+        // the class of instrument this flag's engaged%% guard exists to refuse.
+        // The world has to be running; the requirement is real, so it is
+        // stated rather than worked around.
+        if (CrowdCount > 0 && !FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")))
+        {
+            UE_LOG(LogTemp, Error,
+                TEXT("[BreakerCrowd] the probe needs -BreakerAutoPlay: without it the title menu is up, ")
+                TEXT("the world is paused, and the sampler never runs. Probe not armed."));
+            CrowdCount = 0;
+            if (FApp::IsUnattended()) FPlatformMisc::RequestExitWithStatus(false, 1);
+        }
         if (CrowdCount > 0)
         {
             SpawnCrowdProbe(FMath::Clamp(CrowdCount, 1, 200),
