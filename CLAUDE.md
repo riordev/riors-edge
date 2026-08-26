@@ -353,92 +353,69 @@ it draws phase-count-only until the encounter exposes a total, per O120.
 GLASS PICKED UP FROM KIT'S CENSUS: zero sound anywhere is an Audio item.
 
 DECISIONS.md HAD DUPLICATE O-NUMBERS from lanes allocating concurrently
-against the highest number each could see. THE O125 COLLISION IS CLOSED:
-LEDGER landed first and keeps O125 (health bands); the dash-lane trio
-renumbered to O132/O133/O134 on the owner's call, citations in Source and
-Scripts moved with them. TWO O120s REMAIN (loading progress, reward
-composition) — another lane's line, reported not rewritten. Allocation
-needs to happen at push time, or it recurs.
+against the highest number each could see, and BOTH COLLISIONS ARE NOW
+CLOSED: LEDGER landed O125 first and keeps it (health bands) with the
+dash-lane trio renumbered to O132/O133/O134 and every citation in Source
+and Scripts moved with them, and the second O120 (reward composition)
+went to LEDGER as its subject-matter owner. Each was found by a lane
+other than the one that fixed it. Allocation still needs to happen at
+push time, or it recurs.
 
-GROUND LANE, THE READOUT PASS (453 / 4 / 0 on the rebased tree, same
-expected-red roster).
-THE FERNHALL LANE DEFECT IS CLOSED, AND THE ANSWER INVERTED THE
-DIAGNOSIS. The yard prints two lanes and they were printing under one
-word, but the chest lane is NOT unguarded: `MinimumOpenLaneWidth` is
-full-height only (correctly — chest cover is under MantleStepHeight and
-is mantled, not rounded), and the ground the player dashes down is held
-by the CORRIDOR rejection instead — no cover of any class within
-`CorridorHalfWidth` 900 of the centreline. Pulling the chest pairs to
-+-5 m goes RED, and `RiorsEdge.Zone.Fernhall.LaneGuard` proves which rule
-objects by perturbing the yard rather than asserting it. O132 rules it.
-`DescribeCoverField` now names the lane's CLASS, prints the corridor
-margin beside it as an OFFSET (never a width — centre-to-centre versus
-face-to-face is the same defect in a new place), and states every band's
-DIRECTION in status.py's vocabulary. The Fernhall grammar test logs the
-readout on PASSING runs too; it used to print only on failure, so the
-numbers were visible exactly once — when they were already wrong.
+GROUND LANE: THE LOOP HAS AN ENDING NOW (476 / 3 / 0, same expected-red
+roster). O168'S CHAIN RUNS END TO END ACROSS THREE LANES, verified in
+one live run rather than three arguments: FIELD's terminator dies and
+raises knowing nothing about rifts, this lane consumes and owns
+completion, LEDGER pays. The second terminator's death is REFUSED by
+the latch and pays NOTHING, which is the evidence LEDGER's
+no-deduplication decision was owed — their test covers the composition,
+mine covers the rule, and only a run covers the pair. Marking and
+binding are ONE act (`MarkRiftTerminator`), safe only because the raise
+is mark-guarded and `ReviveFromPool` clears both; the latch is set
+BEFORE the broadcast so a re-entrant listener cannot pass the guard
+meant to stop it. `Breaker.CloseRift` and `Breaker.MarkTerminator` keep
+it exercisable without anyone having decided which body holds a rift
+open in play — that decision is design and is in the lane's report.
 
-THE WAVE SOLVER'S PARTY AXIS HAS COVERAGE (`RiorsEdge.Game.Waves.PartyScaling`):
-the elite interpolation pointwise across 1-5 plus both clamps, the
-per-player body ceiling, the FLAT ranged cap, the per-player Warden cap
-reached rather than merely respected, and `IsCompositionLegal` at every
-party size over 30 waves. IT FOUND SOMETHING (O133): the budget curve
-carries no party term while 5.3's caps are per-player, so at wave 3 solo
-buys a Warden, a Lattice and nine Skitters on 18 points while five
-players buy three Wardens and NOTHING ELSE. Both legal; pinned as
-measured, not intent, and it goes red the day a party term lands.
-O134 records the question rift interiors must answer before any solver
-code: what a room's shape does to its budget. Archetype roster and
-cross-solve state stay HELD; the endgame-pacing question (periodic is
-predictable) is in DECISIONS' Open list.
+THE RIFT DOOR IS A PLACE (O132's sibling work): `marker_rift` stopped
+being a measurement. The door is an `ABreakerTravelPoint` SUBCLASS, not
+a new interactable — the travel point's beacon was already rift-teal
+because "travel IS the rift verb", and making two functions virtual put
+the door on the F key with no change in `Characters/` or `UI/`, neither
+of which this lane owns. `bDoorOnly` is what makes it a door rather than
+a gate: registered once so ids validate in one place, offered by the
+door alone, and REFUSED at the base rather than merely hidden.
 
-O134'S QUESTION IS ANSWERED AHEAD OF THE INTERIORS (O166/O167), as a
-design report with no code: a rift budget takes THREE space inputs, not
-one, because 5.3's caps are spatial in three different units — density
-is navigable ground, the ranged cap is sightlines against cover, the
-Warden cap is flanking angle — and the ELITE cap is not spatial at all
-(two modifier sets to read is attention, which the room does not change).
-Collapsing them into one room-size scalar prices a corridor and a small
-arena identically while they fail in opposite directions. The solver
-seam is already right: pricing and spend order are space-free and are
-reused unchanged, the cap block is what a rift supplies, and the three
-measurements ALREADY EXIST in the cover grammar (LargestUncoveredGap,
-LargestGapToLineBreak, the corridor rule + MinimumOpenLaneWidth). No
-magnitudes authored; interiors still come first.
+MARKERS ARE A LIST AND THE GRAMMAR HAS A LEVEL ABOVE THE FIELD. Three
+fixed FVectors meant one zone was one of everything; the name contract
+is now parsed (`marker_<role>` / `marker_<role>_<yard>`, longest role
+first because `npc_contract` has an underscore) and every pre-yards
+export imports unchanged. `IsZoneLegal` validates a zone as a list of
+yards, identical to `IsLayoutLegal` at one yard by construction, with
+the failing yard NAMED. Connections are deliberately unchecked: Q3 ruled
+them a distinct space and their magnitudes are not authored.
 
-CROWD PROBE: THE FLAG NAMES THE SCENE AND THE SUMMARY MEASURES IT.
-FIELD found the mechanism and it was worse than a standing grid: at
-6000 cm against a 2200 cm DetectionRange NOTHING EVER PURSUED — the
-bodies could not see the player, so every figure ever taken with this
-probe is the cost of N enemies on the PATROL branch. My own
-"pursuing-unengaged" label was wrong too. `-BreakerCrowdLoad=<patrol|
-engaged>` now names it: patrol keeps the historical far grid unchanged
-so old figures stay comparable, engaged arrays the crowd in frontal
-rings 900-2100 cm (inside detection) and drops the safe ring for the
-run. AND THE MODE NAME IS NOT TRUSTED — the sampler reads each body's
-own state label and prints `engaged=NN% (measured)` beside the
-requested load, erroring when the two disagree in EITHER direction.
-That guard caught my first attempt: zeroing SafeZoneRadius does not
-work, because IsInSafeZone compares with <= and the pawn spawns AT the
-centre, so the crowd sat at 600 cm and still reported 0% engaged. The
-flag clears bSafeZoneSet instead, and restores it at the summary. An
-unrecognised load is refused with the probe unarmed and the run ended
-(read the log line, not the exit code — status 1 is requested and
-measured as 0). INSTRUMENT SELF-TEST, one run each, this machine,
-1280x720, 100 primitive bodies, area level 10, 10 s sample:
-patrol 0% engaged / nearest 6001 cm / 6.70 ms / 149 fps; engaged 100%
-/ nearest 0 cm / 34.16 ms / 29 fps, game thread 34.16 of it. THE
-MEASUREMENT IS FIELD'S TO RE-RUN; those two lines are evidence the
-instrument works, not a result. STILL MISSING, AND IT NEEDS FIELD:
-nothing shoots BACK, so no enemy hit reaction, damage number or death
-effect is on the frame — that half needs a damage entry point in
-`Combat/`, which this lane does not own. Ask before assuming engaged
-covers it.
+THE ANCHOR IS THE START, AND THE INSTRUMENTS MOVED WITH IT — moving the
+config alone was forbidden and this is why: five dev instruments sat in
+the gym-only tail, so landing the player elsewhere would have silently
+disarmed `-BreakerCrowdProbe` for the lane told to prioritise density.
+They arm on any map with a field frame now (the probe runs in Fernhall:
+40 engaged at 8.27 ms), and the ANCHOR IS EXCLUDED because forty enemies
+in a social space drove the hub into travelling on its own.
 
-DEFECT FOR THE OWNER, NOT FIXED HERE: `Docs/DECISIONS.md` has TWO O120
-rulings (loading progress, and reward composition). Both cite-able; only
-the loading one is actually cited. Renumbering is a ledger call and the
-reward ruling is LEDGER's subject, so it is reported, not touched.
+FOUND WHILE PASSING: the wave spawner cited a 1500-4000 band and used
+4400, so the distance is now DERIVED and clamped rather than either
+number being rewritten. That is NOT the fix for enemies spawning outside
+the tileset — containment is, and it is reported before numbers. And an
+unattended run with no exit condition now SAYS SO instead of hanging;
+that shape has cost three cycles across two lanes.
+
+OPEN AND WITH THE SEAT, none blocking: spawn containment (I think the
+100x50 yard already IS the too-small case), the connection rule's
+mouth-width-as-ceiling inversion, what anchors a NON-ENTRY yard's frame,
+the `Characters/` autoplay line for the standalone path, and how many
+bodies make a yard feel populated. The yard-instance rift interior is
+sequenced AFTER the close verb, on this lane's own argument that a
+populated rift with no ending is a louder version of the problem.
 
 THE KIT LANE OPENED WITH A CENSUS, NOT A FEATURE (lane/kit). Over
 the 32 registered fallback abilities (Swift 4, Caster 7, Gunsmith 7,
