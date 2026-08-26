@@ -11,6 +11,7 @@ class UBreakerAttributeSet;
 class UBreakerClassDefinition;
 class UBreakerProgressionNode;
 class UBreakerProgressionTree;
+struct FBreakerRiftDefinition;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerProgressionChanged);
 // NewLevel, and how many levels arrived at once — a single kill can cross more
@@ -97,6 +98,17 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") int32 GetTreeInvestment(const UBreakerProgressionTree* Tree) const;
     UFUNCTION(BlueprintPure, Category="Progression") const FBreakerProgressionState& GetProgressionState() const { return State; }
     UFUNCTION(BlueprintCallable, Category="Progression") void LoadProgressionState(const FBreakerProgressionState& NewState);
+
+    // O168's third commit — the rift completion payout. Bound in BeginPlay to
+    // ABreakerGameMode::OnRiftCompleted (GROUND's published seam; the event
+    // fires ONLY on completion, in-world, at the latch, structurally once per
+    // run) and public so the payout is testable by direct call with no world.
+    // Grants XP here and Riftglass through the owner's equipment component —
+    // both travel-surviving state by construction, which is what firing at
+    // completion rather than exit was ruled on. Ignores a broadcast for a
+    // pawn that is not this owner: the event carries WHO completed, and a
+    // second player's rift is not this character's payday.
+    void HandleRiftCompleted(const FBreakerRiftDefinition& Rift, APawn* Player);
 
     // ORDERS ruling 1: the node id of Swift's enhanced-dash passive, seeded
     // at rank 1 wherever a character becomes (or loads as) Swift — the class's

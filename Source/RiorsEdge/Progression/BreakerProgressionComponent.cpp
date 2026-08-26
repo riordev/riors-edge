@@ -1,5 +1,10 @@
 #include "Progression/BreakerProgressionComponent.h"
 
+#include "Game/BreakerGameMode.h"
+#include "Game/BreakerRiftDefinition.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Progression/BreakerRiftRewardMath.h"
+
 #include "Attributes/BreakerAttributeAggregation.h"
 
 // The per-source More ceiling exists in two headers for include-cycle reasons;
@@ -63,6 +68,18 @@ void UBreakerProgressionComponent::BeginPlay()
     // LoadProgressionState re-runs it after restoring a save.
     ApplySliceDefaultsIfFresh();
     BindAttributes(FoundAttributes);
+    // O168's third commit: bind the rift completion payout to GROUND's seam.
+    // Authority only (the game mode exists only there), weak so a component
+    // torn down before its world cannot be called into. The handler itself
+    // filters by pawn, so every player component may bind the one event.
+    if (GetOwner() && GetOwner()->HasAuthority())
+    {
+        if (ABreakerGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ABreakerGameMode>() : nullptr)
+        {
+            Mode->OnRiftCompleted.AddWeakLambda(this,
+                [this](const FBreakerRiftDefinition& Rift, APawn* Player) { HandleRiftCompleted(Rift, Player); });
+        }
+    }
 }
 
 void UBreakerProgressionComponent::BindAttributes(UBreakerAttributeSet* InAttributes)
@@ -88,6 +105,37 @@ void UBreakerProgressionComponent::SeedGrantedNodes()
         if (Rank.NodeId == SwiftGrantedDashNodeId) return;
     }
     State.DoctrineNodeRanks.Add({SwiftGrantedDashNodeId, 1});
+}
+
+void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinition& Rift, APawn* Player)
+{
+    // The event carries WHO completed; a broadcast for another pawn is not
+    // this character's payday. Null owner or no authority cannot happen on
+    // the bound path (the bind is authority-gated) but the direct-call test
+    // path deserves the same guards as every other grant.
+    if (!GetOwner() || GetOwner() != Player) return;
+
+    const int32 AreaLevel = Rift.EffectiveAreaLevel();
+    const int32 Xp = BreakerRiftReward::XpForCompletion(AreaLevel);
+    const int32 Riftglass = BreakerRiftReward::RiftglassForCompletion(AreaLevel);
+
+    AwardExperience(Xp);
+    // Riftglass lands on the account-wide wallet through the owner's
+    // equipment component — the same GrantForgeCurrency every reward path
+    // uses. A pawn with no equipment component (a bare rig) forfeits nothing
+    // silently: say so, because a payout that vanished is a lost-currency
+    // report nobody can reproduce.
+    if (UBreakerEquipmentComponent* Equipment = GetOwner()->FindComponentByClass<UBreakerEquipmentComponent>())
+    {
+        Equipment->GrantForgeCurrency(Riftglass);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] rift complete (%s, AL %d): +%d XP, +%d Riftglass (O168/O137)."),
+            *Rift.AreaName.ToString(), AreaLevel, Xp, Riftglass);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerProgression] rift complete (AL %d): +%d XP granted, but no equipment component holds the wallet — %d Riftglass NOT paid."),
+            AreaLevel, Xp, Riftglass);
+    }
 }
 
 void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
