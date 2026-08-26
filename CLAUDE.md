@@ -633,8 +633,22 @@ the Lead node sheds its Swift.Lead grant (a free route around the
 token since ruling 1; the node is the two-target rule alone). That
 was the last GrantedAbilityIds writer: NoPhantomAbilityGrants now
 pins the writer count at ZERO so a new grant announces itself, and
-the writerless path's fate stays the owner's open question. 467 / 3
-/ 0 on the tip. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
+the writerless path's fate stays the owner's open question. SINCE
+THEN, three more rulings landed: O141 — Collapse is the game's ONE
+hit-time More (shared, TargetBandBroken, paid under the O34 ceiling
+at the rider site, FIELD-agreed; never a slot, population pinned at
+one); O142 — the parity fixture buys an ability-built tree
+(AbilityOptimizedRanks, ring-legal 65-point mirror; parity 0.27 ->
+0.621 cap / 0.356 endgame against the on-record 0.48-0.51 prediction,
+missed LOW and said so — the four-ratio decomposition now asserts its
+own product after Part One-J caught the stale cancellation claim);
+O143 — O168's payout closes the rift chain end to end
+(BreakerRiftRewardMath rides the chassis's own growth constant, the
+listener binds GROUND's event, and GROUND's live triple-lane run
+proved definition-intact, one payment, and the refused second
+completion paying nothing). 476 / 3 / 0 on the tip. Open on the
+seat/owner: Longstride reading confirmation, allocation-at-push-time,
+the parity content routes now aimed at 0.62. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
 hit-time More — x1.30 shared, gated on TargetBandBroken, paid by the
 rider path under the one O34 ceiling (headroom, never a slot; the
 clamp is exact because the window chain already folds into
