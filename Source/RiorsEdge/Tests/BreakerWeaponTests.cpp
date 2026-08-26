@@ -7,6 +7,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponFeel.h"
 #include "Weapons/BreakerWeaponMath.h"
+#include "Characters/BreakerShakeMath.h"
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
 
@@ -586,6 +587,37 @@ bool FBreakerArchetypeRecoilTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The rifle is dead accurate on the first shot"), Rifle.FirstShotSpreadMultiplier, 0.0f);
     TestTrue(TEXT("The heavies shove the viewmodel hardest"),
         Rocket.ViewmodelKickUnits > Rifle.ViewmodelKickUnits && Sniper.ViewmodelKickUnits > Rifle.ViewmodelKickUnits);
+
+    // The O27 three, absent from this test since they were authored: each has
+    // a recoil character none of the original five carries.
+    const FBreakerRecoilProfile Burst = ProfileFor(EBreakerWeaponArchetype::BurstRifle);
+    const FBreakerRecoilProfile MG = ProfileFor(EBreakerWeaponArchetype::Machinegun);
+    const FBreakerRecoilProfile Sidearm = ProfileFor(EBreakerWeaponArchetype::Sidearm);
+    TestTrue(TEXT("The burst rifle holds the tightest horizontal discipline in the table"),
+        Burst.HorizontalKickDegrees < SMG.HorizontalKickDegrees && Burst.HorizontalKickDegrees < Rifle.HorizontalKickDegrees);
+    TestTrue(TEXT("The machinegun ramps longest - its identity is the long held burst"),
+        MG.ClimbRampShots > Rifle.ClimbRampShots * 3.0f && MG.ClimbRampMultiplier > Rifle.ClimbRampMultiplier);
+    TestTrue(TEXT("The machinegun blooms widest"), MG.MaxBloomDegrees > SMG.MaxBloomDegrees);
+    TestTrue(TEXT("The sidearm snaps back fastest of the whole table"),
+        Sidearm.RecoveryInterpSpeed > SMG.RecoveryInterpSpeed);
+
+    // The formerly dead levers, now authored: RecoveryFraction separates the
+    // guns that fully settle from the guns the player must re-plant, and the
+    // spring CHARACTER (damping) separates the light weapons that used to
+    // share one return on different amplitudes.
+    TestEqual(TEXT("The rifle settles completely"), Rifle.RecoveryFraction, 1.0f);
+    TestTrue(TEXT("The machinegun leaves the deepest residue in the table"),
+        MG.RecoveryFraction < Shotgun.RecoveryFraction && MG.RecoveryFraction < 1.0f);
+    TestTrue(TEXT("The rocket and shotgun leave residue too"),
+        Rocket.RecoveryFraction < 1.0f && Shotgun.RecoveryFraction < 1.0f);
+    TestTrue(TEXT("The four light automatics no longer share one spring character"),
+        SMG.ViewmodelSpringDamping != Burst.ViewmodelSpringDamping
+        && Burst.ViewmodelSpringDamping != MG.ViewmodelSpringDamping
+        && MG.ViewmodelSpringDamping != Sidearm.ViewmodelSpringDamping);
+    TestTrue(TEXT("The rocket's authored kick fits under its own ceiling"),
+        Rocket.MaxViewmodelKickUnits > Rocket.ViewmodelKickUnits);
+    TestTrue(TEXT("The sniper's authored kick fits under its own ceiling"),
+        Sniper.MaxViewmodelKickUnits > Sniper.ViewmodelKickUnits);
 
     // The global trim is a real dial and only touches the kick.
     Weapon->EquipArchetype(EBreakerWeaponArchetype::Rifle);
@@ -1495,6 +1527,94 @@ bool FBreakerAimThenTraceInvariantTest::RunTest(const FString& Parameters)
             Aimed.PitchDegrees < Hip.PitchDegrees);
         TestTrue(TEXT("Every archetype kicks upward, so the aim moves at all"), Hip.PitchDegrees > 0.0f);
     }
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// The viewmodel MOTION channel (sway / bob / landing dip) - pure rules.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerViewmodelMotionTest,
+    "RiorsEdge.Weapons.ViewmodelMotion",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerViewmodelMotionTest::RunTest(const FString& Parameters)
+{
+    FBreakerViewmodelMotionParams Params;
+
+    // The bob is distance-driven: zero speed advances nothing, and equal
+    // ground covered advances equally however the frame rate sliced it.
+    TestEqual(TEXT("Standing still advances no bob phase"),
+        FBreakerWeaponFeel::AdvanceBobPhase(1.0f, 0.0f, 0.016f, Params.StrideLengthCm), 1.0f, 0.0f);
+    const float OneStep = FBreakerWeaponFeel::AdvanceBobPhase(0.0f, 600.0f, 0.1f, Params.StrideLengthCm);
+    float Sliced = 0.0f;
+    for (int32 Index = 0; Index < 10; ++Index)
+    {
+        Sliced = FBreakerWeaponFeel::AdvanceBobPhase(Sliced, 600.0f, 0.01f, Params.StrideLengthCm);
+    }
+    TestEqual(TEXT("Ground covered decides the phase, not the frame slicing"), Sliced, OneStep, 0.0001f);
+
+    // Zero speed leaves only the sway; zero scale leaves nothing at all.
+    const FBreakerViewmodelMotionOffset Idle = FBreakerWeaponFeel::MotionOffsets(Params, 1.7f, 0.0f, 0.0f, 1.0f);
+    TestTrue(TEXT("Idle sway is bounded by its authored amplitudes"),
+        FMath::Abs(Idle.LateralCm) <= Params.SwayLateralCm + UE_KINDA_SMALL_NUMBER
+        && FMath::Abs(Idle.VerticalCm) <= Params.SwayVerticalCm + UE_KINDA_SMALL_NUMBER);
+    const FBreakerViewmodelMotionOffset Quiet = FBreakerWeaponFeel::MotionOffsets(Params, 1.7f, 2.0f, 1.0f, 0.0f);
+    TestTrue(TEXT("Zero motion scale silences the whole channel"),
+        Quiet.LateralCm == 0.0f && Quiet.VerticalCm == 0.0f && Quiet.PitchDegrees == 0.0f && Quiet.RollDegrees == 0.0f);
+
+    // The full-speed stride stays inside the authored envelope, and the
+    // footfall pushes the gun DOWN - a bob that lifts reads as floating.
+    const FBreakerViewmodelMotionOffset Striding = FBreakerWeaponFeel::MotionOffsets(Params, 3.3f, 1.2f, 1.0f, 1.0f);
+    TestTrue(TEXT("A full stride stays inside the authored envelope"),
+        FMath::Abs(Striding.LateralCm) <= Params.SwayLateralCm + Params.BobLateralCm + UE_KINDA_SMALL_NUMBER
+        && FMath::Abs(Striding.VerticalCm) <= Params.SwayVerticalCm + Params.BobVerticalCm + UE_KINDA_SMALL_NUMBER);
+    const FBreakerViewmodelMotionOffset BobOnly = FBreakerWeaponFeel::MotionOffsets(Params, 0.0f, 1.2f, 1.0f, 1.0f);
+    TestTrue(TEXT("The footfall pushes the gun down"), BobOnly.VerticalCm <= Params.SwayVerticalCm);
+
+    // The landing dip: linear in the fall, clamped at the ceiling.
+    TestEqual(TEXT("No fall, no dip"), FBreakerWeaponFeel::LandingKickUnits(Params, 0.0f), 0.0f, 0.0f);
+    const float Kerb = FBreakerWeaponFeel::LandingKickUnits(Params, 200.0f);
+    const float Drop = FBreakerWeaponFeel::LandingKickUnits(Params, 900.0f);
+    TestTrue(TEXT("A bigger fall dips harder"), Drop > Kerb);
+    TestEqual(TEXT("A skydive is clamped at the authored ceiling"),
+        FBreakerWeaponFeel::LandingKickUnits(Params, 100000.0f), Params.MaxLandingKickUnits, 0.0001f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Shake and recoil share the control rotation. The shake model's safety is
+// that its per-frame writes TELESCOPE - each frame applies (new - last), so
+// the sum over any window is (last - first), and a decayed shake has returned
+// every degree it borrowed. That property is what keeps it from corrupting
+// the recoil settle budget, so it is pinned here, beside the recoil tests,
+// rather than assumed.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerShakeRecoilCoexistenceTest,
+    "RiorsEdge.Weapons.ShakeRecoilCoexistence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerShakeRecoilCoexistenceTest::RunTest(const FString& Parameters)
+{
+    float Trauma = 1.0f;
+    FRotator Last = FRotator::ZeroRotator;
+    float NetPitch = 0.0f, NetYaw = 0.0f;
+    double Time = 0.0;
+    const float Dt = 1.0f / 60.0f;
+    for (int32 Frame = 0; Frame < 600; ++Frame)
+    {
+        Trauma = BreakerShake::DecayTrauma(Trauma, 1.8f, Dt);
+        Time += Dt;
+        const FRotator Offset = BreakerShake::ShakeOffset(Trauma, Time, 18.0f, 0.5f, 0.4f);
+        NetPitch += Offset.Pitch - Last.Pitch;
+        NetYaw += Offset.Yaw - Last.Yaw;
+        Last = Offset;
+    }
+    TestEqual(TEXT("A decayed shake has returned every borrowed degree of pitch"), NetPitch, 0.0f, 0.001f);
+    TestEqual(TEXT("A decayed shake has returned every borrowed degree of yaw"), NetYaw, 0.0f, 0.001f);
+    TestEqual(TEXT("Trauma actually reached zero"), Trauma, 0.0f, 0.0001f);
     return true;
 }
 

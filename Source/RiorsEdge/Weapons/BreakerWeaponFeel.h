@@ -106,10 +106,9 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     // is what the game does TODAY, so leaving this at 1.0 anywhere reproduces
     // current behaviour exactly.
     //
-    // This is the third item on the ADS bill and the only one the weapon layer
-    // cannot collect on its own: nothing in Movement/ reads it yet. See the
-    // gap note on `UBreakerWeaponComponent::GetAimMoveSpeedMultiplier`, which
-    // names the one function that has to consume it. Authored per archetype
+    // The third item on the ADS bill, and CHARGED: Movement/'s
+    // GetAimSpeedMultiplier reads it into GetMaxSpeed's grounded cap through
+    // `UBreakerWeaponComponent::GetAimMoveSpeedMultiplier`. Authored per archetype
     // because "how much does sighting this weapon root you" is exactly the
     // kind of thing that should separate an SMG from a sniper. O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0.1", ClampMax="1"))
@@ -227,6 +226,55 @@ struct FBreakerViewmodelState
     }
 };
 
+/**
+ * Tuning for the viewmodel's MOTION channel — idle sway, locomotion bob and
+ * the landing dip. One global set rather than per-archetype: motion belongs
+ * to the body carrying the gun, not to the gun, and the per-archetype voice
+ * already lives in the recoil profile's kick and spring. Every figure O2
+ * PLACEHOLDER, and every amplitude SMALL on purpose — the shake model's
+ * ruled constraint ("SUBTLE — this is a game played for hours") applies to
+ * every ambient channel, this one included.
+ */
+struct FBreakerViewmodelMotionParams
+{
+    // Idle sway: two slow sines on incommensurate frequencies so the figure
+    // never closes into a visible loop. Centimetres and degrees at rest.
+    float SwayLateralCm = 0.18f;          // O2 PLACEHOLDER
+    float SwayVerticalCm = 0.12f;         // O2 PLACEHOLDER
+    float SwayFrequencyHz = 0.45f;        // O2 PLACEHOLDER
+    float SwayPitchDegrees = 0.15f;       // O2 PLACEHOLDER
+
+    // Locomotion bob: a figure-8 driven by DISTANCE, not time — phase
+    // advances with ground covered, so slowing down slows the cycle rather
+    // than leaving the gun pumping at sprint tempo. StrideLengthCm is one
+    // full cycle's worth of ground.
+    float BobVerticalCm = 0.85f;          // O2 PLACEHOLDER
+    float BobLateralCm = 0.55f;           // O2 PLACEHOLDER
+    float BobPitchDegrees = 0.25f;        // O2 PLACEHOLDER
+    float StrideLengthCm = 360.0f;        // O2 PLACEHOLDER
+    // Ground speed at which the bob reaches full amplitude; below it the bob
+    // scales linearly, so a creep barely breathes and a sprint works.
+    float FullBobSpeed = 600.0f;          // O2 PLACEHOLDER
+
+    // Landing dip: the fall's vertical speed converted into a downward-and-
+    // back impulse on the EXISTING kick spring, so the dip and the recoil
+    // share one recovery character per archetype and there is no second
+    // spring to tune. Units are the spring's centimetres per (cm/s) of fall.
+    float LandingKickPerFallSpeed = 0.004f;   // O2 PLACEHOLDER
+    float MaxLandingKickUnits = 5.0f;         // O2 PLACEHOLDER
+    float LandingPitchPerKickUnit = 0.6f;     // O2 PLACEHOLDER, muzzle dips
+};
+
+/** The motion channel's output for one frame, camera-relative like the spring. */
+struct FBreakerViewmodelMotionOffset
+{
+    float BackCm = 0.0f;
+    float LateralCm = 0.0f;
+    float VerticalCm = 0.0f;
+    float PitchDegrees = 0.0f;
+    float RollDegrees = 0.0f;
+};
+
 class RIORSEDGE_API FBreakerWeaponFeel
 {
 public:
@@ -309,4 +357,33 @@ public:
 
     /** Integrates the viewmodel spring back toward rest. */
     static void IntegrateViewmodel(const FBreakerRecoilProfile& Profile, FBreakerViewmodelState& State, float DeltaSeconds);
+
+    // ---- The motion channel (sway / bob / landing) ------------------------
+
+    /**
+     * Advances the bob phase by ground covered. Returns the new phase in
+     * radians, wrapped to [0, 2π). Zero speed advances nothing — the bob is
+     * distance-driven by construction, which is what keeps it honest when the
+     * player decelerates mid-cycle.
+     */
+    static float AdvanceBobPhase(float PhaseRadians, float GroundSpeed, float DeltaSeconds, float StrideLengthCm);
+
+    /**
+     * The frame's sway + bob offset. TimeSeconds drives the idle sway (slow,
+     * incommensurate sines); BobPhaseRadians and SpeedFraction [0,1] drive the
+     * figure-8 (lateral at the phase, vertical at DOUBLE the phase — two
+     * footfalls per stride cycle); MotionScale scales the whole channel and is
+     * where ADS quiets it (pass the profile's aim-blended viewmodel
+     * multiplier). Pure, so a test can pin: zero speed leaves only sway, zero
+     * scale leaves nothing.
+     */
+    static FBreakerViewmodelMotionOffset MotionOffsets(const FBreakerViewmodelMotionParams& Params,
+        float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale);
+
+    /**
+     * The landing dip's impulse magnitude, in the kick spring's units, for a
+     * landing at FallSpeed (cm/s, positive down). Linear in the fall, clamped
+     * at the authored ceiling so a skydive cannot bury the gun.
+     */
+    static float LandingKickUnits(const FBreakerViewmodelMotionParams& Params, float FallSpeed);
 };

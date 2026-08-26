@@ -226,6 +226,13 @@ void ABreakerCharacter::UpdateCameraShake(float DeltaSeconds)
 void ABreakerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    // Cached while airborne for the landing dip: Landed fires after the
+    // movement component has zeroed Velocity.Z, so the dip's input is the
+    // last falling frame's speed, not the (always zero) landing frame's.
+    if (GetCharacterMovement() && GetCharacterMovement()->IsFalling())
+    {
+        LastFallingSpeed = FMath::Max(0.0f, -GetCharacterMovement()->Velocity.Z);
+    }
     // Backstop for every path that changes the equipped gun without going
     // through the 1/2 keys — the loadout screen, an item equip, a dev swap.
     // Early-outs on the first line when nothing changed.
@@ -950,7 +957,43 @@ void ABreakerCharacter::UpdateViewmodelKick()
         Rotation.Pitch += BreakerHolsterPitchDegrees;
         Rotation.Yaw += BreakerHolsterYawDegrees;
     }
-    PrototypeWeaponVisual->SetRelativeLocation(Rest + Offset);
+    // The motion channel rides on top of the spring: idle sway from time,
+    // locomotion bob from ground covered, all of it quieted by ADS through
+    // the same aim-blended multiplier the kick uses, and silenced while
+    // sliding or airborne — a slide is a posture, not a stride. Pure maths in
+    // BreakerWeaponFeel; the two state members are on the character because
+    // this is the one place that ticks every frame regardless of the
+    // weapon's own feel-tick gating.
+    FBreakerViewmodelMotionOffset Motion;
+    if (const UWorld* MotionWorld = GetWorld())
+    {
+        const UBreakerCharacterMovementComponent* Move = GetBreakerMovement();
+        const bool bGroundedStride = Move && !Move->IsFalling() && !Move->IsSliding();
+        const float GroundSpeed = Move ? Move->Velocity.Size2D() : 0.0f;
+        const float Delta = MotionWorld->GetDeltaSeconds();
+        if (bGroundedStride)
+        {
+            ViewmodelBobPhase = FBreakerWeaponFeel::AdvanceBobPhase(
+                ViewmodelBobPhase, GroundSpeed, Delta, ViewmodelMotion.StrideLengthCm);
+        }
+        const float SpeedFraction = (bGroundedStride && ViewmodelMotion.FullBobSpeed > 0.0f)
+            ? FMath::Clamp(GroundSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
+        // ADS quiets motion exactly as it quiets the kick: through the
+        // profile's aim-blended viewmodel multiplier.
+        float MotionScale = 1.0f;
+        if (Weapon)
+        {
+            const FBreakerRecoilProfile Profile = Weapon->GetRecoilProfile();
+            MotionScale = FMath::Lerp(1.0f, Profile.AimViewmodelMultiplier, Weapon->GetAimAlpha());
+        }
+        Motion = FBreakerWeaponFeel::MotionOffsets(ViewmodelMotion,
+            static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, SpeedFraction, MotionScale);
+    }
+    Rotation.Pitch += Motion.PitchDegrees;
+    Rotation.Roll += Motion.RollDegrees;
+
+    PrototypeWeaponVisual->SetRelativeLocation(Rest + Offset
+        + FVector(-Motion.BackCm, Motion.LateralCm, Motion.VerticalCm));
     PrototypeWeaponVisual->SetRelativeRotation(Rotation);
 
     // The shoulders do NOT move with the rig — they are the player's body — so
@@ -2037,4 +2080,23 @@ void ABreakerCharacter::TogglePauseMenu()
         return;
     }
     MenuWidget->HandleEscape();
+}
+
+void ABreakerCharacter::Landed(const FHitResult& Hit)
+{
+    Super::Landed(Hit);
+    // The landing dip: the fall's cached speed becomes one impulse into the
+    // weapon's OWN kick spring, so the dip recovers with the equipped
+    // archetype's character — a machinegun lands heavier than a sidearm
+    // because its spring already wallows. Purely presentation; a dedicated
+    // server has no viewmodel and the call is inert there.
+    if (Weapon)
+    {
+        const float KickUnits = FBreakerWeaponFeel::LandingKickUnits(ViewmodelMotion, LastFallingSpeed);
+        if (KickUnits > 0.0f)
+        {
+            Weapon->AddViewmodelImpulse(KickUnits, -KickUnits * ViewmodelMotion.LandingPitchPerKickUnit);
+        }
+    }
+    LastFallingSpeed = 0.0f;
 }

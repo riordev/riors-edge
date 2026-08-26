@@ -325,6 +325,8 @@ public:
     // the damage path does.
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FVector GetViewmodelLocationOffset() const;
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FRotator GetViewmodelRotationOffset() const;
+    // A non-shot displacement into the kick spring (the landing dip's entry).
+    UFUNCTION(BlueprintCallable, Category="Weapon|Feel") void AddViewmodelImpulse(float BackUnits, float PitchDegrees);
     UFUNCTION(BlueprintPure, Category="Weapon|Feel") FBreakerRecoilProfile GetRecoilProfile() const { return ResolveRecoilProfile(); }
 
     // ---- The ADS mobility bill: the weapons half ---------------------------
@@ -343,13 +345,11 @@ public:
     // instantly bolt the player to the floor, and it is published here as one
     // query with no world side effects.
     //
-    // WHAT IS STILL MISSING, on the OTHER side of the boundary and owned by
-    // whoever holds Movement/: exactly one consumer.
-    // `UBreakerCharacterMovementComponent::GetMaxSpeed()` must multiply its
-    // grounded cap by `GetAimMoveSpeedMultiplier()` from the owner's weapon
-    // component (or the character must push it as a keyed temporary multiplier
-    // on aim state changes). Until that lands this returns an honest number
-    // that nobody reads, which is a visible gap rather than a silent one.
+    // The other side is closed too: GetMaxSpeed multiplies its grounded cap
+    // by UBreakerCharacterMovementComponent::GetAimSpeedMultiplier, which
+    // reads this query live (and re-clamps it at 1.0 — two independent clamps
+    // on one invariant, so a misauthored profile cannot turn aiming into a
+    // speed buff). The whole ADS bill now charges: time, cone, and speed.
     // Sliding and the boosted-speed ceiling deliberately have no opinion here;
     // whether an aimed slide is slowed is a movement-feel ruling, not a weapon
     // one.

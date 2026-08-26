@@ -106,6 +106,11 @@ namespace
             Profile.ViewmodelKickLateralUnits = 1.0f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 1.6f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 320.0f;        // O2 PLACEHOLDER
+            // Its own damping too: the four light weapons all sat on the
+            // struct's 26, so their springs shared one CHARACTER and differed
+            // only in amplitude. The SMG rattles — under-damped for its
+            // stiffness relative to the others.
+            Profile.ViewmodelSpringDamping = 30.0f;           // O2 PLACEHOLDER
             // Fastest into the sights and the least punished for running with
             // them up: the SMG is the one weapon that is allowed to be a
             // run-and-gun ADS weapon.
@@ -143,6 +148,11 @@ namespace
             Profile.ViewmodelSpringStiffness = 150.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 17.0f;           // O2 PLACEHOLDER
             Profile.AimViewmodelMultiplier = 0.5f;            // O2 PLACEHOLDER
+            // The shared clamp (9.0 / 7.0) sat exactly at this kick, so a
+            // second shot had no room to read at all. The heavies author
+            // their own ceilings.
+            Profile.MaxViewmodelKickUnits = 12.0f;            // O2 PLACEHOLDER
+            Profile.MaxViewmodelKickPitchDegrees = 8.0f;      // O2 PLACEHOLDER
             // Slowest scope in the table and the harshest movement penalty:
             // the sniper is the weapon that must be PLANTED, and hip firing
             // one is deliberately close to useless.
@@ -178,6 +188,11 @@ namespace
             Profile.ViewmodelKickPitchDegrees = 5.2f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 180.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 19.0f;           // O2 PLACEHOLDER
+            // A sliver of the kick never settles: the pump's shove leaves the
+            // aim a touch high and the player re-plants it. First author of
+            // RecoveryFraction below 1.0 — the "real gun" weight the feel
+            // model always had and nothing used.
+            Profile.RecoveryFraction = 0.96f;                 // O2 PLACEHOLDER
             // Smallest movement penalty in the table. Hip firing a shotgun
             // while strafing is the thing it is FOR, and its own 4.5 degree
             // pellet cone dwarfs a quarter-degree of movement anyway.
@@ -213,6 +228,12 @@ namespace
             Profile.ViewmodelKickPitchDegrees = 6.8f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 140.0f;        // O2 PLACEHOLDER
             Profile.ViewmodelSpringDamping = 16.0f;           // O2 PLACEHOLDER
+            Profile.RecoveryFraction = 0.94f;                 // O2 PLACEHOLDER
+            // The authored 10.0 kick was truncated by the shared 9.0 ceiling
+            // on the FIRST shot — the one weapon whose whole feel is that
+            // shot. Its own ceilings, above its own kick.
+            Profile.MaxViewmodelKickUnits = 14.0f;            // O2 PLACEHOLDER
+            Profile.MaxViewmodelKickPitchDegrees = 9.0f;      // O2 PLACEHOLDER
             Profile.AimInSeconds = 0.30f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.30f;                // O2 PLACEHOLDER
             Profile.AimMoveSpeedMultiplier = 0.65f;           // O2 PLACEHOLDER
@@ -258,6 +279,7 @@ namespace
             Profile.ViewmodelKickLateralUnits = 0.5f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 2.8f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 300.0f;        // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 24.0f;           // O2 PLACEHOLDER, a shade loose: the burst rocks
             Profile.AimInSeconds = 0.22f;                     // O2 PLACEHOLDER
             Profile.MoveSpreadDegrees = 0.55f;                // O2 PLACEHOLDER
             Profile.AimMoveSpreadMultiplier = 2.4f;           // O2 PLACEHOLDER
@@ -293,6 +315,12 @@ namespace
             Profile.ViewmodelKickLateralUnits = 1.5f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 1.9f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 240.0f;        // O2 PLACEHOLDER
+            // The belt gun wallows — softest spring character of the
+            // automatics — and sustained fire leaves the deepest residue:
+            // the largest never-settled share in the table, so a long burst
+            // must be re-planted rather than waited out.
+            Profile.ViewmodelSpringDamping = 20.0f;           // O2 PLACEHOLDER
+            Profile.RecoveryFraction = 0.90f;                 // O2 PLACEHOLDER
             // The heaviest weapon in the table to bring up and the most rooted
             // once it is up — harsher than the sniper on speed, because the
             // sniper's answer to being rushed is to stop aiming and this one's
@@ -336,6 +364,7 @@ namespace
             Profile.ViewmodelKickLateralUnits = 0.7f;         // O2 PLACEHOLDER
             Profile.ViewmodelKickPitchDegrees = 2.0f;         // O2 PLACEHOLDER
             Profile.ViewmodelSpringStiffness = 340.0f;        // O2 PLACEHOLDER
+            Profile.ViewmodelSpringDamping = 34.0f;           // O2 PLACEHOLDER, crisp: the snappiest return in the table
             // Snaps up faster than anything else and barely slows you: a
             // sidearm you cannot bring up in a hurry is not a sidearm.
             Profile.AimInSeconds = 0.10f;                     // O2 PLACEHOLDER
@@ -695,9 +724,9 @@ float UBreakerWeaponComponent::GetSpeedFraction() const
 float UBreakerWeaponComponent::GetAimMoveSpeedMultiplier() const
 {
     // Composed against LIVE aim progress, not the aim button, so the penalty
-    // arrives at exactly the pace every other ADS benefit does. Nothing reads
-    // this yet — see the gap note on the declaration for the one function in
-    // Movement/ that has to.
+    // arrives at exactly the pace every other ADS benefit does. Consumed by
+    // UBreakerCharacterMovementComponent::GetAimSpeedMultiplier inside
+    // GetMaxSpeed — the ADS bill's third leg is CHARGED.
     return FBreakerWeaponFeel::AimMoveSpeedMultiplier(ResolveRecoilProfile(), GetAimAlpha());
 }
 
@@ -778,6 +807,21 @@ FRotator UBreakerWeaponComponent::GetViewmodelRotationOffset() const
 {
     // Positive pitch on a camera-relative component points the muzzle up.
     return FRotator(Viewmodel.PitchOffset, 0.0f, 0.0f);
+}
+
+void UBreakerWeaponComponent::AddViewmodelImpulse(float BackUnits, float PitchDegrees)
+{
+    // A non-shot impulse into the SAME spring the shot kick uses — the
+    // landing dip is the first caller — so every displacement of the gun
+    // returns with one recovery character per archetype and there is never a
+    // second spring to keep in tune with the first. Negative pitch dips the
+    // muzzle, which is what a landing does.
+    if (!bViewmodelKickEnabled || (BackUnits == 0.0f && PitchDegrees == 0.0f)) return;
+    const FBreakerRecoilProfile Profile = ResolveRecoilProfile();
+    Viewmodel.BackOffset = FMath::Min(Viewmodel.BackOffset + FMath::Max(0.0f, BackUnits), Profile.MaxViewmodelKickUnits);
+    Viewmodel.PitchOffset = FMath::Clamp(Viewmodel.PitchOffset + PitchDegrees,
+        -Profile.MaxViewmodelKickPitchDegrees, Profile.MaxViewmodelKickPitchDegrees);
+    UpdateFeelTickEnabled();
 }
 
 void UBreakerWeaponComponent::ResetWeaponFeel()

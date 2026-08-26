@@ -7,6 +7,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Characters/BreakerViewmodelRig.h"
+#include "Weapons/BreakerWeaponFeel.h"
 #include "BreakerCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -41,6 +42,7 @@ public:
     ABreakerCharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
     virtual void Tick(float DeltaSeconds) override;
+    virtual void Landed(const FHitResult& Hit) override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const;
@@ -284,6 +286,16 @@ private:
     // its own sight on the crosshair.
     FVector GetWeaponRestLocation() const;
     void UpdateViewmodelKick();
+
+    // ---- Viewmodel motion channel (sway / bob / landing dip) --------------
+    // Tuning lives in the world-free params struct; the character only owns
+    // the two pieces of state a pure function cannot: the distance-driven bob
+    // phase, and the last airborne fall speed (Landed fires after the
+    // movement component has already zeroed the vertical velocity, so the dip
+    // reads the cached value from the final falling frame).
+    FBreakerViewmodelMotionParams ViewmodelMotion;
+    float ViewmodelBobPhase = 0.0f;
+    float LastFallingSpeed = 0.0f;
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
     void UpdateDashCameraFeedback(float DeltaSeconds);
     void ApplyBaseFieldOfView();

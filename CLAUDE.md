@@ -2,6 +2,40 @@
 
 ## Current work
 
+KIT LANE, WEAPON FEEL: THE MODEL EXISTED, SO THE CYCLE TUNED AND
+EXTENDED IT (lead's go-ahead on the four-item order from the recon).
+(a) The ADS bill's third leg was ALREADY CHARGED — GetMaxSpeed
+multiplies GetAimSpeedMultiplier with the double clamp — and only
+three comments said otherwise; the recon inherited their lie. All
+three corrected; BreakerAimSpeedTests already covers it. (b) The
+viewmodel gains its MOTION channel: idle sway (two incommensurate
+slow sines), locomotion bob driven by GROUND COVERED not time (phase
+advances per stride-length, so decelerating slows the cycle — pinned
+by a frame-slicing-invariance test), and a landing dip that converts
+the cached last-falling-frame speed into an impulse on the EXISTING
+kick spring, so the dip recovers with the equipped archetype's own
+character and there is no second spring. Pure maths + params in
+BreakerWeaponFeel (FBreakerViewmodelMotionParams, all O2, amplitudes
+SMALL per the shake model's SUBTLE ruling); state (bob phase, fall
+cache) on the character, the one thing that ticks every frame; ADS
+quiets motion through the same aim-blended viewmodel multiplier the
+kick uses; sliding and airborne still the stride. (c) The dead
+levers wake: RecoveryFraction below 1.0 for the first time
+(Machinegun .90 — sustained fire leaves residue the player replants
+— Rocket .94, Shotgun .96; everything else settles fully), the four
+light automatics get four spring CHARACTERS instead of one damping
+shared at different amplitudes, and Sniper/Rocket author their own
+viewmodel ceilings — the Rocket's 10.0 kick had been flat against
+the shared 9.0 clamp on the one shot that IS the weapon. (d)
+ArchetypeRecoil finally covers the O27 three (burst discipline, the
+machinegun's long ramp, the sidearm's snap) plus the lever
+assertions; new pure tests pin the motion channel; and
+ShakeRecoilCoexistence pins the telescoping property that keeps the
+trauma shake from corrupting the recoil settle budget — stated,
+no longer assumed. FEEL IS OWED THE OWNER'S HANDS: screenshots
+cannot photograph motion, and every figure is O2 until he says a
+rifle reads as a rifle.
+
 GLASS LANE, THE DOOR STOPS SAYING TWO THINGS (465 / 3 / 0, upstream's
 own baseline at `fde7a60`, `Docs/STATE.md` byte-identical). Line 1742
 calls `GetPromptLabel()` instead of the literal `TEXT("TRAVEL")`, so the

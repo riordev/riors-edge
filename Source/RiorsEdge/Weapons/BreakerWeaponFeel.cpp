@@ -186,3 +186,53 @@ void FBreakerWeaponFeel::IntegrateViewmodel(const FBreakerRecoilProfile& Profile
     IntegrateAxis(State.LateralOffset, State.LateralVelocity);
     IntegrateAxis(State.PitchOffset, State.PitchVelocity);
 }
+
+float FBreakerWeaponFeel::AdvanceBobPhase(float PhaseRadians, float GroundSpeed, float DeltaSeconds, float StrideLengthCm)
+{
+    if (StrideLengthCm <= 0.0f || GroundSpeed <= 0.0f || DeltaSeconds <= 0.0f)
+    {
+        return PhaseRadians;
+    }
+    const float Advanced = PhaseRadians + (GroundSpeed * DeltaSeconds / StrideLengthCm) * 2.0f * UE_PI;
+    return FMath::Fmod(Advanced, 2.0f * UE_PI);
+}
+
+FBreakerViewmodelMotionOffset FBreakerWeaponFeel::MotionOffsets(const FBreakerViewmodelMotionParams& Params,
+    float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale)
+{
+    FBreakerViewmodelMotionOffset Offset;
+    const float Scale = FMath::Max(0.0f, MotionScale);
+    if (Scale <= 0.0f)
+    {
+        return Offset;
+    }
+
+    // Idle sway: two incommensurate frequencies (the second at the golden
+    // ratio of the first) so the figure precesses rather than looping.
+    const float SwayPhase = TimeSeconds * Params.SwayFrequencyHz * 2.0f * UE_PI;
+    Offset.LateralCm = Params.SwayLateralCm * FMath::Sin(SwayPhase) * Scale;
+    Offset.VerticalCm = Params.SwayVerticalCm * FMath::Sin(SwayPhase * 0.618f) * Scale;
+    Offset.PitchDegrees = Params.SwayPitchDegrees * FMath::Sin(SwayPhase * 0.618f) * Scale;
+
+    // Locomotion bob, faded in by speed: lateral at the stride phase,
+    // vertical at DOUBLE it — two footfalls per full cycle, which is what
+    // makes it read as steps rather than as a float.
+    const float Bob = FMath::Clamp(SpeedFraction, 0.0f, 1.0f) * Scale;
+    if (Bob > 0.0f)
+    {
+        Offset.LateralCm += Params.BobLateralCm * FMath::Sin(BobPhaseRadians) * Bob;
+        Offset.VerticalCm += Params.BobVerticalCm * FMath::Abs(FMath::Sin(BobPhaseRadians)) * -1.0f * Bob;
+        Offset.PitchDegrees += Params.BobPitchDegrees * FMath::Sin(2.0f * BobPhaseRadians) * Bob;
+        Offset.RollDegrees += Params.BobLateralCm * 0.25f * FMath::Sin(BobPhaseRadians) * Bob;
+    }
+    return Offset;
+}
+
+float FBreakerWeaponFeel::LandingKickUnits(const FBreakerViewmodelMotionParams& Params, float FallSpeed)
+{
+    if (FallSpeed <= 0.0f || Params.LandingKickPerFallSpeed <= 0.0f)
+    {
+        return 0.0f;
+    }
+    return FMath::Min(FallSpeed * Params.LandingKickPerFallSpeed, FMath::Max(0.0f, Params.MaxLandingKickUnits));
+}
