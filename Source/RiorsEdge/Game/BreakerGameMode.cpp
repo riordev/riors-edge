@@ -101,6 +101,11 @@ void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
         IConsoleManager::Get().UnregisterConsoleObject(MarkTerminatorConsoleCommand);
         MarkTerminatorConsoleCommand = nullptr;
     }
+    if (PopulationConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(PopulationConsoleCommand);
+        PopulationConsoleCommand = nullptr;
+    }
     Super::EndPlay(Reason);
 }
 
@@ -830,6 +835,57 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
                 MarkRiftTerminator(Nearest);
             }));
     }
+    // Breaker.Rift.Population <n>: respawn the current wave at n bodies, in
+    // place, so the owner can walk the same yard at three populations and pick
+    // one. It clears what is alive and re-solves at the requested count rather
+    // than adding to it — comparing populations means comparing populations,
+    // not watching one accumulate.
+    if (!PopulationConsoleCommand)
+    {
+        PopulationConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.Rift.Population"),
+            TEXT("Re-populates the current wave at N live bodies (walk a yard at three counts and pick)."),
+            FConsoleCommandWithArgsDelegate::CreateLambda([this](const TArray<FString>& Args)
+            {
+                const int32 Wanted = Args.Num() > 0 ? FCString::Atoi(*Args[0]) : 0;
+                if (Wanted <= 0)
+                {
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[Rift] Breaker.Rift.Population <n>: how many live bodies to stand in. ")
+                        TEXT("Try 25, 50 and 100 in the same yard and pick the one that reads."));
+                    return;
+                }
+                // THE DENSITY CEILING IS NOT RAISED HERE. 5.3's per-player cap
+                // is a readability rule and this command exists to FIND the
+                // number inside it, not to argue with it: a run at 300 would
+                // answer a question nobody asked and cost a frame nobody has.
+                const int32 Capped = FMath::Clamp(Wanted, 1,
+                    UBreakerWaveBudgetLibrary::GetMaximumLiveEnemies(1, WaveBudget));
+                if (Capped != Wanted)
+                {
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[Rift] %d clamped to %d: 5.3's density ceiling. The question is which number ")
+                        TEXT("inside the cap reads as populated, not whether the cap should move."),
+                        Wanted, Capped);
+                }
+                for (const TObjectPtr<ABreakerEnemy>& Enemy : WaveEnemies)
+                {
+                    if (IsValid(Enemy) && !Enemy->IsDeadEnemy()) Enemy->Destroy();
+                }
+                WaveEnemies.Reset();
+                CurrentWave = FMath::Max(CurrentWave - 1, 0);
+
+                // The density ceiling IS the knob, so it is the knob this
+                // turns — borrowed for one solve and handed straight back. The
+                // budget curve is untouched: a wave still buys what it can
+                // afford, it is simply allowed fewer bodies to buy.
+                const int32 Restore = WaveBudget.MaximumLiveEnemiesPerPlayer;
+                WaveBudget.MaximumLiveEnemiesPerPlayer = Capped;
+                StartNextWave();
+                WaveBudget.MaximumLiveEnemiesPerPlayer = Restore;
+                UE_LOG(LogTemp, Display, TEXT("[Rift] re-populated at %d live bodies."), Capped);
+            }));
+    }
     if (!EffectProbeConsoleCommand)
     {
         EffectProbeConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
@@ -1381,8 +1437,36 @@ void ABreakerGameMode::CaptureScreenshot()
             {
                 const int32 VantageIndex = (ScreenshotIndex - 1) % TourCameras.Num();
                 AActor* Vantage = TourCameras[VantageIndex];
-                PC->SetViewTarget(Vantage);
-                UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] next shot %d from vantage %d"),
+
+                // THE TOUR MOVES THE PAWN, NOT A FREE CAMERA (ruled). It used
+                // to SetViewTarget onto the vantage actor and leave the pawn
+                // behind, which broke an invariant the shipping game relies on:
+                // the enemy bar culls at 50 m FROM THE PAWN, and in the real
+                // game the pawn and the camera are the same point
+                // (FirstPersonCamera is a component on the character). A
+                // vantage standing among enemies with the pawn 60 m away
+                // therefore culled every bar, and the capture read as a bar
+                // defect that did not exist.
+                //
+                // The alternative was widening the cull to camera-space, which
+                // would be changing SHIPPING behaviour to serve an instrument
+                // — the mirror of never narrowing an instrument to make a cycle
+                // pass. Moving the pawn keeps the invariant true everywhere,
+                // including inside the thing that was breaking it.
+                if (APawn* Pawn = PC->GetPawn())
+                {
+                    Pawn->TeleportTo(Vantage->GetActorLocation(), Vantage->GetActorRotation());
+                    PC->SetControlRotation(Vantage->GetActorRotation());
+                    PC->SetViewTarget(Pawn);
+                }
+                else
+                {
+                    // No pawn is a capture of a menu or the front end, where a
+                    // vantage means nothing anyway; fall back rather than skip
+                    // the shot silently.
+                    PC->SetViewTarget(Vantage);
+                }
+                UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] next shot %d from vantage %d (pawn moved)"),
                     ScreenshotIndex, VantageIndex);
             }
         }

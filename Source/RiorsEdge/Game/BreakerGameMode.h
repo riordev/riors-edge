@@ -551,6 +551,12 @@ private:
     // unregister-on-EndPlay contract as the two above.
     IConsoleCommand* CloseRiftConsoleCommand = nullptr;
     IConsoleCommand* MarkTerminatorConsoleCommand = nullptr;
+    // Breaker.Rift.Population <n> — how many bodies make a yard feel
+    // populated is the owner's and is not answerable from a chair. The way to
+    // get it is to walk the yard at three populations and pick, which the
+    // interior now makes possible; this turns a standing-in-it question into a
+    // two-minute answer instead of a report.
+    IConsoleCommand* PopulationConsoleCommand = nullptr;
     void HandleRiftTerminatorDefeated(class ABreakerEnemy* Terminator);
     // THE ONE-WAY LATCH (O168). Per-world by construction: the game mode is
     // destroyed on travel, so a re-entered door is a new world with fresh state

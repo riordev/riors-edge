@@ -133,7 +133,17 @@ private:
     UFUNCTION() void HandleVitalsRestoredForTTD();
 
     UPROPERTY() FBreakerPlaytestStats Stats;
-    bool bDiagnosticsVisible = true;
+    // DEFAULTS TO FALSE, RULED, AND THIS ONE HAS A RECEIPT. It shipped true,
+    // so the F3 debug overlay was up in every playtest the owner ever ran —
+    // including the screenshot that was read as colliding enemy LABELS and
+    // ruled on as a readability defect. FIELD's bar probe later found the
+    // collision was the overlay's own second label pass, not the shipping HUD.
+    // A default nobody chose cost the seat a wrong ruling and cost another lane
+    // a cycle chasing it.
+    //
+    // Nothing is lost: ToggleDiagnostics already exists and F3 still shows it.
+    // A debug overlay that ships visible is not a debug overlay.
+    bool bDiagnosticsVisible = false;
     mutable double LastReportCopyTime = -1000.0;
     EBreakerKillBucket PendingKillBucket = EBreakerKillBucket::Count;
     double PendingKillBucketTime = -1000.0;
