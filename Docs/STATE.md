@@ -11,9 +11,9 @@ measurement without judging it.
 
 | Section | Direction | Value | Pin | State |
 |---|---|---|---|---|
-| Silent nodes | ceiling | 43 of 445 authored | ceiling 54 | ok |
-| Stat targets with no aggregation lane | ceiling | 1 of 33 | ceiling 6 | ok |
-| Aggregation lanes carrying nothing | ceiling | 0 of 31 lanes | ceiling 9 | ok |
+| Silent nodes | ceiling | 43 of 446 authored | ceiling 54 | ok |
+| Stat targets with no aggregation lane | ceiling | 1 of 34 | ceiling 6 | ok |
+| Aggregation lanes carrying nothing | ceiling | 0 of 32 lanes | ceiling 9 | ok |
 | Node tags with no consumer | ceiling | 140 of 206 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 11 of 25 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
@@ -21,7 +21,7 @@ measurement without judging it.
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 57 % ranked minors, all trees | no pin — measurement only | — |
-| Scaffolding nodes | ceiling | 42 of 445 authored | ceiling 50 | ok |
+| Scaffolding nodes | ceiling | 42 of 446 authored | ceiling 50 | ok |
 | Conditions that can never be true | ceiling | 4.0 | ceiling 4, target 0 | ok |
 | Items dropped per hour, at the reference area level | band | 134.0 | band 110–160 | ok |
 | Build variance band, at cap | band | 6.01 | band 8.0–10.0 | **OUT** |
@@ -34,7 +34,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 465
+- passing: 467
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 38
@@ -50,7 +50,7 @@ A test that was never written is the worst of the three: it looks asserted.
 
 ## Silent nodes
 
-**ceiling** · 43 of 445 authored · ceiling 54
+**ceiling** · 43 of 446 authored · ceiling 54
 
 Authored, purchasable, costs a point, and produces no observable change. Counted against BOTH consumption axes — tag and node id.
 
@@ -73,7 +73,7 @@ Authored, purchasable, costs a point, and produces no observable change. Counted
 
 ## Stat targets with no aggregation lane
 
-**ceiling** · 1 of 33 · ceiling 6
+**ceiling** · 1 of 34 · ceiling 6
 
 A node authored against one of these is silently unpaid. 1 further target(s) are delivered by a rider and are correctly laneless: MeleeDamage.
 
@@ -81,7 +81,7 @@ A node authored against one of these is silently unpaid. 1 further target(s) are
 
 ## Aggregation lanes carrying nothing
 
-**ceiling** · 0 of 31 lanes · ceiling 9
+**ceiling** · 0 of 32 lanes · ceiling 9
 
 Plumbing with no author, counted across BOTH authoring layers: node effects, and shipped affix lines landing in the same composed value. A lane listed here is fed by neither.
 
@@ -223,7 +223,7 @@ Most of a build should be refusal. A CEILING here would lock the trees at their 
 - GetSupportMedicTree: 12 nodes, 24 points offered, 3.0x budget
 - GetSupportWardenTree: 12 nodes, 24 points offered, 3.0x budget
 - GetSwiftFrenzyTree: 13 nodes, 26 points offered, 3.25x budget
-- GetSwiftKineticTree: 14 nodes, 28 points offered, 3.5x budget
+- GetSwiftKineticTree: 15 nodes, 28 points offered, 3.5x budget
 - GetSwiftMarksmanTree: 13 nodes, 26 points offered, 3.25x budget
 - GetTankBastionTree: 12 nodes, 24 points offered, 3.0x budget
 - GetTankDemolitionistTree: 12 nodes, 24 points offered, 3.0x budget
@@ -262,7 +262,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 - GetSupportMedicTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSupportWardenTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSwiftFrenzyTree: 46% ranked minor, 46% notable, 8% convergence/keystone
-- GetSwiftKineticTree: 14% ranked minor, 79% notable, 7% convergence/keystone
+- GetSwiftKineticTree: 20% ranked minor, 73% notable, 7% convergence/keystone
 - GetSwiftMarksmanTree: 23% ranked minor, 69% notable, 8% convergence/keystone
 - GetTankBastionTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetTankDemolitionistTree: 0% ranked minor, 92% notable, 8% convergence/keystone
@@ -270,7 +270,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 
 ## Scaffolding nodes
 
-**ceiling** · 42 of 445 authored · ceiling 50
+**ceiling** · 42 of 446 authored · ceiling 50
 
 No stat line, no condition, and no rule anything reads. A STRICT SUBSET of the silent nodes: the difference is the silent nodes that ARE shaped and merely point at an unpaid target, which is a wiring problem where this is an authoring one.
 

@@ -595,14 +595,26 @@ multiple of three is the one wrong answer), pinned in
 BossBandsAvoidPhaseGates. LEDGER's standing questions live in
 Docs/reports/LEDGER.md — the per-hit More ruling (Collapse) and the
 dash grant are the two open ones. BreakerHealthBands.h now names its
-consumers (published path, ORDERS Part Four). ORDERS ANSWERS TAKEN
-(fb0dba3): the O120 collision is repaired — the reward-composition
-ruling is O137, loading keeps O120, every citation grepped and all
-referenced loading; the dash node's grant is RULED (seeded free rank,
-node form) and its READING waits on one narrow answer in
-Docs/reports/LEDGER.md — Route 2 (the jump precedent, four sites, one
-line in Movement/) against the seat's "one entry and one wire" line;
-Swift pacing (1b) is HELD by order, nothing acted.
+consumers (published path, ORDERS Part Four). THE fde7a60 ORDERS BATCH IS
+LANDED (467 / 3 / 0, same expected-red roster): O138 — the token
+schedule DERIVES (first level 5 + completion 30 authored, count read
+from the class's unlockables, convex t^1.2 spacing that reproduces
+the retired four-class {5,12,20,30} bit-identically; Swift compresses
+to {5,10,16,23,30} and every class finishes at 30, owner-ruled).
+O139 — Longstride lands: Swift.Kinetic.Longstride, rank 1 seeded on
+all five arrival paths (three Choose/DevForce, load, doctrine respec
+re-seed), cost 0 so respec-no-refund is arithmetic; reading is
+DISTANCE (+20% dash impulse pre-cap, one line in Movement/'s TryDash,
+single-bidder DashDistance lane, gear-migration note at the enum) —
+resolved by the seat's own cheap-case rule, overturnable to cooldown
+in one commit. At-cap and parity re-measured after both: 6.01x and
+0.268x, UNCHANGED — unlike O95's Culling, neither edit authors a
+damage-lane line, and the suite's emitted values are the proof. Three
+tripwire pins amended deliberately (cost grammar admits 0 for the one
+granted id; Kinetic counts fifteen; the enum-tail pin moves to
+DashDistance with RicochetCount pinned absolutely). The rider-More
+report the seat asked for is written in full in Docs/reports/LEDGER.md
+with a stated recommendation (window law, partial payment).
 
 
 THE FIELD LANE (this pass): THE DENSITY SWEEP, AND THE COST IS NOT
