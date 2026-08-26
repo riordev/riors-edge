@@ -614,7 +614,16 @@ tripwire pins amended deliberately (cost grammar admits 0 for the one
 granted id; Kinetic counts fifteen; the enum-tail pin moves to
 DashDistance with RicochetCount pinned absolutely). The rider-More
 report the seat asked for is written in full in Docs/reports/LEDGER.md
-with a stated recommendation (window law, partial payment).
+with a stated recommendation (window law, partial payment). O140:
+KIT's two "LEDGER's to rule" leftovers retired on their own written
+schedule — the Sightline node sheds its +2 Pierce stand-in (the O175
+ability carries the pierce; the node is the armour rule alone) and
+the Lead node sheds its Swift.Lead grant (a free route around the
+token since ruling 1; the node is the two-target rule alone). That
+was the last GrantedAbilityIds writer: NoPhantomAbilityGrants now
+pins the writer count at ZERO so a new grant announces itself, and
+the writerless path's fate stays the owner's open question. 467 / 3
+/ 0 on the tip.
 
 
 THE FIELD LANE (this pass): THE DENSITY SWEEP, AND THE COST IS NOT
