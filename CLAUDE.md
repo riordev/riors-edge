@@ -2,6 +2,67 @@
 
 ## Current work
 
+GLASS LANE, THE FIFTH VERB — the census debt KIT's block names as
+outstanding is now closed (464 / 3 / 0, matching upstream exactly,
+`Docs/STATE.md` byte-identical). Every ability makes a sound.
+`PlayAbilityCast(FName)` is ORDERS ruling 2's shape: one default cue,
+a per-ability override, the override falling back to the default and
+the default falling back to synth.
+
+THE OVERRIDE NEEDED NO CROSS-LANE SURFACE, which is the question this
+lane went in expecting to ask. The director was already FILE-PATH
+driven rather than asset-reference driven, so an override is a
+filename convention — `ability_<AbilityId>.wav`, then
+`ability_cast.wav`, then the synth. No field on KIT's
+`UBreakerAbilityDefinition`, no asset reference, no save migration.
+The owner names a file after an ability to give it its own voice.
+Resolved lazily and cached per id, with a NULL-wave sentinel meaning
+"probed, none authored", so a miss costs one failed open per ability
+per SESSION rather than one per cast — twenty-five abilities and zero
+authored assets makes eager loading a cost paid for nothing.
+
+The synth default is THE ONLY SOUND IN THE SET THAT RISES; the other
+four all sweep downward, so direction alone separates an ability from
+anything the weapon does. `ability_cast.wav` is DELIBERATELY ABSENT
+from the shipped-files test and the test says so: that test asserts a
+repo shipping the audio directory ships every file the director names,
+so listing one nobody has authored would turn a designed fallback into
+a red. It joins when the owner makes it; the per-ability overrides
+never do, being optional by construction.
+
+BOTH PUBLISHED PATHS NAME THEIR CONSUMERS AT THE DECLARATION, with the
+grep that derives them and the `Tests/` exclusion, so the next reader
+re-measures instead of trusting. Measured, not transcribed:
+`BreakerEffectRenderer` -> KIT, FIELD, GROUND; `BreakerEffectMath` ->
+KIT, FIELD and NOT GROUND. The banner records why that row was wrong
+in ORDERS — measured for one file, copied onto the other.
+
+`Docs/reports/GLASS.md` opens to the ratified contract with two open
+questions: whether a channelled ability wants a DURATION verb (Siphon's
+beam is audible at its start and silent for the rest of itself), and
+whether enemy ability audio belongs on this director at all — it does
+not: every verb here is flat 2D and `bIsUISound` because the player's
+own events happen TO the listener, and a telegraph's whole value is
+where it came from.
+
+CLOSED THIS PASS: the boss phase readout needs no coordination with
+FIELD's bar — the readout is a text status line carrying no ticks and
+no marks, so O135's surviving branch is entirely FIELD's. And the
+ability-impact claim splits three ways rather than two: routing
+PROVEN (one `OnHitDealt.Broadcast` site, bound at
+`BreakerPlaytestHUD.cpp:1860`), audibility INFERRED, character
+UNHEARD — the last is the owner's ear and no inspection discharges it.
+
+ON GROUND'S TRAVEL/RIFT QUESTION: the defect is real and in GLASS's
+file (`BreakerPlaytestHUD.cpp:1724` draws a literal `TEXT("TRAVEL")`
+while the prompt below correctly calls `GetPromptLabel()`). The
+cheaper fix does NOT work and should not be taken: `GetPromptLabel()`
+already exists and is already called two lines down, so reusing it
+would print the VERB TWICE — "ENTER RIFT" over "F ENTER RIFT".
+GROUND's separate getter is the right shape, because the overhead
+label is a NOUN (what the thing is) and the prompt is a VERB PHRASE
+(what F does). GLASS's one line lands the moment the getter exists.
+
 KIT LANE, THE CAST-MOMENT PASS COMPLETES THE ROSTER: with no new KIT
 items in ORDERS (all four discharged), the ratified template swept
 the remaining Abilities/ casts — Sidearm Rig and Overhaul flash
