@@ -88,6 +88,14 @@ namespace BreakerEnemyBar
     // body in the game.
     static constexpr float BodyHalfWidthCm = 45.0f;
 
+    // --- The rank glyph's proportions -------------------------------------
+    // Half-extent as a fraction of bar HEIGHT (see the glyph block below for
+    // why height and not width). At the near end that is a mark a little
+    // taller than the bar; at range it is the bar's own height, which is the
+    // smallest thing on screen still known to resolve. Both O2 PLACEHOLDER.
+    static constexpr float GlyphHeightRatio = 0.9f;
+    static constexpr float GlyphGapPixels = 3.0f;
+
     // --- A1: how narrow a band may get before it stops being drawn --------
     // BreakerHealthBands::SegmentCountFor is the ONE source of the count and
     // is never second-guessed here. This is a DISPLAY limit and it is keyed on
@@ -188,6 +196,81 @@ namespace
         const FVector Edge = ProjectFn(WorldAnchor + CameraRight * BreakerEnemyBar::BodyHalfWidthCm);
         if (Edge.Z <= 0.0f) return 0.0f;
         return FMath::Abs(Edge.X - Projected.X) * 2.0f;
+    }
+
+    // --- THE RANK GLYPH (readability pack, ORDERS Part One-B item 4) ------
+    // Never routed to a lane until now, and it is the only rank carrier that
+    // survives distance. Past roughly 35 m the gold edge and the rank word are
+    // both at 0.55 scale and unreadable, so a body's rank is carried by a WORD
+    // THAT CANNOT BE READ at exactly the range where knowing the rank matters
+    // most. A shape can be read when a word cannot.
+    //
+    // SIZED OFF THE BAR'S HEIGHT, NEVER ITS WIDTH, and that is deliberate.
+    // Width is now the projected width of the silhouette and clamps to a 32 px
+    // floor at range; height keeps the gentle 1.0 -> 0.55 scale. Tying the
+    // glyph to width would shrink it fastest exactly where it becomes the only
+    // carrier — the opposite of what it is for.
+    //
+    // Drawn OUTSIDE the left cap rather than inside it: inside would eat fill,
+    // and fill is the health read.
+    void BreakerEnemyBarDrawDiamond(AHUD& HUD, float CentreX, float CentreY, float HalfExtent,
+        const FLinearColor& Colour, float Thickness, bool bFilled)
+    {
+        if (bFilled)
+        {
+            // Scanline fill: the canvas cannot rotate a rect, and a diamond of
+            // three or four pixels is a handful of rows rather than a texture.
+            const int32 Rows = FMath::Max(1, FMath::RoundToInt(HalfExtent));
+            for (int32 Row = -Rows; Row <= Rows; ++Row)
+            {
+                const float RowHalf = HalfExtent * (1.0f - FMath::Abs(Row) / static_cast<float>(Rows));
+                if (RowHalf <= 0.0f) continue;
+                HUD.DrawRect(Colour, CentreX - RowHalf, CentreY + Row, RowHalf * 2.0f, 1.0f);
+            }
+            return;
+        }
+        HUD.DrawLine(CentreX, CentreY - HalfExtent, CentreX + HalfExtent, CentreY, Colour, Thickness);
+        HUD.DrawLine(CentreX + HalfExtent, CentreY, CentreX, CentreY + HalfExtent, Colour, Thickness);
+        HUD.DrawLine(CentreX, CentreY + HalfExtent, CentreX - HalfExtent, CentreY, Colour, Thickness);
+        HUD.DrawLine(CentreX - HalfExtent, CentreY, CentreX, CentreY - HalfExtent, Colour, Thickness);
+    }
+
+    // Anchored by its RIGHT edge so the mark grows leftward away from the bar,
+    // and a two-glyph rank never pushes the bar sideways.
+    void BreakerEnemyBarDrawRankGlyph(AHUD& HUD, float RightEdgeX, float CentreY, float HalfExtent,
+        EBreakerMonsterRank Rank, const FLinearColor& Colour, float Thickness)
+    {
+        switch (Rank)
+        {
+        case EBreakerMonsterRank::Elite:
+            // A hollow SQUARE: the one rank whose mark is a different shape
+            // rather than a different count, so elite never reads as "some
+            // number of diamonds" at the distance where counting gets hard.
+            HUD.DrawLine(RightEdgeX - HalfExtent * 2.0f, CentreY - HalfExtent, RightEdgeX, CentreY - HalfExtent, Colour, Thickness);
+            HUD.DrawLine(RightEdgeX, CentreY - HalfExtent, RightEdgeX, CentreY + HalfExtent, Colour, Thickness);
+            HUD.DrawLine(RightEdgeX, CentreY + HalfExtent, RightEdgeX - HalfExtent * 2.0f, CentreY + HalfExtent, Colour, Thickness);
+            HUD.DrawLine(RightEdgeX - HalfExtent * 2.0f, CentreY + HalfExtent, RightEdgeX - HalfExtent * 2.0f, CentreY - HalfExtent, Colour, Thickness);
+            break;
+        case EBreakerMonsterRank::ModifierBearing:
+            // TWO hollow diamonds. Champion is elite-and-more, so its mark is
+            // the trash mark twice rather than a third unrelated shape.
+            BreakerEnemyBarDrawDiamond(HUD, RightEdgeX - HalfExtent, CentreY, HalfExtent, Colour, Thickness, false);
+            BreakerEnemyBarDrawDiamond(HUD, RightEdgeX - HalfExtent * 3.0f, CentreY, HalfExtent, Colour, Thickness, false);
+            break;
+        case EBreakerMonsterRank::Boss:
+            // Two FILLED. Fill is the last thing to survive shrinking — an
+            // outline closes up into a blob long before a solid does — so the
+            // rank that must never be mistaken gets the most robust mark.
+            BreakerEnemyBarDrawDiamond(HUD, RightEdgeX - HalfExtent, CentreY, HalfExtent, Colour, Thickness, true);
+            BreakerEnemyBarDrawDiamond(HUD, RightEdgeX - HalfExtent * 3.0f, CentreY, HalfExtent, Colour, Thickness, true);
+            break;
+        default:
+            // Trash: one filled diamond, the smallest mark that is still a
+            // mark. It draws only when a trash bar draws at all, which is
+            // while aimed at or fading.
+            BreakerEnemyBarDrawDiamond(HUD, RightEdgeX - HalfExtent, CentreY, HalfExtent, Colour, Thickness, true);
+            break;
+        }
     }
 
     // ONE bar body, drawn by both loops below. It was two: the enemy loop and
@@ -450,6 +533,18 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         {
             // Gold edge, not a gold fill: the health colour must stay readable.
             DrawBorder(Bar.X, Bar.Y, Bar.W, Bar.H, BreakerUI::Alpha(BreakerUI::Gold, BarAlpha), ScaleUnit * Bar.Scale);
+        }
+
+        // The rank glyph, outside the left cap. Colour follows the rank word it
+        // outlives, so the two agree while both are legible and the glyph
+        // carries alone once the word is not.
+        {
+            const float GlyphHalf = FMath::Max(2.0f, Bar.H * BreakerEnemyBar::GlyphHeightRatio);
+            const float GlyphRight = Bar.X - BreakerEnemyBar::GlyphGapPixels * ScaleUnit * Bar.Scale;
+            BreakerEnemyBarDrawRankGlyph(*this, GlyphRight, Bar.Y + Bar.H * 0.5f, GlyphHalf,
+                Enemy->GetMonsterRank(),
+                BreakerUI::Alpha(bElite ? BreakerUI::Gold : BreakerUI::TextMuted, BarAlpha),
+                FMath::Max(1.0f, ScaleUnit * Bar.Scale));
         }
 
         // ---- The label, and how much of it -----------------------------
