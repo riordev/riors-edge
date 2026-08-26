@@ -37,6 +37,7 @@
 #include "Combat/BreakerEnemy.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Components/CapsuleComponent.h"
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerEnemyModifiers.h"
@@ -329,6 +330,101 @@ namespace
             {
                 const float Amount = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 0.0f;
                 BreakerFieldDamageNearest(World, Amount);
+            }));
+
+    // --- WHAT THE CROWD IS ACTUALLY DOING TO ITSELF ------------------------
+    // The sweep says the engaged cost is 73% an N^2 term and the only
+    // body-body interaction in the tick is the swept AddActorWorldOffset. That
+    // narrows the cause but leaves a question the separation design turns on,
+    // and it is a question I was about to answer by reasoning: DO ENEMY
+    // CAPSULES BLOCK EACH OTHER?
+    //
+    // It matters because the two answers need different fixes. If they block,
+    // the crowd is resolving contacts and cannot actually interpenetrate, so
+    // the cost is contact resolution and "separation" is partly already
+    // happening. If they do not, bodies occupy the same point, the sweep is
+    // paying pure QUERY cost against a dense cluster, and separation has to be
+    // authored as a steering behaviour because nothing physical keeps them
+    // apart.
+    //
+    // Nothing in the project sets a collision profile on BodyCollision — only
+    // the weapon trace channel is touched — so the answer is an engine default
+    // nobody chose, which is exactly the kind of thing to read off the running
+    // game rather than off documentation.
+    void BreakerFieldCrowdReport(UWorld* World)
+    {
+        if (!World) return;
+        TArray<ABreakerEnemy*> Live;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            if (*It && !It->IsDeadEnemy()) Live.Add(*It);
+        }
+        if (Live.Num() == 0)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerCrowdReport] no live enemies."));
+            return;
+        }
+
+        const UCapsuleComponent* Capsule = Live[0]->FindComponentByClass<UCapsuleComponent>();
+        FString Profile = TEXT("<none>");
+        FString PawnResponse = TEXT("<unknown>");
+        float Radius = 0.0f;
+        if (Capsule)
+        {
+            Radius = Capsule->GetScaledCapsuleRadius();
+            FCollisionResponseParams Params;
+            Capsule->GetCollisionResponseToChannels();
+            const ECollisionResponse ToPawn = Capsule->GetCollisionResponseToChannel(ECC_Pawn);
+            PawnResponse = ToPawn == ECR_Block ? TEXT("BLOCK") : (ToPawn == ECR_Overlap ? TEXT("Overlap") : TEXT("Ignore"));
+            Profile = Capsule->GetCollisionProfileName().ToString();
+        }
+
+        // Nearest-neighbour distance across the live set, and how many sit
+        // inside one body width of each other. THIS is the number separation
+        // has to move, and it is measured rather than assumed.
+        double Sum = 0.0;
+        float Closest = TNumericLimits<float>::Max();
+        int32 Overlapping = 0;
+        for (int32 i = 0; i < Live.Num(); ++i)
+        {
+            float NearestSq = TNumericLimits<float>::Max();
+            for (int32 j = 0; j < Live.Num(); ++j)
+            {
+                if (i == j) continue;
+                NearestSq = FMath::Min(NearestSq,
+                    static_cast<float>(FVector::DistSquared2D(Live[i]->GetActorLocation(), Live[j]->GetActorLocation())));
+            }
+            if (NearestSq == TNumericLimits<float>::Max()) continue;
+            const float Nearest = FMath::Sqrt(NearestSq);
+            Sum += Nearest;
+            Closest = FMath::Min(Closest, Nearest);
+            if (Nearest < Radius * 2.0f) ++Overlapping;
+        }
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerCrowdReport] %d live. capsule radius %.0f cm, profile '%s', response to Pawn = %s. ")
+            TEXT("nearest-neighbour: min %.0f cm, mean %.0f cm, %d of %d closer than one body width (%.0f cm)."),
+            Live.Num(), Radius, *Profile, *PawnResponse,
+            Closest, Sum / FMath::Max(1, Live.Num()), Overlapping, Live.Num(), Radius * 2.0f);
+    }
+
+    // Delayed by default, because the interesting moment is AFTER the crowd
+    // has converged and -ExecCmds fires at engine init when the world is
+    // empty. Core ticker for the same reason everything else here uses one:
+    // travel destroys a world timer.
+    FAutoConsoleCommandWithWorldAndArgs GBreakerFieldCrowdReportCommand(
+        TEXT("Breaker.Field.CrowdReport"),
+        TEXT("Reports enemy capsule collision setup and the crowd's nearest-neighbour spacing. ")
+        TEXT("Optional delay in seconds (default 12) so the crowd has converged first."),
+        FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(
+            [](const TArray<FString>& Args, UWorld*)
+            {
+                const float Delay = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 12.0f;
+                FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+                    [](float) -> bool
+                    {
+                        BreakerFieldCrowdReport(BreakerBarProbeCurrentWorld());
+                        return false;
+                    }), FMath::Max(0.1f, Delay));
             }));
 
     // --- THE ONE RUN NEITHER LANE COULD TAKE -------------------------------
