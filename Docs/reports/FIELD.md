@@ -197,6 +197,82 @@ which is the outcome worth being able to see.
 3. **Do ranged and melee separate differently?** A Lattice holding a band already
    has spacing behaviour of its own kind, and stacking two rules produces neither.
 
+## The mesh-swap cost (ORDERS Part One-K item 2, reported before pulling)
+
+Measured on `3e1a369`, `Lvl_Gym`, N=100 engaged, two reps each, both configs
+self-reporting `engaged=100%`. The probe's own `-BreakerCrowdSkeletal` flag is
+the instrument — this is the one question the crowd probe was already built to
+answer.
+
+```
+              game     render     gpu
+  primitive   35.23      6.92     3.52
+  skeletal    39.25      8.59     8.50
+  delta       +4.01     +1.67    +4.98      0.040 ms/body on the game thread
+```
+
+### The number is cheap or expensive depending on what it is measured against, and that is the finding
+
+**Against today: +11%.** Against a crowd that costs 35 ms because of the N²
+sweep term, a skeletal mesh is noise, and the honest reading of that is not "the
+mesh is free" — it is **the mesh looks free because something three times worse
+is standing in front of it.**
+
+**Against a separated crowd: +41%.** If separation lands its predicted 9.79 ms,
+the same 4.01 ms becomes nearly half the frame again:
+
+```
+  60 fps budget                        16.67 ms
+  post-separation, primitive            9.79 ms     margin 6.88
+  post-separation, skeletal            13.80 ms     margin 2.87
+```
+
+Still inside 60 fps at a hundred, which is the answer the owner's ruling 4 needs —
+but the margin falls by 58%, and every later system (hit reactions, damage
+numbers, death effects, the player firing — none of which the probe measures)
+spends from what is left. **Fixing the crowd promotes the mesh from noise to a
+significant fraction, so these two pieces of work cannot be costed separately.**
+
+The GPU is the loudest multiplier — 3.52 to 8.50 ms, **2.42x** — and is the least
+worrying today, because the project renders grey boxes and nothing else. It is
+worth recording precisely because that will stop being true.
+
+### The measurement is an UPPER BOUND, and the reason matters
+
+The probe's skeletal mode is surgery from outside: it HIDES the six primitive
+parts and straps a mannequin on. The primitives still exist, still tick, still
+sweep. A real family mesh would REPLACE them.
+
+So +4.01 ms is the cost of ADDING a skeletal mesh, not the NET cost of swapping
+one in — a real swap also deletes six static mesh components per body. The true
+figure is lower by whatever those cost, and nothing measures that today.
+
+`SKM_Manny_Simple` with `ABP_Unarmed` is also the only skeletal mesh in the
+project. A CC0 creature at a different bone count and a different animation
+budget is not this number; it is this number's order of magnitude.
+
+### What the swap costs in code, which is the other half of the gate
+
+The ruling's test is that **replacing every mesh is a content change with no C++
+diff.** Today it would be a large one:
+
+- **12 `ConstructorHelpers::FObjectFinder` sites in `Combat/`** acquire every
+  mesh and material in the enemy tree, all in constructors.
+- **Exactly two files in the whole project set a skeletal mesh at all** —
+  `BreakerCharacter.cpp:1530` and the crowd probe.
+
+A `TMap<EBreakerEnemyFamily, TSoftObjectPtr<USkeletalMesh>>` on a data asset
+passes the test. A constructor lookup fails it by construction, because a
+constructor runs before any data could be read. **So the first mesh is also a
+refactor of how enemy visuals are acquired**, and that belongs in the estimate
+rather than arriving as scope.
+
+**Question, and it is the one that decides the cycle:** who imports? A skeletal
+mesh needs a skeleton and an import session, `.uasset` may not be hand-edited,
+and the fonts precedent has the owner running the import script. That is a
+dependency on his time rather than mine, and knowing which way round it goes
+changes what I can promise.
+
 ## Two claims dropped rather than assembled
 
 Recorded because "I checked and it is not true any more" is worth as much as a
