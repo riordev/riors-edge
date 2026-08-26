@@ -4,26 +4,6 @@ The lane's open questions for the design seat, in one place. Answered questions
 are deleted; git holds them. Findings and status live in the session reports,
 never here.
 
-## The health ramp's terminal hue — is magenta the death read?
-
-O146 applies the readability pack's authored offset in the display domain it was
-authored in, which fixed the magnitude problem: travel spread across the twelve
-(family, rank) pairs fell from 30.8 to 11.1 dE76 and the worst case rose from
-27.7 to 38.8. But **a delta carries magnitude, not hue direction.** The Boss row
-barely moves blue and all three family bases are blue-ish, so every family's Boss
-dies MAGENTA rather than red — Vestige runs `#A099AD` to `#C669BD`.
-
-Three answers, none obviously right:
-
-- give the delta a hue-direction term, so the travel aims at the authored
-  destination rather than merely covering the authored distance;
-- re-author the four rank rows against the bases they actually land on, which
-  makes the pack's table a function of the family list;
-- accept magenta as the boss's death colour and say so at the table.
-
-**Question:** which. Readability measures the same under all three — this is a
-look question, and FIELD will not pick it alone.
-
 ## The fracture mask — does it get a project-owned material?
 
 The pack's second near-death carrier (emissive crack mask `#FF4040`, coverage
@@ -42,28 +22,24 @@ second is a real answer — but it is the single point of failure A3 was written
 remove, and it means a colour-blind screen, fog, or a red wall each take the
 whole read.
 
-## Is the F3 diagnostics overlay meant to default ON?
+## Does the F3 diagnostics overlay ship visible on purpose?
 
-`bDiagnosticsVisible` initialises to **true** (`Playtest/BreakerPlaytestComponent.h:136`),
-so every playtest — including the owner's — ships with the F3 overlay drawn. One
-of the things it draws is `BreakerPlaytestHUD.cpp:693`: a `TActorIterator` over
-every enemy within 25 m printing `GetEnemyStateLabel()` in orange, with **no
-focus gate, no occlusion suppression and no cap**.
+Narrowed, not answered. This question had two halves and GLASS closed one in
+`2e294d4`: the ungated second label pass now carries occlusion suppression and —
+better than I asked for — **counts and prints what it suppressed**, so the
+overlay cannot quietly show six of twenty and read as though there were six.
 
-That is a second enemy-label drawer, entirely outside the bar TU, and the bar
-TU's own label block is focus-gated and occlusion-suppressed precisely so labels
-cannot pile up. The playtest frame shows `PATROL` printed fifteen times over a
-group of twenty. **This is the label collision in Part One-B item 1**, and it is
-why A9 did not fix it: A9 changed the disciplined drawer, and the collision is in
-the undisciplined one.
+**The other half is untouched: `bDiagnosticsVisible` still initialises to
+`true`** (`Playtest/BreakerPlaytestComponent.h:136`). ORDERS Part One-F said the
+root question is the default rather than the labels, and it is still the default.
+Every playtest the owner has run, including both he has reported on, had a debug
+overlay up.
 
-Neither file is FIELD's — `UI/` is GLASS's and `Playtest/` is unassigned in the
-lane map. So this is reported, not fixed.
+Neither file is FIELD's — the directory is GROUND's, the file is GLASS's — so
+this is reported, not fixed.
 
-**Question:** should diagnostics default on? If yes, the orange pass needs the
-same focus gate and occlusion bounds the bar labels already have, and that is
-GLASS's. If no, it is one initialiser and the owner has been playtesting with a
-debug overlay on since it was written.
+**Question:** is a debug overlay that ships visible intended? If it is, it is not
+a debug overlay and the name is wrong. If it is not, it is one initialiser.
 
 ## What photographs the enemy bar?
 
@@ -114,28 +90,30 @@ has no reason to fire.
 **Question:** do enemies get elements. It changes the damage pipeline's shape
 rather than a table, which is why it has sat unanswered rather than being cheap.
 
-## Does the crowd get separation, and is stacking a bug or a look?
+## The enemy mesh swap — what FIELD needs before pulling anything
 
-The density sweep says the cost at N=100 is **73% a quadratic term**, and the
-only body-body interaction in the whole enemy tick is the swept
-`AddActorWorldOffset`. Patrol — same actor-iterator scan, same ground trace,
-bodies spread on an 800 cm grid — is linear at 0.036 ms/body. Engaged bodies
-converge to `nearest=1-5cm` and go quadratic. There is no avoidance, no
-separation and no spacing behaviour anywhere in `Combat/`, so a hundred engaged
-enemies converge on one point and pay collision against each other forever.
+ORDERS Part One-K item 2 rules the mesh mine, the owner has approved CC0 enemy
+meshes "for the time being", and the gate is: report what swapping a family's
+mesh costs before pulling. Two things I need alongside that measurement, both
+cheap to answer and both expensive to get wrong.
 
-Removing that term is worth more than any per-body saving available: the same fit
-without it puts N=100 at 9.79 ms (102 fps) and N=200 at 18.43 ms.
+**1. Where does a vendored mesh live, and who imports it?** GROUND's zone kit is
+the precedent — vendored with a licence note in the same commit — but the route
+went through `Scripts/compose_fernhall.py` and an import session, and the fonts
+went through `Scripts/import_fonts.py` plus an editor console command because
+Python could not build the composite. A skeletal mesh needs a skeleton and an
+import, and `.uasset` may not be hand-edited. **I need to know whether I author
+the import script and the owner runs it, or whether the owner imports and I
+consume** — the fonts precedent says the second, and it is a real dependency on
+his time rather than mine.
 
-But **separation is a fight-feel change, not only an optimisation.** Enemies that
-hold spacing surround the player instead of stacking; they become individually
-readable and collectively less oppressive, and a melee pack that refuses to
-overlap is a different encounter from one that piles. That is a design call.
-
-**Question:** is a hundred enemies stacking into one body at 1 cm a bug to fix or
-a look to keep? If it is a bug, FIELD builds separation and the density target
-falls out of it. If the stacking is wanted, the target needs a different answer,
-because the collision cost is what stacking IS.
+**2. The mapping is DATA, and I want the shape agreed before I build it.** The
+ruling's test is that replacing every mesh is a content change with no C++ diff.
+A `TMap<EBreakerEnemyFamily, TSoftObjectPtr<USkeletalMesh>>` on a data asset
+satisfies that; a `ConstructorHelpers::FObjectFinder` in each subclass does not,
+and that is what every existing mesh and material in `Combat/` uses today. So the
+first mesh is also a small refactor of how enemy visuals are acquired at all,
+and I would rather say that now than discover it as scope.
 
 ## Two claims dropped rather than assembled
 
