@@ -59,12 +59,17 @@ namespace
         // RUNTIME, not OFFLINE: Slate composites glyphs live, and an
         // offline-cached font renders nothing through FSlateFontInfo.
         Font->FontCacheType = EFontCacheType::Runtime;
-        Font->CompositeFont.DefaultTypeface.Fonts.Empty();
+        // Through the accessors, not the member. UFont::CompositeFont has been
+        // UE_DEPRECATED since 5.7 — public access still COMPILES on 5.8 and only
+        // warns, which is exactly how a deprecation reaches the release that
+        // removes it. Mutating writes take GetMutableInternalCompositeFont();
+        // the read below takes the const one.
+        Font->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.Empty();
         for (const TPair<FName, const TCHAR*>& Entry : Entries)
         {
             UFontFace* Face = BreakerLoadFace(Entry.Value);
             if (!Face) return false;
-            FTypefaceEntry& Typeface = Font->CompositeFont.DefaultTypeface.Fonts.AddDefaulted_GetRef();
+            FTypefaceEntry& Typeface = Font->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.AddDefaulted_GetRef();
             Typeface.Name = Entry.Key;
             Typeface.Font = FFontData(Face);
         }
@@ -82,7 +87,7 @@ namespace
         const bool bSaved = UPackage::SavePackage(Package, Font, *FileName, SaveArgs);
         UE_LOG(LogTemp, Display, TEXT("[BreakerFonts] %s %s (%d typefaces)"),
             AssetName, bSaved ? TEXT("saved") : TEXT("FAILED TO SAVE"),
-            Font->CompositeFont.DefaultTypeface.Fonts.Num());
+            Font->GetInternalCompositeFont().DefaultTypeface.Fonts.Num());
         return bSaved;
     }
 
