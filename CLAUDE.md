@@ -2,6 +2,40 @@
 
 ## Current work
 
+GLASS LANE, THE DEATH BEAT GOES QUIET (464 / 3 / 0, same roster,
+`Docs/STATE.md` byte-identical). Both of ORDERS Part One-B's GLASS
+items, from the owner's first hands-on.
+
+THERE WAS NO DEATH SOUND TO DELETE, and finding that out changed the
+fix. Every audio site in the project is `ABreakerSoundDirector` —
+grepped, zero others — so the sound heard on dying had to be one of the
+five verbs, and the only one that fires when the player dies is
+`PlayTakeHit`, because THE FATAL HIT IS A HIT. Deleting the call would
+have taken being-hit out of the whole game to silence one moment of it,
+and that verb is ruled to matter more than the other three. The removal
+is one condition, `!Result.bKilled`. NOT replaced, per the ruling — and
+the consequence is recorded in `Docs/reports/GLASS.md` as an open
+question, because the death beat is now COMPLETELY silent rather than
+quieter, and "goes" may have meant *different* rather than *absent*.
+
+THE REDEPLOY LINE IS A STATUS LINE, NOT AN ALARM. One 35-character
+string in Harm red at 16px, forty pixels off dead centre, crossing the
+middle of the screen and printing over the enemy labels behind it.
+Harm -> Cyan (Harm is the damage accent; a respawn state is a
+player/system readout), the rule half — WHERE you come back — drops to
+caption size and TextMuted, and it moves below the crosshair instead of
+through it. The wording did not change. ORDERS' own inference holds:
+the sting landed on this same frame, so the beat was over-produced
+rather than under-produced.
+
+UNVERIFIED BY CAPTURE, SAID PLAINLY. The line draws only while
+`IsAwaitingRespawn()` and the harness cannot kill the player, so the
+redeploy beat is structurally unphotographable — the same class of
+limit as hover states. It was deliberately NOT forced into the capture
+preview: that would print it over every frame of every other capture
+and degrade instruments that work today. The owner's next playtest is
+the check.
+
 GLASS LANE, THE FIFTH VERB — the census debt KIT's block names as
 outstanding is now closed (464 / 3 / 0, matching upstream exactly,
 `Docs/STATE.md` byte-identical). Every ability makes a sound.
