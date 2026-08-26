@@ -437,7 +437,15 @@ multiple of three is the one wrong answer), pinned in
 BossBandsAvoidPhaseGates. LEDGER's standing questions live in
 Docs/reports/LEDGER.md — the per-hit More ruling (Collapse) and the
 dash grant are the two open ones. BreakerHealthBands.h now names its
-consumers (published path, ORDERS Part Four).
+consumers (published path, ORDERS Part Four). ORDERS ANSWERS TAKEN
+(fb0dba3): the O120 collision is repaired — the reward-composition
+ruling is O137, loading keeps O120, every citation grepped and all
+referenced loading; the dash node's grant is RULED (seeded free rank,
+node form) and its READING waits on one narrow answer in
+Docs/reports/LEDGER.md — Route 2 (the jump precedent, four sites, one
+line in Movement/) against the seat's "one entry and one wire" line;
+Swift pacing (1b) is HELD by order, nothing acted.
+
 
 THE FIELD LANE (this pass): TWO WRONG SPACES, AND THE BAR LANDS. HEAD
 `e8b2349`, 457 passing / 4 expected red (same roster) / 0 unexpected.
