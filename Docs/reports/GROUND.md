@@ -43,6 +43,30 @@ asking about length and sightline rather than cover pitch, with
   no-through-sight recommendation. Magnitudes are O2 and get authored in the
   cycle after, against a walked yard.
 
+## The rift door announces itself as TRAVEL (needs one line in GLASS's file)
+
+Found by capture, not by the suite — the door is placed geometry and
+automation cannot see a label. The door spawns correctly on `marker_rift`,
+the beacon reads at lane distance, and the F prompt says **ENTER RIFT**. The
+line directly above it says **TRAVEL**.
+
+`BreakerPlaytestHUD.cpp:1724` draws the overhead label as a literal
+`TEXT("TRAVEL")`, while the prompt beneath it correctly calls
+`GetPromptLabel()`. So the first new interactable in the world states two
+different things about itself, one of them wrong, stacked vertically. That is
+O132's shape exactly — two things printing under one word — on a rift object.
+
+**The crossing:** the fix is a getter on `ABreakerTravelPoint` (mine) that
+the HUD calls instead of the literal — default `TRAVEL`, overridden to `RIFT`
+on the door — and swapping the literal is one line in `UI/` (GLASS's).
+
+I have deliberately NOT added my half yet. An uncalled getter is a dead API,
+and this file already carries the note that `GetPromptLabel` spent a whole
+milestone as one; adding a second would repeat the defect I would be fixing.
+
+- **Question:** route the one-line swap to GLASS and I will land the getter in
+  the same cycle, or tell me to take both halves as a declared crossing.
+
 ## How many bodies make one yard feel populated? (ORDERS Q1, design half)
 
 The engineering half is ruled and understood: 50–100 is a concurrency budget
