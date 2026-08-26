@@ -635,7 +635,26 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
     // that a combat instrument in a no-combat space produced behaviour nobody
     // asked for, and the instrument armed there for the first time because of
     // the move above.
-    if (UBreakerGameInstance::IsAnchorMap(this)) return;
+    if (UBreakerGameInstance::IsAnchorMap(this))
+    {
+        // AND A PROBE ASKED FOR HERE IS REFUSED OUT LOUD, not silently skipped.
+        // Autoplay now lands in the Anchor (Part One-E), so the sweep command
+        // every lane already has in its notes stopped arming anything — and
+        // because the exit is wired to the probe's summary, an unattended run
+        // then HUNG instead of failing. Silence plus a hang is the worst pair
+        // this harness can produce, and it is the third time the shape has cost
+        // a cycle.
+        int32 Requested = 0;
+        if (FParse::Value(FCommandLine::Get(), TEXT("BreakerCrowdProbe="), Requested) && Requested > 0)
+        {
+            UE_LOG(LogTemp, Error,
+                TEXT("[BreakerCrowd] the probe does not arm in the Anchor: it is a social map and a crowd ")
+                TEXT("in it drove the hub into travelling on its own. Name a combat map, e.g. ")
+                TEXT("Lvl_Fernhall or Lvl_Gym, as the first argument."));
+            if (FApp::IsUnattended()) FPlatformMisc::RequestExitWithStatus(false, 1);
+        }
+        return;
+    }
 
     // EVERY DEV INSTRUMENT, ON EVERY MAP THAT HAS A FIELD FRAME.
     //
@@ -879,6 +898,13 @@ void ABreakerGameMode::SpawnCrowdProbe(int32 Count, bool bSkeletal, ECrowdLoad L
     // pickups.
     CrowdLoad = Load;
     CrowdRoster.Reset();
+    if (Load == ECrowdLoad::Engaged)
+    {
+        // DECLARED FIRST, so the ordering cannot matter. SpawnSafeZone honours
+        // this whenever it runs; the drop below only handles the case where the
+        // ring is already up by the time the probe arms.
+        bProbeSuppressesSafeZone = true;
+    }
     if (Load == ECrowdLoad::Engaged && bSafeZoneSet)
     {
         // A player inside the safe ring is off-limits to EVERY enemy
@@ -1046,11 +1072,17 @@ void ABreakerGameMode::TickCrowdSampler(float DeltaSeconds)
             EngagedPct);
     }
 
+    // The world is handed back as it was found: a probe must not leave a
+    // controller-in-hand run without its safe ring.
     if (CrowdSavedSafeZoneRadius >= 0.0f)
     {
         SafeZoneRadius = CrowdSavedSafeZoneRadius;
-        bSafeZoneSet = true;
         CrowdSavedSafeZoneRadius = -1.0f;
+    }
+    if (bProbeSuppressesSafeZone)
+    {
+        bProbeSuppressesSafeZone = false;
+        bSafeZoneSet = true;
     }
     if (FApp::IsUnattended())
     {
@@ -1931,7 +1963,19 @@ void ABreakerGameMode::SpawnSafeZone()
 {
     if (!GetWorld() || !bFieldFrameSet) return;
     SafeZoneCenter = Frame.Ground;
-    bSafeZoneSet = true;
+    // THE PROBE'S DECLARATION WINS. An engaged crowd probe needs no safe ring
+    // and cannot drop one that does not exist yet; establishing it here anyway
+    // would null every enemy's target before detection is consulted and hold
+    // the whole crowd in PATROL, which is precisely the measurement the probe
+    // exists to refuse. The ring's visual furniture below still builds — only
+    // the RULE is suppressed — so a capture of an engaged run still looks like
+    // the gym it is.
+    bSafeZoneSet = !bProbeSuppressesSafeZone;
+    if (bProbeSuppressesSafeZone)
+    {
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerCrowd] safe ring suppressed for the engaged probe (declared at arm time)."));
+    }
 
     // Owner feedback: the full-radius teal disc swallowed the spawn area.
     // The boundary now reads as a modest center pad plus a ring of short

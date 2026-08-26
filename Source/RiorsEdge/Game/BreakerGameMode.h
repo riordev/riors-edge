@@ -635,6 +635,18 @@ private:
     // a player standing inside it is off-limits to every enemy, so the ring
     // alone would hold the whole crowd in PATROL no matter how close it spawned.
     float CrowdSavedSafeZoneRadius = -1.0f;
+    // THE PROBE DECLARES "no safe ring this run" INSTEAD OF DROPPING ONE.
+    // Dropping only works if the ring already exists when the probe arms, and
+    // that ordering broke the moment the instruments moved above the map
+    // branches: the probe arms before SpawnSafeZone establishes the ring, so
+    // the drop was guarded on a flag that was still false, the ring came up
+    // afterwards, and every target was nulled before detection was consulted.
+    // The crowd held in PATROL at its spawn rings and the run reported 4 ms.
+    //
+    // A DECLARATION IS ORDER-INDEPENDENT AND A DROP IS NOT. Whoever establishes
+    // the ring honours this, so the probe no longer cares whether it runs
+    // first, and a future reorder cannot silently re-break it.
+    bool bProbeSuppressesSafeZone = false;
     float CrowdWarmupRemaining = 5.0f;    // O2: past the shader-compile hitches
     float CrowdSampleRemaining = 10.0f;
     int32 CrowdFrames = 0;
