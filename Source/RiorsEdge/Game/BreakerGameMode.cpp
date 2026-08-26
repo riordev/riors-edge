@@ -294,6 +294,37 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     // light (Lvl_FirstPerson) suppresses this entirely.
     UBreakerWorldBasics::EnsureWorldLighting(GetWorld());
 
+    // AN UNATTENDED RUN THAT CANNOT EXIT IS A HANG, NOT A FAILURE, and this is
+    // the third time that shape has cost someone a cycle: the crowd probe's
+    // refused flag left a scripted run sitting forever, FIELD's verify command
+    // gave up silently and logged the giving-up as a result, and a headless run
+    // with no exit condition simply never returns. A script waiting on a
+    // process that will never end has nothing to read and nothing to blame.
+    //
+    // THREE THINGS END A HEADLESS RUN and if none is armed nobody is told:
+    // -BreakerScreenshots exits after its last frame, -BreakerCrowdProbe exits
+    // after its summary, and an ExecCmds carrying Quit or SoftQuit exits on its
+    // own. Warning rather than forcing an exit, deliberately: a legitimate long
+    // unattended run exists (a soak, a profile) and killing it would be a worse
+    // failure than the one being prevented. The point is that the operator
+    // learns it now instead of after a timeout.
+    if (FApp::IsUnattended())
+    {
+        int32 Shots = 0;
+        int32 Crowd = 0;
+        const FString CommandLine = FCommandLine::Get();
+        const bool bExits =
+            (FParse::Value(*CommandLine, TEXT("BreakerScreenshots="), Shots) && Shots > 0)
+            || (FParse::Value(*CommandLine, TEXT("BreakerCrowdProbe="), Crowd) && Crowd > 0)
+            || CommandLine.Contains(TEXT("Quit"), ESearchCase::IgnoreCase);
+        if (!bExits)
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("[BreakerCapture] -unattended with no exit condition: this run will NOT end on its own. ")
+                TEXT("Add -BreakerScreenshots=N, -BreakerCrowdProbe=N, or SoftQuit in -ExecCmds."));
+        }
+    }
+
     // WHAT THIS MAP IS FOR. Until tonight there was one map, so this function
     // unconditionally built the entire gym — which is exactly why the owner
     // reported "loading in still takes you to the game": the front end was a
