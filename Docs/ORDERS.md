@@ -148,6 +148,87 @@ way.
 
 ---
 
+# PART ONE-B — THE OWNER PLAYED IT, 2026-08-26
+
+First hands-on since the lanes started. Two notes, both rulings, plus what the
+screenshot shows that he did not have to say.
+
+## RULED: the death sound goes
+
+Owner: *"the death sound needs to go."* **GLASS: identify it and remove it.**
+
+Do not replace it with a quieter one without asking. "Needs to go" is a verdict
+on the sound existing at that moment, not on its mix — a redeploy is already
+carrying a full-screen banner and a respawn, and a sting on top of that may be
+the thing that is wrong rather than the sting's character. Report which verb it
+was and what the moment sounds like without it.
+
+## The feedback verdict, and the screenshot names three things he did not
+
+Owner: *"the feedback needs to be better."* That is not actionable as written, so
+here is what the capture shows. **Owner: confirm or correct these — a wrong
+reading of a one-line verdict is worse than no reading.**
+
+**1. Enemy labels collide, and it is the worst thing in the frame.** Two `CHASE`
+labels overlap each other at left; `WARDED | VOLATILE` runs straight through
+`CLOSING` in the centre. Four ranked enemies at mid distance produce unreadable
+text soup. **A9 — modifier marks going distance-progressive — is the fix and it
+is still open in FIELD's queue.** This is now the highest-value item in it: at
+four enemies it is noise, and the design target is fifty to a hundred.
+
+**2. Every bar reads as one flat red stripe.** No rank separates at that
+distance, no segmentation is visible, and the only bar that stands out does so
+because it has a cyan shield above it. Whether that is the build predating
+`e2bdeae` or the bands genuinely not reading at range, **FIELD should photograph
+it at 12 m and 35 m before touching anything** — the same rule as the tint ramp:
+the capture wins over the swatch.
+
+**3. `REDEPLOYING — FROM THE TILESET START` is enormous and red, across the
+middle of the screen.** It is competing with the crosshair and with every enemy
+label behind it. GLASS: it is a status line, not an alarm — and it appears at
+exactly the moment the death sound was ruled out of, which suggests the whole
+redeploy beat is over-produced rather than under-produced.
+
+**4. THE RANK GLYPHS WERE NEVER BUILT, AND THAT IS MY OMISSION.** Owner:
+*"the health bars also dont have icons nor look different am i missing
+something?"* He is not missing anything. Rank differentiation on the bar today
+is **a gold border and the word ELITE or BOSS** — nothing else.
+
+The readability pack authored a glyph per rank: one diamond for trash, a hollow
+square for elite, a double diamond for champion, a filled double for boss, drawn
+at the bar's left cap. I reviewed that pack, routed the tint ramp, the segment
+counts and the modifier marks — and **never routed the glyphs to anyone**. They
+are not late; they were never assigned.
+
+**FIELD: the rank glyph is yours, and it belongs beside A9 rather than behind
+it.** The pack's own crowd study leans on it — at over 35 m a champion and an
+elite are distinguished by the double diamond alone, because the gold edge and
+the rank word are both at 0.55 scale and unreadable by then. A word that cannot
+be read at the distance rank matters most is not a rank carrier.
+
+Take these four as the concrete reading of "feedback needs to be better" unless
+the owner says otherwise.
+
+---
+
+## A NOTE ON HOW THIS SECTION CAME BACK
+
+PRESS caught this on its first cycle and the loss was the seat's, not a lane's.
+
+Writing the PRESS charter, the seat built its edit on a copy of this file it had
+reset with `git checkout --` several times to unstick merges — so the base was
+main's published version, not the seat's own two newer ones. Part One-B and the
+rank-glyph item vanished from the tip. **PRESS read the diff before committing,
+saw content disappear, and said so in the commit message rather than publishing
+it quietly.** That is precisely what the read-the-diff rule was written for, and
+it worked on the first opportunity.
+
+The seat's defect, named so it is not repeated: **editing a file without
+re-reading its current state.** The same rule every lane is held to — measure the
+base, do not assume it — applied to a document instead of to code.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
