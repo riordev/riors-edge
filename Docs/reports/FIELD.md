@@ -42,6 +42,29 @@ second is a real answer — but it is the single point of failure A3 was written
 remove, and it means a colour-blind screen, fog, or a red wall each take the
 whole read.
 
+## Is the F3 diagnostics overlay meant to default ON?
+
+`bDiagnosticsVisible` initialises to **true** (`Playtest/BreakerPlaytestComponent.h:136`),
+so every playtest — including the owner's — ships with the F3 overlay drawn. One
+of the things it draws is `BreakerPlaytestHUD.cpp:693`: a `TActorIterator` over
+every enemy within 25 m printing `GetEnemyStateLabel()` in orange, with **no
+focus gate, no occlusion suppression and no cap**.
+
+That is a second enemy-label drawer, entirely outside the bar TU, and the bar
+TU's own label block is focus-gated and occlusion-suppressed precisely so labels
+cannot pile up. The playtest frame shows `PATROL` printed fifteen times over a
+group of twenty. **This is the label collision in Part One-B item 1**, and it is
+why A9 did not fix it: A9 changed the disciplined drawer, and the collision is in
+the undisciplined one.
+
+Neither file is FIELD's — `UI/` is GLASS's and `Playtest/` is unassigned in the
+lane map. So this is reported, not fixed.
+
+**Question:** should diagnostics default on? If yes, the orange pass needs the
+same focus gate and occlusion bounds the bar labels already have, and that is
+GLASS's. If no, it is one initialiser and the owner has been playtesting with a
+debug overlay on since it was written.
+
 ## What photographs the enemy bar?
 
 Nothing does, and A1/A7/A8/A9 shipped unphotographed because of it. The bar culls
@@ -55,13 +78,22 @@ at 50 m measured from the PLAYER, and every route in is blocked:
 The same gap hides O129's ramp, which needs a DAMAGED body and has no headless
 way to make one — no `Breaker.` command sets health or deals damage.
 
-FIELD can build the instrument (a console command spreading live enemies' health
-across the authored stops photographs both) and **intends to unless told
-otherwise** — that half needs no ruling. What is not FIELD's to decide is the
-camera-versus-player mismatch: it spans the capture tour and the bar, and it is
-either a tour defect or a deliberate limit nobody has written down.
+**BUILT.** `Breaker.Field.BarProbe` (`Combat/BreakerBarProbe.cpp`) freezes a
+four-rank by five-health matrix at 12 m and 35 m ahead of the pawn, so the bar,
+the bands, the hatch, the marks and O129's ramp all photograph in one frame. It
+suppresses the F3 overlay, because the overlay is not the shipping read.
 
-**Question:** which of those two, and whose.
+What is still not FIELD's to decide is the camera-versus-player mismatch. The
+bar cull measures from the PAWN while the capture photographs the CAMERA, and
+they are not the same heading — the probe's first two runs placed forty bodies
+behind the player's shoulder and reported success both times. The probe now
+takes its origin from the pawn and its direction from the camera, which is
+correct FOR THE PROBE and leaves the underlying split untouched:
+`-BreakerCaptureTour` still moves the camera while the cull still measures from
+the player, so a tour vantage standing among enemies culls every bar.
+
+**Question:** is that a tour defect or a deliberate limit? It spans the tour
+(GROUND) and the bar (FIELD), which is why it is not simply fixed here.
 
 ## Whether enemies deal elemental damage at all
 

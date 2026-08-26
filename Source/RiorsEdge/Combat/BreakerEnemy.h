@@ -45,6 +45,16 @@ public:
     // Dev-only: a crowd-probe enemy measures frame cost and nothing else —
     // no loot, no respawn — so the measurement is enemies, not pickups.
     void ConfigureCrowdProbe() { bDropsLoot = false; bRespawns = false; }
+
+    // DEV INSTRUMENT ONLY, and the narrowest thing that unblocks the capture.
+    // O129's health ramp and the whole enemy bar are visual rules with no way
+    // to be photographed: nothing in the harness can damage a body, so every
+    // frame the project can take shows a crowd at full health. This poses one
+    // body at a health fraction and refreshes the paint. It is not a damage
+    // path -- no damage event, no reaction, no telemetry, no death -- so it
+    // must never be used to test anything about damage. See
+    // Combat/BreakerBarProbe.cpp, its only caller.
+    void DebugPoseHealthFraction(float Fraction);
     // --- Pooling (wave mode's churn path) ----------------------------------
     // The game mode marks a wave body poolable at spawn. A poolable corpse
     // PARKS itself after the same fuse-safe corpse window SetLifeSpan used to

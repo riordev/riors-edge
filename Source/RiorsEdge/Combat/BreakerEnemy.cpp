@@ -234,6 +234,15 @@ void ABreakerEnemy::ApplyChassis()
     RefreshBodyPaint();
 }
 
+void ABreakerEnemy::DebugPoseHealthFraction(float Fraction)
+{
+    if (!Attributes) return;
+    const float MaxHealth = Attributes->GetMaxHealth();
+    if (MaxHealth <= 0.0f) return;
+    Attributes->SetHealth(MaxHealth * FMath::Clamp(Fraction, 0.0f, 1.0f));
+    RefreshBodyPaint();
+}
+
 void ABreakerEnemy::RefreshBodyPaint()
 {
     // "WHICH ONE IS THE ELITE" IN A GLANCE (ruled): silhouette carries
