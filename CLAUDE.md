@@ -2,6 +2,29 @@
 
 ## Current work
 
+KIT LANE, THE VERBS' FIRST HALF: THE MANTLE MOVES HOME AND THE VAULT
+IS BORN (One-R's ruling-safe half; the wall-ride REMOVAL is next
+cycle, LEDGER one rebase behind by agreed protocol, notice sent with
+the exact BreakerBuildConditions hunk). The pawn's 48-line fused
+TryMantle is now the component's: ResolveLedgeTraversal in Movement/
+runs the wall probe, top probe, height band and capsule clearance
+with every rule a named tested predicate (IsMantleableWallNormal,
+IsStandableTopNormal, ResolveLedgeVerb — the house pattern the old
+body violated); the pawn keeps only the smoothstep execution at the
+resolved verb's own clock. VAULT exists: the low window [35, 80]
+crosses at 0.12 s against the mantle's 0.20 (O2 both) — a low ledge
+no longer breaks stride. THE NUMBER IS PUBLISHED per One-R:
+UBreakerCharacterMovementComponent::MantleStepHeightCm = 145 (the
+grammar's value; the pawn's hand-copied 150 dies), the mantle
+ceiling defaults to it, and RiorsEdge.Movement.LedgeVerbs pins the
+GameMode copy equal to it — the tripwire that stops the five-
+centimetre drift reopening. GROUND's half when they wish: re-point
+ABreakerGameMode::MantleStepHeight to read the published constexpr
+(the pin stays green either way). Wall-jump still gates the jump key
+first; that ordering resolves in the removal commit, where wall-jump
+retires with the ride by default (seat can save it via
+FindRunnableWall — KIT.md question stands).
+
 KIT LANE, THE QUEUE REFILLS: THE OWNER'S SMOKE RUN REACHES THE
 ANCHOR, AND THE MOVEMENT RECON CORRECTS PART ONE-R. Item 1 landed:
 bare -BreakerAutoPlay travels to the ANCHOR (Part One-E's missing

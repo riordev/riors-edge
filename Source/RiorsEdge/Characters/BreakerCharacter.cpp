@@ -261,7 +261,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     if (!bMantling) return;
 
     MantleElapsed += DeltaSeconds;
-    const float Alpha = FMath::Clamp(MantleElapsed / MantleDuration, 0.0f, 1.0f);
+    const float Alpha = FMath::Clamp(MantleElapsed / FMath::Max(ActiveTraversalDuration, 0.05f), 0.0f, 1.0f);
     const float SmoothedAlpha = Alpha * Alpha * (3.0f - 2.0f * Alpha);
     FHitResult MoveHit;
     SetActorLocation(FMath::Lerp(MantleStart, MantleTarget, SmoothedAlpha), true, &MoveHit, ETeleportType::None);
@@ -797,48 +797,26 @@ void ABreakerCharacter::HandleJumpInput()
 
 bool ABreakerCharacter::TryMantle()
 {
-    if (bMantling || !GetWorld() || !GetCapsuleComponent()) return false;
-
-    const FVector Up = FVector::UpVector;
-    const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
-    const FVector ActorLocation = GetActorLocation();
-    const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-    const float CapsuleRadius = GetCapsuleComponent()->GetScaledCapsuleRadius();
-    const FVector FeetLocation = ActorLocation - Up * CapsuleHalfHeight;
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerMantle), false, this);
-
-    FHitResult WallHit;
-    const FVector WallTraceStart = ActorLocation + Up * 15.0f;
-    if (!GetWorld()->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceStart + Forward * MantleReach, ECC_Visibility, Params)
-        || FMath::Abs(WallHit.ImpactNormal.Z) > 0.35f)
-    {
-        return false;
-    }
-
-    FHitResult TopHit;
-    const FVector TopProbe = WallHit.ImpactPoint + Forward * (CapsuleRadius + 12.0f) + Up * MantleMaximumHeight;
-    if (!GetWorld()->LineTraceSingleByChannel(TopHit, TopProbe, TopProbe - Up * (MantleMaximumHeight + 25.0f), ECC_Visibility, Params)
-        || TopHit.ImpactNormal.Z < 0.65f)
-    {
-        return false;
-    }
-
-    const float LedgeHeight = TopHit.ImpactPoint.Z - FeetLocation.Z;
-    if (LedgeHeight < MantleMinimumHeight || LedgeHeight > MantleMaximumHeight) return false;
-
-    MantleTarget = TopHit.ImpactPoint + Up * (CapsuleHalfHeight + 3.0f) + Forward * 18.0f;
-    const FCollisionShape Capsule = FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight);
-    if (GetWorld()->OverlapBlockingTestByChannel(MantleTarget, FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), Capsule, Params))
-    {
-        return false;
-    }
-
+    // The rules and the traces moved into Movement/ (Part One-R): the
+    // component resolves WHETHER and WHERE, and which verb the ledge height
+    // buys — vault through the low window, mantle through the high one. The
+    // pawn keeps only the execution: the smoothstep move at the resolved
+    // verb's own duration. Vault's shorter clock is the whole difference the
+    // player feels — a low ledge does not break stride.
+    if (bMantling || !GetWorld()) return false;
     UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
     if (!Movement) return false;
+
+    FBreakerLedgeTraversal Traversal;
+    if (!Movement->ResolveLedgeTraversal(Traversal)) return false;
+
+    MantleTarget = Traversal.TargetLocation;
     MantleExitVelocity = Movement->Velocity;
     MantleExitVelocity.Z = 0.0f;
-    MantleStart = ActorLocation;
+    MantleStart = GetActorLocation();
     MantleElapsed = 0.0f;
+    ActiveTraversalDuration = Traversal.Verb == EBreakerLedgeVerb::Vault
+        ? Movement->VaultDurationSeconds : Movement->MantleDurationSeconds;
     bMantling = true;
     Movement->StopMovementImmediately();
     Movement->SetMovementMode(MOVE_Flying);

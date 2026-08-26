@@ -555,4 +555,64 @@ bool FBreakerPlaytestAssemblyTest::RunTest(const FString& Parameters)
     return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// Ledge traversal (Part One-R): the rules the pawn's TryMantle fused for its
+// whole life, now named and pinned. Plus the agreement test: the grammar's
+// MantleStepHeight and the verb's published ceiling are ONE number — the
+// 145-vs-150 disagreement this extraction closed must not be able to reopen.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerLedgeVerbsTest,
+    "RiorsEdge.Movement.LedgeVerbs",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerLedgeVerbsTest::RunTest(const FString& Parameters)
+{
+    using FMove = UBreakerCharacterMovementComponent;
+
+    // Wall and top predicates: near-vertical walls mantle, near-flat tops stand.
+    TestTrue(TEXT("A vertical wall is mantleable"), FMove::IsMantleableWallNormal(0.0f));
+    TestTrue(TEXT("A slightly leaning wall is mantleable"), FMove::IsMantleableWallNormal(-0.3f));
+    TestFalse(TEXT("A ramp is not a mantleable wall"), FMove::IsMantleableWallNormal(0.5f));
+    TestTrue(TEXT("A flat top is standable"), FMove::IsStandableTopNormal(1.0f));
+    TestTrue(TEXT("The standable boundary itself qualifies"), FMove::IsStandableTopNormal(0.65f));
+    TestFalse(TEXT("A steep top is not standable"), FMove::IsStandableTopNormal(0.5f));
+
+    // The verb bands, at the shipped defaults' shape: [min, vaultMax] vaults,
+    // (vaultMax, mantleMax] mantles, outside is nothing.
+    const float Min = 35.0f, VaultMax = 80.0f, MantleMax = FMove::MantleStepHeightCm;
+    TestTrue(TEXT("Below the minimum is a step, not a verb"),
+        FMove::ResolveLedgeVerb(20.0f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::None);
+    TestTrue(TEXT("The minimum itself vaults"),
+        FMove::ResolveLedgeVerb(Min, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Vault);
+    TestTrue(TEXT("The vault ceiling itself vaults"),
+        FMove::ResolveLedgeVerb(VaultMax, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Vault);
+    TestTrue(TEXT("Just above the vault ceiling mantles"),
+        FMove::ResolveLedgeVerb(VaultMax + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
+    TestTrue(TEXT("Chest cover (120) mantles — the grammar's whole premise"),
+        FMove::ResolveLedgeVerb(120.0f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
+    TestTrue(TEXT("The mantle ceiling itself mantles"),
+        FMove::ResolveLedgeVerb(MantleMax, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
+    TestTrue(TEXT("Above the ceiling is a wall, not a verb"),
+        FMove::ResolveLedgeVerb(MantleMax + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::None);
+
+    // Shipped-configuration invariants, on a default-constructed component.
+    const UBreakerCharacterMovementComponent* Defaults = GetDefault<UBreakerCharacterMovementComponent>();
+    TestEqual(TEXT("The mantle ceiling IS the published step height"),
+        Defaults->MantleMaximumHeightCm, FMove::MantleStepHeightCm, 0.0f);
+    TestTrue(TEXT("The windows nest: min < vault max < mantle max"),
+        Defaults->LedgeMinimumHeightCm < Defaults->VaultMaximumHeightCm
+        && Defaults->VaultMaximumHeightCm < Defaults->MantleMaximumHeightCm);
+    TestTrue(TEXT("A vault is faster than a mantle — the difference the player feels"),
+        Defaults->VaultDurationSeconds < Defaults->MantleDurationSeconds);
+
+    // THE AGREEMENT PIN: the grammar's copy on the game mode equals the
+    // published number. GROUND's re-point makes this trivially true forever;
+    // until then it is the tripwire that stops the two drifting apart again.
+    TestEqual(TEXT("The grammar's MantleStepHeight equals the published ceiling"),
+        GetDefault<ABreakerGameMode>()->MantleStepHeight, FMove::MantleStepHeightCm, 0.0f);
+    return true;
+}
+
 #endif

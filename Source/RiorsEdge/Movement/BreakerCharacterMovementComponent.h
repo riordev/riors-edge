@@ -19,6 +19,24 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerLandingImpact, float, Impact
 // movement layer knowing anything about cameras or widgets.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBreakerDashStarted, FVector, DashDirection, float, DashSpeed);
 
+// The ledge-traversal verbs (Part One-R): vault for the low window, mantle
+// for the high one. Runtime-only — never serialized, so it may be reordered.
+enum class EBreakerLedgeVerb : uint8
+{
+    None,
+    Vault,
+    Mantle,
+};
+
+// One resolved traversal: the verb the ledge's height selects and the
+// clearance-checked landing point. Produced by ResolveLedgeTraversal; the
+// pawn executes it (the smoothstep move) and owns nothing about the rules.
+struct FBreakerLedgeTraversal
+{
+    EBreakerLedgeVerb Verb = EBreakerLedgeVerb::None;
+    FVector TargetLocation = FVector::ZeroVector;
+};
+
 UCLASS(ClassGroup=Movement, BlueprintType)
 class RIORSEDGE_API UBreakerCharacterMovementComponent : public UCharacterMovementComponent
 {
@@ -77,6 +95,36 @@ public:
     UFUNCTION(BlueprintCallable, Category="Movement") void PrepareSlideJump();
     UFUNCTION(BlueprintCallable, Category="Movement") void EndSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") bool TryWallJump();
+
+    // ---- Ledge traversal: vault and mantle (Part One-R) -------------------
+    // The verbs live HERE now. The pawn's TryMantle carried 48 fused lines of
+    // traces and rules with zero tests, three files from the component that
+    // extracted twelve pure predicates for exactly this reason — and its
+    // ceiling (150) disagreed with the grammar's MantleStepHeight (145) by
+    // five hand-copied centimetres. Rules and traces are the component's;
+    // the pawn keeps only the smoothstep execution.
+    //
+    // Runs the wall probe, the top probe, the height band and the capsule
+    // clearance; writes the resolved verb and landing point. Const — resolves
+    // only, changes nothing. False when no traversable ledge is ahead.
+    bool ResolveLedgeTraversal(FBreakerLedgeTraversal& OutTraversal) const;
+
+    // THE PUBLISHED STEP HEIGHT (Part One-R's order): one number, one home.
+    // The cover grammar's chest-cover reasoning and the gym's climbable
+    // geometry cite 145 in comments and ABreakerGameMode::MantleStepHeight
+    // carries its own copy — that copy now reads as a consumer of this one
+    // (GROUND's re-point; RiorsEdge.Movement.LedgeVerbs pins the agreement
+    // until it lands and after). The mantle ceiling below defaults to it.
+    static constexpr float MantleStepHeightCm = 145.0f;   // O2 PLACEHOLDER
+
+    // Pure rules, exposed for world-free tests (the house pattern).
+    // A mantleable wall is near-vertical; a standable top is near-flat.
+    static bool IsMantleableWallNormal(float ImpactNormalZ);
+    static bool IsStandableTopNormal(float ImpactNormalZ);
+    // Which verb a ledge height buys: below the minimum nothing (a step the
+    // engine already takes), through the vault window a vault, through the
+    // mantle window a mantle, above the ceiling nothing.
+    static EBreakerLedgeVerb ResolveLedgeVerb(float LedgeHeightCm, float MinimumCm, float VaultMaximumCm, float MantleMaximumCm);
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const { return bWantsToSprint; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const { return bSliding; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequested() const { return bSlideRequested; }
@@ -254,6 +302,19 @@ public:
 
     // Short wall ride: preserves traversal flow without generating speed or
     // replacing combat.
+    // ---- Ledge traversal parameters (Part One-R), all O2 PLACEHOLDER ------
+    // The vault window is [minimum, vault max]; the mantle window is
+    // (vault max, mantle max]. The mantle ceiling defaults to the published
+    // MantleStepHeightCm so the grammar and the verb cannot drift apart.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float MantleReachCm = 90.0f;               // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float LedgeMinimumHeightCm = 35.0f;        // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float VaultMaximumHeightCm = 80.0f;        // O2 PLACEHOLDER
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float MantleMaximumHeightCm = MantleStepHeightCm;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0.05")) float MantleDurationSeconds = 0.20f;    // O2 PLACEHOLDER
+    // A vault is FAST — the whole point of the low window is not breaking
+    // stride; the duration gap is what makes the two verbs read differently.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0.05")) float VaultDurationSeconds = 0.12f;     // O2 PLACEHOLDER
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMaxDuration = 0.85f;   // O2 PLACEHOLDER
     // BUG FIX (owner: "wall riding doesnt work"). This gate is read AFTER the
     // engine has already deflected the approach velocity along the wall, so it

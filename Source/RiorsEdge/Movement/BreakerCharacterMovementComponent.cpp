@@ -8,6 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 
 UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
@@ -1048,5 +1049,85 @@ bool UBreakerCharacterMovementComponent::TryWallJump()
         CharacterOwner->JumpCurrentCount = FMath::Min(CharacterOwner->JumpCurrentCount, FMath::Max(CharacterOwner->JumpMaxCount - 1, 0));
     }
     EndWallRide();
+    return true;
+}
+
+bool UBreakerCharacterMovementComponent::IsMantleableWallNormal(float ImpactNormalZ)
+{
+    // Near-vertical: the same 0.25-adjacent band FindRunnableWall uses, a
+    // shade looser because a mantle approaches head-on rather than alongside.
+    return FMath::Abs(ImpactNormalZ) <= 0.35f;
+}
+
+bool UBreakerCharacterMovementComponent::IsStandableTopNormal(float ImpactNormalZ)
+{
+    // Near-flat: anything steeper is a slope the engine's own walkable-floor
+    // rule should own, not a ledge to pop onto.
+    return ImpactNormalZ >= 0.65f;
+}
+
+EBreakerLedgeVerb UBreakerCharacterMovementComponent::ResolveLedgeVerb(float LedgeHeightCm, float MinimumCm, float VaultMaximumCm, float MantleMaximumCm)
+{
+    if (LedgeHeightCm < MinimumCm || LedgeHeightCm > MantleMaximumCm)
+    {
+        return EBreakerLedgeVerb::None;
+    }
+    return LedgeHeightCm <= VaultMaximumCm ? EBreakerLedgeVerb::Vault : EBreakerLedgeVerb::Mantle;
+}
+
+bool UBreakerCharacterMovementComponent::ResolveLedgeTraversal(FBreakerLedgeTraversal& OutTraversal) const
+{
+    // The pawn's old TryMantle trace body, verbatim in shape: a forward wall
+    // probe, a downward top probe, the height band, and a capsule clearance
+    // test at the landing point — now with every rule a named, tested
+    // predicate and every number authored once, here.
+    const ACharacter* Owner = CharacterOwner.Get();
+    UWorld* World = GetWorld();
+    const UCapsuleComponent* Capsule = Owner ? Owner->GetCapsuleComponent() : nullptr;
+    if (!World || !Capsule)
+    {
+        return false;
+    }
+
+    const FVector Up = FVector::UpVector;
+    const FVector Forward = Owner->GetActorForwardVector().GetSafeNormal2D();
+    const FVector ActorLocation = Owner->GetActorLocation();
+    const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+    const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
+    const FVector FeetLocation = ActorLocation - Up * CapsuleHalfHeight;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerLedgeTraversal), false, Owner);
+
+    FHitResult WallHit;
+    const FVector WallTraceStart = ActorLocation + Up * 15.0f;
+    if (!World->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceStart + Forward * MantleReachCm, ECC_Visibility, Params)
+        || !IsMantleableWallNormal(WallHit.ImpactNormal.Z))
+    {
+        return false;
+    }
+
+    FHitResult TopHit;
+    const FVector TopProbe = WallHit.ImpactPoint + Forward * (CapsuleRadius + 12.0f) + Up * MantleMaximumHeightCm;
+    if (!World->LineTraceSingleByChannel(TopHit, TopProbe, TopProbe - Up * (MantleMaximumHeightCm + 25.0f), ECC_Visibility, Params)
+        || !IsStandableTopNormal(TopHit.ImpactNormal.Z))
+    {
+        return false;
+    }
+
+    const float LedgeHeight = TopHit.ImpactPoint.Z - FeetLocation.Z;
+    const EBreakerLedgeVerb Verb = ResolveLedgeVerb(LedgeHeight, LedgeMinimumHeightCm, VaultMaximumHeightCm, MantleMaximumHeightCm);
+    if (Verb == EBreakerLedgeVerb::None)
+    {
+        return false;
+    }
+
+    const FVector Target = TopHit.ImpactPoint + Up * (CapsuleHalfHeight + 3.0f) + Forward * 18.0f;
+    if (World->OverlapBlockingTestByChannel(Target, FQuat::Identity, Capsule->GetCollisionObjectType(),
+        FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight), Params))
+    {
+        return false;
+    }
+
+    OutTraversal.Verb = Verb;
+    OutTraversal.TargetLocation = Target;
     return true;
 }

@@ -205,10 +205,10 @@ protected:
     // OnKeybindOverridesChanged — every time the settings screen rebinds,
     // clears or resets a key mid-session.
     void ApplyKeybindOverrides(const TMap<FName, FKey>& Overrides);
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleReach = 90.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleMinimumHeight = 35.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0")) float MantleMaximumHeight = 150.0f;
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Mantle", meta=(ClampMin="0.05")) float MantleDuration = 0.20f;
+    // The mantle parameters that lived here — reach, height window, duration
+    // — moved to UBreakerCharacterMovementComponent (Part One-R), where the
+    // ceiling is the PUBLISHED MantleStepHeightCm rather than a hand-copied
+    // 150 disagreeing with the grammar's 145 by five centimetres.
 
     // --- Dash camera feedback -------------------------------------------
     // Owner report: the dash's speed change is correct but unreadable. In a
@@ -426,6 +426,8 @@ private:
     FTimerHandle ShotCosmeticTimer;
     bool bMantling = false;
     float MantleElapsed = 0.0f;
+    // The resolved verb's clock: vault's short one or mantle's, set per cast.
+    float ActiveTraversalDuration = 0.2f;
     FVector MantleStart = FVector::ZeroVector;
     FVector MantleTarget = FVector::ZeroVector;
     FVector MantleExitVelocity = FVector::ZeroVector;
