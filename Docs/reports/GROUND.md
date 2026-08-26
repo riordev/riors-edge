@@ -4,6 +4,121 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
+## PIE and autoplay leaving the gym: what breaks (Part One-E, report before changing)
+
+**Measured, not estimated.** Five harness entry points sit at the TAIL of the
+gym build, after the front-end, Anchor and Fernhall branches have already
+returned. `-BreakerAutoPlay` landing in the Anchor does not move them; it stops
+reaching them:
+
+- **`-BreakerCrowdProbe=N` never arms.** This is the serious one: FIELD's
+  density sweep is the ruled priority and the probe is the only instrument that
+  produces it.
+- **`-BreakerEffectProbe` never arms**, and `Breaker.EffectProbe` never
+  registers.
+- **`-BreakerBossOnStart` never spawns**, `Breaker.Boss` never registers, and
+  the **F5 boss key never binds** — so the one archetype most worth
+  photographing becomes unreachable headlessly.
+- **`BuildCaptureTour` never builds**, so `-BreakerCaptureTour`'s eight authored
+  vantages are gone.
+- **`LogGymSummary` never runs.**
+
+Menu captures are unaffected — they draw on the front end by design.
+
+**The mitigation is small and I would do it in the same commit:** those blocks
+are gym-*located* but not gym-*dependent*. Moving the probe, effect-probe, boss
+key and console registrations above the map branches makes them map-agnostic,
+and the capture tour stays gym-only because its vantages are authored against
+gym geometry. Without that move, changing autoplay's destination silently
+disarms the instrument FIELD is currently blocked on.
+
+`EditorStartupMap` itself is a one-line config change. The file's warning
+("an untested change to the only loop anyone playtests in") is discharged by the
+playtest, as ORDERS says — but the warning was about the LOOP, and the loop's
+instruments are the part that actually breaks.
+
+- **Question:** confirm I move the four instrument blocks out of the gym tail in
+  the same commit as the config change. Doing the config alone is the version
+  that breaks FIELD.
+
+## Costing the rift interior: yard instance vs. gym placeholder (Part One-E)
+
+Both costed, as asked.
+
+**The yard-instance route is CHEAPER THAN IT LOOKS, and the reason is one line
+of existing code.** `StartNextWave` spawns its ring around the PLAYER, not at
+the authored arena — deliberately, so "the instrument works wherever a playtest
+happens". **The wave system has no dependency on gym geometry.** It would run in
+Fernhall today if anything called it; nothing does, because only F2 on
+`ABreakerCharacter` does.
+
+So the route does not need a new map either. `Lvl_Fernhall` + `PendingRift.IsSet()`
+IS a different instance of the same tileset — which is exactly what ORDERS
+describes, and it is what an instanced rift is. The branch already exists and
+already distinguishes those two states.
+
+Estimated shape, one cycle:
+- a rift-instance branch beside the existing Fernhall branch, keyed on
+  `PendingRift.IsSet()`
+- a run start that calls `StartNextWave`
+- the door pointing at Fernhall instead of the gym — the one line I already
+  flagged as the line that moves when interiors exist
+
+**What it does NOT solve, and this is the honest half:** it gives the rift a
+population but not an ENDING. Part Three-E is right that there is no close-rift
+verb, and escalating waves in the yard is the same shooting range in nicer
+geometry. It also lands before the yard shape is ruled, so the first rift
+interior would be the one-yard entry plaza.
+
+**The gym-placeholder route costs nothing and is wrong in one specific way:**
+it is now the only path in normal play that arrives at a test bench, at the
+most fiction-breaking moment available.
+
+- **My recommendation:** take the yard instance, but sequence it AFTER the
+  close-rift seam rather than before. A populated rift with no ending is a
+  louder version of the problem Part Three-E names; a populated rift WITH an
+  ending is the loop. Until then the collision is recorded, which ORDERS
+  already offers as the acceptable outcome.
+
+## The close-rift seam (Part Three-E, report before building)
+
+The seat's specific question: does the terminator's death write the completion
+state directly, or raise something GROUND consumes?
+
+**Raise. GROUND consumes.** The precedent is in this lane already and it was
+built for exactly this shape: `ABreakerRiftDoor` does not travel — it raises
+`OnRiftEntryRequested` carrying its definition, and the game mode owns what
+travel means. Entry and exit should be the same shape in reverse:
+
+- **FIELD's terminator raises** "I died and I was the thing holding this open",
+  carrying whatever identifies it. It does not know what a rift IS.
+- **GROUND consumes it**, writes the completion state, and ends the run.
+- **LEDGER binds the same completion**, or a signal GROUND raises from it, for
+  the payout.
+
+That makes it **three commits with one interface**, not one commit across three
+lanes — and the interface is a delegate on the terminator, which is FIELD's
+header to declare. A direct write would need `Combat/` to include `Game/` and
+know rift state, which is the coupling the door was deliberately built to avoid.
+
+- **Question:** confirm the raise-and-consume direction and I will specify the
+  completion state's shape and storage next cycle.
+
+## `Playtest/` is GROUND's (Part One-F asks which of us is right)
+
+ORDERS is right and FIELD's reading is wrong: `Playtest/` is named in this
+lane's charter alongside `Game/` and `Interaction/`.
+
+Worth saying why the confusion is structural rather than anyone's error:
+**`UI/BreakerPlaytestHUD.cpp` is not in `Playtest/`.** The overlay with the
+ungated second label pass at line 693, and `bDiagnosticsVisible` defaulting on,
+are GLASS's file wearing a name that reads like mine. `Playtest/` itself is
+`BreakerPlaytestComponent`, `BreakerKillBuckets` and `BreakerKillTelemetry` —
+none of which draws anything.
+
+So: the directory is mine, the defect is GLASS's, and the seat's routing of the
+fix to `UI/` is correct.
+
 ## The connection rule's own terms (ORDERS Q3, reported before authoring numbers)
 
 Q3 ruled connections a distinct kind of space, exempt from the field grammar,
@@ -77,30 +192,6 @@ produces a second yard's pieces.
 
 - **Question:** confirm the `yard` marker role, or name a different anchor.
 
-## The rift door announces itself as TRAVEL (needs one line in GLASS's file)
-
-Found by capture, not by the suite — the door is placed geometry and
-automation cannot see a label. The door spawns correctly on `marker_rift`,
-the beacon reads at lane distance, and the F prompt says **ENTER RIFT**. The
-line directly above it says **TRAVEL**.
-
-`BreakerPlaytestHUD.cpp:1724` draws the overhead label as a literal
-`TEXT("TRAVEL")`, while the prompt beneath it correctly calls
-`GetPromptLabel()`. So the first new interactable in the world states two
-different things about itself, one of them wrong, stacked vertically. That is
-O132's shape exactly — two things printing under one word — on a rift object.
-
-**The crossing:** the fix is a getter on `ABreakerTravelPoint` (mine) that
-the HUD calls instead of the literal — default `TRAVEL`, overridden to `RIFT`
-on the door — and swapping the literal is one line in `UI/` (GLASS's).
-
-I have deliberately NOT added my half yet. An uncalled getter is a dead API,
-and this file already carries the note that `GetPromptLabel` spent a whole
-milestone as one; adding a second would repeat the defect I would be fixing.
-
-- **Question:** route the one-line swap to GLASS and I will land the getter in
-  the same cycle, or tell me to take both halves as a declared crossing.
-
 ## How many bodies make one yard feel populated? (ORDERS Q1, design half)
 
 The engineering half is ruled and understood: 50–100 is a concurrency budget
@@ -110,16 +201,6 @@ inhabited is a standing-in-it number.
 
 Not blocking. The marker chain and the grammar split come first either way,
 and both are independent of it.
-
-## More kit assets — yes or no? (ORDERS Q5, owner's call)
-
-Ten `.glb` pieces vendored, all ten already spent by the composer. Layout can
-make five yards; it cannot make them look like five places with no unused
-vocabulary. A download, so it needs the owner's say-so like the fonts.
-
-Blocking only the *authoring* of yards two through five, not the marker
-chain, the grammar split, or the connection rule. Worth answering before that
-authoring starts rather than during it.
 
 ## Does the wave budget take a party term? (O133)
 
