@@ -128,6 +128,13 @@ TArray<FBreakerZoneMarker> FBreakerZoneMarkers::OfRole(EBreakerZoneMarkerRole Ro
     return Out;
 }
 
+TArray<FName> FBreakerZoneMarkers::Yards() const
+{
+    TArray<FName> Out;
+    for (const FBreakerZoneMarker& Marker : All) Out.AddUnique(Marker.Yard);
+    return Out;
+}
+
 bool FBreakerZoneMarkers::IsComplete(FString& OutReason) const
 {
     const int32 Starts = OfRole(EBreakerZoneMarkerRole::PlayerStart).Num();
@@ -153,6 +160,22 @@ bool FBreakerZoneMarkers::IsComplete(FString& OutReason) const
             }
         }
     }
+    // EVERY NAMED YARD IS ANCHORED. The entry yard is exempt because the player
+    // start anchors it; any other yard that a door or a giver names needs a
+    // frame of its own, and without one its grammar would be measured in the
+    // entry yard's frame and pass while meaning nothing.
+    for (const FName& Yard : Yards())
+    {
+        if (Yard.IsNone()) continue;
+        if (!Has(EBreakerZoneMarkerRole::Yard, Yard))
+        {
+            OutReason = FString::Printf(
+                TEXT("yard '%s' is named by a marker but has no 'yard' anchor to give it a frame"),
+                *Yard.ToString());
+            return false;
+        }
+    }
+
     OutReason.Reset();
     return true;
 }
@@ -164,6 +187,7 @@ const TCHAR* UBreakerZoneBuilder::MarkerRoleName(EBreakerZoneMarkerRole Role)
     case EBreakerZoneMarkerRole::PlayerStart: return TEXT("playerstart");
     case EBreakerZoneMarkerRole::Rift:        return TEXT("rift");
     case EBreakerZoneMarkerRole::NPCContract: return TEXT("npc_contract");
+    case EBreakerZoneMarkerRole::Yard:        return TEXT("yard");
     }
     return TEXT("<unknown>");
 }
@@ -182,6 +206,7 @@ bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarke
         EBreakerZoneMarkerRole::NPCContract,
         EBreakerZoneMarkerRole::PlayerStart,
         EBreakerZoneMarkerRole::Rift,
+        EBreakerZoneMarkerRole::Yard,
     };
     const EBreakerZoneMarkerRole* Best = nullptr;
     int32 BestLength = 0;

@@ -261,6 +261,13 @@ bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("an unknown role is refused rather than guessed"),
         UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_bogus"), Role, Yard));
 
+    // The yard anchor parses like any other role, suffix and all.
+    TestTrue(TEXT("marker_yard_north parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_yard_north"), Role, Yard));
+    TestEqual(TEXT("...as a yard anchor"), static_cast<int32>(Role),
+        static_cast<int32>(EBreakerZoneMarkerRole::Yard));
+    TestEqual(TEXT("...for the north yard"), Yard, FName(TEXT("north")));
+
     // --- The completeness rule ------------------------------------------
     FString Reason;
     FBreakerZoneMarkers Empty;
@@ -273,8 +280,15 @@ bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
 
     // A yard with no rift is LEGAL now. This is the assertion that says the
     // all-or-nothing rule is really gone, rather than moved.
+    //
+    // THE ANCHOR COMES WITH THE YARD. This block used to declare a rift in
+    // 'north' and assert the zone complete; the yard-anchor rule correctly made
+    // it red, because a yard nothing anchors has no frame. Naming a yard and
+    // anchoring it are one act, so the test does both — the point it was making
+    // (a rift outside the entry yard is fine) survives intact.
+    One.All.Add({ EBreakerZoneMarkerRole::Yard, FName(TEXT("north")), FVector(80.0f, 0.0f, 0.0f) });
     One.All.Add({ EBreakerZoneMarkerRole::Rift, FName(TEXT("north")), FVector(100.0f, 0.0f, 0.0f) });
-    TestTrue(TEXT("a rift in another yard is fine"), One.IsComplete(Reason));
+    TestTrue(TEXT("a rift in another anchored yard is fine"), One.IsComplete(Reason));
     TestTrue(TEXT("and it is found by its yard"), One.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("north"))));
     TestFalse(TEXT("and is NOT found in the entry yard"), One.Has(EBreakerZoneMarkerRole::Rift));
 
@@ -283,6 +297,27 @@ bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
     Two.All.Add({ EBreakerZoneMarkerRole::PlayerStart, FName(TEXT("north")), FVector::ZeroVector });
     TestFalse(TEXT("two player starts is a broken export, even in different yards"),
         Two.IsComplete(Reason));
+
+    // THE YARD ANCHOR (ruled, shape one). A yard that a door names but nothing
+    // anchors has no frame to be measured in, so its grammar would be measured
+    // in the ENTRY yard's and pass while meaning nothing — a missing anchor
+    // arriving as a passing test is the failure this clause exists to stop.
+    FBreakerZoneMarkers Unanchored;
+    Unanchored.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    Unanchored.All.Add({ EBreakerZoneMarkerRole::Rift, FName(TEXT("north")), FVector(100.0f, 0.0f, 0.0f) });
+    TestFalse(TEXT("a named yard with no anchor is refused"), Unanchored.IsComplete(Reason));
+    TestTrue(FString::Printf(TEXT("and the reason names the yard: %s"), *Reason),
+        Reason.Contains(TEXT("north")));
+
+    Unanchored.All.Add({ EBreakerZoneMarkerRole::Yard, FName(TEXT("north")), FVector(80.0f, 0.0f, 0.0f) });
+    TestTrue(TEXT("anchored, the same zone is complete"), Unanchored.IsComplete(Reason));
+
+    // THE ENTRY YARD IS EXEMPT, because the player start anchors it. Without
+    // this the shipped one-yard export would stop importing.
+    FBreakerZoneMarkers EntryOnly;
+    EntryOnly.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    EntryOnly.All.Add({ EBreakerZoneMarkerRole::Rift, NAME_None, FVector(100.0f, 0.0f, 0.0f) });
+    TestTrue(TEXT("the entry yard needs no yard anchor"), EntryOnly.IsComplete(Reason));
 
     FBreakerZoneMarkers Dup;
     Dup.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });

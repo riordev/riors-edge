@@ -125,7 +125,7 @@ for i, (x, z) in enumerate(((32.0, 17.0), (32.0, -17.0), (62.0, 17.0), (62.0, -1
 #   marker_<role>          this marker belongs to the ENTRY yard
 #   marker_<role>_<yard>   it belongs to <yard>
 #
-# Roles: playerstart, rift, npc_contract. An unknown role is REFUSED, not
+# Roles: playerstart, rift, npc_contract, yard. An unknown role is REFUSED, not
 # skipped, so a typo here is a loud failure rather than a marker that silently
 # does not exist.
 #
@@ -134,8 +134,14 @@ for i, (x, z) in enumerate(((32.0, 17.0), (32.0, -17.0), (62.0, 17.0), (62.0, -1
 # (role, yard) pair may repeat: two rift markers in one yard would spawn two
 # doors on the same spot.
 #
+# EVERY NAMED YARD NEEDS A `yard` ANCHOR. A yard's grammar is measured in its
+# OWN frame, and a zone has exactly one playerstart, so the rule that anchors
+# the entry yard cannot anchor a second: marker_yard_<name> is what gives yard
+# <name> a frame. The ENTRY yard is exempt because the playerstart anchors it.
+#
 # The three below carry no yard suffix because Fernhall is one yard today.
-# Growing it means adding suffixed markers, not changing any of this.
+# Growing it means adding marker_yard_<name> plus that yard's own markers, not
+# changing any of this.
 place("marker_playerstart", None, (6.0, 0.0, 0.0), marker=True)
 place("marker_rift", None, (92.0, 0.0, 0.0), marker=True)
 place("marker_npc_contract", None, (13.0, 0.0, -14.0), marker=True)

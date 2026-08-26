@@ -39,7 +39,7 @@ SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 # LONGEST ROLE FIRST, for the same reason the C++ does it: npc_contract
 # contains an underscore, so a shortest-match parse reads marker_npc_contract
 # as role "npc" in a yard called "contract".
-MARKER_ROLES = ("npc_contract", "playerstart", "rift")
+MARKER_ROLES = ("npc_contract", "playerstart", "rift", "yard")
 
 
 def parse_marker(name):

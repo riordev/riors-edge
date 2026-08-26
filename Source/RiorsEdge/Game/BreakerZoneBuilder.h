@@ -38,6 +38,21 @@ enum class EBreakerZoneMarkerRole : uint8
     PlayerStart,
     Rift,
     NPCContract,
+    // THE YARD'S OWN ANCHOR (ruled, shape one). A zone has exactly ONE player
+    // start, so the rule that anchors the entry yard's frame cannot anchor a
+    // second yard \u2014 and a yard's grammar is measured in its own frame, because
+    // FBreakerCoverPiece is field-space by construction.
+    //
+    // The alternatives were rejected on the record: two markers per yard
+    // doubles the authoring for a second marker that means nothing alone, and
+    // dropping frames for non-entry yards makes every yard's grammar depend on
+    // how the composer happened to be rotated \u2014 the exact failure the derived
+    // frame exists to prevent.
+    //
+    // A yard marker's ROTATION is not read (the composer bakes world transforms
+    // into vertices and markers are placed axis-aligned), so a yard's forward
+    // is derived the same way the entry yard's is: from what it points at.
+    Yard,
 };
 
 // One authored marker. Yard is NAME_None for the ENTRY yard, which is what
@@ -69,7 +84,17 @@ struct FBreakerZoneMarkers
     // second rule is that no (role, yard) pair may repeat — two rift doors in
     // one yard is not two doors, it is a naming mistake that would spawn one
     // on top of the other.
+    //
+    // THE THIRD RULE IS THE YARD ANCHOR: every named yard must carry a Yard
+    // marker. A yard that a door or a giver names but nothing anchors has no
+    // frame to be measured in, so its grammar would silently be measured in
+    // the entry yard's — which is the failure the anchor exists to prevent,
+    // arriving as a passing test rather than a missing one. The ENTRY yard is
+    // exempt: the player start anchors it.
     bool IsComplete(FString& OutReason) const;
+
+    // Every yard named by any marker, entry included (as NAME_None).
+    TArray<FName> Yards() const;
 };
 
 // Builds the Fernhall approach yard — the campaign's first authored zone —
