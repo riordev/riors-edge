@@ -37,6 +37,8 @@
 #include "Combat/BreakerEnemy.h"
 
 #include "Characters/BreakerCharacter.h"
+#include "Combat/BreakerCombatComponent.h"
+#include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerEnemyModifiers.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -243,6 +245,148 @@ namespace
                 return false;
             }), BreakerBarProbeRetrySeconds);
     }
+
+    // --- THE HEADLESS DAMAGE ENTRY POINT ----------------------------------
+    // Asked for by GROUND, and owed by ORDERS twice over. The rift chain
+    // (O168) is unit-tested at every branch and the wiring is proven by build,
+    // but the end-to-end mark-then-kill path has never run: the harness can
+    // drive a mark, and could not drive a kill. Separately, Part One-C's scope
+    // caveat says the crowd sweep is HALF A FIGHT because nothing in it takes
+    // damage, and closing that needs a damage entry point in `Combat/` — this
+    // file's directory.
+    //
+    // IT GOES THROUGH ReceiveDamage, NOT AROUND IT. That is the entire value:
+    // mitigation, the band-break bit, the hit reaction, the damage number, the
+    // death beat, loot, telemetry and O168's terminator raise all hang off the
+    // real path, and a command that wrote health directly would prove none of
+    // them. `DebugPoseHealthFraction` in this same file deliberately does NOT
+    // do this — it poses a body for a photograph and fires nothing. The two
+    // must not be confused, which is why they read so differently.
+    //
+    // TrueDamage so a kill is a kill: armour, shields and resistances are
+    // exactly the systems a verification run must not have to defeat first.
+    void BreakerFieldDamageNearest(UWorld* World, float Amount)
+    {
+        if (!World) return;
+        ABreakerCharacter* Player = BreakerBarProbeFindPlayer(World);
+        if (!Player)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerField] no player pawn; nothing damaged."));
+            return;
+        }
+
+        ABreakerEnemy* Nearest = nullptr;
+        float NearestSq = TNumericLimits<float>::Max();
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            ABreakerEnemy* Candidate = *It;
+            if (!Candidate || Candidate->IsDeadEnemy()) continue;
+            const float DistanceSq = FVector::DistSquared(Player->GetActorLocation(), Candidate->GetActorLocation());
+            if (DistanceSq < NearestSq)
+            {
+                NearestSq = DistanceSq;
+                Nearest = Candidate;
+            }
+        }
+        if (!Nearest)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerField] no live enemy in the world; nothing damaged."));
+            return;
+        }
+
+        UBreakerCombatComponent* Combat = Nearest->FindComponentByClass<UBreakerCombatComponent>();
+        if (!Combat)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerField] nearest enemy has no combat component."));
+            return;
+        }
+
+        FBreakerDamageRequest Request;
+        // A non-positive argument means LETHAL: the caller wants the body gone
+        // and should not have to know its health. Sized off the target's own
+        // max health rather than a large literal, so it stays lethal when the
+        // chassis curve moves.
+        Request.BaseDamage = Amount > 0.0f ? Amount : FMath::Max(1.0f, Nearest->GetMonsterMaxHealth() * 4.0f);
+        Request.DamageFamily = EBreakerDamageFamily::TrueDamage;
+        Request.Instigator = Player;
+
+        const float Before = Nearest->GetMonsterMaxHealth();
+        const bool bTerminator = Nearest->IsRiftTerminator();
+        Combat->ReceiveDamage(Request);
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerField] dealt %.0f TrueDamage to the nearest enemy at %.0f cm ")
+            TEXT("(max health %.0f, rift terminator=%d, dead now=%d) through the real ReceiveDamage path."),
+            Request.BaseDamage, FMath::Sqrt(NearestSq), Before, bTerminator ? 1 : 0,
+            Nearest->IsDeadEnemy() ? 1 : 0);
+    }
+
+    FAutoConsoleCommandWithWorldAndArgs GBreakerFieldDamageCommand(
+        TEXT("Breaker.Field.Damage"),
+        TEXT("Deals TrueDamage to the nearest live enemy through the real damage path. ")
+        TEXT("Optional amount; omitted or non-positive means lethal."),
+        FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(
+            [](const TArray<FString>& Args, UWorld* World)
+            {
+                const float Amount = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 0.0f;
+                BreakerFieldDamageNearest(World, Amount);
+            }));
+
+    // --- THE ONE RUN NEITHER LANE COULD TAKE -------------------------------
+    // GROUND: "the end-to-end mark-then-kill path is NOT verified in play —
+    // the harness can drive neither a mark nor a kill. I would rather one of us
+    // confirm it than both of us assume it." This drives the whole O168 chain
+    // through PUBLIC CONSOLE COMMANDS ONLY — GROUND's Breaker.MarkTerminator
+    // and this file's Breaker.Field.Damage — so no lane reaches into another's
+    // code to test it, which is the same boundary the seam itself keeps.
+    //
+    // Sequenced on the core ticker because -ExecCmds fires everything at engine
+    // init, in one breath, before any body exists to mark. It waits for a live
+    // enemy (the bar probe supplies them), marks, then kills on a LATER tick —
+    // the mark must be committed before the damage lands or the kill arrives at
+    // an unmarked body and the whole run silently proves nothing.
+    void BreakerFieldVerifyRiftChain()
+    {
+        TSharedPtr<int32> Stage = MakeShared<int32>(0);
+        TSharedPtr<int32> Attempt = MakeShared<int32>(0);
+        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+            [Stage, Attempt](float) -> bool
+            {
+                if ((*Attempt)++ > BreakerBarProbeMaxAttempts)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("[BreakerField] rift-chain check gave up waiting for a live enemy."));
+                    return false;
+                }
+                UWorld* World = BreakerBarProbeCurrentWorld();
+                if (!World || !GEngine) return true;
+
+                if (*Stage == 0)
+                {
+                    bool bHasLiveEnemy = false;
+                    for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                    {
+                        if (*It && !It->IsDeadEnemy()) { bHasLiveEnemy = true; break; }
+                    }
+                    if (!bHasLiveEnemy) return true;
+                    GEngine->Exec(World, TEXT("Breaker.MarkTerminator"));
+                    UE_LOG(LogTemp, Display, TEXT("[BreakerField] rift-chain check: marked, killing next tick."));
+                    *Stage = 1;
+                    return true;
+                }
+
+                GEngine->Exec(World, TEXT("Breaker.Field.Damage"));
+                UE_LOG(LogTemp, Display,
+                    TEXT("[BreakerField] rift-chain check: kill issued. A [Rift] line below is the seam firing — ")
+                    TEXT("'run complete' if a rift is set, 'completion refused' if none is, and EITHER proves ")
+                    TEXT("the raise reached the consume site."));
+                return false;
+            }), BreakerBarProbeRetrySeconds);
+    }
+
+    FAutoConsoleCommandWithWorld GBreakerFieldVerifyRiftChainCommand(
+        TEXT("Breaker.Field.VerifyRiftChain"),
+        TEXT("Marks the nearest enemy and kills it, driving O168's raise-consume-pay chain end to end."),
+        FConsoleCommandWithWorldDelegate::CreateStatic(
+            [](UWorld*) { BreakerFieldVerifyRiftChain(); }));
 
     FAutoConsoleCommandWithWorld GBreakerBarProbeCommand(
         TEXT("Breaker.Field.BarProbe"),
