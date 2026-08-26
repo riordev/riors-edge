@@ -115,6 +115,88 @@ and that is what every existing mesh and material in `Combat/` uses today. So th
 first mesh is also a small refactor of how enemy visuals are acquired at all,
 and I would rather say that now than discover it as scope.
 
+## The separation shape (ORDERS Part One-C, reported before authoring)
+
+Measured on `a981ec9`, `Lvl_Gym`, `-BreakerCrowdProbe=100 -BreakerCrowdLoad=engaged`,
+probe self-reporting `engaged=100%`:
+
+```
+  game thread            31.43 ms        (sweep fit predicted 35.63)
+  nearest body to pawn        2 cm
+  nearest-neighbour min       0 cm
+  nearest-neighbour mean     71 cm       against a 90 cm body width
+  bodies inside one body width of a neighbour   100 of 111
+```
+
+**Both claims were true and I had only checked one.** `nearest` in the probe's
+summary is measured to the PAWN; I read it as the crowd clumping into itself and
+GROUND read it as clumping onto the player. It does both — the mean
+nearest-neighbour distance is 71 cm against a 90 cm body, and 100 of 111 bodies
+are inside one body width of another. **71 cm is the number separation has to
+move**, and there was no instrument that could state it until now.
+
+### Nothing physical keeps them apart, so this is steering
+
+The enemy capsule is profile `Custom`, radius 45 cm, **response to Pawn =
+Overlap**. Nothing in the project sets that profile; it is an engine default
+nobody chose. Enemies are bare `APawn`s with no movement component, moving by a
+single `AddActorWorldOffset(Step, bSweep=true)` at `BreakerEnemy.cpp:543`.
+
+So bodies interpenetrate freely, and the N² is the swept capsule's QUERY cost
+through a dense cluster — not contact resolution. Three consequences:
+
+- **Making them Block is not the fix.** Physics would enforce spacing, but a
+  blocking crowd cannot reach the player at all (they would shell at ~90 cm),
+  which changes the fight into something nobody designed, and contact resolution
+  between a hundred stacked capsules is not obviously cheaper than the query.
+- **Separation must be authored as a behaviour**, contributing to
+  `DesiredDirection` before the move, alongside the chase and patrol branches
+  that already write it.
+- **The sweep stays.** It is what stops enemies walking through walls. Separation
+  makes it cheap by making the cluster sparse, rather than removing it.
+
+### The neighbour query is the trap, and it has a known shape
+
+ORDERS asked whether a separation pass reintroduces the term it removes. **It
+does, if written the obvious way.** Asking each body for its neighbours by
+iterating every enemy is O(N²) — that is literally what `Breaker.Field.CrowdReport`
+does, deliberately, because it is a one-shot diagnostic and 111² is free once.
+
+The fix is a **uniform grid rebuilt once per frame**: O(N) to build, and each
+query touches only the cells within the separation radius. Cell size at the
+separation radius makes that a small constant.
+
+**And it is self-stabilising in a way worth stating plainly.** The grid degrades
+to O(N²) only when every body occupies one cell — which is precisely the state
+separation exists to prevent. The worst case is therefore the FIRST FRAME after a
+mass spawn, and it decays immediately. A structure whose pathological case is the
+thing it removes is a safe structure; one whose pathological case is the steady
+state is not.
+
+No spatial structure exists anywhere in `Source/RiorsEdge` today, so this is new
+plumbing rather than a reuse. It is enemy-crowd-specific and belongs in `Combat/`.
+
+### The falsifiable prediction
+
+The sweep's fit without its quadratic term puts N=100 at **9.79 ms**. If
+separation works, engaged N=100 should approach that. If it lands near 31 ms with
+spacing improved, the quadratic was never the sweep and this report is wrong —
+which is the outcome worth being able to see.
+
+**Questions, and they are design rather than engineering:**
+
+1. **What spacing?** One body width (90 cm) is the minimum that stops
+   interpenetration. Comfortable readability is probably more. This sets how a
+   pack of fifty occupies a yard, and Fernhall's yards are 100 x 50 m — at 150 cm
+   spacing, fifty bodies need a 15 m circle, which is a third of a yard's width.
+   **The number is a level-design constraint disguised as a movement constant.**
+2. **Does separation apply at contact?** An enemy that reaches the player wants to
+   be AT the player; strict separation would push attackers off their target and
+   turn melee into a shoving match. My assumption unless corrected: separation
+   applies between enemies and is suppressed inside attack range of the target.
+3. **Do ranged and melee separate differently?** A Lattice holding a band already
+   has spacing behaviour of its own kind, and stacking two rules produces neither.
+
 ## Two claims dropped rather than assembled
 
 Recorded because "I checked and it is not true any more" is worth as much as a
