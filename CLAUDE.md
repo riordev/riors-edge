@@ -2,6 +2,35 @@
 
 ## Current work
 
+KIT LANE, THE QUEUE REFILLS: THE OWNER'S SMOKE RUN REACHES THE
+ANCHOR, AND THE MOVEMENT RECON CORRECTS PART ONE-R. Item 1 landed:
+bare -BreakerAutoPlay travels to the ANCHOR (Part One-E's missing
+half, the half the owner uses — photographed: Kess, the
+Quartermaster, the TRAVEL monolith, social HUD); the gym keeps a
+DELIBERATE entrance as -BreakerAutoPlay=Gym (also =Fernhall /
+=Anchor; unknown values land in the Anchor loudly). EVERY INSTRUMENT
+INVOCATION THAT ASSUMED BARE AUTOPLAY = GYM MUST ADD =Gym: the
+capture harness, -BreakerAbilityProbe, -BreakerEffectProbe,
+-BreakerCrowdProbe, FIELD's bar probe — the harness table row is
+updated, other lanes' scripts are theirs. Item 2, the movement recon,
+REPORTED (session report, nothing built) and its headline corrects
+ORDERS One-R: A WORKING MANTLE ALREADY EXISTS —
+ABreakerCharacter::TryMantle, ledge detection + capsule clearance +
+35-150 cm window, wired into the jump key THIRD behind TryWallJump —
+so the verbs work is extract-publish-test, not build. Also found:
+wall-jump is separable from wall-ride (FindRunnableWall is
+standalone), the removal blast radius is 11 non-Movement files not
+ORDERS' four, dash burns its full cooldown against a wall from 10 cm
+(no geometry awareness anywhere but the verb being deleted), slide
+UnCrouches under ceilings unconditionally, and THREE mantle heights
+disagree (pawn 150 / grammar 145 / engine's enforced-but-unauthored
+45). Three new questions in Docs/reports/KIT.md: the extract shape,
+wall-jump's fate + Terminal Velocity's orphaned half, and the one
+ruled height. LEDGER coupling for the removal window is agreed
+(option 1: my commit carries their one-line evaluator deletion;
+cycle-ahead notice promised). Verbs wait on containment + interior
+per One-R's sequencing.
+
 KIT LANE, WEAPON FEEL: THE MODEL EXISTED, SO THE CYCLE TUNED AND
 EXTENDED IT (lead's go-ahead on the four-item order from the recon).
 (a) The ADS bill's third leg was ALREADY CHARGED — GetMaxSpeed
@@ -795,7 +824,7 @@ timer**, because opening a menu pauses the world.
 
 | Switch | Form | Effect |
 |---|---|---|
-| `-BreakerAutoPlay` | flag | Skips the title menu into the gym. **Required for `-BreakerCaptureMenu`**, which is parsed inside its branch. |
+| `-BreakerAutoPlay[=Anchor\|Gym\|Fernhall]` | flag or value | Skips the title menu. BARE lands in the ANCHOR (Part One-E: the player starts in the hub; the gym left the accidental path). Instruments that need the test bench ask by name: `=Gym`. **Required for `-BreakerCaptureMenu`**, which is parsed inside its branch. |
 | `-BreakerScreenshots=N` | int 1–60 | N frames then exit. First at 6.0 s, then every 2.0 s. |
 | `-BreakerCaptureMenu=<SCREEN>` | string | `INVENTORY`, `SKILLTREES`/`SKILLS`, `SETTINGS`, `CLASS`/`CLASSSELECT`, `PAUSE`, `CHARACTERSELECT`, `CHARACTERCREATE`, `DEVSANDBOX`/`SANDBOX`. Anything else **silently** falls back to the main screen. |
 | `-BreakerCaptureBoard=<BOARD>` | string, not a bare flag | `CORE`, `COMPARE`, `BRANCH<n>`. Also the back door to FORGE/ABILITIES when combined with `-BreakerCaptureMenu=INVENTORY`. |

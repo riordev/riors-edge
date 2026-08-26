@@ -1750,16 +1750,38 @@ void ABreakerCharacter::ApplyMenuSettings(float NewSensitivity, float NewFOV, bo
 
 void ABreakerCharacter::ShowInitialMenu()
 {
-    // -BreakerAutoPlay skips the title menu and drops straight into the gym.
-    // This exists so the game can be SMOKE-TESTED without a human at the
-    // keyboard: a standalone run that stops on the title screen proves only
-    // that startup works, and never executes the gym, the enemy spawns, the
-    // HUD or anything else a change is likely to break. Dev-only by
-    // construction — it is a command-line switch, so a shipped build cannot
-    // reach it unless someone deliberately passes it.
-    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")))
+    // -BreakerAutoPlay skips the title menu so the game can be SMOKE-TESTED
+    // without a human at the keyboard: a run that stops on the title screen
+    // proves only that startup works. Dev-only by construction — a
+    // command-line switch a shipped build cannot reach.
+    //
+    // WHERE it lands is Part One-E's ruling: the bare flag goes to the ANCHOR
+    // — the player starts in the hub, and the owner's own standalone smoke
+    // run now exercises the loop he actually plays. The gym LEAVES the
+    // accidental path and keeps its deliberate entrance: -BreakerAutoPlay=Gym
+    // (the capture harness and the ability/effect probes are its callers —
+    // instruments ask for the bench by name now, nothing arrives there by
+    // default). An unrecognised value lands in the Anchor LOUDLY rather than
+    // guessing.
+    FString AutoPlayDestination;
+    const bool bAutoPlayFlag = FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay"));
+    const bool bAutoPlayValue = FParse::Value(FCommandLine::Get(), TEXT("BreakerAutoPlay="), AutoPlayDestination);
+    if (bAutoPlayFlag || bAutoPlayValue)
     {
-        UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; entering the gym directly."));
+        FName DestinationMap(UBreakerGameInstance::AnchorMapName());
+        if (bAutoPlayValue && AutoPlayDestination.Equals(TEXT("Gym"), ESearchCase::IgnoreCase))
+        {
+            DestinationMap = FName(UBreakerGameInstance::GymMapName());
+        }
+        else if (bAutoPlayValue && AutoPlayDestination.Equals(TEXT("Fernhall"), ESearchCase::IgnoreCase))
+        {
+            DestinationMap = FName(UBreakerGameInstance::FernhallMapName());
+        }
+        else if (bAutoPlayValue && !AutoPlayDestination.Equals(TEXT("Anchor"), ESearchCase::IgnoreCase))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerAutoPlay] Unknown destination '%s'; landing in the Anchor."), *AutoPlayDestination);
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerAutoPlay] Skipping the title menu; travelling to %s."), *DestinationMap.ToString());
         // ...unless a capture run asked for a specific screen, in which case
         // the whole point is to be sitting on it.
         FString CaptureScreen;
@@ -1776,8 +1798,9 @@ void ABreakerCharacter::ShowInitialMenu()
             // and returning here left every autoplay run sitting in it — the
             // harness photographed the void three frames in a row and exited
             // green. The menu's own play path is one TravelTo, so autoplay
-            // now takes exactly that step itself.
-            UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
+            // takes exactly that step itself, to the destination resolved
+            // above.
+            UBreakerGameInstance::TravelTo(this, DestinationMap);
         }
         return;
     }
