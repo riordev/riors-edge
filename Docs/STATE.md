@@ -263,7 +263,7 @@ A tree that is almost entirely notable-shaped has nothing to fill a constellatio
 - GetSupportWardenTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetSwiftFrenzyTree: 46% ranked minor, 46% notable, 8% convergence/keystone
 - GetSwiftKineticTree: 20% ranked minor, 73% notable, 7% convergence/keystone
-- GetSwiftMarksmanTree: 23% ranked minor, 69% notable, 8% convergence/keystone
+- GetSwiftMarksmanTree: 15% ranked minor, 77% notable, 8% convergence/keystone
 - GetTankBastionTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetTankDemolitionistTree: 0% ranked minor, 92% notable, 8% convergence/keystone
 - GetTankLeechTree: 0% ranked minor, 92% notable, 8% convergence/keystone

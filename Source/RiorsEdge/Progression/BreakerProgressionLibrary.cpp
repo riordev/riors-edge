@@ -1993,37 +1993,38 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftMarksmanTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_PierceDiscipline.GetTag());
     Tree->Nodes.Add(Node);
 
-    // LIVE 2026-08-16: the "STILL INERT awaiting a Weapons/ consumer" note
-    // below is settled — the pierce-ignores-armour rule is now CONSUMED by
+    // The pierce-ignores-armour rule is CONSUMED by
     // UBreakerWeaponComponent::ResolvePelletImpacts, which reads this tag and
     // grants full armour penetration to the second and subsequent targets of
-    // a pierced shot (§1.5 M7's rule half, verbatim). The Pierce line is
-    // AUTHORED (O2 PLACEHOLDER): the S5 Sightline ABILITY this node was meant
-    // to grant still does not exist, and an armour rule riding zero
-    // penetrations would be a purchase the player cannot feel — two whole
-    // penetrations is the nearest honest stand-in until the ability lands,
-    // and it comes out again the day the grant goes in.
+    // a pierced shot (§1.5 M7's rule half, verbatim).
+    //
+    // THE +2 PIERCE STAND-IN IS RETIRED (O140). It was authored so an armour
+    // rule never rode zero penetrations while the S5 Sightline ABILITY did
+    // not exist, with its own retirement scheduled "the day the grant goes
+    // in" — the ability landed (O175, Swift.Sightline: the next shot pierces
+    // through its own channel bonus), so keeping the always-on +2 here would
+    // double-pay the same fantasy and quietly out-value the unlockable. The
+    // node is the RULE half alone now, which the ability's pierce feeds.
     Node = MakeNode(TEXT("Swift.Marksman.Sightline"), TEXT("Sightline"),
-        TEXT("Shots pierce two more enemies, and pierced targets after the first take full damage through Armour."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Pierced targets after the first take full damage through Armour."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.PierceDiscipline"));
-    AddEffect(Node, EBreakerNodeStatTarget::Pierce, EBreakerNodeStatBucket::Flat, 2.0f); // O2 PLACEHOLDER (authored count until the S5 ability grant exists)
-    // PHANTOM GRANT FIXED (audit item 3): "Sightline" is not an ability id in
-    // the fallback registry (it collides in NAME ONLY with the unrelated
-    // Core.Precision.Sightline node) and there is no implemented ability it
-    // could resolve to. The grant stays absent rather than invented; the tag
-    // is the real hook, and it now has its consumer.
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Sightline.GetTag());
     Tree->Nodes.Add(Node);
 
+    // THE ABILITY GRANT IS RETIRED (O140). This node granted Swift.Lead from
+    // the era when Lead was a starter and the grant was redundant decoration;
+    // ruling 1 made Lead a quartermaster UNLOCKABLE, which turned the grant
+    // into a free route around the token — two doctrine points buying what
+    // the token economy prices, from a node whose real payload is the
+    // two-target rule. The node keeps that rule (the tag's consumer holds
+    // marks on two targets); a save that bought this node before the
+    // retirement keeps its rank and its rule and buys Lead with a token like
+    // every other Swift. This was also the LAST GrantedAbilityIds writer in
+    // the project — the path's readers-with-no-writers question is already in
+    // DECISIONS' Open list and is the owner's.
     Node = MakeNode(TEXT("Swift.Marksman.Lead"), TEXT("Lead"),
-        TEXT("Grants Lead. Lead may be held on two targets at once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
+        TEXT("Lead may be held on two targets at once."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 3, 1, 2);
     AddPrerequisite(Node, TEXT("Swift.Marksman.MarkEconomy"));
-    // PHANTOM GRANT FIXED (audit item 3): the registry's real id is
-    // "Swift.Lead" (Abilities/BreakerAbilityDefinition.cpp) — the bare "Lead"
-    // this node granted never matched it, so IsAbilityUnlocked("Swift.Lead")
-    // could never see this node's rank at all and buying it could not unlock
-    // the ability it names.
-    Node->GrantedAbilityIds.Add(TEXT("Swift.Lead"));
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Lead.GetTag());
     Tree->Nodes.Add(Node);
 

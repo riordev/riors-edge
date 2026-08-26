@@ -185,10 +185,15 @@ bool FBreakerNoPhantomAbilityGrantsTest::RunTest(const FString& Parameters)
             }
         }
     }
-    // At least one real grant must exist, or this test would pass vacuously
-    // and never actually exercise the check (Swift.Marksman.Lead grants
-    // Swift.Lead).
-    TestTrue(TEXT("At least one ability grant exists to validate"), GrantsChecked >= 1);
+    // THE WRITER POPULATION IS ZERO BY RULING (O140): the last grant —
+    // Swift.Marksman.Lead's — retired when ruling 1 made Lead a token
+    // unlockable and the grant became a free route around the quartermaster.
+    // The check above is therefore vacuous ON PURPOSE, stated rather than
+    // discovered: it stands armed for the next writer, and this count pin is
+    // what makes a new grant announce itself here instead of arriving
+    // unaudited. Whether the readers-with-no-writers path itself survives is
+    // the owner's open question in DECISIONS.
+    TestEqual(TEXT("No node ability-grant exists (O140) — a new writer moves this pin deliberately"), GrantsChecked, 0);
     return true;
 }
 
