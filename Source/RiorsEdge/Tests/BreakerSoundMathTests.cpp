@@ -33,6 +33,7 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("HitConfirm"), BreakerSound::HitDurationSeconds, &BreakerSound::RenderHitConfirm},
         {TEXT("Kill"), BreakerSound::KillDurationSeconds, &BreakerSound::RenderKill},
         {TEXT("TakeHit"), BreakerSound::TakeHitDurationSeconds, &BreakerSound::RenderTakeHit},
+        {TEXT("AbilityCast"), BreakerSound::AbilityCastDurationSeconds, &BreakerSound::RenderAbilityCast},
     };
 
     for (const FCase& Case : Cases)
@@ -111,6 +112,14 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // assets is legal by design (the synth is the floor), but a repo that
     // SHIPS the directory must ship all four files in a format the reader
     // speaks, or the fallback would engage silently over a broken commit.
+    //
+    // FOUR, NOT FIVE, AND ability_cast.wav IS DELIBERATELY ABSENT. The fifth
+    // verb ships on its synth: the owner will author ability audio
+    // "eventually", and the whole point of the default-plus-override shape is
+    // that nothing is silent before then. Listing a file nobody has made would
+    // turn a designed fallback into a red test. When the owner adds
+    // ability_cast.wav, it joins this list; the per-ability overrides never do,
+    // because every one of them is optional by construction.
     {
         const FString AudioDir = FPaths::ProjectContentDir() / TEXT("Breaker/Audio");
         if (IFileManager::Get().DirectoryExists(*AudioDir))

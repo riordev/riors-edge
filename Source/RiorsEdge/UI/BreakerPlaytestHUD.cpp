@@ -2045,6 +2045,16 @@ void ABreakerPlaytestHUD::HandleAbilityActivated(EBreakerAbilitySlot Slot)
         SkimBurstTime = Now;
     }
 
+    // THE FIFTH VERB (ORDERS ruling 2). Played before the null-definition
+    // return below, and with NAME_None when there is no definition: the
+    // activation HAPPENED either way, and an ability that fires silently
+    // because its definition failed to resolve is the worse failure. NAME_None
+    // resolves to the shared default cue.
+    if (ABreakerSoundDirector* Sound = GetSoundDirector())
+    {
+        Sound->PlayAbilityCast(Definition ? Definition->AbilityId : NAME_None);
+    }
+
     if (!Definition) return;
 
     // Which variant this cast actually resolved to. A keystone rewrite is

@@ -32,6 +32,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     HitVoice = MakeVoice(TEXT("HitVoice"));
     KillVoice = MakeVoice(TEXT("KillVoice"));
     TakeHitVoice = MakeVoice(TEXT("TakeHitVoice"));
+    AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
 }
 
 USoundWaveProcedural* ABreakerSoundDirector::MakeWave(int32 SampleRate)
@@ -81,6 +82,13 @@ void ABreakerSoundDirector::BeginPlay()
     const int32 KillRate = LoadOrSynth(TEXT("kill_confirm.wav"), &BreakerSound::RenderKill, KillPcm);
     const int32 TakeHitRate = LoadOrSynth(TEXT("take_hit.wav"), &BreakerSound::RenderTakeHit, TakeHitPcm);
 
+    // The ability DEFAULT loads here with the other four. Per-ability
+    // overrides do NOT: there are twenty-five abilities, the owner has authored
+    // none of them yet, and opening twenty-five files that are expected to be
+    // missing at every level load is a cost paid for nothing. They resolve on
+    // first cast instead.
+    const int32 AbilityRate = LoadOrSynth(TEXT("ability_cast.wav"), &BreakerSound::RenderAbilityCast, AbilityDefaultPcm);
+
     FireWave = MakeWave(FireRate);
     HitWave = MakeWave(HitRate);
     KillWave = MakeWave(KillRate);
@@ -89,6 +97,8 @@ void ABreakerSoundDirector::BeginPlay()
     HitVoice->SetSound(HitWave);
     KillVoice->SetSound(KillWave);
     TakeHitVoice->SetSound(TakeHitWave);
+    AbilityDefaultWave = MakeWave(AbilityRate);
+    AbilityVoice->SetSound(AbilityDefaultWave);
 }
 
 void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm)
@@ -101,6 +111,60 @@ void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural
     Wave->ResetAudio();
     Wave->QueueAudio(reinterpret_cast<const uint8*>(Pcm.GetData()), Pcm.Num() * sizeof(int16));
     Voice->Play();
+}
+
+void ABreakerSoundDirector::PlayAbilityCast(FName AbilityId)
+{
+    // Resolve the override once per id. A key present with a null wave is the
+    // "probed, none authored" sentinel, so an ability with no file costs one
+    // failed open for the whole session rather than one per cast.
+    USoundWaveProcedural* Wave = AbilityDefaultWave;
+    const TArray<int16>* Pcm = &AbilityDefaultPcm;
+
+    if (!AbilityId.IsNone())
+    {
+        if (const TObjectPtr<USoundWaveProcedural>* Found = AbilityWaves.Find(AbilityId))
+        {
+            if (*Found)
+            {
+                Wave = *Found;
+                Pcm = AbilityPcm.Find(AbilityId);
+            }
+        }
+        else
+        {
+            // Not probed yet. The id is the filename: Swift.Skim becomes
+            // ability_Swift.Skim.wav, so the owner names an asset after the
+            // ability and nothing here has to learn about it.
+            const FString FileName = FString::Printf(TEXT("ability_%s.wav"), *AbilityId.ToString());
+            const FString Path = FPaths::ProjectContentDir() / TEXT("Breaker/Audio") / FileName;
+            TArray<uint8> Bytes;
+            BreakerWave::FParsedWave Parsed;
+            if (FFileHelper::LoadFileToArray(Bytes, *Path)) Parsed = BreakerWave::ParseWav(Bytes);
+
+            if (Parsed.IsValid())
+            {
+                TArray<int16>& Stored = AbilityPcm.Add(AbilityId, MoveTemp(Parsed.Samples));
+                USoundWaveProcedural* Override = MakeWave(Parsed.SampleRate);
+                AbilityWaves.Add(AbilityId, Override);
+                UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s: per-ability cue loaded (%d Hz)."),
+                    *FileName, Parsed.SampleRate);
+                Wave = Override;
+                Pcm = &Stored;
+            }
+            else
+            {
+                // Sentinel: probed, nothing authored, use the default forever.
+                AbilityWaves.Add(AbilityId, nullptr);
+            }
+        }
+    }
+
+    // The voice is shared, so the wave has to be re-pointed whenever this cast
+    // resolved to a different clip than the last one did — the four fixed verbs
+    // never need this because each owns its wave for the whole session.
+    if (Wave && AbilityVoice && AbilityVoice->Sound != Wave) AbilityVoice->SetSound(Wave);
+    if (Pcm) Trigger(AbilityVoice, Wave, *Pcm);
 }
 
 void ABreakerSoundDirector::PlayWeaponFire() { Trigger(FireVoice, FireWave, FirePcm); }

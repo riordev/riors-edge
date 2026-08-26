@@ -4,6 +4,26 @@
 #include "GameplayTagContainer.h"
 
 // ---------------------------------------------------------------------------
+// PUBLISHED PATH — owner GLASS, consumers KIT (Abilities/), FIELD (Combat/) — NOT GROUND.
+//
+// A published path has ONE owner and NAMED consumers. GLASS changes the
+// implementation freely; a change to the PUBLIC SURFACE is a DECLARED
+// CROSSING, told to the consumers before it lands. Same rule as a header
+// across a lane boundary, except the consumers are named in advance instead
+// of being discovered by whatever broke.
+//
+// The list above is MEASURED, not remembered, and re-measuring is one command:
+//
+//     grep -rl BreakerEffectMath Source/RiorsEdge
+//
+// minus UI/ (GLASS's own). Tests/ IS NEVER A CONSUMER — every lane writes its
+// own tests, so a test touching this path belongs to whoever wrote it and adds
+// no obligation. Re-measure before relying on this list: a stale one licenses a
+// change that silently breaks a caller nobody listed. The row for the header
+// beside this one was wrong for exactly that reason — measured for one file and
+// transcribed onto the other.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Ability-effect lifetime maths.
 //
 // The effects renderer's whole schedule is here: when a primitive becomes

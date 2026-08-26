@@ -10,9 +10,19 @@ class USoundWaveProcedural;
 // ---------------------------------------------------------------------------
 // The game's combat sounds, and deliberately only four of them.
 //
-// FOUR VERBS (ruled): weapon fire, hit confirm, kill — and taking a hit,
-// which matters more than the other three. No generic PlaySound(AnyWave)
-// surface exists for the roster to grow through without a ruling.
+// FIVE VERBS (ruled): weapon fire, hit confirm, kill, taking a hit — which
+// matters more than the other three — and, since ORDERS ruling 2, the ability
+// cast. There is still no generic PlaySound(AnyWave) surface: the roster grows
+// by a ruling adding a verb, never by a caller passing a wave.
+//
+// THE FIFTH VERB TAKES AN ABILITY ID, and that is the whole of the override
+// mechanism. The owner will author per-ability sounds "eventually", so the cue
+// resolves ability_<id>.wav first and falls back to one shared default — which
+// itself falls back to the synth. Nothing is silent before the assets exist and
+// nothing is re-plumbed when they arrive: the owner drops a file named after an
+// ability and that ability stops sharing the default. NO ASSET FIELD ON THE
+// ABILITY DEFINITION — that asset is another lane's, and a filename convention
+// buys the same result with no cross-lane surface and no save migration.
 //
 // RECORDED SAMPLES FIRST, SYNTH AS FALLBACK (ruled): a gunshot is a crack,
 // a body, a mechanical action and a tail — recorded layers, not
@@ -48,6 +58,11 @@ public:
     void PlayKill();
     // The player took real damage. Immediate — being hit has no flight.
     void PlayTakeHit();
+    // An ability was cast. AbilityId selects a per-ability override if one has
+    // been authored; NAME_None, or an id with no file, plays the shared
+    // default. Resolved on first use per id and cached, so the miss costs one
+    // failed file open per ability per session rather than one per cast.
+    void PlayAbilityCast(FName AbilityId);
 
 protected:
     virtual void BeginPlay() override;
@@ -59,15 +74,25 @@ private:
     UPROPERTY() TObjectPtr<UAudioComponent> HitVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> KillVoice;
     UPROPERTY() TObjectPtr<UAudioComponent> TakeHitVoice;
+    // One voice for every ability: a cast cuts the previous cast, exactly as
+    // the other four verbs cut themselves.
+    UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
+    // Per-ability overrides, resolved lazily. A key present with a NULL value
+    // means "probed, no override authored" — the sentinel is what stops a
+    // missing file being re-opened on every cast.
+    UPROPERTY() TMap<FName, TObjectPtr<USoundWaveProcedural>> AbilityWaves;
 
     TArray<int16> FirePcm;
     TArray<int16> HitPcm;
     TArray<int16> KillPcm;
     TArray<int16> TakeHitPcm;
+    TArray<int16> AbilityDefaultPcm;
+    TMap<FName, TArray<int16>> AbilityPcm;
 
     USoundWaveProcedural* MakeWave(int32 SampleRate);
     // Loads Content/Breaker/Audio/<FileName> into OutPcm and returns its

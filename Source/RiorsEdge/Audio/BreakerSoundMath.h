@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 
 // ---------------------------------------------------------------------------
-// The three placeholder sounds, SYNTHESIZED. Pure, header-inline, no world,
+// The placeholder sounds, SYNTHESIZED. Pure, header-inline, no world,
 // no assets: every sample is a deterministic function of its index, which is
 // what lets the automation suite prove the only things about a sound a test
 // can prove — that it renders the length it claims, that no sample clips,
@@ -29,6 +29,7 @@ namespace BreakerSound
     constexpr float HitDurationSeconds  = 0.06f;   // O2 PLACEHOLDER
     constexpr float KillDurationSeconds = 0.30f;   // O2 PLACEHOLDER
     constexpr float TakeHitDurationSeconds = 0.22f; // O2 PLACEHOLDER
+    constexpr float AbilityCastDurationSeconds = 0.20f; // O2 PLACEHOLDER
 
     inline int32 SampleCount(float DurationSeconds)
     {
@@ -117,8 +118,27 @@ namespace BreakerSound
         return 0.45f * (Body + Grit) / 1.25f * Envelope(T, TakeHitDurationSeconds, 14.0f);
     }
 
+    // ABILITY CAST: the fifth verb, and the only sound in the set that RISES.
+    // Every other verb falls — fire, hit, kill and take-hit all sweep downward
+    // — so DIRECTION alone separates an ability from anything the weapon does,
+    // before pitch or timbre are considered. That matters more than usual
+    // here: this one cue plays for every ability that has no override of its
+    // own, so it has to read as "an ability happened" against four sounds the
+    // player hears constantly.
+    inline float AbilityCastSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        const float Hz = 320.0f + 2600.0f * T;   // rises 320 -> 840 over 200 ms
+        const float Fundamental = FMath::Sin(2.0f * PI * Hz * T);
+        // An octave above at a third the weight: shimmer, so the sweep reads
+        // as charged rather than as a test tone.
+        const float Octave = 0.33f * FMath::Sin(2.0f * PI * Hz * 2.0f * T);
+        return 0.40f * (Fundamental + Octave) / 1.33f * Envelope(T, AbilityCastDurationSeconds, 5.0f);
+    }
+
     inline void RenderWeaponFire(TArray<int16>& Out) { RenderPcm16(Out, FireDurationSeconds, &WeaponFireSample); }
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }
     inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }
+    inline void RenderAbilityCast(TArray<int16>& Out) { RenderPcm16(Out, AbilityCastDurationSeconds, &AbilityCastSample); }
 }
