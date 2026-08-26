@@ -426,6 +426,10 @@ private:
     // Bound to the hub travel point. Teleports only — see the implementation
     // for why travel must never re-run the gym build.
     void HandleHubTravelSelected(FName DestinationId, APawn* RequestingPawn);
+    // The rift door's own handler. Separate from the travel one because a
+    // rift entry carries DATA — which rift — and the travel delegate carries
+    // only an id. Writes PendingRift and travels to the interior.
+    void HandleRiftEntryRequested(const struct FBreakerRiftDefinition& Rift, APawn* RequestingPawn);
 public:
     // Where a session starts. PLAY puts the chosen character here, and the
     // hub's travel point is what reaches the gym from it.

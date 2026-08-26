@@ -6,6 +6,7 @@
 #include "Game/BreakerWorldBasics.h"
 #include "GameFramework/PlayerStart.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Interaction/BreakerRiftDoor.h"
 
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerTargetDummy.h"
@@ -125,6 +126,15 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     if (UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>())
     {
         Session->PendingDestinationId = DestinationId;
+        // ORDINARY TRAVEL CLEARS THE PENDING RIFT, and this line is load
+        // bearing in two places at once. PendingRift is transient travel
+        // state, but nothing used to unset it: once a door had written one,
+        // leaving the interior carried it onward, so travelling back to
+        // Fernhall would raise a deployment briefing naming the rift you had
+        // just walked out of, and the yard would build at that rift's area
+        // level instead of its own. Walking out of a place is not entering it
+        // again.
+        Session->PendingRift = FBreakerRiftDefinition();
     }
     if (DestinationId == ABreakerTravelPoint::HubDestinationId)
     {
@@ -147,6 +157,42 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     // builds it.
     UE_LOG(LogTemp, Warning, TEXT("HandleHubTravelSelected: no map is registered for destination '%s'."),
         *DestinationId.ToString());
+}
+
+void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Rift, APawn* RequestingPawn)
+{
+    if (!RequestingPawn) return;
+    UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+    if (!Session) return;
+
+    // A door with no rift on it is a broken placement, not an empty rift, and
+    // travelling anyway would land the player in an interior built at the dev
+    // fallback area level with a briefing that has no name to print. Refuse
+    // loudly, in the precedent of the zone builder's incomplete marker set.
+    if (!Rift.IsSet())
+    {
+        UE_LOG(LogTemp, Error,
+            TEXT("[Rift] a rift door was entered with no definition on it (AreaLevel 0). Refusing travel."));
+        return;
+    }
+
+    // THE WRITE IS THE WHOLE FEATURE. Every consumer downstream already
+    // exists and has been waiting for something to set this: the deployment
+    // beat gates on PendingRift.IsSet(), the briefing reads the name, line,
+    // tier and derived multipliers off it, and the destination's build takes
+    // its area level from EffectiveAreaLevel(). None of that changes here.
+    Session->PendingRift = Rift;
+    Session->PendingDestinationId = ABreakerTravelPoint::RiftDestinationId;
+
+    // THE INTERIOR IS THE GYM, FOR THIS LANDING ONLY. The generator is not
+    // started and is not what makes this a loop — the gym is a real space
+    // with real spawning that already reads PendingRift for its area level, so
+    // pointing the door at it produces a COMPLETE loop with a placeholder
+    // room. That is worth more than a perfect room with no loop. The way back
+    // is the gym's own travel point, which offers Fernhall.
+    //
+    // When interiors exist this is the one line that moves.
+    UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
 }
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
@@ -294,6 +340,37 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             {
                 Gate->ExcludedDestinationId = ABreakerTravelPoint::FernhallDestinationId;
                 Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
+            }
+
+            // THE RIFT DOOR, standing on the marker the yard was authored
+            // around. marker_rift has been placed and measured since the yard
+            // landed and nothing consumed it; this is what it was for.
+            //
+            // Faces back down the lane toward the player start, so a player
+            // walking the length of the yard arrives looking at its front
+            // rather than its side. Feet on the marker's ground plane, the
+            // same arithmetic the player start uses.
+            const FVector DoorAt = Markers.Rift + FVector(0.0f, 0.0f, 100.0f);
+            if (ABreakerRiftDoor* Door = GetWorld()->SpawnActor<ABreakerRiftDoor>(
+                ABreakerRiftDoor::StaticClass(),
+                FTransform((-YardForward).Rotation(), DoorAt)))
+            {
+                // WHICH RIFT THIS DOOR OPENS. Authored here rather than on the
+                // actor's defaults because the zone owns its own rift: the
+                // name and line are the plate's own (FBreakerRiftDefinition's
+                // Fernhall Substation), so the travel list, the deployment
+                // briefing and the door all speak one name.
+                //
+                // Tier is Campaign, which is what makes entry free (O122) and
+                // respawn unlimited (O82). AreaLevel is O2 PLACEHOLDER — the
+                // first rift the player can reach is an early one, and nothing
+                // has measured what "early" is worth yet.
+                Door->Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
+                Door->Rift.AreaLine = FText::FromString(
+                    TEXT("The tear under the substation, where the yard stops being quiet."));
+                Door->Rift.AreaLevel = 5;   // O2 PLACEHOLDER
+                Door->Rift.Tier = EBreakerRiftTier::Campaign;
+                Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
             }
         }
         bPlaytestTargetsSpawned = true;

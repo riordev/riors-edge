@@ -11,6 +11,7 @@
 const FName ABreakerTravelPoint::GymDestinationId(TEXT("Gym"));
 const FName ABreakerTravelPoint::HubDestinationId(TEXT("Hub"));
 const FName ABreakerTravelPoint::FernhallDestinationId(TEXT("Fernhall"));
+const FName ABreakerTravelPoint::RiftDestinationId(TEXT("Rift.Local"));
 
 ABreakerTravelPoint::ABreakerTravelPoint()
 {
@@ -95,7 +96,13 @@ TArray<FBreakerTravelDestination> ABreakerTravelPoint::GetAvailableDestinations(
         // A travel point never offers the place it stands in. Without this the
         // hub's gate would list "The Anchor" and teleport the player half a
         // metre, which reads as a broken button rather than as a no-op.
-        if (Destination.bEnabled && Destination.Id != ExcludedDestinationId)
+        //
+        // And it never offers a DOOR-ONLY destination. The rift is entered
+        // through the door standing in front of it, so a general gate listing
+        // "Local Rift" would let a player walk into a rift from the Anchor
+        // with no door having authored which rift it is — PendingRift unset,
+        // and the destination silently falling back to the dev area level.
+        if (Destination.bEnabled && !Destination.bDoorOnly && Destination.Id != ExcludedDestinationId)
         {
             Available.Add(Destination);
         }
@@ -107,6 +114,16 @@ bool ABreakerTravelPoint::SelectDestination(FName DestinationId, APawn* Requesti
 {
     FBreakerTravelDestination Destination;
     if (!FindDestination(DestinationId, Destination) || !Destination.bEnabled)
+    {
+        return false;
+    }
+    // A DOOR-ONLY DESTINATION IS REFUSED HERE TOO, not merely hidden. The
+    // filter above keeps it out of the picker, which is what a player sees;
+    // this is what stops the id being ACCEPTED if it ever reaches a general
+    // point another way. Hiding a choice and refusing it are different
+    // guarantees, and only the second one holds when the caller is not the UI.
+    // ABreakerRiftDoor takes the rift id in its override before this runs.
+    if (Destination.bDoorOnly)
     {
         return false;
     }
@@ -162,9 +179,26 @@ const TArray<FBreakerTravelDestination>& ABreakerTravelPoint::GetFallbackRegistr
     Fernhall.Description = TEXT("The overgrown yard outside Fernhall — the First Contract, and the rift.");
     Fernhall.bEnabled = true;
 
+    // THE LOCAL RIFT, and it is DOOR-ONLY (see FBreakerTravelDestination).
+    // O122: a campaign rift is entered FREELY — no key, no cost, no gate — so
+    // this carries no entry condition and the door refuses nothing. The
+    // consumable half arrives with endgame rifts and is not represented here.
+    //
+    // It is in the registry so every id validates against one list, but no
+    // general gate offers it: it is reached by walking to the door in
+    // Fernhall, which is what makes it a place in the world rather than a
+    // menu entry.
+    FBreakerTravelDestination Rift;
+    Rift.Id = ABreakerTravelPoint::RiftDestinationId;
+    Rift.DisplayName = FText::FromString(TEXT("Enter the Rift"));
+    Rift.Description = TEXT("The tear at the far end of the yard. Campaign rift — entered freely, unlimited respawn.");
+    Rift.bEnabled = true;
+    Rift.bDoorOnly = true;
+
     Registry.Add(Gym);
     Registry.Add(Hub);
     Registry.Add(Fernhall);
+    Registry.Add(Rift);
 
     return Registry;
 }

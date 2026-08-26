@@ -27,6 +27,19 @@ struct RIORSEDGE_API FBreakerTravelDestination
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FText DisplayName;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FString Description;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") bool bEnabled = true;
+
+    // DOOR-ONLY. A destination that exists but is offered by ONE actor rather
+    // than by every gate: the rift is entered through the door standing in
+    // Fernhall, not chosen from a list at the Anchor. Distinct from bEnabled,
+    // which answers "is this place real" — a door-only destination IS real, it
+    // just is not somewhere you go from anywhere. The base point filters these
+    // out; the actor that IS the door overrides GetAvailableDestinations and
+    // offers its own.
+    //
+    // It stays in the ONE registry rather than living on the door, so
+    // SelectDestination still validates every id against a single list and a
+    // stale selection still fails closed.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") bool bDoorOnly = false;
 };
 
 // Raised when a player picks a destination through SelectDestination. The
@@ -60,13 +73,20 @@ public:
     // Enabled destinations only, in registry order. The UI iterates this
     // instead of the raw registry so an absent/disabled destination can never
     // render as a choice.
-    UFUNCTION(BlueprintPure, Category="Travel") TArray<FBreakerTravelDestination> GetAvailableDestinations() const;
+    // VIRTUAL, and that is what lets a rift door be a travel point rather than
+    // a second interactable. ABreakerCharacter finds travel points with a
+    // TActorIterator over this class and the menu calls both of these through
+    // a base pointer, so a subclass reaches the F key and the picker with no
+    // change in Characters/ or UI/ — neither of which this lane owns.
+    UFUNCTION(BlueprintPure, Category="Travel")
+    virtual TArray<FBreakerTravelDestination> GetAvailableDestinations() const;
 
     // False for an unknown id or a disabled one — both refused the same way,
     // so a stale UI selection (built before a destination was disabled) fails
     // closed instead of firing travel to nowhere. True means the delegate
     // fired; the requester is responsible for what travel actually does.
-    UFUNCTION(BlueprintCallable, Category="Travel") bool SelectDestination(FName DestinationId, APawn* RequestingPawn);
+    UFUNCTION(BlueprintCallable, Category="Travel")
+    virtual bool SelectDestination(FName DestinationId, APawn* RequestingPawn);
 
     FBreakerTravelRequested OnDestinationSelected;
 
@@ -83,6 +103,9 @@ public:
     static const FName GymDestinationId;
     static const FName HubDestinationId;
     static const FName FernhallDestinationId;
+    // The Local Rift. DOOR-ONLY: it is in the registry so ids validate in one
+    // place, and it is offered by ABreakerRiftDoor alone.
+    static const FName RiftDestinationId;
     // Which destination this point IS, so it does not offer to send the
     // player where they already are. Set by whoever spawns it.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Travel") FName ExcludedDestinationId;

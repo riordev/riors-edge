@@ -22,25 +22,37 @@ bool FBreakerHubTravelRegistryTest::RunTest(const FString& Parameters)
 {
     const TArray<FBreakerTravelDestination>& Registry = ABreakerTravelPoint::GetFallbackRegistry();
 
-    // THREE destinations: the gym, the way back (the Anchor), and the
-    // Fernhall approach — the vertical slice's authored zone. The old "no
-    // third destination without checking the selection UI exists" reason is
-    // discharged: SBreakerMenu::BuildTravelScreen is a real multi-card picker
-    // that iterates GetAvailableDestinations, so any point can offer several
-    // places at once.
+    // THE PIN IS NOW TWO COUNTS, because the registry holds two KINDS of
+    // destination and one number could not tell them apart. Splitting it keeps
+    // the original claim exactly as strong and adds the new one, rather than
+    // loosening a 3 into a 4 and losing what the 3 was asserting.
     //
-    // The count stays pinned exactly rather than loosened to "at least one"
-    // because every entry here is a REACHABILITY claim: a destination in this
-    // registry with no map branch behind it is a card that travels to a
-    // refusal log line. Adding an entry means adding its
-    // HandleHubTravelSelected branch and its map-identity exclusion, and this
-    // pin is what makes forgetting that a red instead of a shrug.
-    int32 EnabledCount = 0;
+    // GENERAL destinations — three: the gym, the way back (the Anchor), and
+    // the Fernhall approach. The old "no third destination without checking
+    // the selection UI exists" reason is discharged: SBreakerMenu's travel
+    // screen is a real multi-card picker over GetAvailableDestinations.
+    //
+    // DOOR-ONLY destinations — one: the Local Rift, offered by
+    // ABreakerRiftDoor alone and by no general gate.
+    //
+    // Both counts stay pinned exactly rather than loosened to "at least one"
+    // because every entry here is a REACHABILITY claim: a destination with no
+    // dispatch behind it is a card that travels to a refusal log line. THE TWO
+    // KINDS ARE DISPATCHED DIFFERENTLY and that is why they are counted apart
+    // — a general destination is an id, routed by HandleHubTravelSelected to a
+    // map; a door-only destination carries DATA (which rift), so it is routed
+    // by the door's own OnRiftEntryRequested, which writes PendingRift before
+    // travelling. Adding either kind means adding its dispatch, and these pins
+    // are what make forgetting that a red instead of a shrug.
+    int32 GeneralCount = 0;
+    int32 DoorOnlyCount = 0;
     for (const FBreakerTravelDestination& Destination : Registry)
     {
-        if (Destination.bEnabled) ++EnabledCount;
+        if (!Destination.bEnabled) continue;
+        if (Destination.bDoorOnly) ++DoorOnlyCount; else ++GeneralCount;
     }
-    TestEqual(TEXT("Exactly three destinations are enabled: the gym, the way back, and Fernhall"), EnabledCount, 3);
+    TestEqual(TEXT("Exactly three general destinations: the gym, the way back, and Fernhall"), GeneralCount, 3);
+    TestEqual(TEXT("Exactly one door-only destination: the Local Rift"), DoorOnlyCount, 1);
 
     // A travel point never offers the place it stands in, which is what keeps
     // each point at exactly one option and therefore inside the no-picker-yet
