@@ -150,17 +150,8 @@ float UBreakerCharacterMovementComponent::LandingSpeedScale(float ImpactSpeed, f
 
 FVector UBreakerCharacterMovementComponent::NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const
 {
-    // Wall riding is exempt on purpose. It already runs its own reduced
-    // GravityScale, it is capped at WallRideMaxDuration, and it is specified as
-    // short and SPEED-NEUTRAL; letting the fall multiplier through would both
-    // change its arc and let it end faster than its own duration cap intends.
-    if (bWallRiding)
-    {
-        return Super::NewFallVelocity(InitialVelocity, Gravity, DeltaTime);
-    }
-
-    // The project uses standard downward gravity everywhere (wall ride, dash
-    // and slide all reason in world Z), so the phase is read off Z directly.
+    // The project uses standard downward gravity everywhere (dash and slide
+    // both reason in world Z), so the phase is read off Z directly.
     const float Multiplier = ComputeGravityMultiplier(InitialVelocity.Z, ApexBandSpeed, ApexGravityMultiplier, FallGravityMultiplier);
     FVector Result = Super::NewFallVelocity(InitialVelocity, Gravity * Multiplier, DeltaTime);
     Result.Z = ClampFallSpeed(Result.Z, MaxFallSpeed);
@@ -599,68 +590,6 @@ bool UBreakerCharacterMovementComponent::IsDashCooldownSuspended() const
     return DashCooldownSuspensions.Num() > 0;
 }
 
-void UBreakerCharacterMovementComponent::PushWallRideTimerSuspension(FName Key, float Duration)
-{
-    if (Key.IsNone())
-    {
-        return;
-    }
-    FSuspensionEntry Entry;
-    const UWorld* World = GetWorld();
-    Entry.ExpiryTime = (Duration > 0.0f && World) ? World->GetTimeSeconds() + Duration : -1.0;
-    WallRideTimerSuspensions.Add(Key, Entry);
-}
-
-void UBreakerCharacterMovementComponent::PopWallRideTimerSuspension(FName Key)
-{
-    WallRideTimerSuspensions.Remove(Key);
-}
-
-void UBreakerCharacterMovementComponent::PruneWallRideTimerSuspensions() const
-{
-    const UWorld* World = GetWorld();
-    if (!World || WallRideTimerSuspensions.Num() == 0)
-    {
-        return;
-    }
-    const double Now = World->GetTimeSeconds();
-    for (auto It = WallRideTimerSuspensions.CreateIterator(); It; ++It)
-    {
-        if (!IsSuspensionActive(It.Value().ExpiryTime, Now))
-        {
-            It.RemoveCurrent();
-        }
-    }
-}
-
-bool UBreakerCharacterMovementComponent::IsWallRideTimerSuspended() const
-{
-    PruneWallRideTimerSuspensions();
-    return WallRideTimerSuspensions.Num() > 0;
-}
-
-bool UBreakerCharacterMovementComponent::CanBeginWallRide(
-    bool bAlreadyWallRiding,
-    bool bFalling,
-    bool bSlidingNow,
-    float HorizontalSpeed,
-    float MinimumSpeed,
-    bool bHasMovementInput,
-    float SecondsSinceLastWallRide,
-    float Cooldown)
-{
-    if (bAlreadyWallRiding || !bFalling || bSlidingNow || !bHasMovementInput)
-    {
-        return false;
-    }
-    if (SecondsSinceLastWallRide < Cooldown)
-    {
-        return false;
-    }
-    // Strictly-greater on the threshold would make an exactly-at-cap approach a
-    // coin flip against float rounding, which is half of how this verb died.
-    return HorizontalSpeed >= MinimumSpeed;
-}
 
 float UBreakerCharacterMovementComponent::GetSpeedMultiplier() const
 {
@@ -831,44 +760,6 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
         }
     }
 
-    FHitResult RunnableWall;
-    const float SecondsSinceLastWallRide = GetWorld()
-        ? static_cast<float>(GetWorld()->GetTimeSeconds() - LastWallRideEndTime)
-        : 0.0f;
-    if (GetWorld()
-        && CanBeginWallRide(bWallRiding, IsFalling(), bSliding, Velocity.Size2D(), WallRideMinimumSpeed,
-            Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER, SecondsSinceLastWallRide, WallRideCooldown)
-        && FindRunnableWall(RunnableWall))
-    {
-        BeginWallRide(RunnableWall);
-    }
-
-    if (bWallRiding)
-    {
-        WallRideElapsed += DeltaTime;
-        // Terminal Velocity removes only the DURATION timer (Class-Kits.md:192).
-        // Everything else that can end a ride — leaving the ground, losing the
-        // wall — is untouched, so the elapsed clock keeps running (for
-        // whatever reads it later) but its expiry check alone is suspended.
-        if (IsMovingOnGround() || (!IsWallRideTimerSuspended() && WallRideElapsed >= WallRideMaxDuration) || !FindRunnableWall(RunnableWall))
-        {
-            EndWallRide();
-        }
-        else
-        {
-            WallRideNormal = RunnableWall.ImpactNormal.GetSafeNormal();
-            const float HorizontalSpeed = Velocity.Size2D();
-            FVector AlongWall = FVector::VectorPlaneProject(Velocity, WallRideNormal);
-            AlongWall.Z = Velocity.Z;
-            const FVector HorizontalAlongWall = AlongWall.GetSafeNormal2D() * HorizontalSpeed;
-            Velocity.X = HorizontalAlongWall.X;
-            Velocity.Y = HorizontalAlongWall.Y;
-            // A small contact bias prevents collision resolution from
-            // bouncing the player away; it is not a speed boost.
-            Velocity -= WallRideNormal * 35.0f;
-        }
-    }
-
     const float SpeedBeforeMovement = Velocity.Size2D();
     const FVector DirectionBeforeMovement = Velocity.GetSafeNormal2D();
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -937,7 +828,7 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
 
 void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
 {
-    if (!IsFalling() || bWallRiding)
+    if (!IsFalling())
     {
         return;
     }
@@ -963,94 +854,6 @@ void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
     Velocity.Y = SteeredDirection.Y * HorizontalSpeed;
 }
 
-bool UBreakerCharacterMovementComponent::FindRunnableWall(FHitResult& OutHit) const
-{
-    if (!CharacterOwner || !GetWorld())
-    {
-        return false;
-    }
-
-    const FVector Start = CharacterOwner->GetActorLocation();
-    const FVector Right = CharacterOwner->GetActorRightVector();
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerWallRide), false, CharacterOwner);
-    FHitResult LeftHit;
-    FHitResult RightHit;
-    const bool bLeft = GetWorld()->LineTraceSingleByChannel(LeftHit, Start, Start - Right * WallRideTraceDistance, ECC_Visibility, Params);
-    const bool bRight = GetWorld()->LineTraceSingleByChannel(RightHit, Start, Start + Right * WallRideTraceDistance, ECC_Visibility, Params);
-
-    auto IsRunnable = [](const FHitResult& Hit)
-    {
-        return Hit.bBlockingHit && FMath::Abs(Hit.ImpactNormal.Z) <= 0.25f;
-    };
-
-    const bool bValidLeft = bLeft && IsRunnable(LeftHit);
-    const bool bValidRight = bRight && IsRunnable(RightHit);
-    if (!bValidLeft && !bValidRight)
-    {
-        return false;
-    }
-
-    OutHit = bValidLeft && bValidRight
-        ? (LeftHit.Distance <= RightHit.Distance ? LeftHit : RightHit)
-        : (bValidLeft ? LeftHit : RightHit);
-    return true;
-}
-
-void UBreakerCharacterMovementComponent::BeginWallRide(const FHitResult& WallHit)
-{
-    bWallRiding = true;
-    // The wall owns the vertical arc while it lasts.
-    bJumpCutArmed = false;
-    WallRideElapsed = 0.0f;
-    WallRideNormal = WallHit.ImpactNormal.GetSafeNormal();
-    SavedGravityScale = GravityScale;
-    GravityScale = WallRideGravityScale;
-    Velocity.Z = FMath::Max(Velocity.Z, -250.0f);
-    OnWallRideStateChanged.Broadcast(true);
-}
-
-void UBreakerCharacterMovementComponent::EndWallRide()
-{
-    if (!bWallRiding)
-    {
-        return;
-    }
-
-    bWallRiding = false;
-    GravityScale = SavedGravityScale;
-    WallRideElapsed = 0.0f;
-    LastWallRideEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-    OnWallRideStateChanged.Broadcast(false);
-}
-
-bool UBreakerCharacterMovementComponent::TryWallJump()
-{
-    if (!bWallRiding)
-    {
-        return false;
-    }
-
-    FVector AlongWall = FVector::VectorPlaneProject(Velocity, WallRideNormal);
-    AlongWall.Z = 0.0f;
-    // Its own floor, not the entry gate's: the two used to share a value, so
-    // lowering the entry gate would have quietly weakened every wall jump.
-    const float PreservedSpeed = FMath::Max(AlongWall.Size2D(), WallRideJumpMinimumSpeed);
-    Velocity = AlongWall.GetSafeNormal2D() * PreservedSpeed
-        + WallRideNormal * WallRideJumpAwaySpeed
-        + FVector::UpVector * WallRideJumpUpSpeed;
-    // Wall jump and the O25 second jump share one key and used to compete for
-    // the same budget: by the time a player reached a wall both jumps were
-    // usually spent, so the wall jump threw them off the wall with no way to
-    // correct. Clamping (never clearing) the count hands back exactly one air
-    // jump, so a wall jump chains instead of stranding, and the baseline is
-    // still two.
-    if (bWallJumpRefreshesAirJump && CharacterOwner)
-    {
-        CharacterOwner->JumpCurrentCount = FMath::Min(CharacterOwner->JumpCurrentCount, FMath::Max(CharacterOwner->JumpMaxCount - 1, 0));
-    }
-    EndWallRide();
-    return true;
-}
 
 bool UBreakerCharacterMovementComponent::IsMantleableWallNormal(float ImpactNormalZ)
 {

@@ -47,7 +47,6 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const;
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const;
-    UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRiding() const;
     UFUNCTION(BlueprintPure, Category="Movement") bool IsMantling() const { return bMantling; }
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const;
     UFUNCTION(BlueprintPure, Category="Movement") UBreakerCharacterMovementComponent* GetBreakerMovement() const;

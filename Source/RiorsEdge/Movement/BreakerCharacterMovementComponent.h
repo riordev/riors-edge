@@ -5,7 +5,6 @@
 #include "Progression/BreakerProgressionTypes.h"
 #include "BreakerCharacterMovementComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FWallRideStateChanged, bool, bNowWallRiding);
 // Broadcast when the character arrives on the ground faster than
 // LandingHeavyFallSpeed. Presentation only (camera dip, dust, audio) — the
 // weight itself is applied in C++ before this fires.
@@ -88,13 +87,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Movement") void PushDashCooldownSuspension(FName Key, float Duration);
     UFUNCTION(BlueprintCallable, Category="Movement") void PopDashCooldownSuspension(FName Key);
     UFUNCTION(BlueprintPure, Category="Movement") bool IsDashCooldownSuspended() const;
-    UFUNCTION(BlueprintCallable, Category="Movement") void PushWallRideTimerSuspension(FName Key, float Duration);
-    UFUNCTION(BlueprintCallable, Category="Movement") void PopWallRideTimerSuspension(FName Key);
-    UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRideTimerSuspended() const;
     UFUNCTION(BlueprintCallable, Category="Movement") bool BeginSlide();
     UFUNCTION(BlueprintCallable, Category="Movement") void PrepareSlideJump();
     UFUNCTION(BlueprintCallable, Category="Movement") void EndSlide();
-    UFUNCTION(BlueprintCallable, Category="Movement") bool TryWallJump();
 
     // ---- Ledge traversal: vault and mantle (Part One-R) -------------------
     // The verbs live HERE now. The pawn's TryMantle carried 48 fused lines of
@@ -128,8 +123,6 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const { return bWantsToSprint; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const { return bSliding; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequested() const { return bSlideRequested; }
-    UFUNCTION(BlueprintPure, Category="Movement") bool IsWallRiding() const { return bWallRiding; }
-    UFUNCTION(BlueprintPure, Category="Movement") FVector GetWallRideNormal() const { return WallRideNormal; }
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const { return Velocity.Size2D(); }
     // World time of the last consumed dash charge; class loops watch it to
     // credit a dash exactly once.
@@ -315,38 +308,12 @@ public:
     // stride; the duration gap is what makes the two verbs read differently.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0.05")) float VaultDurationSeconds = 0.12f;     // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMaxDuration = 0.85f;   // O2 PLACEHOLDER
-    // BUG FIX (owner: "wall riding doesnt work"). This gate is read AFTER the
-    // engine has already deflected the approach velocity along the wall, so it
-    // must be sized for the along-wall speed that SURVIVES contact, not for the
-    // approach speed. At the old 700 it sat exactly ON WalkSpeed — the hard
-    // airborne horizontal ceiling when the sprint toggle is off — so a
-    // non-sprinting player could never pass it at all, and a sprinting player
-    // lost it as soon as the approach angle exceeded ~50 degrees
-    // (1100 * cos 50 = 707). 450 restores the invariant every other gate in
-    // this component already follows: an entry threshold sits strictly BELOW
-    // the speed it gates (slide enters at 550, under the 700 walk speed).
-    // Covered by RiorsEdge.Movement.WallRideEntry.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideMinimumSpeed = 450.0f; // OLD: 700.0f (== WalkSpeed, unreachable) — O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideGravityScale = 0.55f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideTraceDistance = 85.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpAwaySpeed = 650.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpUpSpeed = 650.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideCooldown = 0.3f;   // O2 PLACEHOLDER
-    // The wall jump keeps its own exit floor. It used to borrow
-    // WallRideMinimumSpeed, so lowering the entry gate above would silently
-    // have made every wall jump weaker — two different jobs, two values.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride", meta=(ClampMin="0")) float WallRideJumpMinimumSpeed = 700.0f;   // O2 PLACEHOLDER
-    // FEEL, not a bug fix. Two jumps are base kit (O25) and are spent by the
-    // time most players reach a wall, so a wall jump used to launch you with
-    // nothing left and no way to correct — which is most of what "awkward"
-    // describes. A wall jump now hands back one air jump (never more than the
-    // O25 baseline: the count is clamped, not cleared), so wall-to-wall
-    // traversal is a chain instead of a dead end. False restores the old
-    // behaviour exactly.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wall Ride") bool bWallJumpRefreshesAirJump = true;
-
-    UPROPERTY(BlueprintAssignable, Category="Movement|Wall Ride") FWallRideStateChanged OnWallRideStateChanged;
+    // Wall ride and wall jump RETIRED (Part One-R, owner ruling): the owner
+    // asked for vault and mantle instead, wall-jump's whole parameter family
+    // was the ride's, and the grammar the levels validate against never
+    // assumed either. The serialized things they touched stay by their own
+    // rules: EBreakerBuildCondition::WallRiding retires in place
+    // (Progression/), and the owner's WallRideDamage affix lines are his.
     UPROPERTY(BlueprintAssignable, Category="Movement|Weight") FBreakerLandingImpact OnLandingImpact;
     UPROPERTY(BlueprintAssignable, Category="Movement|Dash") FBreakerDashStarted OnDashStarted;
 
@@ -360,7 +327,7 @@ public:
     // Multiplicative composition of the active temporary multipliers.
     static float ComposeSpeedMultipliers(const TArray<float>& Multipliers);
     // The expiry rule shared by both keystone suspension chains, factored out
-    // as a pure predicate for exactly the reason CanBeginWallRide and the
+    // as a pure predicate for exactly the reason the ledge predicates and the
     // weight curve below are pure: PushSpeedMultiplier's own expiry has no
     // world-free test anywhere in this suite (NewObject() has no World, so a
     // Duration > 0 push there never actually reaches its ExpiryTime branch),
@@ -389,23 +356,6 @@ public:
     // exactly. Alpha 0 is a no-op, 1 is a full redirect. A zero or vertical
     // direction leaves the velocity alone.
     static FVector BlendHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float Alpha);
-
-    // Every non-spatial half of the wall-ride entry decision, lifted out of
-    // TickComponent so it can be tested without a world. Only the wall trace
-    // itself stays in the component. This verb broke silently once; the rule
-    // now has a name and a regression test (RiorsEdge.Movement.WallRideEntry).
-    // HorizontalSpeed is the speed the entry frame actually observes, which —
-    // once the capsule has touched the wall — is the ALONG-WALL component the
-    // engine's falling deflection leaves behind, not the approach speed.
-    static bool CanBeginWallRide(
-        bool bAlreadyWallRiding,
-        bool bFalling,
-        bool bSlidingNow,
-        float HorizontalSpeed,
-        float MinimumSpeed,
-        bool bHasMovementInput,
-        float SecondsSinceLastWallRide,
-        float Cooldown);
 
     // --- Weight rules, pure maths so they can be tested without a world ---
     // Gravity multiplier as a continuous function of vertical velocity:
@@ -446,9 +396,7 @@ private:
         double ExpiryTime = -1.0;
     };
     mutable TMap<FName, FSuspensionEntry> DashCooldownSuspensions;
-    mutable TMap<FName, FSuspensionEntry> WallRideTimerSuspensions;
     void PruneDashCooldownSuspensions() const;
-    void PruneWallRideTimerSuspensions() const;
 
     // The composed attribute set is the source of truth for the four movement
     // stats above. Equipment and progression are still resolved, but only as
@@ -495,18 +443,9 @@ private:
     float SlideElapsed = 0.0f;
     float SlideEntryBoostRemaining = 0.0f;
     // True between a real jump impulse and the moment the cut is spent (or the
-    // jump ends). Only DoJump arms it, which is what keeps the wall jump, the
-    // slide jump and the dash's vertical floor — none of which run through the
-    // jump state machine — from being cut by a stray key release.
+    // jump ends). Only DoJump arms it, which is what keeps the slide jump
+    // and the dash's vertical floor — neither of which runs through the jump
+    // state machine — from being cut by a stray key release.
     bool bJumpCutArmed = false;
-    bool bWallRiding = false;
-    FVector WallRideNormal = FVector::ZeroVector;
-    float WallRideElapsed = 0.0f;
-    float SavedGravityScale = 1.0f;
-    double LastWallRideEndTime = -1000.0;
-
-    bool FindRunnableWall(FHitResult& OutHit) const;
     void ApplyAirSteering(float DeltaTime);
-    void BeginWallRide(const FHitResult& WallHit);
-    void EndWallRide();
 };

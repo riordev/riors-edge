@@ -13,7 +13,7 @@ bool FBreakerKeystoneOverrideSuspensionTest::RunTest(const FString& Parameters)
     // Terminal Velocity (Class-Kits.md:192): both chains are booleans, keyed
     // and duration-expiring, modeled on PushSpeedMultiplier's own trio. This
     // test covers push/pop/independence for both the dash-cooldown chain and
-    // the wall-ride-timer chain.
+    // the (since-retired) wall-ride-timer chain.
     UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
 
     // --- Dash cooldown suspension ------------------------------------------
@@ -43,23 +43,8 @@ bool FBreakerKeystoneOverrideSuspensionTest::RunTest(const FString& Parameters)
     Movement->PopDashCooldownSuspension(TEXT("Never.Pushed"));
     TestFalse(TEXT("Popping an absent key is a no-op"), Movement->IsDashCooldownSuspended());
 
-    // --- Wall ride timer suspension: identical shape, independent chain ----
-    TestFalse(TEXT("Wall ride timer starts unsuspended"), Movement->IsWallRideTimerSuspended());
-
-    Movement->PushWallRideTimerSuspension(TEXT("Keystone.Swift.TerminalVelocity"), 8.0f);
-    TestTrue(TEXT("A pushed wall-ride suspension reads active"), Movement->IsWallRideTimerSuspended());
-    TestFalse(TEXT("The dash chain is untouched by pushing the wall-ride chain"), Movement->IsDashCooldownSuspended());
-
-    Movement->PopWallRideTimerSuspension(TEXT("Keystone.Swift.TerminalVelocity"));
-    TestFalse(TEXT("Popping the only wall-ride key clears it"), Movement->IsWallRideTimerSuspended());
-
-    Movement->PushWallRideTimerSuspension(TEXT("A"), 8.0f);
-    Movement->PushWallRideTimerSuspension(TEXT("B"), 8.0f);
-    Movement->PopWallRideTimerSuspension(TEXT("A"));
-    TestTrue(TEXT("Popping one of two independent wall-ride keys leaves the other active"), Movement->IsWallRideTimerSuspended());
-    Movement->PopWallRideTimerSuspension(TEXT("B"));
-    TestFalse(TEXT("Popping the second wall-ride key clears it"), Movement->IsWallRideTimerSuspended());
-
+    // The wall-ride suspension chain retired with its verb (Part One-R);
+    // the dash chain above is the suspension shape's surviving regression.
     return true;
 }
 

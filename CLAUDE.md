@@ -2,6 +2,27 @@
 
 ## Current work
 
+KIT LANE, WALL-RIDE IS OUT (Part One-R's removal window, LEDGER one
+rebase behind by agreement). The ride's ~48-line state machine, its
+nine parameters, the suspension chain, FindRunnableWall, and
+wall-jump — whose parameter family was the ride's and which One-R
+never named as incoming — are gone from Movement/; the jump key's
+chain is now slide-jump, ledge traversal (vault or mantle), air
+jump. Momentum loses its wall-ride generation source and decay
+block; Overdrive's Terminal Velocity keeps its dash half with the
+lost wall-ride half RECORDED at the site (K12's node text is
+LEDGER's to reword). The agreed one-line evaluator retirement in
+Progression/BreakerBuildConditions.cpp rides in this commit with
+LEDGER's name on it; their same-window half (IsSelfEvaluable +
+census ceiling 4->5 + Traction/Grind) lands one rebase behind —
+until it does, main is green but the census claims WallRiding is
+still evaluable, which their half corrects. UNTOUCHED BY RULE: the
+owner's two WallRideDamage affix lines and the WallRideDamage stat
+target (his file); GROUND's gym wall-ride corridor is now dead
+scenery, theirs to prune; the Warden's comment citing the retired
+CanBeginWallRide as pattern precedent is FIELD's file, noted not
+edited. Movement/ retains a retirement note where the verbs lived.
+
 KIT LANE, THE VERBS' FIRST HALF: THE MANTLE MOVES HOME AND THE VAULT
 IS BORN (One-R's ruling-safe half; the wall-ride REMOVAL is next
 cycle, LEDGER one rebase behind by agreed protocol, notice sent with

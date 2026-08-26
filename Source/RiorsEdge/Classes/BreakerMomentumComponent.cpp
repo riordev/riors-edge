@@ -551,12 +551,9 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     const float Speed = Movement->GetHorizontalSpeed();
     const bool bAirborne = Movement->IsFalling();
     const bool bSliding = Movement->IsSliding();
-    const bool bWallRiding = Movement->IsWallRiding();
 
     if (bAirborne) AirborneCreditRemaining = FMath::Max(0.0f, AirborneCreditRemaining - DeltaTime);
     else AirborneCreditRemaining = AirborneCreditSeconds;
-    if (bWallRiding) WallRideCreditRemaining = FMath::Max(0.0f, WallRideCreditRemaining - DeltaTime);
-    else WallRideCreditRemaining = WallRideCreditSeconds;
 
     // K9 Momentum Shield rides the loop tick because this is the one place
     // that knows both the band and the posture. CachedState is last tick's
@@ -593,7 +590,6 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     }
     if (bAirborne && AirborneCreditRemaining > 0.0f) Rate += AirborneRate;
     if (bSliding && Speed >= GroundThresholdSpeed) Rate += SlideRate;
-    if (bWallRiding && WallRideCreditRemaining > 0.0f) Rate += WallRideRate;
 
     // An active loop override (Overdrive) multiplies both the generated rate
     // and the per-second cap, so doubling generation is not silently eaten by
@@ -626,7 +622,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
-    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bWallRiding || Speed >= GroundThresholdSpeed;
+    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || Speed >= GroundThresholdSpeed;
     if (bDecayBlocked)
     {
         SettledElapsed = 0.0f;

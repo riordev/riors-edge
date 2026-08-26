@@ -220,7 +220,11 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
         const bool bFalling = Movement->IsFalling();
         State.Set(EBreakerBuildCondition::Airborne, bFalling);
         State.Set(EBreakerBuildCondition::Sliding, Movement->IsSliding());
-        State.Set(EBreakerBuildCondition::WallRiding, Movement->IsWallRiding());
+        // WallRiding retired with the verb (Part One-R): the enumerator stays
+        // by the append-only rule and joins the never-evaluable set — see
+        // IsSelfEvaluable. Nothing may re-author against it. (Line carried in
+        // KIT's removal commit by agreement with LEDGER; their same-window
+        // half owns IsSelfEvaluable and the census ceiling.)
         // Grounded is not merely !Airborne as a matter of taste: it is written
         // as the negation of the SAME read, in the same frame, so the two can
         // never both be false (or both true) because two accessors disagreed.

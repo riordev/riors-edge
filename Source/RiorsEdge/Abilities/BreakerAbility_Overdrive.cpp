@@ -194,10 +194,13 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
     }
     else if (Variant.KeystoneTag == BreakerAbilityTags::Keystone_Swift_TerminalVelocity)
     {
-        // Class-Kits K12: unlimited dash charges and no wall-ride timer for the
-        // duration. An availability rewrite, never a speed rewrite — Master 5.4
-        // still forbids self-acceleration and wall rides still generate no
-        // speed, which is why this variant's SpeedMultiplier is 1.0.
+        // Class-Kits K12: unlimited dash charges — an availability rewrite,
+        // never a speed rewrite (Master 5.4), which is why this variant's
+        // SpeedMultiplier is 1.0. THE OTHER HALF IS GONE WITH ITS VERB: K12's
+        // "no wall-ride timer" suspended a timer wall-ride owned, and Part
+        // One-R retired wall-ride entirely, so the keystone is the dash half
+        // alone until a ruling re-sites the lost half (recorded in
+        // Docs/reports/KIT.md; the node text is LEDGER's to reword).
         //
         // "Unlimited dash charges" is expressed as a SUSPENDED COOLDOWN rather
         // than a charge pool, because O40(a) rules the single-directional-dash-
@@ -209,7 +212,6 @@ void UBreakerAbility_Overdrive::ActivateAbility(const FGameplayAbilitySpecHandle
         if (UBreakerCharacterMovementComponent* Movement = Character->GetBreakerMovement())
         {
             Movement->PushDashCooldownSuspension(WindowKey(), Duration);
-            Movement->PushWallRideTimerSuspension(WindowKey(), Duration);
         }
     }
     else if (Variant.KeystoneTag == BreakerAbilityTags::Keystone_Swift_StandingWave)

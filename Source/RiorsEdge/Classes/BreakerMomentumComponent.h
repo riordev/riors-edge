@@ -161,9 +161,8 @@ public:
     // aimed disabled their own resource, on a permanent class, and the most
     // natural way to play the projectile class is down the sights.
     //
-    // THIS EXACT BUG IS ALREADY FIXED ONCE, THREE FILES AWAY:
-    // BreakerCharacterMovementComponent's WallRideMinimumSpeed carries the note
-    // "OLD: 700.0f (== WalkSpeed, unreachable)" and was lowered to 450. Same
+    // THIS EXACT BUG WAS ALREADY FIXED ONCE, THREE FILES AWAY: the retired
+    // wall-ride's entry gate shipped at exactly WalkSpeed, unreachable. Same
     // shape, same file family, caught once and missed here.
     //
     // 450 is that same gate, so the three movement floors now agree — wall ride
@@ -186,8 +185,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float AirborneRate = 8.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float AirborneCreditSeconds = 3.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float SlideRate = 12.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float WallRideRate = 10.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float WallRideCreditSeconds = 0.85f;   // O2 PLACEHOLDER
+    // The wall-ride generation source retired with the verb (Part One-R).
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DashGrant = 10.0f;   // O2 PLACEHOLDER
     // Floor only: the real internal cooldown is the movement component's dash
     // cooldown, so refunded charges cannot be farmed.
@@ -280,7 +278,6 @@ private:
     FVector LastLocation = FVector::ZeroVector;
     bool bHasLastLocation = false;
     float AirborneCreditRemaining = 0.0f;
-    float WallRideCreditRemaining = 0.0f;
     float SettledElapsed = 0.0f;
     float PendingGrants = 0.0f;
     double LastDashGrantTime = -1000.0;

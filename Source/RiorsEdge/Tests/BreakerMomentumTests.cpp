@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 // THE GENERATION THRESHOLD IS REACHABLE WHILE AIMING (O92)
 // ---------------------------------------------------------------------------
-// Written in the shape of RiorsEdge.Movement.WallRideEntry, which exists
+// Written in the shape of the retired RiorsEdge.Movement.WallRideEntry, which exists
 // because the wall-ride gate shipped set to exactly WalkSpeed and could not be
 // satisfied. This is the same bug in the same file family: the momentum gate
 // sat at 750 against a 700 walk speed, and aiming multiplies move speed by 0.45

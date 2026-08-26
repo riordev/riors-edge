@@ -760,12 +760,6 @@ bool ABreakerCharacter::IsSliding() const
     return Movement && Movement->IsSliding();
 }
 
-bool ABreakerCharacter::IsWallRiding() const
-{
-    const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
-    return Movement && Movement->IsWallRiding();
-}
-
 void ABreakerCharacter::StartSprint()
 {
     if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement()) Movement->SetSprinting(!Movement->IsSprinting());
@@ -775,11 +769,11 @@ void ABreakerCharacter::HandleDashInput() { TryDash(); }
 
 void ABreakerCharacter::HandleJumpInput()
 {
+    // Wall-jump retired with the ride (Part One-R): the jump key's chain is
+    // now slide-jump, then the ledge (vault or mantle), then the air jump —
+    // the traversal verb no longer waits behind a verb that gated on a state
+    // nobody could reach.
     UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
-    if (Movement && Movement->TryWallJump())
-    {
-        return;
-    }
     if (Movement && Movement->IsSliding())
     {
         Movement->PrepareSlideJump();
