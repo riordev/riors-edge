@@ -1020,12 +1020,14 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
             // still composes it right here, which is what keeps the
             // "potential" display an upper bound rather than a blind spot.
             //
-            // The MorePercent case is skipped under ANY state: target-side
-            // lines are Increased-bucket only (vocabulary §3.3 — a
-            // target-conditional More would re-run the strongest-three
-            // selection per event per target), and letting All() compose one
-            // would make the tooltip promise a More the pipeline refuses to
-            // pay. The loud drop lives in BuildTargetConditionRiders.
+            // The MorePercent case is skipped under ANY state — including
+            // All() — because since O141 the rider path pays it AT HIT TIME
+            // (headroom under the one ceiling, never a slot): composing it
+            // here too would double-pay it, it must never enter the
+            // strongest-three sort below, and All()'s tooltip hypothetical
+            // must not promise the UNCLAMPED value a saturated build will
+            // never receive. The one legal shape and the loud drop for every
+            // other live in BuildTargetConditionRiders.
             if (Effect.RequiresTargetState())
             {
                 if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent) continue;
@@ -1394,31 +1396,33 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
             const bool bTagKeyed = BreakerStatTargetIsRiderDelivered(Effect.StatTarget);
             if (!Effect.RequiresTargetState() && !bTagKeyed) continue;
 
-            // Target-side lines are Increased-bucket only, and Damage is the
-            // one stat target with a rider consumer today. Everything else is
+            // Target-side lines are Increased-bucket damage-pool lines — plus
+            // ONE ruled exception (O141): a target-gated MorePercent on a
+            // delivered damage pool rides this table as a HIT-TIME More, paid
+            // at the combat site by multiplying the request's standing More
+            // product under the one O34 ceiling. The old §3.3 objection —
+            // that a target-gated More would re-run the strongest-three
+            // selection per event — was answered by LEDGER's report: it never
+            // enters the sort at all; it spends headroom, exactly as the
+            // outgoing window chain already does. Everything ELSE is still
             // dropped LOUDLY, once per node — the dead-lane rule (§2.7):
-            //  * MorePercent is unsupported BY RULE (§3.3): it would need the
-            //    strongest-three More selection re-run per event per target,
-            //    which is expensive and unexplainable to a player. Same
-            //    warn-and-drop the aggregator gives every other unpaid More.
-            //  * Flat and non-damage targets simply have no lane yet; they
-            //    are dropped with the same loudness until one exists.
-            //
-            // O54 widened the second bullet, not the first: a rider may now
-            // name any DELIVERED damage pool — shared, weapon or ability — and
-            // the combat site pays it only into the lane the hit actually drew.
-            // DamageOverTime stays out: a tick snapshots at application, so a
-            // rider read per event against a live target has nothing to attach
-            // to.
-            if (Effect.StatBucket != EBreakerNodeStatBucket::IncreasedPercent
-                || !(BreakerIsDeliveredDamagePool(Effect.StatTarget) || bTagKeyed))
+            //  * Flat and non-damage targets have no lane yet.
+            //  * A MorePercent on a tag-keyed slice or DamageOverTime has no
+            //    payment shape (a tick snapshots at application).
+            const bool bRiderIncreased = Effect.StatBucket == EBreakerNodeStatBucket::IncreasedPercent
+                && (BreakerIsDeliveredDamagePool(Effect.StatTarget) || bTagKeyed);
+            const bool bRiderMore = Effect.StatBucket == EBreakerNodeStatBucket::MorePercent
+                && Effect.RequiresTargetState()
+                && BreakerIsDeliveredDamagePool(Effect.StatTarget)
+                && !bTagKeyed;
+            if (!bRiderIncreased && !bRiderMore)
             {
                 static TSet<FName> WarnedOnceTargetRiderNodeIds;
                 if (!WarnedOnceTargetRiderNodeIds.Contains(Node->NodeId))
                 {
                     WarnedOnceTargetRiderNodeIds.Add(Node->NodeId);
                     UE_LOG(LogTemp, Warning,
-                        TEXT("[BreakerProgression] node '%s' authors a target-conditional effect in bucket %d on stat target %d, but target-side lines are Increased-bucket damage-pool lines only — this effect is dropped."),
+                        TEXT("[BreakerProgression] node '%s' authors a target-conditional effect in bucket %d on stat target %d, which no rider shape pays (Increased damage-pool lines, or O141's one hit-time More) — this effect is dropped."),
                         *Node->NodeId.ToString(), static_cast<int32>(Effect.StatBucket), static_cast<int32>(Effect.StatTarget));
                 }
                 continue;
@@ -1428,7 +1432,16 @@ TArray<FBreakerTargetConditionRider> UBreakerProgressionComponent::BuildTargetCo
             Rider.Condition = Effect.Condition;
             Rider.AlsoRequires = Effect.AlsoRequires;
             Rider.StatTarget = Effect.StatTarget;
-            Rider.Percent = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
+            if (bRiderMore)
+            {
+                // A More never scales with rank (the aggregation-side rule,
+                // held here too): the authored percent is the whole value.
+                Rider.MorePercent = FMath::Max(0.0f, Effect.ValuePerRank);
+            }
+            else
+            {
+                Rider.Percent = Effect.ValuePerRank * static_cast<float>(EffectiveRank);
+            }
             Rider.RequiredSourceTag = BreakerRiderSliceSourceTag(Effect.StatTarget);
         }
     }

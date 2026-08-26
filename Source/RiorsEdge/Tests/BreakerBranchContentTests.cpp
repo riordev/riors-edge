@@ -402,7 +402,7 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     Ranks.Add({TEXT("Core.Arc.Overflow"), 1});                // x1.28 ability lane
     Ranks.Add({TEXT("Core.Affliction.Compound"), 1});         // x1.24 DoT lane
     Ranks.Add({TEXT("Core.Velocity.TerminalVelocity"), 1});   // x1.30 airborne, SHARED
-    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 weapon lane
+    Ranks.Add({TEXT("Core.Ruin.Collapse"), 1});               // x1.30 SHARED, TargetBandBroken — HIT-TIME (O141): pays via the rider path, never this sort
     Ranks.Add({TEXT("Core.Velocity.Redline"), 1});            // DEMOTED: +14% ability line, no More
     // O95: these three author no More any more. They stay in the fixture
     // deliberately -- owning every doctrine keystone must not change the
@@ -414,19 +414,24 @@ bool FBreakerMoreCeilingWithNewContentTest::RunTest(const FString& Parameters)
     const FBreakerNodeStats Stats = UBreakerProgressionComponent::AggregateStats(
         Nodes, Ranks, nullptr, FBreakerBuildConditionState::All());
 
-    // Nine — the ruled atlas roster, counted across every lane (the skill
-    // screen's "N / 3 MORE" is the whole budget). Redline contributes none:
+    // Eight STANDING sources — the ruled atlas roster minus Collapse, which
+    // O141 moved to the hit-time rider path: it spends ceiling headroom at
+    // the hit, never a slot, so counting it here would tell the player it
+    // competes for the three when it structurally cannot. The skill screen's
+    // "N / 3 MORE" keeps meaning slot competition. Redline contributes none:
     // its demotion from the tenth More is the pair-F change this fixture
     // witnesses.
-    TestEqual(TEXT("Every authored More source is counted honestly"), Stats.DamageMoreSourceCount, 9);
+    TestEqual(TEXT("Every authored STANDING More source is counted honestly"), Stats.DamageMoreSourceCount, 8);
     TestTrue(TEXT("More options outnumber the O3 cap, so holding three is a choice"),
         Stats.DamageMoreSourceCount > UBreakerProgressionComponent::MaxDamageMoreSources);
-    // Strongest three across lanes under the no-shared-hub ruling: Terminal
-    // Velocity (1.30 SHARED, airborne), Collapse (1.30 weapon) and Overflow
-    // (1.28 ability). The weapon lane composes the shared winner and its own;
-    // the ability lane the shared winner and its own. One budget, spent once
-    // (O74), and only conditional commitment touches both lanes at once.
-    TestEqual(TEXT("The weapon lane composes shared + weapon winners"), Stats.DamageMoreMultiplier, 1.30f * 1.30f, 0.0001f);
+    // Strongest three across lanes, post-O141: Terminal Velocity (1.30
+    // SHARED, airborne), Overflow (1.28 ability) and Reaction Chain (1.26
+    // DoT) — Collapse no longer stands for selection at all. The weapon lane
+    // therefore composes the shared winner alone; the ability lane the
+    // shared winner and its own. One budget, spent once (O74); Collapse's
+    // x1.30 arrives at the hit on top of whichever product the target's
+    // band-break earns, clamped to the same one ceiling.
+    TestEqual(TEXT("The weapon lane composes the shared winner alone"), Stats.DamageMoreMultiplier, 1.30f, 0.0001f);
     TestEqual(TEXT("The ability lane composes shared + ability winners"), Stats.AbilityDamageMoreMultiplier, 1.30f * 1.28f, 0.0001f);
     // A hard upper bound stated independently of the content, so a future node
     // authored above the ceiling fails here rather than in a playtest.

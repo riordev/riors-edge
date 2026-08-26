@@ -292,17 +292,24 @@ bool FBreakerTargetRiderTableTest::RunTest(const FString& Parameters)
             UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks).Num(), 0);
     }
 
-    // The doc rule (§3.3): a target-conditional MorePercent is NOT supported —
-    // it would need the strongest-three More selection re-run per event per
-    // target. Warn-and-drop, exactly like the aggregator's other unpaid Mores.
-    AddExpectedError(TEXT("target-side lines are Increased-bucket damage-pool lines only"), EAutomationExpectedErrorFlags::Contains, 0);
+    // O141 rewrote §3.3's half-rule: a target-gated MorePercent on a
+    // delivered damage pool now PUBLISHES as a hit-time More row — the sort
+    // never sees it, the combat site pays it under the one ceiling — and the
+    // row carries the authored percent UNSCALED BY RANK, the same rule the
+    // aggregation side holds for every More.
     {
         TArray<const UBreakerProgressionNode*> Nodes = { BreakerMakeRiderNode(
             TEXT("Test.Table.MoreRider"), EBreakerBuildCondition::TargetMultiStatus, {}, 25.0f,
             EBreakerNodeStatBucket::MorePercent) };
-        TArray<FBreakerNodeRank> Ranks = { {TEXT("Test.Table.MoreRider"), 1} };
-        TestEqual(TEXT("a target-conditional MorePercent is dropped, never published"),
-            UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks).Num(), 0);
+        TArray<FBreakerNodeRank> Ranks = { {TEXT("Test.Table.MoreRider"), 2} };
+        const TArray<FBreakerTargetConditionRider> MoreRows =
+            UBreakerProgressionComponent::BuildTargetConditionRiders(Nodes, Ranks);
+        TestEqual(TEXT("a target-gated MorePercent publishes one hit-time More row (O141)"), MoreRows.Num(), 1);
+        if (MoreRows.Num() == 1)
+        {
+            TestEqual(TEXT("the row carries the More half, unscaled by rank"), MoreRows[0].MorePercent, 25.0f, 0.0001f);
+            TestEqual(TEXT("the row's Increased half is empty"), MoreRows[0].Percent, 0.0f, 0.0001f);
+        }
     }
 
     // Same drop for a bucket/target with no target-side lane (a Flat rider).
@@ -541,6 +548,82 @@ bool FBreakerTargetBandBrokenRiderTest::RunTest(const FString& Parameters)
     {
         const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(MakeSizedRequest(5.0f));
         TestEqual(TEXT("a cleared bit pays nothing"), Result.RawDamage, 5.0f, 0.001f);
+    }
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// O141 — the ONE hit-time More, end to end. A target-gated MorePercent rides
+// the rider table and pays by multiplying the request's standing More product
+// under the one O34 ceiling: headroom, never a slot. The three points that
+// define the law are each asserted: full payment where headroom exists,
+// exact ceiling where the product would pass it, and nothing at saturation —
+// plus the recomposition identity with the Increased half, and the gate that
+// an unsatisfied condition pays nothing.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHitTimeMoreRiderTest,
+    "RiorsEdge.Combat.TargetRiders.HitTimeMore",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHitTimeMoreRiderTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerTargetRiderTest;
+
+    AActor* Attacker = BreakerMakeRiderAttacker(BreakerMakeRiderNode(TEXT("Test.Rider.HitTimeMore"),
+        EBreakerBuildCondition::TargetBandBroken, {}, 30.0f,
+        EBreakerNodeStatBucket::MorePercent, EBreakerNodeStatTarget::Damage), 1);
+
+    const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+
+    // One case per standing product: a fresh victim, armed by a 30-damage
+    // first hit (100 -> 70 crosses the 75 boundary on the default 4-band
+    // pool), then the measured hit with that standing More in its split.
+    auto MeasureRiddenMore = [&](float StandingMore) -> float
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Arm = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Arm.BaseDamage = 30.0f;
+        Victim.Combat->ReceiveDamage(Arm);
+        FBreakerDamageRequest Hit = BreakerMakeSplitRequest(Attacker, 0.0f, StandingMore);
+        Hit.BaseDamage = 4.0f;
+        const FBreakerDamageResult Result = Victim.Combat->ReceiveDamage(Hit);
+        return Result.RawDamage / 4.0f;   // the effective composed multiplier
+    };
+
+    // Headroom: a bare product takes the whole authored x1.30.
+    TestEqual(TEXT("with headroom the rider pays its full authored More"),
+        MeasureRiddenMore(1.0f), 1.30f, 0.001f);
+    // Partial: 1.9349 standing (the weapon build's product) clamps the total
+    // to exactly the ceiling — the rider delivered x1.1355, not x1.30.
+    TestEqual(TEXT("a near-saturated product clamps the total to the one ceiling"),
+        MeasureRiddenMore(1.9349f), Ceiling, 0.001f);
+    // Saturation: a product already at the ceiling gains exactly nothing.
+    TestEqual(TEXT("a saturated product gains nothing from the rider"),
+        MeasureRiddenMore(Ceiling), Ceiling, 0.001f);
+
+    // The recomposition identity with the Increased half intact:
+    // (1 + 20/100) x 1.0 x 1.30 = 1.56.
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Arm = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Arm.BaseDamage = 30.0f;
+        Victim.Combat->ReceiveDamage(Arm);
+        FBreakerDamageRequest Hit = BreakerMakeSplitRequest(Attacker, 20.0f, 1.0f);
+        Hit.BaseDamage = 10.0f;
+        TestEqual(TEXT("the Increased half recomposes beside the rider More"),
+            Victim.Combat->ReceiveDamage(Hit).RawDamage, 15.6f, 0.01f);
+    }
+
+    // The gate: no band break, no payment — the composed value resolves
+    // exactly as authored.
+    {
+        FBreakerRiderVictimRig Victim = BreakerMakeRiderVictim();
+        FBreakerDamageRequest Hit = BreakerMakeSplitRequest(Attacker, 0.0f, 1.0f);
+        Hit.BaseDamage = 10.0f;
+        TestEqual(TEXT("an unsatisfied More rider changes nothing"),
+            Victim.Combat->ReceiveDamage(Hit).RawDamage, 10.0f, 0.001f);
     }
 
     return true;

@@ -657,7 +657,19 @@ token since ruling 1; the node is the two-target rule alone). That
 was the last GrantedAbilityIds writer: NoPhantomAbilityGrants now
 pins the writer count at ZERO so a new grant announces itself, and
 the writerless path's fate stays the owner's open question. 467 / 3
-/ 0 on the tip.
+/ 0 on the tip. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
+hit-time More — x1.30 shared, gated on TargetBandBroken, paid by the
+rider path under the one O34 ceiling (headroom, never a slot; the
+clamp is exact because the window chain already folds into
+SourceMoreProduct, and the paid rider folds back so the split identity
+stays literally true — FIELD's refinements, agreed pre-landing). It
+leaves the strongest-three sort and the sheet's slot count (standing
+sources 9 -> 8, re-pinned); TreeContent.OneHitTimeMore holds the
+population at exactly one. Pinned parity 0.268x unchanged — the
+fixtures cannot afford Collapse's chain; the improvement lives with
+builds that buy it (full x1.30 on the ability lane where the weapon
+lane gave them nothing). O125's bullet closes. Standing waits:
+Longstride reading confirmation, allocation-at-push-time.
 
 
 THE FIELD LANE (this pass): THE DENSITY SWEEP, AND THE COST IS NOT

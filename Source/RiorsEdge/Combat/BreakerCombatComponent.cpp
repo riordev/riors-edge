@@ -265,6 +265,7 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
     Conditions.SupplyTargetState(GetOwner(), Attacker);
 
     float RiderPercent = 0.0f;
+    float RiderMoreProduct = 1.0f;
     for (const FBreakerTargetConditionRider& Rider : Riders)
     {
         // O54: a rider pays only into the lane this hit actually drew. The
@@ -293,15 +294,49 @@ void UBreakerCombatComponent::ApplyTargetConditionRiders(FBreakerDamageRequest& 
         if (Conditions.SatisfiesAll(Rider.Condition, Rider.AlsoRequires))
         {
             RiderPercent += Rider.Percent;
+            if (Rider.MorePercent > 0.0f) RiderMoreProduct *= 1.0f + Rider.MorePercent / 100.0f;
         }
     }
-    if (FMath::IsNearlyZero(RiderPercent)) return;
+    const bool bRiderMoreFired = !FMath::IsNearlyEqual(RiderMoreProduct, 1.0f);
+    if (FMath::IsNearlyZero(RiderPercent) && !bRiderMoreFired) return;
 
-    // The recomposition (§3.3): the rider joins the source's ADDITIVE
-    // Increased bucket and the More product is reapplied on top, unchanged.
-    // Floored at zero on both factors so a hostile authored negative can
-    // never invert damage.
+    // The recomposition: an Increased rider joins the source's ADDITIVE
+    // bucket exactly as before, and — since O141 — the ONE hit-time More
+    // rider (Collapse; TreeContent.OneHitTimeMore pins the population at one,
+    // and a second is a request to revisit the 1.30^3 ceiling, a different
+    // and larger ruling) multiplies the standing More product under the one
+    // O34 ceiling: HEADROOM, never a slot, the same law the outgoing window
+    // chain already spends by. The clamp cannot double-count because
+    // SourceMoreProduct is the request's WHOLE prior More spend —
+    // ApplyOutgoingModifiers folds the window chain into it as well as into
+    // the composed value — so Ceiling/SourceMoreProduct is the true residual.
+    // PaidRiderMore folds into SourceMoreProduct too, so the header's
+    // identity ((1 + (Inc + Riders)/100) x SourceMoreProduct ==
+    // SourceDamageMultiplier) stays literally true; nothing downstream reads
+    // the split again, so this costs nothing and keeps the formula honest.
+    // Floored at zero so a hostile authored negative can never invert damage.
     const float IncreasedFactor = FMath::Max(0.0f, 1.0f + (Request.SourceIncreasedPercent + RiderPercent) / 100.0f);
+    const float StandingMore = FMath::Max(0.0f, Request.SourceMoreProduct);
+    if (bRiderMoreFired)
+    {
+        const float Ceiling = FBreakerAttributeAggregator::ComposedMoreCeiling();
+        const float RiderBudget = FMath::Max(1.0f, Ceiling / FMath::Max(StandingMore, UE_SMALL_NUMBER));
+        const float PaidRiderMore = FMath::Min(RiderMoreProduct, RiderBudget);
+        if (PaidRiderMore < RiderMoreProduct - UE_KINDA_SMALL_NUMBER)
+        {
+            // Loud when the ceiling bites, once: the partial (or zero)
+            // payment is the ruling's intent, not a defect, but it must be
+            // audible rather than discovered on a damage sheet.
+            static bool bWarnedClampOnce = false;
+            if (!bWarnedClampOnce)
+            {
+                bWarnedClampOnce = true;
+                UE_LOG(LogTemp, Log, TEXT("[BreakerCombat] a hit-time More rider (x%.3f) was clamped to x%.3f by the O34 ceiling (standing product %.3f) — headroom spent, working as ruled (O141)."),
+                    RiderMoreProduct, PaidRiderMore, StandingMore);
+            }
+        }
+        Request.SourceMoreProduct = StandingMore * PaidRiderMore;
+    }
     Request.SourceDamageMultiplier = IncreasedFactor * FMath::Max(0.0f, Request.SourceMoreProduct);
 }
 

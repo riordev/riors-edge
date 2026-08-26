@@ -37,10 +37,14 @@ void UBreakerDamageLibrary::FillSourcePools(const UBreakerAttributeSet* SourceAt
         : SourceAttributes->GetDamageMultiplier();
 
     Request.SourceDamageMultiplier = Composed;
-    // The split, so the target side can add a conditional Increased line
-    // without it becoming a second More. The lane's share of the shared pool is
-    // already inside Composed, which is why the shared argument is zero here:
-    // recovering it separately would add it twice.
+    // The split, so the target side can recompose honestly: a conditional
+    // Increased rider joins the additive half without becoming a second
+    // More, and — since O141 — the game's ONE target-gated More rider
+    // (Collapse) lawfully multiplies the More half at the hit, spending
+    // headroom under the one O34 ceiling rather than a slot. The lane's
+    // share of the shared pool is already inside Composed, which is why the
+    // shared argument is zero here: recovering it separately would add it
+    // twice.
     Request.SourceMoreProduct = FMath::Max(
         SourceAttributes->GetAttributeAggregator().ComposedMoreProduct(Lane), UE_SMALL_NUMBER);
     Request.SourceIncreasedPercent = (Composed / Request.SourceMoreProduct - 1.0f) * 100.0f;

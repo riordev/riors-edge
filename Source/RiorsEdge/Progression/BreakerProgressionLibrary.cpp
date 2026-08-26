@@ -600,10 +600,14 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     AddPrerequisite(Fixate, TEXT("Core.Precision.CalledShot"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.TunnelVision"));
     AddPrerequisite(Fixate, TEXT("Core.Precision.Deadeye"));
-    // RULED (this session): no hub authors a shared-pool More — five
+    // RULED: no hub authors an UNCONDITIONAL shared-pool More — five
     // unconditional shared hubs composed x2.0475 with zero commitment,
     // beating the old tree's fully committed airborne build. Each hub's More
-    // moves to its wheel's identity lane, magnitude unchanged.
+    // moved to its wheel's identity lane, magnitude unchanged. The one
+    // exception since is Collapse (O141): its shared x1.30 is TARGET-GATED
+    // and hit-timed, which is precisely the "not free" property this ruling
+    // was protecting — the gate, not the lane, is what stops it being a
+    // zero-commitment freebie.
     AddEffect(Fixate, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 22.0f); // O2 PLACEHOLDER: x1.22, weapon lane
     Fixate->GrantedTags.AddTag(BreakerNodeTags::Node_Fixate.GetTag());
     Tree->Nodes.Add(Fixate);
@@ -1309,28 +1313,27 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Tree->Nodes.Add(RuinOverpressure);
 
     // COLLAPSE is the spec's Unmake, renamed by ruling — Caster.Unmake is the
-    // Caster ultimate and Spellblade's Edgework rewrites it by name. Its
-    // health-band condition EXISTS now (TargetBandBroken, Overpressure above),
-    // and the intended shape is this More on the SHARED pool gated on it —
-    // a condition beats a lane restriction at the same "not free" property
-    // without amputating ability builds. IT CANNOT PAY YET, in either lane a
-    // conditional More could ride: standing aggregation evaluates conditions
-    // from the attacker's cached SELF state and structurally never holds a
-    // Target* bit, and the per-hit rider table is Increased-bucket only BY
-    // RULE (§3.3 — BuildTargetConditionRiders warns and drops a More row).
-    // So a target-gated More authored today is a dead line wearing a
-    // condition, the exact bug class the warn-once machinery exists for.
-    // Until a per-hit More lane is ruled (the outgoing-modifier chain's O34
-    // budget clamp is the precedent shape), Collapse stays what it shipped
-    // as: unconditional on the WEAPON LANE by the no-shared-hub ruling, so
-    // what it multiplies is the wheel's own delivery rather than every
-    // build's everything.
+    // Caster ultimate and Spellblade's Edgework rewrites it by name. It is
+    // THE GAME'S ONE TARGET-GATED HIT-TIME MORE (O141): x1.30 on the SHARED
+    // pool, gated on TargetBandBroken, paid by the rider path multiplying the
+    // request's standing More product under the one O34 ceiling — headroom,
+    // never a slot, so it does not enter the strongest-three sort, does not
+    // count on the sheet's "N / 3 MORE", and delivers most where headroom
+    // remains: in full on an ability build (2.1632 of 2.197 — 98.5% of the
+    // ceiling), x1.1355 on a weapon build at 1.9349, nothing at saturation.
+    // That asymmetry is the RULED point, not a side effect: a hit-time More
+    // is structurally an ability-lane buff, the exact inverse of the old
+    // weapon-lane placement, and it delivers against the 0.27 parity gap as
+    // a property of the ceiling arithmetic. AT MOST ONE such line may exist
+    // — a second would deliver almost nothing past this one's saturation and
+    // is a request to revisit 1.30^3, a different and larger ruling; the
+    // TreeContent population pin holds it at one.
     UBreakerProgressionNode* RuinCollapse = MakeNode(TEXT("Core.Ruin.Collapse"), TEXT("Collapse"),
-        TEXT("Convergence. The finishing blow becomes a MORE multiplier to weapon damage."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
+        TEXT("Convergence. Break a band, and your next blow becomes a MORE multiplier to everything you deliver."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 3, 1, 3, TEXT("Ruin"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Execute"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Siege"));
     AddPrerequisite(RuinCollapse, TEXT("Core.Ruin.Overpressure"));
-    AddEffect(RuinCollapse, EBreakerNodeStatTarget::WeaponDamage, EBreakerNodeStatBucket::MorePercent, 30.0f); // O2 PLACEHOLDER: x1.30, weapon lane
+    AddEffect(RuinCollapse, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::MorePercent, 30.0f, EBreakerBuildCondition::TargetBandBroken); // O2 PLACEHOLDER: x1.30, shared pool, hit-time (O141)
     Tree->Nodes.Add(RuinCollapse);
 
     // --- RESERVOIR: resource economy (atlas pair C, no hub by design) ------

@@ -477,4 +477,46 @@ bool FBreakerMultiRankMoreValidatorTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// O141: AT MOST ONE target-gated More exists in the game, and Collapse is it.
+// A single x1.30 hit-time rider already takes an ability build to 98.5% of
+// the 1.30^3 ceiling, so a second would deliver almost nothing past the first
+// and read as a line that does not work — authoring one is not a tuning
+// question, it is a request to revisit the ceiling, which is a different and
+// larger ruling. This pin is where the next author meets that rule before
+// shipping a dead line.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerOneHitTimeMoreTest,
+    "RiorsEdge.Progression.TreeContent.OneHitTimeMore",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerOneHitTimeMoreTest::RunTest(const FString& Parameters)
+{
+    TArray<FString> Found;
+    int32 EffectsWalked = 0;
+    for (const UBreakerProgressionTree* Tree : UBreakerProgressionLibrary::GetAllFallbackTrees())
+    {
+        if (!Tree) continue;
+        for (const UBreakerProgressionNode* Node : Tree->Nodes)
+        {
+            if (!Node) continue;
+            for (const FBreakerNodeEffect& Effect : Node->Effects)
+            {
+                ++EffectsWalked;
+                if (Effect.StatBucket == EBreakerNodeStatBucket::MorePercent && Effect.RequiresTargetState())
+                {
+                    Found.Add(Node->NodeId.ToString());
+                }
+            }
+        }
+    }
+    TestTrue(TEXT("The walk saw real content"), EffectsWalked > 100);
+    TestEqual(*FString::Printf(TEXT("Exactly one target-gated More exists (O141): %s"),
+        Found.Num() ? *FString::Join(Found, TEXT("; ")) : TEXT("none")), Found.Num(), 1);
+    TestTrue(TEXT("...and it is Collapse"),
+        Found.Num() == 1 && Found[0] == TEXT("Core.Ruin.Collapse"));
+    return true;
+}
+
 #endif

@@ -42,6 +42,17 @@ struct RIORSEDGE_API FBreakerTargetConditionRider
     EBreakerNodeStatTarget StatTarget = EBreakerNodeStatTarget::Damage;
     // Whole percent, already multiplied by the owned rank.
     float Percent = 0.0f;
+    // O141: the HIT-TIME More half. Zero on every Increased row; on the one
+    // target-gated More row (Collapse) it is the authored percent above 1.0
+    // (30.0 == x1.30), NEVER rank-scaled — a More does not scale with rank
+    // anywhere. Paid at the combat site by multiplying the request's standing
+    // More product under the one O34 ceiling: headroom, never a slot, so the
+    // strongest-three sort never sees it and "N / 3 MORE" keeps meaning slot
+    // competition. At most one such row may exist in authored content —
+    // TreeContent pins the population — because a single x1.30 rider already
+    // saturates an ability build to 98.5% of the ceiling and a second would
+    // read as a line that does not work.
+    float MorePercent = 0.0f;
     // O98: set on a rider-delivered slice row (MeleeDamage today, keyed on
     // Damage.Melee). The row pays only when the request's SourceTags carry
     // this tag — the slice is selected by what the hit says it IS, never by

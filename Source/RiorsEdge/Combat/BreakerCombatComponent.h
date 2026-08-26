@@ -244,9 +244,12 @@ private:
     // supplies the target half from GetOwner(), and — only when a rider fired
     // AND the request carries the source split — recomposes
     //   Effective = (1 + (SourceIncreasedPercent + RiderPercent)/100) x SourceMoreProduct
-    // so the rider joins the SAME additive Increased bucket as every other
-    // Increased line instead of becoming a second More. Any other request
-    // resolves bit-identically to before this existed (test-pinned).
+    // where an Increased rider joins the SAME additive bucket as every other
+    // Increased line, and — since O141 — the ONE hit-time More rider
+    // (Collapse) has already been folded into SourceMoreProduct under the
+    // one O34 ceiling (headroom, never a slot), so the identity above stays
+    // literally true. Any other request resolves bit-identically to before
+    // this existed (test-pinned).
     void ApplyTargetConditionRiders(FBreakerDamageRequest& Request) const;
     void DispatchHitDealt(const FBreakerDamageRequest& Request, const FBreakerDamageResult& Result);
 
