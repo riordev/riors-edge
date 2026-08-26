@@ -690,14 +690,54 @@ void ABreakerPlaytestHUD::DrawPlaytestInstrumentation(const ABreakerCharacter* C
                     Screen.X, Screen.Y, BreakerUI::TextMuted, 11.0f, 0.8f);
             }
         }
+        // OCCLUSION-SUPPRESSED, AND IT WAS NOT. This pass drew
+        // GetEnemyStateLabel over EVERY enemy within 25 m with no focus gate,
+        // no overlap test and no cap, so twenty bodies in a pocket printed
+        // PATROL fifteen times through itself. That mush is what the owner's
+        // "the feedback needs to be better" frame actually showed — the
+        // collision was never the enemy BARS, it was this debug overlay drawing
+        // a second label pass on top of them.
+        //
+        // The bar TU solved this exact problem already; this is the same
+        // screen-space test, deliberately kept LOCAL rather than sharing
+        // DrawnLabelBounds — that array is the enemy-bar pass's, and coupling a
+        // debug overlay to a shipping read across a lane boundary to save one
+        // allocation is a bad trade. The allocation is debug-path only: nothing
+        // here runs unless the diagnostics overlay is up.
+        //
+        // A DIAGNOSTIC MUST NOT LIE BY OMISSION. What is suppressed is counted
+        // and printed, so the overlay can never quietly show six of twenty and
+        // read as though there were six — which is the failure mode that makes
+        // an instrument worse than no instrument.
+        TArray<FVector4> DiagnosticLabelBounds;
+        int32 SuppressedLabels = 0;
         for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
         {
             if (FVector::DistSquared(Character->GetActorLocation(), It->GetActorLocation()) > FMath::Square(2500.0f)) continue;
             FVector2D Screen;
-            if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen))
+            if (!PlayerOwner || !PlayerOwner->ProjectWorldLocationToScreen(
+                It->GetActorLocation() + FVector(0.0f, 0.0f, 130.0f), Screen)) continue;
+
+            const FString Label = It->GetEnemyStateLabel();
+            const FVector2D Size = MeasureSpecText(Label, 11.0f);
+            bool bOccluded = false;
+            for (const FVector4& Taken : DiagnosticLabelBounds)
             {
-                DrawSpecTextCentered(It->GetEnemyStateLabel(), Screen.X, Screen.Y, BreakerUI::Orange, 11.0f, 0.7f);
+                if (FMath::Abs(Screen.X - Taken.X) < (Size.X + Taken.Z) * 0.5f
+                    && FMath::Abs(Screen.Y - Taken.Y) < (Size.Y + Taken.W) * 0.5f)
+                {
+                    bOccluded = true;
+                    break;
+                }
             }
+            if (bOccluded) { ++SuppressedLabels; continue; }
+            DiagnosticLabelBounds.Emplace(Screen.X, Screen.Y, Size.X, Size.Y);
+            DrawSpecTextCentered(Label, Screen.X, Screen.Y, BreakerUI::Orange, 11.0f, 0.7f);
+        }
+        if (SuppressedLabels > 0)
+        {
+            DrawSpecTextCentered(FString::Printf(TEXT("+%d STATE LABEL(S) HIDDEN — OVERLAP"), SuppressedLabels),
+                Center.X, Center.Y + S(110.0f), BreakerUI::TextMuted, 10.0f, 0.7f);
         }
     }
     if (Playtest && Playtest->GetSecondsSinceReportCopy() < 2.0f)
