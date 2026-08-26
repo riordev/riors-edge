@@ -311,6 +311,152 @@ not be.
 
 ---
 
+# PART ONE-C — THE SWEEP LANDED, AND IT MOVES THE TARGET
+
+`d43bbb7`. **Every figure reproduces.** The seat refit the four points
+independently: the quadratic to six digits, both N² shares exactly, the fps
+lines, and the counterfactual. The linear model really does want a **negative
+6.93 ms intercept** — not a frame — and its residuals run `+ - - +`, which is
+curvature seen through a straight line. An R² of 0.98 would have passed
+unexamined, and that is the finding inside the finding.
+
+```
+  t = 1.15 + 0.0864 N + 0.002584 N²      game thread, ms, R² 0.9997
+  N² share:  33% at N=25    73% at N=100
+  60 fps at N=63     120 fps at N=39
+```
+
+## The cost is the crowd touching itself, and that changes what to optimise
+
+FIELD's elimination holds. Patrol runs the same iterator and the same 40 m
+ground trace and is **linear** at 0.036 ms/body, so neither the scan nor the
+trace is the term. The only body-body interaction in the tick is the swept
+`AddActorWorldOffset`, and the two loads differ in exactly one way that reaches
+it: patrol bodies sit on an 800 cm grid and never touch; engaged bodies converge
+to 1–5 cm and sweep against every neighbour.
+
+**Nothing in `Combat/` holds spacing.** That is not a performance bug with a
+performance fix — it is a missing behaviour, and the frame cost is a symptom.
+
+## RULED: separation is the work, and it buys two things at once
+
+Drop the N² and the same fit puts **N=200 at 18.43 ms** — two hundred bodies
+cheaper than a hundred costs today. No per-body saving available is within an
+order of that, so micro-optimisation is the wrong lane of attack and the sweep
+was worth running for exactly that reason.
+
+**And separation is not only a frame fix.** A hundred enemies stacking into one
+body at 1 cm is a readability failure before it is a cost: it is the same
+complaint the owner already made about labels colliding, one layer down. Bodies
+that do not separate produce a blob that no bar, glyph or tint ramp can
+disambiguate, because there is nothing spatially distinct to label. **One change
+fixes the frame and the read.** That is why it outranks A9 in FIELD's queue as of
+now — A9 makes labels legible over a crowd that separation makes legible at all.
+
+FIELD: report the separation shape before authoring numbers, as every lane now
+does. Spacing radius, whether it is steering or resolution, and what it costs —
+because a separation pass is itself a body-body interaction and could reintroduce
+the term it removes.
+
+## The owner's ruling 4 is ACHIEVABLE, and that is news
+
+*"We just need to optimize"* with the 50–100 target standing. The sweep says the
+top of that range is not reachable **today** — N=63 at 60 fps — and the
+counterfactual says it is comfortably reachable **with separation**. The ruling
+stands and the path to it is now known rather than hoped.
+
+## The scope caveat, restated because N=63 will get quoted
+
+`engaged` is convergence and attack. **No hit reactions, no damage numbers, no
+flashes, no death effects, and the player never fires.** N=63 is a ceiling with
+half a fight missing; the real number is lower and nobody knows by how much.
+Whoever quotes 63 without that sentence is repeating "affordable at 100" with a
+different number.
+
+The other half needs a damage entry point in `Combat/` — FIELD's own file — and
+GROUND owns the probe. That handoff is the two lanes' to arrange.
+
+---
+
+# PART ONE-D — THE RIDER-MORE ANSWER, AND COLLAPSE MOVES
+
+LEDGER's report answers a question the seat framed too coarsely. Asked: *can the
+rider path carry a More bucket?* The honest answer splits in two and only the
+report found the seam.
+
+**The strongest-three SORT cannot take a hit-time member, and that is forever.**
+Membership is decided at standing time; a target-gated candidate makes correct
+membership differ per hit, and the request carries two floats
+(`SourceIncreasedPercent`, `SourceMoreProduct`), not a member list — a specific
+member cannot be removed from a product without knowing the members. A rocket in
+flight snapshots its split at fire time and would be wrong regardless. And the
+character sheet's "N / 3 MORE" stops meaning anything if the three change per
+target. Three independent reasons, any one sufficient.
+
+**But the CEILING already operates at hit time, and that is the lawful opening.**
+The outgoing-modifier chain already multiplies a More into the request at
+submission under a clamp, and the DoT tick path clamps the same way. O34 already
+says temporary ability windows ARE Mores and count inside the budget. So
+**hit-time Mores spend HEADROOM, not slots** — one clamp at the recomposition
+site, loud when it bites.
+
+Every figure in that report reproduces on an independent refit.
+
+## RULED: Collapse moves to the shared pool, gated, under the ceiling clamp
+
+The seat put that ×1.30 on the weapon lane because no condition existed, then
+told LEDGER to move it once one did, then was corrected because a rider could
+only ever be an Increased. All three positions were partly wrong. The mechanism
+is a hit-time More under the existing ceiling law, it has precedent in two
+shipped paths, and Collapse is what it was written for.
+
+## The asymmetry the report measured points somewhere it did not say
+
+```
+  standing product   residual headroom   a x1.30 rider delivers
+  ability   1.664         x1.3203              x1.3000   (100% of authored)
+  weapon    1.9349        x1.1355              x1.1355   ( 45% of authored)
+```
+
+**A hit-time More is structurally an ability-lane buff.** Weapon builds have
+already spent their headroom; ability builds have not, so the same authored line
+pays them in full and pays a weapon build less than half. Ability parity is 0.27,
+the worst number in the project — and this delivers against it as a property of
+the ceiling arithmetic rather than as a tuning choice.
+
+That is the exact inverse of what the seat did originally. Putting Collapse on
+the weapon lane hurt parity; making it a hit-time rider helps it, for free.
+
+## And it saturates, so ONE is the number
+
+At ×1.30 an ability build lands at **98.5% of the ceiling**. The headroom that
+makes riders valuable to ability builds is nearly exhausted by a single one — a
+second target-gated More would deliver almost nothing and would read to the
+player as a line that does not work.
+
+**RULED: at most one target-gated More exists in the game, and Collapse is it.**
+A second is not a tuning question, it is a request to revisit the `1.30³`
+ceiling, which is a different and much larger ruling. Record that at the clamp so
+the next author meets it there rather than after shipping a dead line.
+
+**LEDGER: re-measure ability parity after it lands and report it.** The prediction
+is that it improves; a prediction stated before the measurement is worth more
+than one fitted after.
+
+## O138 and O139 — both right, and one detail worth keeping
+
+The convex `t^1.2` spacing was chosen because the retired `{5,12,20,30}` already
+had convex gaps (7/8/10) and the derivation **reproduces it bit-identically** —
+where even spacing would have silently retuned four classes as a side effect of
+fixing Swift. Choosing the derivation that leaves the baseline untouched over the
+one that is tidiest is the whole discipline in one decision.
+
+Longstride took the distance reading, per the cheap-case rule, and stayed
+convertible to cooldown in one commit. `COST 0` making the no-refund property
+**arithmetic rather than a flag** is the right kind of small.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
@@ -906,6 +1052,40 @@ it; it is in GLASS's list below.
 `Abilities/`, `Combat/`, `Game/`, `UI/`. The map has no vocabulary for that:
 `Tests/` is shared because every lane writes its own, `Docs/` because every lane
 appends, and both have **no owner**.
+
+## A FOURTH KIND: THE INSTRUMENTS, and the map does not cover them
+
+`Scripts/status.py`, `Scripts/shapecheck.py` and `Scripts/lanereport.py` appear
+nowhere in the path table. Only `Scripts/compose_*` does, under GROUND. So the
+three programs **every lane runs at every cycle** have no stated owner.
+
+It has not bitten because nothing has touched them since the lanes existed —
+every edit to `status.py` and `shapecheck.py` predates the split. It will bite:
+FIELD is about to add a sleep concept that may want a pin, and GROUND is growing
+yards whose grammar readout those instruments print.
+
+They are not `Tests/` and they are not `Docs/`. A test belongs to the lane that
+wrote it; a doc line is append-only and hurts nobody. **An instrument change
+changes what every lane's cycle DOES**, which makes it the strongest case in the
+map rather than the weakest.
+
+**RULED — the instruments are ownerless and announced.** Any lane may extend one.
+Two conditions:
+
+- **Say so in the commit and in your report.** Not because permission is needed,
+  but because the next lane to run a green cycle deserves to know the instrument
+  changed under it.
+- **Never narrow an instrument to make your own cycle pass.** This is the
+  assertion rule one level up: *never widen an assertion to make a red go green*
+  applies to the thing doing the asserting. Loosening a check, dropping a
+  section, or scoping a sweep so your commit comes back clean is the same defect
+  wearing a script.
+
+A third condition follows from tonight, and it is the seat's own: `lanereport.py`
+checks ruling-number collisions **only within the commits it is given**, which is
+why two live O120 rulings survived a cycle of being looked at directly. An
+instrument whose scope is narrower than its name is the defect it exists to find.
+Whoever touches it next should make that sweep whole-file, or rename the check.
 
 **A published path has an owner and named consumers.** The owner changes the
 implementation freely and **declares** a change to the public surface. Same rule
