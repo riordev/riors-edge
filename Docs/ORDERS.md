@@ -1418,6 +1418,430 @@ end, against a grammar that is finally true.
 
 ---
 
+# PART ONE-S — THE CROWD CONVERGES ON A POINT, AND SEPARATION ALONE WOULD FIGHT THE CHASE VECTOR
+
+Owner, 2026-08-26: *"enemies are stacking."*
+
+Two causes, both measured, and they are **independent** — which is the reason
+this is a ruling and not a ticket. Building only the half already on FIELD's
+list would leave the other half pushing back against it.
+
+## 1. Nothing physical keeps them apart, and there is no flag to turn on
+
+FIELD measured this instead of reasoning about it, which is why it is usable:
+`Breaker.Field.CrowdReport` reports profile `Custom`, response to Pawn =
+**OVERLAP**, capsule radius 45 cm. Bodies interpenetrate.
+
+And the escape hatch is not there. `ABreakerEnemy` is an `APawn` moved by
+`AddActorWorldOffset(Step, true, &MoveHit)` — there is no
+`CharacterMovementComponent` anywhere on it, so there is no `bUseRVOAvoidance`
+to enable. `grep -rn "RVOAvoidance" Source/` returns nothing. Separation must
+be authored as steering because nothing else can do it.
+
+## 2. The chase vector aims every body at the same coordinate and never stops
+
+`BreakerEnemy.cpp:578` — `OutDirection = ToPlayer` — and inside `AttackRange`
+nothing zeroes it. The label changes to `ATTACK`, `PerformAttack` fires on its
+cooldown, and the body **keeps walking at `MoveSpeed`**. There is no standoff,
+no arrival, no slot. N bodies chasing one point arrive at one point.
+
+The player is a Pawn too, so the same OVERLAP response means they do not stop
+at *him* either. They stack inside him. That is the thing the owner is looking
+at, and it is not a separation bug — it is the absence of an arrival.
+
+## RULED: the arrival ring comes first, and separation is tuned against it
+
+A steering force pushing bodies apart while the chase vector pushes every one
+of them at a single coordinate is two of our own systems in tension, and its
+tuning constant is the *ratio between them* — the least stable number a crowd
+can be built on. Stop the chase at `AttackRange` and geometry has already
+solved most of it; separation then handles the residue, which is what
+separation is actually good at.
+
+**The arithmetic, and check it before building to it.** `AttackRange` is
+260 cm, capsule radius 45 cm. The ring at attack range is 2π·260 = 1634 cm of
+arc; each body needs 90 cm of it. **Eighteen bodies fit on the first ring.**
+The interior spawns ten. So at the density the owner is *actually playing*, an
+arrival ring alone removes the stack — separation is the next problem, not this
+one. Past ~18 concurrent melee a second rank becomes a design question rather
+than an arithmetic one, and that question — do rank-two bodies hold, circle, or
+push through — **is the seat's. Do not answer it in code.**
+
+## FIELD owns both halves; `Combat/` is yours
+
+Order: arrival ring, re-measure the stack, then separation for what is left.
+
+**Report the ring's shape before building it.** The one question that decides
+its cost: does an arriving body *claim a slot* — stateful, needs an owner, and
+someone has to release it on death — or does it simply stop and let separation
+spread it — stateless, cheaper, and probably sufficient at N=10. Say which and
+why before writing either.
+
+And the cost model already has an opinion worth testing.
+`t = 1.15 + 0.0864N + 0.002584N²`, where the N² term is crowd collision.
+Bodies that stop overlapping stop generating the pairwise contacts that term
+measures, so **expect the ring to move the quadratic coefficient, and say by how
+much.** If it does not move, that is a finding about the cost model rather than
+about the ring — and it would be the second time this session a number moved
+for a reason other than the one it names.
+
+---
+
+# PART ONE-T — THE ARRIVAL BAND ALREADY EXISTS, ON THE OTHER ARCHETYPE
+
+FIELD reported the separation shape before authoring it (3bb2556) and asked
+three questions, all correctly identified as design. They are answered here,
+and the first answer changes what the work is.
+
+## The machine is already written and the wrong archetype has it
+
+`Combat/BreakerRangedBehavior.h` is a world-free, unit-tested band controller:
+`ClassifyBand` with hysteresis, `GetBandRadialSign` (+1 close, 0 hold and
+strafe, −1 back off), `GetBandSpeedScale`, and `StepEngagementDistance` so the
+loop can be simulated with no world. Its own header says why it exists:
+
+> *"a ranged enemy that advances forever is a slow melee enemy, and one that
+> never moves is a turret."*
+
+**The melee enemy advances forever.** The failure mode this file was written to
+prevent is the shipping behaviour of the other archetype, in the same
+directory, and nobody has connected them. Part One-S's arrival ring is not new
+machinery — it is `EBreakerRangedBand` with a thin band at contact instead of a
+wide one at standoff. Melee's `Hold` is `Distance ≈ AttackRange`; its `Retreat`
+is the crowded case the ranged comment already calls "the failure state this
+archetype must escape".
+
+**FIELD: reuse it, do not re-derive it.** If the band controller cannot express
+melee's case, that is a finding about the controller and I want it named rather
+than worked around.
+
+## The three questions
+
+**1. What spacing?** Derive it, do not pick it. The ring at `AttackRange`
+(260 cm) is 2π·260 = 1634 cm of arc. At 150 cm spacing it seats **10.9 bodies**
+— one wave, which is what the interior spawns. So 150 cm is not a taste, it is
+*the spacing at which one wave fits one rank*, and the rule states its own
+breaking point: a 20-body wave would need 82 cm, below the 90 cm body, which
+means a 20-body wave **requires** a second rank. That is the design question,
+and the rule tells you the day you have to answer it instead of hiding it in a
+constant. Take 150 cm and record the derivation beside it.
+
+**And one number of yours I cannot reproduce.** You wrote that fifty bodies at
+150 cm need *"a third of a Fernhall yard."* Hex-packed, fifty bodies at 150 cm
+is (√3/2)·1.5²·50 = **97 m²**, and `FernhallFieldParams` gives a combat band of
+1400→8900 cm by ±2000 cm — 75 × 40 m, **3000 m²**. That is 3%, not 33%. Line
+abreast it is a different story: fifty at 1.5 m is 75 m of frontage against a
+40 m band width, so it does not fit and needs two ranks. Both are true and they
+answer different questions. **Say which one you meant** — it decides whether
+spacing is a level-design constraint or a movement constant, and you called it
+the first.
+
+**2. Is separation suppressed at contact so melee is not a shoving match?**
+No rule, because the ring removes the case. Bodies that stop at 260 cm are not
+in contact and have nothing to suppress. If they shove *after* the band lands,
+that is evidence the band is not holding, and the fix is the band — not a
+suppression exception layered on top of it. An exception here would be a
+justification outliving its cause before its cause was even built.
+
+**3. Do ranged and melee separate by different rules?** Same rule, different
+band edges — which is the whole point of reusing the controller. If they need
+different *separation* strengths that is a tuning row, not a second system.
+
+## The falsifiable prediction stands, and add one
+
+Your fit without the quadratic puts N=100 at 9.79 ms and you said plainly that
+landing near 31 ms with spacing improved means the report was wrong. Keep that.
+Add: **the band should move the quadratic before separation does**, because
+bodies that stop at 260 cm stop generating the dense-cluster queries the N²
+term measures. If the band alone does not move it, separation probably will not
+either, and the term is something else.
+
+## Order against the meshes, and their own numbers say so
+
+6884b43 measured the mesh swap at +4.01 ms on a 35 ms crowd — 11%, noise — and
+then said the honest thing: it *looks* free because something three times worse
+stands in front of it. Against a separated crowd it is +41% and the 60 fps
+margin falls 6.88 → 2.87 ms, a 58% cut, before hit reactions, damage numbers,
+death effects and the player's own gun spend from what is left.
+
+**RULED: the crowd work lands first, then the meshes are re-costed against it.**
+Not because the meshes are expensive — because a figure measured behind a
+bottleneck is a figure about the bottleneck. The +11% is not wrong; it is
+about today, and today is the thing being removed.
+
+Two riders. **The acquisition refactor is scope, not surprise:** 12
+`ConstructorHelpers::FObjectFinder` sites in `Combat/` acquire every enemy mesh
+in constructors, and a constructor runs before data could be read, so the
+"replacing a mesh is a content change with no C++ diff" test fails by
+construction. A soft-pointer table on a data asset passes it. That refactor is
+part of the first mesh's estimate. **And the import is the owner's** — a
+skeletal mesh needs a skeleton and an import session, `.uasset` is not
+hand-editable, and the fonts precedent already has him running the script.
+
+## Traction's new window: the mantle is the wrong shape, the exit is the right one
+
+LEDGER left `Core.Velocity.Traction` deliberately silent and named a mantle
+window as the obvious candidate (0df1fb6). Half right, and the half that is
+wrong is the important half.
+
+`MantleDurationSeconds` is **0.20** and `VaultDurationSeconds` is **0.12**.
+Every other Velocity condition is a state you live in — `Freefall` is airborne,
+`Slipstream` is sliding, and the wall ride it replaces was a second or more of
+committed travel. A damage line gated on 0.20 s is not a build decision, it is
+a coin flip about whether a shot happened to leave the barrel inside a fifth of
+a second, and no player can aim at it.
+
+**The window is `RecentlyMantled`, not `Mantling`** — `Afterburn`'s exact shape
+(*"increased damage for a few seconds after dashing, the one Velocity line you
+can trigger on demand"*), which is the only Velocity line that is already
+honest about being a triggered window rather than a state. Vault and mantle are
+the second and third things in this game a player triggers on purpose.
+
+**Nothing records either today.** The pawn carries `MantleElapsed` and
+`ActiveTraversalDuration`, so "am I mantling" is derivable; a completion
+timestamp does not exist and is one float. The rule against authoring at absent
+plumbing still holds: **KIT records the exit, then LEDGER re-targets the line.**
+Not the other way round, and not in one commit across two lanes.
+
+## Grind's deletion: the save story exists, and it is a tax rather than a refund
+
+LEDGER marked `Swift.Kinetic.Grind` for full removal and said the deletion owes
+a save story. It has one, and it is worth reading before relying on it:
+`RiorsEdge.Progression`'s audit test loads `{"Some.Removed.Node", 3}` and the
+running total charges **fallback cost 1 per rank for a node that no longer
+resolves**. So a save that bought Grind keeps paying for it and receives
+nothing — the removal silently taxes the character, invisibly, forever.
+
+That cost is **zero today** because the only saves that ever bought Grind are
+the owner's own, and it is the largest it will ever be the day someone else
+plays. **Delete it now, or rule that unknown rows are dropped and credited at
+load.** Those are the two honest options; keeping a dead node to avoid a save
+story is choosing the census's problem over the player's.
+
+## And a standing constraint everyone should know
+
+`dead-conditions` landed exactly at its ceiling, **12 of 12** (0df1fb6). The
+next unauthored condition moves a pin or does not land. That is not a warning
+about that commit — it is the state every lane is now working inside.
+
+---
+
+# PART ONE-U — THE BLOCKED-ON-THE-SEAT PASS: EVERY OPEN LANE QUESTION, ANSWERED
+
+I audited the five lane reports for queue depth and found the wrong problem.
+The queues are not empty — they are **blocked**, and every one of the blocks is
+a question addressed to this seat. Fifteen of them, some carried for days,
+several of the form *"confirm and I will build it."* A restart that does not
+clear these stalls on the first one.
+
+Answered here in one pass, by lane. Where I am overturning a lane's own
+recommendation I say so; where I am confirming it, the confirmation is the
+whole ruling and no further report is wanted before building.
+
+---
+
+## GROUND
+
+**1. The `yard` marker role: CONFIRMED, shape one.** Your reasoning carries it —
+the anchor is authored where the yard is authored, it costs a role string, and
+`IsComplete` gains one clause. Shape two doubles the authoring for a marker
+that means nothing alone; shape three makes every yard's grammar depend on how
+the composer happened to be rotated, which is the exact failure the derived
+frame exists to prevent. Build it.
+
+**2. The connection rule: CONFIRMED, both terms.** Mouth width as a ceiling is
+right and it is the inversion that makes a connection a different kind of
+space rather than a thin yard. No-through-sight is right for the reason you
+gave — O1 makes movement the only active defence, and a straight seam lets a
+ranged enemy hold a player who has no cover authored for that angle.
+
+One addition, because it is the term you did not name: **a connection has
+exactly two mouths.** Three is a junction, a junction is a place where a fight
+can be flanked from a direction the yard's cover was not laid against, and the
+grammar has no vocabulary for it. If the composer wants a hub, that hub is a
+yard with no population, not a connection with three ends. Magnitudes stay O2
+against a walked yard, as you proposed.
+
+**3. `Playtest/` is yours.** ORDERS was right, your reading is right, and the
+useful part is why it confused anyone: `UI/BreakerPlaytestHUD.cpp` is not in
+`Playtest/`. No action; recorded so it stops being re-litigated.
+
+**4. The F3 overlay ships visible, and the initialiser is yours.**
+`Playtest/BreakerPlaytestComponent.h:136` — `bDiagnosticsVisible = true`.
+**RULED: it defaults to false.**
+
+This one has a receipt. The owner's first playtest screenshot showed what I
+read as colliding enemy labels and ruled on as a readability defect; FIELD's
+bar probe later found the collision was **the debug overlay**, not the shipping
+HUD. So a default nobody chose cost this seat a wrong ruling and cost GLASS a
+cycle chasing it. Every playtest the owner has ever run had it up. The verb is
+already there (`ToggleDiagnostics`), so nothing is lost — F3 still shows it.
+
+**5. The bar cull is not a bar defect, and the fix is in the tour.** The bar
+culls at 50 m from the pawn; `-BreakerCaptureTour` moves the camera and leaves
+the pawn behind, so a vantage standing among enemies culls every bar.
+
+In the shipping game the pawn and the camera **are the same point** —
+`FirstPersonCamera` is a component on the character. The invariant the bar
+relies on holds everywhere except inside the instrument that breaks it. So:
+**the tour moves the pawn, not a free camera.** Do not widen the cull to
+camera-space to make a capture pass — that is changing shipping behaviour to
+serve an instrument, which is the mirror of the rule we already hold about
+never narrowing an instrument to make a cycle pass.
+
+**6. How many bodies make a yard feel populated stays the owner's**, and it is
+not answerable from a chair. The way to get it is to walk the yard at three
+populations and pick — which is now possible, because the interior exists. Put
+three numbers behind a console var and hand him the command; that turns a
+standing-in-it question into a two-minute answer instead of a report.
+
+---
+
+## FIELD
+
+**7. Enemies get elements. RULED — and the pipeline already voted.** This has
+sat as a bare line in `DECISIONS.md` as though it were open. It is not, and the
+evidence is that every layer except the source is already built:
+
+- `Combat/BreakerCombatComponent.cpp:143` applies `ElementalResistancePercent`
+  to any family that is not Physical and not TrueDamage. Live, not stubbed.
+- `Items/BreakerAffixLibrary.cpp` ships `Core.ElementalResist` as a **droppable
+  suffix** with a 60% cap in `FBreakerEquipmentStats`, and a passing test.
+- And zero `Elemental` sites exist in `Combat/`, so nothing can ever produce
+  one.
+
+**The game currently drops an item stat that cannot matter.** That is not a
+missing feature, it is a trap in the loot pool — and it lives in the owner's
+own file, which is the one file no lane may edit. Two consistent worlds exist
+and only one of them is cheap: enemies get elements, or the affix comes out of
+the pool and the owner does it. The first costs FIELD a field.
+
+**8. Elements arrive through the MODIFIER layer, not the archetype, and that is
+the ruling that protects O116.** A plain soldier keeps dealing Physical, so the
+time-to-die derivation solved at 4.50 s / 4.53 s against one baseline stays
+intact and does not have to be reopened — which is exactly what the comment at
+`BreakerCombatComponent.cpp:130` warns about. The elemental case becomes a
+property an encounter **rolls**, met on a ModifierBearing enemy, which is the
+ARPG idiom and the layer that already exists with pressure axes and family
+gating. `Cascading` already leaves lingering hazards; a hazard with a family is
+the cheapest first element in the game.
+
+**9. One bucket, not per-element. O5's expansion is PARKED.** The defence is a
+single `Elemental` bucket today and it should stay one until there are at least
+two elements that behave differently from each other. Per-element resistance
+against one incoming element is untestable and it is table-work standing in for
+a design decision nobody has made. Do not build it; do not delete it.
+
+**10. Start with one modifier, one element, and report the TTD number it
+produces** against a character carrying zero resistance and a character at the
+60% cap. Two numbers. They are the whole design conversation.
+
+---
+
+## GLASS
+
+**11. The per-archetype weapon cue is YOURS TO BUILD NOW.** You were right not
+to read Ruling 2 as covering weapons by analogy, and right about the finding:
+`PlayWeaponFire()` takes no argument, so a sidearm, a rifle and a shotgun fire
+the identical clip, and no asset work fixes archetype sameness.
+
+Build it in the shape you proposed and no larger:
+`weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth, resolved lazily and
+cached, exactly as `PlayAbilityCast` resolves per ability. **No new verb, no
+generic `PlaySound`, no asset field on the weapon.** The constraint that makes
+this safe is the one you already named: it costs the owner nothing until he
+authors a file, and it means the files he authors land somewhere.
+
+**12. The telegraph hold STANDS, and you are right about why.** The sweep
+bounds the body count a telegraph system must serve and says nothing about what
+one costs, because audio lives in exactly the half the sweep did not measure.
+Designing against the body count alone is how it gets authored twice.
+
+**The lift condition, stated precisely so it cannot drift:** the hold lifts on
+FIELD's **full-fight** sweep — hit reactions, damage numbers, flashes, death
+effects and player fire included — not on the existence of any sweep. Until
+that number exists this stays held, and if someone tells you the gate is lifted,
+the test is whether the measurement contains the cosmetic half.
+
+**13. Travel points get their noun.** Ask GROUND for the getter. The NPC idiom
+is right — `GetDisplayName()` over `F TALK` — and the door reading "Fernhall
+Substation / F TRAVEL" instead of "TRAVEL / F TRAVEL" is worth one method on
+an actor that already carries the `DisplayName` property. **GROUND: publish
+the getter.** Sequence it behind the completion moment; it is cosmetic and the
+ending is not.
+
+---
+
+## KIT
+
+**14. The empty second slot repairing to EMPTY is the RULED SHAPE.** Every
+class repairs a stale foreign id to its own ruled default. Swift's ruled
+default for slot two is empty. The apparent inconsistency is the rule being
+applied correctly to a class whose default happens to be nothing — flagging it
+was right, and the answer is that nothing changed.
+
+**15. Sightline's cover clause: RETIRE it, do not re-scope it.** "Cannot be
+blocked by cover-state enemies" is about bodies in cover. Pointing it at the
+Warden's shield is not scoping, it is finding a new referent for a sentence
+whose referent died — the same shape as a justification outliving its cause,
+run in reverse.
+
+And the design says the same thing louder: the Warden's shield is the puzzle
+you flank. A node that lets you ignore it buys away the one enemy whose whole
+identity is a defence you must move around, and it does it as a *clause*, in
+small print, on a node named for something else. If an anti-Warden answer is
+wanted it is a node with its own name and its own cost, and that is the owner's
+call rather than a rescue for a dead sentence.
+
+**16. The probe-only token grant: YES, with one guard.** An instrument that can
+photograph only default loadouts photographs five-sixths of Swift's kit not at
+all, which makes it an instrument whose scope is narrower than its name — a
+shape this session has now named twice. Grant it. **The guard: probe-only, and
+it must never touch a save.** A dev grant that persists is a save-corruption
+path wearing a convenience.
+
+**17. The ultimate tint: a cue IS wanted, and it is GLASS's.** You were right
+to remove the accidental violet wash and right that a deliberate one is a
+post-process question rather than pooled primitives. Ignition should read
+without the player looking at a bar. **GLASS: brief, on ignition only, and it
+must not survive the ability** — a tint that outlives its cause is the same bug
+as the wash, authored on purpose.
+
+---
+
+## LEDGER
+
+**18. Longstride stays DISTANCE.** Four sites is the cheap side of the line I
+drew, your own conditional resolved it correctly, and you were right to land it
+rather than burn a round-trip. No commit.
+
+**19. O-numbers allocate at PUSH TIME, from the rebased file. RULED.** The
+mechanism that produced the O120 and O125 collisions was mine, and allocating
+at ruling time cannot be made safe by better ranges — I proved that by issuing
+ranges that went stale within minutes. Push time is the only moment at which
+the file you are reading is the file everyone else will read. **The line goes
+in `CLAUDE.md`'s session discipline; the file is the seat's and I will carry
+it.** Report it as landed and I will fold it in.
+
+**20. Grind: I left two options open, and that was the seat failing to rule.**
+Closing it now, in the order that fixes the shape rather than the instance:
+
+**First, fix the load path.** A save carrying a node id that no longer resolves
+is charged fallback cost 1 per rank and granted nothing — the audit test
+records this as behaviour. That is a silent, permanent tax on a character for
+content that was removed *under* them. **Unknown rows are dropped and credited
+at load, at the same fallback cost the recompute charges** — exactly undoing
+what it took, which is the only credit that is self-consistent once the real
+cost is gone with the node.
+
+**Then delete Grind.** In that order, two commits. Doing the deletion first
+would ship the tax and then fix it; doing it in the other order means every
+future removal is already safe, and there will be more of them. The cost of
+this is at its minimum today, because the only saves that ever bought Grind are
+the owner's own.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
@@ -2136,6 +2560,76 @@ That is the lane behaving well and the seat failing to keep a queue. **The fix i
 not for KIT to self-assign** — that is how a self-executing default became a
 ruling earlier tonight. It is for the seat to check queue depth when a lane
 reports, not only when it goes quiet.
+
+---
+
+# PART THREE-G — GLASS'S REFILL, AND THE LOOP'S ENDING HAS NO READER
+
+Owner, 2026-08-26: *"glass says it has no orders."*
+
+**It is right, and the fault is the seat's.** GLASS's list in Part Three-D had
+three items: the `TRAVEL` literal (done), the death beat (held on the owner),
+and enemy telegraph audio (held on FIELD's sweep). Everything written since —
+One-Q, One-R, Three-E, Three-F — assigned GLASS nothing. Four parts, every
+other lane named in them, and the one lane already down to two blocked items
+was in none of them. **A lane that reports an empty queue is doing its job.
+The empty queue is mine.**
+
+## 1. The ending has exactly one consumer and it is not the HUD
+
+Measured, not assumed. `OnRiftCompleted` is broadcast at
+`BreakerGameMode.cpp:225`, and `grep -rn "OnRiftCompleted" Source/` finds
+exactly one binder: `BreakerProgressionComponent.cpp:79`, LEDGER's payout. The
+HUD does not bind it. There is no completion banner, no summary, no cue —
+grep for a completion string in `BreakerPlaytestHUD.cpp` returns one line and
+it is an objective-journal flag.
+
+So as of 09829fd a rift run can be entered, fought, terminated and **paid**,
+and the screen says nothing at the moment it ends. The owner ruled the interior
+its own instance for one stated reason — *"so you can actually feel the loop"* —
+and the loop's ending is the single beat with nothing reading it.
+
+**GLASS: bind the seam and mark the moment.** LEDGER owns what was paid, so do
+not invent a reward summary; if you want the payout in the banner, ask LEDGER
+for a seam and say so in your report rather than reaching into `Progression/`.
+Part One-Q named this and did not order it. This is the order.
+
+## 2. The deployment briefing, same reason, one beat earlier
+
+One-Q's own sentence: the briefing and the completion "both get seen for the
+first time." Neither was ordered. Take the briefing **second** — the ending is
+the one the owner reaches this cycle, and an unmarked ending costs more than an
+unmarked start.
+
+## 3. Settle the kill sound with a measurement, not with the source
+
+Owner, again: *"the death sound is definitely still there."*
+
+Both fixes are on main and have been for hours — the `!Result.bKilled` guard
+since 2c63f81 (08-25 23:31), the `PlayKill` removal since 012262e (08-26
+01:29) — and `PlayKill()` has **zero call sites** outside its own definition.
+Five trigger sites exist in the whole project and they are AbilityCast,
+WeaponFire, HitConfirm ×2, TakeHit. So either the binary is stale, or what he
+is hearing is the hit-confirm that the fall-through deliberately kept.
+
+**The discriminator is in your own file and it is not subtle:**
+`KillDurationSeconds` is 0.30 and `KillSample` is a low two-tone drop;
+`HitDurationSeconds` is 0.06 and `HitConfirmSample` is a bright tick falling
+1400 → 920 Hz. Five times the length, opposite register.
+
+**Report which voice fires on an enemy death, in a build you compiled
+yourself.** Do not answer it from the source — the source is exactly what is
+already known and is not what is in question. That distinction is the order.
+
+If it is the hit-confirm, the code is correct and what remains is a design
+question the owner can answer in one word: *may a kill sound like a graze?*
+Put it to him as that, and do not infer it — your refusal to add a sixth verb
+on inference was right the first time.
+
+## Report before building, all three
+
+The owner's habit, and it works. One report covering all three. The completion
+moment is the only one that should also carry a proposal.
 
 ---
 
