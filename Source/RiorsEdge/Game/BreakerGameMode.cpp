@@ -250,15 +250,17 @@ void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Ri
     Session->PendingRift = Rift;
     Session->PendingDestinationId = ABreakerTravelPoint::RiftDestinationId;
 
-    // THE INTERIOR IS THE GYM, FOR THIS LANDING ONLY. The generator is not
-    // started and is not what makes this a loop — the gym is a real space
-    // with real spawning that already reads PendingRift for its area level, so
-    // pointing the door at it produces a COMPLETE loop with a placeholder
-    // room. That is worth more than a perfect room with no loop. The way back
-    // is the gym's own travel point, which offers Fernhall.
+    // THE INTERIOR IS THE YARD'S OWN GEOMETRY (Part One-Q, ruled). This is the
+    // line the placeholder comment said would move, and it moved: the gym was
+    // the interior only while nothing better existed, and it put the player in
+    // a room with target dummies at the most fiction-breaking moment available.
     //
-    // When interiors exist this is the one line that moves.
-    UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::GymMapName()));
+    // Same map, PendingRift set — which IS a different instance of the same
+    // tileset, and is what an instanced rift means. No new map and no new art:
+    // the yard is already built, already validated by the grammar, and the wave
+    // system spawns around the PLAYER rather than at an authored arena, so it
+    // has no dependency on gym geometry at all.
+    UBreakerGameInstance::TravelTo(this, FName(UBreakerGameInstance::FernhallMapName()));
 }
 
 AActor* ABreakerGameMode::ChoosePlayerStart_Implementation(AController* Player)
@@ -434,12 +436,65 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 {
                     Controller->SetControlRotation(Facing);
                 }
+
+                // THE FRAME IS REBUILT HERE, AFTER THE TELEPORT, and that is
+                // not tidiness. BuildFieldFrame ran before any map branch, so
+                // it anchored on wherever the pawn happened to spawn \u2014 the
+                // runtime fallback at the world origin \u2014 while the yard's
+                // grammar is expressed from the PLAYER START MARKER looking at
+                // the rift. Two frames for one yard, and spawn containment
+                // solved in the wrong one: it reported a 100 x 50 m yard
+                // affording 11285 cm, which is longer than the yard.
+                BuildFieldFrame(Pawn);
             }
-            // The way back. The yard fronts the rift; it must not be a trap
-            // while the rift is not built yet, so the entry keeps a gate to
-            // everywhere else the registry knows. Placed off the lane on the
-            // entry plaza, in the yard's own marker-derived frame rather than
-            // world axes, so a re-exported yard carries its gate with it.
+
+            // AND THE YARD'S OWN BAND, not the gym's. MakeCoverFieldParams
+            // builds the gym field from this actor's properties; measuring
+            // Fernhall against it is measuring one place with another's
+            // dimensions. This is the same params object the grammar test
+            // validates the yard with, so what contains the spawner and what
+            // proves the layout legal are one source.
+            ActiveFieldParams = UBreakerZoneBuilder::FernhallFieldParams();
+            bActiveFieldParamsSet = true;
+            // ONE MAP, TWO BUILDS. With a PendingRift set this is a RIFT RUN
+            // in the yard's geometry; without one it is the yard itself. The
+            // difference is what stands in it: a run has a fight and a way out,
+            // the yard has a door and no fight. Reading the session rather than
+            // a second map is what makes this an INSTANCE.
+            UBreakerGameInstance* RiftSession = GetGameInstance<UBreakerGameInstance>();
+
+            // -BreakerRiftInstance: the harness's way INTO a run. The interior
+            // is a mode of this map that only TRAVEL can reach — the door
+            // writes PendingRift and travels — and the capture harness cannot
+            // press F, so without this the one build that matters is the one
+            // build nobody can photograph. Same construction and same reason as
+            // -BreakerCaptureDeployBeat, which seeds a rift for the briefing:
+            // a command-line switch, so a shipped build cannot reach it, and it
+            // never overwrites a rift a door already authored.
+            if (RiftSession && !RiftSession->PendingRift.IsSet()
+                && FParse::Param(FCommandLine::Get(), TEXT("BreakerRiftInstance")))
+            {
+                RiftSession->PendingRift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
+                RiftSession->PendingRift.AreaLine = FText::FromString(
+                    TEXT("The tear under the substation, where the yard stops being quiet."));
+                RiftSession->PendingRift.AreaLevel = 5;   // O2 PLACEHOLDER, the door's own level
+                RiftSession->PendingRift.Tier = EBreakerRiftTier::Campaign;
+                UE_LOG(LogTemp, Display, TEXT("[Rift] -BreakerRiftInstance seeded a run; this is a capture, not a door."));
+            }
+
+            bRiftInstance = RiftSession && RiftSession->PendingRift.IsSet();
+
+            // The way back. Both builds need one — the yard must not be a trap,
+            // and a rift the player cannot leave is worse. Placed off the lane
+            // on the entry plaza, in the yard's own marker-derived frame rather
+            // than world axes, so a re-exported yard carries its gate with it.
+            //
+            // FROM INSIDE A RUN THE GATE IS THE WAY OUT, and it needs no
+            // special case: travelling anywhere clears PendingRift
+            // (HandleHubTravelSelected), so choosing Fernhall from inside a
+            // rift lands the player back in the yard rather than in another
+            // run. Leaving by the door you came in is exactly O168's
+            // no-completion path — no event, no payout.
             const FVector YardRight = FVector::CrossProduct(FVector::UpVector, YardForward);
             const FVector GateAt = StartAt - YardForward * 300.0f + YardRight * 900.0f
                 + FVector(0.0f, 0.0f, 100.0f);
@@ -456,7 +511,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // changes — but the marker list is what lets five yards each
             // carry their own door without this code moving again, which is
             // the whole reason the marker model was reshaped.
-            for (const FBreakerZoneMarker& RiftMarker : Markers.OfRole(EBreakerZoneMarkerRole::Rift))
+            //
+            // NO DOORS INSIDE A RUN. A rift door standing in the rift it opens
+            // would offer to enter the place the player is already in, and
+            // entering it would write a fresh PendingRift over the live one.
+            for (const FBreakerZoneMarker& RiftMarker : bRiftInstance
+                    ? TArray<FBreakerZoneMarker>()
+                    : Markers.OfRole(EBreakerZoneMarkerRole::Rift))
             {
                 // Faces back down the lane toward the player start, so a
                 // player walking the length of the yard arrives looking at
@@ -490,9 +551,31 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
             }
         }
+        if (bRiftInstance)
+        {
+            // THE RUN STARTS ITSELF. A rift the player has to press a key to
+            // populate is a test bench, and the gym already is one; walking
+            // through a tear and finding an empty yard is the opposite of a
+            // felt loop.
+            //
+            // THE BOSS ARRIVES ON RiftBossWave, NOT THE GYM'S TWELVE. Twelve
+            // waves is a wave-mode endurance figure and the ruling's success
+            // test is one sitting. This is the shortest lever that makes a run
+            // a run, and it is O2 PLACEHOLDER: the owner moves it after
+            // walking one, which is the only test this has.
+            WaveBudget.BossWaveInterval = FMath::Max(RiftBossWave, 1);
+            const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+            UE_LOG(LogTemp, Display,
+                TEXT("[Rift] instance built: %s, area level %d, boss on wave %d."),
+                Session ? *Session->PendingRift.AreaName.ToString() : TEXT("<unnamed>"),
+                Session ? Session->PendingRift.EffectiveAreaLevel() : 0,
+                WaveBudget.BossWaveInterval);
+            StartNextWave();
+        }
         bPlaytestTargetsSpawned = true;
         ScheduleScreenshots();
-        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — zone assembled, no gym field."));
+        UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
+            bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
         return;
     }
 
@@ -2890,7 +2973,10 @@ void ABreakerGameMode::StartNextWave()
     FVector ArenaCenter = Origin + Forward * SpawnDistance;
     if (bFieldFrameSet)
     {
-        const FBreakerCoverFieldParams FieldParams = MakeCoverFieldParams();
+        // The zone's band where a zone built one, the gym's where this actor
+        // authored the field itself.
+        const FBreakerCoverFieldParams FieldParams =
+            bActiveFieldParamsSet ? ActiveFieldParams : MakeCoverFieldParams();
         const FVector Offset = Origin - Frame.Ground;
         const float PlayerF = static_cast<float>(FVector::DotProduct(Offset, Frame.Forward));
         const float PlayerR = static_cast<float>(FVector::DotProduct(Offset, Frame.Right));
@@ -2950,6 +3036,17 @@ void ABreakerGameMode::StartNextWave()
         {
             ActiveBoss->ConfigureWave(AreaLevel);
             WaveEnemies.Add(ActiveBoss);
+            // THE BOSS IS THE RIFT'S TERMINATOR (O168). Inside a run the thing
+            // holding the rift open is the thing the run culminates in — the
+            // only body in this game that already means "this is the end", so
+            // marking it invents no design. Marking and binding are one act,
+            // and FIELD's raise is mark-guarded, so an unmarked boss in the gym
+            // costs one bool and completes nothing.
+            //
+            // WHICH BODY HOLDS A RIFT OPEN IS STILL THE SEAT'S TO RULE. This is
+            // the least arbitrary choice available, not a ruling: if a rift
+            // should end on something else, this is the one call that moves.
+            if (bRiftInstance) MarkRiftTerminator(ActiveBoss);
         }
         return;
     }

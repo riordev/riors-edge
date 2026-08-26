@@ -557,6 +557,25 @@ private:
     // and honestly a new run — which is why no idempotence counter is needed
     // anywhere downstream.
     bool bRiftRunCompleted = false;
+    // THIS WORLD IS A RIFT INSTANCE (Part One-Q). Fernhall's geometry with a
+    // PendingRift set is a different INSTANCE of the same tileset, which is
+    // what an instanced rift is: same ground, separate run. The flag is what
+    // separates the two builds of one map \u2014 the yard has a rift door and no
+    // fight, the instance has a fight and no door.
+    bool bRiftInstance = false;
+    // THE FIELD THE SPAWNER IS CONTAINED IN. MakeCoverFieldParams builds the
+    // GYM's band from this actor's own properties, which is right on the gym
+    // and wrong everywhere else: an authored zone carries its own band, its own
+    // corridor and its own safe ring. Set when a zone builds; unset means the
+    // gym, which is the only map whose field this actor authors.
+    FBreakerCoverFieldParams ActiveFieldParams;
+    bool bActiveFieldParamsSet = false;
+    // How many waves a rift run lasts before its boss arrives. The gym's
+    // BossWaveInterval is 12, which is a wave-mode endurance figure and NOT a
+    // run: the ruling's success test is that the loop is FELT in one sitting,
+    // and twelve waves is not one sitting. O2 PLACEHOLDER, and the first number
+    // the owner should move after walking it.
+    UPROPERTY(EditAnywhere, Category="Playtest|Rift", meta=(ClampMin="1")) int32 RiftBossWave = 3;   // O2 PLACEHOLDER
 
     // --- The crowd probe (vertical-slice density instrument) --------------
     // -BreakerCrowdProbe=N spawns N trash enemies during the gym build;
