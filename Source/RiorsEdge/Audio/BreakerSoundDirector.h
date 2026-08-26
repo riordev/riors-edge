@@ -55,6 +55,16 @@ public:
     // arrival clock.
     void PlayHitConfirm();
     // Something the player hit died of it.
+    //
+    // NO CALLER, BY RULING, AND THAT IS NOT THE DEAD-API DEFECT. "No death
+    // sound for now" (owner, 2026-08-26) retired both death stings — the
+    // player's and this one — and the kill now falls through to
+    // PlayHitConfirm at the arrival-clock site, so a killing shot still
+    // confirms it connected. Kept rather than deleted because the ruling is
+    // explicitly "for now" and the open question is what a kill should SOUND
+    // like, not whether the verb should exist. The distinction that matters:
+    // GetPromptLabel spent a milestone uncalled because nobody knew it was
+    // there. This one is uncalled on purpose and says so.
     void PlayKill();
     // The player took real damage. Immediate — being hit has no flight.
     void PlayTakeHit();

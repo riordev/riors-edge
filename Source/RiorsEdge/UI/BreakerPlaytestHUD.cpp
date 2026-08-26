@@ -2463,6 +2463,26 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
 
 void ABreakerPlaytestHUD::ScheduleArrivalSound(float DelaySeconds, bool bKill)
 {
+    // NO DEATH SOUND, AND A KILL FALLS THROUGH TO THE HIT-CONFIRM (ruled
+    // 2026-08-26, the owner's second playtest). There were TWO death sounds and
+    // only one had been ruled on: the player's, silenced by the !bKilled guard
+    // in HandlePlayerDamageReceived. This is the other one — the noise an ENEMY
+    // makes dying, which the player hears far more often — and it was still
+    // there.
+    //
+    // THE FALL-THROUGH IS THE RULING, not an implementation detail. Deleting
+    // the kill branch has two readings and only one was asked for: the kill
+    // plays the hit-confirm (no sting, the shot still confirms it connected),
+    // NOT the kill plays nothing — which would make the LAST shot on an enemy
+    // silent and remove the feedback that it landed at all. Losing hit
+    // confirmation is a worse defect than a bad sting.
+    //
+    // bKill is retained and deliberately unread. The ruling is "for now", and
+    // whether a kill should sound different from a graze is a separate question
+    // the owner has left open — the caller already knows the answer and
+    // throwing it away here is the expensive half to reconstruct.
+    (void)bKill;
+
     // Retrigger-cut semantics survive the delay: each scheduled play calls
     // the same voice, and the newest arrival wins exactly as it does at
     // zero delay. The timer handle is deliberately per-call and discarded —
@@ -2472,7 +2492,7 @@ void ABreakerPlaytestHUD::ScheduleArrivalSound(float DelaySeconds, bool bKill)
     {
         if (ABreakerSoundDirector* Sound = GetSoundDirector())
         {
-            if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();
+            Sound->PlayHitConfirm();
         }
         return;
     }
@@ -2480,13 +2500,13 @@ void ABreakerPlaytestHUD::ScheduleArrivalSound(float DelaySeconds, bool bKill)
     if (!World) return;
     TWeakObjectPtr<ABreakerPlaytestHUD> WeakThis(this);
     FTimerHandle Discarded;
-    World->GetTimerManager().SetTimer(Discarded, FTimerDelegate::CreateLambda([WeakThis, bKill]()
+    World->GetTimerManager().SetTimer(Discarded, FTimerDelegate::CreateLambda([WeakThis]()
     {
         if (ABreakerPlaytestHUD* HUD = WeakThis.Get())
         {
             if (ABreakerSoundDirector* Sound = HUD->GetSoundDirector())
             {
-                if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();
+                Sound->PlayHitConfirm();
             }
         }
     }), DelaySeconds, false);

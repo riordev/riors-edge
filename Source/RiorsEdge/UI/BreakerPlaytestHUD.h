@@ -172,8 +172,12 @@ private:
     // ride (OnShot, OnHitDealt), through the same lazily-spawned cosmetic
     // sibling; see BreakerSoundDirector.h.
     ABreakerSoundDirector* GetSoundDirector();
-    // Plays the hit-confirm (or kill) sound on the arrival clock: now for a
-    // zero delay, through a one-shot timer for a round still in flight.
+    // Plays the hit-confirm on the arrival clock: now for a zero delay, through
+    // a one-shot timer for a round still in flight. A KILL PLAYS THE SAME
+    // CONFIRM — "no death sound for now" (2026-08-26) retired the sting, and
+    // the fall-through is the ruling: a silent killing shot would remove the
+    // feedback that it landed at all. bKill is retained and unread; see the
+    // definition.
     void ScheduleArrivalSound(float DelaySeconds, bool bKill);
     void DrawDamageNumbers();
     // DEFINED IN Combat/BreakerEnemyHealthBars.cpp, not beside its siblings
