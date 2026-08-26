@@ -18,6 +18,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 
 namespace BreakerSupportAbilityLocal
 {
@@ -355,6 +357,40 @@ void UBreakerAbility_Patch::ActivateAbility(const FGameplayAbilitySpecHandle Han
                 }
             }
         }
+
+        // THE HEAL, VISIBLE: a gold pulse and a short rising stroke at the
+        // HEALED actor -- self or ally, wherever the value landed. Gold is
+        // the reward family and a heal is a payment received. Drawn only
+        // when a target resolved, so a whiffed ally-cast (which still
+        // committed) shows nothing it did not do. Figures O2 PLACEHOLDER.
+        // (Server-only, cosmetic call -- see BreakerEffectRenderer.h.)
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(Character->GetWorld()))
+        {
+            BreakerFX::FEffectTiming HealTiming;
+            HealTiming.DurationSeconds = 0.35f;
+            HealTiming.FadeInSeconds = 0.05f;
+            HealTiming.FadeOutSeconds = 0.25f;
+            if (Target == Character)
+            {
+                // SELF-CAST DRAWS AT THE FEET, off-axis: the ally composition
+                // below, placed at the caster's own chest, rises straight
+                // through the first-person camera and fills the screen with a
+                // gold pillar (the Support probe photographed it). Same
+                // lesson, third site: never wrap a primitive around the one
+                // camera guaranteed to be standing in it.
+                const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+                Effects->AddGlow(Feet, 40.0f, BreakerUI::Gold, 2.6f, HealTiming);
+                const FVector Side = FVector::CrossProduct(Character->GetControlRotation().Vector(), FVector::UpVector).GetSafeNormal();
+                Effects->AddStroke(Feet + Side * 50.0f, Feet + Side * 55.0f + FVector(0, 0, 70.0f), 3.0f, BreakerUI::Gold, 2.2f, HealTiming, 0.05f);
+                Effects->AddStroke(Feet - Side * 50.0f, Feet - Side * 55.0f + FVector(0, 0, 70.0f), 3.0f, BreakerUI::Gold, 2.2f, HealTiming, 0.05f);
+            }
+            else
+            {
+                const FVector Chest = Target->GetActorLocation() + FVector(0.0f, 0.0f, 25.0f);
+                Effects->AddGlow(Chest, 32.0f, BreakerUI::Gold, 3.0f, HealTiming);
+                Effects->AddStroke(Chest + FVector(0, 0, 10.0f), Chest + FVector(0, 0, 85.0f), 3.0f, BreakerUI::Gold, 2.4f, HealTiming, 0.05f);
+            }
+        }
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -423,6 +459,37 @@ void UBreakerAbility_Purge::ActivateAbility(const FGameplayAbilitySpecHandle Han
         {
             const UBreakerAbilityDefinition* Definition = GetAbilityDefinition();
             Status->GrantStatusImmunity(Definition && Definition->WindowDuration > 0.0f ? Definition->WindowDuration : 3.0f);   // §U2: 3s
+        }
+
+        // THE CLEANSE, VISIBLE: a cyan wash and a rising ring of short
+        // strokes shrugging off the target -- cyan is the player/system
+        // family, and a cleanse is the system scrubbing something OFF, not a
+        // payment. Intensity does not scale with statuses removed; a zero
+        // cleanse still bought the immunity-shaped moment the cast paid for.
+        // Figures O2 PLACEHOLDER. (Server-only, cosmetic call -- see
+        // BreakerEffectRenderer.h.)
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(Character->GetWorld()))
+        {
+            const FVector Base = Target->GetActorLocation();
+            BreakerFX::FEffectTiming CleanseTiming;
+            CleanseTiming.DurationSeconds = 0.35f;
+            CleanseTiming.FadeInSeconds = 0.03f;
+            CleanseTiming.FadeOutSeconds = 0.28f;
+            // Self-cast: no centre glow (the camera stands in it — Patch's
+            // photographed lesson); the shrug ring alone, wider so its
+            // strokes sit outside the first-person view's near plane.
+            const bool bSelf = Target == Character;
+            if (!bSelf)
+            {
+                Effects->AddGlow(Base + FVector(0, 0, 40.0f), 42.0f, BreakerUI::Cyan, 2.6f, CleanseTiming);
+            }
+            const float RingCm = bSelf ? 75.0f : 45.0f;
+            for (int32 Index = 0; Index < 6; ++Index)
+            {
+                const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+                Effects->AddStroke(Base + Out * RingCm + FVector(0, 0, 15.0f),
+                    Base + Out * (RingCm + 15.0f) + FVector(0, 0, 95.0f), 3.0f, BreakerUI::Cyan, 2.2f, CleanseTiming, 0.02f * Index);
+            }
         }
     }
 

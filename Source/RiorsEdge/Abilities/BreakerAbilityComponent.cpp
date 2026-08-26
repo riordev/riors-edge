@@ -4,7 +4,11 @@
 #include "Abilities/BreakerAbilityDefinition.h"
 #include "Abilities/BreakerGameplayAbility.h"
 #include "Attributes/BreakerAttributeSet.h"
+#include "Classes/BreakerChargeComponent.h"
+#include "Classes/BreakerGritComponent.h"
+#include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
+#include "Classes/BreakerScrapComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
@@ -28,7 +32,8 @@ void UBreakerAbilityComponent::BeginPlay()
     // -BreakerAbilityProbe: the ability-cast half the capture harness cannot
     // reach (it cannot press a key). Self-scheduled against the harness's own
     // screenshot clock (first frame 6.0s, then every 2.0s): the class is
-    // forced at 5.0s, slot two casts at 5.85s and the ultimate at 7.6s. The
+    // forced at 5.0s, then slot one at 5.85s, slot two at 7.6s and the
+    // ultimate at 9.6s (frames 6/8/10, -BreakerScreenshots=3). The
     // probe clock (BeginPlay) and the harness clock (capture arm) skew by up
     // to ~0.3s run to run — one photograph landed BEFORE the cast it was
     // for — so each cast leads its frame by less than its flash's life
@@ -38,21 +43,48 @@ void UBreakerAbilityComponent::BeginPlay()
     // could not reach; the O176-gated abilities join the photograph when
     // their unlock rows land. Resource is granted through the loop's own
     // unmetered dev grant, not by touching the bank.
-    if (FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe")))
+    FString ProbeClassName;
+    const bool bProbeFlag = FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe"));
+    const bool bProbeValue = FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeClassName);
+    if (bProbeFlag || bProbeValue)
     {
+        // Bare flag probes Swift; -BreakerAbilityProbe=<Tank|Support|...>
+        // probes any class DevForceClass can inhabit, casting its DEFAULT
+        // loadout: slot one at 5.85s, slot two at 7.6s, the ultimate at 9.6s
+        // against frames at 6/8/10 (-BreakerScreenshots=3). An unrecognised
+        // name falls back to Swift LOUDLY rather than probing nothing.
+        EBreakerClassId ProbeClass = EBreakerClassId::Swift;
+        if (bProbeValue)
+        {
+            if (ProbeClassName.Equals(TEXT("Caster"), ESearchCase::IgnoreCase)) ProbeClass = EBreakerClassId::Caster;
+            else if (ProbeClassName.Equals(TEXT("Gunsmith"), ESearchCase::IgnoreCase)) ProbeClass = EBreakerClassId::Gunsmith;
+            else if (ProbeClassName.Equals(TEXT("Tank"), ESearchCase::IgnoreCase)) ProbeClass = EBreakerClassId::Tank;
+            else if (ProbeClassName.Equals(TEXT("Support"), ESearchCase::IgnoreCase)) ProbeClass = EBreakerClassId::Support;
+            else if (!ProbeClassName.Equals(TEXT("Swift"), ESearchCase::IgnoreCase))
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerAbilityProbe] unknown class '%s'; probing Swift"), *ProbeClassName);
+            }
+        }
         AActor* Owner = GetOwner();
         UWorld* World = GetWorld();
         if (Owner && World && Owner->HasAuthority() && Cast<APawn>(Owner))
         {
             TWeakObjectPtr<UBreakerAbilityComponent> WeakThis(this);
-            FTimerHandle ClassHandle, SlotTwoHandle, UltimateHandle;
-            World->GetTimerManager().SetTimer(ClassHandle, FTimerDelegate::CreateLambda([WeakThis]()
+            FTimerHandle ClassHandle, SlotOneHandle, SlotTwoHandle, UltimateHandle;
+            World->GetTimerManager().SetTimer(ClassHandle, FTimerDelegate::CreateLambda([WeakThis, ProbeClass]()
             {
                 UBreakerAbilityComponent* Probe = WeakThis.Get();
                 UBreakerProgressionComponent* Progression = Probe ? Probe->GetProgression() : nullptr;
-                if (Progression && Progression->GetProgressionState().PermanentClass == EBreakerClassId::None)
+                // Force whenever the held class is not the requested one — the
+                // autoplay path has already chosen Swift by 5.0s, so a gate on
+                // None never fires for any other class (the first Tank probe
+                // photographed a Swift because of exactly that). The dev swap
+                // leaves the old loadout ids in place on purpose: resolving
+                // them through the guarded read IS the stale-loadout repair
+                // path, probed live.
+                if (Progression && Progression->GetProgressionState().PermanentClass != ProbeClass)
                 {
-                    Progression->DevForceClass(EBreakerClassId::Swift);
+                    Progression->DevForceClass(ProbeClass);
                 }
                 if (Probe)
                 {
@@ -66,21 +98,43 @@ void UBreakerAbilityComponent::BeginPlay()
                 {
                     return;
                 }
+                // Fill whatever loop the probed class runs; each grant is a
+                // no-op for every class it does not belong to.
                 if (UBreakerMomentumComponent* Momentum = Probe->GetOwner()->FindComponentByClass<UBreakerMomentumComponent>())
                 {
                     Momentum->GrantMomentum(200.0f);
                 }
+                if (UBreakerGritComponent* Grit = Probe->GetOwner()->FindComponentByClass<UBreakerGritComponent>())
+                {
+                    Grit->GrantGrit(200.0f);
+                }
+                if (UBreakerChargeComponent* ChargeLoop = Probe->GetOwner()->FindComponentByClass<UBreakerChargeComponent>())
+                {
+                    ChargeLoop->GrantCharge(200.0f);
+                }
+                if (UBreakerManaComponent* Mana = Probe->GetOwner()->FindComponentByClass<UBreakerManaComponent>())
+                {
+                    Mana->GrantMana(200.0f, true);
+                }
+                if (UBreakerScrapComponent* Scrap = Probe->GetOwner()->FindComponentByClass<UBreakerScrapComponent>())
+                {
+                    Scrap->GrantScrap(200.0f);
+                }
                 const bool bActivated = Probe->TryActivateSlot(Slot);
                 UE_LOG(LogTemp, Log, TEXT("[BreakerAbilityProbe] slot %d activate=%d"), static_cast<int32>(Slot), bActivated ? 1 : 0);
             };
+            World->GetTimerManager().SetTimer(SlotOneHandle, FTimerDelegate::CreateLambda([ProbeCast]()
+            {
+                ProbeCast(EBreakerAbilitySlot::ClassAbilityOne);
+            }), 5.85f, false);
             World->GetTimerManager().SetTimer(SlotTwoHandle, FTimerDelegate::CreateLambda([ProbeCast]()
             {
                 ProbeCast(EBreakerAbilitySlot::ClassAbilityTwo);
-            }), 5.85f, false);
+            }), 7.6f, false);
             World->GetTimerManager().SetTimer(UltimateHandle, FTimerDelegate::CreateLambda([ProbeCast]()
             {
                 ProbeCast(EBreakerAbilitySlot::Ultimate);
-            }), 7.6f, false);
+            }), 9.6f, false);
         }
     }
 #endif

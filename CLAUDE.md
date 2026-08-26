@@ -2,6 +2,33 @@
 
 ## Current work
 
+KIT LANE, THE INVISIBLE SIX DRAW AND THE PROBE LEARNS CLASSES. The
+lane's open questions moved to Docs/reports/KIT.md (LEDGER's
+convention, per the lead: one place, one name). Rend wears Cleave's
+own swept cyan arc at its L7-widened effective geometry plus a gold
+pulse only when the leech actually paid; Provoke flares a Harm-red
+ring at the TRUE B3 radius on every committed cast — the ring is the
+radius readout; Breach Charge's bare-FVector charge finally has
+presence (an OrangeDeep fuse glow for exactly the fuse at the one
+kind of spot a lifetime world primitive tells no lie about — a fixed
+point) and detonation shares one BreakerTankBlastFlash with Ground
+Zero exactly as they share the radial damage seam; Patch and Purge
+draw gold heal / cyan cleanse at the healed or cleansed actor, with
+SELF-CASTS feet-anchored — the Support probe photographed Patch's
+ally composition at the caster's own chest as a screen-filling gold
+pillar, the same camera-inside-the-primitive defect as Overdrive's
+wash, now the template's stated rule (third site, now a law: never
+wrap a primitive around the one camera guaranteed to stand in it).
+-BreakerAbilityProbe grew =<Class> (Tank/Support/Caster/Gunsmith; the
+dev-swap over autoplay's Swift exercises the stale-loadout guard
+live) and a slot-one cast (frames 6/8/10, -BreakerScreenshots=3).
+O176's DECISIONS text rewritten to the owner's overturn (one starter,
+five unlockables, dash NODE with LEDGER). Still drawing nothing after
+this pass: NOTHING in Tank/Support — the census's invisible six are
+all lit; remaining presentation debt is per-ability sound (GLASS's
+fifth verb) and the deployable action-visibility items (turret fire,
+crate dispense, mine charges) from the census.
+
 KIT LANE, SWIFT COMPLETES AND THE WHOLE KIT DRAWS (457 passing / 7
 expected red / 0 unexpected on the rebased tree — the three new reds
 are ENUMERATED, each naming LEDGER's two-line fix). O175-O178. The
@@ -31,13 +58,12 @@ ONLY, windows stay HUD bars — a world aura pinned to a cast point
 lies three steps later on the game's fastest class, and pooled
 primitives per cast scale with CASTS, not enemies (the crowd probe's
 engaged 34.16 ms says the enemy side has no headroom to lend).
-WAITING ON LEDGER (O176): BreakerProgressionLibrary.cpp:4180 starters
-{Swift.Slipcut, Swift.Skim}, :4186 unlockables {Swift.Lead,
-Swift.CadenceBreak, Swift.HardStop, Swift.Sightline}, plus their call
-on the now-redundant Swift.Marksman.Lead node grant and the Sightline
-node's +2 Pierce stand-in (its own comment retires it); KIT flips
-DefaultAbilityIdForSlot in the same landing. Until then the three
-new abilities are registered and honestly refused. AUDIO: no KIT
+LANDED SINCE (O176 as overturned, LEDGER's 6568371 with KIT's hunks):
+one starter (Skim), slot two EMPTY until the first unlock, five
+unlockables Slipcut-first, fifth token milestone, and the three
+enumerated reds deleted. Still theirs to rule: the Lead node grant
+(now a token bypass) and the Sightline node's +2 Pierce stand-in —
+both in Docs/reports/KIT.md. AUDIO: no KIT
 interface needed — OnAbilityActivated is already broadcast and
 already bound by GLASS's HUD; the blocker is the owner's fifth-verb
 ruling (one ability cue vs per-ability cues), per O178's split.

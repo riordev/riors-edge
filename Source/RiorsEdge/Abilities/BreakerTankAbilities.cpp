@@ -21,10 +21,40 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 namespace BreakerTankAbilityLocal
 {
+    // The Demolitionist blast, visible: one flash shared by Breach Charge and
+    // Ground Zero exactly as they share the radial damage seam, so the
+    // geometry the player reads is the geometry the damage used. Orange is
+    // the heat family (BreakerUIStyle); the pop is hard, an explosion is an
+    // impact. Figures O2 PLACEHOLDER. (Server-only abilities, cosmetic call
+    // -- see BreakerEffectRenderer.h.)
+    void BreakerTankBlastFlash(UWorld* World, const FVector& Center, float RadiusCm)
+    {
+        ABreakerEffectRenderer* Effects = World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+        if (!Effects) return;
+        BreakerFX::FEffectTiming BlastTiming;
+        BlastTiming.DurationSeconds = 0.40f;
+        BlastTiming.FadeInSeconds = 0.0f;
+        BlastTiming.FadeOutSeconds = 0.32f;
+        const FVector Lift = Center + FVector(0.0f, 0.0f, 30.0f);
+        Effects->AddGlow(Lift, 60.0f, BreakerUI::Orange, 3.8f, BlastTiming);
+        Effects->AddBlinkLight(Lift, FMath::Max(400.0f, RadiusCm), BreakerUI::OrangeDeep, 3200.0f, BlastTiming);
+        // Eight ground spokes out to the EFFECTIVE radius -- a D9-widened
+        // blast draws wider, the same honesty as Cleave's widened arc.
+        for (int32 Index = 0; Index < 8; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 45.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(Center + Out * (RadiusCm * 0.25f) + FVector(0, 0, 8.0f),
+                Center + Out * RadiusCm + FVector(0, 0, 8.0f), 5.0f, BreakerUI::Orange, 2.6f, BlastTiming,
+                0.015f * Index);
+        }
+    }
+
     // Prefixed for the unity build, per house rule.
 
     // Node reads, the Cleave's Edge pattern: rank for the R1/R2 nodes, tag for
@@ -254,6 +284,30 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     const float BloodletFraction = BloodletRank >= 2 ? 0.14f : (BloodletRank == 1 ? 0.08f : 0.0f);   // node text
     const float OwnMaxHealth = SourceAttributes ? SourceAttributes->GetMaxHealth() : 0.0f;
 
+    // THE SWING, VISIBLE -- Cleave's own composition at Rend's geometry: the
+    // arc's outer rim in pooled strokes at the EFFECTIVE arc (an L7-widened
+    // 180 draws as 180), staggered left to right so it reads as a swing.
+    // Cyan, matching Cleave: one melee-sweep verb, one look, whatever class
+    // swings it. Timings O2 PLACEHOLDER. (Server-only, cosmetic call -- see
+    // BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector ArcOrigin = Params.Origin + FVector(0.0f, 0.0f, 60.0f);
+        BreakerFX::FEffectTiming SwingTiming;
+        SwingTiming.DurationSeconds = 0.22f;
+        SwingTiming.FadeInSeconds = 0.02f;
+        SwingTiming.FadeOutSeconds = 0.12f;
+        const float SweepSeconds = 0.16f;
+        for (int32 Index = 0; Index < BreakerFX::SweptArcStrokes; ++Index)
+        {
+            FVector A, B;
+            BreakerFX::ArcStroke(ArcOrigin, Params.Forward, Params.ArcDegrees, Params.RangeCm,
+                Index, BreakerFX::SweptArcStrokes, A, B);
+            Effects->AddStroke(A, B, 6.0f, BreakerUI::Cyan, 3.0f, SwingTiming,
+                SweepSeconds * Index / BreakerFX::SweptArcStrokes);
+        }
+    }
+
     float TotalPostMitigation = 0.0f;
     int32 TargetIndex = 0;
     for (AActor* Target : UBreakerMeleeSweep::SweepTargets(World, Character, Params))
@@ -358,6 +412,22 @@ void UBreakerAbility_Rend::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         {
             GetBreakerAttributes()->ApplyShield(FMath::Min(SourceAttributes->GetMaxShield(),
                 SourceAttributes->GetShield() + HealResult.ShieldGranted * (ClotRatio - 1.0f)));
+        }
+    }
+
+    // The payout, visible only when it PAID: a small gold pulse at the chest
+    // when the sweep actually leeched (gold is the reward family, and Rend's
+    // heal is its payout). A dry swing draws the arc and nothing else --
+    // a heal flash on a whiff would be the ability lying. O2 PLACEHOLDER.
+    if (TotalPostMitigation > 0.0f)
+    {
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+        {
+            BreakerFX::FEffectTiming PayTiming;
+            PayTiming.DurationSeconds = 0.30f;
+            PayTiming.FadeInSeconds = 0.05f;
+            PayTiming.FadeOutSeconds = 0.22f;
+            Effects->AddGlow(Character->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f), 30.0f, BreakerUI::Gold, 2.8f, PayTiming);
         }
     }
 
@@ -654,6 +724,30 @@ void UBreakerAbility_Provoke::ActivateAbility(const FGameplayAbilitySpecHandle H
         }
     }
 
+    // THE SHOUT, VISIBLE: a ring of strokes at the feet flaring out to the
+    // EFFECTIVE radius (a B3-widened reach draws wider), in the Harm family's
+    // red -- Provoke paints its caster as the thing to attack, and red is
+    // what this palette says danger in. Drawn on every committed cast: the
+    // radius readout is the presentation, provoked count or not. Figures O2
+    // PLACEHOLDER. (Server-only, cosmetic call -- see BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming ShoutTiming;
+        ShoutTiming.DurationSeconds = 0.45f;
+        ShoutTiming.FadeInSeconds = 0.02f;
+        ShoutTiming.FadeOutSeconds = 0.35f;
+        Effects->AddGlow(Character->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), 45.0f, BreakerUI::Harm, 3.0f, ShoutTiming);
+        // Twelve rim segments approximating the radius circle, staggered so
+        // the ring reads as expanding outward from the shout.
+        for (int32 Index = 0; Index < 12; ++Index)
+        {
+            const FVector A = Feet + FRotator(0.0f, 30.0f * Index, 0.0f).Vector() * EffectiveRadius;
+            const FVector B = Feet + FRotator(0.0f, 30.0f * (Index + 1), 0.0f).Vector() * EffectiveRadius;
+            Effects->AddStroke(A + FVector(0, 0, 10.0f), B + FVector(0, 0, 10.0f), 4.0f, BreakerUI::Harm, 2.2f, ShoutTiming, 0.10f + 0.01f * Index);
+        }
+    }
+
     // §T4: each enemy provoked grants stacking FLAT damage (+4% of weapon base
     // per enemy, 6 stacks max, 6s), delivered as a flat contribution so it
     // cannot double-dip with the Increased bucket.
@@ -725,6 +819,20 @@ void UBreakerAbility_BreachCharge::ActivateAbility(const FGameplayAbilitySpecHan
     const FVector BlastLocation = World->LineTraceSingleByChannel(Hit, ViewLocation, TraceEnd, ECC_Visibility, QueryParams)
         ? Hit.ImpactPoint : TraceEnd;
 
+    // THE CHARGE, VISIBLE AT LAST: the census recorded it as a bare FVector
+    // in a timer. It is still no actor -- but the spot now glows OrangeDeep
+    // for exactly the fuse, a fixed world point being the one place a
+    // lifetime-length world primitive tells no lie. The player (and anyone
+    // standing on it) can read where and roughly when. O2 PLACEHOLDER.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        BreakerFX::FEffectTiming FuseTiming;
+        FuseTiming.DurationSeconds = FMath::Max(0.05f, FuseSeconds);
+        FuseTiming.FadeInSeconds = 0.03f;
+        FuseTiming.FadeOutSeconds = 0.0f;   // it does not fade, it detonates
+        Effects->AddGlow(BlastLocation + FVector(0.0f, 0.0f, 15.0f), 20.0f, BreakerUI::OrangeDeep, 3.0f, FuseTiming);
+    }
+
     TWeakObjectPtr<UBreakerAbility_BreachCharge> WeakThis(this);
     World->GetTimerManager().SetTimer(FuseTimer, FTimerDelegate::CreateLambda([WeakThis, BlastLocation]()
     {
@@ -795,6 +903,7 @@ void UBreakerAbility_BreachCharge::Detonate(FVector BlastLocation)
 
     const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage);
     BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, BlastLocation, EnemyRadius, BaseDamage, EdgeDamageFraction, /*bApplyFalloff=*/true, Mods);
+    BreakerTankAbilityLocal::BreakerTankBlastFlash(World, BlastLocation, EnemyRadius);
 
     // The Tank's end of the tool: knockback with FULL directional control (the
     // impulse is the blast normal, undamped) and self-damage that is reduced
@@ -911,6 +1020,10 @@ void UBreakerAbility_GroundZero::ActivateAbility(const FGameplayAbilitySpecHandl
 
     const float BaseDamage = BreakerTankAbilityLocal::BreakerTankAbilityBaseDamage(Character, WeaponDamageCoefficient, UnarmedDamage) * Power;
     BreakerTankAbilityLocal::BreakerTankRadialDamage(World, Character, Center, EnemyRadius, BaseDamage, 0.5f, /*bApplyFalloff=*/true, Mods);
+    // The same flash as Breach Charge, sharing the radial seam's geometry --
+    // the slam's Power scales damage, not reach, so the flash honestly does
+    // not scale with it.
+    BreakerTankAbilityLocal::BreakerTankBlastFlash(World, Center, EnemyRadius);
 
     // D5 CONCUSSION: the stagger runs 2.0s (R2: 2.5s) instead of 1.5. Its
     // mid-air clause is already structural — the stop below never asked
