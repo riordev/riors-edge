@@ -272,6 +272,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     }
 
     BuildFieldFrame(NewPlayer->GetPawn());
+    // Before any map branch returns, so the dev instruments reach every map
+    // that has a frame rather than only the gym (see ArmDevInstruments).
+    ArmDevInstruments(NewPlayer);
 
     // The Anchor builds the hub and stops. No gym field, no encounter, no
     // waves — a social space with a gate, which is what a hub is.
@@ -435,6 +438,44 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
     BuildCaptureTour();
     ScheduleScreenshots();
 
+}
+
+void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
+{
+    // EVERY MAP WITH A FRAME, EXCEPT THE ANCHOR, and the exception is the
+    // Anchor's own ruling rather than a workaround: the hub is social — no
+    // combat, weapon holstered — so arming a crowd of forty enemies in it is
+    // wrong on its face.
+    //
+    // MEASURED, not assumed. The first run with these moved armed the probe in
+    // the hub and the session then travelled to Fernhall on its own, with no
+    // input: forty bodies in a social space drove the hub into a state it is
+    // not built for. The same run without the probe stayed put, which is what
+    // named the cause. So this is not "the probe is noisy in the hub" — it is
+    // that a combat instrument in a no-combat space produced behaviour nobody
+    // asked for, and the instrument armed there for the first time because of
+    // the move above.
+    if (UBreakerGameInstance::IsAnchorMap(this)) return;
+
+    // EVERY DEV INSTRUMENT, ON EVERY MAP THAT HAS A FIELD FRAME.
+    //
+    // These five used to sit in the gym-only tail, ninety lines past the
+    // last map branch. That was invisible and load-bearing: the ruling that
+    // moves autoplay into the Anchor does not MOVE them, it stops REACHING
+    // them — so -BreakerCrowdProbe, the only instrument that produces the
+    // density sweep, would have become unreachable for the lane told to
+    // prioritise density. Silently correct at compile time, and broken in a
+    // way nobody would think to re-run.
+    //
+    // Called immediately after BuildFieldFrame, which is the real
+    // precondition: SpawnEffectProbe and SpawnCrowdProbe both refuse without
+    // bFieldFrameSet, and the front end returns before the frame is built.
+    // So "every map with a frame" is exactly the set that can host them.
+    //
+    // BuildCaptureTour and LogGymSummary deliberately DID NOT move: the
+    // tour's eight vantages are authored against gym geometry and the
+    // summary describes the gym's own build, so both are gym-DEPENDENT
+    // rather than merely gym-located.
     // THE BOSS KEY. F5, because the playtest keys F1-F4 and the F talk key all
     // live on ABreakerCharacter (Characters/), which this lane does not own.
     // Binding onto the PLAYER CONTROLLER's input component reaches the same

@@ -528,6 +528,12 @@ private:
     // the requested mode. A run whose scene disagrees with its flag says so in
     // its own summary, which is the check that was missing the first time.
     enum class ECrowdLoad : uint8 { Patrol, Engaged };
+    // Arms every dev instrument on any map that has a field frame. Called
+    // from HandleStartingNewPlayer immediately after BuildFieldFrame and
+    // BEFORE any map branch returns — which is the whole point: these used
+    // to live in the gym-only tail, so a ruling that moved autoplay off the
+    // gym would have silently disarmed the density probe.
+    void ArmDevInstruments(APlayerController* NewPlayer);
     void SpawnCrowdProbe(int32 Count, bool bSkeletal, ECrowdLoad Load);
     const TCHAR* CrowdLoadName() const;
     void TickCrowdSampler(float DeltaSeconds);

@@ -4,42 +4,22 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
-## PIE and autoplay leaving the gym: what breaks (Part One-E, report before changing)
+## Autoplay's destination is one line in `Characters/` (Part One-E, half-landed)
 
-**Measured, not estimated.** Five harness entry points sit at the TAIL of the
-gym build, after the front-end, Anchor and Fernhall branches have already
-returned. `-BreakerAutoPlay` landing in the Anchor does not move them; it stops
-reaching them:
+`EditorStartupMap` now points at `Lvl_Anchor` and the instruments moved with it,
+as ruled. **PIE is done** — autoplay only travels when `IsFrontEndMap` is true,
+so starting in the Anchor it simply suppresses the menu and stays.
 
-- **`-BreakerCrowdProbe=N` never arms.** This is the serious one: FIELD's
-  density sweep is the ruled priority and the probe is the only instrument that
-  produces it.
-- **`-BreakerEffectProbe` never arms**, and `Breaker.EffectProbe` never
-  registers.
-- **`-BreakerBossOnStart` never spawns**, `Breaker.Boss` never registers, and
-  the **F5 boss key never binds** — so the one archetype most worth
-  photographing becomes unreachable headlessly.
-- **`BuildCaptureTour` never builds**, so `-BreakerCaptureTour`'s eight authored
-  vantages are gone.
-- **`LogGymSummary` never runs.**
+What is NOT done is the standalone path. `GameDefaultMap` is `Lvl_FrontEnd`, so a
+`-game -BreakerAutoPlay` run still hits
+`BreakerCharacter.cpp`'s `TravelTo(GymMapName())` and lands in the gym. That
+line is in `Characters/`, which this lane does not own and which ORDERS has not
+assigned to anyone.
 
-Menu captures are unaffected — they draw on the front end by design.
-
-**The mitigation is small and I would do it in the same commit:** those blocks
-are gym-*located* but not gym-*dependent*. Moving the probe, effect-probe, boss
-key and console registrations above the map branches makes them map-agnostic,
-and the capture tour stays gym-only because its vantages are authored against
-gym geometry. Without that move, changing autoplay's destination silently
-disarms the instrument FIELD is currently blocked on.
-
-`EditorStartupMap` itself is a one-line config change. The file's warning
-("an untested change to the only loop anyone playtests in") is discharged by the
-playtest, as ORDERS says — but the warning was about the LOOP, and the loop's
-instruments are the part that actually breaks.
-
-- **Question:** confirm I move the four instrument blocks out of the gym tail in
-  the same commit as the config change. Doing the config alone is the version
-  that breaks FIELD.
+- **Question:** route the one-line change (gym -> Anchor) to whoever owns
+  `Characters/`, or tell me to take it as a declared crossing. Until then the
+  ruling holds for PIE and not for standalone, which is a half-state worth
+  knowing rather than assuming.
 
 ## Costing the rift interior: yard instance vs. gym placeholder (Part One-E)
 
