@@ -23,6 +23,23 @@
 
 namespace BreakerSupportAbilityLocal
 {
+    // Feet-anchored cast flash (the camera law: never wrap a primitive around
+    // the one camera guaranteed to stand in it). Cyan for the system/tempo
+    // verbs, violet for the ultimate below. Figures O2 PLACEHOLDER.
+    // (Server-only abilities, cosmetic calls — see BreakerEffectRenderer.h.)
+    void BreakerSupportCastFlash(ABreakerCharacter* Character, const FLinearColor& Color, float RadiusCm)
+    {
+        UWorld* World = Character ? Character->GetWorld() : nullptr;
+        ABreakerEffectRenderer* Effects = World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+        if (!Effects) return;
+        const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming CastTiming;
+        CastTiming.DurationSeconds = 0.30f;
+        CastTiming.FadeInSeconds = 0.02f;
+        CastTiming.FadeOutSeconds = 0.22f;
+        Effects->AddGlow(Feet, RadiusCm, Color, 2.8f, CastTiming);
+    }
+
     // Prefixed for the unity build, per house rule.
 
     // The target's maximum health, for percentage-of-target healing (§U1) and
@@ -581,6 +598,7 @@ void UBreakerAbility_Cadence::ActivateAbility(const FGameplayAbilitySpecHandle H
     // is the header's recorded gap.
     RefreshBuffUptime(Character);
     bCadenceActive = true;
+    BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Cyan, 45.0f);
 
     // CO7 CONDUCTING: Cadence also speeds ability cooldown recovery for the
     // buffed — solo, you. A once-a-second shave through the Charge component's
@@ -730,6 +748,7 @@ void UBreakerAbility_Metronome::ActivateAbility(const FGameplayAbilitySpecHandle
     BoundCombat = Combat;
     Combat->OnHitDealt.AddDynamic(this, &UBreakerAbility_Metronome::HandleHitDealt);
     bMetronomeActive = true;
+    BreakerSupportAbilityLocal::BreakerSupportCastFlash(Character, BreakerUI::Cyan, 40.0f);
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseMetronome(); }), Duration, false);
 }
 
@@ -912,6 +931,21 @@ void UBreakerAbility_Mark::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     if (UBreakerAbilityStateComponent* State = UBreakerAbilityStateComponent::FindOrAdd(Character))
     {
         State->SetMark(Target, Duration);
+        // The painting, Lead's proven composition (weapon-side offset start —
+        // a camera-origin stroke reads as a dot to its own caster): a gold
+        // line to the marked enemy plus a glow at the impact. The mark's
+        // lifetime stays the HUD diamond's job. Figures O2 PLACEHOLDER.
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+        {
+            BreakerFX::FEffectTiming PaintTiming;
+            PaintTiming.DurationSeconds = 0.30f;
+            PaintTiming.FadeInSeconds = 0.03f;
+            PaintTiming.FadeOutSeconds = 0.22f;
+            const FVector PaintSide = FVector::CrossProduct(ViewRotation.Vector(), FVector::UpVector).GetSafeNormal();
+            Effects->AddStroke(ViewLocation + ViewRotation.Vector() * 90.0f + PaintSide * 25.0f - FVector(0.0f, 0.0f, 20.0f),
+                Hit.ImpactPoint, 2.0f, BreakerUI::Gold, 2.6f, PaintTiming);
+            Effects->AddGlow(Hit.ImpactPoint, 28.0f, BreakerUI::Gold, 3.2f, PaintTiming);
+        }
     }
     // "Takes more damage from ALL SOURCES including allies" is structural: the
     // keyed incoming modifier sits on the TARGET, so every damage request from
@@ -1362,6 +1396,23 @@ void UBreakerAbility_Conduit::ActivateAbility(const FGameplayAbilitySpecHandle H
     }
     bConduitActive = true;
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseConduit(); }), Duration, false);
+    // The ultimates' violet ignition (Overdrive's precedent), feet-anchored.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Centre = Character->GetActorLocation();
+        const FVector Feet = Centre - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming BurstTiming;
+        BurstTiming.DurationSeconds = 0.55f;
+        BurstTiming.FadeInSeconds = 0.02f;
+        BurstTiming.FadeOutSeconds = 0.40f;
+        Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
+        Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+        for (int32 Index = 0; Index < 6; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+        }
+    }
 
     if (bTriage)
     {

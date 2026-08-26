@@ -16,6 +16,8 @@
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "TimerManager.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 #include "Weapons/BreakerWeaponComponent.h"
 
 namespace BreakerGunsmithAbilityLocal
@@ -50,6 +52,73 @@ UBreakerAbility_SidearmRig::UBreakerAbility_SidearmRig()
 
 FName UBreakerAbility_SidearmRig::WindowKey() { return TEXT("Window.Gunsmith.SidearmRig"); }
 FName UBreakerAbility_SidearmRig::OutgoingModifierKey() { return TEXT("SidearmRig"); }
+
+namespace
+{
+    // Cast-moment flashes for the Gunsmith kit, the Swift template applied:
+    // orange is the weapon/heat family; self-anchored draws sit at the FEET
+    // (the camera law — three photographed sites say never wrap a primitive
+    // around the one camera guaranteed to stand in it); ultimates ignite in
+    // the palette's violet, Overdrive's precedent. Figures O2 PLACEHOLDER.
+    // (Server-only abilities, cosmetic calls — see BreakerEffectRenderer.h.)
+    void BreakerGunsmithCastFlash(ABreakerCharacter* Character, const FLinearColor& Color)
+    {
+        UWorld* World = Character ? Character->GetWorld() : nullptr;
+        ABreakerEffectRenderer* Effects = World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+        if (!Effects) return;
+        const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        const FVector Aim = Character->GetControlRotation().Vector();
+        const FVector Side = FVector::CrossProduct(Aim, FVector::UpVector).GetSafeNormal();
+        BreakerFX::FEffectTiming SnapTiming;
+        SnapTiming.DurationSeconds = 0.22f;
+        SnapTiming.FadeInSeconds = 0.0f;
+        SnapTiming.FadeOutSeconds = 0.16f;
+        Effects->AddGlow(Feet + Aim * 70.0f + FVector(0, 0, 20.0f), 26.0f, Color, 2.8f, SnapTiming);
+        Effects->AddStroke(Feet + Side * 40.0f, Feet + Side * 30.0f + Aim * 100.0f, 3.0f, Color, 2.2f, SnapTiming);
+        Effects->AddStroke(Feet - Side * 40.0f, Feet - Side * 30.0f + Aim * 100.0f, 3.0f, Color, 2.2f, SnapTiming);
+    }
+
+    // The placement ring: a ground pulse at a spawn point — a fixed world
+    // point, the honest home for a world primitive — so a deployable ARRIVES
+    // rather than pops into being. Shared by the deploy base and Field
+    // Assembly's mass placement.
+    void BreakerGunsmithPlacementRing(UWorld* World, const FVector& PlaceLocation, float DelaySeconds = 0.0f)
+    {
+        ABreakerEffectRenderer* Effects = World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+        if (!Effects) return;
+        BreakerFX::FEffectTiming PlaceTiming;
+        PlaceTiming.DurationSeconds = 0.35f;
+        PlaceTiming.FadeInSeconds = 0.0f;
+        PlaceTiming.FadeOutSeconds = 0.28f;
+        Effects->AddGlow(PlaceLocation + FVector(0, 0, 20.0f), 45.0f, BreakerUI::Orange, 3.0f, PlaceTiming, DelaySeconds);
+        for (int32 Index = 0; Index < 8; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 45.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(PlaceLocation + Out * 40.0f + FVector(0, 0, 6.0f),
+                PlaceLocation + Out * 80.0f + FVector(0, 0, 6.0f), 4.0f, BreakerUI::Orange, 2.4f, PlaceTiming, DelaySeconds + 0.012f * Index);
+        }
+    }
+
+    void BreakerGunsmithUltimateIgnition(ABreakerCharacter* Character)
+    {
+        UWorld* World = Character ? Character->GetWorld() : nullptr;
+        ABreakerEffectRenderer* Effects = World ? ABreakerEffectRenderer::FindOrSpawn(World) : nullptr;
+        if (!Effects) return;
+        const FVector Centre = Character->GetActorLocation();
+        const FVector Feet = Centre - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming BurstTiming;
+        BurstTiming.DurationSeconds = 0.55f;
+        BurstTiming.FadeInSeconds = 0.02f;
+        BurstTiming.FadeOutSeconds = 0.40f;
+        Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
+        Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+        for (int32 Index = 0; Index < 6; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+        }
+    }
+}
 
 void UBreakerAbility_SidearmRig::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
@@ -95,6 +164,10 @@ void UBreakerAbility_SidearmRig::ActivateAbility(const FGameplayAbilitySpecHandl
         Weapon->OnShot.AddDynamic(this, &UBreakerAbility_SidearmRig::HandleShotFired);
     }
     bRigActive = true;
+
+    // The rig snapping onto the weapon, drawn once (orange: a magazine-economy
+    // verb). The shot-counted window itself stays the HUD bar's job.
+    BreakerGunsmithCastFlash(Character, BreakerUI::Orange);
 }
 
 bool UBreakerAbility_SidearmRig::OwnerHasNodeTag(const FGameplayTag& Tag) const
@@ -294,6 +367,9 @@ void UBreakerAbility_Overhaul::ActivateAbility(const FGameplayAbilitySpecHandle 
 
     BoundWeapon = Weapon;
     bOverhaulActive = true;
+    // The bench moment, drawn once; the conversion's economy is the ammo
+    // counter's story and the window is the HUD bar's.
+    BreakerGunsmithCastFlash(Character, BreakerUI::OrangeDeep);
     // The pop is the settle: unspent converted rounds return to reserve at the
     // same 3:1 they were bought at, and rounds fired stay spent — the bet.
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
@@ -523,6 +599,8 @@ void UBreakerGunsmithDeployAbility::ActivateAbility(const FGameplayAbilitySpecHa
         Deployable->InitializeDeployable(DeployableType, Character, GetResourceCost());
         // FT5: the discount is a one-placement credit; the placement spent it.
         ABreakerDeployable::ConsumeReplacementCredit(Character, DeployableType);
+
+        BreakerGunsmithPlacementRing(World, PlaceLocation);
     }
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -617,6 +695,9 @@ void UBreakerAbility_FieldAssembly::ActivateAbility(const FGameplayAbilitySpecHa
     }
     bAssemblyActive = true;
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseAssembly(); }), Duration, false);
+    // The ultimates' violet ignition (Overdrive's precedent); each placement
+    // below marks itself through the deploy ring.
+    BreakerGunsmithUltimateIgnition(Character);
 
     const bool bMachinist = Variant.KeystoneTag == FGameplayTag::RequestGameplayTag(TEXT("Keystone.Gunsmith.Machinist"), false);
     const bool bFoundry = Variant.KeystoneTag == FGameplayTag::RequestGameplayTag(TEXT("Keystone.Gunsmith.Foundry"), false);
@@ -697,6 +778,9 @@ void UBreakerAbility_FieldAssembly::ActivateAbility(const FGameplayAbilitySpecHa
         SpawnParams.Owner = Character;
         if (ABreakerDeployable* Deployable = World->SpawnActor<ABreakerDeployable>(ABreakerDeployable::StaticClass(), PlaceLocation, FRotator(0.0f, Character->GetActorRotation().Yaw, 0.0f), SpawnParams))
         {
+            // Each mass placement marks itself, staggered around the ring so
+            // the assembly reads as a sequence rather than a pop.
+            BreakerGunsmithPlacementRing(World, PlaceLocation, 0.08f * Index);
             // Placed at NO individual Scrap cost (§3) — and therefore with a
             // zero refund base, or the free placements would mint Scrap on
             // expiry. The economy stays one-directional.

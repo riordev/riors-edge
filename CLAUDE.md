@@ -2,6 +2,24 @@
 
 ## Current work
 
+KIT LANE, THE CAST-MOMENT PASS COMPLETES THE ROSTER: with no new KIT
+items in ORDERS (all four discharged), the ratified template swept
+the remaining Abilities/ casts — Sidearm Rig and Overhaul flash
+orange, every deployable placement pulses a ground ring at its spawn
+point (the deploy base and Field Assembly's mass placement share one
+BreakerGunsmithPlacementRing, staggered), Bloodline pulses gold at
+the feet, Mark paints its target with Lead's proven composition, and
+the three remaining ultimates ignite in the ultimates' violet — Hold,
+Conduit, Field Assembly, plus BASE Unmake, which until now drew only
+on its Cascade branch. Every ignition and every self-cast is
+feet-anchored per the camera law. Probed and photographed via
+=Gunsmith and =Caster runs (activations 3/3 each; Field Assembly's
+frame shows the full-bar spend, the violet light on the viewmodel and
+the placement rings). Every ability in the game now has a cast-moment
+presentation or a standing world presence; what remains of the census
+debt is FIELD-owned action visibility (turret fire, crate dispense,
+mine charges) and GLASS's fifth sound verb.
+
 KIT LANE, THE INVISIBLE SIX DRAW AND THE PROBE LEARNS CLASSES. The
 lane's open questions moved to Docs/reports/KIT.md (LEDGER's
 convention, per the lead: one place, one name). Rend wears Cleave's

@@ -270,6 +270,27 @@ void UBreakerAbility_Unmake::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         Mana->PushGenerationSuspension(GenerationSuspensionKey());
     }
 
+    // The ultimates' violet ignition (Overdrive's precedent, the one moment
+    // base and Long Dark Unmake were still invisible), feet-anchored per the
+    // camera law. Figures O2 PLACEHOLDER. (Server-only, cosmetic — see
+    // BreakerEffectRenderer.h.)
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Centre = Character->GetActorLocation();
+        const FVector Feet = Centre - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming BurstTiming;
+        BurstTiming.DurationSeconds = 0.55f;
+        BurstTiming.FadeInSeconds = 0.02f;
+        BurstTiming.FadeOutSeconds = 0.40f;
+        Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
+        Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+        for (int32 Index = 0; Index < 6; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+        }
+    }
+
     // Cascade (Class-Kits §2.2): the reaction ultimate. Only when the resolved
     // variant IS the Cascade row — the resolver already required the keystone
     // tag, so this cannot arm off a foreign keystone or an untagged owner.

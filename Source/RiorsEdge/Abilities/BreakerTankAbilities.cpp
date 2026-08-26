@@ -473,6 +473,19 @@ void UBreakerAbility_Bloodline::ActivateAbility(const FGameplayAbilitySpecHandle
     Combat->OnHitDealt.AddDynamic(this, &UBreakerAbility_Bloodline::HandleHitDealt);
     bBloodlineActive = true;
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseBloodline(); }), Duration, false);
+
+    // The cast moment, feet-anchored per the camera law: gold, the payment
+    // family — Bloodline is a sustain multiplier and its whole promise is
+    // leech paid back. The window stays the HUD bar's job. O2 PLACEHOLDER.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+    {
+        const FVector Feet = Character->GetActorLocation() - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming CastTiming;
+        CastTiming.DurationSeconds = 0.30f;
+        CastTiming.FadeInSeconds = 0.02f;
+        CastTiming.FadeOutSeconds = 0.22f;
+        Effects->AddGlow(Feet, 45.0f, BreakerUI::Gold, 2.8f, CastTiming);
+    }
 }
 
 void UBreakerAbility_Bloodline::HandleHitDealt(const FBreakerHitContext& Hit)
@@ -1128,6 +1141,25 @@ void UBreakerAbility_Hold::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     bHoldActive = true;
     World->GetTimerManager().SetTimer(WindowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { CloseHold(); }), Duration, false);
+
+    // The ultimates' violet ignition (Overdrive's precedent), feet-anchored
+    // per the camera law. Figures O2 PLACEHOLDER.
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(Character->GetWorld()))
+    {
+        const FVector Centre = Character->GetActorLocation();
+        const FVector Feet = Centre - FVector(0.0f, 0.0f, Character->GetSimpleCollisionHalfHeight() * 0.8f);
+        BreakerFX::FEffectTiming BurstTiming;
+        BurstTiming.DurationSeconds = 0.55f;
+        BurstTiming.FadeInSeconds = 0.02f;
+        BurstTiming.FadeOutSeconds = 0.40f;
+        Effects->AddGlow(Feet, 70.0f, BreakerUI::Violet, 3.6f, BurstTiming);
+        Effects->AddBlinkLight(Centre, 650.0f, BreakerUI::Violet, 3600.0f, BurstTiming);
+        for (int32 Index = 0; Index < 6; ++Index)
+        {
+            const FVector Out = FRotator(0.0f, 60.0f * Index, 0.0f).Vector();
+            Effects->AddStroke(Feet + Out * 40.0f, Feet + Out * 150.0f, 4.5f, BreakerUI::Violet, 2.8f, BurstTiming, 0.03f * Index);
+        }
+    }
 }
 
 void UBreakerAbility_Hold::HandleDamageTaken(const FBreakerHitContext& Hit)
