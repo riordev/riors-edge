@@ -110,8 +110,110 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
 
     // The yard points somewhere: the rift marker stands at the far end of the
     // lane, not next to the door.
-    TestTrue(TEXT("the rift is over 80 m downrange of the player start"),
-        FVector::Dist2D(Markers.Rift, Markers.PlayerStart) > 8000.0f);
+    const FBreakerZoneMarker* Start = Markers.Find(EBreakerZoneMarkerRole::PlayerStart);
+    const FBreakerZoneMarker* Rift = Markers.Find(EBreakerZoneMarkerRole::Rift);
+    if (TestTrue(TEXT("the entry yard has a player start and a rift"), Start != nullptr && Rift != nullptr))
+    {
+        TestTrue(TEXT("the rift is over 80 m downrange of the player start"),
+            FVector::Dist2D(Rift->Location, Start->Location) > 8000.0f);
+    }
+
+    // THE SHIPPED YARD IS A ONE-YARD ZONE, and it says so rather than leaving
+    // it implied. Every marker belongs to the entry yard (no name suffix),
+    // which is what keeps the pre-yards export valid unchanged — and this
+    // assertion is what will move, deliberately, on the day a second yard is
+    // authored.
+    TestEqual(TEXT("the yard authors three markers"), Markers.All.Num(), 3);
+    for (const FBreakerZoneMarker& Marker : Markers.All)
+    {
+        TestTrue(FString::Printf(TEXT("marker '%s' belongs to the entry yard"),
+            UBreakerZoneBuilder::MarkerRoleName(Marker.Role)), Marker.Yard.IsNone());
+    }
+    TestEqual(TEXT("exactly one rift door is authored today"),
+        Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 1);
+    return true;
+}
+
+// THE NAME CONTRACT ITSELF, world-free. The parser is one of TWO halves of a
+// contract — the other is breaker_import_fernhall.py's parse_marker — and the
+// two are hand-kept in step, so the cases that would diverge are pinned here
+// rather than discovered at an import.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerZoneMarkerNameTest,
+    "RiorsEdge.Zone.Markers.NameContract",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerZoneMarkerNameTest::RunTest(const FString& Parameters)
+{
+    EBreakerZoneMarkerRole Role;
+    FName Yard;
+
+    // Every name authored before yards existed still parses, to the entry
+    // yard. If this breaks, the shipped export stops importing.
+    TestTrue(TEXT("marker_playerstart parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_playerstart"), Role, Yard));
+    TestEqual(TEXT("...as a player start"), static_cast<int32>(Role),
+        static_cast<int32>(EBreakerZoneMarkerRole::PlayerStart));
+    TestTrue(TEXT("...in the entry yard"), Yard.IsNone());
+
+    // THE UNDERSCORE ROLE, which is the case a shortest-match parse gets
+    // wrong: marker_npc_contract read as role 'npc' in yard 'contract' would
+    // import the existing yard as one with no contract giver, silently.
+    TestTrue(TEXT("marker_npc_contract parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_npc_contract"), Role, Yard));
+    TestEqual(TEXT("...as a contract giver, not as 'npc' in a yard called 'contract'"),
+        static_cast<int32>(Role), static_cast<int32>(EBreakerZoneMarkerRole::NPCContract));
+    TestTrue(TEXT("...in the entry yard"), Yard.IsNone());
+
+    // A yard suffix on the same role.
+    TestTrue(TEXT("marker_npc_contract_north parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_npc_contract_north"), Role, Yard));
+    TestEqual(TEXT("...as a contract giver"), static_cast<int32>(Role),
+        static_cast<int32>(EBreakerZoneMarkerRole::NPCContract));
+    TestEqual(TEXT("...in the north yard"), Yard, FName(TEXT("north")));
+
+    TestTrue(TEXT("marker_rift_north parses"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_rift_north"), Role, Yard));
+    TestEqual(TEXT("...in the north yard"), Yard, FName(TEXT("north")));
+
+    // THE BOUNDARY. Without requiring the role to end at '_' or at the end of
+    // the name, 'rift' matches 'riftpad' and a floor piece becomes a marker.
+    TestFalse(TEXT("marker_riftpad is not a rift marker"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_riftpad"), Role, Yard));
+    TestFalse(TEXT("a non-marker name is not a marker"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("flr_riftpad"), Role, Yard));
+    TestFalse(TEXT("an unknown role is refused rather than guessed"),
+        UBreakerZoneBuilder::ParseMarkerName(TEXT("marker_bogus"), Role, Yard));
+
+    // --- The completeness rule ------------------------------------------
+    FString Reason;
+    FBreakerZoneMarkers Empty;
+    TestFalse(TEXT("a zone with no player start is refused"), Empty.IsComplete(Reason));
+
+    FBreakerZoneMarkers One;
+    One.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    TestTrue(TEXT("a player start alone is a complete zone: doors and givers are optional"),
+        One.IsComplete(Reason));
+
+    // A yard with no rift is LEGAL now. This is the assertion that says the
+    // all-or-nothing rule is really gone, rather than moved.
+    One.All.Add({ EBreakerZoneMarkerRole::Rift, FName(TEXT("north")), FVector(100.0f, 0.0f, 0.0f) });
+    TestTrue(TEXT("a rift in another yard is fine"), One.IsComplete(Reason));
+    TestTrue(TEXT("and it is found by its yard"), One.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("north"))));
+    TestFalse(TEXT("and is NOT found in the entry yard"), One.Has(EBreakerZoneMarkerRole::Rift));
+
+    FBreakerZoneMarkers Two;
+    Two.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    Two.All.Add({ EBreakerZoneMarkerRole::PlayerStart, FName(TEXT("north")), FVector::ZeroVector });
+    TestFalse(TEXT("two player starts is a broken export, even in different yards"),
+        Two.IsComplete(Reason));
+
+    FBreakerZoneMarkers Dup;
+    Dup.All.Add({ EBreakerZoneMarkerRole::PlayerStart, NAME_None, FVector::ZeroVector });
+    Dup.All.Add({ EBreakerZoneMarkerRole::Rift, NAME_None, FVector::ZeroVector });
+    Dup.All.Add({ EBreakerZoneMarkerRole::Rift, NAME_None, FVector(50.0f, 0.0f, 0.0f) });
+    TestFalse(TEXT("two rift doors in ONE yard is a naming mistake, not two doors"),
+        Dup.IsComplete(Reason));
     return true;
 }
 

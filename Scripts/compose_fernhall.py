@@ -117,6 +117,25 @@ for i, (x, z) in enumerate(((32.0, 17.0), (32.0, -17.0), (62.0, 17.0), (62.0, -1
     place("blk_full_break%02d" % i, "full", (x, 0.0, z), (3.0, 4.0, 3.0))
 
 # ---- Markers ----------------------------------------------------------------
+# THE NAME CARRIES A ROLE AND A YARD, and this is the authoring side of a
+# contract with two readers — BreakerZoneBuilder::ParseMarkerName and
+# breaker_import_fernhall.py's parse_marker. Change it here and both refuse
+# the export rather than importing a zone that is quietly missing something.
+#
+#   marker_<role>          this marker belongs to the ENTRY yard
+#   marker_<role>_<yard>   it belongs to <yard>
+#
+# Roles: playerstart, rift, npc_contract. An unknown role is REFUSED, not
+# skipped, so a typo here is a loud failure rather than a marker that silently
+# does not exist.
+#
+# EXACTLY ONE playerstart per zone. Rift doors and contract givers are
+# per-yard and OPTIONAL — a yard with no door is a legal yard — but no
+# (role, yard) pair may repeat: two rift markers in one yard would spawn two
+# doors on the same spot.
+#
+# The three below carry no yard suffix because Fernhall is one yard today.
+# Growing it means adding suffixed markers, not changing any of this.
 place("marker_playerstart", None, (6.0, 0.0, 0.0), marker=True)
 place("marker_rift", None, (92.0, 0.0, 0.0), marker=True)
 place("marker_npc_contract", None, (13.0, 0.0, -14.0), marker=True)

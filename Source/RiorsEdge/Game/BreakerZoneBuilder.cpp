@@ -109,6 +109,101 @@ bool UBreakerZoneBuilder::CollectZonePieces(const FString& MeshFolder, TArray<FB
     return true;
 }
 
+const FBreakerZoneMarker* FBreakerZoneMarkers::Find(EBreakerZoneMarkerRole Role, FName Yard) const
+{
+    for (const FBreakerZoneMarker& Marker : All)
+    {
+        if (Marker.Role == Role && Marker.Yard == Yard) return &Marker;
+    }
+    return nullptr;
+}
+
+TArray<FBreakerZoneMarker> FBreakerZoneMarkers::OfRole(EBreakerZoneMarkerRole Role) const
+{
+    TArray<FBreakerZoneMarker> Out;
+    for (const FBreakerZoneMarker& Marker : All)
+    {
+        if (Marker.Role == Role) Out.Add(Marker);
+    }
+    return Out;
+}
+
+bool FBreakerZoneMarkers::IsComplete(FString& OutReason) const
+{
+    const int32 Starts = OfRole(EBreakerZoneMarkerRole::PlayerStart).Num();
+    if (Starts != 1)
+    {
+        OutReason = FString::Printf(
+            TEXT("a zone needs exactly one player start and this one has %d"), Starts);
+        return false;
+    }
+    // No (role, yard) pair may repeat. Two rift doors in one yard is not two
+    // doors — they would spawn on top of each other — it is a naming mistake,
+    // and Find() would silently return the first either way.
+    for (int32 A = 0; A < All.Num(); ++A)
+    {
+        for (int32 B = A + 1; B < All.Num(); ++B)
+        {
+            if (All[A].Role == All[B].Role && All[A].Yard == All[B].Yard)
+            {
+                OutReason = FString::Printf(TEXT("two '%s' markers in yard '%s'"),
+                    UBreakerZoneBuilder::MarkerRoleName(All[A].Role),
+                    All[A].Yard.IsNone() ? TEXT("<entry>") : *All[A].Yard.ToString());
+                return false;
+            }
+        }
+    }
+    OutReason.Reset();
+    return true;
+}
+
+const TCHAR* UBreakerZoneBuilder::MarkerRoleName(EBreakerZoneMarkerRole Role)
+{
+    switch (Role)
+    {
+    case EBreakerZoneMarkerRole::PlayerStart: return TEXT("playerstart");
+    case EBreakerZoneMarkerRole::Rift:        return TEXT("rift");
+    case EBreakerZoneMarkerRole::NPCContract: return TEXT("npc_contract");
+    }
+    return TEXT("<unknown>");
+}
+
+bool UBreakerZoneBuilder::ParseMarkerName(const FString& Name, EBreakerZoneMarkerRole& OutRole, FName& OutYard)
+{
+    static const TCHAR* Prefix = TEXT("marker_");
+    if (!Name.StartsWith(Prefix, ESearchCase::CaseSensitive)) return false;
+    const FString Rest = Name.RightChop(FCString::Strlen(Prefix));
+
+    // LONGEST ROLE FIRST. `npc_contract` contains an underscore, so a parse
+    // that took the first token would read `marker_npc_contract` as role
+    // `npc` in a yard called `contract` — the existing yard would import as
+    // a zone with no contract marker and nothing would say why.
+    static const EBreakerZoneMarkerRole Roles[] = {
+        EBreakerZoneMarkerRole::NPCContract,
+        EBreakerZoneMarkerRole::PlayerStart,
+        EBreakerZoneMarkerRole::Rift,
+    };
+    const EBreakerZoneMarkerRole* Best = nullptr;
+    int32 BestLength = 0;
+    for (const EBreakerZoneMarkerRole& Role : Roles)
+    {
+        const FString RoleName = MarkerRoleName(Role);
+        if (!Rest.StartsWith(RoleName, ESearchCase::CaseSensitive)) continue;
+        // The role must end at a boundary: either the whole remainder, or
+        // followed by the yard separator. Without this `rift` would match
+        // `riftpad` and a floor piece would become a marker.
+        if (Rest.Len() != RoleName.Len() && Rest[RoleName.Len()] != TEXT('_')) continue;
+        if (RoleName.Len() > BestLength) { Best = &Role; BestLength = RoleName.Len(); }
+    }
+    if (!Best) return false;
+
+    OutRole = *Best;
+    // No suffix means the ENTRY yard, which is what keeps every name authored
+    // before yards existed valid with no re-export.
+    OutYard = Rest.Len() == BestLength ? NAME_None : FName(*Rest.RightChop(BestLength + 1));
+    return true;
+}
+
 bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces, FBreakerZoneMarkers& OutMarkers)
 {
     OutMarkers = FBreakerZoneMarkers();
@@ -117,16 +212,35 @@ bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces
         // Marker positions are the box centre on the ground plane: the
         // composer floors each marker cube to Y=0, so min-Z is the walkable
         // surface the marked thing stands on.
-        const FVector Ground(Piece.Origin.X, Piece.Origin.Y, Piece.Origin.Z - Piece.Extent.Z);
-        if (Piece.Name == TEXT("marker_playerstart")) { OutMarkers.PlayerStart = Ground; OutMarkers.bPlayerStart = true; }
-        else if (Piece.Name == TEXT("marker_rift")) { OutMarkers.Rift = Ground; OutMarkers.bRift = true; }
-        else if (Piece.Name == TEXT("marker_npc_contract")) { OutMarkers.NPCContract = Ground; OutMarkers.bNPCContract = true; }
+        EBreakerZoneMarkerRole Role;
+        FName Yard;
+        if (!ParseMarkerName(Piece.Name, Role, Yard))
+        {
+            // A `marker_`-prefixed name that does not parse is a TYPO, not a
+            // piece of scenery: the prefix is the contract and nothing else
+            // uses it. Refusing loudly is the difference between "the yard has
+            // no contract giver" and "someone spelled it wrong".
+            if (Piece.Name.StartsWith(TEXT("marker_"), ESearchCase::CaseSensitive))
+            {
+                UE_LOG(LogTemp, Error,
+                    TEXT("[Zone] '%s' is prefixed marker_ but names no known role; refusing the zone."),
+                    *Piece.Name);
+                OutMarkers = FBreakerZoneMarkers();
+                return false;
+            }
+            continue;
+        }
+        FBreakerZoneMarker& Marker = OutMarkers.All.AddDefaulted_GetRef();
+        Marker.Role = Role;
+        Marker.Yard = Yard;
+        Marker.Location = FVector(Piece.Origin.X, Piece.Origin.Y, Piece.Origin.Z - Piece.Extent.Z);
     }
-    if (!OutMarkers.IsComplete())
+
+    FString Reason;
+    if (!OutMarkers.IsComplete(Reason))
     {
-        UE_LOG(LogTemp, Error,
-            TEXT("[Zone] marker set incomplete (playerstart=%d rift=%d npc=%d): the export is broken, not the layout."),
-            OutMarkers.bPlayerStart ? 1 : 0, OutMarkers.bRift ? 1 : 0, OutMarkers.bNPCContract ? 1 : 0);
+        UE_LOG(LogTemp, Error, TEXT("[Zone] marker set rejected: %s. The export is broken, not the layout."),
+            *Reason);
         return false;
     }
     return true;
@@ -140,8 +254,20 @@ TArray<FBreakerCoverPiece> UBreakerZoneBuilder::BuildCoverPieces(const TArray<FB
     // frame is DERIVED from the markers rather than assumed to be +X, so a
     // re-export that rotates the yard moves the frame with it and the grammar
     // numbers stay true.
-    const FVector2D Start(Markers.PlayerStart.X, Markers.PlayerStart.Y);
-    FVector2D Forward = FVector2D(Markers.Rift.X, Markers.Rift.Y) - Start;
+    // THE ENTRY YARD'S frame, explicitly. With one yard this is the zone's
+    // frame; with several it is the arrival yard's, and per-yard frames are
+    // the grammar split's job (Q3), not this one's. Named here so the
+    // single-yard assumption is visible rather than inherited.
+    const FBreakerZoneMarker* StartMarker = Markers.Find(EBreakerZoneMarkerRole::PlayerStart);
+    if (!StartMarker) return Cover;
+    const FBreakerZoneMarker* RiftMarker = Markers.Find(EBreakerZoneMarkerRole::Rift);
+
+    const FVector2D Start(StartMarker->Location.X, StartMarker->Location.Y);
+    // A yard with no rift door keeps a frame: forward falls back to +X, which
+    // is what the Normalize guard below already did for a degenerate pair.
+    FVector2D Forward = RiftMarker
+        ? FVector2D(RiftMarker->Location.X, RiftMarker->Location.Y) - Start
+        : FVector2D::ZeroVector;
     if (!Forward.Normalize()) Forward = FVector2D(1.0f, 0.0f);
     const FVector2D Right(-Forward.Y, Forward.X);
 

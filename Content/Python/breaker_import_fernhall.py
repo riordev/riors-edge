@@ -26,7 +26,41 @@ MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 
 EXPECTED_TOTAL = 58
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
-MARKERS = ("marker_playerstart", "marker_rift", "marker_npc_contract")
+
+# THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to
+# be MARKERS = ("marker_playerstart", "marker_rift", "marker_npc_contract"),
+# one of three places that hardcoded "a zone has exactly one of each"; a yard
+# with its own door could not be imported. Kept in step with
+# BreakerZoneBuilder::ParseMarkerName, which is the C++ half of this contract.
+#
+#   marker_<role>          the entry yard
+#   marker_<role>_<yard>   that yard
+#
+# LONGEST ROLE FIRST, for the same reason the C++ does it: npc_contract
+# contains an underscore, so a shortest-match parse reads marker_npc_contract
+# as role "npc" in a yard called "contract".
+MARKER_ROLES = ("npc_contract", "playerstart", "rift")
+
+
+def parse_marker(name):
+    """(role, yard) for a marker name, or None if it is not one. yard is '' for
+    the entry yard."""
+    if not name.startswith("marker_"):
+        return None
+    rest = name[len("marker_"):]
+    best = None
+    for role in MARKER_ROLES:
+        if not rest.startswith(role):
+            continue
+        # The role must end at a boundary, or "rift" would match "riftpad".
+        if len(rest) != len(role) and rest[len(role)] != "_":
+            continue
+        if best is None or len(role) > len(best):
+            best = role
+    if best is None:
+        return None
+    return (best, rest[len(best) + 1:] if len(rest) > len(best) else "")
+
 
 if not os.path.isfile(GLB):
     raise RuntimeError("[Fernhall] source GLB missing: %s (run Scripts/compose_fernhall.py)" % GLB)
@@ -57,10 +91,36 @@ for data in assets:
         continue
     meshes[str(data.asset_name)] = data
 
-missing = [n for n in MARKERS if n not in meshes]
-if missing:
-    raise RuntimeError("[Fernhall] markers missing after import: %s (have: %s)"
-                       % (missing, sorted(meshes)[:10]))
+# THE ONE HARD REQUIREMENT IS A PLAYER START, and exactly one — the same rule
+# FBreakerZoneMarkers::IsComplete enforces at load, checked here so a broken
+# export fails at import rather than at spawn. Rift doors and mission givers
+# are per-yard and optional; a marker-prefixed name that parses to no known
+# role is a TYPO and refused, because the prefix is the contract.
+parsed = {}
+bad = []
+for name in meshes:
+    if not name.startswith("marker_"):
+        continue
+    role_yard = parse_marker(name)
+    if role_yard is None:
+        bad.append(name)
+        continue
+    parsed.setdefault(role_yard, []).append(name)
+
+if bad:
+    raise RuntimeError("[Fernhall] marker_ names that parse to no known role: %s "
+                       "(roles: %s)" % (sorted(bad), MARKER_ROLES))
+
+duplicates = {k: v for k, v in parsed.items() if len(v) > 1}
+if duplicates:
+    raise RuntimeError("[Fernhall] two markers share a role and yard: %s" % duplicates)
+
+starts = [k for k in parsed if k[0] == "playerstart"]
+if len(starts) != 1:
+    raise RuntimeError("[Fernhall] a zone needs exactly one player start, found %d (markers: %s)"
+                       % (len(starts), sorted(parsed)))
+
+unreal.log("[Fernhall] markers: %s" % sorted("%s@%s" % (r, y or "entry") for (r, y) in parsed))
 if len(meshes) != EXPECTED_TOTAL:
     unreal.log_warning("[Fernhall] expected %d static meshes, imported %d"
                        % (EXPECTED_TOTAL, len(meshes)))

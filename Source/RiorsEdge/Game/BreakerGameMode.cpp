@@ -311,14 +311,24 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         FBreakerZoneMarkers Markers;
         if (UBreakerZoneBuilder::BuildFernhallYard(GetWorld(), Markers))
         {
+            // The entry yard's frame. A zone has exactly one player start
+            // (FBreakerZoneMarkers::IsComplete), and the arrival yard's rift
+            // is what the yard points at.
+            const FBreakerZoneMarker* StartMarker = Markers.Find(EBreakerZoneMarkerRole::PlayerStart);
+            const FBreakerZoneMarker* EntryRift = Markers.Find(EBreakerZoneMarkerRole::Rift);
+            const FVector StartAt = StartMarker ? StartMarker->Location : FVector::ZeroVector;
+            const FVector YardForward = EntryRift
+                ? (EntryRift->Location - StartAt).GetSafeNormal2D()
+                : FVector::ForwardVector;
+
             if (APawn* Pawn = NewPlayer->GetPawn())
             {
                 // Feet on the marker's ground plane (capsule half-height 88,
                 // same arithmetic as the fallback PlayerStart), facing the
                 // rift end of the yard so the first thing seen is somewhere
                 // to go.
-                const FVector StandAt = Markers.PlayerStart + FVector(0.0f, 0.0f, 112.0f);
-                const FRotator Facing = (Markers.Rift - Markers.PlayerStart).GetSafeNormal2D().Rotation();
+                const FVector StandAt = StartAt + FVector(0.0f, 0.0f, 112.0f);
+                const FRotator Facing = YardForward.Rotation();
                 Pawn->TeleportTo(StandAt, Facing);
                 if (AController* Controller = Pawn->GetController())
                 {
@@ -330,9 +340,8 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // everywhere else the registry knows. Placed off the lane on the
             // entry plaza, in the yard's own marker-derived frame rather than
             // world axes, so a re-exported yard carries its gate with it.
-            const FVector YardForward = (Markers.Rift - Markers.PlayerStart).GetSafeNormal2D();
             const FVector YardRight = FVector::CrossProduct(FVector::UpVector, YardForward);
-            const FVector GateAt = Markers.PlayerStart - YardForward * 300.0f + YardRight * 900.0f
+            const FVector GateAt = StartAt - YardForward * 300.0f + YardRight * 900.0f
                 + FVector(0.0f, 0.0f, 100.0f);
             if (ABreakerTravelPoint* Gate = GetWorld()->SpawnActor<ABreakerTravelPoint>(
                 ABreakerTravelPoint::StaticClass(),
@@ -342,19 +351,25 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 Gate->OnDestinationSelected.AddUObject(this, &ABreakerGameMode::HandleHubTravelSelected);
             }
 
-            // THE RIFT DOOR, standing on the marker the yard was authored
-            // around. marker_rift has been placed and measured since the yard
-            // landed and nothing consumed it; this is what it was for.
-            //
-            // Faces back down the lane toward the player start, so a player
-            // walking the length of the yard arrives looking at its front
-            // rather than its side. Feet on the marker's ground plane, the
-            // same arithmetic the player start uses.
-            const FVector DoorAt = Markers.Rift + FVector(0.0f, 0.0f, 100.0f);
-            if (ABreakerRiftDoor* Door = GetWorld()->SpawnActor<ABreakerRiftDoor>(
-                ABreakerRiftDoor::StaticClass(),
-                FTransform((-YardForward).Rotation(), DoorAt)))
+            // A DOOR PER RIFT MARKER, not one door per zone. Today the yard
+            // authors one and this loop runs once, so nothing observable
+            // changes — but the marker list is what lets five yards each
+            // carry their own door without this code moving again, which is
+            // the whole reason the marker model was reshaped.
+            for (const FBreakerZoneMarker& RiftMarker : Markers.OfRole(EBreakerZoneMarkerRole::Rift))
             {
+                // Faces back down the lane toward the player start, so a
+                // player walking the length of the yard arrives looking at
+                // the door's front rather than its side. Derived per marker
+                // rather than from the entry yard's forward, because a door
+                // in another yard does not share this one's axis.
+                const FVector Approach = (StartAt - RiftMarker.Location).GetSafeNormal2D();
+                const FVector DoorAt = RiftMarker.Location + FVector(0.0f, 0.0f, 100.0f);
+                ABreakerRiftDoor* Door = GetWorld()->SpawnActor<ABreakerRiftDoor>(
+                    ABreakerRiftDoor::StaticClass(),
+                    FTransform(Approach.IsNearlyZero() ? FRotator::ZeroRotator : Approach.Rotation(), DoorAt));
+                if (!Door) continue;
+
                 // WHICH RIFT THIS DOOR OPENS. Authored here rather than on the
                 // actor's defaults because the zone owns its own rift: the
                 // name and line are the plate's own (FBreakerRiftDefinition's
@@ -364,7 +379,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                 // Tier is Campaign, which is what makes entry free (O122) and
                 // respawn unlimited (O82). AreaLevel is O2 PLACEHOLDER — the
                 // first rift the player can reach is an early one, and nothing
-                // has measured what "early" is worth yet.
+                // has measured what "early" is worth yet. Per-yard rift
+                // authoring arrives with the yards; one definition is correct
+                // while there is one door.
                 Door->Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
                 Door->Rift.AreaLine = FText::FromString(
                     TEXT("The tear under the substation, where the yard stops being quiet."));
