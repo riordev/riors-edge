@@ -1448,12 +1448,23 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     TestTrue(*FString::Printf(TEXT("PARITY %.3fx is at most %.2fx (O99)"), Parity, AbilityParityBandMaximum),
         Parity <= AbilityParityBandMaximum);
     // The decomposition, because a single ratio does not say what to author.
-    // Crit and the More product CANCEL EXACTLY — the two builds hold identical
-    // crit lines and an identical More product — so parity is the flat ratio
-    // times the increased ratio and nothing else.
-    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) decomposes: flat %.3fx x increased %.3fx (crit and More cancel exactly)"),
-        AbilityBuild.AbilityFlatLayer / WeaponBuild.FlatLayer,
-        AbilityBuild.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer));
+    // ALL FOUR RATIOS PRINT, AND THEIR PRODUCT IS ASSERTED EQUAL TO PARITY.
+    // This line used to print two ratios with the parenthetical "crit and
+    // More cancel exactly" — true when written (pre-atlas, both lanes held
+    // one More product) and FALSE from 983b925 on (the weapon lane holds
+    // Fixate x Barrage x TV = 1.9349 while the ability lane holds TV alone =
+    // 1.30), so the printed decomposition multiplied to 0.40 while the
+    // reported parity was 0.27 and the missing x0.672 hid inside a stale
+    // claim. Part One-J caught it. A decomposition that asserts its own
+    // product cannot make that claim wrongly again.
+    const float CapFlatRatio = AbilityBuild.AbilityFlatLayer / WeaponBuild.FlatLayer;
+    const float CapIncreasedRatio = AbilityBuild.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer;
+    const float CapMoreRatio = AbilityBuild.AbilityMoreLayer / WeaponBuild.MoreLayer;
+    const float CapCritRatio = AbilityBuild.EffectiveCrit / WeaponBuild.EffectiveCrit;
+    AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (cap) decomposes: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
+        CapFlatRatio, CapIncreasedRatio, CapMoreRatio, CapCritRatio));
+    TestEqual(TEXT("the printed decomposition multiplies to the reported parity"),
+        CapFlatRatio * CapIncreasedRatio * CapMoreRatio * CapCritRatio, Parity, 0.001f);
 
     // PARITY AT ENDGAME, measured and reported, deliberately UNPINNED. Whether
     // the cap figure holds at item level 120 is a different question: the
@@ -1472,9 +1483,16 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
             EndgameItemLevel, EndgameTier, EndgameAbility.AbilityFlatLayer, EndgameAbility.AbilityIncreasedLayer, EndgameAbility.AbilityMoreLayer, EndgameAbility.AbilityTotal));
         AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) %.3fx — UNPINNED; divergence from the cap figure is its own finding"),
             EndgameParity));
-        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) decomposes: flat %.3fx x increased %.3fx (crit and More cancel exactly)"),
-            EndgameAbility.AbilityFlatLayer / EndgameWeapon.FlatLayer,
-            EndgameAbility.AbilityIncreasedLayer / EndgameWeapon.IncreasedLayer));
+        // The same four-ratio form and the same product assertion as the cap
+        // decomposition above, for the same Part One-J reason.
+        const float EndFlatRatio = EndgameAbility.AbilityFlatLayer / EndgameWeapon.FlatLayer;
+        const float EndIncreasedRatio = EndgameAbility.AbilityIncreasedLayer / EndgameWeapon.IncreasedLayer;
+        const float EndMoreRatio = EndgameAbility.AbilityMoreLayer / EndgameWeapon.MoreLayer;
+        const float EndCritRatio = EndgameAbility.EffectiveCrit / EndgameWeapon.EffectiveCrit;
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  PARITY (endgame) decomposes: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
+            EndFlatRatio, EndIncreasedRatio, EndMoreRatio, EndCritRatio));
+        TestEqual(TEXT("the endgame decomposition multiplies to the reported parity"),
+            EndFlatRatio * EndIncreasedRatio * EndMoreRatio * EndCritRatio, EndgameParity, 0.001f);
         // BOTH halves widen with gear depth, and the reason is the same in each:
         // the back-loaded ladder multiplies what a line is worth, so a lane with
         // more lines compounds harder as tiers deepen. The breadth deficit is
