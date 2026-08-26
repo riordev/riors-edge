@@ -72,7 +72,6 @@ namespace BreakerNodeTags
     UE_DEFINE_GAMEPLAY_TAG(Node_MarksmanCalledShot, "Progression.Node.Swift.Marksman.CalledShot");
 
     UE_DEFINE_GAMEPLAY_TAG(Node_Downforce, "Progression.Node.Swift.Kinetic.Downforce");
-    UE_DEFINE_GAMEPLAY_TAG(Node_Grind, "Progression.Node.Swift.Kinetic.Grind");
     UE_DEFINE_GAMEPLAY_TAG(Node_Overpressure, "Progression.Node.Swift.Kinetic.Overpressure");
     UE_DEFINE_GAMEPLAY_TAG(Node_Deadeye, "Progression.Node.Swift.Marksman.Deadeye");
     UE_DEFINE_GAMEPLAY_TAG(Node_Culling, "Progression.Node.Swift.Marksman.Culling");
@@ -1799,21 +1798,13 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     Node->GrantedTags.AddTag(BreakerNodeTags::Node_Downforce.GetTag());
     Tree->Nodes.Add(Node);
 
-    // RETIRED WITH ITS VERB, AND MARKED FOR FULL RETIREMENT (Part One-R,
-    // O144): Grind's whole fantasy was the wall — "shots fired off a wall
-    // ride" — so unlike Traction there is no narrow-window idea to carry onto
-    // a mantle, and re-targeting it would be the name dragging the node onto
-    // a verb it does not mean (KIT's own flag). The conditional line is gone
-    // now; the NODE deletion is deferred to its own deliberate act because a
-    // purchasable node's removal owes a save story — a paid rank on a deleted
-    // id refunds nothing through GetRefundValue — plus the Kinetic count pin
-    // and any fixture rows, and doing that as a rider on tonight's window
-    // would be three decisions hiding in one commit.
-    Node = MakeNode(TEXT("Swift.Kinetic.Grind"), TEXT("Grind"),
-        TEXT("Its wall retired. This node is marked for removal."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 2, 2, 1);
-    AddPrerequisite(Node, TEXT("Swift.Kinetic.Contact"));
-    Node->GrantedTags.AddTag(BreakerNodeTags::Node_Grind.GetTag());
-    Tree->Nodes.Add(Node);
+    // Swift.Kinetic.Grind stood here and is DELETED, not retired-in-place
+    // (Part One-U item 20, closing O144's deferral): its whole fantasy was
+    // the wall and the wall's verb is gone. The save story that deferral
+    // owed landed FIRST, in the same push — a loaded rank on an id that no
+    // longer resolves is dropped and credited at the fallback cost
+    // (DropUnknownRanksAndCredit), so the owner's saves that bought Grind
+    // get their points back instead of paying a silent permanent tax.
 
     // --- Tier 4 (K9-K11), the rewrite tier -----------------------------------
     // Kinetic's rewrites all move the same idea: the branch's airborne

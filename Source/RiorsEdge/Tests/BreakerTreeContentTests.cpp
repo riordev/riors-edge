@@ -137,7 +137,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // costs 2 behind a gate of 6, so it is the last of four picks rather than a
     // rung on the way up. See the block comment above GetSwiftKineticTree.
     TestEqual(TEXT("Frenzy ships thirteen nodes: ten, plus F9-F11"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
-    TestEqual(TEXT("Kinetic ships fifteen nodes: eleven, K9-K11, and the granted Longstride (O139)"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 15);
+    TestEqual(TEXT("Kinetic ships fourteen nodes: ten, K9-K11, and the granted Longstride (O139; Grind deleted under Part One-U item 20)"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 14);
     TestEqual(TEXT("Marksman ships thirteen nodes: ten, plus M9-M11"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
         UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})
