@@ -395,10 +395,28 @@ void ABreakerPlaytestHUD::DrawHUD()
     // timer is running, so the one honest thing to draw is what happens
     // next. Dying with nothing on screen read as a bug in the first
     // playtest; dying with this line reads as a rule.
+    //
+    // A STATUS LINE, NOT AN ALARM (owner playtest 2026-08-26). It was one
+    // 35-character string in Harm red at 16px, forty pixels off dead centre —
+    // so it crossed the middle of the screen, competed with the crosshair and
+    // printed over every enemy label behind it. Three things changed and none
+    // of them is the wording:
+    //  * COLOUR. Harm is the damage accent and it read as an alarm. Cyan is
+    //    FIELDPLATE's player/system accent, which is what a respawn state is.
+    //  * WEIGHT. The rule half — WHERE you come back — is the quiet half, so
+    //    it drops to caption size and TextMuted. The state is the loud half
+    //    and it is still only 14px.
+    //  * PLACE. Below the crosshair rather than through it. A dead player is
+    //    not aiming, but the crosshair is still drawn and two things in the
+    //    same 40 pixels is what made it read as competing.
+    // The sting that used to land on this same frame is gone by the same
+    // ruling; the whole beat was over-produced rather than under-produced.
     if (Character->IsAwaitingRespawn())
     {
-        DrawSpecTextCentered(TEXT("REDEPLOYING — FROM THE TILESET START"),
-            Center.X, Center.Y - S(40.0f), BreakerUI::Harm, 16.0f);
+        DrawSpecTextCentered(TEXT("REDEPLOYING"),
+            Center.X, Center.Y + S(96.0f), BreakerUI::Cyan, 14.0f);
+        DrawSpecTextCentered(TEXT("FROM THE TILESET START"),
+            Center.X, Center.Y + S(96.0f) + S(18.0f), BreakerUI::TextMuted, 10.0f);
     }
 
     TickCapturePreview(Character);
@@ -2715,7 +2733,16 @@ void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult&
     // Immediate, never on the arrival clock — being hit has no flight — and
     // only for damage that actually landed: a dodge or a fully blocked hit
     // already has its own readout and earned its silence.
-    if (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f)
+    //
+    // NOT ON THE KILLING BLOW (ruled: "the death sound needs to go"). There was
+    // never a death sound to delete — this verb IS what played when the player
+    // died, because the fatal hit is a hit and the project has no other audio
+    // source at all. Deleting the call would have taken being-hit out of the
+    // whole game to silence one moment of it, so the removal is this condition
+    // and nothing else. NOT REPLACED with a quieter sting: the ruling is a
+    // verdict on a sound existing at that moment, and the moment already
+    // carries a full-screen line and a respawn. The death beat is now silent.
+    if (!Result.bKilled && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
     {
         if (ABreakerSoundDirector* Sound = GetSoundDirector())
         {
