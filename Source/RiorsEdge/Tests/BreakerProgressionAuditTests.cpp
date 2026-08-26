@@ -254,7 +254,7 @@ bool FBreakerCasterAbilitiesUnlockTest::RunTest(const FString& Parameters)
         // zero and every unlock failed for want of tokens. A test that borrows
         // another system's number is asserting a coincidence.
         Progression->AwardExperience(UBreakerExperienceLibrary::TotalXpToReachLevel(
-            UBreakerProgressionLibrary::AbilityTokenLevels[UE_ARRAY_COUNT(UBreakerProgressionLibrary::AbilityTokenLevels) - 1],
+            UBreakerProgressionLibrary::AbilityCompletionLevel,
             Progression->ExperienceCurve));
 
         FText Failure;

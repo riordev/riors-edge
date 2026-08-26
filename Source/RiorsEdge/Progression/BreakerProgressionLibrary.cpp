@@ -466,14 +466,32 @@ int32 UBreakerProgressionLibrary::MilestoneEntitlement(int32 CharacterLevel, con
     return Reached * PerMilestone;
 }
 
+int32 UBreakerProgressionLibrary::AbilityTokenLevelForIndex(int32 Index, int32 Count)
+{
+    // Convex interpolation between the two authored ends (see the O138 block
+    // at the declaration). Index clamps rather than errors so a caller
+    // walking one past the end reads the completion level instead of garbage.
+    if (Count <= 0) return TNumericLimits<int32>::Max();
+    if (Count == 1 || Index <= 0) return FirstAbilityTokenLevel;
+    const int32 Clamped = FMath::Min(Index, Count - 1);
+    const float T = static_cast<float>(Clamped) / static_cast<float>(Count - 1);
+    const float Shaped = FMath::Pow(T, AbilityTokenSpacingExponent);
+    return FMath::RoundToInt32(FirstAbilityTokenLevel
+        + Shaped * static_cast<float>(AbilityCompletionLevel - FirstAbilityTokenLevel));
+}
+
 int32 UBreakerProgressionLibrary::AbilityTokenEntitlement(int32 CharacterLevel, int32 UnlockableCount)
 {
-    // Count the schedule entries the character has reached, then clamp to what
-    // the class can actually spend. The clamp is the whole reason this takes
-    // UnlockableCount at all: a token that cannot buy anything is not a
-    // reward, it is a counter the player watches and cannot use.
-    const int32 Capped = FMath::Clamp(UnlockableCount, 0, UE_ARRAY_COUNT(AbilityTokenLevels));
-    return MilestoneEntitlement(CharacterLevel, AbilityTokenLevels, Capped, 1);
+    // Count the derived milestones the character has reached. The schedule's
+    // length IS the unlockable count (O138), so the old clamp — a token that
+    // cannot buy anything is a counter the player watches and cannot use —
+    // now holds by construction rather than by truncation.
+    int32 Reached = 0;
+    for (int32 Index = 0; Index < UnlockableCount; ++Index)
+    {
+        if (CharacterLevel >= AbilityTokenLevelForIndex(Index, UnlockableCount)) ++Reached;
+    }
+    return Reached;
 }
 
 int32 UBreakerProgressionLibrary::DoctrinePointEntitlement(int32 CharacterLevel)
@@ -1647,6 +1665,22 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetSwiftKineticTree()
     if (Tree) return Tree;
 
     Tree = MakeTree(TEXT("Doctrine.Swift.Kinetic"), TEXT("Swift — Kinetic"), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift);
+
+    // THE GRANTED NODE (ORDERS ruling 1): Swift's second free verb, the
+    // enhanced-dash passive — a node, never a slot occupant. Seeded at rank 1
+    // wherever a character becomes or loads as Swift
+    // (UBreakerProgressionComponent::SeedGrantedNodes), COST ZERO on purpose:
+    // a refund of rank x 0 is 0, so the doctrine respec's refund arithmetic
+    // and every spent-points total are untouched by construction — the
+    // respec-no-refund property as arithmetic rather than as a special case.
+    // Single rank today; higher purchasable ranks are the ruled extension and
+    // arrive with their own costs, never by making rank 1 purchasable.
+    // DISTANCE, not cooldown — the seat's argument: a cooldown shave is
+    // invisible until the player spams, distance is felt on the first dash.
+    UBreakerProgressionNode* Longstride = MakeNode(TEXT("Swift.Kinetic.Longstride"), TEXT("Longstride"),
+        TEXT("Your dash carries further. Granted with the class."), EBreakerPointCurrency::DoctrinePoints, EBreakerClassId::Swift, 1, 1, 0);
+    AddEffect(Longstride, EBreakerNodeStatTarget::DashDistance, EBreakerNodeStatBucket::IncreasedPercent, 20.0f); // O2 PLACEHOLDER — felt on the first dash
+    Tree->Nodes.Add(Longstride);
 
     // Kinetic's entry loop knob: lengthening the airborne credit window is what
     // lets a jump chain pay across the gap between two surfaces rather than only
@@ -4204,8 +4238,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // the list because the quartermaster offers in this order and Slipcut is
     // Frenzy's ignition, the fantasy the ruling moved off the starter row;
     // Lead joins them (it was only ever a starter because the old single
-    // list held two). Five purchases against the five-milestone token
-    // schedule below (AbilityTokenLevels), all reachable by 50.
+    // list held two). Five purchases against the DERIVED token schedule
+    // (AbilityTokenLevelForIndex, O138) — the count reads this list, so all
+    // five are reachable and the last lands at the shared completion level.
     Swift->UnlockableAbilityIds = {
         TEXT("Swift.Slipcut"), TEXT("Swift.Lead"), TEXT("Swift.CadenceBreak"),
         TEXT("Swift.HardStop"), TEXT("Swift.Sightline")};

@@ -244,6 +244,19 @@ enum class EBreakerNodeStatTarget : uint8
     // the item layer yet, the node also has to be the count's source).
     RicochetCount,
 
+    // ---- Dash distance (ORDERS ruling 1, the enhanced-dash passive) -------
+    // Increased dash impulse, in percent: the movement component multiplies
+    // its composed dash output speed (floor-or-velocity plus DashSpeedBonus,
+    // before the momentum hard cap) by this lane's product. DISTANCE rather
+    // than cooldown by the seat's own argument — a cooldown shave is
+    // invisible until the player spams; distance is felt on the first dash.
+    // A single-bidder lane on FBreakerNodeStats read by TryDash, like the
+    // projectile channels: no aggregated attribute exists and gear does not
+    // bid. THE DAY a gear dash-distance affix is authored, this moves onto
+    // the aggregator so the two layers share one additive bucket — the same
+    // migration the register comment demands of DashCooldown.
+    DashDistance,
+
     Count UMETA(Hidden)
 };
 
@@ -345,6 +358,13 @@ inline bool BreakerStatTargetHasAggregationLane(EBreakerNodeStatTarget Target)
     case EBreakerNodeStatTarget::AbilityArea:
     case EBreakerNodeStatTarget::AbilityDuration:
     case EBreakerNodeStatTarget::AbilityCooldown:
+    // ---- Wired 2026-08-26, the enhanced-dash passive (ORDERS ruling 1) ---
+    // DashDistance: a single-bidder Increased lane composed onto
+    // FBreakerNodeStats::DashDistanceMultiplier and read by
+    // UBreakerCharacterMovementComponent::TryDash, which multiplies its
+    // composed dash output speed before the momentum hard cap. The enum
+    // entry's own comment carries the gear-migration note.
+    case EBreakerNodeStatTarget::DashDistance:
     // ---- Wired by the O54 pool split -------------------------------------
     // These two could not be wired a line at a time like everything above,
     // because until the split there was ONE damage bucket for them to land in
@@ -615,6 +635,9 @@ struct RIORSEDGE_API FBreakerNodeStats
     UPROPERTY(BlueprintReadOnly) float SlideSpeedMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float AirControlMultiplier = 1.0f;
     UPROPERTY(BlueprintReadOnly) float DamageOverTimeMultiplier = 1.0f;
+    // The DashDistance lane (single-bidder; see the register). TryDash
+    // multiplies its composed output speed by this before the hard cap.
+    UPROPERTY(BlueprintReadOnly) float DashDistanceMultiplier = 1.0f;
     // Composed from node Damage effects PLUS the per-spent-point baseline, so
     // this is the whole tree layer's contribution to the shared additive
     // Increased bucket on the DamageMultiplier attribute.

@@ -48,9 +48,15 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
             TestTrue(*(Context + TEXT(" has a description")), !Node->Description.IsEmpty());
             TestTrue(*(Context + TEXT(" has at least one rank")), Node->MaxRank >= 1);
 
-            // Cost grammar: 1 minor, 2 notable, 3 convergence, 5 keystone.
-            const bool bCostInGrammar = Node->CostPerRank == 1 || Node->CostPerRank == 2 || Node->CostPerRank == 3 || Node->CostPerRank == 5;
-            TestTrue(*(Context + TEXT(" cost is in the 1/2/3/5 grammar")), bCostInGrammar);
+            // Cost grammar: 1 minor, 2 notable, 3 convergence, 5 keystone —
+            // plus 0 for exactly the GRANTED node (O139): seeded, never
+            // purchasable-for-free, and cost 0 is what makes its
+            // respec-no-refund property arithmetic. Keyed to the one id so a
+            // second cost-0 node cannot ride in under this exemption.
+            const bool bGrantedNode = Node->NodeId == UBreakerProgressionComponent::SwiftGrantedDashNodeId;
+            const bool bCostInGrammar = Node->CostPerRank == 1 || Node->CostPerRank == 2 || Node->CostPerRank == 3 || Node->CostPerRank == 5
+                || (bGrantedNode && Node->CostPerRank == 0);
+            TestTrue(*(Context + TEXT(" cost is in the 1/2/3/5 grammar (0 for the granted node alone)")), bCostInGrammar);
 
             // A node that grants nothing at all is a content bug.
             const bool bGrantsSomething = Node->Effects.Num() > 0 || Node->GrantedTags.Num() > 0 || Node->GrantedAbilityIds.Num() > 0;
@@ -131,7 +137,7 @@ bool FBreakerFallbackTreeIntegrityTest::RunTest(const FString& Parameters)
     // costs 2 behind a gate of 6, so it is the last of four picks rather than a
     // rung on the way up. See the block comment above GetSwiftKineticTree.
     TestEqual(TEXT("Frenzy ships thirteen nodes: ten, plus F9-F11"), UBreakerProgressionLibrary::GetSwiftFrenzyTree()->Nodes.Num(), 13);
-    TestEqual(TEXT("Kinetic ships fourteen nodes: eleven, plus K9-K11"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 14);
+    TestEqual(TEXT("Kinetic ships fifteen nodes: eleven, K9-K11, and the granted Longstride (O139)"), UBreakerProgressionLibrary::GetSwiftKineticTree()->Nodes.Num(), 15);
     TestEqual(TEXT("Marksman ships thirteen nodes: ten, plus M9-M11"), UBreakerProgressionLibrary::GetSwiftMarksmanTree()->Nodes.Num(), 13);
     for (const UBreakerProgressionTree* Tree : {UBreakerProgressionLibrary::GetSwiftFrenzyTree(),
         UBreakerProgressionLibrary::GetSwiftKineticTree(), UBreakerProgressionLibrary::GetSwiftMarksmanTree()})

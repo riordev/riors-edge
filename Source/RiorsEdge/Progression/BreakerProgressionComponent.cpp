@@ -76,6 +76,20 @@ void UBreakerProgressionComponent::BindAttributes(UBreakerAttributeSet* InAttrib
     RecalculateStats();
 }
 
+const FName UBreakerProgressionComponent::SwiftGrantedDashNodeId(TEXT("Swift.Kinetic.Longstride"));
+
+void UBreakerProgressionComponent::SeedGrantedNodes()
+{
+    // See the declaration. Swift-only today; a second class earning a granted
+    // node adds a row here, not a mechanism.
+    if (State.PermanentClass != EBreakerClassId::Swift) return;
+    for (const FBreakerNodeRank& Rank : State.DoctrineNodeRanks)
+    {
+        if (Rank.NodeId == SwiftGrantedDashNodeId) return;
+    }
+    State.DoctrineNodeRanks.Add({SwiftGrantedDashNodeId, 1});
+}
+
 void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
 {
     State.PermanentClass = ClassId;
@@ -117,6 +131,7 @@ void UBreakerProgressionComponent::DevForceClass(EBreakerClassId ClassId)
                 static_cast<int32>(ClassId));
         }
     }
+    SeedGrantedNodes();
     RecalculateStats();
     OnProgressionChanged.Broadcast();
 }
@@ -155,6 +170,7 @@ bool UBreakerProgressionComponent::ChoosePermanentClassById(EBreakerClassId Clas
         if (ClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StarterAbilityIds[1];
         State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
+    SeedGrantedNodes();
     RecalculateStats();
     // Locking a class is a progression change like any other. Without this the
     // class-resource loops never learn they went live: UBreakerMomentumComponent
@@ -177,6 +193,7 @@ bool UBreakerProgressionComponent::ChoosePermanentClass(const UBreakerClassDefin
     if (NewClassDefinition->StarterAbilityIds.Num() > 0) State.AbilityLoadout.ClassAbilityOne = NewClassDefinition->StarterAbilityIds[0];
     if (NewClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = NewClassDefinition->StarterAbilityIds[1];
     State.AbilityLoadout.Ultimate = NewClassDefinition->BaseUltimateId;
+    SeedGrantedNodes();
     RecalculateStats();
     // Same reason as ChoosePermanentClassById: this is the Data-Asset-driven
     // twin of that path and the listeners cannot tell them apart.
@@ -381,6 +398,10 @@ bool UBreakerProgressionComponent::RespecAtForge(EBreakerPointCurrency Currency,
         // from this function; RiorsEdge.Progression.AbilityUnlocks.
         // SurvivesRespec is what keeps them absent.
     }
+    // A respec refunds what was PAID; the granted rank was never paid for
+    // (cost 0, seeded), so the clear above must not be how a Swift loses its
+    // class verb. Re-seed before the recalculation.
+    SeedGrantedNodes();
     // Cleared ranks must clear their effects, tags and verb grants included.
     RecalculateStats();
     OnProgressionChanged.Broadcast();
@@ -484,6 +505,10 @@ void UBreakerProgressionComponent::LoadProgressionState(const FBreakerProgressio
         if (ClassDefinition->StarterAbilityIds.Num() > 1) State.AbilityLoadout.ClassAbilityTwo = ClassDefinition->StarterAbilityIds[1];
         State.AbilityLoadout.Ultimate = ClassDefinition->BaseUltimateId;
     }
+    // A migrated or roster-written Swift save carries no granted rank; a
+    // save that has one is left untouched. Before the spent rebuild so the
+    // totals see the final ranks (the granted rank is cost 0 either way).
+    SeedGrantedNodes();
     // Ranks were just bulk-replaced from outside; the running spent-points
     // totals have to be rebuilt from what actually loaded rather than
     // incrementally tracked, exactly once, here (audit item 6).
@@ -688,7 +713,17 @@ void UBreakerProgressionComponent::ApplySliceDefaultsIfFresh()
     // correct only while the migration has already zeroed it -- the reasoning
     // ProgressionTypes.h rules out at that field's own declaration. The retired
     // WALLET stays, because a v5 payload can still carry a non-zero one.
-    const bool bFresh = State.CoreNodeRanks.Num() == 0 && State.DoctrineNodeRanks.Num() == 0
+    // The GRANTED rank does not count against freshness: it is seeded, not
+    // spent (cost 0, SeedGrantedNodes), so a Swift whose only doctrine rank
+    // is the grant has exactly the empty economy this repair exists for —
+    // counting it would quietly withhold the slice lump from every seeded
+    // character loaded from a rankless save.
+    int32 SpentDoctrineRanks = 0;
+    for (const FBreakerNodeRank& Rank : State.DoctrineNodeRanks)
+    {
+        if (Rank.NodeId != SwiftGrantedDashNodeId) ++SpentDoctrineRanks;
+    }
+    const bool bFresh = State.CoreNodeRanks.Num() == 0 && SpentDoctrineRanks == 0
         && State.UnspentClassPoints == 0 && State.UnspentCorePoints == 0
         && State.UnspentDoctrinePoints == 0;
     if (!bFresh) return;
@@ -1136,6 +1171,10 @@ FBreakerNodeStats UBreakerProgressionComponent::AggregateStats(const TArray<cons
     Stats.MoveSpeedMultiplier = Increased(EBreakerNodeStatTarget::MoveSpeed);
     Stats.SlideSpeedMultiplier = Increased(EBreakerNodeStatTarget::SlideSpeed);
     Stats.AirControlMultiplier = Increased(EBreakerNodeStatTarget::AirControl);
+    // The DashDistance lane (ORDERS ruling 1): single-bidder, read by
+    // TryDash before the momentum hard cap. See the register in
+    // BreakerProgressionTypes.h for the gear-migration note.
+    Stats.DashDistanceMultiplier = Increased(EBreakerNodeStatTarget::DashDistance);
     Stats.DamageOverTimeMultiplier = Increased(EBreakerNodeStatTarget::DamageOverTime);
     // O54: the display figures for each delivery lane. Each is the shared pool
     // plus its own narrow line — the same sum the contribution bids, so the

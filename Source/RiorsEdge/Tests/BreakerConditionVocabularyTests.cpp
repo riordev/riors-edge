@@ -441,8 +441,13 @@ bool FBreakerConditionVocabularyStatTargetTest::RunTest(const FString& Parameter
     // Lifesteal stays unwired on purpose — no bidder in either layer, owed a
     // lane or a retirement as its own ruling.
     //
+    // Plus DashDistance, wired 2026-08-26 for ORDERS ruling 1's granted
+    // Longstride: a single-bidder Increased lane on FBreakerNodeStats read by
+    // TryDash before the momentum hard cap. The enum entry carries the
+    // gear-migration note.
+    //
     // This number goes up in the same commit as the lane, never before it.
-    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 31);
+    TestEqual(TEXT("stat targets with an aggregation lane today"), Wired, 32);
     TestTrue(*FString::Printf(TEXT("%d stat targets still await a lane"), TargetCount - Wired), TargetCount > Wired);
 
     // The pre-existing ten specifically, so that a future reshuffle cannot quiet

@@ -289,8 +289,14 @@ bool FBreakerSwiftChannelLanesTest::RunTest(const FString& Parameters)
     // of them; the vocabulary test pins the originals, this pins the tail.
     TestEqual(TEXT("ChainCount appended after StatusChance"),
         static_cast<int32>(EBreakerNodeStatTarget::ChainCount), static_cast<int32>(EBreakerNodeStatTarget::StatusChance) + 1);
-    TestEqual(TEXT("RicochetCount is the last entry before Count"),
-        static_cast<int32>(EBreakerNodeStatTarget::RicochetCount), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
+    // RicochetCount's ordinal is pinned ABSOLUTELY now rather than as
+    // last-before-Count: DashDistance appended behind it (O139), which is
+    // exactly the legal move this pin exists to distinguish from an
+    // insertion — the originals must not shift.
+    TestEqual(TEXT("RicochetCount appended after ChainCount"),
+        static_cast<int32>(EBreakerNodeStatTarget::RicochetCount), static_cast<int32>(EBreakerNodeStatTarget::ChainCount) + 1);
+    TestEqual(TEXT("DashDistance is the last entry before Count (O139)"),
+        static_cast<int32>(EBreakerNodeStatTarget::DashDistance), static_cast<int32>(EBreakerNodeStatTarget::Count) - 1);
 
     // And the lanes actually pay: a rank-2 node authoring all four Flat lines
     // lands on the FBreakerNodeStats fields the weapon reads.

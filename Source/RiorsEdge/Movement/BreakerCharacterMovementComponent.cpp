@@ -722,7 +722,17 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
         return false;
     }
 
-    const float OutputSpeed = FMath::Min(FMath::Max(Velocity.Size2D(), DashSpeedFloor) + DashSpeedBonus, MomentumHardCap);
+    // The DashDistance node lane (ORDERS ruling 1 — Swift's granted
+    // Longstride, LEDGER's single-bidder lane): multiplies the whole composed
+    // impulse BEFORE the hard cap, so "dash carries further" is what the
+    // player reads and the cap still has the last word at high Momentum. Read
+    // per press, not per tick; a pawn with no progression component (an
+    // enemy, a test rig) reads x1.0 and is bit-identical to before.
+    const UBreakerProgressionComponent* DashProgression = GetProgression();
+    const float DashDistanceMultiplier = DashProgression
+        ? FMath::Max(0.0f, DashProgression->GetNodeStats().DashDistanceMultiplier) : 1.0f;
+    const float OutputSpeed = FMath::Min(
+        (FMath::Max(Velocity.Size2D(), DashSpeedFloor) + DashSpeedBonus) * DashDistanceMultiplier, MomentumHardCap);
     Velocity.X = Direction.X * OutputSpeed;
     Velocity.Y = Direction.Y * OutputSpeed;
     Velocity.Z = FMath::Max(Velocity.Z, DashVerticalFloor);

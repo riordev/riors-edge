@@ -442,17 +442,36 @@ public:
     // player can open and never use, which is the reachability rule's own
     // example. When the campaign lands, these levels are replaced by the
     // milestones and the cumulative counter means no character is paid twice.
-    // O2 PLACEHOLDER: the five levels are shape, not balance.
+    // THE SCHEDULE IS DERIVED, NEVER AUTHORED AS A LIST (O138; owner: "i
+    // think all classes should finish at the same time"). The shipped defect
+    // this replaces: an authored milestone array and a derived unlockable
+    // count were two facts that could disagree, and they did — four
+    // milestones against Swift's five purchases left its last ability
+    // unreachable at the cap. Now the first-token level and the completion
+    // level are authored, the COUNT is read from the class's unlockables, and
+    // the levels space themselves between the two ends — so a class gaining
+    // or losing an unlockable re-spaces itself and the disagreement cannot
+    // recur.
     //
-    // TRUNCATED PER CLASS to UnlockableAbilityIds.Num(). A flat count would
-    // pay a class more tokens than it has unlockables and strand the excess
-    // permanently — the same kind of unreachable content this whole pass
-    // exists to delete. The FIFTH milestone exists because ruling 1 made
-    // Swift a one-starter class with FIVE unlockables (Lead joined them):
-    // four milestones against five purchases would leave the last ability
-    // unreachable by 50, which is the exact red ReachableByFifty holds. The
-    // four-unlockable classes truncate to four and never see it.
-    static constexpr int32 AbilityTokenLevels[] = {5, 12, 20, 30, 40};   // O2 PLACEHOLDER
+    // THE SPACING IS CONVEX (t^Exponent, early unlocks close, late far),
+    // chosen over even spacing for two reasons stated in the O138 report: the
+    // shipped four-class schedule {5, 12, 20, 30} already had convex gaps
+    // (7, 8, 10) — that was the authored feel — and at Exponent 1.2 the
+    // derivation reproduces it BIT-IDENTICALLY, so four classes' schedules do
+    // not move as a side effect of the mechanism changing. Even spacing would
+    // have silently retuned them to {5, 13, 22, 30}. Swift's five derive to
+    // {5, 10, 16, 23, 30}: first two unlocks close together, last two apart,
+    // and every class completes at the same level. All O2 PLACEHOLDER.
+    static constexpr int32 FirstAbilityTokenLevel = 5;      // O2 PLACEHOLDER
+    static constexpr int32 AbilityCompletionLevel = 30;     // O2 PLACEHOLDER — every class finishes here (O138)
+    static constexpr float AbilityTokenSpacingExponent = 1.2f;   // O2 PLACEHOLDER — >1 is early-close/late-far
+
+    // The level at which token (Index+1) of a Count-token schedule arrives.
+    // Index 0 is FirstAbilityTokenLevel and Index Count-1 is
+    // AbilityCompletionLevel by construction. A one-token schedule pays at
+    // the first-token level: an only unlock is a first unlock, and no shipped
+    // class has one.
+    static int32 AbilityTokenLevelForIndex(int32 Index, int32 Count);
 
     // How many tokens a character of this level and this many unlockables has
     // earned in total. The component pays the difference against what it has

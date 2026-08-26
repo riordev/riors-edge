@@ -87,6 +87,12 @@ public:
     UFUNCTION(BlueprintPure, Category="Progression") const FBreakerProgressionState& GetProgressionState() const { return State; }
     UFUNCTION(BlueprintCallable, Category="Progression") void LoadProgressionState(const FBreakerProgressionState& NewState);
 
+    // ORDERS ruling 1: the node id of Swift's enhanced-dash passive, seeded
+    // at rank 1 wherever a character becomes (or loads as) Swift — the class's
+    // second free verb, a node and never a slot occupant. Public so tests and
+    // the board can name it without a string copy drifting.
+    static const FName SwiftGrantedDashNodeId;
+
     // Every tree this character may spend in, fallback content included. The
     // UI enumerates trees here and nodes through UBreakerProgressionTree.
     UFUNCTION(BlueprintPure, Category="Progression") TArray<UBreakerProgressionTree*> GetAvailableTrees() const;
@@ -294,6 +300,15 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Progression") FBreakerProgressionChanged OnProgressionChanged;
 
 private:
+    // ORDERS ruling 1's grant mechanism: writes rank 1 of the granted node
+    // into the doctrine ranks when the character is Swift and does not hold
+    // it. Idempotent, cost 0 (so refunds and spent-point totals are untouched
+    // by construction), called from every path that sets or restores a class
+    // — the three Choose/DevForce paths, LoadProgressionState (a migrated or
+    // roster-written Swift save carries no rank), and the doctrine respec
+    // (whose clear would otherwise take a grant a refund never paid for).
+    void SeedGrantedNodes();
+
     UPROPERTY(VisibleInstanceOnly, Category="Progression") FBreakerProgressionState State;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
 

@@ -214,6 +214,71 @@ bool FBreakerAbilityNoUnspendableTokensTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// (d2) The derived schedule (O138). The count is read from the thing it
+// counts, so the four-against-five disagreement that stranded Swift's last
+// ability cannot recur — and the derivation must not silently retune the four
+// classes whose schedule was already authored by feel.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAbilityTokenScheduleDerivesTest,
+    "RiorsEdge.Progression.AbilityUnlocks.ScheduleDerives",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAbilityTokenScheduleDerivesTest::RunTest(const FString& Parameters)
+{
+    using L = UBreakerProgressionLibrary;
+
+    // BIT-IDENTITY with the retired authored list for the four-unlockable
+    // classes: {5, 12, 20, 30}. The convex exponent was chosen BECAUSE it
+    // reproduces the authored feel exactly (gaps 7, 8, 10); if a retune moves
+    // the exponent, this is the pin that makes the four-class consequence a
+    // decision instead of a side effect.
+    const int32 FourClass[] = {5, 12, 20, 30};
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        TestEqual(*FString::Printf(TEXT("a four-unlockable class's token %d arrives at the authored level"), Index + 1),
+            L::AbilityTokenLevelForIndex(Index, 4), FourClass[Index]);
+    }
+
+    // Swift's five: first two close, last two apart, completion shared.
+    const int32 FiveClass[] = {5, 10, 16, 23, 30};
+    for (int32 Index = 0; Index < 5; ++Index)
+    {
+        TestEqual(*FString::Printf(TEXT("a five-unlockable class's token %d arrives at the derived level"), Index + 1),
+            L::AbilityTokenLevelForIndex(Index, 5), FiveClass[Index]);
+    }
+
+    // The ends are the two authored numbers, at any count — the derivation's
+    // whole contract, and the owner's ruling ("all classes should finish at
+    // the same time") as arithmetic.
+    for (int32 Count = 2; Count <= 8; ++Count)
+    {
+        TestEqual(*FString::Printf(TEXT("a %d-token schedule starts at the first-token level"), Count),
+            L::AbilityTokenLevelForIndex(0, Count), L::FirstAbilityTokenLevel);
+        TestEqual(*FString::Printf(TEXT("a %d-token schedule completes at the shared completion level"), Count),
+            L::AbilityTokenLevelForIndex(Count - 1, Count), L::AbilityCompletionLevel);
+        // Strictly increasing: two tokens on one level would be one milestone
+        // wearing two names.
+        for (int32 Index = 1; Index < Count; ++Index)
+        {
+            TestTrue(*FString::Printf(TEXT("a %d-token schedule strictly increases at token %d"), Count, Index + 1),
+                L::AbilityTokenLevelForIndex(Index, Count) > L::AbilityTokenLevelForIndex(Index - 1, Count));
+        }
+    }
+
+    // Every SHIPPED class completes exactly at the completion level — the
+    // ruling asserted against the real definitions, not just the arithmetic.
+    using namespace BreakerUnlockTest;
+    for (const EBreakerClassId ClassId : UnlockTestAllClasses())
+    {
+        const UBreakerClassDefinition* Definition = UBreakerProgressionLibrary::GetFallbackClassDefinition(ClassId);
+        if (!Definition || Definition->UnlockableAbilityIds.Num() == 0) continue;
+        const int32 Count = Definition->UnlockableAbilityIds.Num();
+        TestEqual(*FString::Printf(TEXT("%s completes its kit at the shared level"), *UEnum::GetValueAsString(ClassId)),
+            L::AbilityTokenLevelForIndex(Count - 1, Count), L::AbilityCompletionLevel);
+    }
+    return true;
+}
+
 // (e) Reachability at the shipped entitlement, with no test grant anywhere.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerAbilityReachableByFiftyTest,
