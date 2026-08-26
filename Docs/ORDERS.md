@@ -659,6 +659,140 @@ that the fixture reaches the edit.
 
 ---
 
+# PART ONE-H — GROUND'S FOUR REPORTS, ALL FOUR ACCEPTED
+
+`b8f66b2`, no code. Four answers the seat asked for before building, and one of
+them catches a defect in the seat's own ruling.
+
+## 1. The Anchor ruling would have broken FIELD. ACCEPTED WITH ITS CONDITION
+
+Verified in the tree: the Fernhall branch returns at **line 396**;
+`-BreakerCrowdProbe` is at **line 486**. Five harness entry points sit in the
+gym-only tail, ninety lines past the last map branch.
+
+**Autoplay landing in the Anchor does not move them — it stops reaching them.**
+The density instrument would have become unreachable for the lane the seat had
+just told to prioritise density. The blocks are gym-*located*, not
+gym-*dependent*.
+
+**RULED: the harness moves above the map branches IN THE SAME COMMIT as the
+config change. Doing the config alone is forbidden** — not discouraged, forbidden,
+because it is silently correct at compile time and breaks an instrument nobody
+would think to re-run.
+
+Part One-E stands as amended by this.
+
+## 2. Rift interior: the yard instance is the route, and it goes AFTER the close verb
+
+The route is cheaper than the seat guessed and for a reason worth keeping:
+**`StartNextWave` spawns its ring around the PLAYER, not at the authored arena**,
+so the wave system has no dependency on gym geometry at all. `Lvl_Fernhall` with
+`PendingRift` set already IS a different instance of the same tileset. No new map.
+
+**But GROUND recommends taking it after the close-rift seam, and it is right:**
+*"a populated rift with no ending is a louder version of the problem, not a fix
+for it."* That is an argument against its own more interesting work, made on the
+merits.
+
+**RULED: close verb first, yard instance second.** The gym stays the interior in
+the meantime and the contradiction with Part One-E is recorded rather than
+rushed, exactly as Part Three-E allowed for.
+
+## 3. The close-rift seam: RAISE AND CONSUME. Three commits, one interface
+
+**ACCEPTED, and the precedent argument is decisive.** The rift door does not
+travel — it raises, and the game mode owns what travel means. Entry and exit
+should be the same shape reversed. A direct write would need `Combat/` to include
+`Game/` and know rift state, which is precisely the coupling the door was built
+to avoid.
+
+So: **FIELD's terminator raises. GROUND consumes and owns completion. LEDGER pays
+out.** Three commits, one interface, no lane inside another's file.
+
+## 4. `Playtest/` is GROUND's. FIELD misread it, and the confusion is structural
+
+**Settled: ORDERS is right.** And the reason for the mistake is worth recording,
+because it will recur: **`UI/BreakerPlaytestHUD.cpp` is not in `Playtest/`.** The
+directory belongs to GROUND; the ungated second label pass and the diagnostics
+default live in GLASS's file wearing a name that reads like GROUND's.
+
+The directory is GROUND's. **The defect is GLASS's.**
+
+## And GROUND found its own instrument comparing a file to itself
+
+*"Three ORDERS revisions landed while my check said unchanged — the check compared
+the blob at HEAD against origin/main, and the worktree kept advancing to match,
+so it was comparing a file against itself."*
+
+That is the self-referential shape `status.py` warns about, found by a lane in
+its own tooling, and it explains why GROUND appeared to be working without
+orders. Fixed by reading the diff from the last revision acted on.
+
+**Worth every lane's attention: if you have a check that tells you whether ORDERS
+changed, make sure it is not comparing the file to a copy of itself.** A check
+that cannot report a difference is not a check that reports no difference.
+
+---
+
+# PART ONE-I — BAR WIDTH FIRST. FIELD'S RE-ORDER IS RULED IN
+
+FIELD asked whether to take bar width before the rank glyphs, against the order
+Part One-B gave. **Take the width first. The re-order is right and the reasoning
+is the reasoning.**
+
+A glyph's size, its position on the cap, and the distance at which it stops
+resolving are all **functions of the bar's proportions**. Authoring them against
+a bar that is 2.3× its body's width at 12 m and 5× at 35 m — and that is about to
+stop being — is authoring them twice, and the second authoring is the one that
+gets rushed because it feels like rework rather than work.
+
+This is the third time tonight the same shape has been the right call: land the
+zone refactor while it is provably a no-op; take the close verb before populating
+the rift; fix the proportions before decorating them. **Change the shape, then
+decorate the shape.** Worth naming, because in all three cases the decorating
+work was the more visible one and the discipline was to do the invisible one
+first.
+
+The glyphs stay next after the width, and the seat's Part One-B item is amended
+rather than withdrawn: they were never late, they were never routed, and they are
+still the only rank carrier that survives past 35 m.
+
+## And FIELD asked rather than assumed, which is the behaviour to keep
+
+The re-order was clearly correct and FIELD had the evidence in hand — its own
+probe produced the numbers. It still put the call back to the seat because the
+instruction was the seat's to change.
+
+Contrast with the weapon-feel cycle, where a question carrying a self-executing
+default was answered by the lane that asked it, in the same commit, and deleted.
+That worked because the default was right. **This is the shape that works when
+the default is wrong**, and the difference costs one cycle.
+
+## Two verifications FIELD volunteered, both confirmed
+
+Neither was asked for, and both are the kind that matter more than the tests.
+
+**The no-rider path is bit-identical.** Everything new sits inside
+`if (bRiderMoreFired)`; the early return at `:301` fires before any of it; the
+final expression is the original untouched. That is the property that makes O141
+safe for **every existing damage event**, which is a stronger statement than any
+test in the commit makes.
+
+**Enemies cannot reach the rider path at the code, not merely in principle.**
+`ApplyTargetConditionRiders` early-returns at `if (!Progression) return;`
+(`:255`), and `ABreakerEnemy` carries no progression component at all — the
+header has none. Nothing in `Combat/` feels O141.
+
+## The rebase habit is better than the seat's was
+
+FIELD rebased onto LEDGER's push and **verified the combined tip before
+publishing**, rather than assuming no interaction. That is exactly what would
+have caught the stale-binary short suite earlier in the session, and it is worth
+copying: a green suite on your own tip is evidence about your tip, not about the
+one you are pushing onto.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
