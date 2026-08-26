@@ -407,26 +407,31 @@ the loading one is actually cited. Renumbering is a ledger call and the
 reward ruling is LEDGER's subject, so it is reported, not touched.
 
 THE KIT LANE OPENED WITH A CENSUS, NOT A FEATURE (lane/kit). Over
-the 25 registered fallback abilities (Swift 4, Caster 7, Gunsmith 7,
-Tank 7, Support 7): every definition names a real UGameplayAbility
-and every ActivateAbility runs real logic — the owner's "make sure
-all abilities are implemented" is answered YES for the registered
-set, and the gap is PRESENTATION, not activation. Zero of 25 make a
-sound or shake a camera. In-world visuals: 12 of 25 draw something
+the 32 registered fallback abilities (Swift 4, Caster 7, Gunsmith 7,
+Tank 7, Support 7 — the census HEADLINE said 25, an arithmetic slip
+that dropped one class's term from the sum; the per-ability table
+was complete at 32 rows and its categories re-sum to it, and 32 +
+O175's three = the 35 ORDERS measured. The number 25 is RETIRED):
+every definition names a real UGameplayAbility and every
+ActivateAbility runs real logic — the owner's "make sure all
+abilities are implemented" is answered YES for the registered set,
+and the gap is PRESENTATION, not activation. Zero of 32 make a
+sound or shake a camera. In-world visuals: 13 of 32 draw something
+(plus Unmake's Cascade branch, partial)
 (five Caster abilities call ABreakerEffectRenderer directly; Rot and
 Fracture draw through their spawned actors; the deployable/zone
 actors carry Turret, AmmoCrate, MineCluster, Disruptor, AnchorPoint,
 Suppress, FieldAssembly — but Turret fires invisibly, the crate
 dispenses invisibly, and Mine Cluster's individual charges have NO
 visual, only the cluster marker, while the player must avoid the
-charges). 8 are HUD-only (Sidearm Rig, Overhaul, Bloodline, Hold,
+charges). 9 are HUD-only (Sidearm Rig, Overhaul, Bloodline, Hold,
 Metronome, Conduit, Cadence — window bars — plus Lead/Mark's target
 diamond). 6 still draw NOTHING at all: Rend, Provoke, Breach Charge
 (the charge is a bare FVector), Ground Zero, Patch, Purge — the
 Swift three that shared this list (Skim, CadenceBreak, Overdrive)
 draw as of the Swift pass above. Swift's formerly-missing three were
 NAMED from the deleted Class-Kits §1.2 and have since LANDED (O175);
-population 28 intended = 25 registered at census + those 3. The
+population 35 = 32 registered at census + those 3. The
 class-swap stale loadout (BreakerAbilityComponent.cpp:92) still
 occurs — DevForceClass never migrates AbilityLoadout — but the grant
 is guarded at ResolveDefinition (foreign-class id falls back to the
