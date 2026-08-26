@@ -7,6 +7,10 @@
 #include "GameFramework/GameModeBase.h"
 #include "Game/BreakerWaveBudget.h"
 #include "Game/BreakerCoverRegistry.h"
+// For FBreakerRiftCompleted and FBreakerRiftDefinition: the completion seam
+// below publishes the delegate, and its signature is declared beside the rift
+// rather than here so a consumer needs the rift header, not this one.
+#include "Game/BreakerRiftDefinition.h"
 #include "BreakerGameMode.generated.h"
 
 class ABreakerEffectRenderer;
@@ -33,6 +37,39 @@ public:
 
     // Enemies never target players inside the zone and will not enter it.
     UFUNCTION(BlueprintPure, Category="Playtest") bool IsInSafeZone(const FVector& Location) const;
+    // --- THE RIFT COMPLETION SEAM (O168) ---------------------------------
+    // PUBLISHED SURFACE. Owner: GROUND. Consumers: LEDGER (payout), FIELD
+    // (raises into CompleteRiftRun from its terminator). Treat a change to
+    // these three as a declared crossing, per ORDERS Part Four.
+    //
+    // Fires AT COMPLETION, IN-WORLD, at the latch — not at exit. Every consumer
+    // writes travel-surviving state (Riftglass is the account-wide scalar, XP is
+    // save-backed), so broadcasting while the interior is alive depends on
+    // nothing that dies with it; holding until exit would make the payout
+    // hostage to the teardown path, and a completion followed by a death, a dev
+    // reset or a crash would owe a reward nothing can pay.
+    FBreakerRiftCompleted OnRiftCompleted;
+
+    // The consume side of the seam. FIELD's terminator calls this when the
+    // thing holding the rift open dies; Breaker.CloseRift calls it by hand so
+    // the state has a producer that exists TODAY rather than being an API
+    // nobody can fire. Refuses per CanCompleteRiftRun and says why.
+    UFUNCTION(BlueprintCallable, Category="Playtest|Rift") void CompleteRiftRun(APawn* Player);
+
+    // MARKING AND BINDING ARE ONE ACT, deliberately. FIELD's raise is guarded
+    // on the mark, so only a marked body can ever fire — which means binding
+    // every enemy would wire hundreds of delegates that can never be called.
+    // Doing both here gives the seam exactly ONE wiring site, and makes "this
+    // body holds the rift open" a single statement rather than two that can
+    // drift apart.
+    //
+    // WHICH body gets marked in play is NOT decided (see the lane's report):
+    // the interior is still the gym, and choosing a rank or a wave to carry the
+    // rift is a design decision, not a wiring one. Breaker.MarkTerminator
+    // exercises the whole chain in the meantime.
+    void MarkRiftTerminator(class ABreakerEnemy* Enemy);
+    UFUNCTION(BlueprintPure, Category="Playtest|Rift") bool IsRiftRunCompleted() const { return bRiftRunCompleted; }
+
     UFUNCTION(BlueprintPure, Category="Playtest") FVector GetSafeZoneCenter() const { return SafeZoneCenter; }
     UFUNCTION(BlueprintPure, Category="Playtest") float GetSafeZoneRadius() const { return SafeZoneRadius; }
 
@@ -490,6 +527,16 @@ private:
     // command for a controller-in-hand rerun; -BreakerEffectProbe for the
     // headless capture. Same unregister-on-EndPlay contract as Breaker.Boss.
     IConsoleCommand* EffectProbeConsoleCommand = nullptr;
+    // Breaker.CloseRift — the completion seam's first producer. Same
+    // unregister-on-EndPlay contract as the two above.
+    IConsoleCommand* CloseRiftConsoleCommand = nullptr;
+    IConsoleCommand* MarkTerminatorConsoleCommand = nullptr;
+    void HandleRiftTerminatorDefeated(class ABreakerEnemy* Terminator);
+    // THE ONE-WAY LATCH (O168). Per-world by construction: the game mode is
+    // destroyed on travel, so a re-entered door is a new world with fresh state
+    // and honestly a new run — which is why no idempotence counter is needed
+    // anywhere downstream.
+    bool bRiftRunCompleted = false;
 
     // --- The crowd probe (vertical-slice density instrument) --------------
     // -BreakerCrowdProbe=N spawns N trash enemies during the gym build;

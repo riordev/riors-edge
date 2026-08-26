@@ -168,4 +168,57 @@ bool FBreakerRiftDoorEntryTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// THE COMPLETION SEAM'S RULE (O168), world-free. The seam is FIELD raises,
+// GROUND consumes and owns completion, LEDGER pays — and LEDGER binds DIRECTLY
+// rather than settling grants against a counter, on the strength of this being
+// single-fire. That makes the latch a load-bearing promise to another lane
+// rather than an internal detail, so it is proved rather than asserted in a
+// comment.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRiftCompletionRuleTest,
+    "RiorsEdge.Zone.RiftDoor.CompletionRule",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRiftCompletionRuleTest::RunTest(const FString& Parameters)
+{
+    FBreakerRiftDefinition Unset;
+    FBreakerRiftDefinition Live;
+    Live.AreaLevel = 5;
+    Live.Tier = EBreakerRiftTier::Campaign;
+
+    // YOU CANNOT FINISH A RUN YOU ARE NOT IN. Without this a stray
+    // Breaker.CloseRift in the gym or the hub broadcasts a completion carrying
+    // a nameless rift, and LEDGER pays out on it.
+    TestFalse(TEXT("an unset rift cannot be completed"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(false, Unset));
+    TestFalse(TEXT("...and not even if something already latched"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(true, Unset));
+
+    // The ordinary case.
+    TestTrue(TEXT("a live rift completes"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(false, Live));
+
+    // THE ONE-WAY LATCH. One completion, one broadcast.
+    TestFalse(TEXT("a completed run cannot complete again"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(true, Live));
+
+    // TIER DOES NOT GATE COMPLETION. Campaign and endgame differ in their death
+    // allowance (O82/O123) and in how they are ENTERED (O122), not in whether
+    // finishing one counts — an endgame rift that could not be completed would
+    // be a rift that never pays.
+    FBreakerRiftDefinition Endgame = Live;
+    Endgame.Tier = EBreakerRiftTier::Endgame;
+    TestTrue(TEXT("an endgame rift completes on the same rule"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(false, Endgame));
+
+    // The rule reads IsSet, so a rift is completable exactly when it is a rift:
+    // the same predicate the door refuses travel on, which keeps entry and
+    // completion agreeing about what a set rift is.
+    TestEqual(TEXT("completable and set are the same question"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(false, Live), Live.IsSet());
+    TestEqual(TEXT("...at both ends"),
+        UBreakerRiftLibrary::CanCompleteRiftRun(false, Unset), Unset.IsSet());
+    return true;
+}
+
 #endif

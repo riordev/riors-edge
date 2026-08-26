@@ -62,6 +62,19 @@ struct RIORSEDGE_API FBreakerRiftDefinition
     int32 EffectiveAreaLevel() const { return UBreakerMonsterChassisLibrary::ClampAreaLevel(AreaLevel); }
 };
 
+// THE COMPLETION EVENT (O168). FIELD's terminator raises that it died; GROUND
+// consumes and broadcasts THIS; LEDGER binds it and pays. Declared here rather
+// than on the game mode so a consumer needs the rift's own header and not the
+// 500-line game-mode header to know the signature.
+//
+// It carries the WHOLE definition because that is already the thing that
+// travels, and a struct grows. It fires ONLY on completion — abandonment has no
+// representation on it, deliberately, because a bool for "abandoned" invites
+// paying a reduced amount for walking out, and leaving by the door you came in
+// is simply the absence of this.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FBreakerRiftCompleted,
+    const FBreakerRiftDefinition& /*Rift*/, APawn* /*Player*/);
+
 UCLASS()
 class RIORSEDGE_API UBreakerRiftLibrary : public UBlueprintFunctionLibrary
 {
@@ -104,6 +117,27 @@ public:
     // entry; this constant exists so the readout below and the future
     // budget spend read one number.
     static constexpr int32 SoloEndgameDeathBudget = 2;
+
+    // CAN THIS RUN BE COMPLETED? The whole rule, world-free, so the latch is
+    // provable without standing in a rift (the precedent is every other rule in
+    // this project that matters: extract the arithmetic, make the actor a thin
+    // caller). Two conditions and both are refusals worth having:
+    //
+    //   * A rift that is NOT SET cannot be completed. You cannot finish a run
+    //     you are not in, and without this a stray console call in the gym or
+    //     the hub would broadcast a completion carrying a nameless rift — which
+    //     LEDGER would pay out on.
+    //   * A run already completed cannot complete again. This is the ONE-WAY
+    //     LATCH O168 names: one completion, one broadcast, so LEDGER binds
+    //     directly instead of settling grants against a counter.
+    //
+    // Re-ENTERING a door is not caught here and must not be: that is a new
+    // world with fresh state and honestly a new run.
+    UFUNCTION(BlueprintPure, Category="Rift")
+    static bool CanCompleteRiftRun(bool bAlreadyCompleted, const FBreakerRiftDefinition& Rift)
+    {
+        return Rift.IsSet() && !bAlreadyCompleted;
+    }
 
     // O123: the death-allowance field is ALWAYS present and reads its mode —
     // campaign prints UNLIMITED, endgame prints the count remaining. Never

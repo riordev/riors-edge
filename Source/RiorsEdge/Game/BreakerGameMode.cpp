@@ -91,6 +91,16 @@ void ABreakerGameMode::EndPlay(const EEndPlayReason::Type Reason)
         IConsoleManager::Get().UnregisterConsoleObject(EffectProbeConsoleCommand);
         EffectProbeConsoleCommand = nullptr;
     }
+    if (CloseRiftConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(CloseRiftConsoleCommand);
+        CloseRiftConsoleCommand = nullptr;
+    }
+    if (MarkTerminatorConsoleCommand)
+    {
+        IConsoleManager::Get().UnregisterConsoleObject(MarkTerminatorConsoleCommand);
+        MarkTerminatorConsoleCommand = nullptr;
+    }
     Super::EndPlay(Reason);
 }
 
@@ -157,6 +167,62 @@ void ABreakerGameMode::HandleHubTravelSelected(FName DestinationId, APawn* Reque
     // builds it.
     UE_LOG(LogTemp, Warning, TEXT("HandleHubTravelSelected: no map is registered for destination '%s'."),
         *DestinationId.ToString());
+}
+
+void ABreakerGameMode::MarkRiftTerminator(ABreakerEnemy* Enemy)
+{
+    if (!Enemy) return;
+    Enemy->SetRiftTerminator(true);
+    // AddUObject, so the binding dies with this game mode. The mark and the
+    // binding are cleared together by ReviveFromPool on FIELD's side, which is
+    // what stops a pooled body reused in a later wave from completing a rift
+    // the player has already left.
+    Enemy->OnRiftTerminatorDefeated.AddUObject(this, &ABreakerGameMode::HandleRiftTerminatorDefeated);
+    UE_LOG(LogTemp, Display, TEXT("[Rift] terminator marked: %s"), *Enemy->GetName());
+}
+
+void ABreakerGameMode::HandleRiftTerminatorDefeated(ABreakerEnemy* Terminator)
+{
+    // THE CONSUME SIDE OF O168. FIELD's raise says "the thing holding this open
+    // died" and knows nothing about rifts; this is where that becomes a
+    // completion. The player is read here rather than carried on the raise,
+    // because a terminator's death has no second actor that means anything —
+    // agreed with FIELD rather than assumed.
+    APawn* Player = GetWorld() && GetWorld()->GetFirstPlayerController()
+        ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+    UE_LOG(LogTemp, Display, TEXT("[Rift] terminator defeated: %s"),
+        Terminator ? *Terminator->GetName() : TEXT("<destroyed>"));
+    CompleteRiftRun(Player);
+}
+
+void ABreakerGameMode::CompleteRiftRun(APawn* Player)
+{
+    UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+    const FBreakerRiftDefinition Rift = Session ? Session->PendingRift : FBreakerRiftDefinition();
+
+    // THE RULE IS WORLD-FREE AND THIS IS THE THIN CALLER. Both refusals are
+    // worth logging rather than swallowing: a completion that did not happen is
+    // a payout that did not happen, and LEDGER binds directly on the strength
+    // of this being single-fire.
+    if (!UBreakerRiftLibrary::CanCompleteRiftRun(bRiftRunCompleted, Rift))
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("[Rift] completion refused: %s"),
+            bRiftRunCompleted
+                ? TEXT("this run is already complete (one completion, one broadcast)")
+                : TEXT("no rift is set; you cannot finish a run you are not in"));
+        return;
+    }
+
+    // LATCH BEFORE BROADCAST, not after. A listener that re-entered this
+    // function — directly, or by anything it triggers — would otherwise pass
+    // the guard it was supposed to be stopped by, and LEDGER would be paid
+    // twice for one run.
+    bRiftRunCompleted = true;
+    UE_LOG(LogTemp, Display, TEXT("[Rift] run complete: %s (area level %d, %s)"),
+        *Rift.AreaName.ToString(), Rift.EffectiveAreaLevel(),
+        Rift.Tier == EBreakerRiftTier::Campaign ? TEXT("campaign") : TEXT("endgame"));
+    OnRiftCompleted.Broadcast(Rift, Player);
 }
 
 void ABreakerGameMode::HandleRiftEntryRequested(const FBreakerRiftDefinition& Rift, APawn* RequestingPawn)
@@ -554,6 +620,59 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
             SpawnCrowdProbe(FMath::Clamp(CrowdCount, 1, 200),
                 FParse::Param(FCommandLine::Get(), TEXT("BreakerCrowdSkeletal")), Load);
         }
+    }
+    // Breaker.CloseRift: the completion seam's producer until FIELD's terminator
+    // exists. THE POINT IS THAT THE STATE IS NOT A DEAD API — LEDGER binds
+    // OnRiftCompleted and can actually receive it today, and the suite can
+    // exercise the latch through a real caller. FIELD's raise becomes a SECOND
+    // producer without changing this surface.
+    if (!CloseRiftConsoleCommand)
+    {
+        CloseRiftConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.CloseRift"),
+            TEXT("Completes the current rift run (O168's seam; refuses outside a rift and refuses twice)."),
+            FConsoleCommandDelegate::CreateLambda([this]()
+            {
+                APawn* Pawn = GetWorld() && GetWorld()->GetFirstPlayerController()
+                    ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+                CompleteRiftRun(Pawn);
+            }));
+    }
+    // Breaker.MarkTerminator: marks the nearest live enemy so the WHOLE chain
+    // is exercisable today — mark, kill it, completion broadcast — without
+    // anyone having decided which body holds a rift open in play. That decision
+    // is design and is in the lane's report; this is the instrument.
+    if (!MarkTerminatorConsoleCommand)
+    {
+        MarkTerminatorConsoleCommand = IConsoleManager::Get().RegisterConsoleCommand(
+            TEXT("Breaker.MarkTerminator"),
+            TEXT("Marks the nearest live enemy as the rift terminator (O168's seam, dev instrument)."),
+            FConsoleCommandDelegate::CreateLambda([this]()
+            {
+                UWorld* World = GetWorld();
+                APawn* Pawn = World && World->GetFirstPlayerController()
+                    ? World->GetFirstPlayerController()->GetPawn() : nullptr;
+                if (!World || !Pawn)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("[Rift] no pawn; cannot pick a terminator."));
+                    return;
+                }
+                ABreakerEnemy* Nearest = nullptr;
+                float NearestSq = TNumericLimits<float>::Max();
+                for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+                {
+                    if (It->IsDeadEnemy()) continue;
+                    const float DistanceSq = static_cast<float>(
+                        FVector::DistSquared(It->GetActorLocation(), Pawn->GetActorLocation()));
+                    if (DistanceSq < NearestSq) { NearestSq = DistanceSq; Nearest = *It; }
+                }
+                if (!Nearest)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("[Rift] nothing alive to mark as a terminator."));
+                    return;
+                }
+                MarkRiftTerminator(Nearest);
+            }));
     }
     if (!EffectProbeConsoleCommand)
     {
