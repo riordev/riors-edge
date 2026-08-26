@@ -563,6 +563,93 @@ namespace BreakerPowerBandTest
         };
     }
 
+    // THE CRIT-BUYING VARIANT (Part One-N's report order). NOT A FIXTURE:
+    // nothing pins it, nothing emits it — the AbilityLane test PRINTS what it
+    // measures beside the pinned pair, because the seat's question is whether
+    // the mirrored fixture's crit 0.863 is a spend choice (buying crit costs
+    // increased/More elsewhere) or slack (it moves and nothing falls). A
+    // legal 65-point ability build entered at PRECISION instead of Reservoir:
+    // Precision to its inners for the crit flats (12, no Fixate — a weapon
+    // More buys this lane nothing), east along the ring through Volley and
+    // Vector (their rim0s bought to cross, 2), ARC complete (15), Ring3 to
+    // the Reservoir entry (3), Chord2 to Velocity complete for the shared
+    // More (5 + 15), and the spare into Ring4 and Ring10 ability picks (4).
+    // What it gives up against AbilityOptimizedRanks: the whole Reservoir
+    // wheel and the Ruin dip.
+    TArray<FBreakerNodeRank> AbilityCritVariantRanks()
+    {
+        return {
+            // Precision to its inners, no hub: 12
+            {TEXT("Core.Precision.Sightline"), 1},
+            {TEXT("Core.Precision.Steady"), 1},
+            {TEXT("Core.Precision.Angle"), 1},
+            {TEXT("Core.Precision.Ledger"), 1},
+            {TEXT("Core.Precision.LongLens"), 1},
+            {TEXT("Core.Precision.Lead"), 1},
+            {TEXT("Core.Precision.CalledShot"), 1},
+            {TEXT("Core.Precision.TunnelVision"), 1},
+            {TEXT("Core.Precision.Deadeye"), 1},
+            // East along the ring: Ring0, cross Volley, Ring1, cross Vector,
+            // Ring2 into ARC. Ability picks; the two rim0s are the toll. 3+1+3+1+3
+            {TEXT("Core.Travel.Ring0P1Ability"), 1},
+            {TEXT("Core.Travel.Ring0P2Ability"), 1},
+            {TEXT("Core.Travel.Ring0P3Ability"), 1},
+            {TEXT("Core.Volley.Cyclic"), 1},
+            {TEXT("Core.Travel.Ring1P1Ability"), 1},
+            {TEXT("Core.Travel.Ring1P2Ability"), 1},
+            {TEXT("Core.Travel.Ring1P3Ability"), 1},
+            {TEXT("Core.Vector.Split"), 1},
+            {TEXT("Core.Travel.Ring2P1Ability"), 1},
+            {TEXT("Core.Travel.Ring2P2Ability"), 1},
+            {TEXT("Core.Travel.Ring2P3Ability"), 1},
+            // ARC, complete: 15
+            {TEXT("Core.Arc.Channel"), 1},
+            {TEXT("Core.Arc.Widen"), 1},
+            {TEXT("Core.Arc.Recycle"), 1},
+            {TEXT("Core.Arc.Anchor"), 1},
+            {TEXT("Core.Arc.Prime"), 1},
+            {TEXT("Core.Arc.Vent"), 1},
+            {TEXT("Core.Arc.CadenceBreak"), 1},
+            {TEXT("Core.Arc.Reach"), 1},
+            {TEXT("Core.Arc.Widening"), 1},
+            {TEXT("Core.Arc.Overflow"), 1},
+            // Ring3 to the Reservoir entry, ability picks: 3 + the entry: 1
+            {TEXT("Core.Travel.Ring3P1Ability"), 1},
+            {TEXT("Core.Travel.Ring3P2Ability"), 1},
+            {TEXT("Core.Travel.Ring3P3Ability"), 1},
+            {TEXT("Core.Reservoir.Draw"), 1},
+            // Chord2 to Velocity, ability picks: 5
+            {TEXT("Core.Travel.Chord2P1Ability"), 1},
+            {TEXT("Core.Travel.Chord2P2Ability"), 1},
+            {TEXT("Core.Travel.Chord2P3Ability"), 1},
+            {TEXT("Core.Travel.Chord2P4Ability"), 1},
+            {TEXT("Core.Travel.Chord2P5Ability"), 1},
+            // Velocity, complete, for the shared More: 15
+            {TEXT("Core.Velocity.Freefall"), 1},
+            {TEXT("Core.Velocity.Afterburn"), 1},
+            {TEXT("Core.Velocity.Traction"), 1},
+            {TEXT("Core.Velocity.Slipstream"), 1},
+            {TEXT("Core.Velocity.Grind"), 1},
+            {TEXT("Core.Velocity.Downforce"), 1},
+            {TEXT("Core.Velocity.TerminalDescent"), 1},
+            {TEXT("Core.Velocity.Redline"), 1},
+            {TEXT("Core.Velocity.NoGround"), 1},
+            {TEXT("Core.Velocity.TerminalVelocity"), 1},
+            // The spare four: Ring4 ability picks and one step of Ring10. 3+1
+            {TEXT("Core.Travel.Ring4P1Ability"), 1},
+            {TEXT("Core.Travel.Ring4P2Ability"), 1},
+            {TEXT("Core.Travel.Ring4P3Ability"), 1},
+            {TEXT("Core.Travel.Ring10P1Ability"), 1},
+            // The doctrine layer, identical to both fixtures on purpose.
+            {TEXT("Swift.Marksman.LongLens"), 2},
+            {TEXT("Swift.Marksman.Deadeye"), 2},
+            {TEXT("Swift.Marksman.PierceDiscipline"), 2},
+            {TEXT("Swift.Marksman.Culling"), 1},
+            {TEXT("Swift.Kinetic.ReadTheRoom"), 2},
+            {TEXT("Swift.Kinetic.Downforce"), 2},
+        };
+    }
+
     // Airborne, recently dashed, at Redline: the rotation the optimized build is
     // organised around, and the state both builds are measured in.
     FBreakerBuildConditionState MeasurementState()
@@ -803,11 +890,12 @@ bool FBreakerPowerBandFixtureIdsResolveTest::RunTest(const FString& Parameters)
     int32 Checked = 0;
     TArray<FString> Missing;
     TArray<FString> Overdrawn;
-    for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized"), TEXT("ability-optimized")})
+    for (const TCHAR* Label : {TEXT("baseline"), TEXT("optimized"), TEXT("ability-optimized"), TEXT("ability-crit-variant")})
     {
         const TArray<FBreakerNodeRank> Ranks =
             FString(Label) == TEXT("baseline") ? BaselineRanks()
-            : FString(Label) == TEXT("optimized") ? OptimizedRanks() : AbilityOptimizedRanks();
+            : FString(Label) == TEXT("optimized") ? OptimizedRanks()
+            : FString(Label) == TEXT("ability-optimized") ? AbilityOptimizedRanks() : AbilityCritVariantRanks();
         for (const FBreakerNodeRank& Rank : Ranks)
         {
             ++Checked;
@@ -1598,6 +1686,21 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
         // That is why parity has to be measured at two points and not one.
         AddInfo(TEXT("ABILITY LANE  the deficit widens with gear depth: a lane with more lines compounds harder up a back-loaded ladder"));
         BreakerStatus::Emit(TEXT("power-band-ability-endgame"), EndgameParity);
+    }
+
+    // PART ONE-N'S REPORT, printed and deliberately unpinned: the same
+    // gear, the crit-buying tree. If crit moves and increased/More fall, the
+    // fixture's 0.863 was a spend choice; if crit moves and nothing falls,
+    // the ability wheels have slack the weapon wheels do not.
+    {
+        const FComposedBuild CritVariant = Compose(AbilityOptimizedLoadout(AtCapItemLevel, Tier), AbilityCritVariantRanks(), State);
+        const float VariantParity = CritVariant.AbilityTotal / WeaponBuild.Total;
+        AddInfo(FString::Printf(TEXT("ABILITY LANE  CRIT VARIANT (cap, unpinned) parity %.3fx: flat %.3fx x increased %.3fx x more %.3fx x crit %.3fx"),
+            VariantParity,
+            CritVariant.AbilityFlatLayer / WeaponBuild.FlatLayer,
+            CritVariant.AbilityIncreasedLayer / WeaponBuild.IncreasedLayer,
+            CritVariant.AbilityMoreLayer / WeaponBuild.MoreLayer,
+            CritVariant.EffectiveCrit / WeaponBuild.EffectiveCrit));
     }
 
     // RESPONSE - the assertion the pools were built to make possible.
