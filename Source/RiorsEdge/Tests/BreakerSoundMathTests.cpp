@@ -3,6 +3,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Audio/BreakerSoundMath.h"
+#include "Audio/BreakerSoundDirector.h"
 #include "Audio/BreakerWaveFile.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -103,6 +104,29 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         TArray<uint8> Compressed = BuildWav(44100, 1, Mono);
         Compressed[20] = 2;   // format tag != PCM
         TestFalse(TEXT("A non-PCM format refuses"), BreakerWave::ParseWav(Compressed).IsValid());
+    }
+
+    // --- The per-archetype fire cue's filename rule ---------------------------
+    // The override is a FILENAME CONVENTION, so the convention is the contract:
+    // every archetype must derive a DISTINCT, space-free name. A collision does
+    // not fail — two guns quietly share one clip, which is the sameness this
+    // override exists to end. Asserted across the whole enum rather than a
+    // sample, so an archetype appended later is covered by existing.
+    {
+        TSet<FString> Seen;
+        for (int32 Index = 0; Index < static_cast<int32>(EBreakerWeaponArchetype::Count); ++Index)
+        {
+            const EBreakerWeaponArchetype Archetype = static_cast<EBreakerWeaponArchetype>(Index);
+            const FString FileName = BreakerSoundFiles::ArchetypeFire(Archetype);
+            TestFalse(FString::Printf(TEXT("%s carries no space"), *FileName), FileName.Contains(TEXT(" ")));
+            TestTrue(FString::Printf(TEXT("%s is the fire prefix"), *FileName),
+                FileName.StartsWith(TEXT("weapon_fire_")) && FileName.EndsWith(TEXT(".wav")));
+            TestFalse(FString::Printf(TEXT("%s is not already claimed by another archetype"), *FileName),
+                Seen.Contains(FileName));
+            Seen.Add(FileName);
+        }
+        TestEqual(TEXT("every archetype derived its own cue name"),
+            Seen.Num(), static_cast<int32>(EBreakerWeaponArchetype::Count));
     }
 
     // --- The shipped samples parse -------------------------------------------

@@ -2435,7 +2435,9 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
     // nothing else makes its sound.
     if (ABreakerSoundDirector* Sound = GetSoundDirector())
     {
-        Sound->PlayWeaponFire();
+        // The archetype decides the clip. BoundWeapon is the same component
+        // this handler is bound to, so there is no extra lookup.
+        Sound->PlayWeaponFire(BoundWeapon ? BoundWeapon->GetArchetype() : EBreakerWeaponArchetype::Rifle);
     }
 
     // A launcher already puts a real actor in the world; a hitscan streak on

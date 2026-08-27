@@ -168,7 +168,58 @@ void ABreakerSoundDirector::PlayAbilityCast(FName AbilityId)
     if (Pcm) Trigger(AbilityVoice, Wave, *Pcm);
 }
 
-void ABreakerSoundDirector::PlayWeaponFire() { Trigger(FireVoice, FireWave, FirePcm); }
+void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
+{
+    // Resolve the override once per archetype; a key present with a NULL wave
+    // is the "probed, none authored" sentinel, exactly as the ability cue does.
+    USoundWaveProcedural* Wave = FireWave;
+    const TArray<int16>* Pcm = &FirePcm;
+
+    if (const TObjectPtr<USoundWaveProcedural>* Found = ArchetypeFireWaves.Find(Archetype))
+    {
+        if (*Found)
+        {
+            Wave = *Found;
+            Pcm = ArchetypeFirePcm.Find(Archetype);
+        }
+    }
+    else
+    {
+        // Derived by the pure helper in the header, which the suite asserts is
+        // injective across every archetype.
+        const FString FileName = BreakerSoundFiles::ArchetypeFire(Archetype);
+        const FString Path = FPaths::ProjectContentDir() / TEXT("Breaker/Audio") / FileName;
+        TArray<uint8> Bytes;
+        BreakerWave::FParsedWave Parsed;
+        if (FFileHelper::LoadFileToArray(Bytes, *Path)) Parsed = BreakerWave::ParseWav(Bytes);
+
+        if (Parsed.IsValid())
+        {
+            TArray<int16>& Stored = ArchetypeFirePcm.Add(Archetype, MoveTemp(Parsed.Samples));
+            USoundWaveProcedural* Override = MakeWave(Parsed.SampleRate);
+            ArchetypeFireWaves.Add(Archetype, Override);
+            UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s: per-archetype fire cue loaded (%d Hz)."),
+                *FileName, Parsed.SampleRate);
+            Wave = Override;
+            Pcm = &Stored;
+        }
+        else
+        {
+            // LOGGED, unlike the ability miss, and once per archetype per
+            // session. The four fixed verbs already log which path they took
+            // because "a silent fallback is visible in any run's log" is this
+            // file's rule; the same rule makes the naming convention
+            // DISCOVERABLE — the owner authoring gun audio reads the exact
+            // filename the game is looking for instead of guessing it.
+            UE_LOG(LogTemp, Log, TEXT("[BreakerSound] %s absent — %s fires the shared default."),
+                *FileName, *BreakerWeaponArchetypeNames::Display(Archetype));
+            ArchetypeFireWaves.Add(Archetype, nullptr);
+        }
+    }
+
+    if (Wave && FireVoice && FireVoice->Sound != Wave) FireVoice->SetSound(Wave);
+    if (Pcm) Trigger(FireVoice, Wave, *Pcm);
+}
 void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm); }
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }
 void ABreakerSoundDirector::PlayTakeHit()    { Trigger(TakeHitVoice, TakeHitWave, TakeHitPcm); }

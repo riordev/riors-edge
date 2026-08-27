@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Weapons/BreakerWeaponArchetype.h"
 #include "BreakerSoundDirector.generated.h"
 
 class UAudioComponent;
@@ -39,6 +40,27 @@ class USoundWaveProcedural;
 // cosmetic actor spawned lazily by the HUD, replicates nothing, never
 // ticks.
 // ---------------------------------------------------------------------------
+// The per-archetype fire cue's filename, pure and world-free so the one rule
+// it carries can be asserted: EVERY ARCHETYPE MUST PRODUCE A DISTINCT NAME.
+// Two archetypes collapsing onto one file would not fail — they would quietly
+// share a gun sound, which is the exact defect this override exists to end.
+//
+// The AUTHORED display name with spaces removed, not the enumerator: a Burst
+// Rifle is weapon_fire_BurstRifle.wav, called what the player sees it called.
+// The enumerator is free to be renamed — the project's enum rule is that
+// renaming is safe and only MOVING a value is not, and the archetype header
+// guards the ordering rather than the spelling — so keying a filename on it
+// would orphan the owner's file in silence the day somebody renames one.
+namespace BreakerSoundFiles
+{
+    inline FString ArchetypeFire(EBreakerWeaponArchetype Archetype)
+    {
+        FString Key = BreakerWeaponArchetypeNames::Display(Archetype);
+        Key.ReplaceInline(TEXT(" "), TEXT(""));
+        return FString::Printf(TEXT("weapon_fire_%s.wav"), *Key);
+    }
+}
+
 UCLASS(NotBlueprintable, NotPlaceable)
 class RIORSEDGE_API ABreakerSoundDirector : public AActor
 {
@@ -49,7 +71,14 @@ public:
 
     // The trigger was pulled and a round left. Per cosmetic shot, not per
     // pellet: a shotgun blast is one report.
-    void PlayWeaponFire();
+    //
+    // PER-ARCHETYPE, and that is the structural half of "all of the sound is
+    // bad ... does not sound like real guns". This verb took no argument, so a
+    // sidearm, a rifle and a shotgun fired the IDENTICAL clip — sameness no
+    // amount of asset quality fixes. Same override shape as the ability cue one
+    // level over: weapon_fire_<Archetype>.wav, then weapon_fire.wav, then the
+    // synth. Still one verb; no generic PlaySound, no asset field.
+    void PlayWeaponFire(EBreakerWeaponArchetype Archetype);
     // A hit the player dealt landed — any source, never a DoT tick (the
     // caller owns that exclusion). Scheduled by the caller on the round's
     // arrival clock.
@@ -96,6 +125,11 @@ private:
     // means "probed, no override authored" — the sentinel is what stops a
     // missing file being re-opened on every cast.
     UPROPERTY() TMap<FName, TObjectPtr<USoundWaveProcedural>> AbilityWaves;
+    // Per-archetype fire overrides, same lazy resolve and same NULL-value
+    // sentinel meaning "probed, none authored". Eight archetypes, not
+    // thirty-five, but the cost of eager loading is still eight failed opens
+    // for files that do not exist yet.
+    UPROPERTY() TMap<EBreakerWeaponArchetype, TObjectPtr<USoundWaveProcedural>> ArchetypeFireWaves;
 
     TArray<int16> FirePcm;
     TArray<int16> HitPcm;
@@ -103,6 +137,7 @@ private:
     TArray<int16> TakeHitPcm;
     TArray<int16> AbilityDefaultPcm;
     TMap<FName, TArray<int16>> AbilityPcm;
+    TMap<EBreakerWeaponArchetype, TArray<int16>> ArchetypeFirePcm;
 
     USoundWaveProcedural* MakeWave(int32 SampleRate);
     // Loads Content/Breaker/Audio/<FileName> into OutPcm and returns its
