@@ -5,6 +5,7 @@
 #include "Game/BreakerRiftDefinition.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerRiftRewardMath.h"
+#include "Save/BreakerAccountSave.h"
 
 #include "Attributes/BreakerAttributeAggregation.h"
 
@@ -150,6 +151,27 @@ void UBreakerProgressionComponent::HandleRiftCompleted(const FBreakerRiftDefinit
     if (!GetOwner() || GetOwner() != Player) return;
 
     const int32 AreaLevel = Rift.EffectiveAreaLevel();
+
+    // One-AA: A FIRST CLEAR PAYS THE LADDER, A RE-CLEAR PAYS THE LOOT. The
+    // completion purse is the ladder's pay, so it lands only when this
+    // completion advances the account's highest-cleared record (One-Z's
+    // account-scope field: characters are builds, the account is the player
+    // — an alt does not re-earn the purse the account already earned). Drops
+    // and kill XP never route through here and pay exactly as before, so
+    // going back is allowed; going back is just not the game. A refused
+    // account load (newer-version file) pays no purse rather than paying an
+    // untracked one: a purse the record cannot remember would pay again
+    // forever.
+    UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
+    if (!Account || AreaLevel <= Account->HighestClearedAreaLevel)
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerProgression] rift complete (AL %d): re-clear — loot and kill XP only, the ladder was paid at first clear (One-AA%s)."),
+            AreaLevel, Account ? TEXT("") : TEXT("; account unreadable, purse withheld"));
+        return;
+    }
+    Account->HighestClearedAreaLevel = AreaLevel;
+    Account->SaveAccount();
+
     const int32 Xp = BreakerRiftReward::XpForCompletion(AreaLevel);
     const int32 Riftglass = BreakerRiftReward::RiftglassForCompletion(AreaLevel);
 

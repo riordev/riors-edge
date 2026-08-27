@@ -6,6 +6,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerRiftRewardMath.h"
+#include "Save/BreakerAccountSave.h"
 
 // ---------------------------------------------------------------------------
 // O168's third commit, proven: the rift completion payout. The pure math is
@@ -62,6 +63,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
 {
+    // A transient, never-persisting account, injected so the suite exercises
+    // the record and the first-clear rule WITHOUT touching the machine's
+    // real account slot.
+    UBreakerAccountSave* Account = NewObject<UBreakerAccountSave>();
+    Account->bNeverPersist = true;
+    UBreakerAccountSave::InjectForTesting(Account);
+
     // A pawn owner, because the handler compares the event's pawn against its
     // owner — the guard under test.
     APawn* Owner = NewObject<ADefaultPawn>();
@@ -77,28 +85,42 @@ bool FBreakerRiftRewardPayoutTest::RunTest(const FString& Parameters)
     const int32 XpBefore = Progression->GetProgressionState().TotalExperience;
     const int32 GlassBefore = Equipment->GetForgeWallet().Get();
 
-    // A broadcast for SOMEBODY ELSE'S pawn pays this character nothing.
+    // A broadcast for SOMEBODY ELSE'S pawn pays this character nothing —
+    // and advances no record.
     APawn* Stranger = NewObject<ADefaultPawn>();
     Progression->HandleRiftCompleted(Rift, Stranger);
     TestEqual(TEXT("another pawn's completion pays no XP here"),
         Progression->GetProgressionState().TotalExperience, XpBefore);
-    TestEqual(TEXT("another pawn's completion pays no Riftglass here"),
-        Equipment->GetForgeWallet().Get(), GlassBefore);
+    TestEqual(TEXT("another pawn's completion advances no record"), Account->HighestClearedAreaLevel, 0);
 
-    // The owner's completion pays both halves, at the math's own numbers.
+    // The FIRST clear pays both halves and advances the account record
+    // (One-AA: a first clear pays the ladder).
     Progression->HandleRiftCompleted(Rift, Owner);
-    TestEqual(TEXT("completion pays the composed XP"),
+    TestEqual(TEXT("first clear pays the composed XP"),
         Progression->GetProgressionState().TotalExperience, XpBefore + ExpectedXp);
-    TestEqual(TEXT("completion pays the composed Riftglass onto the wallet"),
+    TestEqual(TEXT("first clear pays the composed Riftglass onto the wallet"),
         Equipment->GetForgeWallet().Get(), GlassBefore + ExpectedRiftglass);
+    TestEqual(TEXT("first clear advances the account record"), Account->HighestClearedAreaLevel, 3);
 
-    // A second completion pays again — GROUND's latch makes a second
-    // broadcast a genuinely new run, so the payout must not deduplicate what
-    // the seam already guarantees is distinct.
+    // A RE-CLEAR pays no purse and moves no record — going back is allowed;
+    // going back is not the game. (Drops and kill XP never route through
+    // this handler and are untouched.)
     Progression->HandleRiftCompleted(Rift, Owner);
-    TestEqual(TEXT("a new run's completion pays again"),
-        Progression->GetProgressionState().TotalExperience, XpBefore + 2 * ExpectedXp);
+    TestEqual(TEXT("a re-clear pays no purse"),
+        Progression->GetProgressionState().TotalExperience, XpBefore + ExpectedXp);
+    TestEqual(TEXT("a re-clear moves no record"), Account->HighestClearedAreaLevel, 3);
 
+    // A DEEPER first clear pays again and advances again — the ladder is
+    // climbed once per rung, not once.
+    FBreakerRiftDefinition Deeper = Rift;
+    Deeper.AreaLevel = 5;
+    Progression->HandleRiftCompleted(Deeper, Owner);
+    TestEqual(TEXT("a deeper first clear pays its own purse"),
+        Progression->GetProgressionState().TotalExperience,
+        XpBefore + ExpectedXp + BreakerRiftReward::XpForCompletion(5));
+    TestEqual(TEXT("and advances the record to it"), Account->HighestClearedAreaLevel, 5);
+
+    UBreakerAccountSave::ResetCacheForTesting();
     return true;
 }
 
