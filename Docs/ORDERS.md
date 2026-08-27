@@ -2333,6 +2333,197 @@ One-X is about.
 
 ---
 
+# PART ONE-AB — THE CAPS ARE RULED, AND THE DROP RATE THEY ARE MEASURED AGAINST IS A GYM RULE
+
+Owner, 2026-08-27: *"stash can have 70 items for now, backpack 25 we might need
+to do a redesign for currencies or something? unsure."*
+
+**RULED: stash 70, backpack 25, both `O2 PLACEHOLDER`.** And the uncertainty at
+the end of that sentence is worth answering properly, because one half of it is
+already solved and the other half is real.
+
+## WHAT THE NUMBERS MEAN IN SETS
+
+Eight equip slots. So **25 is about three full sets** carried, and **70 is 8.75
+sets stored — 1.75 per character across five.** That is the transfer point One-X
+ruled rather than a warehouse, which is the right shape: enough to hold what an
+alt needs, not enough to hoard.
+
+## A FULL BACKPACK MUST BE RULED OR IT WILL BE DEFAULTED
+
+`AddToBackpack` currently appends unconditionally, and it is what
+`BreakerLootPickup.cpp:250` calls when the player walks over a drop. Put a cap
+in without ruling the refusal and someone will pick the cheap branch.
+
+**RULED: a full backpack REFUSES the pickup and the item stays on the ground.**
+Never destroyed, never silently swapped, never auto-salvaged. The tools to make
+room already exist — `DiscardBackpackBelowRarity` and `SalvageFromBackpack` —
+so the player has an answer, and a drop the player can see and cannot take is a
+readable problem where a drop that vanished is a bug report.
+
+**GLASS, later:** a refused pickup has to say why, or it reads as the pickup
+being broken. Not tonight; it is behind the completion moment.
+
+## AND YOU CANNOT CHECK 25 AGAINST TODAY'S DROP RATE, BECAUSE THE DROP RATE IS THE GYM'S
+
+`BreakerWaveBudget.cpp:53`:
+
+```cpp
+Out.bDropsLoot = Out.Kind != EBreakerWaveKind::Standard;
+```
+
+Only **Rest** waves (every 6) and the **Boss** wave drop loot. The rift interior
+runs three waves with the boss on wave 3, so **waves 1 and 2 of every rift run
+drop nothing at all** — two thirds of the run.
+
+The rule's own comment says why it exists: *"otherwise the gym becomes a farm
+and pollutes the drop-rate data the instrument exists to gather."* That is a
+**measurement-integrity rule for an instrument**, and the log line beside it
+literally reads `[BreakerGym]`. It is now applied to the player's actual loot
+loop, because 09829fd made the rift interior reuse the gym's wave spawner.
+
+This is the shape we already named twice tonight — *a justification outliving
+its cause* — and it is the mirror of the capture-tour ruling: we refused to
+widen the bar cull to serve an instrument, and here an instrument's own rule has
+been quietly narrowing the game.
+
+**RULED: `bDropsLoot` keys off the MODE, not the wave kind.** In the gym, §4.3
+stands exactly as written and the drop-rate data stays clean. **In a rift, every
+wave drops.** GROUND owns it — `Game/` — and it is small.
+
+## THEN THE CAP CAN BE CHECKED, AND HERE IS THE ARITHMETIC TO CHECK IT WITH
+
+Once every wave drops, a three-wave run at ten bodies a wave — say 26 trash,
+3 promoted, 1 boss — against the authored chances (trash 0.10, elite 0.75,
+modifier-bearing 0.90, boss 1.0) yields:
+
+```
+  26 x 0.10  =  2.6
+   3 x 0.75  =  2.25
+   1 x 1.00  =  1.0
+              ------
+              ~5.9 items per run  ->  25 fills in about 4.3 runs
+```
+
+**That is an estimate from a composition I assumed, not one I solved.** Four
+runs to a full bag is a cap the player feels without fighting — which is why 25
+looks right — but **FIELD or LEDGER should run `SolveWave` for waves 1–3 and
+replace my 26/3/1 with the real numbers.** If a run actually yields twelve, 25
+is two runs and the bag becomes the game; if it yields two, the cap never
+binds and it is decoration. Report the real figure before anyone tunes either
+number.
+
+## CURRENCIES: THE REDESIGN ALREADY HAPPENED
+
+**O51 did it.** *"One crafting currency: Riftglass, account-wide and scalar."*
+It lives as a single `int32` on `FBreakerForgeWallet` — **not an item, so it
+occupies zero slots, ever, at any quantity.** The failure you are half-
+remembering, where currency eats the stash and the stash grows tabs to hold it,
+**cannot occur here by construction.** Three denominations already existed and
+were already collapsed, migration and all. No currency redesign is needed.
+
+**What WILL take slots is O122's endgame rift consumable.** *"A campaign rift is
+entered freely and an endgame rift is consumable"* — a consumable is an item,
+and a player banking runs is a player filling a stash with things that are not
+gear. That is the real pressure and it arrives with the endgame.
+
+**RULED IN ADVANCE, so it is not discovered as scope: consumables do not share
+the gear cap.** They get their own count. A gear cap exists to make *keeping
+gear* a decision; if the same 70 also governs *how many runs you can bank*, the
+player resolves the conflict by never keeping gear — and the cap has then done
+the exact opposite of its job. O122's work authors the separate count.
+
+## QUEUE AMENDMENTS TO PART THREE-H
+
+- **LEDGER item 4** — the stash cap is no longer "propose a number". It is
+  **70**, and the backpack's **25** comes with it. Both `O2 PLACEHOLDER`. Add
+  the full-backpack refusal to the same commit as the cap, because a cap without
+  a refusal rule is the branch someone picks by accident.
+- **GROUND, new item, take it after `GetDisplayName()` and before the second
+  yard:** `bDropsLoot` keys off the mode. It is small, it is squarely yours, and
+  every loot number anyone measures before it lands is measuring the gym.
+- **FIELD or LEDGER, whoever reaches it first:** solve waves 1–3 and report the
+  real per-run drop count. Say in your report which of you took it so the other
+  does not.
+
+---
+
+# PART ONE-AC — THERE IS NO MODE, AND "THE GYM" IS DEFINED BY SUBTRACTION
+
+Owner, 2026-08-27: *"what modes currently exist."*
+
+Asked because One-AB ruled `bDropsLoot` should key off *"the mode"*, and the
+honest answer is that **there is no mode.** I used a word for a thing that does
+not exist, and a lane reading it would have invented an enum to satisfy it.
+Correcting that here before anyone builds against it.
+
+## WHAT ACTUALLY EXISTS
+
+**Four named maps**, and that is the whole vocabulary:
+
+```
+  Lvl_FrontEnd   the menu
+  Lvl_Anchor     the hub; where the player starts (One-E)
+  Lvl_Fernhall   the world
+  Lvl_Gym        the test bench
+```
+
+**One bool on the game mode:** `bRiftInstance`, set at
+`BreakerGameMode.cpp:490` from whether the session carries a `PendingRift`.
+That is 09829fd's *one map, two builds*: Fernhall with a rift set is a run and
+its waves are live; without one it is the yard, and there is no fight.
+
+**And one thing that reads like a mode and is not:** `EBreakerRiftTier`
+(Campaign / Endgame) is a **death rule** — free entry versus consumable
+(O122) — not a place or a spawn behaviour. Every rift today is Campaign.
+
+That is the complete list. No enum, no state machine, no "wave mode" flag.
+
+## ONE-AB'S PREDICATE, CORRECTED
+
+**`bDropsLoot` keys off `bRiftInstance`, not off a mode.** It is already a
+member of the game mode, already computed before the spawner runs, and already
+consulted three lines from the `SetEnemyDropsLoot` calls at 3249–3329.
+
+- `bRiftInstance == true` → **every wave drops.** This is the player's loop.
+- otherwise → §4.3 stands unchanged, and the gym's drop-rate data stays clean.
+
+One existing bool, no new concept. **GROUND: do not add a mode enum for this.**
+If a mode concept is ever wanted it should be wanted for its own reasons, not
+conjured to satisfy a sentence I wrote.
+
+## THE FINDING: THE GYM IS EVERYTHING THAT IS NOT NAMED
+
+`UBreakerGameInstance::IsGymMapName` is a **negative definition**:
+
+```cpp
+return Name != FrontEndMapName() && Name != AnchorMapName() && Name != FernhallMapName();
+```
+
+The comment is honest about the cost, and it is the right call for the reason it
+gives — every existing entry point (the capture harness, a PIE drop-in,
+`-BreakerAutoPlay`) runs on an unnamed map and expects the gym field. But it
+means **any map added from now on is a gym until someone remembers to say
+otherwise**, and it will fill with targets and a boss key on its own.
+
+**This is live right now, because GROUND's next large item is the second yard.**
+If that yard lands as a new map rather than as more of `Lvl_Fernhall`, it
+inherits the gym field, the dev instruments, and — until `bRiftInstance` keys
+the loot — the gym's loot suppression, silently and without a single line
+saying so.
+
+**GROUND: rule which it is in your report before you build it.** More of
+Fernhall, or a named map. If it is a named map, the exclusion goes in
+`IsGymMapName` **in the same commit that names it**, and the suite already holds
+that function name-in/bool-out precisely so this is one test row.
+
+**And the shape worth naming, because it will recur:** a default that is correct
+for everything that exists is not thereby correct for the next thing. This one is
+documented and tested, which is the only reason it is a hazard rather than a
+trap.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
