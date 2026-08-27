@@ -96,6 +96,23 @@ private:
     void DrawLevelUpBanner(const FVector2D& Center);
     void EnsureDamageBinding(const ABreakerCharacter* Character);
 
+    // THE LOOP'S ENDING, MARKED. `OnRiftCompleted` is GROUND's published seam
+    // (declared in Game/BreakerRiftDefinition.h so a consumer needs that header
+    // and not the 500-line game-mode one), and LEDGER's payout was its ONLY
+    // binder — a rift could be entered, fought, terminated and PAID with
+    // nothing on screen saying it had ended. Bound weakly to the game mode,
+    // rebinding when the mode changes, exactly as the component seams above
+    // rebind on their component.
+    void EnsureRiftBinding();
+    void HandleRiftCompleted(const struct FBreakerRiftDefinition& Rift, APawn* Player);
+    void DrawRiftCompleteBanner(const FVector2D& Center);
+    TWeakObjectPtr<class ABreakerGameMode> BoundRiftMode;
+    double RiftCompleteTime = -1000.0;
+    // Latched from the definition at completion, not looked up afterwards: the
+    // session's PendingRift is cleared by the teardown this banner outlives.
+    FText RiftCompleteName;
+    FText RiftCompleteLine;
+
     // Same bind/rebind discipline for shots: the tracer trail is the only
     // record of a hitscan line, and polling GetLastShot() would miss every
     // shot fired faster than one per frame.

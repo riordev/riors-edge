@@ -34,6 +34,7 @@
 #include "Interaction/BreakerTravelPoint.h"
 #include "Game/BreakerGameInstance.h"
 #include "Game/BreakerGameMode.h"
+#include "Game/BreakerRiftDefinition.h"
 // Quest tracker: definitions and the pure state helpers (read-only — the HUD
 // derives, never writes). The journal type itself comes through
 // BreakerQuestContent.h's own include.
@@ -159,6 +160,10 @@ namespace BreakerHUD
     // FIELDPLATE has no fades, so urgency is a metronome, not a breath.
     static constexpr float LoudBlinkSeconds = 0.5f;       // O2 PLACEHOLDER
 
+    // How long the rift-completion banner holds. Longer than the level-up
+    // because it ends a RUN rather than a level, and the player has just
+    // stopped shooting and can read. O2 PLACEHOLDER.
+    static constexpr float RiftCompleteBannerSeconds = 4.5f;
     // How long the level-up banner holds. Presentation, not balance.
     static constexpr float LevelUpBannerSeconds = 3.2f;   // O2 PLACEHOLDER
     // Banner leaves like a panel: 120ms linear out, FIELDPLATE §04.
@@ -277,6 +282,10 @@ void ABreakerPlaytestHUD::DrawHUD()
     EnsureWeaponBinding(Character);
     EnsureAbilityBinding(Character);
     EnsureProgressionBinding(Character);
+    // Not a component seam: this one binds the GAME MODE, so it takes no
+    // character and must re-bind after every travel, which is exactly when a
+    // rift run begins.
+    EnsureRiftBinding();
 
     // ---- Density instruments (dev, command-line gated by construction) ----
     // -BreakerHUDStress=N spawns N enemies in a ring once the field is up, so
@@ -559,6 +568,10 @@ void ABreakerPlaytestHUD::DrawHUD()
     DrawSkimBurst(Center);
     DrawExperienceRail(Character);
     DrawLevelUpBanner(Center);
+    // The loop's ending. Drawn after the level-up because the two co-occur and
+    // the later draw wins a collision — they are placed apart so they cannot,
+    // but the order states which one would.
+    DrawRiftCompleteBanner(Center);
     DrawDefenseFeedback(Center);
     DrawInteractPrompt(Character, Center);
     if (const UBreakerCombatComponent* PlayerCombat = Character->GetCombat(); PlayerCombat && PlayerCombat->GetSecondsSinceDamage() < 0.28f)
@@ -1987,6 +2000,90 @@ void ABreakerPlaytestHUD::DrawExperienceRail(const ABreakerCharacter* Character)
     const FVector2D CaptionSize = MeasureSpecText(Caption, 11.0f);
     DrawSpecTextCentered(Caption, Canvas->ClipX * 0.5f, RailY - S(BreakerUI::Space4) - CaptionSize.Y,
         bCelebrating ? BreakerUI::Gold : BreakerUI::TextMuted, 11.0f);
+}
+
+void ABreakerPlaytestHUD::EnsureRiftBinding()
+{
+    UWorld* World = GetWorld();
+    ABreakerGameMode* Mode = World ? World->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    if (!Mode || BoundRiftMode.Get() == Mode) return;
+    // Weak, and no explicit unbind: the previous mode died with its world, and
+    // a lambda bound weakly to this HUD cannot be called into after teardown.
+    Mode->OnRiftCompleted.AddWeakLambda(this,
+        [this](const FBreakerRiftDefinition& Rift, APawn* Player) { HandleRiftCompleted(Rift, Player); });
+    BoundRiftMode = Mode;
+}
+
+void ABreakerPlaytestHUD::HandleRiftCompleted(const FBreakerRiftDefinition& Rift, APawn* Player)
+{
+    // Filter by pawn, the same shape LEDGER's handler uses: the event is
+    // broadcast once and every listener sees it, so a HUD must confirm the run
+    // was ITS player's before it announces one.
+    if (Player && PlayerOwner && PlayerOwner->GetPawn() != Player) return;
+    RiftCompleteTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    // LATCHED, not looked up later. The session's PendingRift is cleared by
+    // the teardown this banner outlives, so reading it at draw time would
+    // print an empty name on the frame that matters most.
+    RiftCompleteName = Rift.AreaName;
+    RiftCompleteLine = Rift.AreaLine;
+}
+
+void ABreakerPlaytestHUD::DrawRiftCompleteBanner(const FVector2D& Center)
+{
+    if (RiftCompleteTime <= 0.0 || !Canvas) return;
+    const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+    const float Age = static_cast<float>(Now - RiftCompleteTime);
+    if (Age < 0.0f || Age >= BreakerHUD::RiftCompleteBannerSeconds) return;
+
+    // THE ENDING. Same event treatment as the level-up plate — snap in, plate
+    // never fades, 120ms text out — but RIFT-TEAL rather than gold, and that is
+    // O19 rather than taste: teal is the reserved noun for rift geometry, and a
+    // run completing is the one event that IS a rift fact. Gold is the reward
+    // family and would claim this banner was the payout, which it is not.
+    //
+    // NO REWARD NUMBERS. LEDGER owns what was paid and binds the same seam; a
+    // figure here would be a second owner of one question, and I would need a
+    // seam from them to state it truthfully rather than recompute it.
+    const float OutStart = BreakerHUD::RiftCompleteBannerSeconds - BreakerHUD::LevelUpOutSeconds;
+    const float Fade = Age <= OutStart ? 1.0f
+        : 1.0f - (Age - OutStart) / BreakerHUD::LevelUpOutSeconds;
+
+    const FString Title = RiftCompleteName.IsEmpty()
+        ? FString(TEXT("RIFT CLEARED")) : RiftCompleteName.ToString().ToUpper();
+    const FString Line = RiftCompleteLine.ToString();
+
+    constexpr float TitlePixels = 24.0f;   // O2 PLACEHOLDER
+    constexpr float LinePixels = 12.0f;    // O2 PLACEHOLDER
+    const FVector2D LabelSize = MeasureSpecText(TEXT("RUN COMPLETE"), 11.0f);
+    const FVector2D TitleSize = MeasureSpecText(Title, TitlePixels);
+    const FVector2D LineSize = Line.IsEmpty() ? FVector2D::ZeroVector : MeasureSpecText(Line, LinePixels);
+
+    const float Pad = S(BreakerUI::Space16);
+    const float ContentW = FMath::Max3(LabelSize.X, TitleSize.X, LineSize.X);
+    const float PlateW = FMath::Max(S(300.0f), ContentW + Pad * 2.0f);
+    const float PlateH = S(BreakerUI::RailThickness) + Pad
+        + LabelSize.Y + S(BreakerUI::Space4) + TitleSize.Y
+        + (Line.IsEmpty() ? 0.0f : S(BreakerUI::Space8) + LineSize.Y) + Pad;
+    const float PlateX = Center.X - PlateW * 0.5f;
+    // BELOW centre, and the level-up plate is why. A run that ends very often
+    // levels the player, so the two banners genuinely co-occur — and the
+    // level-up owns Center.Y - 190. Two plates in one slot is the collision
+    // this project keeps finding; giving them different halves of the screen
+    // costs nothing and cannot overlap at any resolution.
+    const float PlateY = Center.Y + S(120.0f);
+
+    DrawPlate(PlateX, PlateY, PlateW, PlateH, BreakerUI::TealAnomalous, EBreakerRail::Top);
+    if (Age < 0.26f) DrawBorder(PlateX, PlateY, PlateW, PlateH, BreakerUI::TealAnomalous, S(1.0f));
+
+    float LineY = PlateY + S(BreakerUI::RailThickness) + Pad;
+    DrawSpecTextCentered(TEXT("RUN COMPLETE"), Center.X, LineY, BreakerUI::TealAnomalous, 11.0f, Fade);
+    LineY += LabelSize.Y + S(BreakerUI::Space4);
+    DrawSpecTextCentered(Title, Center.X, LineY, BreakerUI::TextPrimary, TitlePixels, Fade);
+    if (!Line.IsEmpty())
+    {
+        LineY += TitleSize.Y + S(BreakerUI::Space8);
+        DrawSpecTextCentered(Line, Center.X, LineY, BreakerUI::TextMuted, LinePixels, Fade);
+    }
 }
 
 void ABreakerPlaytestHUD::DrawLevelUpBanner(const FVector2D& Center)
