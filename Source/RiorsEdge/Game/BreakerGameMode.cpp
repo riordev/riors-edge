@@ -557,6 +557,9 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // a run, and it is O2 PLACEHOLDER: the owner moves it after
             // walking one, which is the only test this has.
             WaveBudget.BossWaveInterval = FMath::Max(RiftBossWave, 1);
+            // The solver is world-free, so the mode is carried IN rather than
+            // reached for. Every wave of a run drops; the gym keeps 4.3's rule.
+            WaveBudget.bRiftInstance = true;
             const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
             UE_LOG(LogTemp, Display,
                 TEXT("[Rift] instance built: %s, area level %d, boss on wave %d."),

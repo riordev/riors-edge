@@ -58,6 +58,26 @@ bool FBreakerWaveCadenceTest::RunTest(const FString& Parameters)
     // §4.3: loot only on rest and boss waves, or the gym becomes a farm and the
     // drop-rate data it exists to gather is worthless.
     TestFalse(TEXT("A standard wave drops nothing"), ELib::SolveWave(5, 1, Params).bDropsLoot);
+
+    // IN A RIFT, EVERY WAVE DROPS. 4.3's rest-and-boss-only rule is the GYM's
+    // measurement rule — it keeps the instrument's drop-rate data clean — and
+    // applying it to the player's own loop taxes the loop to protect the
+    // instrument. The arithmetic is what makes this load-bearing rather than
+    // tidy: a run reaches wave 3, waves 1 and 2 carry every trash body in it,
+    // and wave 3 is the boss alone, so under the gym's rule the player's whole
+    // loot loop was ONE BOSS DROP PER RUN with every drop-rate constant in the
+    // game unreachable.
+    FBreakerWaveBudgetParams RiftParams = Params;
+    RiftParams.bRiftInstance = true;
+    for (int32 Wave = 1; Wave <= 12; ++Wave)
+    {
+        TestTrue(FString::Printf(TEXT("Rift wave %d drops"), Wave),
+            ELib::SolveWave(Wave, 1, RiftParams).bDropsLoot);
+    }
+    // And the gym is untouched by it, which is the half that keeps the
+    // instrument honest.
+    TestFalse(TEXT("the gym's standard wave still drops nothing"),
+        ELib::SolveWave(5, 1, Params).bDropsLoot);
     TestTrue(TEXT("A rest wave drops"), ELib::SolveWave(6, 1, Params).bDropsLoot);
     TestTrue(TEXT("A boss wave drops"), ELib::SolveWave(12, 1, Params).bDropsLoot);
 

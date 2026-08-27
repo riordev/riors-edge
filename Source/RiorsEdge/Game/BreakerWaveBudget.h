@@ -129,6 +129,25 @@ struct RIORSEDGE_API FBreakerWaveBudgetParams
     // in practice this is a ceiling on Skitters.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Variety", meta=(ClampMin="0", ClampMax="1")) float MaximumSingleArchetypeShare = 0.70f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Variety", meta=(ClampMin="1")) int32 VarietyEnforcedFromWave = 4;   // O2 PLACEHOLDER ("after wave 3")
+
+    // --- IS THIS A PLAYER'S RUN, OR THE GYM'S INSTRUMENT? -----------------
+    // EVERY WAVE DROPS IN A RIFT. 4.3's "loot only on rest and boss waves"
+    // exists so the GYM does not become a farm and pollute the drop-rate data
+    // it is built to gather. That is a measurement rule, and applying it to the
+    // player's own loop taxes the loop to protect an instrument.
+    //
+    // The arithmetic is why this is not cosmetic: a rift run reaches wave 3,
+    // waves 1 and 2 carry every trash body in it, and wave 3 is the boss alone.
+    // Under the gym's rule the player's ENTIRE loot loop is one boss drop per
+    // run \u2014 twenty-two kills paying nothing, and every drop-rate constant in
+    // the game unreachable.
+    //
+    // It is a PARAM rather than an argument because the solver is world-free by
+    // rule and `bRiftInstance` lives on the game mode: the caller already knows
+    // which loop it is in, and this is how it says so without the solver
+    // learning what a world is. Not a mode enum \u2014 ruled \u2014 one bool that
+    // already exists, carried in.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Loot") bool bRiftInstance = false;
 };
 
 USTRUCT(BlueprintType)

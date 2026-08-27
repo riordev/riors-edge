@@ -50,7 +50,10 @@ FBreakerWaveComposition UBreakerWaveBudgetLibrary::SolveWave(int32 Wave, int32 P
     Out.Wave = Wave;
     Out.Kind = GetWaveKind(Wave, Params);
     Out.Budget = GetWaveBudget(Wave, Params);
-    Out.bDropsLoot = Out.Kind != EBreakerWaveKind::Standard;
+    // A RIFT RUN IS THE PLAYER'S LOOP AND EVERY WAVE IN IT DROPS; the gym is an
+    // instrument and 4.3's rest-and-boss-only rule keeps its drop-rate data
+    // clean. Same solver, same struct — the caller says which loop this is.
+    Out.bDropsLoot = Params.bRiftInstance || Out.Kind != EBreakerWaveKind::Standard;
 
     if (Out.Kind == EBreakerWaveKind::Boss)
     {
