@@ -2524,6 +2524,247 @@ trap.
 
 ---
 
+# PART ONE-AD — THE RIFT NEVER REACHES WAVE 4, AND NINE RULES LIVE THERE
+
+LEDGER solved the rift's wave composition (3ebd2f4) and reported two findings
+falling out of one fact, with three candidate levers and a request for the
+seat's pick. **The pick is none of the three, because the fact is larger than
+the two findings they hung on it.**
+
+## THE FACT, EXTENDED
+
+`RiftBossWave` is 3. `FBreakerWaveBudgetParams` is the **gym's** curve, authored
+for a twelve-wave escalation, and the rift reads the same struct. So every rule
+gated at wave 4 or later never fires in the only content a player can reach:
+
+```
+  LatticeFromWave              2    fires  (wave 2 gets exactly one)
+  WardenFromWave               3    DEAD — wave 3 is the boss, alone
+  SkirmisherFromWave           4    DEAD
+  WavesPerElite                4    DEAD
+  ModifierCarrierFromWave      4    DEAD
+  WavesPerExtraEliteModifier   8    DEAD
+  RestWaveInterval             6    DEAD  (this is One-AB's loot rule)
+  VarietyEnforcedFromWave      4    DEAD
+  BossWaveInterval            12    overridden by RiftBossWave
+```
+
+**A rift run is 22 Skitters, one Lattice, and a boss.** Two of four archetypes
+never appear. The entire promotion layer — elites, modifier carriers, §1.3's
+whole diversity axis — is absent. Variety enforcement never runs, because it
+starts one wave after the run ends.
+
+**And this answers a complaint the owner made days ago.** *"They should have
+enemy variety."* It was read as a content gap and routed as one. It is not:
+the variety exists, is built, is tested, and is gated behind a wave number the
+player's content never reaches.
+
+## THE RULING: THE RIFT GETS ITS OWN PARAMS, NOT A LEVER
+
+Not a fourth wave, not a special-case unlock, not promoted bodies in the roam.
+**`FBreakerWaveBudgetParams` is data. Give the rift its own instance with the
+introduction waves compressed to the run's length.** Same struct, same solver,
+same tests — nine constants corrected at once instead of the two that happened
+to be noticed.
+
+This is the **third instance of one shape** and it should now be looked for
+rather than stumbled on: `bDropsLoot` was the gym's measurement rule taxing the
+player's loop; `IsGymMapName` makes the gym the default for anything unnamed;
+and now the gym's twelve-wave pacing curve is the rift's. **The gym was the
+first thing built, so its assumptions are the project's defaults.** Every one of
+them needs a rift reading.
+
+**GROUND owns the params instance; LEDGER owns the drop profile that measures
+it.** Magnitudes are `O2 PLACEHOLDER` — my expectation is Lattice from 1, Warden
+and Skirmisher from 2, promotions from 2, variety enforced from 2 — and the
+first solve after it lands replaces my guess. **Report the new composition and
+the new per-run yield together**, because the yield moves when promoted bodies
+appear: elites drop at 0.75 against trash's 0.10.
+
+**LEDGER's unmeasured variable stands and is now worth measuring:** the Field
+Marshal deploys its own adds at its own source, so whether those adds drop is
+decided where they spawn, not by the wave's `bDropsLoot`. Answer it in the same
+report.
+
+## THE RIFTGLASS FOLD: CONFIRMED, AND THE SKETCH WAS MINE
+
+**Confirmed — build the roster-driven journaled fold.** LEDGER's three windows
+are real: fold-then-zero duplicates, zero-then-fold loses, and a version stamp
+that only lands with the character write duplicates again.
+
+And the receipt matters more than the confirmation. **One-X told LEDGER that
+"move the item, save both files" was the version with the bug in it — and then,
+four paragraphs later, described the currency migration as summing balances,
+"the only migration that cannot rob anyone."** Same two-file crash window, same
+section, and I did not apply my own rule to my own sketch one screen after
+writing it. A rule you state and then do not run against your next paragraph is
+a rule you have not adopted.
+
+**Approve the bonus, explicitly:** carrying the character id in the payload so
+the stash journal's two-step becomes one step is a real simplification and it
+rides the same `SaveVersion` bump. Take it.
+
+## THE ARRIVAL RING WORKED, AND THE NUMBER IS NOT THE FINAL NUMBER
+
+The quadratic coefficient fell to **1.7%** of itself and 60 fps moved from
+N=63 to N=486. That is the largest single win this project has measured, and
+FIELD's diagnosis of its own 3.3× miss is the valuable half: the counterfactual
+assumed removing the quadratic left the linear term intact, and it did not,
+because `if (!DesiredDirection.IsNearlyZero())` means **a held body issues no
+swept move at all.**
+
+**So the ring did not only stop them crowding — it stopped them moving, and
+2.98 ms at N=100 is measured on a crowd standing still.**
+
+**RULED: `Hold` is not a freeze.** A ring of motionless bodies around the player
+is a worse read than a stack, and it is not what the band controller does for
+its own archetype — the ranged case adds a tangential strafe that the melee
+caller simply does not add. **Melee adds it too.** A held enemy circles; that is
+the whole feel of being surrounded, and it is also what spreads the ring without
+a separation pass.
+
+**And re-measure after, because the strafe puts the swept move back.** The
+2.98 ms is a floor for a behaviour we are not shipping. FIELD: report the ring
+with strafe against the ring without it, and say which number ORDERS should
+carry. **A number measured on a behaviour that is not the shipping one is not
+evidence about the shipping one** — the same rule that retired the parity
+prediction and the mesh-swap figure.
+
+## THE THREE BOUNDARY COINCIDENCES: FIX THE GEOMETRY, NOT THE PREDICATE
+
+KIT found the second yard's mound tops at **80.0 cm — exactly
+`VaultMaximumHeightCm`** — joining the 45.0 kerb (exactly `MaxStepHeight`) and
+the 145 riser (exactly `MantleStepHeight`). Every authored ledge in the game
+sits on a verb boundary, so which verb fires is a float comparison's coin toss.
+
+**RULED: the geometry moves, the predicate does not.** An epsilon in
+`ResolveLedgeVerb` hides the coincidence and relocates the coin flip to
+`boundary ± epsilon`; it does not remove it, and it makes the verb table lie
+about where its edges are.
+
+**The rule, and it is a level-design rule: no authored height may equal a verb
+boundary.** Author inside a band, not on its edge. `GROUND` moves the three
+heights — my expectation is 40, 75 and 140, all `O2 PLACEHOLDER` — and **a test
+asserts that no authored height equals any boundary**, which is the durable half
+because the next authored ledge is the one nobody will check.
+
+**KIT: publish the boundary list** so GROUND has something to test against
+rather than three numbers copied out of a header. That is the same
+publish-once-read-many shape that gave 145 one author.
+
+## THE ROAM SPACE: SPARSE AND NON-RESPAWNING, AND THE VERB IS DIFFERENT
+
+GROUND's report names a tension nobody had: **the roam and the rift interior are
+the same ground.** A player who fights trash walking to a door, then steps
+through it to fight trash in the room they were just standing in, has been given
+one space twice — and tuning either population does not fix that.
+
+**Their recommendation is accepted, and one thing is added that resolves the
+tension rather than softening it.** Sparse and non-respawning, yes. And:
+
+**The roam's fight is a DIFFERENT KIND, not a smaller amount.** The rift is
+waves that escalate and end. The roam is **placed, static, finite** — you clear
+it and it stays clear while you are in the area. Nothing spawns behind you,
+nothing escalates, nothing is a run. That makes the roam about **traversal and
+what is found**, which is what One-AA parked the exploration reward on, and the
+rift about escalation and a payout. Same ground, two verbs, and a player can
+tell which one they are in without being told.
+
+**The roam pays the LADDER, not loot-per-kill** (One-AA): what a roam fight
+gives is access, discovery, and the first-clear purse. Density is `O2
+PLACEHOLDER` and it is the owner's, through `Breaker.Rift.Population`.
+
+## KIT'S TRAVERSAL RECON — ROUTED
+
+Four findings, three of them bugs and one parked:
+
+1. **It reads as standing still to the viewmodel.** A 0.20 s verb the hands do
+   not acknowledge is a verb the player does not believe. **KIT fixes; GLASS is
+   not needed** — the viewmodel is movement-driven.
+2. **Zero Momentum while refilling a credit it should not.** Two separate
+   defects wearing one line. The refill is the urgent half: a traversal that
+   restores a resource it never spent is a free reset, and free resets are how
+   a movement economy stops being one. **Fix both; report the Momentum value as
+   a proposal, since granting it is a design number.**
+3. **It eats air jumps from falling players.** Straight bug. Fix.
+4. **No geometry in the project can be vaulted.** Resolved by the boundary
+   ruling above — the mound at 75 becomes the first real vault in the game.
+5. **The prediction path walls at the first remote client. PARKED, and here is
+   why rather than a shrug:** there is no remote client, no netcode lane, and no
+   second player in any plan that has been ruled. Recording it is right;
+   building against it now is authoring at absent plumbing, which is the rule
+   that kept Traction silent until the ledge exit existed. **Write it into the
+   report as a standing constraint on the verb's shape, and do not pay for it
+   yet.**
+
+---
+
+# PART ONE-AE — THE BANNER CARRIES THE NUMBER, AND ONE ORDERED ITEM WAS SKIPPED
+
+## GLASS's question: yes, the completion banner carries the payout
+
+GROUND walked the loop and found it on GLASS's surface: **Riftglass is drawn on
+the Anchor's HUD and not on the combat HUD**, while the payout fires inside the
+rift at completion. So the number a run pays changes on a readout the player can
+only see after leaving the run and travelling home.
+
+**RULED: the banner carries the payout.** A completion moment is *about* the
+reward; a banner with no number in it is a ceremony with nothing inside. O168
+deliberately put the broadcast at the latch so the reward reads while the player
+is standing in the rift they just beat — and nothing reads there.
+
+**The seam is one-way and GLASS's instinct about it is correct.** LEDGER already
+computes the figure at the payout, so **LEDGER publishes what it paid** and GLASS
+displays it verbatim. GLASS does not recompute, does not derive, does not sum.
+Two lanes deriving one number is how they come to disagree, and this project has
+already spent a cycle on exactly that with the parity figure.
+
+**LEDGER: publish it as what was PAID, not as what was earned** — the two differ
+the moment anything caps, converts or rounds, and the player is owed the one that
+hit their wallet.
+
+**And no to the other half.** A persistent Riftglass readout on the combat HUD is
+clutter for a number that only changes once per run, at a moment that now has its
+own reader. The banner is the answer; the HUD line is not.
+
+## ONE ORDERED ITEM WAS SKIPPED, AND IT IS THE MOST EXPENSIVE ONE LEFT
+
+`BreakerWaveBudget.cpp:53` still reads:
+
+```cpp
+Out.bDropsLoot = Out.Kind != EBreakerWaveKind::Standard;
+```
+
+One-AB ruled this keys off `bRiftInstance`; One-AC corrected the predicate to a
+bool that exists; Part Three-H placed it in GROUND's queue **after
+`GetDisplayName()` and before the second yard.** GROUND landed both of those and
+did not land this.
+
+**Nobody did anything wrong by hiding it — it is simply not done, and it is the
+single most expensive thing outstanding.** Stack it against One-AD's finding and
+the arithmetic is stark:
+
+- Waves 1 and 2 drop nothing (this rule).
+- Waves 1 and 2 contain every trash body in the run (One-AD).
+- Wave 3 is the boss, alone.
+
+**So the player's entire loot loop is one boss drop per run.** Twenty-two kills
+pay nothing. Every drop-rate constant in the game — trash 0.10, elite 0.75,
+modifier-bearing 0.90 — is unreachable, and the caps ruled in One-AB are being
+measured against a loop that pays 1 item where the solve says 3.2.
+
+**GROUND: this is your first item on restart, before anything else in your
+queue.** It is one predicate. Everything anyone measures about loot, drops,
+caps or pacing before it lands is measuring the gym.
+
+## AND THE CAPTIONS ARE UNGATED NOW
+
+Part Three-H made GLASS's two `ACCOUNT-WIDE` strings wait on the stash existing.
+`Save/BreakerAccountSave.h` exists as of `598fd4a`. **The gate is lifted; the
+strings are still wrong.** Take them.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
