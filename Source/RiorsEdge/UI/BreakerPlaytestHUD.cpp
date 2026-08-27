@@ -170,6 +170,13 @@ namespace BreakerHUD
     static constexpr float LevelUpOutSeconds = 0.12f;
     static constexpr float LevelUpRailBlinkSeconds = 0.25f; // O2 PLACEHOLDER
 
+    // THE ULTIMATE'S IGNITION FLASH. Brief on purpose, and its peak sits
+    // deliberately below the low-health cue's 0.45-0.75 so a wash can never be
+    // mistaken for danger — violet is the ultimates' colour and Harm is not,
+    // but at equal weight a full-bleed reads as an alarm whatever its hue.
+    static constexpr float UltimateIgnitionSeconds = 0.18f;     // O2 PLACEHOLDER
+    static constexpr float UltimateIgnitionPeakAlpha = 0.22f;   // O2 PLACEHOLDER
+
     // Ability feedback timings. All cosmetic: nothing here gates a rule.
     static constexpr float AbilityFlashSeconds = 0.3f;
     static constexpr float SkimBurstSeconds = 0.25f;
@@ -2321,6 +2328,30 @@ void ABreakerPlaytestHUD::DrawUltimateTreatment(const ABreakerCharacter* Charact
     const float Inset = S(BreakerUI::UltimateFrameInset);
     const float W = Canvas->ClipX;
     const float H = Canvas->ClipY;
+
+    // IGNITION TINT (ORDERS item 7). The frame and the bands below report that
+    // the ultimate is RUNNING; nothing reported that it just STARTED, so
+    // ignition could only be read by looking at a bar. One full-bleed violet
+    // wash, snapping on at ignition and falling linearly to nothing — the
+    // panel-out motion this HUD already uses, not an eased breath.
+    //
+    // IT CANNOT SURVIVE THE ABILITY, AND THAT IS STRUCTURAL RATHER THAN
+    // REMEMBERED. This sits after the `if (!bActive) return` above, so a window
+    // that closes — expired, cancelled, or ended by anything else — takes the
+    // tint with it on the same frame, without a second condition that could be
+    // forgotten or drift. The accidental violet wash that was removed outlived
+    // its cause; a deliberate one that could outlive its cause would be the
+    // same bug authored on purpose.
+    //
+    // Drawn FIRST, so the frame, the bands and the title plate all read over
+    // the wash rather than under it.
+    if (Elapsed < BreakerHUD::UltimateIgnitionSeconds)
+    {
+        const float Fall = 1.0f - Elapsed / BreakerHUD::UltimateIgnitionSeconds;
+        DrawRect(BreakerUI::Alpha(BreakerUI::Violet, BreakerHUD::UltimateIgnitionPeakAlpha * Fall),
+            0.0f, 0.0f, W, H);
+    }
+
     DrawBorder(Inset, Inset, W - Inset * 2.0f, H - Inset * 2.0f, BreakerUI::Violet, S(Thickness));
 
     const FLinearColor Band = BreakerUI::Alpha(BreakerUI::Violet, 0.10f);
