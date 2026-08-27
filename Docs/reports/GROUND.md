@@ -4,6 +4,51 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
+## The rift's composition and its per-run yield (One-AD, reported together as asked)
+
+The rift has its own `FBreakerWaveBudgetParams` and the run now solves to:
+
+```
+  wave 1  budget 15   12 skitters
+  wave 2  budget 24    8 skitters (1 elite x 1 mod), 1 lattice, 1 skirmisher, 1 warden
+  wave 3  budget 33    the boss, alone
+```
+
+**24 bodies: 22 trash-rank, 1 elite, 1 boss.** Against the authored rates
+(trash 0.10, elite 0.75, boss 1.0) that is **3.95 expected drops per run,
+against 1.00 before** — 23 of 24 kills used to pay nothing. The seat's
+expectation was 3.2; the difference is that the compressed schedule fits an
+elite in, which the gym's schedule never did.
+
+**YOUR EXPECTATION DID NOT SURVIVE THE FIRST SOLVE, in the way you said it might.
+Compressing the introduction waves alone does not work.** At the gym's budget
+curve wave 2 has 14 points, spends 6 on the Warden, 3 on the Skirmisher and 3 on
+the Lattice, and has 2 left against an elite costing 5. So the elite was
+introduced on a wave that could not buy one and a run contained no elite at all
+— which puts the 0.75 rate out of reach for the same reason the 0.10 rate was.
+I raised the rift's `BudgetPerWave` to 9 (O2): a three-wave run escalates faster
+because it has fewer waves to do it in, and introducing early while funding late
+is half a change.
+
+**`LatticeFromWave = 1` does not put a Lattice on wave 1**, and the reason is
+worth knowing rather than fixing: the gate opens at 1 but the COUNT is `Wave/2`,
+which is 0 there. Wave 1 is pure trash. I read that as correct — the first wave
+teaches the simplest pressure — so I left it, but the constant reads as a
+promise it does not keep. Making the count a param would change the gym too, so
+it is your call whether the name should change or the formula.
+
+**LEDGER'S UNMEASURED VARIABLE, ANSWERED: the boss's adds always dropped.**
+`ABreakerBossEnemy` spawns them with `ConfigureWave` and touches `bDropsLoot`
+nowhere; it defaults `true` on `ABreakerEnemy`. The wave's flag is applied by
+the wave SPAWNER through `SetEnemyDropsLoot`, and the boss spawns at its own
+source — so its adds were dropping even while every wave body on wave 3 was
+silenced. That is not in the 3.95: their count is dynamic, so a run's real yield
+is 3.95 plus however many adds the fight deploys.
+
+- **Question:** none blocking. Flagging only that the yield figure is a SOLVE,
+  not a measurement — nobody has counted drops in a live run, and the adds make
+  the true number higher by an amount only a run can say.
+
 ## A connection has no marker, so nothing can find one
 
 Found by looking rather than by testing, which is the point of looking. I built

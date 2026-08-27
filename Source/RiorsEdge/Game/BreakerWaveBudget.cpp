@@ -1,5 +1,50 @@
 #include "Game/BreakerWaveBudget.h"
 
+FBreakerWaveBudgetParams UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(int32 BossWave)
+{
+    FBreakerWaveBudgetParams Params;
+
+    // A RUN IS THREE WAVES, so everything the run is supposed to contain has to
+    // arrive inside three. The gym's schedule introduces the Skirmisher on wave
+    // 4 and the first promotion on wave 4, which in a rift means never.
+    Params.BossWaveInterval = FMath::Max(BossWave, 1);
+    // The rest beat is 4.3's endurance pacing and a run is not an endurance
+    // test. Parked beyond the boss rather than deleted: a longer rift tier may
+    // want it back, and a rest wave inside a three-wave run would spend a third
+    // of the run on a breather.
+    Params.RestWaveInterval = FMath::Max(BossWave, 1) * 100;
+
+    // Everything arrives by wave 2, so the last wave before the boss is the
+    // one that has all of it.
+    Params.LatticeFromWave = 1;   // O2 PLACEHOLDER
+    Params.WardenFromWave = 2;   // O2 PLACEHOLDER
+    Params.SkirmisherFromWave = 2;   // O2 PLACEHOLDER
+    Params.ModifierCarrierFromWave = 2;   // O2 PLACEHOLDER
+    // floor(wave/WavesPerElite), so 2 puts the first elite on wave 2 rather
+    // than on a wave the run never reaches.
+    Params.WavesPerElite = 2;   // O2 PLACEHOLDER
+    Params.VarietyEnforcedFromWave = 2;   // O2 PLACEHOLDER
+
+    // AND THE BUDGET HAS TO FUND WHAT THE SCHEDULE INTRODUCES. Compressing the
+    // introduction waves alone does not work, and the first solve said so: at
+    // the gym's curve (6 + 4n) wave 2 has 14 points, spends 6 on the Warden, 3
+    // on the Skirmisher and 3 on the Lattice, and has 2 left against an elite
+    // promotion costing 5. So the elite was introduced on a wave that could not
+    // buy one, and a run contained NO elite at all — which puts the 0.75 elite
+    // drop rate out of reach for the same reason the 0.10 trash rate was.
+    //
+    // A THREE-WAVE RUN ESCALATES FASTER BECAUSE IT HAS FEWER WAVES TO DO IT IN.
+    // The steeper curve is the compression expressed in points rather than in
+    // wave numbers; introducing early and funding late is half a change.
+    // O2 PLACEHOLDER, and the solved composition is in the lane's report.
+    Params.BudgetPerWave = 9;   // O2 PLACEHOLDER
+
+    // EVERY WAVE OF A RUN DROPS. The gym's rest-and-boss-only rule is its
+    // measurement discipline, not the player's economy.
+    Params.bRiftInstance = true;
+    return Params;
+}
+
 int32 UBreakerWaveBudgetLibrary::GetWaveBudget(int32 Wave, const FBreakerWaveBudgetParams& Params)
 {
     if (Wave <= 0) return 0;

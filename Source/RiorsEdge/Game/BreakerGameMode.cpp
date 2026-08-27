@@ -556,10 +556,13 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // test is one sitting. This is the shortest lever that makes a run
             // a run, and it is O2 PLACEHOLDER: the owner moves it after
             // walking one, which is the only test this has.
-            WaveBudget.BossWaveInterval = FMath::Max(RiftBossWave, 1);
-            // The solver is world-free, so the mode is carried IN rather than
-            // reached for. Every wave of a run drops; the gym keeps 4.3's rule.
-            WaveBudget.bRiftInstance = true;
+            // THE RIFT GETS ITS OWN PARAMS, NOT A LEVER (ruled). Two fields
+            // poked into the gym's profile was the lever; this is the whole
+            // struct, because nine of its constants are the gym's twelve-wave
+            // pacing and a run is three waves. The game mode is per-world, so
+            // assigning here IS the rift's own instance — the gym's world has
+            // its own game mode carrying the gym's defaults, untouched.
+            WaveBudget = UBreakerWaveBudgetLibrary::MakeRiftWaveBudget(RiftBossWave);
             const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
             UE_LOG(LogTemp, Display,
                 TEXT("[Rift] instance built: %s, area level %d, boss on wave %d."),

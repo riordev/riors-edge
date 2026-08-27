@@ -192,6 +192,24 @@ class RIORSEDGE_API UBreakerWaveBudgetLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    // THE RIFT'S OWN PROFILE. Same struct, same solver, same tests — data, not
+    // a lever, and not a special case inside the solver.
+    //
+    // THE GYM WAS BUILT FIRST, SO ITS ASSUMPTIONS ARE THE PROJECT'S DEFAULTS,
+    // and this is the third place that has bitten: bDropsLoot was the gym's
+    // measurement rule taxing the player's loop, IsGymMapName makes the gym the
+    // default for anything unnamed, and the introduction schedule below is the
+    // gym's TWELVE-WAVE endurance pacing applied to a three-wave run.
+    //
+    // Under the gym's schedule a rift never reaches the wave that introduces
+    // anything: Lattice from 2, Warden from 3, Skirmisher from 4, promotions
+    // from 4, variety from 4 — against a run that ends on wave 3. Nine
+    // constants were wrong, not the two that happened to be noticed.
+    //
+    // Every magnitude here is O2 PLACEHOLDER and none has been walked.
+    UFUNCTION(BlueprintPure, Category="Waves")
+    static FBreakerWaveBudgetParams MakeRiftWaveBudget(int32 BossWave);
+
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetWaveBudget(int32 Wave, const FBreakerWaveBudgetParams& Params);
     UFUNCTION(BlueprintPure, Category="Waves") static EBreakerWaveKind GetWaveKind(int32 Wave, const FBreakerWaveBudgetParams& Params);
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetMaximumLiveEnemies(int32 PartySize, const FBreakerWaveBudgetParams& Params);

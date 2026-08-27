@@ -434,4 +434,77 @@ bool FBreakerWavePartyScalingTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// THE RIFT'S OWN PROFILE (One-AD). The gym was built first, so its assumptions
+// are the project's defaults — and its TWELVE-WAVE endurance pacing was being
+// applied to a THREE-WAVE run, so a rift never reached the wave that introduces
+// anything. Nine constants, not the two that happened to be noticed.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerRiftWaveProfileTest,
+    "RiorsEdge.Game.Waves.RiftProfile",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerRiftWaveProfileTest::RunTest(const FString& Parameters)
+{
+    using ELib = UBreakerWaveBudgetLibrary;
+    const int32 BossWave = 3;
+    const FBreakerWaveBudgetParams Rift = ELib::MakeRiftWaveBudget(BossWave);
+
+    // THE RUN IS THREE WAVES AND THE BOSS ENDS IT.
+    TestEqual(TEXT("the boss arrives on the run's last wave"),
+        ELib::GetWaveKind(BossWave, Rift), EBreakerWaveKind::Boss);
+
+    // NO REST BEAT INSIDE A RUN. 4.3's breather is endurance pacing; a rest
+    // wave inside three waves spends a third of the run on it.
+    for (int32 Wave = 1; Wave <= BossWave; ++Wave)
+    {
+        TestTrue(FString::Printf(TEXT("wave %d is not a rest wave"), Wave),
+            ELib::GetWaveKind(Wave, Rift) != EBreakerWaveKind::Rest);
+    }
+
+    // EVERYTHING THE RUN CONTAINS ARRIVES INSIDE THE RUN. This is the whole
+    // finding: under the gym's schedule every one of these is introduced on a
+    // wave a rift never reaches.
+    // THE SOLVED RUN, LOGGED. The seat asked for the new composition; this is
+    // where it comes from, so the report and the solver cannot drift apart.
+    for (int32 Wave = 1; Wave <= BossWave; ++Wave)
+    {
+        AddInfo(FString::Printf(TEXT("rift %s"), *ELib::DescribeComposition(ELib::SolveWave(Wave, 1, Rift))));
+    }
+
+    const FBreakerWaveComposition Last = ELib::SolveWave(BossWave - 1, 1, Rift);
+    TestTrue(TEXT("Lattices are present on the last wave before the boss"), Last.Lattices > 0);
+    TestTrue(TEXT("Skirmishers are present"), Last.Skirmishers > 0);
+    TestTrue(TEXT("Wardens are present"), Last.Wardens > 0);
+    TestTrue(TEXT("elite promotions are present"), Last.Elites > 0);
+
+    // AND EVERY WAVE OF A RUN DROPS, including the ones the gym would silence.
+    for (int32 Wave = 1; Wave <= BossWave; ++Wave)
+    {
+        TestTrue(FString::Printf(TEXT("rift wave %d drops"), Wave),
+            ELib::SolveWave(Wave, 1, Rift).bDropsLoot);
+    }
+
+    // LEGAL BY THE SAME RULES. A compressed schedule that broke 5.3's caps
+    // would be trading a readability rule for a pacing one.
+    for (int32 Wave = 1; Wave <= BossWave; ++Wave)
+    {
+        const FBreakerWaveComposition Composition = ELib::SolveWave(Wave, 1, Rift);
+        FString Reason;
+        if (!ELib::IsCompositionLegal(Composition, 1, Rift, Reason))
+        {
+            AddError(FString::Printf(TEXT("rift wave %d is illegal: %s (%s)"),
+                Wave, *Reason, *ELib::DescribeComposition(Composition)));
+        }
+    }
+
+    // THE GYM IS UNTOUCHED, which is the half that keeps the instrument honest:
+    // this is a second profile, not an edit to the first.
+    const FBreakerWaveBudgetParams Gym;
+    TestEqual(TEXT("the gym still introduces Skirmishers on wave 4"), Gym.SkirmisherFromWave, 4);
+    TestEqual(TEXT("the gym still rests every 6"), Gym.RestWaveInterval, 6);
+    TestEqual(TEXT("the gym still bosses every 12"), Gym.BossWaveInterval, 12);
+    TestFalse(TEXT("and the gym is not a rift"), Gym.bRiftInstance);
+    return true;
+}
+
 #endif
