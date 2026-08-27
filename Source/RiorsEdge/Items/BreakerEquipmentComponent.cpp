@@ -1,5 +1,8 @@
 #include "Items/BreakerEquipmentComponent.h"
 
+#include "Items/BreakerItemRequirements.h"
+#include "Progression/BreakerProgressionComponent.h"
+
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Attributes/BreakerAttributeSet.h"
@@ -472,6 +475,26 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
     if (!HasAttributeAuthority()) return false;
     const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
     if (Index == INDEX_NONE) return false;
+    // The One-AA gate, at the player-facing entry and NOT inside EquipItem
+    // (the mechanism stays ungated for the systems and rigs that compose
+    // loadouts directly). A character the component cannot find a level for
+    // REFUSES rather than passes — a gate that passes on missing data is a
+    // silent bypass waiting for the day a component goes missing in the real
+    // game, which is One-AA's own warning.
+    const UBreakerProgressionComponent* Progression = GetOwner()
+        ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("EquipFromBackpack refused: no progression component to read a character level from (the gate refuses rather than passes on missing data)."));
+        return false;
+    }
+    const int32 CharacterLevel = Progression->GetProgressionState().CharacterLevel;
+    if (!BreakerItemRequirements::CanEquipAtLevel(Backpack[Index].ItemLevel, CharacterLevel))
+    {
+        UE_LOG(LogTemp, Display, TEXT("EquipFromBackpack refused: item level %d requires character level %d, character is %d (One-AA)."),
+            Backpack[Index].ItemLevel, BreakerItemRequirements::RequiredLevelFor(Backpack[Index].ItemLevel), CharacterLevel);
+        return false;
+    }
     const FBreakerItemInstance Item = Backpack[Index];
     Backpack.RemoveAt(Index);
     return EquipItem(Item);
