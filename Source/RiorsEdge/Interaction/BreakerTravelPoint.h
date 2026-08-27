@@ -70,6 +70,26 @@ public:
     UFUNCTION(BlueprintPure, Category="Travel") float GetInteractionRange() const { return InteractionRange; }
     UFUNCTION(BlueprintPure, Category="Travel") FText GetPromptLabel() const { return PromptLabel; }
 
+    // --- PUBLISHED: what a travel point CALLS ITSELF ----------------------
+    // Owner GROUND, consumer GLASS. The overhead label was a literal "TRAVEL"
+    // drawn over an "F TRAVEL" prompt, so the first new interactable in the
+    // world said two different things about itself, one of them redundant.
+    // The NPC idiom is the right one: a noun over the verb.
+    //
+    // VIRTUAL, so a door names the place it opens rather than its own kind —
+    // the same dispatch that lets a rift door be a travel point at all. The
+    // base returns its prompt's noun because a general gate IS travel; there
+    // is no better name for it than what it does.
+    UFUNCTION(BlueprintPure, Category="Travel")
+    virtual FText GetDisplayName() const { return PromptLabel; }
+
+    // The second line, empty on a general gate. A rift door fills it with its
+    // own difficulty — "AREA 23" means level-23 content now that the required
+    // level derives from item level, so this one number is the whole gauge.
+    // GROUND owns the number; GLASS decides how it draws.
+    UFUNCTION(BlueprintPure, Category="Travel")
+    virtual FText GetDisplayDetail() const { return FText::GetEmpty(); }
+
     // Enabled destinations only, in registry order. The UI iterates this
     // instead of the raw registry so an absent/disabled destination can never
     // render as a choice.

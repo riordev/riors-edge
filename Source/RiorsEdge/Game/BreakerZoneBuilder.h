@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Game/BreakerCoverRegistry.h"
+// For FBreakerRiftDefinition: a yard authors the rift its door opens.
+#include "Game/BreakerRiftDefinition.h"
 #include "BreakerZoneBuilder.generated.h"
 
 class UWorld;
@@ -143,7 +145,42 @@ public:
     // the yard's line breaks are authored standalone rather than generated in
     // cluster rings.
     static TArray<FBreakerCoverPiece> BuildCoverPieces(const TArray<FBreakerZonePiece>& Pieces,
+        const FBreakerZoneMarkers& Markers, FName Yard = NAME_None);
+
+    // WHICH YARD A PIECE BELONGS TO, decided by GEOMETRY rather than by a
+    // naming convention. The marker contract carries yard names because a
+    // marker means nothing without one; a wall does not need to be told which
+    // room it is in, it is in the room it stands in. Nearest anchor wins —
+    // unambiguous for yards that are separate places, which is what the
+    // connection rule's length ceiling guarantees they are.
+    static FName YardForPoint(const FBreakerZoneMarkers& Markers, const FVector& Point);
+
+    // The frame a yard's grammar is measured in: origin at its anchor (the
+    // player start for the entry yard, the yard marker for any other), forward
+    // toward that yard's own rift. Derived, never assumed — so a re-export that
+    // rotates a yard carries its grammar with it.
+    static bool YardFrame(const FBreakerZoneMarkers& Markers, FName Yard,
+        FVector2D& OutOrigin, FVector2D& OutForward);
+
+    // Every yard in the zone, as measured fields ready for IsZoneLegal.
+    static TArray<FBreakerZoneField> BuildZoneFields(const TArray<FBreakerZonePiece>& Pieces,
         const FBreakerZoneMarkers& Markers);
+
+    // The seams between them. Authored here rather than composed, because a
+    // connection's terms (mouth, length, sight) are properties of a DESIGN
+    // decision that the geometry then honours — the same division as
+    // FernhallFieldParams, which authors a band the composer builds to.
+    static TArray<FBreakerZoneConnection> FernhallConnections();
+
+    // THE RIFT A YARD'S DOOR OPENS, authored per yard. The level was a literal
+    // in the game mode and every door would have carried it; with two yards
+    // that is two doors claiming to be the same place at the same difficulty.
+    //
+    // AREA LEVEL IS THE WHOLE DIFFICULTY GAUGE (One-AA): the required level
+    // derives from item level rather than being stored, so "AREA 23" means
+    // level-23 content and there is no second number to show. Authored here
+    // beside the yard it belongs to, O2 PLACEHOLDER, and the door publishes it.
+    static FBreakerRiftDefinition FernhallRiftFor(FName Yard);
 
     // The grammar params the yard is measured against. Band and exclusions are
     // the yard's own (combat band 14-89 m out from the start marker, entry
@@ -151,7 +188,10 @@ public:
     // gym-specific exclusion is parked out of range rather than zeroed, so a
     // future copy-paste cannot inherit a gym rectangle that happens to overlap
     // this yard. All O2 PLACEHOLDER.
-    static FBreakerCoverFieldParams FernhallFieldParams();
+    // Per yard. Both yards share dimensions today because sizes stay near the
+    // walked one until one has been walked; the parameter exists so that stops
+    // being an assumption the moment it stops being true.
+    static FBreakerCoverFieldParams FernhallFieldParams(FName Yard = NAME_None);
 
     // Assembles the yard: spawns every non-marker piece at identity, returns
     // the marker transforms for the game mode to place the player, the rift

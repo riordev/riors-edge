@@ -271,29 +271,163 @@ bool UBreakerZoneBuilder::ExtractMarkers(const TArray<FBreakerZonePiece>& Pieces
     return true;
 }
 
-TArray<FBreakerCoverPiece> UBreakerZoneBuilder::BuildCoverPieces(const TArray<FBreakerZonePiece>& Pieces,
+FName UBreakerZoneBuilder::YardForPoint(const FBreakerZoneMarkers& Markers, const FVector& Point)
+{
+    // A PIECE IS IN THE YARD WHOSE BAND CONTAINS IT, tested in that yard's own
+    // frame. The first version of this took the nearest ANCHOR and was wrong
+    // for a reason worth keeping: anchors sit at a yard's EDGE — the player
+    // start at the entry yard's mouth, the yard marker at the substation's —
+    // so the entry yard's far cover is nearer the NEXT yard's anchor than its
+    // own. Six of sixteen pieces changed rooms, and the per-yard count caught
+    // it. Nearest-anything is a proxy; the band is the actual question.
+    FName Best = NAME_None;
+    double BestDistanceSq = TNumericLimits<double>::Max();
+    bool bFoundContaining = false;
+
+    for (const FBreakerZoneMarker& Marker : Markers.All)
+    {
+        // Only the two roles that ANCHOR a yard. A rift or a giver sits IN a
+        // yard and cannot define one.
+        if (Marker.Role != EBreakerZoneMarkerRole::PlayerStart
+            && Marker.Role != EBreakerZoneMarkerRole::Yard)
+        {
+            continue;
+        }
+
+        FVector2D Origin;
+        FVector2D Forward;
+        if (!YardFrame(Markers, Marker.Yard, Origin, Forward)) continue;
+        const FVector2D Right(-Forward.Y, Forward.X);
+        const FVector2D Offset = FVector2D(Point.X, Point.Y) - Origin;
+        const double Fwd = FVector2D::DotProduct(Offset, Forward);
+        const double Rgt = FVector2D::DotProduct(Offset, Right);
+
+        const FBreakerCoverFieldParams Params = FernhallFieldParams(Marker.Yard);
+        if (Fwd >= Params.BandNearCm && Fwd <= Params.BandFarCm
+            && FMath::Abs(Rgt) <= Params.BandHalfWidthCm)
+        {
+            return Marker.Yard;
+        }
+
+        // Not in any band yet: remember the nearest yard CENTRE, so a piece
+        // outside every band (dressing, a wall, a piece just past an edge)
+        // still lands somewhere defensible rather than nowhere.
+        if (!bFoundContaining)
+        {
+            const FVector2D Centre = Origin + Forward * (0.5 * (Params.BandNearCm + Params.BandFarCm));
+            const double DistanceSq = FVector2D::DistSquared(FVector2D(Point.X, Point.Y), Centre);
+            if (DistanceSq < BestDistanceSq)
+            {
+                BestDistanceSq = DistanceSq;
+                Best = Marker.Yard;
+            }
+        }
+    }
+    return Best;
+}
+
+bool UBreakerZoneBuilder::YardFrame(const FBreakerZoneMarkers& Markers, FName Yard,
+    FVector2D& OutOrigin, FVector2D& OutForward)
+{
+    const FBreakerZoneMarker* Anchor = Yard.IsNone()
+        ? Markers.Find(EBreakerZoneMarkerRole::PlayerStart)
+        : Markers.Find(EBreakerZoneMarkerRole::Yard, Yard);
+    if (!Anchor) return false;
+
+    OutOrigin = FVector2D(Anchor->Location.X, Anchor->Location.Y);
+    // Forward is what this yard POINTS AT, which is its own rift. A yard with
+    // no rift keeps +X, the same fallback the entry yard has always had.
+    const FBreakerZoneMarker* Rift = Markers.Find(EBreakerZoneMarkerRole::Rift, Yard);
+    OutForward = Rift
+        ? FVector2D(Rift->Location.X, Rift->Location.Y) - OutOrigin
+        : FVector2D::ZeroVector;
+    if (!OutForward.Normalize()) OutForward = FVector2D(1.0f, 0.0f);
+    return true;
+}
+
+TArray<FBreakerZoneField> UBreakerZoneBuilder::BuildZoneFields(const TArray<FBreakerZonePiece>& Pieces,
     const FBreakerZoneMarkers& Markers)
+{
+    TArray<FBreakerZoneField> Fields;
+    for (const FBreakerZoneMarker& Marker : Markers.All)
+    {
+        if (Marker.Role != EBreakerZoneMarkerRole::PlayerStart
+            && Marker.Role != EBreakerZoneMarkerRole::Yard)
+        {
+            continue;
+        }
+        FBreakerZoneField& Field = Fields.AddDefaulted_GetRef();
+        Field.Yard = Marker.Yard;
+        Field.Params = FernhallFieldParams(Marker.Yard);
+        Field.Pieces = BuildCoverPieces(Pieces, Markers, Marker.Yard);
+    }
+    return Fields;
+}
+
+FBreakerRiftDefinition UBreakerZoneBuilder::FernhallRiftFor(FName Yard)
+{
+    FBreakerRiftDefinition Rift;
+    // Campaign, both of them: O122 makes a campaign rift free to enter and O82
+    // makes respawn unlimited inside it. Consumable endgame rifts arrive with
+    // their own entry cost and are not authored here.
+    Rift.Tier = EBreakerRiftTier::Campaign;
+
+    if (Yard == FName(TEXT("substation")))
+    {
+        Rift.AreaName = FText::FromString(TEXT("Substation Undercroft"));
+        Rift.AreaLine = FText::FromString(
+            TEXT("Below the transformer yard, where the rift went looking for power."));
+        // DEEPER THAN THE ENTRY YARD'S, because it is further from the door the
+        // player arrives at — a yard reached through another yard is content
+        // they have walked to. The GAP between the two is the thing being
+        // authored; both magnitudes are O2 PLACEHOLDER.
+        Rift.AreaLevel = 9;   // O2 PLACEHOLDER
+        return Rift;
+    }
+
+    Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
+    Rift.AreaLine = FText::FromString(
+        TEXT("The tear under the substation, where the yard stops being quiet."));
+    Rift.AreaLevel = 5;   // O2 PLACEHOLDER
+    return Rift;
+}
+
+TArray<FBreakerZoneConnection> UBreakerZoneBuilder::FernhallConnections()
+{
+    TArray<FBreakerZoneConnection> Out;
+
+    // THE FIRST SEAM IN THE WORLD. A dog-leg east then north, so nothing at
+    // either mouth can see the other: no-through-sight is the term O1 forces,
+    // because a straight seam lets a ranged enemy in the far yard hold a player
+    // whose cover was never laid for that angle.
+    //
+    // Every magnitude is O2 PLACEHOLDER and matches what the composer built:
+    // a 10 m mouth under the 12 m ceiling, and 29 m walked under the 30 m one.
+    // The geometry honours these numbers; it does not derive them.
+    FBreakerZoneConnection& Seam = Out.AddDefaulted_GetRef();
+    Seam.Name = FName(TEXT("plaza-substation"));
+    Seam.FromYard = NAME_None;
+    Seam.ToYard = FName(TEXT("substation"));
+    Seam.MouthWidthCm = 1000.0f;   // O2 PLACEHOLDER
+    Seam.LengthCm = 2900.0f;   // O2 PLACEHOLDER
+    Seam.bThroughSight = false;
+    return Out;
+}
+
+TArray<FBreakerCoverPiece> UBreakerZoneBuilder::BuildCoverPieces(const TArray<FBreakerZonePiece>& Pieces,
+    const FBreakerZoneMarkers& Markers, FName Yard)
 {
     TArray<FBreakerCoverPiece> Cover;
     // Field frame: origin at the player start, forward toward the rift. The
     // frame is DERIVED from the markers rather than assumed to be +X, so a
     // re-export that rotates the yard moves the frame with it and the grammar
     // numbers stay true.
-    // THE ENTRY YARD'S frame, explicitly. With one yard this is the zone's
-    // frame; with several it is the arrival yard's, and per-yard frames are
-    // the grammar split's job (Q3), not this one's. Named here so the
-    // single-yard assumption is visible rather than inherited.
-    const FBreakerZoneMarker* StartMarker = Markers.Find(EBreakerZoneMarkerRole::PlayerStart);
-    if (!StartMarker) return Cover;
-    const FBreakerZoneMarker* RiftMarker = Markers.Find(EBreakerZoneMarkerRole::Rift);
-
-    const FVector2D Start(StartMarker->Location.X, StartMarker->Location.Y);
-    // A yard with no rift door keeps a frame: forward falls back to +X, which
-    // is what the Normalize guard below already did for a degenerate pair.
-    FVector2D Forward = RiftMarker
-        ? FVector2D(RiftMarker->Location.X, RiftMarker->Location.Y) - Start
-        : FVector2D::ZeroVector;
-    if (!Forward.Normalize()) Forward = FVector2D(1.0f, 0.0f);
+    // THIS YARD'S frame, and only this yard's pieces. The single-yard
+    // assumption that used to live here is gone: a zone is a list of yards,
+    // each measured in a frame anchored where it was authored.
+    FVector2D Start;
+    FVector2D Forward;
+    if (!YardFrame(Markers, Yard, Start, Forward)) return Cover;
     const FVector2D Right(-Forward.Y, Forward.X);
 
     int32 ClusterIndex = 0;
@@ -302,6 +436,8 @@ TArray<FBreakerCoverPiece> UBreakerZoneBuilder::BuildCoverPieces(const TArray<FB
         const bool bFull = BreakerZoneNameHasPrefix(Piece.Name, TEXT("blk_full_"));
         const bool bChest = BreakerZoneNameHasPrefix(Piece.Name, TEXT("blk_chest_"));
         if (!bFull && !bChest) continue;
+        // A piece is in the room it stands in.
+        if (YardForPoint(Markers, Piece.Origin) != Yard) continue;
         const FVector2D Offset = FVector2D(Piece.Origin.X, Piece.Origin.Y) - Start;
         FBreakerCoverPiece& Out = Cover.AddDefaulted_GetRef();
         Out.Forward = FVector2D::DotProduct(Offset, Forward);
@@ -316,8 +452,13 @@ TArray<FBreakerCoverPiece> UBreakerZoneBuilder::BuildCoverPieces(const TArray<FB
     return Cover;
 }
 
-FBreakerCoverFieldParams UBreakerZoneBuilder::FernhallFieldParams()
+FBreakerCoverFieldParams UBreakerZoneBuilder::FernhallFieldParams(FName Yard)
 {
+    // Both yards are the same size and answer to the same band, so the
+    // parameter changes nothing today. It exists because the alternative is a
+    // single function every yard silently shares, which is exactly how one
+    // place's dimensions end up measuring another's.
+    (void)Yard;
     FBreakerCoverFieldParams Params;
     // The yard's combat band, in its own field frame (start marker at X 6 m of
     // a 0-101 m yard, so 1400 cm forward is the 20 m line). The entry plaza

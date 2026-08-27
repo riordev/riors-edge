@@ -66,5 +66,25 @@ public:
     // ever gives one an ordinary destination.
     virtual bool SelectDestination(FName DestinationId, APawn* RequestingPawn) override;
 
+    // A DOOR NAMES THE PLACE IT OPENS, not its own kind. "Fernhall Substation"
+    // over "F ENTER RIFT" is the NPC idiom; "TRAVEL" over "F ENTER RIFT" was
+    // one object saying two things about itself.
+    virtual FText GetDisplayName() const override
+    {
+        return Rift.AreaName.IsEmpty() ? Super::GetDisplayName() : Rift.AreaName;
+    }
+
+    // THE WHOLE DIFFICULTY GAUGE IN ONE NUMBER. The required level derives from
+    // item level rather than being stored (One-AA), so a rift's area level IS
+    // what "level 23 content" means — there is no second figure to show and no
+    // gate to read it against. Empty when unset, because a door with no rift on
+    // it should say nothing rather than "AREA 0".
+    virtual FText GetDisplayDetail() const override
+    {
+        return Rift.IsSet()
+            ? FText::FromString(FString::Printf(TEXT("AREA %d"), Rift.EffectiveAreaLevel()))
+            : FText::GetEmpty();
+    }
+
     FBreakerRiftEntryRequested OnRiftEntryRequested;
 };

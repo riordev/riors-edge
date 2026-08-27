@@ -24,7 +24,7 @@ GLB = os.path.normpath(os.path.join(PROJECT_DIR, "Assets", "zones", "fernhall_ya
 DEST = "/Game/Breaker/Meshes/fernhall_yard"
 MAP_PACKAGE = "/Game/Breaker/Maps/Lvl_Fernhall"
 
-EXPECTED_TOTAL = 58
+EXPECTED_TOTAL = 113
 SOLID_PREFIXES = ("blk_full_", "blk_chest_", "wall_", "flr_")
 
 # THE MARKER CONTRACT, PARSED — not a fixed list of three names. This used to
@@ -62,6 +62,18 @@ def parse_marker(name):
     return (best, rest[len(best) + 1:] if len(rest) > len(best) else "")
 
 
+# The names the export actually contains. Read from the GLB itself so the prune
+# below compares against the SOURCE rather than against whatever happened to be
+# in the destination folder.
+def read_scene_names(path):
+    import json, struct
+    with open(path, "rb") as handle:
+        data = handle.read()
+    # glTF-Binary: 12-byte header, then chunks; the first chunk is the JSON.
+    length = struct.unpack_from("<I", data, 12)[0]
+    doc = json.loads(data[20:20 + length].decode("utf-8"))
+    return set(n.get("name") for n in doc.get("nodes", []) if n.get("name"))
+
 if not os.path.isfile(GLB):
     raise RuntimeError("[Fernhall] source GLB missing: %s (run Scripts/compose_fernhall.py)" % GLB)
 
@@ -76,6 +88,9 @@ else:
 
 # ---- The meshes. Reimport in place on re-run. ------------------------------
 task = unreal.AssetImportTask()
+scene_names = read_scene_names(GLB)
+unreal.log("[Fernhall] export contains %d named nodes." % len(scene_names))
+
 task.filename = GLB
 task.destination_path = DEST
 task.automated = True
@@ -121,6 +136,25 @@ if len(starts) != 1:
                        % (len(starts), sorted(parsed)))
 
 unreal.log("[Fernhall] markers: %s" % sorted("%s@%s" % (r, y or "entry") for (r, y) in parsed))
+
+# ---- PRUNE WHAT THE EXPORT NO LONGER CONTAINS ------------------------------
+# A re-import ADDS and OVERWRITES; it does not remove. So a piece that was
+# RENAMED or SPLIT leaves its old asset behind, and UBreakerZoneBuilder spawns
+# everything in this folder — which means the stale mesh still stands in the
+# world. Splitting wall_e into wall_e_s and wall_e_n left the original slab
+# sitting across the seam's mouth, silently closing a connection that had just
+# been authored. The count check below noticed; nothing else would have.
+#
+# The GLB is the authority: this folder is its projection, not a place assets
+# accumulate.
+exported = set(scene_names)
+stale = sorted(n for n in meshes if n not in exported)
+for name in stale:
+    package = str(meshes[name].package_name)
+    unreal.log_warning("[Fernhall] pruning %s: no longer in the export." % name)
+    unreal.EditorAssetLibrary.delete_asset(package)
+if stale:
+    meshes = {n: d for n, d in meshes.items() if n not in stale}
 if len(meshes) != EXPECTED_TOTAL:
     unreal.log_warning("[Fernhall] expected %d static meshes, imported %d"
                        % (EXPECTED_TOTAL, len(meshes)))

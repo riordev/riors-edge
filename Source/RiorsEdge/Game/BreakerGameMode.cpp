@@ -536,23 +536,11 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
                     FTransform(Approach.IsNearlyZero() ? FRotator::ZeroRotator : Approach.Rotation(), DoorAt));
                 if (!Door) continue;
 
-                // WHICH RIFT THIS DOOR OPENS. Authored here rather than on the
-                // actor's defaults because the zone owns its own rift: the
-                // name and line are the plate's own (FBreakerRiftDefinition's
-                // Fernhall Substation), so the travel list, the deployment
-                // briefing and the door all speak one name.
-                //
-                // Tier is Campaign, which is what makes entry free (O122) and
-                // respawn unlimited (O82). AreaLevel is O2 PLACEHOLDER — the
-                // first rift the player can reach is an early one, and nothing
-                // has measured what "early" is worth yet. Per-yard rift
-                // authoring arrives with the yards; one definition is correct
-                // while there is one door.
-                Door->Rift.AreaName = FText::FromString(TEXT("Fernhall Substation"));
-                Door->Rift.AreaLine = FText::FromString(
-                    TEXT("The tear under the substation, where the yard stops being quiet."));
-                Door->Rift.AreaLevel = 5;   // O2 PLACEHOLDER
-                Door->Rift.Tier = EBreakerRiftTier::Campaign;
+                // WHICH RIFT THIS DOOR OPENS, authored beside the yard it
+                // belongs to rather than as a literal here. Two yards means
+                // two doors, and a literal would have made both of them the
+                // same place at the same difficulty.
+                Door->Rift = UBreakerZoneBuilder::FernhallRiftFor(RiftMarker.Yard);
                 Door->OnRiftEntryRequested.AddUObject(this, &ABreakerGameMode::HandleRiftEntryRequested);
             }
         }

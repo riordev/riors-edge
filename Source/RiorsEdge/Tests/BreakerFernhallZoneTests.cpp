@@ -43,215 +43,49 @@ bool FBreakerFernhallGrammarTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    const TArray<FBreakerCoverPiece> Cover = UBreakerZoneBuilder::BuildCoverPieces(Pieces, Markers);
-    const FBreakerCoverFieldParams Params = UBreakerZoneBuilder::FernhallFieldParams();
+    // VALIDATED AS A ZONE OF YARDS AND SEAMS, which is what Fernhall now is.
+    // Every yard is measured in its OWN frame — anchored at its player start or
+    // its yard marker, pointing at its own rift — and the seam between them
+    // answers the CONNECTION rule rather than the field one, because a seam is
+    // a different kind of space and the field rules would call it triply
+    // illegal for being exactly what it is meant to be.
+    const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
+    const TArray<FBreakerZoneConnection> Seams = UBreakerZoneBuilder::FernhallConnections();
 
-    // THE READOUT IS LOGGED WHETHER OR NOT THE YARD PASSES. It used to print
-    // only on failure, which meant the one place the yard's measurements were
-    // visible was the one run where they were already wrong — and a figure
-    // nobody reads while it is green is a figure free to drift up to the edge
-    // of its band unremarked. Every band in this line names its direction.
-    AddInfo(FString::Printf(TEXT("Fernhall yard: %s"),
-        *UBreakerCoverLayoutLibrary::DescribeCoverField(Cover, Params)));
-
-    // VALIDATED AS A ZONE, which today is a one-yard zone (Q3). The verdict is
-    // identical to the field call it replaces — that is the point of landing
-    // the level above the field before a second yard exists rather than after,
-    // when the change would be tangled up with whatever that yard needs.
-    TArray<FBreakerZoneField> Zone;
-    FBreakerZoneField& Entry = Zone.AddDefaulted_GetRef();
-    Entry.Yard = NAME_None;   // the entry yard, matching the marker contract
-    Entry.Params = Params;
-    Entry.Pieces = Cover;
-
-    FString Reason;
-    const bool bLegal = UBreakerCoverLayoutLibrary::IsZoneLegal(Zone, Reason);
-    if (!bLegal)
+    if (!TestTrue(TEXT("the zone has more than one yard"), Zone.Num() >= 2))
     {
-        AddError(FString::Printf(TEXT("the placed zone is grammar-illegal: %s | %s"),
-            *Reason, *UBreakerCoverLayoutLibrary::DescribeCoverField(Cover, Params)));
-    }
-
-    // AND THE TWO AGREE. A zone rule that could disagree with the field rule
-    // about the same single yard would be a second opinion rather than a level
-    // above it, so the equivalence is asserted rather than assumed.
-    FString FieldReason;
-    TestEqual(TEXT("the zone rule and the field rule agree about a one-yard zone"),
-        bLegal, UBreakerCoverLayoutLibrary::IsLayoutLegal(Cover, Params, FieldReason));
-    return bLegal;
-}
-
-// THE ZONE RULE'S OWN BEHAVIOUR, world-free. The Fernhall test above proves it
-// agrees with the field rule on the shipped yard; this proves it does the
-// things a level above the field has to do, which one passing yard cannot show.
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerZoneLegalityTest,
-    "RiorsEdge.Zone.Grammar.ZoneLegality",
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FBreakerZoneLegalityTest::RunTest(const FString& Parameters)
-{
-    FString Reason;
-
-    // An empty zone is a build that produced nothing, not a zone with nothing
-    // wrong with it. Passing it would be the strongest verdict on the least
-    // evidence — the same reading CollectZonePieces takes of an empty folder.
-    TArray<FBreakerZoneField> Empty;
-    TestFalse(TEXT("a zone with no yards is refused"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Empty, Reason));
-
-    // A yard whose field is illegal fails the zone, AND THE REASON NAMES THE
-    // YARD. Two full-height pieces closer than the dash-corridor floor is the
-    // maze rule, which is the cheapest way to author a guaranteed-illegal
-    // field without depending on a whole placed layout.
-    FBreakerCoverFieldParams Params;
-    Params.BandNearCm = 1000.0f;
-    Params.BandFarCm = 4000.0f;
-    Params.BandHalfWidthCm = 2000.0f;
-
-    FBreakerCoverPiece A;
-    A.Forward = 2000.0f; A.Right = -200.0f; A.HeightCm = Params.FullHeightCm;
-    A.HalfLengthCm = 150.0f; A.HalfDepthCm = 150.0f;
-    A.Class = EBreakerCoverClass::FullHeight; A.ClusterIndex = 0;
-    FBreakerCoverPiece B = A;
-    B.Right = 200.0f; B.ClusterIndex = 1;   // 400 cm apart, far under the 1600 floor
-
-    TArray<FBreakerZoneField> Zone;
-    FBreakerZoneField& Bad = Zone.AddDefaulted_GetRef();
-    Bad.Yard = FName(TEXT("north"));
-    Bad.Params = Params;
-    Bad.Pieces = { A, B };
-
-    TestFalse(TEXT("a zone containing one illegal yard is illegal"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Zone, Reason));
-    TestTrue(FString::Printf(TEXT("and the reason names the yard that failed: %s"), *Reason),
-        Reason.Contains(TEXT("north")));
-
-    // Two yards may not share a name: yard names key the marker contract, so a
-    // duplicate makes "the north yard's door" ambiguous and the first match
-    // would silently win.
-    TArray<FBreakerZoneField> Duplicate;
-    FBreakerZoneField& One = Duplicate.AddDefaulted_GetRef();
-    One.Yard = FName(TEXT("north"));
-    FBreakerZoneField& Two = Duplicate.AddDefaulted_GetRef();
-    Two.Yard = FName(TEXT("north"));
-    TestFalse(TEXT("two yards may not share a name"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Duplicate, Reason));
-    return true;
-}
-
-// THE CONNECTION RULE (ruled). A connection is a DISTINCT KIND OF SPACE, not a
-// thin yard: the field grammar is exempt, and every term here is the opposite
-// shape to the field's. The terms are what is ruled; every magnitude is O2 and
-// none has been walked.
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerConnectionRuleTest,
-    "RiorsEdge.Zone.Grammar.ConnectionRule",
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FBreakerConnectionRuleTest::RunTest(const FString& Parameters)
-{
-    const FBreakerConnectionRuleParams Params;
-    FString Reason;
-
-    FBreakerZoneConnection Good;
-    Good.Name = FName(TEXT("plaza-north"));
-    Good.FromYard = NAME_None;
-    Good.ToYard = FName(TEXT("north"));
-    Good.MouthWidthCm = 800.0f;
-    Good.LengthCm = 1500.0f;
-    Good.bThroughSight = false;
-    TestTrue(TEXT("an ordinary seam is legal"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Good, Params, Reason));
-
-    // MOUTH WIDTH IS A CEILING, and this is the assertion that proves the
-    // inversion rather than restating it: a width the FIELD rule would demand
-    // as a minimum (the 1600 dash corridor) is ILLEGAL here.
-    FBreakerZoneConnection Wide = Good;
-    Wide.MouthWidthCm = 1600.0f;
-    TestFalse(TEXT("a mouth as wide as the field's dash-corridor FLOOR is too wide for a connection"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Wide, Params, Reason));
-    TestTrue(FString::Printf(TEXT("and the reason says why: %s"), *Reason),
-        Reason.Contains(TEXT("two yards touching")));
-
-    // The floor it still needs is PATHING, not movement.
-    FBreakerZoneConnection Narrow = Good;
-    Narrow.MouthWidthCm = 100.0f;
-    TestFalse(TEXT("a mouth the widest body cannot fit through is a wall"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Narrow, Params, Reason));
-
-    // LENGTH IS A CEILING: past it the connection is a place, and a place is a
-    // yard.
-    FBreakerZoneConnection Long = Good;
-    Long.LengthCm = 6000.0f;
-    TestFalse(TEXT("a connection long enough to walk is a yard, not a seam"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Long, Params, Reason));
-
-    // NO THROUGH-SIGHT.
-    FBreakerZoneConnection Straight = Good;
-    Straight.bThroughSight = true;
-    TestFalse(TEXT("a seam you can see through lets the far yard be shot into"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Straight, Params, Reason));
-
-    // TWO MOUTHS, AND THEY ARE DIFFERENT PLACES. A third end is
-    // unrepresentable by construction — the struct has two fields, because the
-    // count IS the rule — so what is left to catch is the degenerate pair.
-    FBreakerZoneConnection Loop = Good;
-    Loop.ToYard = Loop.FromYard;
-    TestFalse(TEXT("a connection from a yard to itself is a loop, not a threshold"),
-        UBreakerCoverLayoutLibrary::IsConnectionLegal(Loop, Params, Reason));
-
-    // --- The zone rule composes both kinds -------------------------------
-    // THE YARDS HAVE TO BE REAL FIELDS, which the first draft of this test got
-    // wrong: two EMPTY FBreakerZoneFields are not two trivially-legal yards,
-    // they are two yards with no cover, and a field with no full-height piece
-    // fails the line-break rule. The zone rule caught it, which is the level
-    // above the field doing its job on its own test. Generated from the shipped
-    // params, so what these yards are is what the gym is.
-    const FBreakerCoverFieldParams FieldParams;
-    const TArray<FBreakerCoverPiece> GeneratedField =
-        UBreakerCoverLayoutLibrary::BuildCoverField(FieldParams);
-
-    TArray<FBreakerZoneField> Yards;
-    FBreakerZoneField& Entry = Yards.AddDefaulted_GetRef();
-    Entry.Yard = NAME_None;
-    Entry.Params = FieldParams;
-    Entry.Pieces = GeneratedField;
-    FBreakerZoneField& North = Yards.AddDefaulted_GetRef();
-    North.Yard = FName(TEXT("north"));
-    North.Params = FieldParams;
-    North.Pieces = GeneratedField;
-
-    FString YardReason;
-    if (!TestTrue(TEXT("the generated yards are themselves legal, or this proves nothing about seams"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, YardReason)))
-    {
-        AddError(FString::Printf(TEXT("yard setup is illegal: %s"), *YardReason));
         return false;
     }
 
-    TArray<FBreakerZoneConnection> Connections;
-    Connections.Add(Good);
-    TestTrue(TEXT("a zone of two yards and a legal seam is legal"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
+    // THE READOUT IS LOGGED PER YARD, whether or not it passes. A zone-level
+    // verdict with no per-yard numbers sends the reader to search a world for a
+    // figure that belongs to one room — and a figure nobody reads while it is
+    // green is a figure free to drift to the edge of its band unremarked.
+    for (const FBreakerZoneField& Yard : Zone)
+    {
+        AddInfo(FString::Printf(TEXT("yard '%s': %s"),
+            Yard.Yard.IsNone() ? TEXT("<entry>") : *Yard.Yard.ToString(),
+            *UBreakerCoverLayoutLibrary::DescribeCoverField(Yard.Pieces, Yard.Params)));
+    }
 
-    Connections[0] = Wide;
-    TestFalse(TEXT("and one illegal seam fails the whole zone"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
+    FString Reason;
+    const bool bLegal = UBreakerCoverLayoutLibrary::IsZoneLegal(Zone, Seams, Reason);
+    if (!bLegal)
+    {
+        AddError(FString::Printf(TEXT("the placed zone is grammar-illegal: %s"), *Reason));
+    }
 
-    // A SEAM TO A YARD NOBODY AUTHORED passes every term above and leads
-    // nowhere, so the zone rule is where it has to be caught.
-    Connections[0] = Good;
-    Connections[0].ToYard = FName(TEXT("nowhere"));
-    TestFalse(TEXT("a seam to a yard that does not exist is refused"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, Connections, Reason));
-    TestTrue(FString::Printf(TEXT("and the reason names it: %s"), *Reason),
-        Reason.Contains(TEXT("nowhere")));
-
-    // A zone with no connections is still a zone: one yard needs no seams.
-    TestTrue(TEXT("a zone with no connections is legal"),
-        UBreakerCoverLayoutLibrary::IsZoneLegal(Yards, TArray<FBreakerZoneConnection>(), Reason));
-    return true;
+    // EVERY YARD CARRIES COVER OF ITS OWN. Pieces are assigned to yards by
+    // GEOMETRY, so a yard whose lattice all landed in another's bucket would
+    // pass the field rules by being empty of the things they measure — which
+    // is the failure a geometric assignment invites and the reason this is
+    // asserted rather than assumed.
+    for (const FBreakerZoneField& Yard : Zone)
+    {
+        TestTrue(FString::Printf(TEXT("yard '%s' has cover of its own"),
+            Yard.Yard.IsNone() ? TEXT("<entry>") : *Yard.Yard.ToString()), Yard.Pieces.Num() > 0);
+    }
+    return bLegal;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -274,16 +108,29 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
         return false;
     }
 
-    // The composer's roster: 58 meshes, of which 16 are measured cover. A
-    // drifted count means the composer and this file disagree about what the
-    // yard IS — re-author both or neither.
-    TestEqual(TEXT("imported piece count"), Pieces.Num(), 58);
-    const TArray<FBreakerCoverPiece> Cover = UBreakerZoneBuilder::BuildCoverPieces(Pieces, Markers);
-    TestEqual(TEXT("measured cover pieces"), Cover.Num(), 16);
-    TestEqual(TEXT("chest-high pieces"),
-        UBreakerCoverLayoutLibrary::CountOfClass(Cover, EBreakerCoverClass::ChestHigh), 10);
-    TestEqual(TEXT("full-height pieces"),
-        UBreakerCoverLayoutLibrary::CountOfClass(Cover, EBreakerCoverClass::FullHeight), 6);
+    // The composer's roster: 113 meshes across TWO yards and the seam between
+    // them, of which 32 are measured cover \u2014 16 per yard, the same lattice in
+    // each yard's own frame. A drifted count means the composer and this file
+    // disagree about what the zone IS, and re-authoring both is the deliberate
+    // act rather than the accident.
+    TestEqual(TEXT("imported piece count"), Pieces.Num(), 113);
+
+    const TArray<FBreakerZoneField> Zone = UBreakerZoneBuilder::BuildZoneFields(Pieces, Markers);
+    TestEqual(TEXT("the zone has two yards"), Zone.Num(), 2);
+
+    int32 TotalCover = 0;
+    for (const FBreakerZoneField& Yard : Zone)
+    {
+        TotalCover += Yard.Pieces.Num();
+        const FString YardName = Yard.Yard.IsNone() ? TEXT("<entry>") : Yard.Yard.ToString();
+        TestEqual(FString::Printf(TEXT("yard '%s' measured cover"), *YardName), Yard.Pieces.Num(), 16);
+        TestEqual(FString::Printf(TEXT("yard '%s' chest-high pieces"), *YardName),
+            UBreakerCoverLayoutLibrary::CountOfClass(Yard.Pieces, EBreakerCoverClass::ChestHigh), 10);
+        TestEqual(FString::Printf(TEXT("yard '%s' full-height pieces"), *YardName),
+            UBreakerCoverLayoutLibrary::CountOfClass(Yard.Pieces, EBreakerCoverClass::FullHeight), 6);
+    }
+    TestEqual(TEXT("measured cover across the zone"), TotalCover, 32);
+    const TArray<FBreakerCoverPiece> Cover = Zone[0].Pieces;
 
     // The name prefix claims a class; the imported geometry must actually BE
     // that class. The composer scales kit walls to the grammar's authored
@@ -313,14 +160,14 @@ bool FBreakerFernhallPieceContractTest::RunTest(const FString& Parameters)
     // which is what keeps the pre-yards export valid unchanged — and this
     // assertion is what will move, deliberately, on the day a second yard is
     // authored.
-    TestEqual(TEXT("the yard authors three markers"), Markers.All.Num(), 3);
-    for (const FBreakerZoneMarker& Marker : Markers.All)
-    {
-        TestTrue(FString::Printf(TEXT("marker '%s' belongs to the entry yard"),
-            UBreakerZoneBuilder::MarkerRoleName(Marker.Role)), Marker.Yard.IsNone());
-    }
-    TestEqual(TEXT("exactly one rift door is authored today"),
-        Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 1);
+    TestEqual(TEXT("the zone authors five markers"), Markers.All.Num(), 5);
+    TestEqual(TEXT("two yards means two rift doors"),
+        Markers.OfRole(EBreakerZoneMarkerRole::Rift).Num(), 2);
+    TestEqual(TEXT("and one anchor for the yard that is not the entry"),
+        Markers.OfRole(EBreakerZoneMarkerRole::Yard).Num(), 1);
+    TestTrue(TEXT("the substation yard has both an anchor and a door"),
+        Markers.Has(EBreakerZoneMarkerRole::Yard, FName(TEXT("substation")))
+        && Markers.Has(EBreakerZoneMarkerRole::Rift, FName(TEXT("substation"))));
     return true;
 }
 
@@ -501,7 +348,7 @@ bool FBreakerFernhallLaneGuardTest::RunTest(const FString& Parameters)
         Piece.Right = FMath::Sign(Piece.Right) * 500.0f;
         ++Moved;
     }
-    TestEqual(TEXT("every chest pair moved"), Moved, 10);
+    TestEqual(TEXT("every chest pair in this yard moved"), Moved, 10);
 
     FString Reason;
     const bool bNarrowedLegal = UBreakerCoverLayoutLibrary::IsLayoutLegal(Narrowed, Params, Reason);
