@@ -31,6 +31,20 @@ string is the cheapest gap in the report); the ledge-ladder gym
 geometry proposal is GROUND's. Two questions filed in KIT.md:
 Momentum for traversals (design), and the custom-mode timing.
 Fallback per the queue: extend the recon when idle.
+EXTENSION (post-second-yard, f971193): the substation yard authors
+the first traversal geometry in a live fight space — chest cover
+tops at 120 cm (mantle band) — and dress_mound_sub tops at EXACTLY
+80.0 cm, on VaultMaximumHeightCm itself. That is the THIRD boundary
+coincidence: kerb 45.0 on the step boundary, riser 145 on the
+mantle ceiling, mound 80 on the vault/mantle edge. Every authored
+ledge in the project sits precisely on one of the three band edges,
+so which verb fires is a float coin-flip at all three sites. The
+"vault band is empty" claim survives only as "no UNAMBIGUOUS vault
+geometry exists". The kit's piece sizes and the band edges evidently
+share the same round numbers; the fix is either GROUND nudging
+authored tops off the edges or KIT biasing the band comparisons by
+an epsilon — a shape question for the seat, appended to the report,
+not built.
 
 KIT LANE, THE OVERNIGHT QUEUE'S FIRST THREE (Part Three-H; the
 owner is away and nothing here waited on him). Item 1, FIRST because
