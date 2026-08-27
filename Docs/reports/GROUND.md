@@ -4,29 +4,27 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
-## Yard size and crowd spacing have to be chosen against each other (FIELD's finding)
+## WITHDRAWN: yard size against crowd spacing
 
-FIELD measured a Fernhall-equivalent engaged crowd and reports nearest-neighbour
-spacing of **71 cm mean against a 90 cm body width, with 100 of 111 bodies
-inside one body width of another**. Separation has to move that number, and
-their design answer is steering rather than collision — enemy capsules overlap
-rather than block, so making them block would shell the crowd at 90 cm and it
-would never reach the player, which is a different fight from the one anyone
-designed.
+I asked the seat to rule yard sizes against a spacing figure. **FIELD has
+retracted the arithmetic that question rested on and I am withdrawing it rather
+than leaving the seat to rule on it.**
 
-**The part that lands on this lane: fifty bodies at 150 cm spacing need a 15 m
-circle, which is roughly a third of a Fernhall yard's width.** Spacing is a
-level-design constraint wearing a movement constant, and the two cannot be
-picked separately — a yard sized without it will not hold the crowd the density
-target asks for, and a spacing constant chosen without yard sizes will either
-not fit or not read.
+Their corrected numbers: fifty bodies at 150 cm hex-pack into 97.4 m², an 11.1 m
+circle — not the 15 m I was given — and against a 75 x 40 m combat band that is
+**3.2% by area**. The original "a third of a yard" was a diameter-against-width
+ratio stated as though it were occupancy.
 
-THIS IS LIVE NOW. The second yard is authored this cycle, so sizes are being
-picked — and I am about to author more against whatever is true today.
+At 3% the coupling I claimed does not exist. Spacing is a movement constant at
+the densities Fernhall fields, and it becomes a level-design constraint only for
+line-abreast formations or waves needing a second rank — a converging crowd is
+neither.
 
-- **Question:** rule the yard sizes against a spacing figure rather than
-  before one. I do not need the figure itself — I need the two not to be
-  decided in different rooms.
+The instinct that the two should not be decided in different rooms was fine; the
+number justifying it was not, and a question resting on a retracted figure is
+worse than no question. **Nothing is wanted from the seat here.** The second
+yard was authored at the entry yard's footprint, which is what the earlier
+direction already said.
 
 ## Does the wave budget take a party term? (O133)
 
