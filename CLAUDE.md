@@ -833,7 +833,18 @@ loss-free shape is a roster-driven journaled fold needing the
 character-id payload field, and the design waits on the seat's
 confirmation in Docs/reports/LEDGER.md. Fallback ran: one stale pin
 sentence (the pre-O142 More ratio) caught and corrected by the sweep
-built to catch it. Suite 484 / 3 / 0 at the night's tip. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
+built to catch it. ONE-AB LANDED (O183, 485 / 3 / 0): stash cap
+24 -> 70 as ruled, backpack 25 with the refusal SPLIT BY WHO LOSES
+THE ITEM — refusable entries (pickup, withdrawal) refuse at the cap
+and the item stays put; paid grants land past it, because refusing
+a paid item destroys it. And the race item, taken by LEDGER: the
+wave solve says a rift run is 22 trash + 1 boss — the estimate's
+promoted bodies DO NOT EXIST (elites and carriers unlock at wave 4,
+the run ends at 3), so ~3.2 items a run, 25 fills in ~7.8 runs, the
+elite/modifier-bearing drop chances are unreachable in the player's
+loop, and O27's ModifierBearing bucket is structurally empty in
+rifts — three candidate levers reported, seat's pick, pinned in
+RiftRunDropProfile. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
 hit-time More — x1.30 shared, gated on TargetBandBroken, paid by the
 rider path under the one O34 ceiling (headroom, never a slot; the
 clamp is exact because the window chain already folds into
