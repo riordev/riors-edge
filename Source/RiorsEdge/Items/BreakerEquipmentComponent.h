@@ -35,6 +35,18 @@ public:
     // Moves a backpack item into its slot; whatever was equipped there
     // returns to the backpack.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpack(const FGuid& ItemId);
+
+    // ---- THE STASH's character side (Part One-X) -------------------------
+    // Anchor-only, the RespecAtForge pattern: the caller states where the
+    // player is standing and the rule is enforced here, not in the UI.
+    // Deposit journals in the account file FIRST (the commit point), then
+    // drops the runtime copy; withdrawal claim-marks the stash copy and
+    // gates on the O182 predicate — the second entry in that roster.
+    // Reconciliation lives in RestoreState, so every crash window in the
+    // two-file transfer resolves at the next load. See the journal's own
+    // comment on UBreakerAccountSave for the whole protocol.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Stash") bool DepositToStash(const FGuid& ItemId, bool bAtAnchor);
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment|Stash") bool WithdrawFromStash(const FGuid& ItemId, bool bAtAnchor);
     // Destroys a single backpack item outright. Returns false when the id is
     // not in the backpack (or on a client).
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool DiscardFromBackpack(const FGuid& ItemId);

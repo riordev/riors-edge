@@ -1,6 +1,7 @@
 #include "Items/BreakerEquipmentComponent.h"
 
 #include "Items/BreakerItemRequirements.h"
+#include "Save/BreakerAccountSave.h"
 #include "Progression/BreakerProgressionComponent.h"
 
 #include "AbilitySystemInterface.h"
@@ -460,6 +461,40 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
     if (!HasAttributeAuthority()) return;
     Equipped = NewEquipped;
     Backpack = NewBackpack;
+    // THE TRANSFER RECONCILE (One-X's journal, the load half). Runs before
+    // stats so the composed state never contains an item the stash owns.
+    //  * A journaled DEPOSIT guid still in this backpack means the crash
+    //    landed between the account write and the character save: the stash
+    //    copy is authoritative, this copy drops, the entry clears.
+    //  * A claimed WITHDRAWAL guid present in this backpack proves the
+    //    withdrawal reached a save: the stash copy retires and the claim
+    //    clears. Absence proves nothing (any alt restores through here), so
+    //    an unproven claim stands — locked, never duplicated.
+    if (UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate())
+    {
+        bool bAccountDirty = false;
+        for (int32 Index = Backpack.Num() - 1; Index >= 0; --Index)
+        {
+            const FGuid ItemId = Backpack[Index].ItemId;
+            if (Account->PendingRemovals.Contains(ItemId))
+            {
+                UE_LOG(LogTemp, Display, TEXT("[BreakerStash] reconcile: '%s' was deposited but this save still carried it — the stash copy is authoritative, this copy drops (One-X)."),
+                    *ItemId.ToString(EGuidFormats::Digits));
+                Backpack.RemoveAt(Index);
+                Account->PendingRemovals.Remove(ItemId);
+                bAccountDirty = true;
+            }
+            else if (Account->PendingWithdrawals.Contains(ItemId))
+            {
+                UE_LOG(LogTemp, Display, TEXT("[BreakerStash] reconcile: withdrawal of '%s' reached a save — the stash copy retires and the claim clears (One-X)."),
+                    *ItemId.ToString(EGuidFormats::Digits));
+                Account->StashItems.RemoveAll([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+                Account->PendingWithdrawals.Remove(ItemId);
+                bAccountDirty = true;
+            }
+        }
+        if (bAccountDirty) Account->SaveAccount();
+    }
     RecalculateStats();
     OnEquipmentChanged.Broadcast();
     // A fresh character's save carries two empty containers (the roster
@@ -498,6 +533,84 @@ bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
     const FBreakerItemInstance Item = Backpack[Index];
     Backpack.RemoveAt(Index);
     return EquipItem(Item);
+}
+
+bool UBreakerEquipmentComponent::DepositToStash(const FGuid& ItemId, bool bAtAnchor)
+{
+    if (!HasAttributeAuthority()) return false;
+    if (!bAtAnchor)
+    {
+        UE_LOG(LogTemp, Display, TEXT("DepositToStash refused: the stash is an Anchor interaction (One-X)."));
+        return false;
+    }
+    const int32 Index = Backpack.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+    if (Index == INDEX_NONE) return false;
+    UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
+    if (!Account)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("DepositToStash refused: the account save is unreadable — depositing into a file this build cannot write is how an item vanishes."));
+        return false;
+    }
+    if (Account->StashItems.Num() >= UBreakerAccountSave::StashCapacity)
+    {
+        UE_LOG(LogTemp, Display, TEXT("DepositToStash refused: the stash is full (%d) — it is a transfer point, not a warehouse (One-X)."),
+            UBreakerAccountSave::StashCapacity);
+        return false;
+    }
+    // The account file is the commit point: item and journal entry land in
+    // ONE write before the runtime copy is touched. A crash after this write
+    // resolves at the next restore — the journaled guid is dropped from
+    // whichever backpack still carries it.
+    Account->StashItems.Add(Backpack[Index]);
+    Account->PendingRemovals.AddUnique(ItemId);
+    Account->SaveAccount();
+    Backpack.RemoveAt(Index);
+    OnEquipmentChanged.Broadcast();
+    return true;
+}
+
+bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAtAnchor)
+{
+    if (!HasAttributeAuthority()) return false;
+    if (!bAtAnchor)
+    {
+        UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: the stash is an Anchor interaction (One-X)."));
+        return false;
+    }
+    UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
+    if (!Account) return false;
+    const int32 Index = Account->StashItems.IndexOfByPredicate([&ItemId](const FBreakerItemInstance& Existing) { return Existing.ItemId == ItemId; });
+    if (Index == INDEX_NONE) return false;
+    if (Account->PendingWithdrawals.Contains(ItemId))
+    {
+        UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: that item is claimed by an unfinished withdrawal — locked, never duplicated."));
+        return false;
+    }
+    // The O182 gate, second entry in the player-facing roster: withdrawal is
+    // how an alt receives gear, which is exactly where a level gate matters.
+    const UBreakerProgressionComponent* Progression = GetOwner()
+        ? GetOwner()->FindComponentByClass<UBreakerProgressionComponent>() : nullptr;
+    if (!Progression)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WithdrawFromStash refused: no progression component to read a character level from."));
+        return false;
+    }
+    if (!BreakerItemRequirements::CanEquipAtLevel(Account->StashItems[Index].ItemLevel, Progression->GetProgressionState().CharacterLevel))
+    {
+        UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: item level %d requires character level %d (O182)."),
+            Account->StashItems[Index].ItemLevel,
+            BreakerItemRequirements::RequiredLevelFor(Account->StashItems[Index].ItemLevel));
+        return false;
+    }
+    // Claim-mark, one account write; the stash copy STAYS until a restore
+    // proves the withdrawal reached a character save. Never lost, never
+    // duplicated; the crash residual is a locked item, said plainly at the
+    // journal's declaration.
+    Account->PendingWithdrawals.Add(ItemId);
+    Account->SaveAccount();
+    Backpack.Add(Account->StashItems[Index]);
+    OnEquipmentChanged.Broadcast();
+    return true;
 }
 
 bool UBreakerEquipmentComponent::DiscardFromBackpack(const FGuid& ItemId)
