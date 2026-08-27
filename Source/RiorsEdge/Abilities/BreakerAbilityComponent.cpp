@@ -48,6 +48,20 @@ void UBreakerAbilityComponent::BeginPlay()
     const bool bProbeValue = FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeClassName);
     if (bProbeFlag || bProbeValue)
     {
+        // =Class:AbilityId photographs an UNLOCKABLE (One-U item 16 + O181):
+        // the id goes into its affinity slot through LEDGER's dev writer,
+        // which bypasses the unlock and nothing else — impossible loadouts
+        // still refuse loudly, and the never-save guard on the character
+        // keeps the whole session out of every save.
+        FString ProbeAbilityName;
+        if (bProbeValue)
+        {
+            FString ClassPart;
+            if (ProbeClassName.Split(TEXT(":"), &ClassPart, &ProbeAbilityName))
+            {
+                ProbeClassName = ClassPart;
+            }
+        }
         // Bare flag probes Swift; -BreakerAbilityProbe=<Tank|Support|...>
         // probes any class DevForceClass can inhabit, casting its DEFAULT
         // loadout: slot one at 5.85s, slot two at 7.6s, the ultimate at 9.6s
@@ -91,6 +105,27 @@ void UBreakerAbilityComponent::BeginPlay()
                     Probe->RefreshGrants();
                 }
             }), 5.0f, false);
+            if (!ProbeAbilityName.IsEmpty())
+            {
+                FTimerHandle EquipHandle;
+                const FName ProbeAbilityId(*ProbeAbilityName);
+                World->GetTimerManager().SetTimer(EquipHandle, FTimerDelegate::CreateLambda([WeakThis, ProbeAbilityId]()
+                {
+                    UBreakerAbilityComponent* Probe = WeakThis.Get();
+                    UBreakerProgressionComponent* Progression = Probe ? Probe->GetProgression() : nullptr;
+                    const UBreakerAbilityDefinition* Definition = UBreakerAbilityDefinition::FindFallback(ProbeAbilityId);
+                    if (!Progression || !Definition)
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("[BreakerAbilityProbe] equip failed for '%s' (progression=%d definition=%d); the default loadout stands"),
+                            *ProbeAbilityId.ToString(), Progression ? 1 : 0, Definition ? 1 : 0);
+                        return;
+                    }
+                    // Into its own affinity slot, so the schedule's per-slot
+                    // casts photograph it without a second argument.
+                    Progression->DevForceEquipAbility(Definition->SlotAffinity, ProbeAbilityId);
+                    Probe->RefreshGrants();
+                }), 5.3f, false);
+            }
             auto ProbeCast = [WeakThis](EBreakerAbilitySlot Slot)
             {
                 UBreakerAbilityComponent* Probe = WeakThis.Get();

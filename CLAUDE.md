@@ -13,9 +13,12 @@ condition (any -BreakerAbilityProbe session refuses character-state
 writes wholesale — the corrupting write is whichever one happens
 last). Item 14 confirms the empty-slot repair as the ruled shape —
 nothing changes; item 17 sends the deliberate ultimate tint to
-GLASS. The probe equip surface (item 16's other half) waits on
-LEDGER publishing a dev-only DevForceEquipAbility (requested,
-message sent); the probe's =Class:AbilityId form wires up then.
+GLASS. The probe equip surface landed the same hour (LEDGER's
+O181, refusals widened to keep impossible loadouts loud) and the
+probe's =Class:AbilityId form is WIRED and PHOTOGRAPHED: a fresh
+level-1 Swift probed as =Swift:Swift.Slipcut shows the SLIPCUT
+window bar and its 4s cooldown, with NO save file written — item
+16 closed end to end, guard proven by absence.
 KIT.md is down to the three One-R flagged-defaults awaiting seat
 confirmation (extract shape, wall-jump retirement, the 145) plus
 the probe-surface tracking note.
