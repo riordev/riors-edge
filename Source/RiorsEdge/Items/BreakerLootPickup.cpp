@@ -247,7 +247,14 @@ bool ABreakerLootPickup::TryPickup(ABreakerCharacter* Character)
     if (!Character || !HasAuthority()) return false;
     UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
     if (!Equipment) return false;
-    Equipment->AddToBackpack(Item);
+    // One-AB: a full backpack REFUSES the pickup and the drop stays on the
+    // ground — a drop the player can see and cannot take is a readable
+    // problem where a drop that vanished is a bug report. The player's answer
+    // is DiscardBackpackBelowRarity or SalvageFromBackpack, not this actor.
+    if (!Equipment->AddToBackpack(Item, /*bRefuseWhenFull=*/true))
+    {
+        return false;
+    }
     Destroy();
     return true;
 }

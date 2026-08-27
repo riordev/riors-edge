@@ -449,11 +449,18 @@ bool UBreakerEquipmentComponent::UnequipSlot(EBreakerEquipSlot Slot)
     return true;
 }
 
-void UBreakerEquipmentComponent::AddToBackpack(const FBreakerItemInstance& Item)
+bool UBreakerEquipmentComponent::AddToBackpack(const FBreakerItemInstance& Item, bool bRefuseWhenFull)
 {
-    if (!Item.IsValid() || !HasAttributeAuthority()) return;
+    if (!Item.IsValid() || !HasAttributeAuthority()) return false;
+    if (bRefuseWhenFull && Backpack.Num() >= BackpackCapacity)
+    {
+        UE_LOG(LogTemp, Display, TEXT("AddToBackpack refused: the backpack holds %d of %d (One-AB). The item stays where it was."),
+            Backpack.Num(), BackpackCapacity);
+        return false;
+    }
     Backpack.Add(Item);
     OnItemAcquired.Broadcast(Item);
+    return true;
 }
 
 void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>& NewEquipped, const TArray<FBreakerItemInstance>& NewBackpack)
@@ -600,6 +607,15 @@ bool UBreakerEquipmentComponent::WithdrawFromStash(const FGuid& ItemId, bool bAt
         UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: item level %d requires character level %d (O182)."),
             Account->StashItems[Index].ItemLevel,
             BreakerItemRequirements::RequiredLevelFor(Account->StashItems[Index].ItemLevel));
+        return false;
+    }
+    // A withdrawal is a REFUSABLE entry under One-AB's cap: the item has
+    // somewhere else to be (the stash it is already in), so a full backpack
+    // refuses it before any mark is written.
+    if (Backpack.Num() >= BackpackCapacity)
+    {
+        UE_LOG(LogTemp, Display, TEXT("WithdrawFromStash refused: the backpack holds %d of %d (One-AB). The item stays stashed."),
+            Backpack.Num(), BackpackCapacity);
         return false;
     }
     // Claim-mark, one account write; the stash copy STAYS until a restore

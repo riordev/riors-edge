@@ -66,10 +66,11 @@ public:
     // ---- THE STASH (Part One-X) ------------------------------------------
     // A TRANSFER POINT, NOT A WAREHOUSE — the backpack is unbounded, so an
     // uncapped stash would be a second pile with a screen between them. The
-    // cap is what makes putting something in a decision. 24 = three full
-    // 8-slot loadouts: builds in motion between alts, not a collection.
-    // O2 PLACEHOLDER; the seat rules the value.
-    static constexpr int32 StashCapacity = 24;
+    // cap is what makes putting something in a decision. RULED at 70
+    // (One-AB, from the owner's own number): 8.75 sets of eight slots —
+    // 1.75 per character across five, a transfer point rather than a
+    // warehouse. O2 PLACEHOLDER still, like every tunable.
+    static constexpr int32 StashCapacity = 70;
 
     UPROPERTY() TArray<FBreakerItemInstance> StashItems;
 

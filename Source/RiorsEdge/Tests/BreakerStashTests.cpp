@@ -175,4 +175,50 @@ bool FBreakerStashRulesTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBackpackCapTest,
+    "RiorsEdge.Items.Backpack.CapRefusal",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBackpackCapTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerStashTest;
+    FBreakerStashRig Rig = BreakerMakeStashRig();
+
+    // Fill to One-AB's cap through the ordinary entry.
+    for (int32 Index = 0; Index < UBreakerEquipmentComponent::BackpackCapacity; ++Index)
+    {
+        TestTrue(TEXT("adds below the cap land"), Rig.Equipment->AddToBackpack(BreakerMakeStashItem(1), true));
+    }
+    TestEqual(TEXT("the backpack sits at the cap"),
+        Rig.Equipment->GetBackpack().Num(), UBreakerEquipmentComponent::BackpackCapacity);
+
+    // A REFUSABLE entry (the pickup's path) refuses at the cap: the item has
+    // somewhere else to be, and nothing is destroyed.
+    TestFalse(TEXT("a refusable add at the cap refuses (One-AB)"),
+        Rig.Equipment->AddToBackpack(BreakerMakeStashItem(1), true));
+    TestEqual(TEXT("the refused add changed nothing"),
+        Rig.Equipment->GetBackpack().Num(), UBreakerEquipmentComponent::BackpackCapacity);
+
+    // A GRANT that already charged the player lands even past the cap —
+    // refusing it would destroy a paid item, the exact loss the ruling
+    // forbids. Each grant source owes its own pre-payment check instead.
+    TestTrue(TEXT("a paid grant lands past the cap — never destroyed"),
+        Rig.Equipment->AddToBackpack(BreakerMakeStashItem(1)));
+    TestEqual(TEXT("the grant is in the bag"),
+        Rig.Equipment->GetBackpack().Num(), UBreakerEquipmentComponent::BackpackCapacity + 1);
+
+    // A withdrawal into a full backpack refuses BEFORE any claim mark is
+    // written: the item stays stashed and stays claimable.
+    const FBreakerItemInstance Stashed = BreakerMakeStashItem(1);
+    Rig.Account->StashItems.Add(Stashed);
+    TestFalse(TEXT("a withdrawal at the cap refuses (One-AB)"),
+        Rig.Equipment->WithdrawFromStash(Stashed.ItemId, true));
+    TestFalse(TEXT("no claim mark was written"), Rig.Account->PendingWithdrawals.Contains(Stashed.ItemId));
+    TestEqual(TEXT("the item stays stashed"), Rig.Account->StashItems.Num(), 1);
+
+    UBreakerAccountSave::ResetCacheForTesting();
+    return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

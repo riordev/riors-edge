@@ -31,7 +31,20 @@ public:
 
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipItem(const FBreakerItemInstance& Item);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool UnequipSlot(EBreakerEquipSlot Slot);
-    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") void AddToBackpack(const FBreakerItemInstance& Item);
+    // THE BACKPACK CAP (One-AB): 25 — about three full sets of eight slots.
+    // The refusal rule is split by WHO loses the item if the add is refused:
+    //  * bRefuseWhenFull = true is for REFUSABLE entries, where the item has
+    //    somewhere else to be — a pickup stays on the ground, a withdrawal
+    //    stays in the stash. A full backpack refuses these and nothing is
+    //    lost; that is the ruled behaviour ("never destroyed, never silently
+    //    swapped, never auto-salvaged").
+    //  * The default (false) is for GRANTS that already charged the player —
+    //    a forge craft, a quest turn-in. Refusing one of those would DESTROY
+    //    the paid item, which is the exact loss the ruling forbids, so a
+    //    grant lands even past the cap and each grant source owes its own
+    //    pre-payment capacity check at its own site instead.
+    static constexpr int32 BackpackCapacity = 25;   // O2 PLACEHOLDER (One-AB)
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool AddToBackpack(const FBreakerItemInstance& Item, bool bRefuseWhenFull = false);
     // Moves a backpack item into its slot; whatever was equipped there
     // returns to the backpack.
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Equipment") bool EquipFromBackpack(const FGuid& ItemId);
