@@ -4,6 +4,43 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
+## A connection has no marker, so nothing can find one
+
+Found by looking rather than by testing, which is the point of looking. I built
+a zone capture tour, wrote a vantage called "the seam from above", and it
+photographed the wall between the two yards instead. The derived midpoint lands
+at x 81; the seam spans x 101-118.
+
+**THE CAUSE IS THAT A CONNECTION IS AUTHORED IN TWO PLACES THAT NEVER MEET.**
+Its geometry — floors, walls, the dog-leg — is in `compose_fernhall.py`. Its
+terms — mouth width 1000, length 2900, no through-sight — are in
+`FernhallConnections()`. **Nothing checks that they agree, and nothing in code
+can locate a seam at all.** I wrote "the geometry honours these numbers; it does
+not derive them" when I authored it, and this is that sentence biting.
+
+It is the same shape as the 19.8 m lane figure this lane already fixed once: a
+number asserted in one place, honoured in another, measured by neither. The
+connection rule I built validates the terms against each other and is silent
+about whether any geometry matches them — so a composer that widened a mouth to
+20 m would still pass, because the rule reads the authored 1000.
+
+**What I would build, and it is a shape so I am reporting first:** a
+`connection` marker role, TWO per connection, one at each mouth. That makes
+mouth position derivable, makes length measurable (the walked distance between
+mouths, not an authored guess), and makes the two-mouth rule structural in the
+export rather than only in the struct. Mouth WIDTH still needs authoring — a
+marker is a point — unless mouths come in pairs per side, which doubles the
+authoring for a term that is already a ceiling.
+
+Not urgent: one seam exists and its numbers are honest today because I authored
+both halves in the same hour. It stops being honest the first time someone
+edits one half.
+
+- **Question:** confirm the two-mouth marker role, or say the terms staying
+  authored is acceptable and I will pin the composer's numbers in a test
+  instead — which is cheaper and catches drift without making the geometry
+  derivable.
+
 ## What a roaming player meets between rift doors (queue item 5, reported before authoring)
 
 Fernhall's roam space is empty: cover, two rift doors, a travel gate, an NPC

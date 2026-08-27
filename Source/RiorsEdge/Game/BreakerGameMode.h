@@ -509,6 +509,16 @@ private:
     // each station instead.
     UPROPERTY() TArray<TObjectPtr<class ACameraActor>> TourCameras;
     void BuildCaptureTour();
+    // THE ZONE'S OWN TOUR. BuildCaptureTour is built from the GYM's station
+    // constants and is reached only in the gym branch, so a zone with two yards
+    // and a seam between them had no way to be photographed at all \u2014 I authored
+    // a whole yard and a connection and could not look at either. Automation
+    // cannot see a layout, which is the entire reason the tour exists.
+    //
+    // Vantages are derived from the zone's MARKERS rather than authored as world
+    // coordinates, so a re-exported zone carries its own tour with it \u2014 the same
+    // rule the gym's vantages follow against its station constants.
+    void BuildZoneCaptureTour(const struct FBreakerZoneMarkers& Markers);
 
     bool bPlaytestTargetsSpawned = false;
     // Every piece of hard cover the field built, in world space, WITH ITS CLASS

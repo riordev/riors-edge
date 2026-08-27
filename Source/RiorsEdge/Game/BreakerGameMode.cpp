@@ -566,6 +566,7 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             StartNextWave();
         }
         bPlaytestTargetsSpawned = true;
+        BuildZoneCaptureTour(Markers);
         ScheduleScreenshots();
         UE_LOG(LogTemp, Log, TEXT("[BreakerMap] fernhall — %s."),
             bRiftInstance ? TEXT("RIFT INSTANCE, waves live") : TEXT("the yard, no gym field"));
@@ -1336,6 +1337,91 @@ void ABreakerGameMode::ScheduleScreenshots()
             }
             return ScreenshotsRemaining > 0;
         }), 0.0f);
+}
+
+void ABreakerGameMode::BuildZoneCaptureTour(const FBreakerZoneMarkers& Markers)
+{
+    if (!GetWorld()) return;
+    if (!FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureTour"))) return;
+
+    const FBreakerZoneMarker* Start = Markers.Find(EBreakerZoneMarkerRole::PlayerStart);
+    const FBreakerZoneMarker* EntryRift = Markers.Find(EBreakerZoneMarkerRole::Rift);
+    if (!Start || !EntryRift) return;
+
+    // The zone's own axes, from its own markers.
+    const FVector A = Start->Location;
+    const FVector B = EntryRift->Location;
+    const FVector Fwd = (B - A).GetSafeNormal2D();
+    const FVector Rgt = FVector::CrossProduct(FVector::UpVector, Fwd);
+    const float LaneLength = static_cast<float>(FVector::Dist2D(A, B));
+    const float Yaw = Fwd.Rotation().Yaw;
+
+    struct FVantage { FVector Location; FRotator Rotation; };
+    TArray<FVantage> Vantages;
+
+    // 1. PLAN VIEW over the whole zone. The one frame that answers "what shape
+    //    is this place", which is the question two yards and a seam raise.
+    Vantages.Add({ A + Fwd * (LaneLength * 0.5f) + FVector(0.0f, 0.0f, 22000.0f),
+        FRotator(-89.9f, Yaw, 0.0f) });
+
+    // 2. Behind the player start, down the entry lane: the arrival composition.
+    Vantages.Add({ A - Fwd * 1800.0f + FVector(0.0f, 0.0f, 1400.0f), FRotator(-9.0f, Yaw, 0.0f) });
+
+    // 3. The entry yard's rift door, from the ground a player approaches it on.
+    Vantages.Add({ B - Fwd * 2200.0f + FVector(0.0f, 0.0f, 200.0f), FRotator(-2.0f, Yaw, 0.0f) });
+
+    // The substation yard, if this zone has one. Derived, so a zone with only
+    // an entry yard simply gets the three vantages above.
+    for (const FBreakerZoneMarker& Marker : Markers.All)
+    {
+        if (Marker.Role != EBreakerZoneMarkerRole::Yard) continue;
+
+        const FBreakerZoneMarker* FarRift = Markers.Find(EBreakerZoneMarkerRole::Rift, Marker.Yard);
+        const FVector YA = Marker.Location;
+        const FVector YFwd = FarRift ? (FarRift->Location - YA).GetSafeNormal2D() : Fwd;
+        const float YYaw = YFwd.Rotation().Yaw;
+
+        // 4. THE BOUNDARY BETWEEN THE TWO YARDS from above — and this vantage
+        //    is NOT the seam, which is the finding rather than the intent.
+        //
+        //    It was written as "the seam from above" and it cannot be: a
+        //    connection has NO MARKER, so nothing in code can locate one. Its
+        //    geometry lives in the composer and its terms live in
+        //    FernhallConnections, with nothing tying the two together. The
+        //    midpoint of the entry rift and the far yard's anchor lands at
+        //    x 81 while the seam spans x 101-118, so this camera photographed
+        //    the wall between the yards and called it the connection.
+        //
+        //    Relabelled rather than moved, because moving it would mean
+        //    hardcoding a world coordinate the composer owns — the same
+        //    unanchored-number shape that produced this. The fix is a marker
+        //    for a connection's mouths, which is in the lane's report.
+        const FVector Boundary = (B + YA) * 0.5f;
+        Vantages.Add({ Boundary + FVector(0.0f, 0.0f, 7000.0f), FRotator(-89.9f, Yaw, 0.0f) });
+
+        // 5. Standing in the seam's far mouth, looking into the yard it opens.
+        Vantages.Add({ YA - YFwd * 1200.0f + FVector(0.0f, 0.0f, 200.0f), FRotator(-3.0f, YYaw, 0.0f) });
+
+        // 6. The far yard's own rift door, the thing the walk is for.
+        if (FarRift)
+        {
+            Vantages.Add({ FarRift->Location - YFwd * 2200.0f + FVector(0.0f, 0.0f, 200.0f),
+                FRotator(-2.0f, YYaw, 0.0f) });
+        }
+    }
+
+    for (const FVantage& Vantage : Vantages)
+    {
+        FActorSpawnParameters Params;
+        Params.ObjectFlags |= RF_Transient;
+        if (ACameraActor* Camera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(),
+            Vantage.Location, Vantage.Rotation, Params))
+        {
+            TourCameras.Add(Camera);
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] zone tour: %d vantages from %d markers."),
+        TourCameras.Num(), Markers.All.Num());
 }
 
 void ABreakerGameMode::BuildCaptureTour()
