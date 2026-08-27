@@ -1842,6 +1842,497 @@ the owner's own.
 
 ---
 
+# PART ONE-V — THE VAULT'S BOTTOM TEN CENTIMETRES CANNOT BE REACHED
+
+KIT's third mantle-height question asked whether the engine's `MaxStepHeight`
+gets authored to agree with the grammar's 145. **It must not, and the reason is
+worth more than the answer.**
+
+They are not the same kind of number. `MaxStepHeight` is what the player walks
+over **with no input and no awareness**, inside the movement update.
+`MantleStepHeight` is what the player **chooses** to go over with a verb that
+costs 0.20 s and commits them. Author them equal and the mantle deletes itself:
+anything you could mantle, you would already have walked up.
+
+**And the numbers as they stand overlap the wrong way.**
+`LedgeMinimumHeightCm` is **35**. `MaxStepHeight` is the engine default **45**,
+authored nowhere. `ResolveLedgeVerb` classifies 35–80 as `Vault` — so a ledge
+between **35 and 45 cm resolves as a vault the player can never trigger**,
+because the character has already silently stepped over it. The bottom quarter
+of the vault window is dead, and the test suite cannot see it: `ResolveLedgeVerb`
+is pure and correct, and the thing that overrides it is in the engine.
+
+**RULED, and it is the relationship rather than either number:**
+
+1. **`MaxStepHeight` is authored, not inherited.** A number this load-bearing
+   arriving as an engine default is the same class of defect as the collision
+   profile nobody chose and the diagnostics flag nobody set. Three now.
+2. **`LedgeMinimumHeightCm > MaxStepHeight`, always.** Whatever the vault claims,
+   the vault must get.
+3. **The kerb walks, the crate vaults.** So the fix is to raise the ledge
+   minimum above the step, not to lower the step — vaulting a 40 cm kerb is
+   comedy, and the verb should read as clearing something. KIT proposes the
+   pair; my expectation is a 45 cm authored step and a 50 cm ledge minimum,
+   which leaves the vault the 50–80 band and costs nothing else. Overturn me
+   with geometry if the yard has risers in that band.
+4. **The invariant goes in a test**, the same shape as the LedgeVerbs test that
+   pins the game mode's 145 to the component's. A relationship that is only
+   true in a comment drifts the first time someone tunes one end.
+
+Check me on one thing before building: I read `GroundOverlayLift = 6.0` as
+"nothing in the yard needs a silent step-up above single digits," and the gym's
+climb is authored at `MantleStepHeight` risers, which are mantles by design. If
+some other geometry relies on walking up 35–50 cm, that changes the direction of
+the fix, not the invariant.
+
+---
+
+# PART ONE-W — A QUESTION THAT OUTLIVES ITS ANSWER, AND ONE THAT ARRIVES TWICE
+
+The report files are the lanes' question queues, and the convention says
+answered questions are deleted because git holds them. The convention is not
+holding, and it produced two defects this cycle.
+
+**`Docs/reports/KIT.md` asks three questions twice**, verbatim — the mantle
+extraction shape, wall-jump's fate, and the three mantle heights appear at both
+lines 7–42 and 43–78. **And all three were answered by KIT's own commits**:
+`ca510a5` moved the mantle home and gave 145 one author, and `a1aecc4` retired
+the wall-jump with the ride. So the lane is asking the seat, twice, for rulings
+its own pushed code already contains.
+
+**`GROUND.md` still asks for the yard marker role and the connection rule**,
+both of which GROUND built in `cdf522f` and `f214dc8`. **`FIELD.md` still asks
+whether the overlay ships visible and whether the tour is at fault**, both ruled
+in One-U and landed in `c70e9c9`.
+
+This is *a justification outliving its cause*, run on questions instead of
+comments — and it is expensive in a specific way: the next reader cannot tell a
+live question from a dead one, so either the seat rules twice or a lane waits
+for a ruling it already has.
+
+**THE RULE: the commit that lands an answer deletes the question, in the same
+commit.** Not the next cycle, not a tidy-up pass. A question surviving its
+answer is a defect in the same class the deleting commit was fixing.
+
+**And a duplicate is worse than a stale entry**, because it reads as emphasis.
+KIT: de-duplicate and delete all three. GROUND, FIELD: delete what One-U closed.
+If any lane disagrees with a ruling, the report says *that* — it does not
+re-ask the question.
+
+---
+
+# PART ONE-X — THE STASH IS ALREADY RULED, ALREADY ANNOUNCED, AND NOWHERE IMPLEMENTED
+
+Owner, 2026-08-27: *"can we add an account wide stash?"*
+
+**It was ruled two weeks ago, and the game already tells the player it exists.**
+
+- `Docs/DECISIONS.md` **O17** — *"The stash is account-wide. Characters are
+  builds; gear is an account asset."*
+- `UI/BreakerMenu.cpp:5372`, the roster screen header, on screen right now:
+  **`GEAR · RIFTGLASS · STASH ARE ACCOUNT-WIDE`**
+- `UI/BreakerMenu.cpp:5691`, the character-creation rail — `GEAR: ACCOUNT-WIDE`
+  — with a comment saying it says so *"at the moment of creation, when it
+  matters most."*
+
+And nothing stands behind any of it:
+
+- **No stash object exists anywhere in `Source/`.** Not a class, not a struct,
+  not a slot name.
+- **Gear is per-character.** `UBreakerSaveGame` holds `EquippedItems` and
+  `BackpackItems`, and there is one save per character GUID
+  (`SlotNameForCharacter`).
+- **And Riftglass — which O51 rules *"account-wide and scalar"* — is stored in
+  `FBreakerForgeWallet`, inside that same per-character save.**
+
+So this is not a feature request. It is three promises with no backing, and one
+of them is **a ruling contradicted by its own storage**: the same shape as the
+pin whose prose was frozen while its number was live, and the headline
+contradicted by its own detail. The difference is that this one is said out loud
+to the player, on the screen where they choose a permanent class.
+
+## What the stash is FOR, and it is not storage
+
+`AddToBackpack` appends and **nothing caps it** — the backpack is unbounded. So
+a stash added for storage reasons is a second unbounded pile with a screen for
+moving things between them, which is strictly worse than one pile. **Storage
+pressure is not the reason and must not become the brief.**
+
+The reason is **transfer**. Class choice is permanent, five characters exist,
+and items carry no class restriction at all — nothing in `FBreakerItemInstance`
+names a class. So a Caster-shaped drop landing on a Swift character today is
+garbage that should have been treasure, and there is no path for it: no mail, no
+trade, no shared container. That is a dead end in the loot loop, and closing it
+is the whole job.
+
+Which sets the brief precisely: **the stash is a transfer point, not a
+warehouse. Cap it.** A cap is what makes putting something in a decision.
+
+## The architecture, and the roster already argues for it
+
+A third save object in its own slot, sibling to the roster.
+
+**Not inside the roster** — its own header says *"the roster is the index, NOT
+the data… listing characters must never mean deserializing their inventories,"*
+and a stash in the roster breaks exactly the invariant that comment exists to
+protect. **Not inside a character save**, which is what account-wide excludes.
+
+## THE DUPLICATION HAZARD IS THE WHOLE ENGINEERING PROBLEM
+
+Two save files and no atomic write across them. A transfer is remove-here and
+add-there, and a crash between the two writes either **duplicates** the item or
+**destroys** it. Duplication is the worse failure: it is permanent, it is
+reproducible on purpose by killing the process at the right moment, and an ARPG
+economy does not recover from it.
+
+`FBreakerItemInstance` already carries an `FGuid ItemId`, which is what makes
+the fix cheap. **The stash file is the commit point:**
+
+1. **Stash:** add the item AND record `PendingRemoval{CharacterId, ItemId}`. Write.
+2. **Character:** remove the item. Write.
+3. **Stash:** clear the record. Write.
+
+On load, a surviving record means the crash landed in the middle: the stash copy
+is authoritative, so the character's copy is dropped if it is still there and the
+record is cleared. Never duplicates, never loses, and it costs one struct and one
+reconcile on load.
+
+**Do not build this as "move the item, save both files."** That is the version
+with the bug in it, and the bug does not show up in testing — it shows up in a
+player's save six months from now.
+
+## Riftglass comes with it, and it is the cheaper half
+
+O51 already rules it account-wide and it is one `int32`. It moves onto the stash
+object in the same commit and leaves `FBreakerForgeWallet`, with a migration
+that **sums** the per-character balances into the account balance — the only
+migration that cannot rob anyone. `SaveVersion` bumps, and the wallet already
+carries the precedent for exactly this kind of fold in
+`CollapseLegacyDenominations`, so the shape is written and tested.
+
+## Lanes
+
+- **LEDGER owns it** — `Items/` and `Save/`. The save object, the journal, the
+  migration, the tests. Your queue is the thinnest of the six and this is the
+  largest thing in it.
+- **GLASS owns the screen, and not yet.** The completion moment first; a stash
+  with no UI is still a working stash for one console command, and a completion
+  moment that nobody sees is a loop with no ending.
+- **Report before building**, on two things specifically: whether the
+  summed-balance migration has any case that loses currency, and what the cap
+  should be — propose a number and the seat will rule it.
+
+## Two questions that are the owner's
+
+1. **Does the backpack get a capacity?** The stash is a transfer point either
+   way. But while the backpack is unbounded, "stash it" never competes with
+   "carry it," and the screen gets used once per alt and then forgotten. A
+   backpack cap is what turns the stash into a habit. Separate ruling, not
+   required for this work, and worth answering before the cap number is set.
+
+2. **Is EQUIPPED gear account-wide too?** O17 says *"gear is an account asset"*
+   and the creation rail says `GEAR: ACCOUNT-WIDE`, which a player reads as
+   *every item*, not merely stashed ones. The strict reading means two
+   characters cannot wear the same helmet at once and every piece follows
+   whoever claims it — a far larger change than a stash, and I do not believe it
+   is what O17 meant. But the screen says it. **So either the implementation or
+   the caption is wrong, and only the owner can say which** — and until he does,
+   nobody should quietly pick the cheap reading and call it done.
+
+---
+
+# PART ONE-Y — THE CAPTION IS WRONG, NOT THE SAVE FORMAT
+
+Owner, 2026-08-27, answering One-X's second question: *"shouldnt it just be you
+can unequip the item, set it in your stash then if you got on another character
+pull it out?"*
+
+**RULED, and it settles the contradiction the cheap way round.** Gear stays
+per-character. The stash is the transit route between characters, not a shared
+wardrobe. O17's *"gear is an account asset"* means gear is **not bound to the
+character who found it** — it does not mean every item lives in one pool.
+
+That is the reading that costs nothing and keeps everything: no shared equipped
+set, no question of which character is wearing the helmet, no conflict to
+resolve when two characters want the same piece. **One-X's transfer journal is
+unchanged and is now the entire mechanism.** The stash and Riftglass are the
+only two things at account scope; everything else stays where it is.
+
+## GLASS: two captions, and do not just delete the word
+
+`UI/BreakerMenu.cpp:5372` says `GEAR · RIFTGLASS · STASH ARE ACCOUNT-WIDE`.
+Gear is not, so the line is telling the player something false about the one
+decision they cannot take back.
+
+`UI/BreakerMenu.cpp:5691`, the creation rail, says `GEAR: ACCOUNT-WIDE` — and
+its own comment says it appears *"at the moment of creation, when it matters
+most."* That comment is right about why it exists, so **deleting the row is the
+wrong fix.** The thing a player needs to hear while choosing a permanent class
+is that the gear they already own can arm this character. Say that, not
+"account-wide."
+
+Both lines are yours, both are one string, and neither may go in before the
+stash they describe exists — a caption that becomes true later is the defect
+this whole part is about.
+
+## The stash lives in the Anchor
+
+A transfer point reachable mid-rift is a loadout swap in the middle of a fight,
+and nothing in the design wants that. The Anchor is where the player starts
+(Part One-E) and is the one authored place in the game with no combat in it.
+**Stash access is Anchor-only.** It is a map check to enforce, and it makes the
+Anchor the hub it was already ruled to be rather than a corridor to the travel
+point. Overturn me if you want gear-swapping between waves; I do not think you
+do.
+
+## AND THE THING THE QUESTION IMPLIES, WHICH IS ALREADY SOLVED
+
+A transfer stash means **a level-1 alt can wear a level-120 item the moment it
+exists.** I checked for a gate and there is none: `EquipFromBackpack` goes
+straight to `EquipItem`, and there is no `RequiredLevel`, no
+`LevelRequirement`, no character-level read anywhere in `Items/`.
+
+The size of it, so it is a number rather than a worry. A body piece's base life
+is `30 + 2.2 × (ItemLevel − 1)` — **30 at level 1, 291.8 at 120, about 9.7×** —
+and a level-120 item also rolls the top affix tiers, where the Health T1 anchor
+alone is 400. A twinked fresh character is not slightly ahead. It is an order of
+magnitude ahead of anything its own level drops.
+
+In most games that demands a required-level field on the item. **Here it does
+not, and the reason is a decision already made:** `FBreakerRiftDefinition
+::AreaLevel` is **player-set**, clamped 1..100, and monster health, drop item
+level, XP and Riftglass all scale from it. The player authors the difficulty of
+every run. **There is no fixed early game to trivialise** — a geared alt simply
+sets a higher number, meets monsters scaled to it, and earns rewards scaled to
+it. The twink corrects itself by being boring at a level the player chose.
+
+**RULED: no equip level requirement.** Do not add one, and do not let it arrive
+quietly as "a small safety check" on the stash withdrawal path.
+
+**And the condition under which that stops being true, so it is watched rather
+than assumed:** the moment any content runs at a *fixed* area level — a
+scripted campaign beat, a tutorial, anything with an authored difficulty the
+player cannot dial — twinking bites exactly there and nowhere else, and the
+guard belongs on that content, not on the item. `EBreakerRiftTier` is a death
+rule and not a level gate, so nothing today has one. **LEDGER: if you ever
+author a fixed area level, that commit is where this gets revisited.**
+
+---
+
+# PART ONE-Z — YES, AND ONE-Y'S PREMISE WAS A COMMENT
+
+Owner, 2026-08-27: *"wait we should have area progression shouldnt we???"*
+
+**Yes. And the instinct caught a bad ruling of mine, so that comes first.**
+
+## ONE-Y IS VOID, AND THE REASON MATTERS MORE THAN THE RULING
+
+One-Y ruled *no equip level requirement*, and the entire argument rested on one
+stated fact: that `AreaLevel` is player-set, so a twinked character simply dials
+a higher number and the advantage corrects itself. **That fact came from a
+comment, not from behaviour.**
+
+`Game/BreakerRiftDefinition.h:49` says *"Player-set, clamped 1..100 on every
+read."* Nothing sets it from a player. What actually exists:
+
+- **`BreakerGameMode.cpp:554` — the in-world rift door is hardcoded
+  `AreaLevel = 5`.** It is the only rift a player can enter, and it is an O2
+  PLACEHOLDER that the code is honest about.
+- **`BreakerGameInstance.cpp:122` — the `42`** sits inside a
+  `-BreakerCaptureDeployBeat` branch, a command-line switch that by construction
+  a shipped build cannot reach. It is capture scaffolding, not a game value.
+- **`GymAreaLevel`** is the 1..100 dial, and it is a **dev-menu tunable on the
+  game mode** (`BreakerMenu.cpp:10401`), not a rift level a player chooses.
+
+So the only rift a player can enter runs at level 5, always, and there is no
+ladder, no choice, and no record of anything cleared — `HighestCleared`,
+`MaxAreaLevel`, `UnlockedArea` return nothing across the whole project.
+
+**I took a comment as behaviour.** That is the one thing this seat exists to
+refuse — *a design document is not authority* — and I did it while ruling on
+twinking, which is precisely where being wrong is expensive. The comment gets
+corrected in the same cycle it is read next, because it will do this to whoever
+reads it after me.
+
+## THE LADDER O122 ALREADY IMPLIES
+
+O122: *"A campaign rift is entered freely and an endgame rift is consumable."*
+That is not a death-rule footnote. **It is the shape of area progression**, and
+it only needs to be said out loud:
+
+- **Campaign rifts carry authored, ascending area levels.** The ladder is
+  content. The player does not pick; they reach. This is what makes an early
+  game exist at all, and today it is one door at 5.
+- **Endgame rifts are consumables carrying their own area level.** You do not
+  dial it — you run what you have, and higher ones come out of higher ones.
+  That is the PoE spine this project's endgame was always described as.
+- **The free dial must never be built.** It is what I invented in One-Y, and if
+  anyone builds it, the endgame's whole progression collapses into a slider that
+  makes every drop below the maximum pointless.
+
+## WHAT IT NEEDS TO EXIST, MINIMALLY
+
+1. **GROUND: the door's level becomes authored per rift** rather than a literal.
+   The file already says per-yard rift authoring arrives with the yards, so this
+   rides that work rather than preceding it.
+2. **LEDGER: a highest-cleared record, and it is an ACCOUNT record.** It does
+   not exist in any save today. Account rather than character because O17
+   already settled the philosophy — characters are builds, the account is the
+   player — and because it is the field that decides the alt question below.
+3. **The endgame consumable is O122's and waits.** It needs a drop source and a
+   ladder that reaches it; neither exists while there is one door.
+
+## AND THE TWINK QUESTION IS BACK, HONESTLY THIS TIME
+
+One-Y named the condition under which no-level-requirement stops working: *the
+moment any content runs at a fixed area level.* **That condition is not
+hypothetical — it is today, and it always was.** A twinked alt walks the
+campaign, whatever the campaign turns out to be.
+
+Two coherent answers, and only one agrees with everything else already ruled:
+
+- **(a) An equip level requirement on items.** Standard, and it works. It also
+  makes every new build re-earn its gear slowly, which is a chore five slots
+  will make you do five times.
+- **(b) Alts skip the campaign, because highest-cleared is an account record.**
+  The second build starts where the account is, not where the character is.
+  This is what O17 already believes — *characters are builds; gear is an account
+  asset* — extended to the one thing that is not yet an account asset and
+  obviously should be.
+
+**I recommend (b), and it is the owner's call**, because it decides how the game
+is played rather than how a number behaves. Without a skip and without a
+requirement, an alt's campaign is a fast chore; with a requirement and no skip
+it is a slow one. (b) is the only version where the answer is "there is no
+chore."
+
+**Nothing on the stash is blocked by this.** One-X and One-Y's transfer
+mechanism, the journal, the Anchor-only access and the caption fixes all stand.
+The only line struck is One-Y's reasoning about why no level requirement is
+needed — the requirement question is now open and waits on the owner.
+
+## HOUSEKEEPING: PART ONE-Z IS THE LAST LETTER
+
+The next section is **PART ONE-AA**, then AB. Said here so two lanes do not
+independently invent different answers, which is exactly how the O125 collision
+happened.
+
+---
+
+# PART ONE-AA — THE REQUIRED LEVEL IS DERIVED, AND THE AREA LEVEL IS ALREADY THE NUMBER
+
+Owner, 2026-08-27: *"required level field on items / story will have area levels
+so we can gauge difficulty for players as they level and are rewarded for
+exploring or reclearing."*
+
+**RULED, both halves.** One-Y's no-requirement ruling stays void; the
+requirement is in. And the second half turns out to be nearly free, because the
+number the owner wants players to read by is already the number the game uses.
+
+## IT IS DERIVED, NOT STORED, AND THE PROJECT ALREADY DECIDED THIS ONCE
+
+Do not add a field to `FBreakerItemInstance`. `Items/BreakerItemBaseStats.h`
+already derives every base magnitude from slot, level and archetype, and says
+why in its own comment: *"the magnitudes are never stored… so a retune never
+needs a save migration."* A stored required level is the same mistake that
+comment exists to prevent — it would freeze today's curve into every save ever
+written, and the first retune would need a migration to unfreeze it.
+
+**`RequiredLevel` is a pure function of `ItemLevel`, in a header, tested.** No
+save-format change, no `SaveVersion` bump, and a retune is a one-line edit.
+
+## THE FUNCTION, AND THE THREE CEILINGS THAT DECIDE IT
+
+The obvious derivation — required level equals item level — is **impossible by
+construction**, and finding out why is worth more than the formula:
+
+```
+  MaxCharacterLevel   50    "A locked decision, not a tunable"
+  BreakerMaxAreaLevel 100
+  MaxItemLevel        120
+```
+
+Three ceilings on what reads like one ladder. They are not a defect — they are
+the ARPG shape, where the character ladder ends early and the area ladder is
+the endgame. But they mean **an item level 100 cannot require character level
+100, because nothing reaches it.**
+
+**RULED: `RequiredLevel = min(ItemLevel, MaxCharacterLevel)`.**
+
+Read that as what it is: **the gate exists only while levelling does.** Past 50
+it is a no-op, which is correct rather than a compromise — the owner's stated
+reason for the field is *"gauge difficulty for players as they level"*, and when
+levelling ends the instrument has no job. It also means the gate cannot touch
+the endgame, so it cannot disturb `GetDropItemLevel`'s identity (`ilvl = AL`)
+or the health-versus-damage cancellation that holds TTK constant from area level
+1 to 100. **A rule that expires when its purpose does has no blast radius.**
+
+## AND THE GAUGE THE OWNER ASKED FOR IS ALREADY BUILT
+
+`GetDropItemLevel(AreaLevel)` is the identity — a level-23 area drops item level
+23. With the requirement derived from item level, **"AREA 23" now literally
+means "level 23 content": the number on the door is the character level its own
+drops will ask for.** That is the difficulty gauge, it needs no second number,
+no colour coding and no recommended-level field, and it is already true in the
+code. It only becomes visible once story areas carry authored levels.
+
+**GROUND: put the level on the door's read-out.** It is the one number that
+tells a player whether a place is for them.
+
+## WHERE THE GATE LIVES, BECAUSE THIS IS WHERE IT GOES WRONG
+
+`EquipItem` is called from **32 sites across eight test files**, most on bare
+components with no character behind them. Put the gate inside `EquipItem` and
+either the suite breaks wholesale, or — worse — the gate learns to pass when it
+cannot find a character level, which is a silent bypass that will also fire in
+the real game the day a component is missing.
+
+**The predicate is pure and lives in one header. `EquipItem` stays the
+mechanism. Every PLAYER-FACING entry point calls the predicate** —
+`EquipFromBackpack` today, and the stash withdrawal path when One-X lands. This
+is the same shape KIT just used for the ledge verbs: rules in `Movement/` as
+named predicates, the pawn keeping only execution.
+
+**And pin it, because the loophole is a new entry point rather than a bad
+one:** a test that asserts every player-facing equip path consults the
+predicate. A gate that a future call site can simply not call is a gate with a
+timer on it.
+
+## RE-CLEARING: THE LADDER PAYS ONCE, THE LOOT PAYS ALWAYS
+
+*"rewarded for exploring or reclearing"* needs one distinction or it eats the
+endgame. Today `RiftglassForCompletion` and `XpForCompletion` are pure functions
+of area level, so a completion pays the same the hundredth time as the first —
+and if the highest story area pays full value forever, O122's consumable
+endgame has nothing to offer.
+
+**RULED: a first clear pays the LADDER, a re-clear pays the LOOT.**
+
+- **First clear** advances the account's highest-cleared record (One-Z), opens
+  what it opens, and pays its completion purse once.
+- **Re-clear** pays drops and kill XP exactly as it does now, and pays no
+  ladder. Nothing is closed off, nothing is farmed for progress that was meant
+  to be earned by reaching.
+
+That is one boolean per area against a record LEDGER is already building for
+One-Z, and it is the difference between "you may go back" and "going back is
+the game."
+
+## EXPLORING IS CONTENT, NOT A SYSTEM, AND IT IS PARKED HERE HONESTLY
+
+Rewarding exploration needs something to find, and today an area is one yard
+with a rift door in it. The system half is small — the same account record, one
+field wider, holding what has been discovered rather than only what has been
+cleared. **The content half does not exist yet and should not be simulated.**
+
+**GROUND: this is what the second yard is for.** When the yard marker role you
+just built produces a second yard, that yard is the first thing in this game
+that can be *found*. Until then, do not author a discovery reward with nothing
+behind it — that is a caption promising a feature, which is the defect Part
+One-X is about.
+
+---
+
 # PART TWO — FERNHALL IS THE WORLD
 
 Owner: *"fernhall should just be an area the player can roam with the rifts and
@@ -2630,6 +3121,289 @@ on inference was right the first time.
 
 The owner's habit, and it works. One report covering all three. The completion
 moment is the only one that should also carry a proposal.
+
+---
+
+# PART THREE-H — THE OVERNIGHT QUEUE, 2026-08-27
+
+Owner, 2026-08-27: *"can we just get a really big set of orders going for all
+lanes im gonna log off for the night and want work for a long while."*
+
+**He is away. Nothing in this part waits on him, and nothing in it may be
+escalated to him.** Every item below is either fully ruled or has a stated way
+to proceed without the ruling it would like to have. Read your lane's queue in
+order; the order is not arbitrary, and the reasons are given where the order
+carries a dependency someone else is waiting on.
+
+---
+
+## THE FIVE STANDING RULES FOR AN UNATTENDED RUN
+
+**1. A number that is the owner's is authored as `O2 PLACEHOLDER`, and the work
+continues.** This is what the convention is for. A missing magnitude is never a
+reason to stop; a missing *rule* is. If you cannot tell which you are missing:
+a magnitude changes a value, a rule changes a shape.
+
+**2. Do not rule on anything in THE OWNER'S LIST below.** Not "provisionally",
+not "as a placeholder that happens to be a decision". If your work needs one,
+build the half that does not and report the seam. A self-executing default
+becoming a ruling has already happened twice this session.
+
+**3. Report before building, on anything whose shape is not stated here.** The
+habit works and it works harder overnight, because a wrong shape built at 03:00
+is a wrong shape nobody read until morning.
+
+**4. If your queue empties, take YOUR FALLBACK** — named per lane at the end of
+each queue. Every fallback is a measurement or an audit. **None of them invents
+design.** An empty queue is not permission to decide what to build next.
+
+**5. Delete the question when you land the answer, same commit** (Part One-W).
+Three report files are currently lying about what is open. Fix yours first — it
+is the shortest item in your queue and it stops the next reader wasting a cycle.
+
+---
+
+## THE OWNER'S LIST — HELD UNTIL HE IS BACK
+
+- **Backpack capacity.** Whether the backpack gains a cap at all (One-X).
+- **The stash cap number.** LEDGER proposes it as `O2 PLACEHOLDER`; the seat
+  rules the value; the owner may overturn.
+- **The death beat.** Whether a kill may sound like a graze (Three-G item 3).
+  Report what fires; do not choose what should.
+- **Bodies per yard.** `Breaker.Rift.Population <N>` exists for exactly this and
+  only he can answer it by standing in it.
+- **Which body holds a rift open.** The boss is the least arbitrary choice and
+  it is what shipped; it is still not ruled.
+
+**And one thing that IS now ruled, so nobody re-opens it:** the owner chose the
+**required level field** over the alt campaign skip. I recommended the skip; he
+did not take it. **Alts level through the campaign with the gate on.** Do not
+reintroduce a skip as a convenience.
+
+---
+
+## PRESS — first, and then standing
+
+Main is at **2,704 lines of ORDERS against 3,196 on the seat's copy**: One-S
+through One-AA, roughly 490 lines, including every ruling the other five lanes
+are about to read. **Nothing below can start correctly until this lands.**
+
+Then the standing job, unchanged: publish on change, fast-forward or refuse,
+never force. **Fallback:** verify main against the seat's copy and report any
+drift line-for-line — a silent divergence between the two is the one failure
+mode that makes every other lane wrong at once.
+
+---
+
+## LEDGER — `Items/`, `Progression/`, `Save/`
+
+The deepest queue tonight, and two items in it unblock other lanes.
+
+**1. The required-level predicate (One-AA). Small, and FIRST because the stash
+needs it.** `RequiredLevel = min(ItemLevel, MaxCharacterLevel)`, derived in a
+header, never stored, no `SaveVersion` bump. `EquipItem` stays the mechanism;
+the predicate is called by every player-facing entry point. **Land the test that
+pins that they all call it** — the loophole is a future entry point, not a bad
+one.
+
+**2. The highest-cleared account record (One-Z).** It does not exist in any save
+today. Account scope, not character. It is the field One-AA's re-clear rule and
+One-Z's ladder both stand on, so it comes before either.
+
+**3. First clear pays the ladder, re-clear pays the loot (One-AA).** One boolean
+against the record from item 2. `RiftglassForCompletion` and `XpForCompletion`
+stay pure functions of area level; what changes is whether the completion purse
+is paid at all.
+
+**4. The stash (One-X, One-Y).** The largest thing in your queue.
+   - The save object in its own slot, sibling to the roster — **not inside the
+     roster**, whose own header forbids it.
+   - **The transfer journal is the design**, not an implementation detail:
+     stash-add-with-`PendingRemoval` → character-remove → clear-record, with
+     reconcile on load. Build it any other way and the bug ships invisibly.
+   - Withdrawal calls the required-level predicate from item 1.
+   - Access is **Anchor-only**.
+   - Cap: propose a number as `O2 PLACEHOLDER` and say what it is derived from.
+
+**5. Riftglass moves to account scope (One-X).** It is one `int32`, O51 already
+rules it, and the migration **sums** the per-character balances. The wallet's
+`CollapseLegacyDenominations` is the precedent for the shape.
+
+**6. Traction's re-target (One-T).** BLOCKED on KIT recording the mantle exit —
+their item 1. Take it the moment their commit lands; do not author against
+absent plumbing.
+
+**Fallback:** run `make status` and reconcile every pin whose *prose* disagrees
+with its *number*. That defect has bitten this project twice and both times the
+number was live while the sentence was frozen.
+
+---
+
+## FIELD — `Combat/`
+
+**1. Delete what One-U closed from `FIELD.md`** (One-W). Two questions in there
+are already ruled and one is already landed.
+
+**2. The arrival band (One-T, One-S). The largest thing you own and it is
+first.** `Combat/BreakerRangedBehavior.h` is a finished, tested band controller
+— classify with hysteresis, hold and strafe, retreat when crowded — and the
+melee enemy is the failure its own header describes. **Reuse it; do not
+re-derive it.** Melee's `Hold` is a thin band at `AttackRange`. If the
+controller cannot express melee's case, that is a finding and I want it named
+rather than worked around.
+
+**3. Re-measure the stack and report whether the QUADRATIC moved.** Your own
+falsifiable prediction: the fit without its quadratic term puts N=100 at
+9.79 ms. My addition stands too — the band should move it *before* separation
+does, because bodies that stop at 260 cm stop generating the dense-cluster
+queries the term measures.
+
+**4. Separation, for whatever residue is left after the band.** Spacing 150 cm,
+derived rather than picked: the ring at `AttackRange` seats 10.9 bodies and the
+interior spawns ten. Record the derivation beside the constant.
+
+**5. THE FULL-FIGHT SWEEP, and it is higher than its position suggests** —
+hit reactions, damage numbers, flashes, death effects, player fire. **GLASS's
+telegraph audio is held on this measurement existing** (One-U item 12), so this
+is the item that unblocks another lane. If items 2–4 look like they will run
+long, take this ahead of item 4.
+
+**6. Elements through the modifier layer (One-U items 7–10).** One modifier, one
+element. `Cascading` already leaves lingering hazards and a hazard with a family
+is the cheapest first element in the game. Report the TTD it produces against a
+character at 0% resistance and one at the 60% cap — two numbers, and they are
+the whole design conversation. **One bucket, not per-element.**
+
+**7. The enemy meshes, re-costed against a separated crowd** (One-T). Your +11%
+was measured behind the bottleneck the crowd work removes. The acquisition
+refactor — 12 `ConstructorHelpers` sites in constructors — is part of the
+estimate, and the import itself is the owner's.
+
+**Fallback:** measure any claim about `Combat/` that ORDERS asserts and nothing
+has ever measured. There are several; you have found two of them already.
+
+---
+
+## GROUND — `Game/`, `Playtest/`, `Interaction/`
+
+**1. Delete what One-U closed from `GROUND.md`** (One-W). You built the yard
+marker role and the connection rule; both questions are still standing in your
+file asking for them.
+
+**2. `GetDisplayName()` on `ABreakerTravelPoint` (One-U item 13). One method,
+and GLASS is waiting on it.** The property already exists with no getter. Do it
+first among your build items purely because it unblocks someone else.
+
+**3. Authored area levels, and the door shows its own (One-AA).** The door's
+`AreaLevel = 5` is a literal in `BreakerGameMode.cpp:554` and the file already
+says per-yard rift authoring arrives with the yards. Author it properly, and
+publish the level to whatever draws the door — **GLASS draws it; you own the
+number.** `AREA 23` means "level 23 content" now that the requirement derives
+from item level, so this one number is the whole difficulty gauge.
+
+**4. THE SECOND YARD.** The marker role you just built exists to make this
+possible, and it is the largest unlock in the project right now: a second yard
+is **the first thing in this game that can be found**, which is what One-AA's
+exploration reward is parked on. It also gives the connection rule its first
+real subject.
+
+**5. Fernhall is empty (Part Three-E).** The roam space between the yards has
+nothing in it. This is content-shaped, so **report the shape before authoring
+any**: what a roaming player meets between rift doors, and whether it is
+population, encounters, or neither.
+
+**Fallback:** walk a build and report what a player actually hits, in order,
+from the Anchor to a completed rift. You have found two bugs that way that the
+suite could not see.
+
+---
+
+## KIT — `Movement/`, `Abilities/`, `Characters/`
+
+**1. Record the mantle exit (One-T). FIRST — LEDGER is blocked on it.** The pawn
+already carries `MantleElapsed` and `ActiveTraversalDuration`, so "am I
+mantling" is derivable; a completion timestamp does not exist and is one float.
+`RecentlyMantled` is `Afterburn`'s shape, and it is the window Traction
+re-targets onto. **You record; LEDGER re-targets. Not one commit across two
+lanes.**
+
+**2. De-duplicate `KIT.md` and delete all three (One-W).** The file asks the
+same three questions twice, and `ca510a5` and `a1aecc4` — your own commits —
+already answered every one of them.
+
+**3. `MaxStepHeight` authored, and the ledge minimum raised above it (One-V).**
+The vault's 35–45 cm band is unreachable today because the character steps over
+it silently. My expectation is a 45 cm authored step and a 50 cm ledge minimum;
+overturn it with geometry if the yard has risers in that band. **The invariant
+`LedgeMinimumHeightCm > MaxStepHeight` goes in a test** — a relationship that is
+only true in a comment drifts the first time someone tunes one end.
+
+**4. Movement feel (Part Three-F item 2).** The recon, then the report, then
+nothing until it is read. Vault and mantle are new verbs and this is the first
+time the movement set has changed since they landed.
+
+**Fallback:** the feel recon in item 4 is unbounded — extend it rather than
+starting something new.
+
+---
+
+## GLASS — `UI/`
+
+**1. The completion moment (Three-G item 1). First, and it is the loop's
+ending.** `OnRiftCompleted` is broadcast at `BreakerGameMode.cpp:225` and bound
+in exactly one place — LEDGER's payout. The HUD does not bind it. A rift can be
+entered, fought, terminated and paid with nothing on screen marking it. **Do not
+invent the reward summary**; LEDGER owns what was paid, so ask for the seam and
+say in your report whether you need one.
+
+**2. The deployment briefing (Three-G item 2).** Same reason, one beat earlier.
+
+**3. The kill-sound arbitration (Three-G item 3). Report only.** Which voice
+fires on an enemy death, in a build you compiled yourself. Kill is 0.30 s and
+low; hit-confirm is 0.06 s and bright at 1400→920 Hz. **Whether a kill may sound
+like a graze is the owner's and he is asleep.**
+
+**4. The per-archetype weapon cue (One-U item 11).** Yours to build now.
+`weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth, lazily resolved and
+cached, exactly as `PlayAbilityCast` resolves per ability. **No new verb, no
+generic `PlaySound`, no asset field.**
+
+**5. The travel point's noun.** Unblocked the moment GROUND lands their item 2.
+NPC idiom: the name over `F TRAVEL`, not the verb over the verb.
+
+**6. The area level on the door (One-AA).** GROUND authors the number, you draw
+it. Sequence behind their item 3.
+
+**7. The ultimate tint (One-U item 17).** Brief, on ignition only, and **it must
+not survive the ability** — a tint that outlives its cause is the same bug as
+the accidental wash, authored on purpose.
+
+**8. The two account-wide captions (One-Y). LAST, AND GATED.** Neither string
+may land before LEDGER's stash exists. A caption that becomes true later is
+precisely the defect Part One-X is about, and shipping the fix early recreates
+it pointing the other way.
+
+**Fallback:** photograph a UI surface that has never been captured, and say what
+the capture shows that the code does not. Both of the last two readability
+findings came from a picture rather than a file.
+
+---
+
+## THE CRITICAL PATH, SO NOBODY WAITS
+
+```
+  PRESS publishes
+      ├─> KIT records the mantle exit ────────> LEDGER re-targets Traction
+      ├─> GROUND publishes GetDisplayName ────> GLASS names the travel point
+      ├─> GROUND authors area levels ─────────> GLASS draws the door's level
+      ├─> LEDGER lands the required predicate > LEDGER's stash withdrawal
+      ├─> LEDGER lands the stash ─────────────> GLASS lands the captions
+      └─> FIELD lands the full-fight sweep ───> GLASS's telegraph hold lifts
+```
+
+Six edges, and every one of them has the blocked lane holding other work — so
+nobody idles waiting. **If you are the left-hand side of an arrow, that item is
+worth more than its position in your own queue suggests.**
 
 ---
 
