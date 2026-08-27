@@ -801,8 +801,25 @@ O180 landed as two ruled-order commits: unknown rank rows DROP AND
 CREDIT at load (the removed-node tax is repaired, the audit test now
 pins the repair) and then Grind is DELETED onto that safe path,
 Kinetic fifteen -> fourteen. O180 was allocated at push time from
-the rebased ledger. Awaiting: KIT's RecentlyMantled recorder (then
-Traction re-targets), the owner's payout feel check. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
+the rebased ledger. THE OVERNIGHT QUEUE (Part
+Three-H) RAN IN ORDER: O182 (equip requirement derived, gated at the
+player-facing roster, expires at the cap); the account save landed
+(third save object, roster-mirrored, HighestClearedAreaLevel) with
+the first-clear rule (ladder pays once, loot always; unreadable
+account withholds rather than pays untracked); Traction re-targeted
+onto KIT's ledge-exit recorder (RecentlyLedgeTraversed — the enum's
+first post-block self condition CLOSED the target block into a
+range); the STASH landed whole (24-cap O2 transfer point, Anchor-
+only, O182-gated withdrawal, the two-file journal with the account
+as commit point, every crash window replay-tested; the no-id
+ambiguity's two-step consumption documented as deliberate). Item 5
+(the Riftglass fold) is REPORTED, NOT BUILT, per rule 3: One-X's
+summed-migration sketch has three crash-window loss/dup cases, the
+loss-free shape is a roster-driven journaled fold needing the
+character-id payload field, and the design waits on the seat's
+confirmation in Docs/reports/LEDGER.md. Fallback ran: one stale pin
+sentence (the pre-O142 More ratio) caught and corrected by the sweep
+built to catch it. Suite 484 / 3 / 0 at the night's tip. O141 LANDED (469 / 3 / 0): Collapse is the game's ONE
 hit-time More — x1.30 shared, gated on TargetBandBroken, paid by the
 rider path under the one O34 ceiling (headroom, never a slot; the
 clamp is exact because the window chain already folds into
