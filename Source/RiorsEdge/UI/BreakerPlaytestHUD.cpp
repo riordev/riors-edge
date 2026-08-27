@@ -1725,7 +1725,33 @@ void ABreakerPlaytestHUD::DrawInteractPrompt(const ABreakerCharacter* Character,
 #if BREAKER_HAS_LOOT_PICKUP
     if (Character->FindNearbyPickup())
     {
-        DrawSpecTextCentered(TEXT("F  TAKE"), Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+        // A REFUSED PICKUP HAS TO SAY WHY, and this prompt's own rule already
+        // demanded it: the precedence above is restated here "so the prompt can
+        // never advertise a verb the key would not perform". O183 made a full
+        // backpack REFUSE — TryPickup returns false and the drop stays on the
+        // ground — so F TAKE over a full backpack was advertising exactly that.
+        //
+        // SAID BEFORE THE PRESS, NOT AFTER IT. The character discards
+        // TryPickup's bool, so there is no refusal event to react to without a
+        // seam from another lane — but none is needed, because the cap is a
+        // public read and the better feedback is preventive anyway: a player
+        // who is told the bag is full never spends a dead keypress finding out.
+        // The count is stated rather than implied, because "FULL" without a
+        // number is a complaint and 25/25 is an instruction.
+        const UBreakerEquipmentComponent* Equipment = Character->GetEquipment();
+        const int32 Carried = Equipment ? Equipment->GetBackpack().Num() : 0;
+        const bool bBackpackFull = Equipment
+            && Carried >= UBreakerEquipmentComponent::BackpackCapacity;
+        if (bBackpackFull)
+        {
+            DrawSpecTextCentered(
+                FString::Printf(TEXT("BACKPACK FULL  %d/%d"), Carried, UBreakerEquipmentComponent::BackpackCapacity),
+                Center.X, Center.Y + S(90.0f), BreakerUI::Orange, 14.0f);
+        }
+        else
+        {
+            DrawSpecTextCentered(TEXT("F  TAKE"), Center.X, Center.Y + S(90.0f), BreakerUI::Cyan, 14.0f);
+        }
         return;
     }
 #endif
