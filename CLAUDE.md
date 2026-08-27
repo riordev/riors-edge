@@ -2,6 +2,36 @@
 
 ## Current work
 
+KIT LANE, THE POST-VERBS FEEL RECON IS REPORTED (overnight item 4 —
+report only, nothing built until read; full findings in the session
+report). The load-bearing ones: EVERY vault/mantle number has never
+been felt (no owner report post-dates 2026-08-14, and the weight
+comment still awaits a reply that never came); the traversal is
+INVISIBLE to every sibling system — the viewmodel reads it as
+standing still (bob predicate never anticipated a third mode), the
+landing dip cannot fire on exit (3 cm drop), Momentum yields ZERO
+from both verbs AND a mid-fall mantle REFILLS the airborne credit
+(an exploit shape, jump-mantle-fall refunds the 3 s window); the
+jump chain starves the other way than feared — the ledge EATS air
+jumps (no grounded gate, feet sweep the band while falling, the
+third jump is unreachable within 90 cm of banded walls) and
+slide-jump beats the vault at the exact crate a vault serves; the
+VAULT HAS NO GEOMETRY anywhere in the project ([50,80] is empty; the
+one kerb sits at exactly 45.0, ON the step boundary; the 145 riser
+sits at the exact mantle ceiling — both float coin-flips); the wall
+probe traces ECC_Visibility while the clearance uses the capsule
+channel (the collision-profile family's fourth appearance); the
+prediction path is graded honestly — zero impact for the
+listen-server host, hard rubber-band for any remote client, custom
+mode costs ~250-300 lines and fixes three sibling defects at the
+root. ROUTED: the gym's dead wall-ride corridor + tour vantage 5 +
+the playtest template still asking "Wall ride/jump:" with no
+Vault/Mantle line (Playtest/ and Game/ are GROUND's — the template
+string is the cheapest gap in the report); the ledge-ladder gym
+geometry proposal is GROUND's. Two questions filed in KIT.md:
+Momentum for traversals (design), and the custom-mode timing.
+Fallback per the queue: extend the recon when idle.
+
 KIT LANE, THE OVERNIGHT QUEUE'S FIRST THREE (Part Three-H; the
 owner is away and nothing here waited on him). Item 1, FIRST because
 LEDGER is blocked on it: the traversal exit RECORDS — one float on
