@@ -112,6 +112,16 @@ public:
     // until it lands and after). The mantle ceiling below defaults to it.
     static constexpr float MantleStepHeightCm = 145.0f;   // O2 PLACEHOLDER
 
+    // The completion timestamp (Part One-T): LEDGER's RecentlyMantled window
+    // — Afterburn's shape, the one Velocity line a player triggers on
+    // purpose — reads recency off this, exactly as Afterburn reads
+    // GetLastDashTime. Only a COMPLETED traversal records; an aborted one
+    // (blocked mid-move) granted nothing worth a window. KIT records, LEDGER
+    // re-targets — two lanes, two commits, per the rule against authoring at
+    // absent plumbing.
+    UFUNCTION(BlueprintPure, Category="Movement") double GetLastLedgeTraversalTime() const { return LastLedgeTraversalEndTime; }
+    void NotifyLedgeTraversalCompleted();
+
     // Pure rules, exposed for world-free tests (the house pattern).
     // A mantleable wall is near-vertical; a standable top is near-flat.
     static bool IsMantleableWallNormal(float ImpactNormalZ);
@@ -300,7 +310,12 @@ public:
     // (vault max, mantle max]. The mantle ceiling defaults to the published
     // MantleStepHeightCm so the grammar and the verb cannot drift apart.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float MantleReachCm = 90.0f;               // O2 PLACEHOLDER
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float LedgeMinimumHeightCm = 35.0f;        // O2 PLACEHOLDER
+    // 50, not the design's 35 (Part One-V): the engine steps 45 silently, so
+    // a 35-45 ledge resolved as a vault the player could never trigger — the
+    // bottom quarter of the window was dead and no pure test could see it.
+    // The invariant LedgeMinimumHeightCm > MaxStepHeight is pinned in
+    // RiorsEdge.Movement.LedgeVerbs.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float LedgeMinimumHeightCm = 50.0f;        // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float VaultMaximumHeightCm = 80.0f;        // O2 PLACEHOLDER
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0")) float MantleMaximumHeightCm = MantleStepHeightCm;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Ledge", meta=(ClampMin="0.05")) float MantleDurationSeconds = 0.20f;    // O2 PLACEHOLDER
@@ -436,6 +451,9 @@ private:
     bool bSlideRequestConsumed = false;
     bool bSliding = false;
     double LastDashTime = -1000.0;
+    // Sentinel matches LastDashTime's: "never" is far in the past, so recency
+    // reads need no separate has-ever flag.
+    double LastLedgeTraversalEndTime = -1000.0;
     double LastSlideBoostTime = -1000.0;
     float BoostedSpeedCeiling = 0.0f;
     float SavedGroundFriction = 0.0f;

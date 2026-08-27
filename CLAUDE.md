@@ -2,6 +2,26 @@
 
 ## Current work
 
+KIT LANE, THE OVERNIGHT QUEUE'S FIRST THREE (Part Three-H; the
+owner is away and nothing here waited on him). Item 1, FIRST because
+LEDGER is blocked on it: the traversal exit RECORDS — one float on
+the movement component (LastLedgeTraversalEndTime, the dash
+sentinel's shape, read via GetLastLedgeTraversalTime), written by
+the pawn only on a COMPLETED traversal (a blocked abort granted
+nothing a RecentlyMantled window should pay for) — LEDGER re-targets
+Traction onto it in their own commit per One-T. Item 3, One-V's
+ruling: MaxStepHeight is AUTHORED at 45 (never inherited — the
+engine default was silently eating the vault's bottom quarter:
+a 35-45 ledge resolved as a vault the player had already stepped
+over), LedgeMinimumHeightCm rises 35 -> 50 (the kerb walks, the
+crate vaults), and the invariant LedgeMinimum > MaxStepHeight plus
+the authored 45 and the recorder's sentinel are pinned in
+LedgeVerbs. Item 2, One-W: KIT.md carried the three answered One-R
+questions TWICE plus a stale probe note — the file is clean, no
+open questions, and the delete-with-the-answer rule is taken as
+standing. Item 4 (the post-verbs movement feel recon) is next and
+is also the lane's fallback.
+
 KIT LANE, ONE-U'S FOUR ANSWERS LAND: the seat's blocked-question pass
 (6fac190, missed by this lane's truncated diff reads for several
 checks — the loop's check now reads full diffs) answered all four

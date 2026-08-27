@@ -533,6 +533,17 @@ bool FBreakerLedgeVerbsTest::RunTest(const FString& Parameters)
         && Defaults->VaultMaximumHeightCm < Defaults->MantleMaximumHeightCm);
     TestTrue(TEXT("A vault is faster than a mantle — the difference the player feels"),
         Defaults->VaultDurationSeconds < Defaults->MantleDurationSeconds);
+    // Part One-V's invariant: whatever the vault claims, the vault must get.
+    // The engine's silent step is authored (never inherited) and the ledge
+    // minimum sits strictly above it — a 35-45 band once resolved as vaults
+    // the character had already stepped over, and only this relationship,
+    // not either number, keeps that dead band from reopening.
+    TestTrue(TEXT("The ledge minimum sits strictly above the authored silent step"),
+        Defaults->LedgeMinimumHeightCm > Defaults->MaxStepHeight);
+    TestEqual(TEXT("The silent step is authored, not inherited"), Defaults->MaxStepHeight, 45.0f, 0.0f);
+    // The One-T recorder starts at the dash sentinel's "never".
+    TestEqual(TEXT("A fresh component has never completed a traversal"),
+        Defaults->GetLastLedgeTraversalTime(), -1000.0, 0.0);
 
     // THE AGREEMENT PIN: the grammar's copy on the game mode equals the
     // published number. GROUND's re-point makes this trivially true forever;

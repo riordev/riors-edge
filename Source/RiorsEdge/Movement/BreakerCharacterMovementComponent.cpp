@@ -53,6 +53,13 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // here would be a zero-gravity hold — maximum floatiness.
     bApplyGravityWhileJumping = true;
     FallingLateralFriction = 0.05f;
+    // AUTHORED, not inherited (Part One-V): the silent step is the vault's
+    // floor, and a number this load-bearing arriving as an engine default is
+    // the collision-profile defect's third appearance. The kerb walks (45 and
+    // under, no input, no awareness); the crate vaults (50 and up, a chosen
+    // verb that costs 0.12s). LedgeMinimumHeightCm sits strictly above this,
+    // and the LedgeVerbs test pins the relationship.
+    MaxStepHeight = 45.0f;   // O2 PLACEHOLDER
     MaxSimulationTimeStep = 1.0f / 60.0f;
     MaxSimulationIterations = 8;
     NavAgentProps.bCanCrouch = true;
@@ -854,6 +861,11 @@ void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)
     Velocity.Y = SteeredDirection.Y * HorizontalSpeed;
 }
 
+
+void UBreakerCharacterMovementComponent::NotifyLedgeTraversalCompleted()
+{
+    LastLedgeTraversalEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+}
 
 bool UBreakerCharacterMovementComponent::IsMantleableWallNormal(float ImpactNormalZ)
 {

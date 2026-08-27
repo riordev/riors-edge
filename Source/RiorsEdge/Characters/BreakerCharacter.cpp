@@ -272,6 +272,12 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
         {
             Movement->SetMovementMode(MOVE_Falling);
             Movement->Velocity = MoveHit.bBlockingHit ? FVector::ZeroVector : MantleExitVelocity;
+            // Only a COMPLETED traversal records (Part One-T): a blocked
+            // abort granted nothing a RecentlyMantled window should pay for.
+            if (!MoveHit.bBlockingHit)
+            {
+                Movement->NotifyLedgeTraversalCompleted();
+            }
         }
     }
 }
