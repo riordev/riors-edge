@@ -1799,22 +1799,46 @@ void ABreakerPlaytestHUD::DrawInteractableLabels(const ABreakerCharacter* Charac
         // Rift-teal, because travel is the rift verb — the one text colour the
         // reserve permits, on the one label describing a rift object.
         //
-        // THE GETTER, NOT A LITERAL. This line printed TEXT("TRAVEL") while the
-        // prompt directly beneath it called GetPromptLabel(), so the rift door —
-        // the first new interactable in the world, whose label is "Enter Rift" —
-        // said TRAVEL over F ENTER RIFT: two verbs, stacked, one of them wrong.
-        // Found by GROUND's capture, not by the suite, because automation cannot
-        // read a label. A hardcoded verb sitting beside a getter that already
-        // returns the right answer is the shape; the other interactable sites
-        // were checked for it and do not have it (see the report).
+        // THE NPC IDIOM AT LAST: a NOUN over a VERB. This line printed a
+        // hardcoded TRAVEL while the prompt beneath called GetPromptLabel(), so
+        // the rift door said TRAVEL over F ENTER RIFT — two verbs, one wrong.
+        // Calling the prompt getter for both fixed the wrong word and left the
+        // word doubled. GROUND has now published GetDisplayName(), virtual and
+        // overridden on the door to return the rift's own area name, which is
+        // the noun this line always wanted.
         const float GateScale = DistanceScaleFor(Distance);
-        DrawSpecTextCentered(TravelPoint->GetPromptLabel().ToString().ToUpper(),
-            Projected.X, Projected.Y, BreakerUI::TealAnomalous, 13.0f * GateScale);
-        // GetPromptLabel finally gets its caller (ruled: a dead API that
-        // already knew the answer). Same always-drawn verb rule as the NPCs.
+        const FString PromptWord = TravelPoint->GetPromptLabel().ToString().ToUpper();
+        const FString NounWord = TravelPoint->GetDisplayName().ToString().ToUpper();
+        // NEVER PRINT THE SAME WORD TWICE. The base GetDisplayName returns the
+        // PROMPT because "a general gate IS travel; there is no better name for
+        // it than what it does" — correct for the getter, and it means a plain
+        // gate would print TRAVEL over F TRAVEL exactly as before. So the noun
+        // line draws only when it is genuinely a different word: the door gets
+        // its name, the gate gets one honest line, and no site prints a
+        // stutter. GROUND read the Anchor gate's single line as a missing noun;
+        // it is a gate with no noun to give, which is this rule working.
+        float LabelY = Projected.Y;
+        if (!NounWord.IsEmpty() && NounWord != PromptWord)
+        {
+            DrawSpecTextCentered(NounWord, Projected.X, LabelY, BreakerUI::TealAnomalous, 13.0f * GateScale);
+            LabelY += S(15.0f) * GateScale;
+        }
+        // The difficulty gauge, empty on a general gate. GROUND owns the number
+        // — "AREA 5" is level-5 content now the required level derives from item
+        // level — and this lane owns only how it draws: muted and small, under
+        // the name and over the verb, because it qualifies the place rather
+        // than announcing it.
+        const FString DetailWord = TravelPoint->GetDisplayDetail().ToString().ToUpper();
+        if (!DetailWord.IsEmpty())
+        {
+            DrawSpecTextCentered(DetailWord, Projected.X, LabelY, BreakerUI::TextMuted, 10.0f * GateScale);
+            LabelY += S(13.0f) * GateScale;
+        }
+        // Same always-drawn verb rule as the NPCs: muted out of reach, cyan
+        // once F would land.
         const bool bInReach = Distance <= TravelPoint->GetInteractionRange();
-        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *TravelPoint->GetPromptLabel().ToString().ToUpper()),
-            Projected.X, Projected.Y + S(15.0f) * GateScale,
+        DrawSpecTextCentered(FString::Printf(TEXT("F  %s"), *PromptWord),
+            Projected.X, LabelY,
             bInReach ? BreakerUI::Cyan : BreakerUI::TextMuted, 10.0f * GateScale);
     }
 }

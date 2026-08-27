@@ -45,23 +45,24 @@ the gate as lifted.
   against the body count alone is how it gets authored twice, which is the
   reason the hold exists.
 
-## The travel label and its prompt now say the same words (raised, not blocking)
+## The reward is paid where the player cannot see it (GROUND's walk, reported not built)
 
-`BreakerPlaytestHUD.cpp` line ~1742 calls `GetPromptLabel()` as ordered, which
-removes the contradiction — the door no longer says TRAVEL over F ENTER RIFT.
-Worth knowing what it leaves, because I was half-wrong about this earlier and
-the correction matters: I said reusing the prompt getter would "print the verb
-twice". It does — but it **already did** at every ordinary gate, which prints
-TRAVEL over F TRAVEL today. The redundancy is pre-existing, not introduced, and
-the one-line fix is a strict improvement either way.
+GROUND walked Anchor -> Fernhall -> a rift door -> completion and found this on
+my surface: **Riftglass is drawn on the Anchor's HUD and not on the combat
+HUD**, but the payout fires inside the rift at completion. So the number a run
+pays changes on a readout only visible after the player has left the run and
+travelled home. The completion moment is the one moment the reward is about,
+and it currently shows nothing about it.
 
-- The NPC block beside it is **noun then verb**: `GetDisplayName()` over a
-  literal `F TALK`. The travel block is now **verb then verb**.
-- `ABreakerTravelPoint` already has a `DisplayName` UPROPERTY with no getter, so
-  the noun exists and is simply unreachable from the HUD. A `GetDisplayName()`
-  on that actor would restore the NPC idiom — which is what GROUND originally
-  proposed before the cheaper fix was ruled.
-- **Question:** leave it verb-over-verb, or ask GROUND for the name getter so
-  travel points read like NPCs do? Purely presentational, nothing waits on it,
-  and I would not open another lane's header for it without the ask.
+- I have NOT built this. ORDERS item 1 says *do not invent the reward summary*,
+  LEDGER owns what was paid, and my banner deliberately carries no figure.
+  GROUND's observation does not change who owns the number — it strengthens the
+  case that someone should show it.
+- O168 put the broadcast at the latch so the reward reads "standing in the rift
+  you just beat" rather than during a loading screen. Nothing reads there.
+- **Question:** should the completion banner carry the payout? If yes, I need a
+  seam from LEDGER stating what was paid — I will not recompute it, because two
+  lanes deriving one number is how they come to disagree. If no, the answer is
+  probably that Riftglass belongs on the combat HUD too, which is a social-trim
+  decision and also not mine.
 
