@@ -7,6 +7,7 @@
 #include "Combat/BreakerMonsterChassis.h"
 #include "Combat/BreakerBodyPaint.h"
 #include "Combat/BreakerEnemyModifiers.h"
+#include "Combat/BreakerRangedBehavior.h"
 #include "Items/BreakerDropTable.h"
 #include "BreakerEnemy.generated.h"
 
@@ -219,6 +220,10 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy") float GetMoveSpeed() const { return MoveSpeed; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetWeaveStrength() const { return WeaveStrength; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetAttackRange() const { return AttackRange; }
+    // Read-only, so the ring's shipped configuration is assertable: an inverted
+    // band never classifies Hold and the ring silently stops existing.
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalInnerRatio() const { return ArrivalInnerRatio; }
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalHysteresisCm() const { return ArrivalHysteresisCm; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetLungeRange() const { return LungeRange; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool DoesRespawn() const { return bRespawns; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool DoesExplodeOnDeath() const { return bExplodesOnDeath; }
@@ -395,6 +400,38 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float DetectionRange = 2200.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float AttackRange = 260.0f;
+
+    // --- THE ARRIVAL RING (One-S) -----------------------------------------
+    // The chase vector aimed every body at the same coordinate and nothing
+    // zeroed it inside AttackRange: the label changed to ATTACK, the attack
+    // fired on its cooldown, and the body KEPT WALKING at MoveSpeed. N bodies
+    // chasing one point arrive at one point — and since the player is a Pawn
+    // and enemy capsules answer Pawn with OVERLAP, they arrived INSIDE him.
+    // That is the stack the owner reported, and it is the absence of an
+    // arrival rather than a separation defect.
+    //
+    // REUSED, NOT RE-DERIVED. UBreakerRangedBehaviorLibrary::ClassifyBand is a
+    // distance-band classifier with hysteresis and nothing in it is
+    // ranged-specific. Melee is the same machine with a THIN band at contact
+    // instead of a wide one at standoff — the ranged header's own warning that
+    // "a ranged enemy that advances forever is a slow melee enemy" describes
+    // the melee enemy exactly, and the cure was one directory away.
+    //
+    // Inner edge as a RATIO of AttackRange rather than a constant, because
+    // archetypes override AttackRange (the Warden reaches further than a
+    // Skitter) and a fixed inner edge would invert the band on whichever of
+    // them is closest. All O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0", ClampMax="1"))
+    float ArrivalInnerRatio = 0.70f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0"))
+    float ArrivalHysteresisCm = 25.0f;
+    // Backing off is deliberate and not symmetric with closing: it exists so a
+    // player who walks INTO the ring is not swallowed by it. Slower than the
+    // advance, because a crowd that sprints backwards reads as fleeing.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0"))
+    float ArrivalRetreatSpeedScale = 0.6f;
+    // Hysteresis needs the previous band, so the controller's state lives here.
+    EBreakerRangedBand ArrivalBand = EBreakerRangedBand::Advance;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy", meta=(ClampMin="0")) float MoveSpeed = 330.0f;
     // DERIVED, not authored: ApplyChassis overwrites this every time the area
     // level or rank changes. Author the archetype's damage as

@@ -580,6 +580,31 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     StateLabel = Distance <= AttackRange ? TEXT("ATTACK") : TEXT("CHASE");
     if (Distance <= AttackRange) PerformAttack(Player);
 
+    // THE ARRIVAL RING. Hold zeroes the RADIAL component and nothing else, so
+    // a body at the ring stops closing, keeps facing its target and keeps
+    // attacking. Retreat backs it off when the player walks in, which is what
+    // stops the ring being swallowed rather than merely formed.
+    //
+    // Deliberately NOT an early return. The lunge blocks below own a COMMITTED
+    // action with a locked direction, and a body that drifts into the band
+    // mid-wind-up must be allowed to finish rather than freeze holding a
+    // telegraph it never pays off. The ring governs the chase; it does not
+    // govern a leap that has already been announced to the player.
+    ArrivalBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
+        AttackRange * ArrivalInnerRatio, AttackRange, ArrivalHysteresisCm, ArrivalBand);
+    if (ArrivalBand != EBreakerRangedBand::Advance)
+    {
+        const float RadialSign = UBreakerRangedBehaviorLibrary::GetBandRadialSign(ArrivalBand);
+        OutDirection = ToPlayer * RadialSign;
+        OutSpeedScale = UBreakerRangedBehaviorLibrary::GetBandSpeedScale(
+            ArrivalBand, 1.0f, ArrivalRetreatSpeedScale, 0.0f);
+        // Facing is set explicitly because a held body has no movement
+        // direction to derive one from, and an enemy attacking the player
+        // while facing where it last walked is worse than the stack was.
+        DesiredFacing = ToPlayer;
+        StateLabel = ArrivalBand == EBreakerRangedBand::Hold ? TEXT("ATTACK") : TEXT("BACK OFF");
+    }
+
     // (a) Closing sprint: far away, they commit to closing the gap
     // instead of ambling. Inside SprintRange they drop to normal so the
     // player still gets readable spacing at knife range.

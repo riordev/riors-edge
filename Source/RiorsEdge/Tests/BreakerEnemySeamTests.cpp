@@ -229,4 +229,61 @@ bool FBreakerRiftTerminatorMarkTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerArrivalRingTest,
+    "RiorsEdge.Combat.EnemySeams.ArrivalRing",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerArrivalRingTest::RunTest(const FString& Parameters)
+{
+    // THE RING'S SHIPPED CONFIGURATION, and the failure it pins is silent.
+    // The band is AttackRange * ArrivalInnerRatio -> AttackRange. A ratio at or
+    // above 1 INVERTS it, and an inverted band never classifies Hold — so the
+    // ring would simply stop existing, every body would resume closing to a
+    // point, and nothing would report an error. The stack would come back
+    // looking exactly like it did before, with the code that fixed it still in
+    // place and still running.
+    //
+    // The second assertion is the one that keeps the ring USEFUL rather than
+    // merely present: a body holding at the ring must still be inside
+    // AttackRange, or the crowd arrives at a standoff it cannot attack from and
+    // the fight quietly stops happening.
+    for (UClass* EnemyClass : { ABreakerEnemy::StaticClass(), ABreakerAlteredEnemy::StaticClass(),
+        ABreakerSkirmisherEnemy::StaticClass(), ABreakerWardenEnemy::StaticClass(),
+        ABreakerBossEnemy::StaticClass() })
+    {
+        const ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>(GetTransientPackage(), EnemyClass);
+        if (!Enemy) { AddError(FString::Printf(TEXT("%s failed to construct"), *EnemyClass->GetName())); continue; }
+        const FString Name = EnemyClass->GetName();
+
+        // Ranged archetypes replace TickEngagedBehaviour wholesale and author
+        // no contact attack, so the ring is not theirs to satisfy.
+        if (Enemy->GetAttackRange() <= 0.0f) continue;
+
+        const float Inner = Enemy->GetAttackRange() * Enemy->GetArrivalInnerRatio();
+        TestTrue(FString::Printf(TEXT("%s: the arrival band is not inverted"), *Name),
+            Inner < Enemy->GetAttackRange());
+        TestTrue(FString::Printf(TEXT("%s: the arrival band is not degenerate"), *Name),
+            Enemy->GetAttackRange() - Inner > KINDA_SMALL_NUMBER);
+
+        // Hold anywhere in the band means the body is inside attack range, so
+        // PerformAttack still fires while it holds station.
+        const float BandMidpoint = (Inner + Enemy->GetAttackRange()) * 0.5f;
+        TestTrue(FString::Printf(TEXT("%s: a body holding at the ring is inside attack range"), *Name),
+            BandMidpoint <= Enemy->GetAttackRange());
+        TestEqual(FString::Printf(TEXT("%s: mid-band classifies as Hold"), *Name),
+            UBreakerRangedBehaviorLibrary::ClassifyBand(BandMidpoint, Inner, Enemy->GetAttackRange(),
+                Enemy->GetArrivalHysteresisCm(), EBreakerRangedBand::Advance),
+            EBreakerRangedBand::Hold);
+    }
+
+    // And the property the whole ring rests on: Hold contributes NO radial
+    // movement. If this ever returns non-zero the ring becomes a slow chase.
+    TestEqual(TEXT("Hold contributes no radial movement"),
+        UBreakerRangedBehaviorLibrary::GetBandRadialSign(EBreakerRangedBand::Hold), 0.0f);
+    TestTrue(TEXT("Retreat backs away rather than closing"),
+        UBreakerRangedBehaviorLibrary::GetBandRadialSign(EBreakerRangedBand::Retreat) < 0.0f);
+    return true;
+}
+
 #endif   // WITH_DEV_AUTOMATION_TESTS
