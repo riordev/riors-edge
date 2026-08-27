@@ -149,27 +149,30 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerConditionVocabularyPartitionTest::RunTest(const FString& Parameters)
 {
-    // IsTargetCondition is a >= comparison against the index of the first target
-    // entry, which is what lets a newly appended target condition classify
-    // itself with no second edit. The property that makes that safe is that the
-    // target block is CONTIGUOUS AND LAST. If someone appends a self condition
-    // after the target block, this fails — which is the intended alarm, because
-    // the classification would otherwise silently mislabel it.
-    bool bSeenTarget = false;
+    // IsTargetCondition tests the CLOSED range [TargetAiling,
+    // TargetBandBroken]. It was ">= first target" until the enum's
+    // append-only rule met its first post-block SELF condition
+    // (RecentlyLedgeTraversed): a self condition cannot be inserted before
+    // the block without renumbering serialized values, so it appends after,
+    // and the block closed. The pin is now the block itself: contiguous
+    // target entries inside the range, self everywhere outside it, and a
+    // future target condition extends LastTargetConditionIndex in the same
+    // commit it appends — this loop is the alarm if it forgets.
     for (int32 Index = 0; Index < FBreakerBuildConditionState::ConditionCount; ++Index)
     {
         const EBreakerBuildCondition Condition = static_cast<EBreakerBuildCondition>(Index);
-        const bool bIsTarget = FBreakerBuildConditionState::IsTargetCondition(Condition);
-        if (bIsTarget) bSeenTarget = true;
-        else
-        {
-            TestFalse(
-                *FString::Printf(TEXT("self condition '%s' does not appear after the target block -- append self conditions BEFORE TargetAiling"),
-                    FBreakerBuildConditionState::DescribeCondition(Condition)),
-                bSeenTarget);
-        }
+        const bool bInBlock = Index >= FBreakerBuildConditionState::FirstTargetConditionIndex
+            && Index <= FBreakerBuildConditionState::LastTargetConditionIndex;
+        TestEqual(
+            *FString::Printf(TEXT("condition '%s' classifies by the closed target block"),
+                FBreakerBuildConditionState::DescribeCondition(Condition)),
+            FBreakerBuildConditionState::IsTargetCondition(Condition), bInBlock);
     }
-    TestTrue(TEXT("at least one target condition exists"), bSeenTarget);
+    TestTrue(TEXT("the target block is non-empty"),
+        FBreakerBuildConditionState::LastTargetConditionIndex >= FBreakerBuildConditionState::FirstTargetConditionIndex);
+    TestTrue(TEXT("the block's edges are the named entries"),
+        FBreakerBuildConditionState::FirstTargetConditionIndex == static_cast<int32>(EBreakerBuildCondition::TargetAiling)
+        && FBreakerBuildConditionState::LastTargetConditionIndex == static_cast<int32>(EBreakerBuildCondition::TargetBandBroken));
 
     // Always is a self condition and must never need target information, or
     // every unconditional line in the game would depend on the damage pipeline.

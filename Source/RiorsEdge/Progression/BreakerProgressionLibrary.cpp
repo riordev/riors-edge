@@ -1173,16 +1173,17 @@ UBreakerProgressionTree* UBreakerProgressionLibrary::GetCoreSliceTree()
     Afterburn->GrantedTags.AddTag(BreakerNodeTags::Node_Afterburn.GetTag());
     Tree->Nodes.Add(Afterburn);
 
-    // THE LINE RETIRED WITH ITS VERB (Part One-R): the Damage line was gated
-    // on WallRiding, wall-ride left Movement/ for vault and mantle, and a
-    // line on a never-true condition is the dead-lane bug wearing a node. It
-    // RE-TARGETS onto whichever new verb offers the same narrow-window
-    // fantasy THE DAY that verb records state (a mantle window is the obvious
-    // candidate) — never before, per the design rule against authoring at
-    // absent plumbing. Until then the node is deliberately silent (the tag is
-    // spare capacity) and the census carries it.
+    // RE-TARGETED (One-T, the deferred half landed): the wall-ride line
+    // retired with its verb, and the new window is the LEDGE EXIT — KIT's
+    // recorder writes a completion timestamp for vault and mantle, and
+    // RecentlyLedgeTraversed is Afterburn's exact shape (a triggered window,
+    // not a lived state; a 0.20 s Mantling gate would be a coin flip no
+    // player can aim at, One-T's own argument). The narrow-window fantasy
+    // survives the verb swap: damage in the seconds after a deliberate
+    // traversal.
     UBreakerProgressionNode* Traction = MakeNode(TEXT("Core.Velocity.Traction"), TEXT("Traction"),
-        TEXT("Its window retired with the wall ride; a new one arrives with the new movement verbs."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+        TEXT("Increased damage in the seconds after vaulting or mantling."), EBreakerPointCurrency::CorePoints, EBreakerClassId::None, 1, 1, 1, TEXT("Velocity"));
+    AddEffect(Traction, EBreakerNodeStatTarget::Damage, EBreakerNodeStatBucket::IncreasedPercent, 3.0f, EBreakerBuildCondition::RecentlyLedgeTraversed); // O2 PLACEHOLDER
     Traction->GrantedTags.AddTag(BreakerNodeTags::Node_Traction.GetTag());
     Tree->Nodes.Add(Traction);
 

@@ -205,6 +205,25 @@ enum class EBreakerBuildCondition : uint8
     // nor clears it; the enemy pool clears it on revive.
     TargetBandBroken,
 
+    // ---- SELF, appended after the closed target block (26) ---------------
+    // The enum is serialized by value, so a new SELF condition cannot be
+    // inserted before the target block — it appends HERE, and classification
+    // stopped being "everything from TargetAiling onward" the day this
+    // arrived: the target block is CLOSED, [TargetAiling, TargetBandBroken],
+    // and IsTargetCondition tests the range. A future target condition
+    // appends at the end and extends LastTargetConditionIndex deliberately.
+    //
+    // Within RecentEventSeconds of the movement component's
+    // GetLastLedgeTraversalTime() — the completion timestamp KIT's recorder
+    // writes for BOTH ledge verbs (vault and mantle share the exit path). A
+    // COMPLETED traversal only: an aborted mantle records nothing, so this
+    // can never pay for a verb that granted nothing. One-T named the window
+    // "RecentlyMantled"; it widened to the traversal pair because the
+    // recorder is shared and both verbs are deliberate triggers — a
+    // mantle-only window waits until a node actually wants the distinction,
+    // and KIT splits the recorder then rather than a duration being sniffed.
+    RecentlyLedgeTraversed,
+
     Count UMETA(Hidden)
 };
 
@@ -216,12 +235,16 @@ struct RIORSEDGE_API FBreakerBuildConditionState
 {
     static constexpr int32 ConditionCount = static_cast<int32>(EBreakerBuildCondition::Count);
 
-    // The index of the first TARGET condition. Everything at or above it is a
-    // two-actor fact that EvaluateForActor structurally cannot answer. Kept as
-    // one constant rather than a switch so that adding a target condition at
-    // the end of the enum classifies itself correctly with no second edit —
-    // the classification cannot drift out of sync with the enum.
+    // The CLOSED target block: [TargetAiling, TargetBandBroken]. Everything
+    // inside it is a two-actor fact that EvaluateForActor structurally cannot
+    // answer. The block was "everything from TargetAiling onward" until the
+    // first post-block SELF condition (RecentlyLedgeTraversed) had to append
+    // at the serialized end — the enum is append-only by value, so a self
+    // condition cannot be inserted before the block. A future TARGET
+    // condition appends at the end and extends LastTargetConditionIndex in
+    // the same commit; the partition test holds the block closed until then.
     static constexpr int32 FirstTargetConditionIndex = static_cast<int32>(EBreakerBuildCondition::TargetAiling);
+    static constexpr int32 LastTargetConditionIndex = static_cast<int32>(EBreakerBuildCondition::TargetBandBroken);
 
     // O2 PLACEHOLDER: how long "recently dashed" lasts. Long enough to cover a
     // burst of fire after the dash, short enough that it is not just "on".
@@ -331,7 +354,8 @@ struct RIORSEDGE_API FBreakerBuildConditionState
     // hitting. Drives which half of the pipeline has to supply it.
     static bool IsTargetCondition(EBreakerBuildCondition Condition)
     {
-        return static_cast<int32>(Condition) >= FirstTargetConditionIndex;
+        const int32 Index = static_cast<int32>(Condition);
+        return Index >= FirstTargetConditionIndex && Index <= LastTargetConditionIndex;
     }
 
     // Whether EvaluateForActor populates this condition today. False for the

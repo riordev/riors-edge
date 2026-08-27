@@ -110,6 +110,7 @@ const TCHAR* FBreakerBuildConditionState::DescribeCondition(EBreakerBuildConditi
     case EBreakerBuildCondition::TargetElite:           return TEXT("TargetElite");
     case EBreakerBuildCondition::TargetAtCloseRange:    return TEXT("TargetAtCloseRange");
     case EBreakerBuildCondition::TargetBandBroken:      return TEXT("TargetBandBroken");
+    case EBreakerBuildCondition::RecentlyLedgeTraversed: return TEXT("RecentlyLedgeTraversed");
     // No default. A new enum entry must fail to compile here rather than fall
     // through to a placeholder — "STAT" in UI/BreakerMenu.cpp's two label
     // switches is exactly that mistake, and it is why every damage node on the
@@ -246,6 +247,11 @@ FBreakerBuildConditionState FBreakerBuildConditionState::EvaluateForActor(const 
         {
             const float SinceDash = World->GetTimeSeconds() - Movement->GetLastDashTime();
             State.Set(EBreakerBuildCondition::RecentlyDashed, SinceDash >= 0.0f && SinceDash <= RecentDashSeconds);
+            // KIT's ledge-exit recorder (the dash shape: completion
+            // timestamp, negative sentinel for never). The Recently* family
+            // constant, not a new one.
+            const float SinceLedge = World->GetTimeSeconds() - static_cast<float>(Movement->GetLastLedgeTraversalTime());
+            State.Set(EBreakerBuildCondition::RecentlyLedgeTraversed, SinceLedge >= 0.0f && SinceLedge <= RecentEventSeconds);
         }
     }
 
