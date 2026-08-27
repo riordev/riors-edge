@@ -5363,13 +5363,26 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterSelectScreen()
                 { TEXT("ESC"), TEXT("BACK") } })
         ];
 
-    // The header's standing facts: the slot count, and O17/O51 in one caption
-    // — gear, Riftglass and the stash are account assets.
+    // The header's standing facts: the slot count, and what actually crosses
+    // between characters.
+    //
+    // THIS CAPTION NAMED THREE THINGS AND WAS WRONG ABOUT TWO. Gear is NOT
+    // account-wide — equipped items live in the character save's EquippedItems
+    // — and it was telling the player something false about the one decision
+    // they cannot take back. Riftglass is not account-wide EITHER, yet: the
+    // account save carries the stash and mentions the currency fold only in
+    // comments, because the fold is confirmed and ordered but not built.
+    //
+    // So the line names the ONE account asset that exists, and names the stash
+    // as the ROUTE rather than claiming the gear itself crosses. Understating
+    // is safe; a caption that becomes true later is the defect this whole
+    // correction is about, and naming Riftglass today would recreate it
+    // pointing the other way. Riftglass joins this line when the fold lands.
     return BreakerScreenShell(TEXT("MAIN"), TEXT("BREAKERS"),
         BreakerMonoText(FText::FromString(FString::Printf(TEXT("%d OF %d"),
             Roster->Characters.Num(), UBreakerCharacterRoster::MaxCharacters)),
             BreakerUI::TypeCaption, Muted, 0.16f),
-        BreakerMonoText(FText::FromString(TEXT("GEAR · RIFTGLASS · STASH ARE ACCOUNT-WIDE")),
+        BreakerMonoText(FText::FromString(TEXT("THE STASH IS ACCOUNT-WIDE · GEAR CROSSES THROUGH IT")),
             BreakerUI::TypeCaption, Muted, 0.16f),
         FOnClicked::CreateSP(this, &SBreakerMenu::GoBack),
         Body);
@@ -5684,11 +5697,15 @@ TSharedRef<SWidget> SBreakerMenu::BuildCharacterCreateScreen()
         MakeSummaryRow(TEXT("RESOURCE"), Selected ? FString(Selected->Resource) : FString(TEXT("NOT CHOSEN")),
             Selected ? Primary : Muted)
     ];
-    // O17: gear is an account asset, and the rail says so at the moment of
-    // creation, when it matters most.
+    // THE ROW STAYS; ONLY THE CLAIM CHANGES. Its own comment was right about
+    // why it exists — this appears at the moment of creation, when it matters
+    // most — so deleting it was the wrong fix even though "ACCOUNT-WIDE" was
+    // false. What a player choosing a PERMANENT class needs to hear is not a
+    // storage fact, it is that the gear they already own can arm this
+    // character: the stash is the route and it is real today. Say that.
     Rail->AddSlot().AutoHeight().Padding(0.0f, BreakerUI::Space8, 0.0f, 0.0f)
     [
-        MakeSummaryRow(TEXT("GEAR"), FString(TEXT("ACCOUNT-WIDE")), Primary)
+        MakeSummaryRow(TEXT("GEAR"), FString(TEXT("VIA STASH")), Primary)
     ];
 
     // The status line, reserved at two caption lines so a refusal cannot
