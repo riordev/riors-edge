@@ -1172,3 +1172,11 @@ three source files, not the whole tree.
 
 **A plan that proposes to "reconcile", "preserve", or "carry forward" is
 wrong.** Reject and re-scope.
+
+## Machine note - seat 2
+
+- Repo path: C:/Users/Administrator/Desktop/riors-edge
+- Engine: C:/Program Files/Epic Games/UE_5.8
+- One lane, one machine: a lane runs on exactly one machine at a time -
+  commit and push before any other seat touches the same lane.
+
