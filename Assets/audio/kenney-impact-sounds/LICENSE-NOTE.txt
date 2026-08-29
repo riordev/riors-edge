@@ -1,0 +1,4 @@
+﻿Kenney - Impact Sounds 1.0 (130 .ogg), committed whole.
+Source: https://kenney.nl/assets/impact-sounds
+License: CC0 1.0 (in-pack License.txt).
+Date: 2026-08-29
