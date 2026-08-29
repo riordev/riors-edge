@@ -55,31 +55,37 @@ namespace
 }
 
 // Dev preview for the named-body hook: applies a mesh (and optional looped
-// idle) to every LIVE enemy, so the intake meshes can be judged on real
-// combatants in the gym without any chassis shipping a default. A preview
-// instrument, not a config surface — enemies spawned after the command still
-// come up primitive, which is the shipped look until FIELD rules otherwise.
+// idle) to every LIVE enemy AND arms a session default that enemies spawned
+// afterwards pick up at BeginPlay — -ExecCmds runs before the gym has spawned
+// anything, so a live-only sweep from the command line applied to zero bodies
+// and photographed nothing. Console-only state, cleared with no arguments;
+// nothing ships through it, which NoEnemyShipsANamedBody keeps true.
 //   Breaker.EnemyBody /Game/Breaker/Meshes/enemies/Rat.Rat [/Game/.../Rig_Idle.Rig_Idle]
+//   Breaker.EnemyBody            (clears the preview for later spawns)
+static FString BreakerEnemyBodyPreviewMesh;
+static FString BreakerEnemyBodyPreviewAnim;
 static FAutoConsoleCommandWithWorldAndArgs BreakerEnemyBodyPreviewCommand(
     TEXT("Breaker.EnemyBody"),
-    TEXT("Preview: fit a skeletal mesh onto every live enemy. Args: <MeshObjectPath> [IdleAnimObjectPath]."),
+    TEXT("Preview: fit a skeletal mesh onto every live enemy and every later spawn. Args: <MeshObjectPath> [IdleAnimObjectPath]; none clears."),
     FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
     {
-        if (!World || Args.Num() < 1)
+        BreakerEnemyBodyPreviewMesh = Args.Num() > 0 ? Args[0] : FString();
+        BreakerEnemyBodyPreviewAnim = Args.Num() > 1 ? Args[1] : FString();
+        if (!World || BreakerEnemyBodyPreviewMesh.IsEmpty())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[BreakerEnemy] Breaker.EnemyBody needs a mesh object path."));
+            UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyBody preview cleared."));
             return;
         }
         int32 Applied = 0;
         for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
         {
-            It->BodyMeshAsset = FSoftObjectPath(Args[0]);
-            if (Args.Num() > 1) It->BodyIdleAnimation = FSoftObjectPath(Args[1]);
+            It->BodyMeshAsset = FSoftObjectPath(BreakerEnemyBodyPreviewMesh);
+            if (!BreakerEnemyBodyPreviewAnim.IsEmpty()) It->BodyIdleAnimation = FSoftObjectPath(BreakerEnemyBodyPreviewAnim);
             It->ApplyBodyMesh();
             ++Applied;
         }
-        UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyBody applied %s to %d live enemies."),
-            *Args[0], Applied);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyBody applied %s to %d live enemies (armed for later spawns)."),
+            *BreakerEnemyBodyPreviewMesh, Applied);
     }));
 
 ABreakerEnemy::ABreakerEnemy()
@@ -227,7 +233,14 @@ void ABreakerEnemy::BeginPlay()
 
     // Editor-placed enemies carry BodyMeshAsset as a property; spawners that
     // set it after SpawnActor call ApplyBodyMesh themselves — ABreakerNPC's
-    // contract, kept identical so there is one rule to know.
+    // contract, kept identical so there is one rule to know. An UNSET body
+    // takes the armed Breaker.EnemyBody preview, so a command issued from
+    // -ExecCmds reaches enemies the gym spawns after it ran.
+    if (!BodyMeshAsset.IsValid() && !BreakerEnemyBodyPreviewMesh.IsEmpty())
+    {
+        BodyMeshAsset = FSoftObjectPath(BreakerEnemyBodyPreviewMesh);
+        if (!BreakerEnemyBodyPreviewAnim.IsEmpty()) BodyIdleAnimation = FSoftObjectPath(BreakerEnemyBodyPreviewAnim);
+    }
     ApplyBodyMesh();
 }
 
