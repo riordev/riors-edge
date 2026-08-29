@@ -1180,3 +1180,12 @@ wrong.** Reject and re-scope.
 - One lane, one machine: a lane runs on exactly one machine at a time -
   commit and push before any other seat touches the same lane.
 
+- LFS warning for the MAIN BOX: the assets/placeholder-intake branch
+  introduces Git LFS rules and ~370 MB of LFS-tracked meshes/audio. Install
+  git-lfs on a seat BEFORE pulling, or every mesh arrives as a small pointer
+  text file and editor imports fail confusingly.
+- Fab items (Game Animation Sample, Paragon Sevarog) are Epic-account
+  licenses delivered via the launcher after UE 5.8 is installed - not files
+  to copy between seats. Sevarog is "Add to Project" into this repo and is
+  ignored per .gitignore; GASP is its own separate sample project on disk,
+  outside this repo.
