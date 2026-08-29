@@ -1,0 +1,4 @@
+﻿Kenney - Sci-Fi Sounds, committed whole.
+Source: https://kenney.nl/assets/sci-fi-sounds
+License: CC0 1.0 (in-pack License.txt).
+Date: 2026-08-29
