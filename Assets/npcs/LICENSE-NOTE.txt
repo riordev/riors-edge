@@ -1,0 +1,5 @@
+﻿NPC cast ruling (owner, 2026-08-29): ONE body family keeps the NPC cast
+coherent - universal-base-characters is that family. The second Quaternius
+base pack (George/Leela/Mike/Stan, drive-download distribution) is skipped
+PERMANENTLY; it was briefly vendored here as base-characters/ and removed
+by this ruling. Do not re-intake it from Downloads.

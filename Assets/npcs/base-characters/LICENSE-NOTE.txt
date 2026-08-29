@@ -1,9 +1,0 @@
-﻿Quaternius - base character pack (George, Leela, Mike, Stan; 4 recolor
-variations each). The in-pack License.txt uses Quaternius's generic
-header, so the exact pack title is unconfirmed. Distinct from
-npcs/universal-base-characters.
-Source: https://quaternius.com (Google Drive distribution).
-License: CC0 1.0 (in-pack License.txt).
-Vendored: Textured FBX + all textures. Flat Colors variant,
-glTF/OBJ/Blend duplicates and turntable gif deleted.
-Date: 2026-08-29
