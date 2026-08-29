@@ -1,0 +1,8 @@
+﻿Quaternius - modular gun pack (AR/SMG/Sniper/Pistol/Shotgun parts;
+also contains crossbows). Downloaded as the manifest's "Sci-Fi Modular
+Gun Pack"; the in-pack License.txt uses Quaternius's generic header, so
+the exact pack title is unconfirmed.
+Source: https://quaternius.com (Google Drive distribution).
+License: CC0 1.0 (in-pack License.txt).
+Vendored: Guns FBX + preview. OBJ/glTF/Blend deleted.
+Date: 2026-08-29

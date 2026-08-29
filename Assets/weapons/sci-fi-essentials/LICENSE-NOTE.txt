@@ -1,0 +1,7 @@
+﻿Quaternius - Sci-Fi Essentials Kit, Standard (free) tier.
+Source: https://quaternius.com
+License: Quaternius free packs are CC0 1.0 (stated on quaternius.com);
+in-pack License_Standard.txt describes the free tier.
+Vendored: the GUN slice only (Gun_*.fbx + T_Guns_* textures).
+Enemies are in Assets/enemies/sci-fi-essentials; props/trim not vendored.
+Date: 2026-08-29

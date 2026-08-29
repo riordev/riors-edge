@@ -1,0 +1,5 @@
+﻿Kenney - Blaster Kit 2.1.
+Source: https://kenney.nl/assets/blaster-kit
+License: CC0 1.0 (in-pack License.txt).
+Vendored: FBX + its Textures. GLB/OBJ duplicates deleted.
+Date: 2026-08-29
