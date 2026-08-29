@@ -1,0 +1,6 @@
+﻿Staged font families, NOT wired - the type cast is not ruled yet.
+Google Fonts downloads: Archivo, Barlow Condensed, JetBrains Mono.
+License: SIL OFL 1.1 (each family's OFL.txt).
+Vendored: variable/root TTFs + OFL per family; static/ weight
+duplicates not vendored (the variable fonts cover them).
+Date: 2026-08-29
