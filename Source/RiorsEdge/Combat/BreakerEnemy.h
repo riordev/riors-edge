@@ -392,6 +392,26 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBoxComponent> BodyHitBox;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USphereComponent> WeakPoint;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> WeakPointVisual;
+
+public:
+    // --- THE NAMED BODY (asset-intake wiring) -----------------------------
+    // ABreakerNPC's pattern, skeletal: when BodyMeshAsset resolves it replaces
+    // the six primitives whole, fitted to the capsule by BreakerEnemyBodyMath;
+    // unset (the DEFAULT — nothing ships one yet) the primitives stand
+    // untouched, so a clone without the imported packs still fights. The weak
+    // point stays visible either way: it is gameplay, not dressing. KNOWN AND
+    // DELIBERATE: rank paint and the hit-reaction tint ramp speak the
+    // primitives' dynamic-material language and do NOT transfer to a named
+    // body — defaulting meshes on is FIELD's readability call, not this
+    // hook's, which is why no chassis sets one.
+    UFUNCTION(BlueprintCallable, Category="Enemy") void ApplyBodyMesh();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyMeshAsset;
+    // Optional looped idle so a named body poses instead of T-posing; the
+    // imported packs ship *_Idle sequences beside every mesh.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyIdleAnimation;
+protected:
+    // Hidden until BodyMeshAsset resolves.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> NamedBody;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;

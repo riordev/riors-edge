@@ -1,6 +1,10 @@
 #include "Combat/BreakerEnemy.h"
 
+#include "Combat/BreakerEnemyBodyMath.h"
 #include "Combat/BreakerHitReactionComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimSequence.h"
 
 #include "Items/BreakerAffixLibrary.h"
 
@@ -49,6 +53,34 @@ namespace
         }
     }
 }
+
+// Dev preview for the named-body hook: applies a mesh (and optional looped
+// idle) to every LIVE enemy, so the intake meshes can be judged on real
+// combatants in the gym without any chassis shipping a default. A preview
+// instrument, not a config surface — enemies spawned after the command still
+// come up primitive, which is the shipped look until FIELD rules otherwise.
+//   Breaker.EnemyBody /Game/Breaker/Meshes/enemies/Rat.Rat [/Game/.../Rig_Idle.Rig_Idle]
+static FAutoConsoleCommandWithWorldAndArgs BreakerEnemyBodyPreviewCommand(
+    TEXT("Breaker.EnemyBody"),
+    TEXT("Preview: fit a skeletal mesh onto every live enemy. Args: <MeshObjectPath> [IdleAnimObjectPath]."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+    {
+        if (!World || Args.Num() < 1)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerEnemy] Breaker.EnemyBody needs a mesh object path."));
+            return;
+        }
+        int32 Applied = 0;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            It->BodyMeshAsset = FSoftObjectPath(Args[0]);
+            if (Args.Num() > 1) It->BodyIdleAnimation = FSoftObjectPath(Args[1]);
+            It->ApplyBodyMesh();
+            ++Applied;
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyBody applied %s to %d live enemies."),
+            *Args[0], Applied);
+    }));
 
 ABreakerEnemy::ABreakerEnemy()
 {
@@ -136,6 +168,14 @@ ABreakerEnemy::ABreakerEnemy()
     WeakPointVisual->SetupAttachment(WeakPoint);
     WeakPointVisual->SetRelativeScale3D(FVector(0.4f));
     WeakPointVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // The named body: hidden until BodyMeshAsset resolves in ApplyBodyMesh.
+    // Created unconditionally so an editor-placed enemy can be given a mesh
+    // by property alone, the same shape as ABreakerNPC's BodyMesh.
+    NamedBody = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("NamedBody"));
+    NamedBody->SetupAttachment(BodyCollision);
+    NamedBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    NamedBody->SetVisibility(false);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (SphereMesh.Succeeded()) WeakPointVisual->SetStaticMesh(SphereMesh.Object);
 
@@ -184,6 +224,40 @@ void ABreakerEnemy::BeginPlay()
     // Health was the literal constant 220 here at every level until O27. It is
     // now a function of the area level this monster belongs to.
     ApplyChassis();
+
+    // Editor-placed enemies carry BodyMeshAsset as a property; spawners that
+    // set it after SpawnActor call ApplyBodyMesh themselves — ABreakerNPC's
+    // contract, kept identical so there is one rule to know.
+    ApplyBodyMesh();
+}
+
+void ABreakerEnemy::ApplyBodyMesh()
+{
+    if (!NamedBody || !BodyMeshAsset.IsValid()) return;
+    USkeletalMesh* Named = Cast<USkeletalMesh>(BodyMeshAsset.TryLoad());
+    if (!Named)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerEnemy] %s: body mesh %s did not resolve — primitive fallback."),
+            *GetName(), *BodyMeshAsset.ToString());
+        return;
+    }
+    NamedBody->SetSkeletalMesh(Named);
+    const FBoxSphereBounds MeshBounds = Named->GetBounds();
+    const BreakerEnemyBody::FBreakerBodyFit Fit = BreakerEnemyBody::FitBodyToCapsule(
+        MeshBounds.Origin, MeshBounds.BoxExtent, BodyCollision->GetUnscaledCapsuleHalfHeight());
+    NamedBody->SetRelativeScale3D(FVector(Fit.Scale));
+    NamedBody->SetRelativeLocation(Fit.RelativeLocation);
+    if (UAnimSequence* Idle = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad()))
+    {
+        NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+        NamedBody->PlayAnimation(Idle, /*bLooping=*/true);
+    }
+    NamedBody->SetVisibility(true);
+    for (UStaticMeshComponent* Part : { BodyVisual.Get(), HeadVisual.Get(), LeftArmVisual.Get(),
+        RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
+    {
+        if (Part) Part->SetVisibility(false);
+    }
 }
 
 void ABreakerEnemy::ApplyChassis()
