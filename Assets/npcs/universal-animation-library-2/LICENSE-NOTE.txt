@@ -1,0 +1,6 @@
+﻿Quaternius - Universal Animation Library 2, Standard (free) tier.
+Source: https://quaternius.com
+License: CC0 1.0 (in-pack License.txt).
+Vendored: Unreal-Godot GLB + Female Mannequin Unreal-Godot GLB.
+Unity FBX variants not vendored (same rationale as library 1).
+Date: 2026-08-29

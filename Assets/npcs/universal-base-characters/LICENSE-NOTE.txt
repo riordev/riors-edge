@@ -1,0 +1,10 @@
+﻿Quaternius - Universal Base Characters, Standard (free) tier.
+Source: https://quaternius.com
+License: Quaternius free packs are CC0 1.0 (stated on quaternius.com);
+in-pack License_Standard.txt describes the free tier.
+Vendored: the vendor's Unreal exports - glTF, per the in-pack
+Unreal-Engine-README (rigged FBX from Blender has a scaling bug in UE,
+vendor says use glTF). BaseCharacters/ = bodies + textures,
+Hairstyles/ = head-bone-rigged hair glTF. Unity FBX, Godot-only
+normal-map variants and extra texture variants not vendored.
+Date: 2026-08-29

@@ -1,0 +1,7 @@
+﻿Quaternius - Ultimate Modular Males.
+Source: https://quaternius.com (Google Drive distribution).
+License: CC0 1.0 (in-pack License.txt).
+Vendored: "Separate Skeletal Meshes and Animations" FBX (the modular
+representation). The three duplicate representations (All together,
+Individual Characters, Humanoid Rigs - 100+ MB) not vendored.
+Date: 2026-08-29

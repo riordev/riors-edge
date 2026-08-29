@@ -1,0 +1,7 @@
+﻿Quaternius - Universal Animation Library, Standard (free) tier.
+Source: https://quaternius.com
+License: CC0 1.0 (in-pack License.txt).
+Vendored: the vendor's Unreal-Godot GLB export. The Unity FBX variant
+(45 MB, same animations) not vendored - GLB is the vendor's UE-facing
+file and a third the size.
+Date: 2026-08-29
