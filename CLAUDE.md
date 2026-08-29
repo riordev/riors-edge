@@ -2,6 +2,32 @@
 
 ## Current work
 
+SEAT 2, ASSET INTAKE AND THE FIRST WIRING (assets/placeholder-intake,
+merged to main at each step; 488 / 3 / 0). The CC0 placeholder packs are
+vendored under Assets/ (enemies / npcs / weapons / zones/kit / audio /
+fonts-staged, LICENSE-NOTE.txt per pack, ~371 MB, all LFS — the main box
+needs git-lfs BEFORE pulling). Rulings recorded: ONE NPC body family
+(universal-base-characters; the George/Leela/Mike/Stan pack is skipped
+permanently, noted in Assets/npcs/LICENSE-NOTE.txt), fonts staged
+unwired, Fab packs launcher-delivered and ignored (/Content/
+ParagonSevarog/ in .gitignore). WIRED: breaker_import_characters.py
+imports the two base-character bodies + nine small-pack enemies as
+SKELETAL WITH ANIMATIONS into /Game/Breaker/Meshes/{npcs,enemies};
+ABreakerEnemy has the NPC's named-body hook (BodyMeshAsset +
+BodyIdleAnimation, capsule fit in tested BreakerEnemyBodyMath.h),
+DEFAULT OFF — NoEnemyShipsANamedBody pins it, because rank paint and
+the tint ramp do not transfer to a named body; defaulting meshes on is
+FIELD's readability call. Breaker.EnemyBody <mesh> [idle] previews on
+live AND later-spawned enemies (photographed: gym cluster wearing the
+EyeDrone). STILL PENDING: Animated Mech / Ultimate Modular Women /
+Ultimate Space Kit not yet downloaded; audio wiring parked (the sound
+director parses PCM16 WAV only, Kenney packs are .ogg — needs a
+converter or a director extension, plus the fifth-verb ruling); zone-kit
+composition parked (composer needs system python + trimesh, quarantined
+on seat 2). Suite reading on seat 2 runs through the PowerShell port of
+status.py's two reconciliations (scratchpad only, not committed);
+Docs/STATE.md regenerates on the owner's box.
+
 KIT LANE, THE POST-VERBS FEEL RECON IS REPORTED (overnight item 4 —
 report only, nothing built until read; full findings in the session
 report). The load-bearing ones: EVERY vault/mantle number has never
