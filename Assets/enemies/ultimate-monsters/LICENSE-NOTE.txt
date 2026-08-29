@@ -1,0 +1,7 @@
+﻿Quaternius - Ultimate Monsters pack.
+Source: https://quaternius.com (free pack, Google Drive distribution).
+License: CC0 1.0 (in-pack License.txt; its header reads "Ultimate Platformer
+Pack" - Quaternius's generic license copy - but the content is the monsters
+pack: Alpaking, Dragon, Glub, Goleling, etc., Atlas_Monsters textures).
+Vendored: FBX per category folder + atlas PNGs. OBJ/glTF/Blend deleted.
+Date: 2026-08-29

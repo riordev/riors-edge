@@ -1,0 +1,5 @@
+﻿Quaternius - Easy Enemy pack (Rat, Snake, Spider, Wasp, Frog...).
+Source: https://quaternius.com (free pack, Google Drive distribution).
+License: CC0 1.0 (in-pack License.txt).
+Vendored: FBX + preview. OBJ/Blend deleted.
+Date: 2026-08-29
