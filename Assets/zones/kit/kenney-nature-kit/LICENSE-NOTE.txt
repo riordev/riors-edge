@@ -1,0 +1,7 @@
+﻿Kenney - Nature Kit 2.1.
+Source: https://kenney.nl/assets/nature-kit
+License: CC0 1.0 (in-pack License.txt).
+Vendored: the .glb models only, kept as-is (the Fernhall composer
+consumes glb). FBX/OBJ/DAE/STL duplicates and isometric/side preview
+sprites deleted.
+Date: 2026-08-29

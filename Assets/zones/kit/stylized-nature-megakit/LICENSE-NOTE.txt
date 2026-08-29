@@ -1,0 +1,8 @@
+﻿Quaternius - Stylized Nature MegaKit, Standard (free) tier (68/116
+models; the rest are the paid tier).
+Source: https://quaternius.com
+License: Quaternius free packs are CC0 1.0 (stated on quaternius.com);
+in-pack License_Standard.txt describes the free tier.
+Vendored: glTF folder (self-contained: .gltf/.bin/textures). FBX/OBJ
+and the duplicate loose Textures folder deleted.
+Date: 2026-08-29
