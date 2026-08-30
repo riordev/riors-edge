@@ -4,6 +4,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerZoneActor.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -159,9 +160,16 @@ void UBreakerEnemyModifierComponent::RefreshHalo()
             Halo->SetupAttachment(GetOwner()->GetRootComponent());
             Halo->SetCollisionEnabled(ECollisionEnabled::NoCollision);
             Halo->SetCastShadow(false);
-            if (UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")))
+            // A GROUND DISC, not a sphere. The halo was an engine sphere in the
+            // opaque BasicShapeMaterial — a solid ball larger than the body, so
+            // every modifier-bearer was a floating orb with its whole silhouette
+            // (primitives then, the mech cast now) hidden inside. The colour and
+            // grows-with-count language survives on the project's proven
+            // at-range idiom instead — the ground ring (Provoke, deployables) —
+            // and the body stays visible above it.
+            if (UStaticMesh* Disc = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
             {
-                Halo->SetStaticMesh(Sphere);
+                Halo->SetStaticMesh(Disc);
             }
             if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(
                 nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
@@ -189,10 +197,18 @@ void UBreakerEnemyModifierComponent::RefreshHalo()
 
     // Colour comes from the FIRST modifier and the SIZE from the count, so an
     // enemy carrying three reads as bigger and more dangerous at range before
-    // any of the three names is legible.
+    // any of the three names is legible. The count widens the DISC; a 4 cm
+    // slab at the feet, dropped to the capsule's bottom so it sits on the
+    // ground whatever the owner's capsule height is.
     const FLinearColor Color = UBreakerEnemyModifierLibrary::GetModifierColor(Modifiers[0]);
     const float Scale = HaloBaseScale + HaloScalePerModifier * static_cast<float>(Modifiers.Num() - 1);
-    Halo->SetRelativeScale3D(FVector(Scale));
+    Halo->SetRelativeScale3D(FVector(Scale, Scale, 0.04f));
+    float FeetDrop = 0.0f;
+    if (const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(GetOwner()->GetRootComponent()))
+    {
+        FeetDrop = Capsule->GetUnscaledCapsuleHalfHeight() - 3.0f;
+    }
+    Halo->SetRelativeLocation(FVector(0.0f, 0.0f, -FeetDrop));
     if (HaloMaterial) HaloMaterial->SetVectorParameterValue(TEXT("Color"), Color);
     if (HaloLight)
     {
