@@ -4,6 +4,27 @@ The lane's open questions for the design seat, in one place. Answered
 questions are deleted; git holds them. Findings and status live in the
 session reports, never here.
 
+## The universal-share instrument is in, and both brief thresholds fail everywhere — promote to reds, or hold?
+
+`RiorsEdge.Items.Affixes.UniversalShare` measures the affix brief's two
+pre-committed thresholds (40% per-slot universal-share ceiling, 50%
+pairwise weighted overlap ex-Necklace) and both fail universally at HEAD:
+universal share reads 0.49–0.69 on every slot at every measured item
+level (worst: BodyArmour ~0.69), and overlap reads 0.63–0.91 on all 28
+slot pairs (worst: Primary~Secondary 0.906, which is also the ex-Necklace
+worst). The instrument asserts only itself and prints the tables; the
+figures are in the suite log every run.
+
+**Question:** promote the two thresholds to enumerated expected-reds now
+(two work items with numbers on them, red until the slot-identity breadth
+pass lands — the master sheet's unauthored slot-limited rows are the
+whole distance), or hold them report-only until that pass is scheduled?
+This lane held them report-only: pre-committed numbers get cited the
+cycle they are first measured, not smuggled into assertions the same
+commit. The brief itself is not committed anywhere in the tree — only
+the thresholds carried by the batch order — so ratifying the numbers
+into the suite is also ratifying where the brief's authority lives.
+
 ## One-AB's race item: LEDGER took the wave solve, and the real numbers are far from the estimate
 
 Claimed here so FIELD does not duplicate it. The solve is the same
