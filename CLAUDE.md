@@ -2,6 +2,44 @@
 
 ## Current work
 
+FIELD LANE, BATCH ONE SESSION A (lane/batch1-field, base 755eede,
+492 / 3 / 0 — up one for the revive pin; main advanced with the audio
+merge mid-session, no overlap, deliberately not rebased). THE SIDEWAYS
+MECHS WERE HELD DEATH FRAMES: root motion is exonerated data-side
+(breaker_report_mech_anim_flags.py, kept as the reimport tripwire —
+all 75 mech sequences ship enable_root_motion=False, so no data pass
+runs and force_root_lock would damage the authored fall for nothing);
+the real defect was RespawnEnemy — the door every standing gym enemy
+churns through, bRespawns defaults true — un-hiding the primitives
+while the named body held the death one-shot's final frame, a double
+body in a corpse's lean. Every revive now routes through ApplyBodyMesh
+(standing respawn and Wakeful rise joined the pool's door), the fit
+owns all three transform channels (rotation reset added), and
+ReviveResetsNamedBodyTransform pins it worldless. Photographed: churn
+waves upright, corpses lying. THE PAINT PORT'S LAST LAYER IS ON FILM:
+the death burn on a named body (kill frame, ash ride + spatter, livery
+occluded per the pinned contract) — the probe's no-burn-mode rationale
+stands; the muzzle-flash exposure wash owns most kill frames and is
+the standing retune item's cost, stated. THE WEAK POINT HAS AN
+INSTRUMENT: [BreakerWeakPoint] SUMMARY lines at weapon EndPlay, per
+WeaponId, earned/granted split (O104), harness-aimer baseline measured
+— earned rates 0.235 (Sidearm) to 0.471 (Sniper), all strictly inside
+(0,1), precision archetypes earn more often AND more per hit; O34's
+[1.0,2.0] holds, no recommendation owed. MODIFIER TELLS SURVEYED on
+the cast: the disc halo carries the carrier tell untouched
+(photographed at range and 30 m); the ONE port gap was Wakeful's down
+— absence is its tell and SetBodyVisible speaks primitive only — the
+named body now vanishes and rises with the primitives.
+Breaker.EnemyModifier <Name>|clear summons any exact modifier for the
+camera through ConfigureWithExactModifiers, armed for later spawns.
+RECORDED, NOT BUILT: Phasing's telegraph is a timer with NO visual
+anywhere (its own comment rules the tell mandatory); WardingAura's
+radius has no readout; strobe/vanish are temporal tells stills cannot
+discriminate. The Lattice ranged-silhouette build plan (tripod + mast
++ target-tracking dish, family green + violet accent, 30 m squint
+test, one session) is in the session report, owner's photo-veto loop
+next.
+
 SEAT 2, ASSET INTAKE AND THE FIRST WIRING (assets/placeholder-intake,
 merged to main at each step; 488 / 3 / 0). The CC0 placeholder packs are
 vendored under Assets/ (enemies / npcs / weapons / zones/kit / audio /
