@@ -192,8 +192,28 @@ class RIORSEDGE_API UBreakerWeaponComponent : public UActorComponent
 public:
     UBreakerWeaponComponent();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    // --- WEAK-POINT RATE INSTRUMENT (dev telemetry, no gameplay reader) ---
+    // O34 reads the weak point as the SKILL-gated site multiplier — never
+    // guaranteed, never unreachable — and no instrument reported where real
+    // aim actually lands between those poles. Every hitscan leg that reaches
+    // a combat target counts here, keyed by the fired definition's WeaponId
+    // and split earned/granted (O104's distinction: a round that STRUCK the
+    // point versus a round Lead's mark handed one to). Chain arcs seek on
+    // their own and are not aim; the rocket's radial path cannot weak-point
+    // at all — neither is counted. Printed as [BreakerWeakPoint] SUMMARY
+    // lines at EndPlay, a log genre the suite reconciler ignores. Ratios,
+    // so CPU contention cannot bend the reading.
+    struct FBreakerWeakPointTally
+    {
+        int32 Hits = 0;
+        int32 Earned = 0;
+        int32 Granted = 0;
+        float WeakPointMultiplier = 1.0f;
+    };
 
     UFUNCTION(BlueprintCallable, Category="Weapon") void StartFire();
     UFUNCTION(BlueprintCallable, Category="Weapon") void StopFire();
@@ -582,6 +602,11 @@ protected:
     UFUNCTION() void OnRep_Swapping();
 
 private:
+    // The weak-point instrument's ledger (see the public block's comment).
+    // Plain map, no UPROPERTY: keys are FNames and values are POD counters,
+    // nothing here for GC to see or a save to inherit.
+    TMap<FName, FBreakerWeakPointTally> WeakPointTally;
+
     UPROPERTY(ReplicatedUsing=OnRep_Ammo) int32 MagazineAmmo = 0;
     UPROPERTY(ReplicatedUsing=OnRep_Ammo) int32 ReserveAmmo = 0;
     UPROPERTY(ReplicatedUsing=OnRep_Reloading) bool bReloading = false;
