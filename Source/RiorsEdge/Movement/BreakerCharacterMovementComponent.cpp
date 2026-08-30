@@ -1369,11 +1369,15 @@ bool UBreakerCharacterMovementComponent::IsStandableTopNormal(float ImpactNormal
 
 EBreakerLedgeVerb UBreakerCharacterMovementComponent::ResolveLedgeVerb(float LedgeHeightCm, float MinimumCm, float VaultMaximumCm, float MantleMaximumCm)
 {
-    if (LedgeHeightCm < MinimumCm || LedgeHeightCm > MantleMaximumCm)
+    // Band comparisons biased by the published epsilon (D4): a measured
+    // height within half a centimetre of an exact edge resolves
+    // DETERMINISTICALLY to the side that keeps the ledge actionable, instead
+    // of letting float noise in the trace pick the verb.
+    if (LedgeHeightCm < MinimumCm - LedgeBandEpsilonCm || LedgeHeightCm > MantleMaximumCm + LedgeBandEpsilonCm)
     {
         return EBreakerLedgeVerb::None;
     }
-    return LedgeHeightCm <= VaultMaximumCm ? EBreakerLedgeVerb::Vault : EBreakerLedgeVerb::Mantle;
+    return LedgeHeightCm <= VaultMaximumCm + LedgeBandEpsilonCm ? EBreakerLedgeVerb::Vault : EBreakerLedgeVerb::Mantle;
 }
 
 bool UBreakerCharacterMovementComponent::ResolveLedgeTraversal(FBreakerLedgeTraversal& OutTraversal) const

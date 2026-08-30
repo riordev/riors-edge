@@ -572,22 +572,62 @@ bool FBreakerLedgeVerbsTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("A steep top is not standable"), FMove::IsStandableTopNormal(0.5f));
 
     // The verb bands, at the shipped defaults' shape: [min, vaultMax] vaults,
-    // (vaultMax, mantleMax] mantles, outside is nothing.
+    // (vaultMax, mantleMax] mantles, outside is nothing — every edge biased
+    // by the published epsilon (D4), so the probes below step past it.
     const float Min = 35.0f, VaultMax = 80.0f, MantleMax = FMove::MantleStepHeightCm;
+    const float Eps = FMove::LedgeBandEpsilonCm;
     TestTrue(TEXT("Below the minimum is a step, not a verb"),
         FMove::ResolveLedgeVerb(20.0f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::None);
     TestTrue(TEXT("The minimum itself vaults"),
         FMove::ResolveLedgeVerb(Min, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Vault);
     TestTrue(TEXT("The vault ceiling itself vaults"),
         FMove::ResolveLedgeVerb(VaultMax, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Vault);
-    TestTrue(TEXT("Just above the vault ceiling mantles"),
-        FMove::ResolveLedgeVerb(VaultMax + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
+    TestTrue(TEXT("Past the vault edge's tolerance mantles"),
+        FMove::ResolveLedgeVerb(VaultMax + Eps + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
     TestTrue(TEXT("Chest cover (120) mantles — the grammar's whole premise"),
         FMove::ResolveLedgeVerb(120.0f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
     TestTrue(TEXT("The mantle ceiling itself mantles"),
         FMove::ResolveLedgeVerb(MantleMax, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::Mantle);
-    TestTrue(TEXT("Above the ceiling is a wall, not a verb"),
-        FMove::ResolveLedgeVerb(MantleMax + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::None);
+    TestTrue(TEXT("Past the ceiling's tolerance is a wall, not a verb"),
+        FMove::ResolveLedgeVerb(MantleMax + Eps + 0.1f, Min, VaultMax, MantleMax) == EBreakerLedgeVerb::None);
+
+    // --- THE COIN-FLIP REGRESSION (D4, owner-ruled) ------------------------
+    // Every authored ledge in the project sat exactly on a band edge (kerb
+    // 45.0 on the step boundary, risers 145 on the mantle ceiling,
+    // dress_mound_sub 80.0 on the vault/mantle edge), so which verb fired
+    // was a float coin-flip: the measured height lands either side of the
+    // edge by transform noise. The epsilon makes both sides of the noise
+    // resolve to ONE verb — the one that keeps the ledge actionable.
+    {
+        const float Noise[3] = { -0.4f, 0.0f, 0.4f };
+        for (const float N : Noise)
+        {
+            // The vault/mantle edge always vaults — the faster verb, and the
+            // verb the mound's author meant.
+            TestTrue(TEXT("An 80.0-authored ledge vaults whatever the float noise"),
+                FMove::ResolveLedgeVerb(80.0f + N, 50.0f, 80.0f, MantleMax) == EBreakerLedgeVerb::Vault);
+            // The mantle ceiling always admits — a 145 riser is a mantle,
+            // never sometimes-a-wall.
+            TestTrue(TEXT("A 145-authored riser mantles whatever the float noise"),
+                FMove::ResolveLedgeVerb(MantleMax + N, 50.0f, 80.0f, MantleMax) == EBreakerLedgeVerb::Mantle);
+            // The minimum always admits — a 50.0 ledge vaults; the engine
+            // steps only 45 and under, so refusing it would strand a dead
+            // zone between the step and the verb.
+            TestTrue(TEXT("A 50.0-authored ledge vaults whatever the float noise"),
+                FMove::ResolveLedgeVerb(50.0f + N, 50.0f, 80.0f, MantleMax) == EBreakerLedgeVerb::Vault);
+        }
+    }
+    // The bias must never reopen One-V's silent-step overlap: the epsilon
+    // sits strictly inside the gap between the ledge minimum and the
+    // authored step, so an admitted below-minimum ledge is still above
+    // everything the engine walks over.
+    {
+        const UBreakerCharacterMovementComponent* EpsDefaults = GetDefault<UBreakerCharacterMovementComponent>();
+        TestTrue(TEXT("The epsilon cannot reopen the silent-step overlap"),
+            FMove::LedgeBandEpsilonCm < EpsDefaults->LedgeMinimumHeightCm - EpsDefaults->MaxStepHeight);
+        TestTrue(TEXT("The epsilon is a tolerance, not a band of its own"),
+            FMove::LedgeBandEpsilonCm <= 1.0f);
+    }
 
     // Shipped-configuration invariants, on a default-constructed component.
     const UBreakerCharacterMovementComponent* Defaults = GetDefault<UBreakerCharacterMovementComponent>();

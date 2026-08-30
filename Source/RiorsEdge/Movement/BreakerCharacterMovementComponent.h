@@ -163,6 +163,23 @@ public:
     // written only by the -BreakerTraversalDemo capture instrument.
     float DevTraversalDurationScale = 1.0f;
 
+    // THE BAND-EDGE TIEBREAK (D4, owner-ruled). Every authored ledge in the
+    // project sits EXACTLY on a band edge — the kerb at 45.0 on the step
+    // boundary, the risers at 145 on the mantle ceiling, dress_mound_sub at
+    // 80.0 on the vault/mantle edge — because the kit's piece sizes and the
+    // band edges share the same round numbers. A measured height at an exact
+    // edge is a float coin-flip (transform error decides the verb), so the
+    // band comparisons are biased by this epsilon: at an edge, the verb that
+    // KEEPS THE LEDGE ACTIONABLE wins — the minimum admits (a 50.0 ledge
+    // vaults; the engine steps only 45 and under, so refusing it would strand
+    // a dead zone), the vault edge vaults (the faster verb), and the ceiling
+    // admits (a 145 riser mantles). Strictly smaller than
+    // LedgeMinimumHeightCm - MaxStepHeight, pinned in LedgeVerbs, so the
+    // bias can never reopen the silent-step overlap. The geometry half of
+    // the ruling — nudging authored tops off the edges — is GROUND-shaped
+    // work done at the gym sites; this is the maths half.
+    static constexpr float LedgeBandEpsilonCm = 0.5f;   // O2 PLACEHOLDER
+
     // THE PUBLISHED STEP HEIGHT (Part One-R's order): one number, one home.
     // The cover grammar's chest-cover reasoning and the gym's climbable
     // geometry cite 145 in comments and ABreakerGameMode::MantleStepHeight
