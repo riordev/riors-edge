@@ -253,6 +253,15 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="0.1", ClampMax="2")) float DashFeedbackMinimumScale = 0.6f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Dash Feedback", meta=(ClampMin="1", ClampMax="3")) float DashFeedbackMaximumScale = 1.35f;
 
+    // --- ADS camera (D5, owner-ruled) -------------------------------------
+    // A small FOV push toward the sights, riding the SAME eased aim blend as
+    // every other ADS quantity — no second timer, no second curve. Small on
+    // purpose: it is a commitment cue, not a scope; per-archetype zoom would
+    // be a different feature and is deliberately not authored here. Composed
+    // with the dash punch over the player's own base FOV; 0 removes it
+    // without a rebuild. Holstered pawns never push. O2 PLACEHOLDER.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Aim", meta=(ClampMin="0", ClampMax="30")) float AimFOVNarrowDegrees = 6.0f;
+
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnFireInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnAimInput(bool bPressed);
     UFUNCTION(BlueprintImplementableEvent, Category="Combat") void OnReloadInput();
@@ -321,6 +330,13 @@ private:
     void TickTraversalDemo();
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
     void UpdateDashCameraFeedback(float DeltaSeconds);
+    // The ONE writer of the camera's live FOV during play (D5): composes the
+    // player's base FOV, the dash punch and the ADS narrow every frame, so
+    // two effects can never fight over SetFieldOfView. Writes only while an
+    // offset is live (or on the frame it dies), so an idle camera costs one
+    // comparison.
+    void UpdateCameraFieldOfView();
+    bool bCameraFOVOffsetApplied = false;
     void ApplyBaseFieldOfView();
     void ResetPlaytest();
     void CopyPlaytestReport();

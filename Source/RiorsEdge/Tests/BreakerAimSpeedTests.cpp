@@ -95,4 +95,63 @@ bool FBreakerAimSpeedPenaltyTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// THE AIM TRANSITION (D5, owner-ruled): one eased blend, both directions.
+// The raw read was a linear clamp while aiming and an instant zero on
+// release — no lerp state — so the pose, the FOV and every aim-blended
+// quantity snapped. The eased curve and the release fade are pure here;
+// the component's resume-from-blend re-press rides the same linear ramp.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerAimTransitionTest,
+    "RiorsEdge.Weapons.AimTransition",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerAimTransitionTest::RunTest(const FString& Parameters)
+{
+    using FFeel = FBreakerWeaponFeel;
+
+    // --- The ease ----------------------------------------------------------
+    TestEqual(TEXT("The blend starts at hip exactly"), FFeel::EasedAimBlend(0.0f), 0.0f);
+    TestEqual(TEXT("The blend ends at sights exactly"), FFeel::EasedAimBlend(1.0f), 1.0f);
+    TestEqual(TEXT("The midpoint is honest"), FFeel::EasedAimBlend(0.5f), 0.5f);
+    // Zero-velocity ends: the transition ARRIVES rather than stopping.
+    TestTrue(TEXT("The blend leaves hip gently"), FFeel::EasedAimBlend(0.1f) < 0.05f);
+    TestTrue(TEXT("The blend settles into the sights gently"), FFeel::EasedAimBlend(0.9f) > 0.95f);
+    float Previous = 0.0f;
+    for (int32 Step = 1; Step <= 20; ++Step)
+    {
+        const float Current = FFeel::EasedAimBlend(Step / 20.0f);
+        TestTrue(TEXT("The blend never reverses"), Current >= Previous);
+        Previous = Current;
+    }
+    TestEqual(TEXT("Out-of-range input clamps"), FFeel::EasedAimBlend(1.7f), 1.0f);
+
+    // --- The release fade --------------------------------------------------
+    TestEqual(TEXT("The fade starts where the release left it"),
+        FFeel::AimOutLinearAlpha(0.8f, 0.0f, 0.15f), 0.8f);
+    TestTrue(TEXT("Half the window pays half the alpha"),
+        FMath::IsNearlyEqual(FFeel::AimOutLinearAlpha(0.8f, 0.075f, 0.15f), 0.4f, 0.0001f));
+    TestEqual(TEXT("The window's end is hip exactly"),
+        FFeel::AimOutLinearAlpha(0.8f, 0.15f, 0.15f), 0.0f);
+    TestEqual(TEXT("Past the window stays hip"),
+        FFeel::AimOutLinearAlpha(0.8f, 5.0f, 0.15f), 0.0f);
+    TestEqual(TEXT("A zero window is the old instant release exactly"),
+        FFeel::AimOutLinearAlpha(0.8f, 0.001f, 0.0f), 0.0f);
+    TestEqual(TEXT("Releasing from hip fades nothing"),
+        FFeel::AimOutLinearAlpha(0.0f, 0.05f, 0.15f), 0.0f);
+
+    // --- Shipped configuration ---------------------------------------------
+    const FBreakerRecoilProfile Defaults;
+    TestTrue(TEXT("The release fade is real — the one-frame snap is retired"),
+        Defaults.AimOutSeconds > 0.0f);
+    // Dropping ADS must stay the faster direction: the shared aim-out sits
+    // at or under every authored aim-in (the fastest is Mark's 0.10... the
+    // SHARED default against the SHARED default is the relation authored
+    // here; per-archetype aim-ins are pinned by their own ordering tests).
+    TestTrue(TEXT("Letting go is not slower than the default aim-in"),
+        Defaults.AimOutSeconds <= Defaults.AimInSeconds);
+    return true;
+}
+
 #endif

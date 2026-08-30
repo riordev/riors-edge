@@ -244,6 +244,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     ApplyWeaponPresentation();
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
+    UpdateCameraFieldOfView();
     UpdateCameraShake(DeltaSeconds);
     if (bTraversalDemoArmed)
     {
@@ -920,9 +921,20 @@ FVector ABreakerCharacter::GetWeaponRestLocation() const
     // this weapon's sight height, which puts its own sight on the crosshair.
     // Authoring the aimed pose per archetype was the alternative and it rots —
     // move one part and the sight silently stops lining up.
-    if (Weapon && Weapon->IsAiming())
+    //
+    // BLENDED, not branched (D5): the pose rides the weapon's eased aim
+    // alpha, so the rig GLIDES between hip and sights over the archetype's
+    // own aim-in and the shared aim-out — the old binary branch snapped the
+    // whole assembly in one frame in both directions, which was the visible
+    // half of "no lerp state exists".
+    if (Weapon)
     {
-        return FVector(ActiveLayout.AdsForwardCm, 0.0f, -ActiveLayout.SightHeightCm * ViewmodelScale);
+        const float AimAlpha = Weapon->GetAimAlpha();
+        if (AimAlpha > 0.0f)
+        {
+            const FVector AimedPose(ActiveLayout.AdsForwardCm, 0.0f, -ActiveLayout.SightHeightCm * ViewmodelScale);
+            return FMath::Lerp(ActiveLayout.HipOffsetCm, AimedPose, AimAlpha);
+        }
     }
     return ActiveLayout.HipOffsetCm;
 }
@@ -1738,10 +1750,9 @@ void ABreakerCharacter::UpdateDashCameraFeedback(float DeltaSeconds)
     const float Alpha = GetDashFeedbackAlpha();
     const bool bFinished = DashFeedbackElapsed >= DashFOVPunchAttack + DashFOVPunchRecovery;
 
-    if (FirstPersonCamera)
-    {
-        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashFOVPunch * DashFeedbackScale * Alpha, 5.0f, 170.0f));
-    }
+    // The FOV write itself moved to UpdateCameraFieldOfView (D5): the dash
+    // punch and the ADS narrow compose there, one writer, every frame either
+    // effect is live. This function keeps the clock and the roll.
 
     // Roll rides the control rotation rather than the camera transform: the
     // camera runs bUsePawnControlRotation, so it re-derives its world rotation
@@ -1763,8 +1774,35 @@ void ABreakerCharacter::UpdateDashCameraFeedback(float DeltaSeconds)
     {
         DashFeedbackElapsed = -1.0f;
         bDashRollApplied = false;
+    }
+}
+
+void ABreakerCharacter::UpdateCameraFieldOfView()
+{
+    if (!FirstPersonCamera)
+    {
+        return;
+    }
+    // Dash widens, ADS narrows, both over the player's own base FOV — the
+    // punch is the genre's "you got fast" cue and the narrow is the sights'
+    // commitment cue, and when a player dashes while aimed they simply sum.
+    // The ADS half rides the weapon's eased aim alpha, the same blend every
+    // other ADS quantity consumes; holstered pawns never narrow.
+    const float DashOffset = DashFOVPunch * DashFeedbackScale * GetDashFeedbackAlpha();
+    const float AimNarrow = (!bWeaponsHolstered && Weapon && AimFOVNarrowDegrees > 0.0f)
+        ? AimFOVNarrowDegrees * Weapon->GetAimAlpha() : 0.0f;
+    const bool bOffsetLive = DashOffset > UE_KINDA_SMALL_NUMBER || AimNarrow > UE_KINDA_SMALL_NUMBER;
+    if (bOffsetLive)
+    {
+        FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFieldOfView + DashOffset - AimNarrow, 5.0f, 170.0f));
+    }
+    else if (bCameraFOVOffsetApplied)
+    {
+        // The frame an offset dies, the base comes back once — never per
+        // frame, so the settings screen's own writes stay authoritative.
         ApplyBaseFieldOfView();
     }
+    bCameraFOVOffsetApplied = bOffsetLive;
 }
 
 void ABreakerCharacter::ResetPlaytest()

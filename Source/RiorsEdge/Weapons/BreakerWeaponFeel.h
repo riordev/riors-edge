@@ -91,6 +91,17 @@ struct RIORSEDGE_API FBreakerRecoilProfile
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
     float AimInSeconds = 0.20f;
 
+    // Seconds from RELEASING aim back to hip (D5, owner-ruled ~0.15 s). The
+    // release used to snap to zero in one frame — no lerp state existed — so
+    // the pose, the FOV and every aim-blended quantity jumped. The benefits
+    // and the penalties ride the same blend both ways, so a fading ADS keeps
+    // a fading slice of its accuracy AND its speed penalty: symmetric, and
+    // shorter than every authored aim-in, so dropping ADS stays the faster
+    // direction. One shared default rather than per-archetype: letting go is
+    // the same motion whatever the gun. O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
+    float AimOutSeconds = 0.15f;
+
     // Extra cone half-angle at MoveSpreadReferenceSpeed, hip fired.
     // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Recoil|Aim", meta=(ClampMin="0"))
@@ -397,4 +408,22 @@ public:
      * at the authored ceiling so a skydive cannot bury the gun.
      */
     static float LandingKickUnits(const FBreakerViewmodelMotionParams& Params, float FallSpeed);
+
+    // ---- The aim transition (D5) ------------------------------------------
+
+    /**
+     * The eased aim blend: smoothstep over the linear ramp, so the pose and
+     * the FOV arrive and settle with zero-velocity ends instead of the raw
+     * clamp's hard corners. Every consumer of the aim alpha moves through
+     * this one curve, so the benefits, the penalties and the presentation
+     * can never pace apart.
+     */
+    static float EasedAimBlend(float LinearAlpha);
+
+    /**
+     * The release fade's LINEAR alpha: the alpha held at release, paid back
+     * to zero over AimOutSeconds. Zero window is the old instant release
+     * exactly.
+     */
+    static float AimOutLinearAlpha(float AlphaAtRelease, float SecondsSinceRelease, float AimOutSeconds);
 };

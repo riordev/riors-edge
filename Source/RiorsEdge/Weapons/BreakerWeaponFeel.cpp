@@ -236,3 +236,25 @@ float FBreakerWeaponFeel::LandingKickUnits(const FBreakerViewmodelMotionParams& 
     }
     return FMath::Min(FallSpeed * Params.LandingKickPerFallSpeed, FMath::Max(0.0f, Params.MaxLandingKickUnits));
 }
+
+float FBreakerWeaponFeel::EasedAimBlend(float LinearAlpha)
+{
+    const float A = FMath::Clamp(LinearAlpha, 0.0f, 1.0f);
+    return A * A * (3.0f - 2.0f * A);
+}
+
+float FBreakerWeaponFeel::AimOutLinearAlpha(float AlphaAtRelease, float SecondsSinceRelease, float AimOutSeconds)
+{
+    const float Held = FMath::Clamp(AlphaAtRelease, 0.0f, 1.0f);
+    if (Held <= 0.0f)
+    {
+        return 0.0f;
+    }
+    if (AimOutSeconds <= 0.0f)
+    {
+        // Zero window is the old release exactly: gone in one frame.
+        return 0.0f;
+    }
+    const float Fade = FMath::Clamp(SecondsSinceRelease / AimOutSeconds, 0.0f, 1.0f);
+    return Held * (1.0f - Fade);
+}

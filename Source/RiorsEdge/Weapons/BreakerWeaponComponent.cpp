@@ -723,12 +723,33 @@ FBreakerRecoilProfile UBreakerWeaponComponent::ResolveRecoilProfile() const
     return Profile;
 }
 
+float UBreakerWeaponComponent::GetLinearAimAlpha() const
+{
+    if (bAiming)
+    {
+        const float AimIn = ResolveRecoilProfile().AimInSeconds;
+        if (AimIn <= 0.0f || !GetWorld()) return 1.0f;
+        return FMath::Clamp(static_cast<float>(GetWorld()->GetTimeSeconds() - AimStartTime) / AimIn, 0.0f, 1.0f);
+    }
+    // The release fade (D5): the alpha held at release pays back to zero
+    // over AimOutSeconds instead of vanishing in one frame. Worldless — a
+    // bare test object — reads exactly the old zero.
+    if (!GetWorld())
+    {
+        return 0.0f;
+    }
+    return FBreakerWeaponFeel::AimOutLinearAlpha(AimAlphaAtRelease,
+        static_cast<float>(GetWorld()->GetTimeSeconds() - AimReleaseTime),
+        ResolveRecoilProfile().AimOutSeconds);
+}
+
 float UBreakerWeaponComponent::GetAimAlpha() const
 {
-    if (!bAiming) return 0.0f;
-    const float AimIn = ResolveRecoilProfile().AimInSeconds;
-    if (AimIn <= 0.0f || !GetWorld()) return 1.0f;
-    return FMath::Clamp(static_cast<float>(GetWorld()->GetTimeSeconds() - AimStartTime) / AimIn, 0.0f, 1.0f);
+    // Eased (D5, owner-ruled): one smoothstep over the linear ramp, both
+    // directions, consumed by EVERY aim-blended quantity — spread, recoil,
+    // move speed, the viewmodel pose and the FOV push — so the benefits,
+    // the penalties and the presentation can never pace apart.
+    return FBreakerWeaponFeel::EasedAimBlend(GetLinearAimAlpha());
 }
 
 float UBreakerWeaponComponent::GetSpeedFraction() const
@@ -1441,7 +1462,20 @@ void UBreakerWeaponComponent::SetAimingInternal(bool bNewAiming)
     // must not hand the player a second aim-in window.
     if (bNewAiming && !bAiming)
     {
-        AimStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+        const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+        // Resume from wherever the blend currently sits (a re-press during
+        // the release fade), never from zero: the pose must not snap back to
+        // hip for one frame on a quick tap-tap. Backdating the start time by
+        // the current LINEAR alpha's share of the ramp is exactly that.
+        const float ResumeFrom = GetLinearAimAlpha();
+        const float AimIn = ResolveRecoilProfile().AimInSeconds;
+        AimStartTime = Now - static_cast<double>(ResumeFrom * FMath::Max(AimIn, 0.0f));
+    }
+    else if (!bNewAiming && bAiming)
+    {
+        // Arm the release fade with the linear alpha as it stands.
+        AimAlphaAtRelease = GetLinearAimAlpha();
+        AimReleaseTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
     }
     bAiming = bNewAiming;
 }

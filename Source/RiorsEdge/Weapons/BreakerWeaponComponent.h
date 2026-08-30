@@ -620,6 +620,13 @@ private:
     int32 SlotTwoMagazineAmmo = -1;
     int32 SlotTwoReserveAmmo = -1;
     bool bAiming = false;
+    // The release fade's state (D5): the LINEAR alpha held at the moment aim
+    // was released, and when. Before this pair existed the release had no
+    // state at all and every aim-blended quantity snapped to hip in one
+    // frame. GetLinearAimAlpha owns the whole ramp; GetAimAlpha eases it.
+    float AimAlphaAtRelease = 0.0f;
+    double AimReleaseTime = -1000.0;
+    float GetLinearAimAlpha() const;
     // When the aim button went down. ADS benefits ramp from here.
     double AimStartTime = -1000.0;
     bool bTriggerHeld = false;
