@@ -1875,25 +1875,29 @@ void ABreakerGameMode::SpawnMovementCourse()
     UWorld* World = GetWorld();
 
     // --- The rubble stair: the redundant way out of the courtyard ----------
-    // Steps at MantleStepHeight so the whole climb is mantle-able and needs no
-    // jump at all (master sheet 5.4: the conventional route is never punished).
-    // Four steps carry 4 x 145 = 580 cm, which clears the template's 400 cm
-    // parapet with the top step landing on the outside apron.
-    // Four risers of MantleStepHeight reach 580 cm, which clears the template's
-    // 400 cm parapet with the top step landing ON it. Placed to the left of the
-    // breach and climbing along the same forward axis, so the courtyard offers
-    // two ways out that read differently: a ramp you keep speed on and a stair
-    // you climb.
+    // Steps a hand under MantleStepHeight so the whole climb is mantle-able
+    // and needs no jump at all (master sheet 5.4: the conventional route is
+    // never punished). THE RISER SITS 10 CM OFF THE CEILING (D4, owner-ruled):
+    // a riser authored AT the exact 145 made every step a float coin-flip
+    // between mantle and wall — the measured height lands either side of the
+    // edge by transform noise — so authored tops now stay clear of the band
+    // edges and the verb is decided by design, not by the trace's float error.
+    // Four 135 cm risers reach 540 cm, which still clears the template's
+    // 400 cm parapet with the top step landing ON it. Placed to the left of
+    // the breach and climbing along the same forward axis, so the courtyard
+    // offers two ways out that read differently: a ramp you keep speed on and
+    // a stair you climb.
+    const float MantleRiser = MantleStepHeight - 10.0f;   // decisively inside the band (D4)
     const float StairRight = -1200.0f;
     for (int32 Step = 0; Step < 4; ++Step)
     {
-        const float Top = MantleStepHeight * (Step + 1);
+        const float Top = MantleRiser * (Step + 1);
         SpawnFieldSlab(World, Frame, 900.0f + Step * 250.0f, 1150.0f + Step * 250.0f,
             StairRight - 450.0f, StairRight + 450.0f, Top, Top, PaletteEarth, TEXT("Runtime_RubbleStair"));
     }
     // Outer side, sloping back down to the apron. Starts past the wall's inner
-    // face so the descent clears the 400 cm crest: at X 1950 it is still at 561.
-    SpawnFieldRamp(World, Frame, 1900.0f, MantleStepHeight * 4.0f, 3400.0f, 0.0f,
+    // face so the descent clears the 400 cm crest: at X 1950 it is still at 522.
+    SpawnFieldRamp(World, Frame, 1900.0f, MantleRiser * 4.0f, 3400.0f, 0.0f,
         StairRight, 900.0f, 60.0f, PaletteEarth, TEXT("Runtime_RubbleStair"));
 
     // --- Dash reach markers -------------------------------------------------
@@ -1963,10 +1967,12 @@ void ABreakerGameMode::SpawnMovementCourse()
             Lateral - 300.0f, Lateral + 300.0f, Height, 30.0f, PaletteConcrete, TEXT("Runtime_Watchtower"));
         SpawnFieldSlab(World, Frame, RangeFiringLineDistance + 400.0f, RangeFiringLineDistance + 600.0f,
             Lateral - 100.0f, Lateral + 100.0f, Height - 30.0f, Height - 30.0f, PaletteStone, TEXT("Runtime_Watchtower"));
-        // Mantle-height stack so the perch has a conventional route up.
+        // Mantle-height stack so the perch has a conventional route up — the
+        // same 10-under-the-ceiling riser as the rubble stair (D4): a step
+        // authored AT the 145 edge was a mantle-or-wall coin flip.
         for (int32 Step = 0; Step < 2; ++Step)
         {
-            const float Top = MantleStepHeight * (Step + 1);
+            const float Top = (MantleStepHeight - 10.0f) * (Step + 1);
             SpawnFieldSlab(World, Frame, RangeFiringLineDistance - 100.0f - Step * 250.0f, RangeFiringLineDistance + 150.0f - Step * 250.0f,
                 Lateral - 250.0f, Lateral + 250.0f, Top, Top, PaletteEarth, TEXT("Runtime_Watchtower"));
         }
@@ -2903,11 +2909,16 @@ void ABreakerGameMode::SpawnExpandedField()
     }
     // Kerbs at DashCorridorWidth so the lane reads as a lane. Low enough that
     // they never block a shot down it, which is the whole point of a sightline.
+    // 35, NOT 45 (D4, owner-ruled): the kerb sat exactly ON the MaxStepHeight
+    // boundary, so whether a running player stepped it or stubbed against it
+    // was a float coin-flip in the engine's own step-up test. Ten under the
+    // boundary, it is decisively WALKED — the verb the kerb was always meant
+    // to have (One-V: "the kerb walks, the crate vaults").
     for (int32 SideIndex = 0; SideIndex < 2; ++SideIndex)
     {
         const float Lateral = LaneRight + (SideIndex == 0 ? -1.0f : 1.0f) * DashCorridorWidth * 0.5f;
         SpawnFieldSlab(World, Frame, LaneStart, LaneStart + 10000.0f,
-            Lateral - 30.0f, Lateral + 30.0f, 45.0f, 45.0f, PaletteStone, TEXT("Runtime_SniperLaneKerb"));
+            Lateral - 30.0f, Lateral + 30.0f, 35.0f, 35.0f, PaletteStone, TEXT("Runtime_SniperLaneKerb"));
     }
     // The lane's one piece of hard cover — RangedSightlineDepth of clear ground
     // behind it, the minimum a LATTICE needs to use its whole 900-1900 band
