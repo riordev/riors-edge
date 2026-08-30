@@ -1,5 +1,6 @@
 #include "Combat/BreakerHitReactionComponent.h"
 
+#include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -41,6 +42,29 @@ void UBreakerHitReactionComponent::ApplyBodyPaint()
             Dynamic->SetVectorParameterValue(TEXT("Color"), Resolved);
         }
     }
+    // The named body's overlay: the SAME resolved colour, at the state's own
+    // overlay strength, over the untouched livery. One resolve, one writer.
+    if (OverlayBody.IsValid())
+    {
+        UMaterialInstanceDynamic* Overlay = Cast<UMaterialInstanceDynamic>(OverlayBody->GetOverlayMaterial());
+        if (!Overlay)
+        {
+            // Lazily built: the asset ships with the imported content, and a
+            // clone without it keeps a paintless (but complete) body — the
+            // floor-still-works shape, again.
+            if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr,
+                TEXT("/Game/Breaker/Materials/M_BreakerBodyOverlay.M_BreakerBodyOverlay")))
+            {
+                Overlay = UMaterialInstanceDynamic::Create(Base, OverlayBody.Get());
+                OverlayBody->SetOverlayMaterial(Overlay);
+            }
+        }
+        if (Overlay)
+        {
+            Overlay->SetVectorParameterValue(TEXT("Color"), Resolved);
+            Overlay->SetScalarParameterValue(TEXT("Strength"), BreakerBodyPaint::ResolveOverlayStrength(Paint));
+        }
+    }
 }
 
 void UBreakerHitReactionComponent::RegisterPart(UStaticMeshComponent* Part)
@@ -51,6 +75,13 @@ void UBreakerHitReactionComponent::RegisterPart(UStaticMeshComponent* Part)
     // A part joining late lands on the CURRENT resolved colour, not on
     // whatever its constructor left behind.
     if (Parts.Num() != Before) ApplyBodyPaint();
+}
+
+void UBreakerHitReactionComponent::RegisterOverlayBody(UMeshComponent* Body)
+{
+    if (!Body || OverlayBody.Get() == Body) return;
+    OverlayBody = Body;
+    ApplyBodyPaint();
 }
 
 void UBreakerHitReactionComponent::SetFamilyPaint(const FLinearColor& InFamilyPaint)

@@ -59,6 +59,13 @@ public:
     // resolved colour rather than whatever its constructor left.
     void RegisterPart(UStaticMeshComponent* Part);
 
+    // A NAMED body (the mech cast) keeps its livery and wears the paint as an
+    // OVERLAY: the same resolved colour, at BreakerBodyPaint's overlay
+    // strength — zero at rest, occluding through reactions. Same state, same
+    // one writer; the overlay material asset resolves lazily and a clone
+    // without it keeps a paintless (but complete) body.
+    void RegisterOverlayBody(class UMeshComponent* Body);
+
     // --- The layers. Each setter repaints; none reads anything back. ------
     // Layer 1: the owning class DECLARES its family's paint. This is the
     // whole reason the race is gone — nothing samples the material to find
@@ -101,6 +108,7 @@ private:
     void UpdateDeathPresentation(float DeltaSeconds);
 
     TArray<TWeakObjectPtr<UStaticMeshComponent>> Parts;
+    TWeakObjectPtr<class UMeshComponent> OverlayBody;
     BreakerBodyPaint::FState Paint;
     FTimerHandle HitFlashTimer;
     float DeathPresentationElapsed = -1.0f;

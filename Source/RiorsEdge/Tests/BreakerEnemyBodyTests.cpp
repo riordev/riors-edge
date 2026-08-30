@@ -1,7 +1,9 @@
 #include "Misc/AutomationTest.h"
+#include "Combat/BreakerBodyPaint.h"
 #include "Combat/BreakerEnemyBodyMath.h"
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerRangedEnemy.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/UObjectIterator.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
@@ -97,6 +99,55 @@ bool FBreakerEnemyBodyCastTest::RunTest(const FString& Parameters)
                 Defaults->BodyIdleAnimation.TryLoad());
         }
     }
+    // THE PAINT PORT'S HALF OF THE CAST: the overlay material the reaction
+    // layer wears over a named body must ship beside the mechs, or every
+    // flash, badge, wash and burn silently vanishes from the whole cast —
+    // the exact recorded cost this asset exists to close.
+    TestNotNull(TEXT("the paint overlay material ships"),
+        LoadObject<UMaterialInterface>(nullptr,
+            TEXT("/Game/Breaker/Materials/M_BreakerBodyOverlay.M_BreakerBodyOverlay")));
+    return true;
+}
+
+// The overlay STRENGTH is pure (BreakerBodyPaint::ResolveOverlayStrength), so
+// its contract is proved without a mesh: the livery is PURE at rest, the
+// reactions occlude exactly as they do on primitives, the rank badge wears
+// the same authored blend weights as the primitive blend (one table, not
+// two), and the wound wash rises with damage but never fully hides the paint
+// job outside a reaction.
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEnemyBodyOverlayStrengthTest,
+    "RiorsEdge.Combat.EnemyBody.OverlayRestsPureAndOccludesInReaction",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEnemyBodyOverlayStrengthTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerBodyPaint;
+    FState State;
+    TestEqual(TEXT("rest is pure livery"), ResolveOverlayStrength(State), 0.0f, 1e-6f);
+
+    State.Reaction = EReaction::Flash;
+    TestEqual(TEXT("flash occludes"), ResolveOverlayStrength(State), 1.0f, 1e-6f);
+    State.Reaction = EReaction::DeathCrumple;
+    State.ReactionAlpha = 0.5f;
+    TestEqual(TEXT("burn occludes for its whole ride"), ResolveOverlayStrength(State), 1.0f, 1e-6f);
+
+    State = FState();
+    State.Rank = EBreakerMonsterRank::Elite;
+    TestEqual(TEXT("elite badge wears the primitive blend weight"),
+        ResolveOverlayStrength(State), RankBlendFor(EBreakerMonsterRank::Elite), 1e-6f);
+    State.Rank = EBreakerMonsterRank::ModifierBearing;
+    TestEqual(TEXT("modifier badge likewise"),
+        ResolveOverlayStrength(State), RankBlendFor(EBreakerMonsterRank::ModifierBearing), 1e-6f);
+
+    State = FState();
+    State.bHealthRamp = true;
+    State.HealthFraction = 1.0f;
+    TestEqual(TEXT("full health adds no wash"), ResolveOverlayStrength(State), 0.0f, 1e-6f);
+    State.HealthFraction = 0.0f;
+    const float Drained = ResolveOverlayStrength(State);
+    TestTrue(TEXT("drained wash is visible but never occludes"), Drained > 0.3f && Drained < 1.0f);
     return true;
 }
 

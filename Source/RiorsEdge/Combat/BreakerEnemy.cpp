@@ -88,6 +88,66 @@ static FAutoConsoleCommandWithWorldAndArgs BreakerEnemyBodyPreviewCommand(
             *BreakerEnemyBodyPreviewMesh, Applied);
     }));
 
+// Dev photography for the paint layers: the hit flash is 0.07 s and the
+// screenshot cadence is 2 s, so the reel can never catch one honestly. The
+// probe drives the SAME public setters a fight drives — nothing is painted
+// that a fight could not paint — it just holds the state still long enough
+// to photograph. Instrument only; the burn is deliberately absent because
+// StartDeathPresentation ends in the owner hiding its body, and a probe that
+// hides the cast photographs nothing (the burn shares the flash's overlay
+// path — colour lerp, strength 1 — so the flash frame is its witness).
+//   Breaker.BodyPaint elite | wash | flash | clear
+static FString BreakerEnemyBodyPaintProbeMode;
+static FAutoConsoleCommandWithWorldAndArgs BreakerBodyPaintProbeCommand(
+    TEXT("Breaker.BodyPaint"),
+    TEXT("Preview paint states on every live enemy: elite | wash | flash | clear."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+    {
+        if (!World || Args.Num() < 1) return;
+        // ARMS as well as drives — Breaker.EnemyBody's pattern: -ExecCmds
+        // runs before the gym spawns anything (and possibly on the pre-travel
+        // world), so live sweeps see nobody. The static survives the travel
+        // and BeginPlay applies it to every later spawn; "clear" disarms.
+        BreakerEnemyBodyPaintProbeMode = Args[0].Equals(TEXT("clear"), ESearchCase::IgnoreCase)
+            ? FString() : Args[0];
+        int32 Driven = 0;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            It->DevDriveBodyPaintProbe(Args[0]);
+            ++Driven;
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.BodyPaint %s on %d enemies (armed for later spawns)."), *Args[0], Driven);
+    }));
+
+void ABreakerEnemy::DevDriveBodyPaintProbe(const FString& Mode)
+{
+    if (!HitReaction) return;
+    if (Mode.Equals(TEXT("elite"), ESearchCase::IgnoreCase))
+    {
+        HitReaction->SetRank(EBreakerMonsterRank::Elite);
+    }
+    else if (Mode.Equals(TEXT("wash"), ESearchCase::IgnoreCase))
+    {
+        HitReaction->SetHealthRampEnabled(true);
+        HitReaction->SetHealthFraction(0.15f);
+    }
+    else if (Mode.Equals(TEXT("flash"), ESearchCase::IgnoreCase))
+    {
+        // Re-struck faster than it decays, so the blink holds for the camera.
+        GetWorldTimerManager().SetTimer(DevPaintProbeTimer,
+            FTimerDelegate::CreateWeakLambda(this, [this]()
+            {
+                if (HitReaction) HitReaction->NotifyHit(false);
+            }), 0.05f, true);
+    }
+    else if (Mode.Equals(TEXT("clear"), ESearchCase::IgnoreCase))
+    {
+        GetWorldTimerManager().ClearTimer(DevPaintProbeTimer);
+        HitReaction->SetRank(MonsterRank);
+        HitReaction->SetHealthFraction(1.0f);
+    }
+}
+
 ABreakerEnemy::ABreakerEnemy()
 {
     PrimaryActorTick.bCanEverTick = true;
@@ -187,11 +247,12 @@ ABreakerEnemy::ABreakerEnemy()
     // default-off landing): the intake mechs are the enemy cast. Base melee —
     // Skitter included, the leap is this class — wears Stan; subclasses
     // override in their own constructors, and the RANGED class CLEARS it
-    // because the Lattice is composed primitives by ruling. KNOWN COSTS,
-    // accepted with the ruling: rank paint and the hit-tint ramp speak the
-    // hidden primitives' material language, and a skeletal crowd is dearer
-    // than a primitive one (8.35 vs 5.48 ms at 100 patrol, measured) — both
-    // now FIELD's to re-measure rather than reasons to hide the cast.
+    // because the Lattice is composed primitives by ruling. The paint-language
+    // cost recorded here at the ruling is CLOSED: the reaction layer drives an
+    // overlay on the named body (flash / rank / wash / burn, livery intact —
+    // BreakerBodyPaint::ResolveOverlayStrength is the rule). Still open and
+    // FIELD's: a skeletal crowd is dearer than a primitive one (8.35 vs 5.48
+    // ms at 100 patrol, measured pre-cast) — re-measure, not a reason to hide.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/Stan.Stan"));
     BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
     BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Death.StanRobotArmature_Death"));
@@ -255,6 +316,11 @@ void ABreakerEnemy::BeginPlay()
         if (!BreakerEnemyBodyPreviewAnim.IsEmpty()) BodyIdleAnimation = FSoftObjectPath(BreakerEnemyBodyPreviewAnim);
     }
     ApplyBodyMesh();
+    // The armed paint probe reaches later spawns the same way.
+    if (!BreakerEnemyBodyPaintProbeMode.IsEmpty())
+    {
+        DevDriveBodyPaintProbe(BreakerEnemyBodyPaintProbeMode);
+    }
 }
 
 void ABreakerEnemy::ApplyBodyMesh()
@@ -283,6 +349,14 @@ void ABreakerEnemy::ApplyBodyMesh()
         RightArmVisual.Get(), LeftLegVisual.Get(), RightLegVisual.Get() })
     {
         if (Part) Part->SetVisibility(false);
+    }
+    // THE PAINT PORT: the named body joins the reaction layer as an OVERLAY —
+    // hit flash, rank badge, health wash and death burn all read on the mech
+    // at BreakerBodyPaint's overlay strength, livery untouched underneath.
+    // This closes the recorded cost from the mech-cast ruling.
+    if (HitReaction)
+    {
+        HitReaction->RegisterOverlayBody(NamedBody);
     }
     // THE WEAK POINT RIDES THE NAMED HEAD. Authored at the primitive
     // humanoid's head height, it floated beside every mech like a balloon —

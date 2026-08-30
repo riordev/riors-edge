@@ -251,6 +251,31 @@ namespace BreakerBodyPaint
         bool bReactionWeakPoint = false;
     };
 
+    // THE OVERLAY STRENGTH: how much of the resolved colour a NAMED body
+    // wears over its livery. A mech's paint job carries the family read the
+    // primitives needed a flat colour for, so at rest — Trash, full health —
+    // the overlay is ZERO and the livery is pure. Reactions occlude exactly
+    // as they do on primitives (a flash is white whatever the body was), the
+    // rank badge wears its own authored blend weights, and the health ramp
+    // rises with damage taken. Same state, same single writer; a second
+    // strength table here would be the two-owners shape O128 deleted.
+    inline float ResolveOverlayStrength(const FState& State)
+    {
+        if (State.Reaction == EReaction::Flash) return 1.0f;
+        // The burn covers fully for its whole ride to ash — the corpse reads
+        // burnt out on a mech the same as on the primitives.
+        if (State.Reaction == EReaction::DeathCrumple) return 1.0f;
+        float Strength = RankBlendFor(State.Rank);
+        if (State.bHealthRamp)
+        {
+            // 0 at full health, up to 0.6 at none: the wound wash never fully
+            // hides the livery the way a reaction does. O2 PLACEHOLDER.
+            Strength = FMath::Max(Strength,
+                0.6f * (1.0f - FMath::Clamp(State.HealthFraction, 0.0f, 1.0f)));
+        }
+        return FMath::Clamp(Strength, 0.0f, 1.0f);
+    }
+
     inline FLinearColor Resolve(const FState& State)
     {
         const FLinearColor Flash = State.bReactionWeakPoint ? FlashWeakPointColor : FlashColor;

@@ -365,6 +365,8 @@ protected:
     // O168's mark. Cleared by ReviveFromPool with the rest of the promoted
     // state — a reused body is a fresh body and holds nothing open.
     bool bRiftTerminator = false;
+    // Breaker.BodyPaint's flash re-strike clock. Dev instrument state only.
+    FTimerHandle DevPaintProbeTimer;
 public:
     // Read-only, and it exists so the shipped configuration is assertable: a
     // subclass that DECLARES one colour and PAINTS another is exactly the
@@ -405,6 +407,9 @@ public:
     // body — defaulting meshes on is FIELD's readability call, not this
     // hook's, which is why no chassis sets one.
     UFUNCTION(BlueprintCallable, Category="Enemy") void ApplyBodyMesh();
+    // Dev photography only (Breaker.BodyPaint): holds a paint state still for
+    // the capture cadence, through the same public setters a fight drives.
+    void DevDriveBodyPaintProbe(const FString& Mode);
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyMeshAsset;
     // Optional looped idle so a named body poses instead of T-posing; the
     // imported packs ship *_Idle sequences beside every mesh.
