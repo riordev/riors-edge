@@ -204,10 +204,12 @@ namespace BreakerPowerBandTest
         // additive bucket and which More product fed them, which is exactly the
         // comparison the parity figure wants to make.
         float ComposedAbilityMultiplier = 1.0f;
-        // Structurally 1.0 today, and that is a measurement rather than a
-        // placeholder: Added Damage bids Flat into the WEAPON lane only, and
-        // O54's three pools are three INCREASED pools — the flat half has no
-        // ability counterpart at all. Printed so the report says so.
+        // Fed by Offense.AddedAbilityDamage since the flat-half ruling
+        // (2026-08-30). Before it this was structurally 1.0 — Added Damage bid
+        // Flat into the WEAPON lane only and O54's three pools were three
+        // INCREASED pools — and the AbilityLane report printed that as a
+        // measurement. Now it moves, and the print is what says whether the
+        // mirror's anchors are right.
         float AbilityFlatLayer = 1.0f;
         float AbilityIncreasedLayer = 1.0f;
         float AbilityMoreLayer = 1.0f;
@@ -1562,17 +1564,25 @@ namespace BreakerPowerBandTest
     // ability pool, plus the shared line on the three slots that carry it. Same
     // slots, same tier, same number of offensive lines - so this compares two
     // POOLS and not a rich build against a poor one.
+    //
+    // THE FLAT MIRROR (the flat-half ruling, 2026-08-30): Added Ability Damage
+    // sits on exactly the five slots where OptimizedLoadout wears Added Damage
+    // (Helmet, Gloves, Necklace, Waist, Secondary), so the two builds carry
+    // their lane's flat line identically and the flat ratio measures the POOLS
+    // rather than a loadout accident. Before the ruling the ability build wore
+    // the WEAPON flat on two slots — a line that paid its weapon lane display
+    // and nothing its parity numerator could see.
     TArray<FBreakerItemInstance> AbilityOptimizedLoadout(int32 ItemLevel, int32 Tier)
     {
         return MakeLoadout({
-            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Helmet,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedAbilityDamage")}},
             {EBreakerEquipSlot::BodyArmour, Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
-            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedDamage")}},
+            {EBreakerEquipSlot::Gloves,     Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedAbilityDamage")}},
             {EBreakerEquipSlot::Boots,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Move.AirControl"), TEXT("Move.DashCooldown")}},
-            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage")}},
-            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Core.Health")}},
+            {EBreakerEquipSlot::Necklace,   Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedAbilityDamage")}},
+            {EBreakerEquipSlot::Waist,      Tier, {TEXT("Offense.AbilityDamage"), TEXT("Offense.SharedDamage"), TEXT("Offense.AddedAbilityDamage"), TEXT("Core.Health")}},
             {EBreakerEquipSlot::Primary,    Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.MaxResource")}},
-            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Core.ResourceRegen")}},
+            {EBreakerEquipSlot::Secondary,  Tier, {TEXT("Offense.AbilityDamage"), TEXT("Crit.Chance"), TEXT("Crit.Damage"), TEXT("Offense.AddedAbilityDamage"), TEXT("Core.ResourceRegen")}},
         }, ItemLevel);
     }
 }
@@ -1602,27 +1612,22 @@ bool FBreakerPowerBandAbilityLaneTest::RunTest(const FString& Parameters)
     AddInfo(FString::Printf(TEXT("ABILITY LANE  ability build, ability lane (ilvl %d, T%d) flat x%.3f | increased x%.3f | more x%.3f => x%.2f"),
         AtCapItemLevel, Tier, AbilityBuild.AbilityFlatLayer, AbilityBuild.AbilityIncreasedLayer, AbilityBuild.AbilityMoreLayer, AbilityBuild.AbilityTotal));
 
-    // PARITY AT THE CAP, against O99's ruled band. EXPECTED RED: the figure is
-    // 0.647x and the band is 0.85-1.15x, and that gap is a work item with a
-    // number on it rather than an open question in a document.
+    // PARITY AT THE CAP, against O99's ruled band. EXPECTED RED: the live
+    // figure is in the emit below (never typed here), the band is 0.85-1.15x,
+    // and the gap is a work item with a number on it rather than an open
+    // question in a document.
     //
-    // THE GAP IS AFFIX BREADTH, AND THE DIAGNOSIS IS IN THE LAYERS ABOVE.
-    // The two builds hold an identical More product and identical crit lines,
-    // so both cancel exactly and parity is the flat ratio times the increased
-    // ratio. BOTH are short, and they are two different pieces of work:
+    // THE REMAINING GAP IS AFFIX BREADTH, AND THE DIAGNOSIS IS IN THE FOUR
+    // RATIOS PRINTED BELOW. The flat half CLOSED with the flat-half ruling
+    // (2026-08-30): Offense.AddedAbilityDamage mirrors Added Damage on the
+    // same five slots of this fixture pair, so the flat ratio now reads ~1.0
+    // and what is left is the increased half — the ability pool is one seeded
+    // line plus the mirror flat, where the weapon pool is those plus fire
+    // rate, five conditional lines and the projectile family — times the More
+    // and crit ratios the atlas pass opened. The increased half closes by
+    // authoring ability affix breadth.
     //
-    //   increased 3.35 against 4.49 — the ability pool is one seeded line per
-    //     slot at placeholder values, where the weapon pool is that line plus
-    //     added damage, fire rate, five conditional lines and the projectile
-    //     family. This half closes by authoring ability affix breadth.
-    //
-    //   flat 1.000 against 1.154 — the ability lane has NO FLAT LINE AT ALL.
-    //     Added Damage bids Flat into the weapon lane only, and O54 names three
-    //     INCREASED pools and says nothing about the flat half. This is an
-    //     unanswered design question rather than unauthored content, and it is
-    //     recorded as one.
-    //
-    // Neither half closes by touching the composition, and a future reader who
+    // It does not close by touching the composition, and a future reader who
     // "fixes" this by folding the weapon pool back into ability hits has
     // deleted the partition rather than closed the gap.
     const float Parity = AbilityBuild.AbilityTotal / WeaponBuild.Total;

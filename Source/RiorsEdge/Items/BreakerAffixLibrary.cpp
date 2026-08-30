@@ -263,6 +263,16 @@ namespace
         // O2 PLACEHOLDER: 1 -> 11 percentage points of base weapon damage.
         Pool.Add(MakeAffix(TEXT("Offense.AddedDamage"), TEXT("Added Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::AddedDamage, EBreakerStatBucket::Flat,
             {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 1.0f, 11.0f, 70.0f));
+        // The ability lane's flat half (the flat-half ruling, 2026-08-30). A
+        // DELIBERATE MIRROR of Added Damage — same slots, same category, same
+        // anchors, same weight — for the same reason Offense.AbilityDamage
+        // mirrors Offense.WeaponDamage: the ability lane has never been felt,
+        // so these values are a mirror rather than a guess with a story
+        // attached, and PowerBand.AbilityLane is what will say whether the
+        // mirror is right.
+        // O2 PLACEHOLDER: 1 -> 11 percentage points of base ability damage.
+        Pool.Add(MakeAffix(TEXT("Offense.AddedAbilityDamage"), TEXT("Added Ability Damage"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::AddedAbilityDamage, EBreakerStatBucket::Flat,
+            {EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary, EBreakerEquipSlot::Secondary}, 1.0f, 11.0f, 70.0f));
 
         // Cadence. Rolls only on the two WEAPON slots, deliberately: fire rate
         // is a property of the gun, and putting it on boots would make the
@@ -611,6 +621,7 @@ bool UBreakerAffixLibrary::IsOffensiveTarget(EBreakerStatTarget Target)
     case EBreakerStatTarget::AbilityDamage:
     case EBreakerStatTarget::SharedDamage:
     case EBreakerStatTarget::AddedDamage:
+    case EBreakerStatTarget::AddedAbilityDamage:
     case EBreakerStatTarget::CriticalChance:
     case EBreakerStatTarget::CriticalDamage:
     case EBreakerStatTarget::AirborneDamage:

@@ -188,6 +188,16 @@ enum class EBreakerStatTarget : uint8
     // at the same tier, which is what stops it being strictly better than the
     // narrow lines it can substitute for.
     SharedDamage,
+    // The FLAT half of the ability pair, appended like everything above. O54
+    // named three Increased pools and was silent on flat; the ability lane
+    // therefore had NO flat line at all, which PowerBand.AbilityLane measured
+    // as a structural x1.000 against the weapon lane's Added Damage. Ruled
+    // closed 2026-08-30 (the flat-half question): this bids into the Flat lane
+    // of the AbilityDamageMultiplier attribute exactly as AddedDamage bids
+    // into DamageMultiplier's — added BEFORE the Increased bucket multiplies,
+    // authored in percentage points of base ability damage. Neither lane
+    // reads the other's flat, same partition rule as the Increased pools.
+    AddedAbilityDamage,
     Count UMETA(Hidden)
 };
 

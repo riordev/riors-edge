@@ -1188,6 +1188,15 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         // increased line are two different decisions instead of one.
         OutContribution->AddFlat(EBreakerAggregatedAttribute::DamageMultiplier,
             FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)] / 100.0f);
+        // The ability lane's flat half, the exact mirror one attribute over
+        // (the flat-half ruling, 2026-08-30): Added Ability Damage lands in
+        // the FLAT lane of AbilityDamageMultiplier, base 1.0, so it multiplies
+        // under the ability Increased bucket exactly as Added Damage does
+        // under the weapon one. This is the ONE aggregation site the ruling
+        // adds; the aggregator's own Compose carries it to every ability hit,
+        // so no consumer changes.
+        OutContribution->AddFlat(EBreakerAggregatedAttribute::AbilityDamageMultiplier,
+            FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedAbilityDamage)] / 100.0f);
 
         // Flat armour, joining the fold for the first time. Its consumer is
         // UBreakerCombatComponent::GetEffectiveArmor(), which is the same route
