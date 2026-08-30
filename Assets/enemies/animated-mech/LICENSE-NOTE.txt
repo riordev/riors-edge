@@ -1,0 +1,12 @@
+﻿Quaternius - Animated Mech Pack (March 2021). The four mechs are NAMED
+George, Leela, Mike and Stan - human names on machine bodies, which is
+why this pack was misidentified at first intake (2026-08-29) as a second
+base-characters pack and briefly vendored under Assets/npcs before the
+pack preview settled it. Identified by Preview.jpg, which titles itself
+ANIMATED MECH PACK.
+Source: https://quaternius.com (Google Drive distribution).
+License: CC0 1.0 (in-pack License.txt).
+Vendored: Textured FBX + base textures + the 16 recolor variations
+(enemy crowd variety, the owner's keep-crowd-variety call). Flat Colors
+variant, glTF/OBJ/Blend duplicates and the turntable gif deleted.
+Date: 
