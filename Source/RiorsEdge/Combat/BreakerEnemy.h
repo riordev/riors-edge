@@ -396,16 +396,20 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> WeakPointVisual;
 
 public:
-    // --- THE NAMED BODY (asset-intake wiring) -----------------------------
+    // --- THE NAMED BODY (the shipped look) --------------------------------
     // ABreakerNPC's pattern, skeletal: when BodyMeshAsset resolves it replaces
-    // the six primitives whole, fitted to the capsule by BreakerEnemyBodyMath;
-    // unset (the DEFAULT — nothing ships one yet) the primitives stand
-    // untouched, so a clone without the imported packs still fights. The weak
-    // point stays visible either way: it is gameplay, not dressing. KNOWN AND
-    // DELIBERATE: rank paint and the hit-reaction tint ramp speak the
-    // primitives' dynamic-material language and do NOT transfer to a named
-    // body — defaulting meshes on is FIELD's readability call, not this
-    // hook's, which is why no chassis sets one.
+    // the six primitives whole, fitted to the capsule by BreakerEnemyBodyMath.
+    // The mech cast IS the default (owner ruling 2026-08-29): every enemy
+    // class defaults a mech except the ranged Lattice, which ships composed
+    // primitives by the same ruling — MechCastResolvesAndLatticeStaysPrimitive
+    // pins both halves. Unset (a clean clone without the imported packs) the
+    // primitives stand untouched and the enemy still fights. The weak point
+    // stays visible either way — it is gameplay, not dressing — and rides the
+    // mech's Head bone when one exists. Every paint layer (family, rank
+    // badge, health wash, flash, death burn) reads on the named body as an
+    // OVERLAY at BreakerBodyPaint::ResolveOverlayStrength, livery intact
+    // underneath — the paint port that closed the mech-cast ruling's
+    // recorded cost.
     UFUNCTION(BlueprintCallable, Category="Enemy") void ApplyBodyMesh();
     // Dev photography only (Breaker.BodyPaint): holds a paint state still for
     // the capture cadence, through the same public setters a fight drives.
