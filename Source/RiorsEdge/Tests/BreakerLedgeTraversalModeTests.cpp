@@ -54,10 +54,37 @@ bool FBreakerLedgeTraversalModeTest::RunTest(const FString& Parameters)
         FMove::LedgeTraversalLocation(Start, Target, 0.0f).Equals(Start, 0.001f));
     TestTrue(TEXT("Alpha one is the target exactly"),
         FMove::LedgeTraversalLocation(Start, Target, 1.0f).Equals(Target, 0.001f));
-    // Smoothstep(0.5) = 0.5: the midpoint of the clock is the midpoint of the
-    // path — the ease lives in the derivative, not in a skewed midpoint.
-    TestTrue(TEXT("The clock's midpoint is the path's midpoint"),
-        FMove::LedgeTraversalLocation(Start, Target, 0.5f).Equals(FMath::Lerp(Start, Target, 0.5f), 0.001f));
+    // THE CORNER RULE (found by photographing the glide): the path RISES
+    // before it advances, so a swept capsule can never clip the ledge's
+    // front-top corner — the straight lerp this replaced aborted every
+    // standing mantle against a solid face. Rise fraction here is
+    // 145/245 = 0.59, so the clock's midpoint (smoothstep 0.5) is still
+    // rising: zero ground covered, real height gained.
+    {
+        const FVector Rising = FMove::LedgeTraversalLocation(Start, Target, 0.5f);
+        TestTrue(TEXT("Mid-rise the glide has covered no ground"), FMath::IsNearlyZero(Rising.X, 0.01f));
+        TestTrue(TEXT("Mid-rise the glide has real height"), Rising.Z > 50.0f);
+    }
+    // Once crossing, the glide is already AT the ledge's height — forward
+    // motion happens above the top, never through the face.
+    {
+        // Smoothstep(0.7)=0.784, past the 0.59 rise fraction.
+        const FVector Crossing = FMove::LedgeTraversalLocation(Start, Target, 0.7f);
+        TestTrue(TEXT("Crossing happens at the ledge's own height"),
+            FMath::IsNearlyEqual(Crossing.Z, Target.Z, 0.01f));
+        TestTrue(TEXT("Crossing actually advances"), Crossing.X > 0.0f && Crossing.X < 100.0f);
+    }
+    // The descending mirror (a traversal resolved mid-fall from above the
+    // top): cross high first, settle after — same rule, other corner.
+    {
+        const FVector HighStart(0.0f, 0.0f, 100.0f);
+        const FVector LowTarget(100.0f, 0.0f, 50.0f);
+        const FVector CrossingHigh = FMove::LedgeTraversalLocation(HighStart, LowTarget, 0.4f);
+        TestTrue(TEXT("A descending glide crosses at its STARTING height"),
+            FMath::IsNearlyEqual(CrossingHigh.Z, HighStart.Z, 0.01f));
+        TestTrue(TEXT("A descending glide still lands on its target"),
+            FMove::LedgeTraversalLocation(HighStart, LowTarget, 1.0f).Equals(LowTarget, 0.001f));
+    }
 
     // --- The stride speed (sibling defect 1's number) --------------------
     // The bob's third mode reads this; on the old tree the only available

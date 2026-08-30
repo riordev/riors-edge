@@ -1084,7 +1084,43 @@ FVector UBreakerCharacterMovementComponent::LedgeTraversalLocation(const FVector
 {
     const float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
     const float Smoothed = A * A * (3.0f - 2.0f * A);
-    return FMath::Lerp(Start, Target, Smoothed);
+
+    // TWO-PHASE PATH (found by photographing the glide, not by reading it):
+    // the old straight start-to-target lerp passes through the ledge's
+    // front-top corner, so a swept capsule ABORTS every standing mantle
+    // against a solid face — the only traversals that ever completed were
+    // resolved mid-fall from near or above the top, which is exactly the
+    // flakiness the recon measured ("feet sweep the band while falling").
+    // The path now RISES first, alongside the face, then CROSSES over the
+    // top; a descending resolve (from above the ledge) mirrors it — cross
+    // high first, settle after. Same clock, same smoothstep, same
+    // durations: only the path's shape changed, and only so the verb can
+    // actually finish what it resolved.
+    const float RiseDist = FMath::Max(Target.Z - Start.Z, 0.0f);
+    const FVector Flat(Target.X - Start.X, Target.Y - Start.Y, 0.0f);
+    const float FlatDist = Flat.Size();
+    const float DropDist = FMath::Max(Start.Z - Target.Z, 0.0f);
+    const float PathLength = RiseDist + FlatDist + DropDist;
+    if (PathLength <= UE_KINDA_SMALL_NUMBER)
+    {
+        return FMath::Lerp(Start, Target, Smoothed);
+    }
+    const float RiseFraction = RiseDist / PathLength;
+    const float CrossFraction = FlatDist / PathLength;
+    if (Smoothed <= RiseFraction)
+    {
+        const float RiseAlpha = FMath::Clamp(Smoothed / FMath::Max(RiseFraction, UE_KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+        return FVector(Start.X, Start.Y, FMath::Lerp(Start.Z, Target.Z, RiseAlpha));
+    }
+    if (Smoothed <= RiseFraction + CrossFraction)
+    {
+        const float CrossAlpha = FMath::Clamp((Smoothed - RiseFraction) / FMath::Max(CrossFraction, UE_KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+        const float CrossZ = RiseDist > 0.0f ? Target.Z : Start.Z;
+        return FVector(Start.X + Flat.X * CrossAlpha, Start.Y + Flat.Y * CrossAlpha, CrossZ);
+    }
+    const float DropAlpha = FMath::Clamp(
+        (Smoothed - RiseFraction - CrossFraction) / FMath::Max(1.0f - RiseFraction - CrossFraction, UE_KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+    return FVector(Target.X, Target.Y, FMath::Lerp(Start.Z, Target.Z, DropAlpha));
 }
 
 float UBreakerCharacterMovementComponent::LedgeTraversalStrideSpeed(float DistanceCm, float DurationSeconds, float Alpha)
@@ -1105,8 +1141,12 @@ float UBreakerCharacterMovementComponent::GetLedgeTraversalStrideSpeed() const
     {
         return 0.0f;
     }
+    // The path is L-shaped (rise, cross, settle), so the honest distance is
+    // the path's, not the chord's.
+    const float PathLength = FMath::Abs(TraversalTarget.Z - TraversalStart.Z)
+        + static_cast<float>(FVector::Dist2D(TraversalTarget, TraversalStart));
     return LedgeTraversalStrideSpeed(
-        static_cast<float>((TraversalTarget - TraversalStart).Size()),
+        PathLength,
         TraversalDuration,
         LedgeTraversalAlpha(TraversalElapsed, TraversalDuration));
 }
