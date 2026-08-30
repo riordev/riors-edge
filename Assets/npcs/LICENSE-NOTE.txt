@@ -1,5 +1,12 @@
 ﻿NPC cast ruling (owner, 2026-08-29): ONE body family keeps the NPC cast
-coherent - universal-base-characters is that family. The second Quaternius
-base pack (George/Leela/Mike/Stan, drive-download distribution) is skipped
-PERMANENTLY; it was briefly vendored here as base-characters/ and removed
-by this ruling. Do not re-intake it from Downloads.
+coherent - universal-base-characters is that family, and it ships both
+bases: Superhero_Female_FullBody and Superhero_Male_FullBody.
+KESS = Superhero_Female_FullBody (recorded per the owner's follow-up;
+the pack holds a female base, so no exception to the one-family rule
+was needed).
+
+CORRECTION TO AN EARLIER NOTE: the "second base-characters pack"
+(George/Leela/Mike/Stan) this file used to skip never existed - that
+zip was the Animated Mech Pack, misidentified at intake because its
+mechs carry human names, and it is vendored where it belongs:
+Assets/enemies/animated-mech/. The one-family ruling stands on its own.
