@@ -263,6 +263,17 @@ struct FBreakerViewmodelMotionParams
     float LandingKickPerFallSpeed = 0.004f;   // O2 PLACEHOLDER
     float MaxLandingKickUnits = 5.0f;         // O2 PLACEHOLDER
     float LandingPitchPerKickUnit = 0.6f;     // O2 PLACEHOLDER, muzzle dips
+
+    // Traversal exit dip (D3, owner-ruled): a completed vault or mantle ends
+    // in a ~3 cm step-down the landing path can never see — the movement
+    // component exits falling with zero vertical speed, so ProcessLanded
+    // reads no impact — which left the exit with no weight at all. The dip
+    // is paid directly off the completion broadcast, in the kick spring's
+    // own units, vault lighter than mantle because vault is the
+    // not-breaking-stride verb. Both stay at or under MaxLandingKickUnits:
+    // no traversal may ever dip harder than the heaviest landing.
+    float VaultExitKickUnits = 1.2f;          // O2 PLACEHOLDER
+    float MantleExitKickUnits = 2.2f;         // O2 PLACEHOLDER
 };
 
 /** The motion channel's output for one frame, camera-relative like the spring. */

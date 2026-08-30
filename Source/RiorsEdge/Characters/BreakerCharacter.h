@@ -33,6 +33,7 @@ class ABreakerNPC;
 class ABreakerLootPickup;
 class SBreakerMenu;
 struct FInputActionValue;
+enum class EBreakerLedgeVerb : uint8;
 
 UCLASS(Blueprintable)
 class RIORSEDGE_API ABreakerCharacter : public ACharacter, public IAbilitySystemInterface
@@ -304,6 +305,20 @@ private:
     FBreakerViewmodelMotionParams ViewmodelMotion;
     float ViewmodelBobPhase = 0.0f;
     float LastFallingSpeed = 0.0f;
+    // The traversal exit dip (D3): bound to the movement component's
+    // completed-only broadcast, pays the verb's authored kick into the
+    // existing spring — the 3 cm exit drop is invisible to the landing path
+    // (zero vertical speed), so the completion event is the honest trigger.
+    void HandleLedgeTraversalCompleted(EBreakerLedgeVerb Verb);
+    // Dev capture only (-BreakerTraversalDemo[=scale]): spawns a mantle-height
+    // block ahead, slows the traversal clock and runs the verb, so a
+    // screenshot cadence of 2 s can photograph the mid-traversal viewmodel —
+    // a real vault crosses in 0.12 s and no frame would ever catch it.
+    bool bTraversalDemoArmed = false;
+    float TraversalDemoClockScale = 25.0f;
+    double TraversalDemoStartTime = -1.0;
+    int32 TraversalDemoStep = 0;
+    void TickTraversalDemo();
     UFUNCTION() void HandleDashStarted(FVector DashDirection, float DashSpeed);
     void UpdateDashCameraFeedback(float DeltaSeconds);
     void ApplyBaseFieldOfView();

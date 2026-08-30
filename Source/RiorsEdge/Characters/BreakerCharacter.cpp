@@ -30,6 +30,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Engine/StaticMeshActor.h"
 #include "Playtest/BreakerPlaytestComponent.h"
 #include "Classes/BreakerManaComponent.h"
 #include "Classes/BreakerMomentumComponent.h"
@@ -244,6 +245,10 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     UpdateViewmodelKick();
     UpdateDashCameraFeedback(DeltaSeconds);
     UpdateCameraShake(DeltaSeconds);
+    if (bTraversalDemoArmed)
+    {
+        TickTraversalDemo();
+    }
     // Coarse poll for the Grit/Charge discrete state inputs (in-combat,
     // enemy-within-5m). Cheap: early-outs unless one of those loops is live.
     if (HasAuthority())
@@ -313,6 +318,25 @@ void ABreakerCharacter::BeginPlay()
     }
     PlaytestSpawnTransform = GetActorTransform();
     FallKillZ = PlaytestSpawnTransform.GetLocation().Z - 4000.0f;
+    // The traversal exit dip (D3): completed-only by the broadcast's own
+    // rule, so a blocked abort never dips. Bound here beside the other
+    // presentation listeners.
+    if (UBreakerCharacterMovementComponent* TraversalMovement = GetBreakerMovement())
+    {
+        TraversalMovement->OnLedgeTraversalCompleted.AddUObject(this, &ABreakerCharacter::HandleLedgeTraversalCompleted);
+        // Dev capture (-BreakerTraversalDemo[=scale]): slow the traversal
+        // clock so the 2 s screenshot cadence can catch the glide mid-flight.
+        if (FParse::Param(FCommandLine::Get(), TEXT("BreakerTraversalDemo")))
+        {
+            bTraversalDemoArmed = true;
+            float ParsedScale = 0.0f;
+            if (FParse::Value(FCommandLine::Get(), TEXT("BreakerTraversalDemo="), ParsedScale) && ParsedScale > 0.0f)
+            {
+                TraversalDemoClockScale = ParsedScale;
+            }
+            TraversalMovement->DevTraversalDurationScale = TraversalDemoClockScale;
+        }
+    }
     // A weapon ITEM decides which gun its slot holds. Bound before the save
     // loads so a restored loadout arms the right archetypes, and called once
     // directly afterwards because the equipment component does not broadcast
@@ -934,16 +958,27 @@ void ABreakerCharacter::UpdateViewmodelKick()
     if (const UWorld* MotionWorld = GetWorld())
     {
         const UBreakerCharacterMovementComponent* Move = GetBreakerMovement();
-        const bool bGroundedStride = Move && !Move->IsFalling() && !Move->IsSliding();
-        const float GroundSpeed = Move ? Move->Velocity.Size2D() : 0.0f;
+        // THE THIRD MODE (D3, owner-ruled): a ledge traversal. The old
+        // predicate knew grounded and not-grounded, and a traversal is
+        // neither — the glide zeroes Velocity and moves the body directly,
+        // so the gun read as standing still through the game's most physical
+        // movement. The stride now reads the glide's own speed (the
+        // smoothstep derivative), so the bob rises and falls with the body's
+        // actual motion and quiets at both ends of the traversal.
+        const bool bTraversing = Move && Move->IsTraversingLedge();
+        const bool bGroundedStride = Move && !bTraversing && !Move->IsFalling() && !Move->IsSliding();
+        const bool bStriding = bGroundedStride || bTraversing;
+        const float StrideSpeed = bTraversing
+            ? Move->GetLedgeTraversalStrideSpeed()
+            : (Move ? static_cast<float>(Move->Velocity.Size2D()) : 0.0f);
         const float Delta = MotionWorld->GetDeltaSeconds();
-        if (bGroundedStride)
+        if (bStriding)
         {
             ViewmodelBobPhase = FBreakerWeaponFeel::AdvanceBobPhase(
-                ViewmodelBobPhase, GroundSpeed, Delta, ViewmodelMotion.StrideLengthCm);
+                ViewmodelBobPhase, StrideSpeed, Delta, ViewmodelMotion.StrideLengthCm);
         }
-        const float SpeedFraction = (bGroundedStride && ViewmodelMotion.FullBobSpeed > 0.0f)
-            ? FMath::Clamp(GroundSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
+        const float SpeedFraction = (bStriding && ViewmodelMotion.FullBobSpeed > 0.0f)
+            ? FMath::Clamp(StrideSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
         // ADS quiets motion exactly as it quiets the kick: through the
         // profile's aim-blended viewmodel multiplier.
         float MotionScale = 1.0f;
@@ -2131,6 +2166,95 @@ void ABreakerCharacter::TogglePauseMenu()
         return;
     }
     MenuWidget->HandleEscape();
+}
+
+void ABreakerCharacter::HandleLedgeTraversalCompleted(EBreakerLedgeVerb Verb)
+{
+    // The exit dip (D3): the completed glide ends in a ~3 cm step-down that
+    // ProcessLanded can never see (the exit's vertical speed is zero), so
+    // the completion broadcast pays the verb's authored kick into the SAME
+    // spring the landing dip and the recoil use — one recovery character per
+    // archetype, no second spring. Purely presentation; a dedicated server
+    // has no viewmodel and the call is inert there.
+    if (!Weapon)
+    {
+        return;
+    }
+    const float KickUnits = Verb == EBreakerLedgeVerb::Vault
+        ? ViewmodelMotion.VaultExitKickUnits : ViewmodelMotion.MantleExitKickUnits;
+    if (KickUnits > 0.0f)
+    {
+        Weapon->AddViewmodelImpulse(KickUnits, -KickUnits * ViewmodelMotion.LandingPitchPerKickUnit);
+    }
+    if (bTraversalDemoArmed)
+    {
+        UE_LOG(LogTemp, Display, TEXT("[BreakerTraversalDemo] traversal COMPLETED verb=%d exitkick=%.2f"),
+            static_cast<int32>(Verb), KickUnits);
+    }
+}
+
+void ABreakerCharacter::TickTraversalDemo()
+{
+    UWorld* World = GetWorld();
+    UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
+    if (!World || !Movement || !IsPlayerControlled())
+    {
+        return;
+    }
+    const double Now = World->GetTimeSeconds();
+    if (TraversalDemoStartTime < 0.0)
+    {
+        TraversalDemoStartTime = Now;
+        UE_LOG(LogTemp, Display, TEXT("[BreakerTraversalDemo] armed clockscale=%.0f"), TraversalDemoClockScale);
+    }
+    const double T = Now - TraversalDemoStartTime;
+
+    // Spawn the subject: a mantle-band block dead ahead, its face inside the
+    // wall probe's 90 cm reach and its top at 110 cm — decisively inside the
+    // mantle window, nowhere near a band edge.
+    if (TraversalDemoStep == 0 && T >= 4.0)
+    {
+        TraversalDemoStep = 1;
+        const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+        const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.0f;
+        const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, HalfHeight);
+        FActorSpawnParameters Params;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        AStaticMeshActor* Block = World->SpawnActor<AStaticMeshActor>(
+            Feet + Forward * 135.0f + FVector(0.0f, 0.0f, 55.0f),
+            Forward.Rotation(), Params);
+        UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+        if (Block && Cube && Block->GetStaticMeshComponent())
+        {
+            Block->SetMobility(EComponentMobility::Movable);
+            Block->GetStaticMeshComponent()->SetStaticMesh(Cube);
+            // 150 deep x 300 wide x 110 tall: face 60 cm from the actor's
+            // centre, top at feet + 110.
+            Block->SetActorScale3D(FVector(1.5f, 3.0f, 1.1f));
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerTraversalDemo] t=%.2f block spawned -> %d"), T, Block ? 1 : 0);
+    }
+    // Trigger: ask every frame until the verb takes (the block needs a frame
+    // of collision settling first).
+    else if (TraversalDemoStep == 1 && T >= 5.0)
+    {
+        if (TryMantle())
+        {
+            TraversalDemoStep = 2;
+            UE_LOG(LogTemp, Display, TEXT("[BreakerTraversalDemo] t=%.2f traversal requested (slowed x%.0f)"), T, TraversalDemoClockScale);
+        }
+        else if (T >= 8.0)
+        {
+            TraversalDemoStep = 3;
+            UE_LOG(LogTemp, Display, TEXT("[BreakerTraversalDemo] t=%.2f FAILED to begin a traversal — nothing resolved"), T);
+        }
+    }
+    // A rate-limited pose line while the glide runs, so the log narrates what
+    // the frames photograph.
+    else if (TraversalDemoStep == 2 && Movement->IsTraversingLedge())
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("[BreakerTraversalDemo] t=%.2f stride=%.0f"), T, Movement->GetLedgeTraversalStrideSpeed());
+    }
 }
 
 void ABreakerCharacter::Landed(const FHitResult& Hit)
