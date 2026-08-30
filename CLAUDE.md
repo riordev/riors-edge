@@ -2,6 +2,56 @@
 
 ## Current work
 
+KIT LANE, BATCH ONE SESSION D (lane/batch1-kit, base 7c12c4d, ends
+497 / 3 / 0 — up five, same expected-red roster). THE OWNER'S ANSWER
+SHEET RAN IN ORDER. D7 FIRST because D1 and D3 write against its
+predicate: the traversal has its OWN movement mode — MOVE_Custom /
+CustomModeLedgeTraversal run by PhysCustom with the saved-move pass
+(request bit on FLAG_Custom_0, glide state captured/restored, server
+and replay re-resolve inside their own simulation) — the pawn keeps
+one question and zero execution state, and IsTraversingLedge() is the
+honest read all three sibling defects were missing. Net scope ~391
+lines in Movement/ against the recon's 250-300, inside the 2x stop
+rule. FOUND BY PHOTOGRAPHING, NOT READING: the straight start-to-
+target lerp ABORTED every standing mantle against a solid face (the
+swept capsule clips the front-top corner — only mid-fall resolves
+ever completed, the recon's own flakiness); the glide is now L-shaped
+(rise, cross, settle; descending mirror) with the corner rule pinned,
+and the demo mantle completes on film. D1, the momentum sentence, all
+O2: a broken boost BLEEDS linearly to the resting cap over 0.5 s and
+the bleed LATCHES at the break (the unlatched version measurably
+re-armed after a wall clip: 2040 -> 2021 -> held); slide-jump
+conserves 0.70; the airborne credit FREEZES through a traversal
+(jump-mantle-fall refund dead, pinned failing-on-old through
+AdvanceLoop); completed traversals pay a 6-point tick on a 1 s
+anti-farm floor and block decay while running. Traced by the new
+-BreakerMoveTrace instrument (the component drives itself — probed
+lanes, a glancing wall hit, a slide-jump — because the harness cannot
+press keys): BEFORE ceiling 2040 -> 0 in one frame, AFTER 2040 ->
+1184 across exactly 0.50 s; slide-jump in/out 1205/1205 BEFORE,
+1207/845 AFTER. D3: the viewmodel bob learns the THIRD MODE (stride
+reads the glide's own smoothstep-derivative speed) and a completed
+exit dips through the one kick spring (vault 1.2 / mantle 2.2, both
+under the heaviest landing, completed-only broadcast); photographed
+via -BreakerTraversalDemo (spawned mantle block, clock x25):
+before / rising / crossing / after. D5: GetAimAlpha is one EASED
+blend both directions — authored AimInSeconds in, new shared
+AimOutSeconds 0.15 out, re-press resumes mid-fade — the viewmodel
+pose LERPS on it instead of branching, and ADS narrows the frame 6.0
+degrees through the same blend, composed with the dash punch in one
+FOV writer. D4 BOTH HALVES: ResolveLedgeVerb biases every band edge
+by LedgeBandEpsilonCm 0.5 toward the verb that keeps the ledge
+actionable (coin-flip repro is the regression test; epsilon pinned
+inside the LedgeMinimum-MaxStepHeight gap), and the gym's authored
+ledges stepped off the edges — kerb 45 -> 35 (decisively walked),
+stair and watchtower risers 145 -> 135 (decisively mantled, parapet
+still cleared). Fernhall's dress_mound_sub 80.0 stays as the
+owner-box recompose item (python-quarantined composer); the epsilon
+resolves it deterministically as a vault meanwhile. KIT.md's two
+questions were answered by the rulings and deleted; the file is
+clean. OWED THE OWNER'S HANDS: every figure is O2 and motion cannot
+be photographed — the traces and triptych are evidence, not feel.
+
 FIELD LANE, BATCH ONE SESSION A (lane/batch1-field, base 755eede,
 492 / 3 / 0 — up one for the revive pin; main advanced with the audio
 merge mid-session, no overlap, deliberately not rebased). THE SIDEWAYS
