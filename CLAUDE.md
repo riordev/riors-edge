@@ -2,6 +2,55 @@
 
 ## Current work
 
+LEDGER LANE, BATCH ONE SESSION C (lane/batch1-ledger, 495 / 3 / 0, same
+expected-red roster, six commits). STORY MISSIONS CAN PAY ABILITY TOKENS
+(the serialize-first half): GrantStoryAbilityToken is GrantWorldPoint's
+shape one wallet over — registry flags only, the grant OBSERVES a flag
+already set, idempotence is a derived AbilityToken.<flag> stamp in the
+journal's own monotonic saved-on-change set, and the token lands in the
+SAME UnspentAbilityTokens wallet so the spend surface does not fork; the
+level schedule stands as the fallback, and a story-paid character's
+end-of-schedule surplus is deliberate and visible, the number the
+unlock-source ruling will spend or delete. Beats are the mission
+layer's to wire (one call at TurnedIn). O180'S REPAIR REACHES THE GEAR:
+a rolled line whose id no longer resolves used to be skipped silently at
+every aggregation forever — now RestoreState drops it and refunds
+Riftglass at the fallback cost (the line's share of its item's own melt
+price, derived off the salvage row, no new number), with the credit held
+across the load path's wholesale wallet replacement and never saved, so
+one file loads the same twice. Stash items are NOT audited — a stashed
+dead line repairs on first post-withdrawal load, recorded not built.
+ONTO THAT SAFE PATH, WALL-RIDE'S AFFIX LINE RETIRED (O144's affix half,
+O180's ruled order) — and ORDERS' "two affix lines" was a MISCOUNT: grep
+counted the pool entry plus the IsOffensiveTarget switch arm; there was
+only ever one authored line. Breadth's conditional floor moved 5 -> 4
+deliberately at the assertion; the stat target and enumerator stay,
+append-only. THE ABILITY LANE HAS ITS FLAT HALF (the flat-half ruling):
+Offense.AddedAbilityDamage mirrors Added Damage (same slots, anchors,
+weight) into AbilityDamageMultiplier's flat lane at ONE aggregation
+site; cap parity 0.621 -> 0.716, endgame 0.356 -> 0.551, flat ratio
+1.000 at both points, the expected red STANDS with its entry rewritten
+to the surviving gap (increased breadth x More x crit), and the unpinned
+crit variant reads 0.925x — the first fixture reading inside O99's band.
+THE UNIVERSAL-SHARE INSTRUMENT IS IN (Items.Affixes.UniversalShare,
+basis in its own output) AND THE POOL FAILS BOTH BRIEF THRESHOLDS
+EVERYWHERE: universal share 0.49-0.69 on every slot at ilvl 10/50/120
+against the 40% ceiling, pairwise overlap 0.63-0.91 on all 28 pairs
+against 50% (Primary~Secondary 0.906 worst, ex-Necklace included) —
+promote-to-reds question filed in Docs/reports/LEDGER.md, nothing in
+the pool moved by the instrument. The at-cap band's parking is recorded
+on its pin (no derivation, no reseed, no tuning; the build-defining
+roster it waits on counted at 20: 3 legendaries, 8 Aberrant + 5
+Anomalous signatures, 4 rollable rules). REPORT-ONLY, delivered in the
+session report: the three uncalled generation hooks (NotifyAssist is
+design-blocked — no non-player killer exists; the two Scrap hooks are
+~5 lines at AddReserveAmmoFraction's clamp and an affix that does not
+exist yet), the boots-pool proposals, and the affix cross-check — the
+56-line roster is NOT RECOVERABLE from the tree (only "28 against a
+planned 56" survives, in ORDERS One-K); the cross-check ran against the
+owner's master sheet in Assets/story-source.md §3 instead, statuses
+re-measured from HEAD.
+
 SEAT 2, ASSET INTAKE AND THE FIRST WIRING (assets/placeholder-intake,
 merged to main at each step; 488 / 3 / 0). The CC0 placeholder packs are
 vendored under Assets/ (enemies / npcs / weapons / zones/kit / audio /
