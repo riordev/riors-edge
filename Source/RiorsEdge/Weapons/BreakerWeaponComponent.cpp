@@ -608,6 +608,27 @@ void UBreakerWeaponComponent::BeginPlay()
     }
 }
 
+void UBreakerWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    // The weak-point instrument's one read: everything this component's
+    // hitscan legs learned about where aim actually lands, printed where a
+    // harness run's log keeps it and the suite reconciler ignores it. The
+    // effective figure is the aim-skill lane's realised multiplier,
+    // 1 + earned-rate * (weakmult - 1) — O34's [1.0, 2.0] pair bounds what
+    // it COULD be; this line says what it IS for whoever was aiming.
+    for (const TPair<FName, FBreakerWeakPointTally>& Pair : WeakPointTally)
+    {
+        const FBreakerWeakPointTally& T = Pair.Value;
+        if (T.Hits <= 0) continue;
+        const float EarnedRate = static_cast<float>(T.Earned) / static_cast<float>(T.Hits);
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerWeakPoint] SUMMARY %s hits=%d earned=%d granted=%d earned-rate=%.3f weakmult=%.2f effective=%.3f"),
+            *Pair.Key.ToString(), T.Hits, T.Earned, T.Granted, EarnedRate,
+            T.WeakPointMultiplier, 1.0f + EarnedRate * (T.WeakPointMultiplier - 1.0f));
+    }
+    Super::EndPlay(EndPlayReason);
+}
+
 void UBreakerWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -2080,6 +2101,16 @@ int32 UBreakerWeaponComponent::ResolvePelletImpacts(const UBreakerWeaponDefiniti
         {
             Shot.bWeakPoint |= bWeakPoint;
             Pellet.bWeakPoint = bWeakPoint;
+        }
+
+        // The weak-point instrument's one write: an aimed hitscan leg
+        // reached a combat target. Header comment carries the contract.
+        {
+            FBreakerWeakPointTally& Tally = WeakPointTally.FindOrAdd(Definition->WeaponId);
+            ++Tally.Hits;
+            if (bEarnedWeakPoint) ++Tally.Earned;
+            else if (bGrantedWeakPoint) ++Tally.Granted;
+            Tally.WeakPointMultiplier = Definition->WeakPointMultiplier;
         }
 
         // The first hit rolls with the legacy seed material so an unchannelled
