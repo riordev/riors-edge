@@ -35,6 +35,12 @@ namespace
 
 ABreakerRangedEnemy::ABreakerRangedEnemy()
 {
+    // THE LATTICE STAYS PRIMITIVES BY RULING (owner, 2026-08-29, recorded in
+    // Assets/enemies/LICENSE-NOTE.txt): it is composed in-engine, code-
+    // animated, BodyPaint material — the one enemy the mech cast does not
+    // dress. The base constructor defaults Stan; this clears it.
+    BodyMeshAsset = FSoftObjectPath();
+    BodyIdleAnimation = FSoftObjectPath();
     // --- Chassis (O2 PLACEHOLDER) ------------------------------------------
     // This archetype used to ship at the base chassis' flat 220 deliberately,
     // because trash and elite health were mid-re-anchor. O27 landed, so

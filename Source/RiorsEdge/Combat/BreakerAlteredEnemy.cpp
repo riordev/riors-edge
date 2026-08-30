@@ -48,6 +48,10 @@ namespace BreakerAlteredDetail
 
 ABreakerAlteredEnemy::ABreakerAlteredEnemy()
 {
+    // Late severance wears Mike at a walk (owner's mech-cast ruling, O2
+    // mapping) — "nothing is left but the shape", and now the shape is a hull.
+    BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/Mike.Mike"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Mike/MikeRobotArmature_Walk.MikeRobotArmature_Walk"));
     // --- FAMILY (Assets/story-source.md §1.5) ----------------------------------------
     // LATE severance: "nothing is left but the shape." No equipment, no
     // insignia, no tactics — UsesCoverDiscipline() and FlinchesWhenHit() both

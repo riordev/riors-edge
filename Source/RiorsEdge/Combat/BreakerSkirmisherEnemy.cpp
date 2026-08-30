@@ -15,6 +15,10 @@
 
 ABreakerSkirmisherEnemy::ABreakerSkirmisherEnemy()
 {
+    // The fast flanker wears Leela at a runner's gait (owner's mech-cast
+    // ruling; the mapping is O2 placeholder like every mech assignment).
+    BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Leela/Leela.Leela"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Leela/LeelaRobotArmature_Run.LeelaRobotArmature_Run"));
     // EARLY-severance Altered. The stage is not decoration: UsesCoverDiscipline
     // and FlinchesWhenHit are asked of the family/stage pair every frame, so
     // re-authoring this actor as a late-stage Altered genuinely turns both

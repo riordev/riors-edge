@@ -182,6 +182,18 @@ ABreakerEnemy::ABreakerEnemy()
     NamedBody->SetupAttachment(BodyCollision);
     NamedBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     NamedBody->SetVisibility(false);
+
+    // DEFAULTS ON, owner-ruled (2026-08-29, overriding this hook's first
+    // default-off landing): the intake mechs are the enemy cast. Base melee —
+    // Skitter included, the leap is this class — wears Stan; subclasses
+    // override in their own constructors, and the RANGED class CLEARS it
+    // because the Lattice is composed primitives by ruling. KNOWN COSTS,
+    // accepted with the ruling: rank paint and the hit-tint ramp speak the
+    // hidden primitives' material language, and a skeletal crowd is dearer
+    // than a primitive one (8.35 vs 5.48 ms at 100 patrol, measured) — both
+    // now FIELD's to re-measure rather than reasons to hide the cast.
+    BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/Stan.Stan"));
+    BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (SphereMesh.Succeeded()) WeakPointVisual->SetStaticMesh(SphereMesh.Object);
 

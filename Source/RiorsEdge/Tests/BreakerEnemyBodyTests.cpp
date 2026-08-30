@@ -1,7 +1,10 @@
 #include "Misc/AutomationTest.h"
 #include "Combat/BreakerEnemyBodyMath.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerRangedEnemy.h"
 #include "UObject/UObjectIterator.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -47,24 +50,54 @@ bool FBreakerEnemyBodyFitTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// This pin was NoEnemyShipsANamedBody for exactly one cycle — the hook landed
+// default-off pending the readability call, and the owner then ruled the mech
+// cast ON (2026-08-29). The pin moves with the ruling, per its own note:
+// every enemy class either RESOLVES its shipped body (a renamed uasset fails
+// here, not in a screenshot) or is the ranged Lattice, which must ship NONE —
+// composed primitives by the same ruling. Gated on the imported mechs
+// existing, the shipped-samples shape: a clean clone still fights as
+// primitives and still passes.
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FBreakerEnemyBodyDefaultsOffTest,
-    "RiorsEdge.Combat.EnemyBody.NoEnemyShipsANamedBody",
+    FBreakerEnemyBodyCastTest,
+    "RiorsEdge.Combat.EnemyBody.MechCastResolvesAndLatticeStaysPrimitive",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FBreakerEnemyBodyDefaultsOffTest::RunTest(const FString& Parameters)
+bool FBreakerEnemyBodyCastTest::RunTest(const FString& Parameters)
 {
-    // Every registered enemy class, not just the base: a subclass constructor
-    // that quietly sets a body would change the shipped look of its whole
-    // family while this test stayed green on the base CDO alone.
+    const FString MechDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/enemies/mechs");
+    if (!IFileManager::Get().DirectoryExists(*MechDir))
+    {
+        return true;
+    }
     for (TObjectIterator<UClass> It; It; ++It)
     {
         if (!It->IsChildOf(ABreakerEnemy::StaticClass())) continue;
         if (It->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) continue;
         const ABreakerEnemy* Defaults = It->GetDefaultObject<ABreakerEnemy>();
         if (!Defaults) continue;
-        TestFalse(FString::Printf(TEXT("%s ships no named body"), *It->GetName()),
-                  Defaults->BodyMeshAsset.IsValid());
+        const bool bIsLattice = It->IsChildOf(ABreakerRangedEnemy::StaticClass());
+        if (bIsLattice)
+        {
+            TestFalse(FString::Printf(TEXT("%s (Lattice) ships primitives by ruling"), *It->GetName()),
+                      Defaults->BodyMeshAsset.IsValid());
+            continue;
+        }
+        TestTrue(FString::Printf(TEXT("%s ships a named body"), *It->GetName()),
+                 Defaults->BodyMeshAsset.IsValid());
+        if (Defaults->BodyMeshAsset.IsValid())
+        {
+            TestNotNull(*FString::Printf(TEXT("%s's body resolves: %s"), *It->GetName(),
+                    *Defaults->BodyMeshAsset.ToString()),
+                Defaults->BodyMeshAsset.TryLoad());
+        }
+        if (Defaults->BodyIdleAnimation.IsValid())
+        {
+            TestNotNull(*FString::Printf(TEXT("%s's gait resolves: %s"), *It->GetName(),
+                    *Defaults->BodyIdleAnimation.ToString()),
+                Defaults->BodyIdleAnimation.TryLoad());
+        }
     }
     return true;
 }
