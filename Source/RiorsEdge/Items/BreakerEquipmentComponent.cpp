@@ -502,6 +502,14 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
         }
         if (bAccountDirty) Account->SaveAccount();
     }
+    // THE DEAD-LINE REPAIR (O180's shape, the item half). Runs before stats so
+    // the composed state never contains a line that resolves to nothing — the
+    // same ordering reason as the stash reconcile above. Credit lands on the
+    // live wallet here AND is held in PendingDeadLineCreditRiftglass, because
+    // the load path replaces the wallet wholesale one call after this — see
+    // RestoreForgeWallet.
+    PendingDeadLineCreditRiftglass = RepairDeadRolledLines();
+    if (PendingDeadLineCreditRiftglass > 0) ForgeWallet.Add(PendingDeadLineCreditRiftglass);
     RecalculateStats();
     OnEquipmentChanged.Broadcast();
     // A fresh character's save carries two empty containers (the roster
@@ -510,6 +518,53 @@ void UBreakerEquipmentComponent::RestoreState(const TArray<FBreakerItemInstance>
     // state. EnsureStarterKit refuses to touch anyone who owns anything, so
     // a veteran's load is byte-identical to before.
     EnsureStarterKit();
+}
+
+int32 UBreakerEquipmentComponent::RepairDeadRolledLines()
+{
+    // O180'S SHAPE, THE ITEM HALF. The tree already drops unknown rank rows
+    // and credits their points back at load
+    // (UBreakerProgressionComponent::DropUnknownRanksAndCredit); gear had no
+    // analog, so a rolled line whose id stopped resolving was skipped
+    // SILENTLY at every aggregation — `if (!Definition) continue;` with no
+    // log — which is both a line that lies (prints, pays nothing) and a tax
+    // on everyone who rolled it. Deleting a pool entry was therefore never
+    // safe for items the way O180 made it safe for nodes. Now it is: the
+    // deletion's cost lands here, once, visibly, as a refund.
+    //
+    // THE FALLBACK COST IS THE LINE'S SHARE OF ITS ITEM'S OWN MELT PRICE:
+    // SalvageValue(item) / lines-before-the-repair, floored at 1 Riftglass.
+    // Derived, not authored — it rides the Forge's own salvage row, so it
+    // retunes when salvage retunes and no new number exists to drift. The
+    // tree repair's credit is likewise the recompute's own fallback cost.
+    //
+    // Resolution goes through the SAME FindAffix the aggregation fold uses
+    // (slice pool argument, special-pool/elemental/downside fallback), so the
+    // repair and the fold cannot disagree about what "unknown" means.
+    int32 TotalCredit = 0;
+    auto RepairContainer = [&TotalCredit](TArray<FBreakerItemInstance>& Items)
+    {
+        const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+        for (FBreakerItemInstance& Item : Items)
+        {
+            const int32 LinesBefore = Item.Affixes.Num();
+            if (LinesBefore == 0) continue;
+            const int32 MeltWhole = UBreakerForgeLibrary::SalvageValue(Item).Get();
+            for (int32 Index = Item.Affixes.Num() - 1; Index >= 0; --Index)
+            {
+                if (UBreakerAffixLibrary::FindAffix(Pool, Item.Affixes[Index].AffixId)) continue;
+                const int32 Credit = FMath::Max(1, MeltWhole / LinesBefore);
+                UE_LOG(LogTemp, Display,
+                    TEXT("[BreakerEquipment] dead-line repair: '%s' on '%s' no longer resolves — the line drops and refunds %d Riftglass (O180's item half)."),
+                    *Item.Affixes[Index].AffixId.ToString(), *Item.DefinitionId.ToString(), Credit);
+                Item.Affixes.RemoveAt(Index);
+                TotalCredit += Credit;
+            }
+        }
+    };
+    RepairContainer(Equipped);
+    RepairContainer(Backpack);
+    return TotalCredit;
 }
 
 bool UBreakerEquipmentComponent::EquipFromBackpack(const FGuid& ItemId)
@@ -667,6 +722,17 @@ void UBreakerEquipmentComponent::RestoreForgeWallet(const FBreakerForgeWallet& N
 {
     if (!HasAttributeAuthority()) return;
     ForgeWallet = NewWallet;
+    // The dead-line repair's refund survives the wholesale replacement: the
+    // load path restores items first (RestoreState, where the repair runs and
+    // records its credit) and the wallet second, so without this re-apply the
+    // assignment above would silently take back what the repair just paid.
+    // Cleared after applying — the credit belongs to THIS load, and the next
+    // RestoreState recomputes it from whatever file that load reads.
+    if (PendingDeadLineCreditRiftglass > 0)
+    {
+        ForgeWallet.Add(PendingDeadLineCreditRiftglass);
+        PendingDeadLineCreditRiftglass = 0;
+    }
     OnEquipmentChanged.Broadcast();
 }
 

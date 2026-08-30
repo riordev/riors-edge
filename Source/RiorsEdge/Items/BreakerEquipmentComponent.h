@@ -251,6 +251,21 @@ private:
     FBreakerAttributeContribution CachedContribution;
     FBreakerBuildConditionState ActiveConditions;
 
+    // O180's shape, the ITEM half: at restore, a rolled line whose id no
+    // longer resolves DROPS from its item and CREDITS the wallet, instead of
+    // being skipped silently at every aggregation forever — the fallback-cost
+    // derivation is on the body. Returns the Riftglass credited so
+    // RestoreState can hold it across the load path's two-step restore.
+    int32 RepairDeadRolledLines();
+    // The repair's credit, held between the two restore steps: Characters/
+    // calls RestoreState (items) THEN RestoreForgeWallet (a WHOLESALE wallet
+    // assignment that would silently wipe a credit applied in step one).
+    // RestoreState applies the credit to the live wallet and records it here;
+    // RestoreForgeWallet re-applies it after its assignment and clears it.
+    // Never saved: a reload recomputes it from the same file, so loading one
+    // file twice produces the same state twice rather than a doubled refund.
+    int32 PendingDeadLineCreditRiftglass = 0;
+
     // Re-reads the owner's movement/momentum state and recalculates only if the
     // active set actually moved. Called from the tick.
     void RefreshBuildConditions();

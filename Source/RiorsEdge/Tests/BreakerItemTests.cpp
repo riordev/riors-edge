@@ -6,7 +6,9 @@
 #include "Combat/BreakerDamageLibrary.h"
 #include "Items/BreakerAffixLibrary.h"
 #include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerForgeLibrary.h"
 #include "Items/BreakerLootLibrary.h"
+#include "Save/BreakerAccountSave.h"
 #include "Weapons/BreakerWeaponMath.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -813,6 +815,106 @@ bool FBreakerRarityRollTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Standard dominates at zero bonus"), StandardCount > 1000);
     TestTrue(TEXT("Drop chance shifts weight out of Standard"), StandardCountWithBonus < StandardCount);
     TestEqual(TEXT("Rarity roll is deterministic"), static_cast<int32>(UBreakerLootLibrary::RollRarity(42, 10.0f)), static_cast<int32>(UBreakerLootLibrary::RollRarity(42, 10.0f)));
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE DEAD-LINE REPAIR — O180's shape, the item half.
+// ---------------------------------------------------------------------------
+// The tree drops unknown rank rows and credits their points back at load; gear
+// had no analog, so a rolled line whose id stopped resolving was skipped
+// silently at every aggregation forever. This is the save story, end to end: a
+// save carrying a dead line loads, the line drops, the wallet is refunded at
+// the fallback cost (the line's share of its item's own melt price), and the
+// loaded state audits clean — every surviving line resolves.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDeadLineRepairTest,
+    "RiorsEdge.Items.DeadLineRepair",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDeadLineRepairTest::RunTest(const FString& Parameters)
+{
+    // Never touch a real account slot: RestoreState runs the stash reconcile
+    // against the account save, so inject a never-persisting one (the stash
+    // tests' rig).
+    UBreakerAccountSave* Account = NewObject<UBreakerAccountSave>();
+    Account->bNeverPersist = true;
+    UBreakerAccountSave::InjectForTesting(Account);
+
+    AActor* Owner = NewObject<AActor>();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+
+    // A save-shaped item: one line that resolves, one that does not. The
+    // unknown id stands in for any deleted pool entry — the exact fixture
+    // shape SpentPointsPerf uses for the tree half's Some.Removed.Node.
+    FBreakerItemInstance Item;
+    Item.ItemId = FGuid::NewGuid();
+    Item.DefinitionId = TEXT("RepairFixture");
+    Item.Slot = EBreakerEquipSlot::Waist;
+    Item.Rarity = EBreakerItemRarity::Uncommon;
+    Item.ItemLevel = 20;
+    auto AddLine = [&Item](const TCHAR* Id, EBreakerAffixCategory Category)
+    {
+        FBreakerRolledAffix Rolled;
+        Rolled.AffixId = Id;
+        Rolled.Tier = 8;
+        Rolled.Value = 30.0f;
+        Rolled.Category = Category;
+        Item.Affixes.Add(Rolled);
+    };
+    AddLine(TEXT("Core.Health"), EBreakerAffixCategory::Suffix);
+    AddLine(TEXT("Some.Removed.Line"), EBreakerAffixCategory::Prefix);
+
+    const int32 LinesBefore = Item.Affixes.Num();
+    const int32 ExpectedCredit = FMath::Max(1, UBreakerForgeLibrary::SalvageValue(Item).Get() / LinesBefore);
+
+    // The load path's two steps, in the load path's own order: items first,
+    // then the WHOLESALE wallet replacement that must not wipe the refund.
+    Equipment->RestoreState({Item}, {});
+    FBreakerForgeWallet SavedWallet;
+    SavedWallet.Add(100);
+    Equipment->RestoreForgeWallet(SavedWallet);
+
+    if (!TestEqual(TEXT("the item survives the load"), Equipment->GetEquipped().Num(), 1)) return false;
+    TestEqual(TEXT("the dead line is gone from the loaded item"), Equipment->GetEquipped()[0].Affixes.Num(), 1);
+    TestEqual(TEXT("the resolving line survives untouched"),
+        Equipment->GetEquipped()[0].Affixes[0].AffixId, FName(TEXT("Core.Health")));
+    TestEqual(TEXT("the line came back as Riftglass at the fallback cost, on top of the SAVED wallet"),
+        Equipment->GetForgeWallet().Get(), 100 + ExpectedCredit);
+
+    // Audits clean: every surviving line resolves through the same FindAffix
+    // the aggregation fold uses.
+    for (const FBreakerRolledAffix& Rolled : Equipment->GetEquipped()[0].Affixes)
+    {
+        TestNotNull(*FString::Printf(TEXT("'%s' resolves after the repair"), *Rolled.AffixId.ToString()),
+            UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), Rolled.AffixId));
+    }
+
+    // Loading the same file twice reproduces the same state, not a doubled
+    // refund: the items AND the wallet both come from the file, so the credit
+    // is recomputed onto the same base every time.
+    Equipment->RestoreState({Item}, {});
+    Equipment->RestoreForgeWallet(SavedWallet);
+    TestEqual(TEXT("a second load of the same file lands on the same wallet"),
+        Equipment->GetForgeWallet().Get(), 100 + ExpectedCredit);
+
+    // A wallet restore with no preceding repair is a plain assignment — no
+    // phantom credit rides a fresh component.
+    UBreakerEquipmentComponent* Fresh = NewObject<UBreakerEquipmentComponent>(Owner);
+    Fresh->RestoreForgeWallet(SavedWallet);
+    TestEqual(TEXT("no repair, no phantom credit"), Fresh->GetForgeWallet().Get(), 100);
+
+    // A clean loadout is untouched: no drop, no credit.
+    FBreakerItemInstance Clean = Item;
+    Clean.ItemId = FGuid::NewGuid();
+    Clean.Affixes.RemoveAt(1);
+    UBreakerEquipmentComponent* CleanEquipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    CleanEquipment->RestoreState({Clean}, {});
+    CleanEquipment->RestoreForgeWallet(SavedWallet);
+    TestEqual(TEXT("a clean item keeps every line"), CleanEquipment->GetEquipped()[0].Affixes.Num(), 1);
+    TestEqual(TEXT("and pays no phantom refund"), CleanEquipment->GetForgeWallet().Get(), 100);
+
+    UBreakerAccountSave::ResetCacheForTesting();
     return true;
 }
 
