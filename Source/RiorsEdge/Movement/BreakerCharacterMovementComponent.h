@@ -368,6 +368,15 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashVerticalFloor = 80.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float DashCooldown = 4.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float MomentumHardCap = 4200.0f;   // O2 PLACEHOLDER
+    // D1(a), owner-ruled (the momentum sentence): when the boosted ceiling's
+    // conditions break — input released, collision slow, hard direction
+    // break — speed above the current cap BLEEDS over this window instead of
+    // the ceiling vanishing in one frame. The felt case is the direction
+    // break: turning hard after a dash used to confiscate every cm/s above
+    // the grounded cap within two frames, because the engine brakes an
+    // over-max velocity to MaxSpeed almost instantly and the ceiling IS
+    // MaxSpeed. 0 restores the old instant cut exactly.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dash", meta=(ClampMin="0")) float AboveCapDecaySeconds = 0.5f;   // O2 PLACEHOLDER
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntrySpeed = 550.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideEntryBoost = 120.0f;   // O2 PLACEHOLDER
@@ -378,6 +387,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideBrakingDeceleration = 350.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideSlopeAcceleration = 900.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0")) float SlideMaxDuration = 1.0f;   // O2 PLACEHOLDER
+    // D1(b), owner-ruled: the fraction of the slide's horizontal speed a
+    // slide-jump carries into the air. It was silently 1.0 — full
+    // conservation — which made slide-jump strictly better than the vault at
+    // the vault's own crate (the recon's finding); the toll is what buys the
+    // verb choice back. 1.0 restores the old behaviour exactly.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Slide", meta=(ClampMin="0", ClampMax="1")) float SlideJumpSpeedConservation = 0.70f;   // O2 PLACEHOLDER
 
     // Short wall ride: preserves traversal flow without generating speed or
     // replacing combat.
@@ -447,6 +462,20 @@ public:
     // exactly. Alpha 0 is a no-op, 1 is a full redirect. A zero or vertical
     // direction leaves the velocity alone.
     static FVector BlendHorizontalVelocity(const FVector& HorizontalVelocity, const FVector& Direction, float Alpha);
+
+    // --- The momentum sentence's pure rules (D1) ---------------------------
+    // The bleed rate a broken boost decays at: the gap between the ceiling
+    // and the resting cap, spread over the window. Zero gap is zero rate; a
+    // zero window is the old instant cut, encoded as an unpayable rate.
+    static float BoostedCeilingBleedRate(float Ceiling, float RestingCap, float WindowSeconds);
+    // One bleed step. Returns the decayed ceiling, or 0 — the existing
+    // "no boost" sentinel — the moment it reaches the resting cap, at which
+    // point GetMaxSpeed's max() owns the answer again.
+    static float StepBoostedCeilingBleed(float Ceiling, float RestingCap, float RatePerSecond, float DeltaTime);
+    // The slide-jump's conserved launch velocity: horizontal only, scaled by
+    // the conservation fraction, clamped so a misauthored value can never
+    // manufacture speed (Master 5.4).
+    static FVector SlideJumpConservedVelocity(const FVector& HorizontalVelocity, float ConservationFraction);
 
     // --- Weight rules, pure maths so they can be tested without a world ---
     // Gravity multiplier as a continuous function of vertical velocity:
@@ -558,6 +587,26 @@ private:
     // Sentinel matches LastDashTime's: "never" is far in the past, so recency
     // reads need no separate has-ever flag.
     double LastLedgeTraversalEndTime = -1000.0;
+    // The grounded cap as GetMaxSpeed computes it, factored so the bleed and
+    // the cap read one expression and cannot drift.
+    float GetGroundedSpeedCap() const;
+    // Captured once when the boost's conditions first break, so the bleed is
+    // LINEAR over the authored window rather than an asymptote. Reset to 0
+    // whenever the boost re-arms.
+    float BoostedCeilingBleedRatePerSecond = 0.0f;
+
+    // ---- Dev speed-trace instrument (-BreakerMoveTrace) -------------------
+    // The capture harness cannot press movement keys, so the component
+    // drives itself: a scripted sprint / dash / hard-turn / slide-jump run
+    // with a rate-limited speed log, read out of the session log. Inert
+    // without the switch; player-controlled pawns only.
+    bool bMoveTraceArmed = false;
+    double MoveTraceStartTime = -1.0;
+    double LastMoveTraceLogTime = -1000.0;
+    int32 MoveTraceStep = 0;
+    FVector MoveTraceForward = FVector::ZeroVector;
+    FVector MoveTraceGlanceDir = FVector::ZeroVector;
+    void TickMoveTrace();
     double LastSlideBoostTime = -1000.0;
     float BoostedSpeedCeiling = 0.0f;
     float SavedGroundFriction = 0.0f;

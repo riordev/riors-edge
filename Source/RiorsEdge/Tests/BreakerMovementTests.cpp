@@ -484,6 +484,71 @@ bool FBreakerPlaytestAssemblyTest::RunTest(const FString& Parameters)
 
 
 // ---------------------------------------------------------------------------
+// THE MOMENTUM SENTENCE (D1, owner-ruled): above-cap speed bleeds instead of
+// clamping in one frame, and a slide-jump pays a conservation toll. Pure
+// rules here; the live before/after speed traces are the -BreakerMoveTrace
+// instrument's, read from the session log.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumSentenceTest,
+    "RiorsEdge.Movement.MomentumSentence",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumSentenceTest::RunTest(const FString& Parameters)
+{
+    using FMove = UBreakerCharacterMovementComponent;
+
+    // --- The bleed rate ----------------------------------------------------
+    TestTrue(TEXT("The rate spreads the gap over the window"),
+        FMath::IsNearlyEqual(FMove::BoostedCeilingBleedRate(1700.0f, 1100.0f, 0.5f), 1200.0f, 0.01f));
+    TestEqual(TEXT("No gap is no rate"), FMove::BoostedCeilingBleedRate(1100.0f, 1100.0f, 0.5f), 0.0f);
+    TestEqual(TEXT("A ceiling already below the cap has no rate"), FMove::BoostedCeilingBleedRate(900.0f, 1100.0f, 0.5f), 0.0f);
+    TestTrue(TEXT("A zero window is the old instant cut, as an unpayable rate"),
+        FMove::BoostedCeilingBleedRate(1700.0f, 1100.0f, 0.0f) > 1.0e30f);
+
+    // --- The bleed step ----------------------------------------------------
+    TestTrue(TEXT("A step is linear at the captured rate"),
+        FMath::IsNearlyEqual(FMove::StepBoostedCeilingBleed(1700.0f, 1100.0f, 1200.0f, 0.1f), 1580.0f, 0.01f));
+    TestEqual(TEXT("Reaching the resting cap collapses to the no-boost sentinel"),
+        FMove::StepBoostedCeilingBleed(1150.0f, 1100.0f, 1200.0f, 0.1f), 0.0f);
+    // The whole property: a broken 1700 boost over an 1100 cap with a 0.5 s
+    // window survives four 0.1 s steps and dies on the fifth — the bleed
+    // lasts EXACTLY the authored window, no longer, no shorter.
+    {
+        float Ceiling = 1700.0f;
+        const float Rate = FMove::BoostedCeilingBleedRate(Ceiling, 1100.0f, 0.5f);
+        int32 StepsSurvived = 0;
+        while (Ceiling > 0.0f && StepsSurvived < 100)
+        {
+            Ceiling = FMove::StepBoostedCeilingBleed(Ceiling, 1100.0f, Rate, 0.1f);
+            ++StepsSurvived;
+        }
+        TestEqual(TEXT("The bleed dies exactly at the window's end"), StepsSurvived, 5);
+    }
+
+    // --- The slide-jump toll -----------------------------------------------
+    const FVector Sliding(1500.0f, 0.0f, 0.0f);
+    const FVector Conserved = FMove::SlideJumpConservedVelocity(Sliding, 0.70f);
+    TestTrue(TEXT("The slide-jump carries exactly the conserved fraction"),
+        FMath::IsNearlyEqual(Conserved.Size(), 1050.0f, 0.01f));
+    TestTrue(TEXT("Conservation keeps the heading"),
+        Conserved.GetSafeNormal().Equals(FVector::ForwardVector, 0.001f));
+    TestTrue(TEXT("Conservation is horizontal only"), FMath::IsNearlyZero(Conserved.Z));
+    TestTrue(TEXT("An over-1.0 fraction can never manufacture speed"),
+        FMove::SlideJumpConservedVelocity(Sliding, 1.5f).Size() <= 1500.01f);
+    TestTrue(TEXT("A negative fraction floors at a dead stop, never a reversal"),
+        FMove::SlideJumpConservedVelocity(Sliding, -0.5f).IsNearlyZero());
+
+    // --- Shipped configuration ---------------------------------------------
+    const UBreakerCharacterMovementComponent* Defaults = GetDefault<UBreakerCharacterMovementComponent>();
+    TestTrue(TEXT("The bleed window is real — the instant cut is retired"),
+        Defaults->AboveCapDecaySeconds > 0.0f);
+    TestTrue(TEXT("A slide-jump pays a real toll"), Defaults->SlideJumpSpeedConservation < 1.0f);
+    TestTrue(TEXT("The toll is a toll, not a confiscation"), Defaults->SlideJumpSpeedConservation > 0.0f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Ledge traversal (Part One-R): the rules the pawn's TryMantle fused for its
 // whole life, now named and pinned. Plus the agreement test: the grammar's
 // MantleStepHeight and the verb's published ceiling are ONE number — the

@@ -142,6 +142,17 @@ public:
     static float GroundSpeedRate(float Speed, float ThresholdSpeed, float UpperSpeed, float RateAtThreshold, float RateAtUpper);
     static float ClampGeneration(float RequestedRate, float GlobalCap);
     static float DecayRateForSpeed(float Speed, float SettledSpeed, float ThresholdSpeed, float SettledDecay, float SlowDecay);
+    // THE EXPLOIT PATCH (owner-ruled, the momentum sentence): the airborne
+    // credit ticks down while airborne, refills only on genuine ground, and
+    // FREEZES through a ledge traversal. The old inline rule refilled it on
+    // "not airborne", and a traversal is not-airborne without being grounded
+    // — so jump, mantle mid-fall, and the 3-second window came back refunded
+    // (jump-mantle-fall, the recon's exploit shape). Airborne wins over the
+    // traversal flag by precedence, defensively: the movement mode cannot be
+    // both, but the rule must not depend on a caller knowing that.
+    static float TickAirborneCredit(float Remaining, bool bAirborne, bool bTraversingLedge, float DeltaTime, float RefillSeconds);
+    // Test/HUD read on the credit the exploit patch protects.
+    UFUNCTION(BlueprintPure, Category="Momentum") float GetAirborneCreditRemaining() const { return AirborneCreditRemaining; }
 
     // Binds the attribute set directly. BeginPlay resolves it from the owner's
     // ability system; this is the same wiring for a component built outside a
@@ -190,6 +201,16 @@ public:
     // Floor only: the real internal cooldown is the movement component's dash
     // cooldown, so refunded charges cannot be farmed.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DashGrantMinimumInterval = 1.0f;   // O2 PLACEHOLDER
+    // Vault and mantle COUNT AS VERBS for Momentum (owner-ruled — the
+    // question this lane filed is answered and deleted): a completed
+    // traversal pays a small one-shot tick, the dash grant's shape, observed
+    // off the movement component's completion recorder so a blocked abort
+    // pays nothing. Smaller than the dash's on purpose: a traversal has no
+    // cooldown of its own, so the minimum interval below is the whole
+    // anti-farm — without it, vaulting back and forth over one crate would
+    // out-earn sprinting.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float LedgeTraversalGrant = 6.0f;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float LedgeTraversalGrantMinimumInterval = 1.0f;   // O2 PLACEHOLDER
     // "Swift converts evasion into Momentum" — an RNG proc off the passive
     // evade layer, never a timed input (Class-Kits 1.1, O1).
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float DodgeProcGrant = 15.0f;   // O2 PLACEHOLDER
@@ -285,6 +306,11 @@ private:
     double LastDodgeGrantTime = -1000.0;
     double LastPhantomStepTime = -1000.0;
     double LastObservedDashTime = -1000.0;
+    // The traversal grant's observation pair, the dash pair's exact shape:
+    // the movement recorder's timestamp last seen, and the last time a grant
+    // was actually paid (the anti-farm interval reads this one).
+    double LastObservedTraversalTime = -1000.0;
+    double LastTraversalGrantTime = -1000.0;
 
     // ---- Frenzy rule-half state (Class-Kits §1.3) -------------------------
     // Rhythm's consecutive-hit counter (F4). Hitscan only: a rocket's shot

@@ -207,6 +207,24 @@ float UBreakerMomentumComponent::DecayRateForSpeed(float Speed, float SettledSpe
     return 0.0f;
 }
 
+float UBreakerMomentumComponent::TickAirborneCredit(float Remaining, bool bAirborne, bool bTraversingLedge, float DeltaTime, float RefillSeconds)
+{
+    // Airborne first, defensively: the movement mode cannot be both airborne
+    // and traversing, but this rule must not depend on the caller knowing so.
+    if (bAirborne)
+    {
+        return FMath::Max(0.0f, Remaining - DeltaTime);
+    }
+    // The exploit patch: a traversal FREEZES the credit. It used to refill it
+    // — "not airborne" read as "grounded" — so jump-mantle-fall refunded the
+    // whole window. Only genuine ground refills.
+    if (bTraversingLedge)
+    {
+        return Remaining;
+    }
+    return RefillSeconds;
+}
+
 UBreakerCharacterMovementComponent* UBreakerMomentumComponent::GetBreakerMovement() const
 {
     if (!CachedMovement.IsValid() && GetOwner())
@@ -551,9 +569,9 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     const float Speed = Movement->GetHorizontalSpeed();
     const bool bAirborne = Movement->IsFalling();
     const bool bSliding = Movement->IsSliding();
+    const bool bTraversing = Movement->IsTraversingLedge();
 
-    if (bAirborne) AirborneCreditRemaining = FMath::Max(0.0f, AirborneCreditRemaining - DeltaTime);
-    else AirborneCreditRemaining = AirborneCreditSeconds;
+    AirborneCreditRemaining = TickAirborneCredit(AirborneCreditRemaining, bAirborne, bTraversing, DeltaTime, AirborneCreditSeconds);
 
     // K9 Momentum Shield rides the loop tick because this is the one place
     // that knows both the band and the posture. CachedState is last tick's
@@ -574,6 +592,22 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     else if (LastDashTime > LastObservedDashTime)
     {
         LastObservedDashTime = LastDashTime;
+    }
+
+    // One-shot traversal credit (owner-ruled: vault and mantle are verbs and
+    // feed the loop), the dash observation's exact shape but with its OWN
+    // minimum interval doing all the anti-farm work — a traversal has no
+    // cooldown, so without the floor a crate becomes a generator. Observed
+    // off the completion recorder, so a blocked abort pays nothing.
+    const double LastTraversalTime = Movement->GetLastLedgeTraversalTime();
+    if (LastTraversalTime > LastObservedTraversalTime)
+    {
+        LastObservedTraversalTime = LastTraversalTime;
+        if (Now - LastTraversalGrantTime >= LedgeTraversalGrantMinimumInterval)
+        {
+            LastTraversalGrantTime = Now;
+            PendingGrants += LedgeTraversalGrant;
+        }
     }
 
     if (IsInSafeZone())
@@ -622,7 +656,10 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
         return;
     }
 
-    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || Speed >= GroundThresholdSpeed;
+    // A running traversal blocks decay for the same reason a slide does: it
+    // is a committed movement verb, and the glide deliberately zeroes
+    // Velocity, so without this term a vault could tick the decay clock.
+    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bTraversing || Speed >= GroundThresholdSpeed;
     if (bDecayBlocked)
     {
         SettledElapsed = 0.0f;

@@ -10,6 +10,8 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
 {
@@ -83,6 +85,12 @@ void UBreakerCharacterMovementComponent::BeginPlay()
     // O25. Binds the progression delegate and resolves the starting budget;
     // the tick poll re-runs it if the progression component was not up yet.
     RefreshJumpGrant();
+
+    // Dev speed-trace instrument. The capture harness cannot press movement
+    // keys, so a -BreakerMoveTrace session drives itself through a scripted
+    // sprint / dash / hard-turn / slide-jump run and prints a rate-limited
+    // speed line; the session log is the deliverable, not the screen.
+    bMoveTraceArmed = FParse::Param(FCommandLine::Get(), TEXT("BreakerMoveTrace"));
 }
 
 UBreakerAttributeSet* UBreakerCharacterMovementComponent::GetAttributes() const
@@ -422,15 +430,49 @@ float UBreakerCharacterMovementComponent::GetComposedDashCooldownMultiplier() co
     return Equipment ? Equipment->GetStats().DashCooldownMultiplier : 1.0f;
 }
 
+float UBreakerCharacterMovementComponent::GetGroundedSpeedCap() const
+{
+    return (bWantsToSprint ? SprintSpeed : WalkSpeed)
+        * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
+}
+
 float UBreakerCharacterMovementComponent::GetMaxSpeed() const
 {
     if (bSliding)
     {
         return FMath::Max(SprintSpeed * GetComposedSlideSpeedMultiplier(), Velocity.Size2D());
     }
-    const float GroundedCap = (bWantsToSprint ? SprintSpeed : WalkSpeed)
-        * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
-    return FMath::Max(GroundedCap, BoostedSpeedCeiling);
+    return FMath::Max(GetGroundedSpeedCap(), BoostedSpeedCeiling);
+}
+
+float UBreakerCharacterMovementComponent::BoostedCeilingBleedRate(float Ceiling, float RestingCap, float WindowSeconds)
+{
+    const float Gap = Ceiling - RestingCap;
+    if (Gap <= 0.0f)
+    {
+        return 0.0f;
+    }
+    if (WindowSeconds <= 0.0f)
+    {
+        // A zero window is the old behaviour — the cut happens in one step —
+        // encoded as a rate no frame can pay only partially.
+        return TNumericLimits<float>::Max();
+    }
+    return Gap / WindowSeconds;
+}
+
+float UBreakerCharacterMovementComponent::StepBoostedCeilingBleed(float Ceiling, float RestingCap, float RatePerSecond, float DeltaTime)
+{
+    const float Bled = Ceiling - RatePerSecond * FMath::Max(DeltaTime, 0.0f);
+    // At or below the resting cap the ceiling stops meaning anything; 0 is
+    // the existing "no boost" sentinel and GetMaxSpeed's max() takes over.
+    return Bled > RestingCap ? Bled : 0.0f;
+}
+
+FVector UBreakerCharacterMovementComponent::SlideJumpConservedVelocity(const FVector& HorizontalVelocity, float ConservationFraction)
+{
+    return FVector(HorizontalVelocity.X, HorizontalVelocity.Y, 0.0f)
+        * FMath::Clamp(ConservationFraction, 0.0f, 1.0f);
 }
 
 float UBreakerCharacterMovementComponent::GetAimSpeedMultiplier() const
@@ -675,6 +717,9 @@ bool UBreakerCharacterMovementComponent::TryDash(const FVector& RequestedDirecti
     Velocity.Z = FMath::Max(Velocity.Z, DashVerticalFloor);
     LastDashTime = World->GetTimeSeconds();
     BoostedSpeedCeiling = OutputSpeed;
+    // A fresh grant is a fresh boost: any bleed left over from an earlier
+    // break must not carry its rate onto this one.
+    BoostedCeilingBleedRatePerSecond = 0.0f;
     // The dash owns its vertical floor from here on; releasing jump after an
     // air dash must not cut it.
     bJumpCutArmed = false;
@@ -737,13 +782,18 @@ void UBreakerCharacterMovementComponent::PrepareSlideJump()
 {
     if (!bSliding) return;
 
-    const FVector PreservedHorizontalVelocity(Velocity.X, Velocity.Y, 0.0f);
-    const float PreservedSpeed = PreservedHorizontalVelocity.Size();
+    // D1(b), owner-ruled: the slide-jump conserves SlideJumpSpeedConservation
+    // of the slide's horizontal speed, not all of it. Full conservation made
+    // slide-jump strictly better than the vault at the vault's own crate —
+    // the recon's finding — and the toll is what buys the verb choice back.
+    const FVector Conserved = SlideJumpConservedVelocity(
+        FVector(Velocity.X, Velocity.Y, 0.0f), SlideJumpSpeedConservation);
     EndSlide();
     SetSprinting(true);
-    BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, PreservedSpeed);
-    Velocity.X = PreservedHorizontalVelocity.X;
-    Velocity.Y = PreservedHorizontalVelocity.Y;
+    BoostedSpeedCeiling = FMath::Max(BoostedSpeedCeiling, static_cast<float>(Conserved.Size()));
+    BoostedCeilingBleedRatePerSecond = 0.0f;
+    Velocity.X = Conserved.X;
+    Velocity.Y = Conserved.Y;
 }
 
 void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -752,6 +802,13 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
     // component's BeginPlay, so the base it cannot know until then is published
     // here. Costs one branch per frame after the first success.
     PublishMoveSpeedBase();
+
+    // Before Super, so the scripted input this frame feeds is consumed by
+    // this frame's movement. Inert without -BreakerMoveTrace.
+    if (bMoveTraceArmed)
+    {
+        TickMoveTrace();
+    }
 
     // O25 poll backstop, in the precedent of UBreakerManaComponent::AdvanceLoop.
     // DevForceClass DOES broadcast OnProgressionChanged today — that was
@@ -781,11 +838,41 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
         const bool bCollisionRedirected = !DirectionBeforeMovement.IsNearlyZero()
             && !DirectionAfterMovement.IsNearlyZero()
             && FVector::DotProduct(DirectionBeforeMovement, DirectionAfterMovement) < 0.65f;
-        if (bMovementReleased || bCollisionSlowed || bCollisionRedirected)
+        // D1(a), owner-ruled: the boost BLEEDS instead of vanishing. The
+        // bleed LATCHES at the break — a nonzero rate IS the latch — because
+        // most breaks are one-frame events (a wall clip fires the slow
+        // condition exactly once) and an unlatched bleed re-armed the
+        // surviving ceiling on the next calm frame, which turned "your boost
+        // ends gracefully" into "a wall costs you almost nothing"; measured
+        // in the first AFTER trace, 2040 -> 2021 -> held. Once latched, the
+        // ceiling glides linearly to the resting cap over AboveCapDecaySeconds
+        // and the engine's own over-max braking walks the velocity down it
+        // (braking never goes below MaxSpeed, and the ceiling IS MaxSpeed).
+        // Only a fresh grant — TryDash, PrepareSlideJump — re-arms the boost.
+        const bool bBoostBroken = bMovementReleased || bCollisionSlowed || bCollisionRedirected;
+        const float RestingCap = GetGroundedSpeedCap();
+        if (bBoostBroken && BoostedCeilingBleedRatePerSecond <= 0.0f)
         {
-            BoostedSpeedCeiling = 0.0f;
+            if (BoostedSpeedCeiling <= RestingCap)
+            {
+                // Nothing above the cap to bleed: the old sentinel, no felt
+                // difference, and the block stops running for free.
+                BoostedSpeedCeiling = 0.0f;
+            }
+            else
+            {
+                BoostedCeilingBleedRatePerSecond = BoostedCeilingBleedRate(BoostedSpeedCeiling, RestingCap, AboveCapDecaySeconds);
+            }
         }
-        else
+        if (BoostedCeilingBleedRatePerSecond > 0.0f)
+        {
+            BoostedSpeedCeiling = StepBoostedCeilingBleed(BoostedSpeedCeiling, RestingCap, BoostedCeilingBleedRatePerSecond, DeltaTime);
+            if (BoostedSpeedCeiling <= 0.0f)
+            {
+                BoostedCeilingBleedRatePerSecond = 0.0f;
+            }
+        }
+        else if (BoostedSpeedCeiling > 0.0f)
         {
             BoostedSpeedCeiling = FMath::Min(FMath::Max(BoostedSpeedCeiling, SpeedAfterMovement), MomentumHardCap);
         }
@@ -831,6 +918,124 @@ void UBreakerCharacterMovementComponent::TickComponent(float DeltaTime, ELevelTi
     const FVector DownSlope = FVector::VectorPlaneProject(FVector::DownVector, FloorNormal).GetSafeNormal2D();
     const float SlopeAmount = FMath::Clamp(1.0f - FloorNormal.Z, 0.0f, 1.0f);
     Velocity += DownSlope * SlideSlopeAcceleration * SlopeAmount * DeltaTime;
+}
+
+void UBreakerCharacterMovementComponent::TickMoveTrace()
+{
+    UWorld* World = GetWorld();
+    if (!World || !CharacterOwner || !CharacterOwner->IsPlayerControlled())
+    {
+        return;
+    }
+    const double Now = World->GetTimeSeconds();
+    if (MoveTraceStartTime < 0.0)
+    {
+        MoveTraceStartTime = Now;
+        // The first attempt sprinted the spawn's facing into a wall 26 m out
+        // and spent the whole script pinned in a corner, so the instrument
+        // picks its own ground: an 8-way horizontal probe, run once, longest
+        // clear ray wins. The turn goes to whichever perpendicular is opener.
+        const FVector Chest = CharacterOwner->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+        const FVector SpawnForward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+        FCollisionQueryParams ProbeParams(SCENE_QUERY_STAT(BreakerMoveTraceProbe), false, CharacterOwner);
+        float BestDistance = -1.0f;
+        float BestWallScore = -1.0f;
+        FVector WallNormal = FVector::ZeroVector;
+        float WallDistance = 0.0f;
+        for (int32 Index = 0; Index < 8; ++Index)
+        {
+            const FVector Candidate = SpawnForward.RotateAngleAxis(45.0f * Index, FVector::UpVector);
+            FHitResult ProbeHit;
+            const bool bHitWall = World->LineTraceSingleByChannel(ProbeHit, Chest, Chest + Candidate * 9000.0f, ECC_Visibility, ProbeParams);
+            const float Distance = bHitWall ? static_cast<float>(ProbeHit.Distance) : 9000.0f;
+            if (Distance > BestDistance)
+            {
+                BestDistance = Distance;
+                MoveTraceForward = Candidate;
+            }
+            // The glancing-collision leg wants a wall with a run-up: nearest
+            // to 2500 cm wins. A wall hit is what makes the (a) reading
+            // DETERMINISTIC — a smooth input turn fires the break conditions
+            // only on frame-time jitter, a collision fires them every run.
+            if (bHitWall && Distance > 1200.0f)
+            {
+                const float Score = 1.0f / (1.0f + FMath::Abs(Distance - 2500.0f));
+                if (Score > BestWallScore)
+                {
+                    BestWallScore = Score;
+                    WallNormal = ProbeHit.ImpactNormal.GetSafeNormal2D();
+                    WallDistance = Distance;
+                }
+            }
+        }
+        // Aim 55 degrees off the wall's inward normal: enough incidence to
+        // fire the collision-slow break, enough tangent that real speed
+        // survives to show what happens to it.
+        MoveTraceGlanceDir = !WallNormal.IsNearlyZero()
+            ? (-WallNormal).RotateAngleAxis(55.0f, FVector::UpVector).GetSafeNormal2D()
+            : MoveTraceForward;
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] ARMED walk=%.0f sprint=%.0f hardcap=%.0f bleedwindow=%.2fs slidejumpconserve=%.2f openlane=%.0fcm wall=%.0fcm glance=(%.2f,%.2f)"),
+            WalkSpeed, SprintSpeed, MomentumHardCap, AboveCapDecaySeconds, SlideJumpSpeedConservation,
+            BestDistance, WallDistance, MoveTraceGlanceDir.X, MoveTraceGlanceDir.Y);
+    }
+    const double T = Now - MoveTraceStartTime;
+
+    // The script, two legs. GLANCE LEG (the (a) reading): sprint at the
+    // probed wall 55 degrees off its normal, dash at 2.0, hold input through
+    // the impact — the glancing hit fires the collision-slow break with real
+    // tangential speed left over, which is exactly the speed the old code
+    // confiscated in one frame and the bleed now pays out over the window.
+    // OPEN LEG (the (b) reading): at 6.0 swing onto the open lane, dash at
+    // 6.8, slide at 7.5, slide-jump at 7.9 — in/out prints the conservation.
+    const bool bHold = T >= 1.0 && T < 10.0;
+    if (bHold)
+    {
+        CharacterOwner->AddMovementInput(T < 6.0 ? MoveTraceGlanceDir : MoveTraceForward, 1.0f);
+        SetSprinting(true);
+    }
+    if (MoveTraceStep == 0 && T >= 2.0)
+    {
+        MoveTraceStep = 1;
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT dash-glance -> %d"), T, TryDash(MoveTraceGlanceDir) ? 1 : 0);
+    }
+    else if (MoveTraceStep == 1 && T >= 6.0)
+    {
+        MoveTraceStep = 2;
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT open-leg (input swings to the open lane)"), T);
+    }
+    else if (MoveTraceStep == 2 && T >= 6.8)
+    {
+        MoveTraceStep = 3;
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT dash-open -> %d"), T, TryDash(MoveTraceForward) ? 1 : 0);
+    }
+    else if (MoveTraceStep == 3 && T >= 7.5)
+    {
+        MoveTraceStep = 4;
+        SetSlideRequested(true);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT slide -> %d"), T, BeginSlide() ? 1 : 0);
+    }
+    else if (MoveTraceStep == 4 && T >= 7.9)
+    {
+        MoveTraceStep = 5;
+        const float SpeedIntoJump = Velocity.Size2D();
+        // The pawn's own slide-jump sequence (HandleJumpInput), driven here
+        // because no key can be pressed: conserve, then launch.
+        PrepareSlideJump();
+        SetSlideRequested(false);
+        CharacterOwner->LaunchCharacter(FVector(0.0f, 0.0f, JumpZVelocity), false, true);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerMoveTrace] t=%.2f EVENT slide-jump in=%.1f out=%.1f"), T, SpeedIntoJump, Velocity.Size2D());
+    }
+
+    // The rate-limited speed line, 10 Hz.
+    if (Now - LastMoveTraceLogTime >= 0.1)
+    {
+        LastMoveTraceLogTime = Now;
+        UE_LOG(LogTemp, Display,
+            TEXT("[BreakerMoveTrace] t=%.2f speed=%.1f vz=%.1f ceiling=%.1f cap=%.1f mode=%d sliding=%d"),
+            T, Velocity.Size2D(), Velocity.Z, BoostedSpeedCeiling, GetGroundedSpeedCap(),
+            static_cast<int32>(MovementMode.GetValue()), bSliding ? 1 : 0);
+    }
 }
 
 void UBreakerCharacterMovementComponent::ApplyAirSteering(float DeltaTime)

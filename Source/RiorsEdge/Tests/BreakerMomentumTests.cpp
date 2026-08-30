@@ -286,4 +286,91 @@ bool FBreakerMomentumAdvanceLoopTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// THE MOMENTUM SENTENCE'S TRAVERSAL HALF (D1, owner-ruled). Two rules:
+//
+// THE EXPLOIT PATCH, pinned as the recon's own repro. A traversal is
+// not-airborne without being grounded, and the old credit rule refilled on
+// "not airborne" — so jump-mantle-fall refunded the whole 3-second airborne
+// window (a mid-fall mantle was a free generation reset). The credit now
+// FREEZES through a traversal and refills only on genuine ground. The wiring
+// pin below fails on the old behaviour: in the traversal mode the old loop
+// wrote AirborneCreditSeconds into the credit, the new one leaves it alone.
+//
+// THE VERBS FEED THE LOOP. A completed vault or mantle pays a small one-shot
+// tick (the dash grant's shape) observed off the movement recorder, with its
+// own minimum interval as the whole anti-farm — a traversal has no cooldown.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMomentumTraversalTest,
+    "RiorsEdge.Classes.MomentumTraversal",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMomentumTraversalTest::RunTest(const FString& Parameters)
+{
+    using FMomentum = UBreakerMomentumComponent;
+
+    // --- The credit rule, pure -------------------------------------------
+    TestTrue(TEXT("Airborne ticks the credit down"),
+        FMath::IsNearlyEqual(FMomentum::TickAirborneCredit(1.2f, true, false, 0.1f, 3.0f), 1.1f, 0.0001f));
+    TestEqual(TEXT("The credit floors at zero"),
+        FMomentum::TickAirborneCredit(0.05f, true, false, 0.5f, 3.0f), 0.0f);
+    TestEqual(TEXT("Genuine ground refills the credit"),
+        FMomentum::TickAirborneCredit(0.4f, false, false, 0.1f, 3.0f), 3.0f);
+    // THE EXPLOIT PATCH: a traversal freezes, never refills. The old rule
+    // returned 3.0 here — that is the jump-mantle-fall refund.
+    TestEqual(TEXT("A traversal FREEZES the credit — the mid-fall mantle refund is dead"),
+        FMomentum::TickAirborneCredit(0.4f, false, true, 0.1f, 3.0f), 0.4f);
+    // Airborne wins by precedence, defensively: the mode cannot be both, but
+    // the rule must not depend on the caller knowing that.
+    TestTrue(TEXT("Airborne outranks a stale traversal flag"),
+        FMath::IsNearlyEqual(FMomentum::TickAirborneCredit(1.0f, true, true, 0.25f, 3.0f), 0.75f, 0.0001f));
+
+    // --- The wiring, worldless (fails on the old AdvanceLoop) ------------
+    AActor* Owner = NewObject<AActor>();
+    UBreakerProgressionComponent* Progression = NewObject<UBreakerProgressionComponent>(Owner);
+    UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>(Owner);
+    UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>(Owner);
+    UBreakerAttributeSet* Attributes = NewObject<UBreakerAttributeSet>();
+    Progression->DevForceClass(EBreakerClassId::Swift);
+    Momentum->BindAttributes(Attributes);
+    TestTrue(TEXT("The rig runs the loop"), Momentum->IsActiveForOwner());
+
+    // A fresh component's credit is 0. In the traversal mode the OLD loop
+    // refilled it to AirborneCreditSeconds; the new loop must not.
+    Movement->SetMovementMode(MOVE_Custom, UBreakerCharacterMovementComponent::CustomModeLedgeTraversal);
+    Momentum->AdvanceLoop(0.1f);
+    TestEqual(TEXT("AdvanceLoop through a traversal leaves the credit alone"),
+        Momentum->GetAirborneCreditRemaining(), 0.0f);
+    // Leaving the mode onto genuine ground refills, exactly as before.
+    Movement->SetMovementMode(MOVE_None);
+    Momentum->AdvanceLoop(0.1f);
+    TestEqual(TEXT("Genuine ground still refills through the wiring"),
+        Momentum->GetAirborneCreditRemaining(), Momentum->AirborneCreditSeconds);
+
+    // --- The traversal grant, wired off the recorder ---------------------
+    const float Before = Momentum->GetMomentum();
+    Movement->NotifyLedgeTraversalCompleted();   // worldless clock: records 0.0
+    for (int32 Step = 0; Step < 4; ++Step)
+    {
+        Momentum->AdvanceLoop(0.1f);   // the grant queues and pays under the cap
+    }
+    TestTrue(TEXT("A completed traversal pays its one-shot tick"),
+        FMath::IsNearlyEqual(Momentum->GetMomentum() - Before, Momentum->LedgeTraversalGrant, 0.01f));
+    // The recorder's timestamp did not advance (worldless clock), so a
+    // re-observation must not pay twice.
+    Momentum->AdvanceLoop(0.1f);
+    TestTrue(TEXT("The same completion never pays twice"),
+        FMath::IsNearlyEqual(Momentum->GetMomentum() - Before, Momentum->LedgeTraversalGrant, 0.01f));
+
+    // --- Shipped configuration -------------------------------------------
+    TestTrue(TEXT("The verbs feed the loop (owner-ruled: the grant is real)"),
+        Momentum->LedgeTraversalGrant > 0.0f);
+    TestTrue(TEXT("The traversal tick is small — at most the dash's"),
+        Momentum->LedgeTraversalGrant <= Momentum->DashGrant);
+    TestTrue(TEXT("The anti-farm interval exists — a crate must not be a generator"),
+        Momentum->LedgeTraversalGrantMinimumInterval > 0.0f);
+    return true;
+}
+
 #endif
