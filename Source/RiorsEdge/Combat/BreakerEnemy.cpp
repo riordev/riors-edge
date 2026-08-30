@@ -339,6 +339,16 @@ void ABreakerEnemy::ApplyBodyMesh()
         MeshBounds.Origin, MeshBounds.BoxExtent, BodyCollision->GetUnscaledCapsuleHalfHeight());
     NamedBody->SetRelativeScale3D(FVector(Fit.Scale));
     NamedBody->SetRelativeLocation(Fit.RelativeLocation);
+    // The fit owns the WHOLE relative transform, not two thirds of it.
+    // Scale and location were reset here and rotation was not — the one
+    // channel this contract left to whoever dirtied it last. Measured
+    // (breaker_report_mech_anim_flags.py): every mech sequence ships
+    // enable_root_motion=False, so today nothing animates the COMPONENT —
+    // the owner's sideways mechs were the death one-shot's final frame
+    // held through a revive, fixed where the revives are. This line is the
+    // contract's third channel so that stays true when an authored asset
+    // stops being so polite.
+    NamedBody->SetRelativeRotation(FRotator::ZeroRotator);
     if (UAnimSequence* Idle = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad()))
     {
         NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -1418,6 +1428,15 @@ void ABreakerEnemy::RespawnEnemy()
         // beat's length, the body must come back at its own scale and colours.
         ResetDeathPresentation();
         SetBodyVisible(true);
+        // The named body dies its own death (HandleDeath) and nothing here
+        // ever brought it back: the mech returned holding the death
+        // one-shot's final frame — alive, fighting, lying where it fell —
+        // while SetBodyVisible(true) above un-hid the primitives underneath
+        // it, a double body. The pool's revive already routes through
+        // ApplyBodyMesh for exactly this reset (gait re-played, fit
+        // restored, primitives re-hidden); the standing respawn now takes
+        // the same door. Idempotent — a primitive body returns at the guard.
+        ApplyBodyMesh();
         bDead = false;
         FirstDamageTime = -1.0;
         LastDamageEventTime = -1.0;

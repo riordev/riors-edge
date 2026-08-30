@@ -411,6 +411,9 @@ public:
     // the capture cadence, through the same public setters a fight drives.
     void DevDriveBodyPaintProbe(const FString& Mode);
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyMeshAsset;
+    // Read-only view for the suite: the pin that every revive returns the
+    // named body to the fit's own transform has to SEE the component.
+    class USkeletalMeshComponent* GetNamedBody() const { return NamedBody; }
     // Optional looped idle so a named body poses instead of T-posing; the
     // imported packs ship *_Idle sequences beside every mesh.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyIdleAnimation;
