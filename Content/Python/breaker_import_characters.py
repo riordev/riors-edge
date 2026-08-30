@@ -29,7 +29,12 @@ ASSETS = os.path.normpath(os.path.join(PROJECT_DIR, "Assets"))
 # what keeps two packs' identically named textures from colliding.
 IMPORTS = []
 
-def add_glob(rel_dir, pattern, dest):
+def add_glob(rel_dir, pattern, dest, per_source_folder=False):
+    """per_source_folder gives every file its own destination subfolder. Rigged
+    FBX NEED this: ten monsters imported into one folder made Interchange try
+    to merge unrelated bone trees into whatever skeleton it found there
+    ("cannot merge bone tree with the existing skeleton", ten times), so each
+    rig gets a folder no other rig's skeleton can be found in."""
     src_dir = os.path.join(ASSETS, rel_dir)
     if not os.path.isdir(src_dir):
         raise RuntimeError("[Characters] missing source dir: %s" % src_dir)
@@ -38,7 +43,8 @@ def add_glob(rel_dir, pattern, dest):
     if not found:
         raise RuntimeError("[Characters] nothing matching %s in %s" % (pattern, src_dir))
     for name in found:
-        IMPORTS.append((os.path.join(src_dir, name), dest))
+        target = dest + "/" + os.path.splitext(name)[0] if per_source_folder else dest
+        IMPORTS.append((os.path.join(src_dir, name), target))
 
 # The NPC cast: the two rigged bodies, the vendor's Unreal-facing glTF.
 # The head-bone hair set joins when an NPC actually wears one.
@@ -51,6 +57,23 @@ add_glob(os.path.join("enemies", "easy-enemy"),
          ((".fbx"), ("",)), "/Game/Breaker/Meshes/enemies")
 add_glob(os.path.join("enemies", "sci-fi-essentials"),
          ((".fbx"), ("Enemy_",)), "/Game/Breaker/Meshes/enemies")
+
+# The mechs (George/Leela/Mike/Stan are MACHINE names here — the pack note
+# tells the story) and the full monster roster. Each gets its own subfolder
+# so fifty-odd flat asset names cannot collide with the small packs'. The
+# monsters' FBX reference Atlas_Monsters.png by bare name, so a copy of the
+# atlas sits beside each category's files (LFS stores the one content once).
+add_glob(os.path.join("enemies", "animated-mech"),
+         ((".fbx"), ("",)), "/Game/Breaker/Meshes/enemies/mechs",
+         per_source_folder=True)
+# The category is part of the destination key: ten monster NAMES exist in
+# two categories (Big/Alien and Blob/Alien are different rigs), and a shared
+# per-name folder put the second rig onto the first one's skeleton — the same
+# merge error, one level down.
+for category in ("Big", "Blob", "Flying"):
+    add_glob(os.path.join("enemies", "ultimate-monsters", category),
+             ((".fbx"), ("",)), "/Game/Breaker/Meshes/enemies/monsters/" + category.lower(),
+             per_source_folder=True)
 
 tasks = []
 for path, dest in IMPORTS:
