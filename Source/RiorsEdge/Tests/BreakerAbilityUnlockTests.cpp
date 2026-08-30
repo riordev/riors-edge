@@ -6,6 +6,8 @@
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
 #include "Progression/BreakerProgressionLibrary.h"
+#include "Save/BreakerQuestContent.h"
+#include "Save/BreakerQuestJournal.h"
 #include "Save/BreakerSaveGame.h"
 
 // ---------------------------------------------------------------------------
@@ -454,6 +456,83 @@ bool FBreakerAbilitySaveLoadTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Unspent tokens round-trip"), Loaded->GetUnspentAbilityTokens(), Saved.UnspentAbilityTokens);
     TestEqual(TEXT("The granted counter round-trips"),
         Loaded->GetProgressionState().AbilityTokensGranted, Saved.AbilityTokensGranted);
+    return true;
+}
+
+// (h2) THE STORY TOKEN GRANT — abilities unlock from story missions.
+// Mechanism only: the mission layer wires beats to it in a later wave, so
+// nothing here fabricates a beat — the fixture sets a SHIPPED registered flag
+// the way the shipped dialogue choice would, then observes it. The level
+// schedule stands beside this untouched (the fallback until the owner rules),
+// which is why the fixture runs at level 1: the shipped entitlement there is
+// ZERO tokens, so every token in the test is the story's and the reachability
+// claim — a story beat can unlock an ability before the first level milestone
+// — is proved with nothing granted that the game does not grant.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerStoryTokenGrantTest,
+    "RiorsEdge.Progression.AbilityUnlocks.StoryTokenGrant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerStoryTokenGrantTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerUnlockTest;
+    const UBreakerClassDefinition* Swift = UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift);
+    if (!Swift || Swift->UnlockableAbilityIds.Num() == 0) { AddError(TEXT("No Swift unlockables")); return false; }
+
+    UBreakerProgressionComponent* Progression = UnlockTestMakeAt(EBreakerClassId::Swift, 1);
+    UBreakerQuestJournal* Journal = NewObject<UBreakerQuestJournal>();
+    TestEqual(TEXT("A level-1 character holds no level tokens"), Progression->GetUnspentAbilityTokens(), 0);
+
+    const FName StoryFlag = BreakerQuestFlags::FirstContractTurnedIn;
+
+    // The grant OBSERVES — a flag nobody has set pays nothing.
+    TestFalse(TEXT("An unset story flag is refused"), Progression->GrantStoryAbilityToken(StoryFlag, Journal));
+    TestEqual(TEXT("And it paid nothing"), Progression->GetUnspentAbilityTokens(), 0);
+
+    // The beat sets the flag (the shipped dialogue choice's own act), then the
+    // grant observes it.
+    Journal->SetFlag(StoryFlag);
+    TestTrue(TEXT("A set, registered story flag grants once"),
+        Progression->GrantStoryAbilityToken(StoryFlag, Journal));
+    TestEqual(TEXT("Exactly one token"), Progression->GetUnspentAbilityTokens(), 1);
+    TestTrue(TEXT("The payment is stamped in the flag set"),
+        Journal->HasFlag(UBreakerProgressionComponent::StoryTokenPaidFlagFor(StoryFlag)));
+
+    // Monotonic: observed once, granted once, never revoked.
+    TestFalse(TEXT("The same flag does not pay twice"), Progression->GrantStoryAbilityToken(StoryFlag, Journal));
+    TestEqual(TEXT("And the second attempt moved nothing"), Progression->GetUnspentAbilityTokens(), 1);
+
+    // Registry flags only: a name the campaign never sets is refused even when
+    // someone has managed to write it into the journal.
+    const FName Unregistered = TEXT("Not.A.Registered.Flag");
+    Journal->SetFlag(Unregistered);
+    TestFalse(TEXT("An unregistered flag is refused"), Progression->GrantStoryAbilityToken(Unregistered, Journal));
+    TestEqual(TEXT("And it minted nothing"), Progression->GetUnspentAbilityTokens(), 1);
+    TestFalse(TEXT("A null journal is refused"), Progression->GrantStoryAbilityToken(StoryFlag, nullptr));
+
+    // The round trip: both halves of the payment persist together (the stamp
+    // in the journal state, the token in the progression state), so a reload
+    // neither double-grants nor loses the token.
+    const FBreakerProgressionState SavedProgression = Progression->GetProgressionState();
+    const FBreakerQuestFlagSet SavedFlags = Journal->GetState();
+
+    UBreakerProgressionComponent* Loaded = NewObject<UBreakerProgressionComponent>();
+    Loaded->LoadProgressionState(SavedProgression);
+    UBreakerQuestJournal* LoadedJournal = NewObject<UBreakerQuestJournal>();
+    LoadedJournal->RestoreFrom(SavedFlags);
+    TestEqual(TEXT("The story token survives a load"), Loaded->GetUnspentAbilityTokens(), 1);
+    TestFalse(TEXT("A reload does not pay the same flag again"),
+        Loaded->GrantStoryAbilityToken(StoryFlag, LoadedJournal));
+    TestEqual(TEXT("And the reloaded wallet holds exactly one"), Loaded->GetUnspentAbilityTokens(), 1);
+
+    // The token is the SAME currency the level schedule pays: it buys a real
+    // unlockable through the one spend path, at a level where the shipped
+    // schedule has paid nothing — the story route reaches an ability first.
+    FText Failure;
+    const FName First = Swift->UnlockableAbilityIds[0];
+    TestTrue(TEXT("The story token buys an unlockable at level 1"), Loaded->SpendAbilityToken(First, Failure));
+    TestTrue(TEXT("And the ability is unlocked"), Loaded->IsAbilityUnlocked(First));
+    TestEqual(TEXT("The wallet is spent to zero"), Loaded->GetUnspentAbilityTokens(), 0);
     return true;
 }
 

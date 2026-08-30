@@ -240,6 +240,47 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|WorldPoints")
     bool GrantWorldPoint(FName SourceId, class UBreakerQuestJournal* Journal);
 
+    // ---- Story ability tokens (serialize-first; the mission layer wires
+    // beats later) ---------------------------------------------------------
+    // Abilities unlock from STORY MISSIONS: a registered quest flag, observed
+    // once, pays ONE ability token into the same wallet the level schedule
+    // pays (UnspentAbilityTokens), and never pays again. The level schedule is
+    // NOT deleted — it stands as the fallback until the owner rules on the
+    // unlock-source question, so SpendAbilityToken cannot tell the two token
+    // sources apart, which is the point: the spend surface does not fork.
+    //
+    // THE GRANT OBSERVES, IT NEVER SETS. The story flag must already be in the
+    // journal — set by the dialogue choice or mission beat that owns it — so a
+    // token can never exist without the story fact it pays for, and the call
+    // is safe from inside an OnFlagSet handler (the flag just broadcast) and
+    // from a beat that sets the flag first. An UNREGISTERED name is refused
+    // rather than paid (GrantWorldPoint's IsKnownSource shape): a typo must
+    // not mint currency.
+    //
+    // IDEMPOTENCE IS A DERIVED FLAG, the world-point pattern one shelf up:
+    // the grant stamps StoryTokenPaidFlagFor(StoryFlag) into the same
+    // presence-only, monotonic, saved-on-change flag set, so the payment
+    // survives a reload with no second bespoke record. The stamp and the
+    // token reach disk in the SAME save write (SetFlag's persist request
+    // saves journal and progression state together), so no crash window
+    // separates them.
+    //
+    // WHILE BOTH SOURCES ARE LIVE a story token can strand: the level
+    // schedule still pays every unlockable by AbilityCompletionLevel, so a
+    // story-paid character ends the schedule holding a token with nothing
+    // left to buy. That surplus is deliberate and visible — it is the exact
+    // number the owner's unlock-source ruling will spend or delete, and
+    // hiding it by capping the grant would pre-empt that ruling.
+    //
+    // CONSUMERS (grep "GrantStoryAbilityToken(" minus Tests/): none yet — the
+    // mission layer wires beats in a later wave; a beat is one call at the
+    // moment its TurnedIn flag is set.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression|Abilities")
+    bool GrantStoryAbilityToken(FName StoryFlag, class UBreakerQuestJournal* Journal);
+    // The derived paid-marker flag ("AbilityToken.<StoryFlag>"), published so
+    // tests and the wiring layer never hand-build the string.
+    static FName StoryTokenPaidFlagFor(FName StoryFlag);
+
     // ---- The XP loop (O40b) --------------------------------------------
     // Awards XP and re-derives the level. Returns the number of levels gained
     // so the caller can fire a level-up tell — a silent level-up is the

@@ -21,6 +21,7 @@ static_assert(UBreakerProgressionComponent::SingleMoreCeiling == FBreakerAttribu
 #include "Attributes/BreakerAttributeSet.h"
 #include "Classes/BreakerGritComponent.h"
 #include "Progression/BreakerWorldPoints.h"
+#include "Save/BreakerQuestContent.h"
 #include "Save/BreakerQuestJournal.h"
 #include "Classes/BreakerMomentumComponent.h"
 #include "Game/BreakerGameInstance.h"
@@ -821,6 +822,36 @@ bool UBreakerProgressionComponent::GrantWorldPoint(FName SourceId, UBreakerQuest
 
     Journal->SetFlag(Flag);
     State.UnspentCorePoints = FMath::Max(0, State.UnspentCorePoints + 1);
+    OnProgressionChanged.Broadcast();
+    return true;
+}
+
+FName UBreakerProgressionComponent::StoryTokenPaidFlagFor(FName StoryFlag)
+{
+    return FName(*(FString(TEXT("AbilityToken.")) + StoryFlag.ToString()));
+}
+
+bool UBreakerProgressionComponent::GrantStoryAbilityToken(FName StoryFlag, UBreakerQuestJournal* Journal)
+{
+    if (GetOwner() && !GetOwner()->HasAuthority()) return false;
+    if (!Journal) return false;
+
+    // Registry flags only, and the registry is the quest content's own list —
+    // a story token can only hang off a flag the campaign actually sets. The
+    // same refusal shape as GrantWorldPoint's IsKnownSource above, for the
+    // same reason: a typo that silently minted a token would widen an ability
+    // economy the token schedule is sized against.
+    if (!UBreakerQuestLibrary::IsRegisteredFlag(StoryFlag)) return false;
+
+    // Observe, never set: the story fact must already be recorded by whoever
+    // owns it. See the declaration for why this ordering is the contract.
+    if (!Journal->HasFlag(StoryFlag)) return false;
+
+    const FName PaidFlag = StoryTokenPaidFlagFor(StoryFlag);
+    if (Journal->HasFlag(PaidFlag)) return false;   // observed once, granted once
+
+    Journal->SetFlag(PaidFlag);
+    State.UnspentAbilityTokens = FMath::Max(0, State.UnspentAbilityTokens + 1);
     OnProgressionChanged.Broadcast();
     return true;
 }
