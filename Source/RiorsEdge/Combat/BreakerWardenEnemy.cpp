@@ -39,6 +39,7 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     // body. The shield stays the puzzle — it never depended on the torso.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/George.George"));
     BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Walk.GeorgeRobotArmature_Walk"));
+    BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/George/GeorgeRobotArmature_Death.GeorgeRobotArmature_Death"));
     // §2.3's stat block, expressed as chassis inputs rather than as literals:
     // health 320 against the Skitter's 100 is 3.2x, damage 26 against the melee
     // baseline's 14 is ~1.86x. Both compose through GetMonsterHealth /

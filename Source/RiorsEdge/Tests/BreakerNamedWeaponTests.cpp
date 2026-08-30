@@ -23,11 +23,11 @@ bool FBreakerNamedWeaponFitTest::RunTest(const FString& Parameters)
     BreakerViewmodel::FitNamedWeapon(FVector::ZeroVector, FVector(50.0, 6.0, 12.0),
         75.0f, FVector(30.0, 0.0, 0.0), Scale, Location);
     TestEqual(TEXT("longest bound scales to the layout length"), Scale, 0.75f, 1e-4f);
-    TestEqual(TEXT("centred at the requested rig point"), Location, FVector(30.0, 0.0, 0.0), 1e-3);
+    TestEqual(TEXT("centred at the requested rig point"), Location, FVector(30.0, 0.0, 0.0), 1e-3f);
     // An off-origin pivot cancels at the fitted scale.
     BreakerViewmodel::FitNamedWeapon(FVector(40.0, -8.0, 4.0), FVector(50.0, 6.0, 12.0),
         75.0f, FVector(30.0, 0.0, 0.0), Scale, Location);
-    TestEqual(TEXT("offset cancels scaled"), Location, FVector(0.0, 6.0, -3.0), 1e-3);
+    TestEqual(TEXT("offset cancels scaled"), Location, FVector(0.0, 6.0, -3.0), 1e-3f);
     // Degenerate bounds refuse the fit.
     BreakerViewmodel::FitNamedWeapon(FVector::ZeroVector, FVector::ZeroVector,
         75.0f, FVector(30.0, 0.0, 0.0), Scale, Location);

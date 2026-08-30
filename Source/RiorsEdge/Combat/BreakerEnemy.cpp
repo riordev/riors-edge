@@ -194,6 +194,7 @@ ABreakerEnemy::ABreakerEnemy()
     // now FIELD's to re-measure rather than reasons to hide the cast.
     BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/Stan.Stan"));
     BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Walk.StanRobotArmature_Walk"));
+    BodyDeathAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/enemies/mechs/Stan/StanRobotArmature_Death.StanRobotArmature_Death"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (SphereMesh.Succeeded()) WeakPointVisual->SetStaticMesh(SphereMesh.Object);
 
@@ -925,6 +926,18 @@ void ABreakerEnemy::HandleDeath()
     // SetLifeSpan already grant. Collision is off above, so the beat is pure
     // presentation. S2 NOTE (unowned domain): the death thump would fire here.
     StartDeathPresentation(bLastHitWasWeakPoint);
+    // A named body dies its own death: the imported packs ship a *_Death
+    // one-shot beside every mesh, and without it the gait loop runs through
+    // the corpse beat. The primitive crumple above still runs on the hidden
+    // parts, so the timing contract (pop, crumple, hide) is untouched.
+    if (NamedBody && NamedBody->IsVisible())
+    {
+        if (UAnimSequence* DeathAnim = Cast<UAnimSequence>(BodyDeathAnimation.TryLoad()))
+        {
+            NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+            NamedBody->PlayAnimation(DeathAnim, /*bLooping=*/false);
+        }
+    }
     // Unconditional like XP, and for the same reason: GrantLoot pays the
     // crafting currency before its item roll, and gating the whole call on
     // bDropsLoot made the wallet inherit loot's wave-gating — in wave mode 5
@@ -1047,6 +1060,10 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     ResetDeathPresentation();
     SetBodyVisible(true);
+    // A revived NAMED body is mid-death-pose otherwise: ApplyBodyMesh re-plays
+    // the gait loop (idempotent — unset bodies stay primitives). Part of the
+    // fresh-body promise, inside the function for the O128 reason above.
+    ApplyBodyMesh();
     bDead = false;
     StateLabel = TEXT("PATROL");
     bLastHitWasWeakPoint = false;

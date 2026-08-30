@@ -409,6 +409,9 @@ public:
     // Optional looped idle so a named body poses instead of T-posing; the
     // imported packs ship *_Idle sequences beside every mesh.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyIdleAnimation;
+    // Optional one-shot on death — without it a named body keeps its gait
+    // loop through the corpse beat, which reads as a glitch, not a kill.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyDeathAnimation;
 protected:
     // Hidden until BodyMeshAsset resolves.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> NamedBody;

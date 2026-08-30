@@ -12,10 +12,8 @@
 // proved here without a world: the mesh fills the capsule's height, the
 // bounds offset cancels at the fitted scale, and a degenerate mesh degrades
 // to identity instead of dividing into an infinity. The second test asserts
-// the SHIPPED CONFIGURATION: no enemy ships a named body — the hook exists
-// for the intake meshes and the preview command, and defaulting one on is
-// FIELD's readability call. The day a chassis legitimately sets one, this
-// pin moves in the same commit, deliberately.
+// the SHIPPED CONFIGURATION — the mech cast — and its own comment below
+// tells the story of the pin that moved.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEnemyBodyFitTest,
@@ -39,7 +37,7 @@ bool FBreakerEnemyBodyFitTest::RunTest(const FString& Parameters)
         const FVector Origin(500.0, 300.0, 80.0);
         const auto Fit = FitBodyToCapsule(Origin, FVector(40.0, 30.0, 180.0), 90.0f);
         TestEqual(TEXT("scale"), Fit.Scale, 0.5f, 1e-4f);
-        TestEqual(TEXT("offset cancels scaled"), Fit.RelativeLocation, FVector(-250.0, -150.0, -40.0), 1e-3);
+        TestEqual(TEXT("offset cancels scaled"), Fit.RelativeLocation, FVector(-250.0, -150.0, -40.0), 1e-3f);
     }
     // Degenerate bounds refuse the fit rather than exploding.
     {

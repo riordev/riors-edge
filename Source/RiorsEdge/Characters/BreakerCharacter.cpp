@@ -1233,9 +1233,13 @@ void ABreakerCharacter::RebuildViewmodelParts()
             if (NamedWeaponVisual->GetStaticMesh() != NamedGun) NamedWeaponVisual->SetStaticMesh(NamedGun);
             const FBoxSphereBounds GunBounds = NamedGun->GetBounds();
             float FitScale; FVector FitLocation;
+            // Centred 4 cm BELOW the rig origin: the primitives author their
+            // mass under the sight line and the first fit centred the gun ON
+            // it, which put the receiver across the crosshair in every hip
+            // frame of the review reel. O2.
             BreakerViewmodel::FitNamedWeapon(GunBounds.Origin, GunBounds.BoxExtent,
                 ActiveLayout.OverallLengthCm(),
-                FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, 0.0f),
+                FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, -4.0f),
                 FitScale, FitLocation);
             NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
             NamedWeaponVisual->SetRelativeLocation(FitLocation);
@@ -1653,7 +1657,10 @@ void ABreakerCharacter::HandleShotCosmetics(const FBreakerShotResult& Shot)
         // Weapon-orange, matching the tracer's token, so the flash and the
         // streak leaving it read as one event.
         PrototypeMuzzleFlash->SetLightColor(FLinearColor(1.0f, 0.54f, 0.24f));   // O2 PLACEHOLDER
-        PrototypeMuzzleFlash->SetIntensity(5000.0f + 850.0f * KickUnits);        // O2 PLACEHOLDER
+        // Retuned down from 5000 + 850/kick: that figure was set against the
+        // near-black blockout guns, and on the intake meshes' bright flat
+        // paints it blew whole dark-side frames to orange under auto-exposure.
+        PrototypeMuzzleFlash->SetIntensity(3000.0f + 500.0f * KickUnits);        // O2 PLACEHOLDER
     }
     // S2 NOTE (unowned domain): the per-archetype fire report would be
     // triggered here, scaled by the same kick number — noted, not built.
