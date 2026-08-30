@@ -134,6 +134,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FSoftObjectPath BodyMeshAsset;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FVector BodyMeshOffset = FVector::ZeroVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FRotator BodyMeshRotation = FRotator::ZeroRotator;
+    // The path may now name a SKELETAL mesh (the intake base characters):
+    // ApplyBodyMesh casts and takes the matching branch, and the optional
+    // idle keeps a person from standing in a T-pose.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPC") FSoftObjectPath BodyIdleAnimation;
 
     // Zero-setup placeholder conversations for the gym camp. The content is
     // split out of the spawners so automation can validate and walk it with no
@@ -152,6 +156,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Head;
     // The named-mesh body; hidden until BodyMeshAsset resolves in BeginPlay.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> BodyMesh;
+    // Its skeletal sibling, for the intake base characters; same fallback.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> SkeletalBody;
     // NPC READABILITY (owner playtest 2026-08-17: "no visual indicator that
     // the npcs are people"). Enemies read as cool grey-violet silhouettes with
     // harm-red bars; a person reads WARM: a bright amber sash across the

@@ -1,8 +1,12 @@
 #include "Interaction/BreakerNPC.h"
 
+#include "Animation/AnimSequence.h"
+#include "Combat/BreakerEnemyBodyMath.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Save/BreakerQuestContent.h"
@@ -84,6 +88,10 @@ ABreakerNPC::ABreakerNPC()
     BodyMesh->SetupAttachment(Body);
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     BodyMesh->SetVisibility(false);
+    SkeletalBody = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalBody"));
+    SkeletalBody->SetupAttachment(Body);
+    SkeletalBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SkeletalBody->SetVisibility(false);
 
     // The idle glow: a soft warm pool, same idiom as the hub's prop lights
     // (HubAttachPropLight) but owned by the NPC so it travels with them.
@@ -119,7 +127,33 @@ void ABreakerNPC::ApplyBodyMesh()
     // imported blockout keeps the primitives — the same "the floor still
     // works" shape as the audio samples over the synth.
     if (!BodyMesh || !BodyMeshAsset.IsValid()) return;
-    if (UStaticMesh* Named = Cast<UStaticMesh>(BodyMeshAsset.TryLoad()))
+    UObject* Loaded = BodyMeshAsset.TryLoad();
+    // The SKELETAL branch: an intake base character. Fitted to the capsule by
+    // the enemy's own pure rule (one fit, two wearers), given its idle so a
+    // person stands rather than T-poses, and the same primitives fallback.
+    if (USkeletalMesh* Person = Cast<USkeletalMesh>(Loaded))
+    {
+        if (!SkeletalBody) return;
+        SkeletalBody->SetSkeletalMesh(Person);
+        const FBoxSphereBounds MeshBounds = Person->GetBounds();
+        const BreakerEnemyBody::FBreakerBodyFit Fit = BreakerEnemyBody::FitBodyToCapsule(
+            MeshBounds.Origin, MeshBounds.BoxExtent, Body->GetScaledCapsuleHalfHeight());
+        SkeletalBody->SetRelativeScale3D(FVector(Fit.Scale));
+        SkeletalBody->SetRelativeLocation(Fit.RelativeLocation + BodyMeshOffset);
+        SkeletalBody->SetRelativeRotation(BodyMeshRotation);
+        if (UAnimSequence* Idle = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad()))
+        {
+            SkeletalBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+            SkeletalBody->PlayAnimation(Idle, /*bLooping=*/true);
+        }
+        SkeletalBody->SetVisibility(true);
+        BodyMesh->SetVisibility(false);
+        Visual->SetVisibility(false);
+        Head->SetVisibility(false);
+        Trim->SetVisibility(false);
+        return;
+    }
+    if (UStaticMesh* Named = Cast<UStaticMesh>(Loaded))
     {
         BodyMesh->SetStaticMesh(Named);
         // MEASURED, NOT ASSUMED: the blockout GLB imported at 100x (an NPC
@@ -534,7 +568,13 @@ ABreakerNPC* ABreakerNPC::SpawnForgeKeeper(UWorld* World, const FVector& Locatio
     NPC->DialogueNodes = MakeForgeKeeperDialogue();
     NPC->EntryOverrides = MakeForgeKeeperEntries();
     // The blockout's own Kess, by name (ruled).
-    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/anchor_hub/StaticMeshes/npc_kess.npc_kess"));
+    // KESS = Superhero_Female_FullBody, recorded in Assets/npcs/
+    // LICENSE-NOTE.txt with the one-body-family ruling; her blockout statue
+    // (npc_kess) stands down for the rigged base at a talking idle. Note: the
+    // Anchor has TWO NPCs — "Forge Keeper" is Kess's own title, not a third
+    // person.
+    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/SkeletalMeshes/Superhero_Female.Superhero_Female"));
+    NPC->BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Female_FullBody/Anims/UAL1_Standard/SkeletalMeshes/UAL1_StandardIdle_Talking_Loop.UAL1_StandardIdle_Talking_Loop"));
     NPC->ApplyBodyMesh();
     return NPC;
 }
@@ -546,7 +586,10 @@ ABreakerNPC* ABreakerNPC::SpawnQuartermaster(UWorld* World, const FVector& Locat
     NPC->DisplayName = FText::FromString(TEXT("QUARTERMASTER"));
     NPC->DialogueNodes = MakeQuartermasterDialogue();
     NPC->EntryOverrides = MakeQuartermasterEntries();
-    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/anchor_hub/StaticMeshes/npc_quartermaster.npc_quartermaster"));
+    // The Quartermaster wears the male base at a plain idle — the second of
+    // the pack's two bodies, distinct from Kess at a glance.
+    NPC->BodyMeshAsset = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/SkeletalMeshes/SuperHero_Male.SuperHero_Male"));
+    NPC->BodyIdleAnimation = FSoftObjectPath(TEXT("/Game/Breaker/Meshes/npcs/Superhero_Male_FullBody/Anims/UAL1_Standard/SkeletalMeshes/UAL1_StandardIdle_Loop.UAL1_StandardIdle_Loop"));
     NPC->ApplyBodyMesh();
     return NPC;
 }

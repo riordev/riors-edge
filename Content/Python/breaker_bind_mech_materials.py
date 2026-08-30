@@ -56,6 +56,9 @@ for mech in MECHS:
                                       unreal.MaterialFactoryNew())
     if not material:
         raise RuntimeError("[MechMat] could not create material for %s" % mech)
+    # Without the usage flag a -game run warns per instance and compiles the
+    # skeletal permutation on demand — the overlay material's exact bug.
+    material.set_editor_property("used_with_skeletal_mesh", True)
     # Rebuild the graph from empty each run rather than diffing it.
     matlib.delete_all_material_expressions(material)
     sample = matlib.create_material_expression(
