@@ -1,0 +1,10 @@
+﻿Kenney sound packs (CC0), converted to the director's format - PCM16 WAV
+44.1 kHz - from the vendored .ogg sources in Assets/audio/<pack>/ (those
+stay the source of truth; regenerate with ffmpeg -ar 44100 -acodec
+pcm_s16le). DELIBERATELY WIRED TO NOTHING: the sound director's file
+NAMES are its wiring (weapon_fire.wav, ability_<Id>.wav...), so nothing
+in this folder uses a verb name. The fifth-verb ruling (one ability cue
+vs per-ability) is the owner's; when a verb wants one of these, it is
+copied or referenced by the director's own naming convention at that
+time. Converted 2026-08-29, 355 files: impact-sounds 130,
+interface-sounds 100, ui-audio 52, sci-fi-sounds 73.

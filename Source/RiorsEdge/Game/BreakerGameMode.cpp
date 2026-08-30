@@ -763,7 +763,18 @@ void ABreakerGameMode::ArmDevInstruments(APlayerController* NewPlayer)
         // the class of instrument this flag's engaged%% guard exists to refuse.
         // The world has to be running; the requirement is real, so it is
         // stated rather than worked around.
-        if (CrowdCount > 0 && !FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")))
+        // BOTH FORMS. Part One-E gave autoplay a value (=Gym / =Fernhall) and
+        // told every instrument to use it — and this guard still tested only
+        // the bare flag, so the probe has been UNARMABLE since that change:
+        // -BreakerAutoPlay=Gym printed this very error and the run played an
+        // endless gym fight that read as a hang. FParse::Param sees flags,
+        // FParse::Value sees values; an instrument gate must accept whichever
+        // the harness table tells people to type.
+        FString BreakerAutoPlayValueProbe;
+        const bool bBreakerAutoPlayPresent =
+            FParse::Param(FCommandLine::Get(), TEXT("BreakerAutoPlay")) ||
+            FParse::Value(FCommandLine::Get(), TEXT("BreakerAutoPlay="), BreakerAutoPlayValueProbe);
+        if (CrowdCount > 0 && !bBreakerAutoPlayPresent)
         {
             UE_LOG(LogTemp, Error,
                 TEXT("[BreakerCrowd] the probe needs -BreakerAutoPlay: without it the title menu is up, ")
