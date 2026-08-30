@@ -134,22 +134,22 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // exercises its loader — this is the suite's replacement for that log
     // line. Gated on the audio directory existing: a clone with no audio
     // assets is legal by design (the synth is the floor), but a repo that
-    // SHIPS the directory must ship all four files in a format the reader
-    // speaks, or the fallback would engage silently over a broken commit.
+    // SHIPS the directory must ship every file the director names eagerly in
+    // a format the reader speaks, or the fallback would engage silently over
+    // a broken commit.
     //
-    // FOUR, NOT FIVE, AND ability_cast.wav IS DELIBERATELY ABSENT. The fifth
-    // verb ships on its synth: the owner will author ability audio
-    // "eventually", and the whole point of the default-plus-override shape is
-    // that nothing is silent before then. Listing a file nobody has made would
-    // turn a designed fallback into a red test. When the owner adds
-    // ability_cast.wav, it joins this list; the per-ability overrides never do,
-    // because every one of them is optional by construction.
+    // FIVE: ability_cast.wav joined this list the day it was authored (a cut
+    // from the converted Kenney set — provenance in SOURCES.txt), exactly per
+    // the deletion condition the four-name version of this comment carried.
+    // The per-ability overrides (ability_<Id>.wav) never join, because every
+    // one of them is optional by construction, and candidates/ is invisible
+    // here on purpose — audition copies are consumed by nothing.
     {
         const FString AudioDir = FPaths::ProjectContentDir() / TEXT("Breaker/Audio");
         if (IFileManager::Get().DirectoryExists(*AudioDir))
         {
             for (const TCHAR* Name : {TEXT("weapon_fire.wav"), TEXT("hit_confirm.wav"),
-                TEXT("kill_confirm.wav"), TEXT("take_hit.wav")})
+                TEXT("kill_confirm.wav"), TEXT("take_hit.wav"), TEXT("ability_cast.wav")})
             {
                 TArray<uint8> Bytes;
                 TestTrue(FString::Printf(TEXT("%s ships"), Name),

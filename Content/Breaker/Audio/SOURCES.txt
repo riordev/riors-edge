@@ -13,6 +13,14 @@ take_hit.wav     from "death pain grunts.wav", first grunt
   "grunts of male death and pain" by thebardofblasphemy, CC0,
   https://opengameart.org/content/grunts-male-death-and-pain
 
+ability_cast.wav is kenney/sci-fi-sounds/forceField_003.wav verbatim
+(Kenney Sci-Fi Sounds, CC0, converted set — see kenney/SOURCES.txt).
+Chosen headless by measurement, not by ear: 0.956 s, mono, and the
+spectral centroid RISES 593 -> 1233 Hz across the clip, which keeps the
+synth default's one design rule — the ability cue is the set's only
+rising sweep while all four combat verbs sweep down. The owner A/Bs the
+actual sound.
+
 Rejected during sourcing: "Gunshot Sounds" (opengameart.org/content/
 gunshot-sounds) — the page says CC0 but the archive's own
 creativecommons.txt claims CC-BY 3.0, and the stricter in-archive claim
