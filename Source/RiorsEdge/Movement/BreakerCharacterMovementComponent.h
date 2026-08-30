@@ -28,13 +28,22 @@ enum class EBreakerLedgeVerb : uint8
 };
 
 // One resolved traversal: the verb the ledge's height selects and the
-// clearance-checked landing point. Produced by ResolveLedgeTraversal; the
-// pawn executes it (the smoothstep move) and owns nothing about the rules.
+// clearance-checked landing point. Produced by ResolveLedgeTraversal and
+// executed by the component's own custom movement mode (the pawn owns
+// nothing about the rules OR the execution any more).
 struct FBreakerLedgeTraversal
 {
     EBreakerLedgeVerb Verb = EBreakerLedgeVerb::None;
     FVector TargetLocation = FVector::ZeroVector;
 };
+
+// Broadcast when a ledge traversal COMPLETES — never on a blocked abort —
+// carrying the verb that ran. Presentation only, the OnDashStarted shape:
+// the movement itself is already finished when this fires, so a listener
+// (the viewmodel's exit dip, a HUD read, rumble) can only dress it. Plain
+// C++ multicast rather than dynamic because EBreakerLedgeVerb is a
+// runtime-only enum with no UENUM reflection, on purpose.
+DECLARE_MULTICAST_DELEGATE_OneParam(FBreakerLedgeTraversalCompleted, EBreakerLedgeVerb);
 
 UCLASS(ClassGroup=Movement, BlueprintType)
 class RIORSEDGE_API UBreakerCharacterMovementComponent : public UCharacterMovementComponent
@@ -54,6 +63,18 @@ public:
     virtual FVector NewFallVelocity(const FVector& InitialVelocity, const FVector& Gravity, float DeltaTime) const override;
     virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
     virtual void ProcessLanded(const FHitResult& Hit, float remainingTime, int32 Iterations) override;
+    // The ledge traversal's execution home (the custom prediction mode). The
+    // old execution was pawn-side SetActorLocation in MOVE_Flying — zero
+    // impact for a listen-server host and a hard rubber-band for any remote
+    // client, and INVISIBLE to every sibling predicate, because "is the
+    // character traversing" had no movement mode to ask about. Running the
+    // smoothstep inside the movement pipeline gives it a saved-move replay
+    // path and gives the siblings (viewmodel bob, Momentum's airborne
+    // credit, any HUD read) one honest predicate: IsTraversingLedge().
+    virtual void PhysCustom(float deltaTime, int32 Iterations) override;
+    virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+    virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
+    virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSprinting(bool bEnabled);
     UFUNCTION(BlueprintCallable, Category="Movement") void SetSlideRequested(bool bEnabled);
@@ -104,6 +125,44 @@ public:
     // only, changes nothing. False when no traversable ledge is ahead.
     bool ResolveLedgeTraversal(FBreakerLedgeTraversal& OutTraversal) const;
 
+    // ---- The traversal's own movement mode --------------------------------
+    // MOVE_Custom sub-mode for the vault/mantle glide. ONE published value so
+    // tests and siblings never hand-copy a magic zero.
+    static constexpr uint8 CustomModeLedgeTraversal = 0;
+
+    // Resolves a traversal from the character's current pose and, on success,
+    // REQUESTS it: the request is consumed inside the next movement update
+    // (UpdateCharacterStateBeforeMovement), which is what lets the same
+    // request replay through the saved-move stream — the server and a
+    // replaying client re-run the begin inside their own simulation instead
+    // of trusting a pawn-side teleport. Returns false when nothing
+    // traversable is ahead or a traversal is already running.
+    UFUNCTION(BlueprintCallable, Category="Movement|Ledge") bool TryBeginLedgeTraversal();
+    // The one honest read every sibling predicate was missing. True from the
+    // frame the traversal begins to the frame it completes or aborts.
+    UFUNCTION(BlueprintPure, Category="Movement|Ledge") bool IsTraversingLedge() const
+    {
+        return IsLedgeTraversalMode(MovementMode, CustomMovementMode);
+    }
+    // The verb currently running, None outside a traversal.
+    EBreakerLedgeVerb GetActiveLedgeVerb() const { return IsTraversingLedge() ? TraversalVerb : EBreakerLedgeVerb::None; }
+    // The body's actual speed along the traversal glide this frame (the
+    // smoothstep's derivative), for the viewmodel's stride — velocity is
+    // deliberately zero during a traversal, so anything reading Velocity sees
+    // a standing character, which is exactly the dead-pose defect this read
+    // exists to close. Zero outside a traversal.
+    UFUNCTION(BlueprintPure, Category="Movement|Ledge") float GetLedgeTraversalStrideSpeed() const;
+
+    // Completed traversals only — a blocked abort broadcasts nothing, the
+    // same rule the recorder below already follows.
+    FBreakerLedgeTraversalCompleted OnLedgeTraversalCompleted;
+
+    // Dev-only clock scale on the traversal durations (screenshot cadence is
+    // 2 s and a vault crosses in 0.12 s, so a capture run slows the glide to
+    // photograph the mid-traversal viewmodel). 1.0 in every real session;
+    // written only by the -BreakerTraversalDemo capture instrument.
+    float DevTraversalDurationScale = 1.0f;
+
     // THE PUBLISHED STEP HEIGHT (Part One-R's order): one number, one home.
     // The cover grammar's chest-cover reasoning and the gym's climbable
     // geometry cite 145 in comments and ABreakerGameMode::MantleStepHeight
@@ -130,6 +189,23 @@ public:
     // engine already takes), through the vault window a vault, through the
     // mantle window a mantle, above the ceiling nothing.
     static EBreakerLedgeVerb ResolveLedgeVerb(float LedgeHeightCm, float MinimumCm, float VaultMaximumCm, float MantleMaximumCm);
+    // The traversal mode predicate as pure maths, so a worldless test can pin
+    // it without a CharacterOwner. MOVE_Flying — the old execution's mode —
+    // deliberately answers false: that mode is what made the traversal
+    // invisible to every sibling system.
+    static bool IsLedgeTraversalMode(uint8 InMovementMode, uint8 InCustomMode)
+    {
+        return InMovementMode == MOVE_Custom && InCustomMode == CustomModeLedgeTraversal;
+    }
+    // The glide's clock and curve, pure. Alpha is elapsed over duration,
+    // clamped; the position eases with the same smoothstep the pawn's old
+    // execution used, so the mode change is bit-identical in shape.
+    static float LedgeTraversalAlpha(float ElapsedSeconds, float DurationSeconds);
+    static FVector LedgeTraversalLocation(const FVector& Start, const FVector& Target, float Alpha);
+    // The smoothstep's speed: distance x 6a(1-a) / duration. Zero at both
+    // ends, peaks at 1.5x the average speed mid-glide. This is the number the
+    // viewmodel's stride reads during a traversal.
+    static float LedgeTraversalStrideSpeed(float DistanceCm, float DurationSeconds, float Alpha);
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const { return bWantsToSprint; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const { return bSliding; }
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSlideRequested() const { return bSlideRequested; }
@@ -446,6 +522,34 @@ private:
     // Applies the third jump's course correction, if this jump is one.
     void ApplyBonusJumpRedirect();
 
+    // ---- Ledge traversal execution state ----------------------------------
+    // The saved-move classes below capture and restore this whole block, so a
+    // replayed move mid-glide continues from the right point instead of
+    // restarting the traversal.
+    friend class FBreakerSavedMove_Character;
+    // The jump key's request, one-shot, carried to the server in the
+    // compressed-flags byte (FLAG_Custom_0) exactly as bWantsToCrouch rides
+    // its own flag. Consumed by UpdateCharacterStateBeforeMovement.
+    bool bWantsLedgeTraversal = false;
+    // The client-side resolve from TryBeginLedgeTraversal, used same-frame so
+    // the initiating machine begins from exactly what it resolved. The server
+    // and a replaying client have no pending copy and re-resolve from their
+    // own authoritative pose — deterministic given the same pose, and the
+    // ordinary movement correction owns any residual divergence.
+    FBreakerLedgeTraversal PendingTraversal;
+    bool bHasPendingTraversal = false;
+    FVector TraversalStart = FVector::ZeroVector;
+    FVector TraversalTarget = FVector::ZeroVector;
+    // Horizontal velocity carried in, restored on a COMPLETED exit; a blocked
+    // abort exits dead (the old execution's rule, kept).
+    FVector TraversalExitVelocity = FVector::ZeroVector;
+    float TraversalElapsed = 0.0f;
+    float TraversalDuration = 0.2f;
+    EBreakerLedgeVerb TraversalVerb = EBreakerLedgeVerb::None;
+    void BeginLedgeTraversal(const FBreakerLedgeTraversal& Traversal);
+    void FinishLedgeTraversal(bool bCompleted);
+    void PhysLedgeTraversal(float DeltaTime, int32 Iterations);
+
     bool bWantsToSprint = false;
     bool bSlideRequested = false;
     bool bSlideRequestConsumed = false;
@@ -466,4 +570,46 @@ private:
     // state machine — from being cut by a stray key release.
     bool bJumpCutArmed = false;
     void ApplyAirSteering(float DeltaTime);
+};
+
+// ---------------------------------------------------------------------------
+// The saved-move pass (the custom prediction mode's other half). The request
+// bit rides FLAG_Custom_0 so the server consumes the SAME one-shot the client
+// consumed, inside its own simulation of the same move; the glide state is
+// captured and restored so a client replaying corrected moves mid-traversal
+// continues the glide instead of restarting it. Graded honestly: this is the
+// standard sprint-flag pattern applied to a one-shot, exercised today only by
+// the listen-server host path (no remote client exists to playtest against),
+// and pinned by the worldless suite at the pure-rule level.
+// ---------------------------------------------------------------------------
+class FBreakerSavedMove_Character : public FSavedMove_Character
+{
+public:
+    using Super = FSavedMove_Character;
+
+    uint8 bSavedWantsLedgeTraversal : 1;
+    FVector SavedTraversalStart = FVector::ZeroVector;
+    FVector SavedTraversalTarget = FVector::ZeroVector;
+    FVector SavedTraversalExitVelocity = FVector::ZeroVector;
+    float SavedTraversalElapsed = 0.0f;
+    float SavedTraversalDuration = 0.2f;
+    EBreakerLedgeVerb SavedTraversalVerb = EBreakerLedgeVerb::None;
+
+    FBreakerSavedMove_Character() : bSavedWantsLedgeTraversal(false) {}
+    virtual void Clear() override;
+    virtual uint8 GetCompressedFlags() const override;
+    virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
+    virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override;
+    virtual void PrepMoveFor(ACharacter* C) override;
+};
+
+class FBreakerNetworkPredictionData_Client_Character : public FNetworkPredictionData_Client_Character
+{
+public:
+    explicit FBreakerNetworkPredictionData_Client_Character(const UCharacterMovementComponent& ClientMovement)
+        : FNetworkPredictionData_Client_Character(ClientMovement) {}
+    virtual FSavedMovePtr AllocateNewMove() override
+    {
+        return FSavedMovePtr(new FBreakerSavedMove_Character());
+    }
 };

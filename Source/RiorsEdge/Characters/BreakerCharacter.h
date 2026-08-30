@@ -47,7 +47,11 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSprinting() const;
     UFUNCTION(BlueprintPure, Category="Movement") bool IsSliding() const;
-    UFUNCTION(BlueprintPure, Category="Movement") bool IsMantling() const { return bMantling; }
+    // Forwards to the movement component's IsTraversingLedge — the execution
+    // moved into the custom movement mode, so the pawn holds no traversal
+    // state of its own any more. Kept under its old name for Blueprint/HUD
+    // callers.
+    UFUNCTION(BlueprintPure, Category="Movement") bool IsMantling() const;
     UFUNCTION(BlueprintPure, Category="Movement") float GetHorizontalSpeed() const;
     UFUNCTION(BlueprintPure, Category="Movement") UBreakerCharacterMovementComponent* GetBreakerMovement() const;
     UFUNCTION(BlueprintPure, Category="Combat") UBreakerAttributeSet* GetAttributes() const { return Attributes; }
@@ -428,13 +432,9 @@ private:
     bool bShowingInitialMenu = false;
     TSharedPtr<SBreakerMenu> MenuWidget;
     FTimerHandle ShotCosmeticTimer;
-    bool bMantling = false;
-    float MantleElapsed = 0.0f;
-    // The resolved verb's clock: vault's short one or mantle's, set per cast.
-    float ActiveTraversalDuration = 0.2f;
-    FVector MantleStart = FVector::ZeroVector;
-    FVector MantleTarget = FVector::ZeroVector;
-    FVector MantleExitVelocity = FVector::ZeroVector;
+    // The traversal execution state that lived here (bMantling, the elapsed
+    // clock, start/target/exit velocity) moved into the movement component's
+    // custom mode with the smoothstep itself — the pawn asks, never executes.
 
     // The player's chosen FOV, kept separately from the camera's live FOV so
     // the dash punch is a pure offset. GetCurrentFOV() reports THIS, which is

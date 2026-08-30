@@ -867,6 +867,247 @@ void UBreakerCharacterMovementComponent::NotifyLedgeTraversalCompleted()
     LastLedgeTraversalEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 }
 
+// ---- The traversal's own movement mode (the custom prediction pass) -------
+
+float UBreakerCharacterMovementComponent::LedgeTraversalAlpha(float ElapsedSeconds, float DurationSeconds)
+{
+    // The 0.05 floor is the old pawn execution's own guard, kept exactly.
+    return FMath::Clamp(ElapsedSeconds / FMath::Max(DurationSeconds, 0.05f), 0.0f, 1.0f);
+}
+
+FVector UBreakerCharacterMovementComponent::LedgeTraversalLocation(const FVector& Start, const FVector& Target, float Alpha)
+{
+    const float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    const float Smoothed = A * A * (3.0f - 2.0f * A);
+    return FMath::Lerp(Start, Target, Smoothed);
+}
+
+float UBreakerCharacterMovementComponent::LedgeTraversalStrideSpeed(float DistanceCm, float DurationSeconds, float Alpha)
+{
+    if (DurationSeconds <= 0.0f || DistanceCm <= 0.0f)
+    {
+        return 0.0f;
+    }
+    const float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    // d/dt of smoothstep(t/T) scaled by distance: 6a(1-a) x distance / T.
+    // Zero at both ends, 1.5x the average speed at the middle of the glide.
+    return DistanceCm * 6.0f * A * (1.0f - A) / DurationSeconds;
+}
+
+float UBreakerCharacterMovementComponent::GetLedgeTraversalStrideSpeed() const
+{
+    if (!IsTraversingLedge())
+    {
+        return 0.0f;
+    }
+    return LedgeTraversalStrideSpeed(
+        static_cast<float>((TraversalTarget - TraversalStart).Size()),
+        TraversalDuration,
+        LedgeTraversalAlpha(TraversalElapsed, TraversalDuration));
+}
+
+bool UBreakerCharacterMovementComponent::TryBeginLedgeTraversal()
+{
+    if (IsTraversingLedge())
+    {
+        return false;
+    }
+    FBreakerLedgeTraversal Traversal;
+    if (!ResolveLedgeTraversal(Traversal))
+    {
+        return false;
+    }
+    // Request, not begin: the begin runs inside the movement update so the
+    // same one-shot replays through the saved-move stream. The resolved copy
+    // is kept so the initiating machine begins from exactly what it resolved.
+    PendingTraversal = Traversal;
+    bHasPendingTraversal = true;
+    bWantsLedgeTraversal = true;
+    return true;
+}
+
+void UBreakerCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
+{
+    Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+    if (bWantsLedgeTraversal && !IsTraversingLedge())
+    {
+        // The server (and a replaying client) has the FLAG but no resolved
+        // copy — it re-resolves from its own authoritative pose, which is the
+        // whole point of consuming the request inside the movement update.
+        FBreakerLedgeTraversal Traversal = PendingTraversal;
+        const bool bResolved = bHasPendingTraversal || ResolveLedgeTraversal(Traversal);
+        if (bResolved)
+        {
+            BeginLedgeTraversal(Traversal);
+        }
+    }
+    bWantsLedgeTraversal = false;
+    bHasPendingTraversal = false;
+}
+
+void UBreakerCharacterMovementComponent::BeginLedgeTraversal(const FBreakerLedgeTraversal& Traversal)
+{
+    if (Traversal.Verb == EBreakerLedgeVerb::None || !UpdatedComponent)
+    {
+        return;
+    }
+    TraversalVerb = Traversal.Verb;
+    TraversalStart = UpdatedComponent->GetComponentLocation();
+    TraversalTarget = Traversal.TargetLocation;
+    TraversalElapsed = 0.0f;
+    const float BaseDuration = Traversal.Verb == EBreakerLedgeVerb::Vault
+        ? VaultDurationSeconds : MantleDurationSeconds;
+    TraversalDuration = FMath::Max(BaseDuration * FMath::Max(DevTraversalDurationScale, 0.01f), 0.05f);
+    // Horizontal momentum is carried across the glide and paid back on a
+    // completed exit; the glide itself runs on zero velocity so nothing
+    // downstream reads phantom speed (the stride read above is the honest
+    // speed source for the viewmodel).
+    TraversalExitVelocity = FVector(Velocity.X, Velocity.Y, 0.0f);
+    Velocity = FVector::ZeroVector;
+    SetMovementMode(MOVE_Custom, CustomModeLedgeTraversal);
+}
+
+void UBreakerCharacterMovementComponent::FinishLedgeTraversal(bool bCompleted)
+{
+    const EBreakerLedgeVerb CompletedVerb = TraversalVerb;
+    TraversalVerb = EBreakerLedgeVerb::None;
+    SetMovementMode(MOVE_Falling);
+    // The old execution's exact exit rule: a completed glide keeps the
+    // carried horizontal velocity, a blocked abort exits dead.
+    Velocity = bCompleted ? TraversalExitVelocity : FVector::ZeroVector;
+    if (bCompleted)
+    {
+        // Only a COMPLETED traversal records (Part One-T) or broadcasts — a
+        // blocked abort granted nothing a recency window or an exit dip
+        // should pay for.
+        NotifyLedgeTraversalCompleted();
+        OnLedgeTraversalCompleted.Broadcast(CompletedVerb);
+    }
+}
+
+void UBreakerCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
+{
+    if (CustomMovementMode == CustomModeLedgeTraversal)
+    {
+        PhysLedgeTraversal(deltaTime, Iterations);
+        return;
+    }
+    Super::PhysCustom(deltaTime, Iterations);
+}
+
+void UBreakerCharacterMovementComponent::PhysLedgeTraversal(float DeltaTime, int32 Iterations)
+{
+    if (DeltaTime < UE_KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+    if (!CharacterOwner || !UpdatedComponent)
+    {
+        FinishLedgeTraversal(false);
+        return;
+    }
+    TraversalElapsed += DeltaTime;
+    const float Alpha = LedgeTraversalAlpha(TraversalElapsed, TraversalDuration);
+    const FVector Desired = LedgeTraversalLocation(TraversalStart, TraversalTarget, Alpha);
+    FHitResult Hit;
+    SafeMoveUpdatedComponent(Desired - UpdatedComponent->GetComponentLocation(),
+        UpdatedComponent->GetComponentQuat(), true, Hit);
+    if (Hit.bBlockingHit)
+    {
+        FinishLedgeTraversal(false);
+    }
+    else if (Alpha >= 1.0f)
+    {
+        FinishLedgeTraversal(true);
+    }
+}
+
+FNetworkPredictionData_Client* UBreakerCharacterMovementComponent::GetPredictionData_Client() const
+{
+    if (!ClientPredictionData)
+    {
+        UBreakerCharacterMovementComponent* MutableThis = const_cast<UBreakerCharacterMovementComponent*>(this);
+        MutableThis->ClientPredictionData = new FBreakerNetworkPredictionData_Client_Character(*this);
+    }
+    return ClientPredictionData;
+}
+
+void UBreakerCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
+{
+    Super::UpdateFromCompressedFlags(Flags);
+    // Server and replay only — the autonomous client consumed its own copy
+    // directly, and this path is what makes the two consume the SAME move.
+    bWantsLedgeTraversal = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+}
+
+void FBreakerSavedMove_Character::Clear()
+{
+    Super::Clear();
+    bSavedWantsLedgeTraversal = false;
+    SavedTraversalStart = FVector::ZeroVector;
+    SavedTraversalTarget = FVector::ZeroVector;
+    SavedTraversalExitVelocity = FVector::ZeroVector;
+    SavedTraversalElapsed = 0.0f;
+    SavedTraversalDuration = 0.2f;
+    SavedTraversalVerb = EBreakerLedgeVerb::None;
+}
+
+uint8 FBreakerSavedMove_Character::GetCompressedFlags() const
+{
+    uint8 Flags = Super::GetCompressedFlags();
+    if (bSavedWantsLedgeTraversal)
+    {
+        Flags |= FLAG_Custom_0;
+    }
+    return Flags;
+}
+
+bool FBreakerSavedMove_Character::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
+{
+    const FBreakerSavedMove_Character* Other = static_cast<const FBreakerSavedMove_Character*>(NewMove.Get());
+    // A one-shot request must reach the server as its own move, and a move
+    // that starts mid-glide carries traversal state a combined move would
+    // silently drop.
+    if (bSavedWantsLedgeTraversal != Other->bSavedWantsLedgeTraversal)
+    {
+        return false;
+    }
+    if (SavedTraversalVerb != EBreakerLedgeVerb::None || Other->SavedTraversalVerb != EBreakerLedgeVerb::None)
+    {
+        return false;
+    }
+    return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
+}
+
+void FBreakerSavedMove_Character::SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData)
+{
+    Super::SetMoveFor(C, InDeltaTime, NewAccel, ClientData);
+    if (const UBreakerCharacterMovementComponent* Movement = C ? Cast<UBreakerCharacterMovementComponent>(C->GetCharacterMovement()) : nullptr)
+    {
+        bSavedWantsLedgeTraversal = Movement->bWantsLedgeTraversal;
+        SavedTraversalStart = Movement->TraversalStart;
+        SavedTraversalTarget = Movement->TraversalTarget;
+        SavedTraversalExitVelocity = Movement->TraversalExitVelocity;
+        SavedTraversalElapsed = Movement->TraversalElapsed;
+        SavedTraversalDuration = Movement->TraversalDuration;
+        SavedTraversalVerb = Movement->TraversalVerb;
+    }
+}
+
+void FBreakerSavedMove_Character::PrepMoveFor(ACharacter* C)
+{
+    Super::PrepMoveFor(C);
+    if (UBreakerCharacterMovementComponent* Movement = C ? Cast<UBreakerCharacterMovementComponent>(C->GetCharacterMovement()) : nullptr)
+    {
+        Movement->TraversalStart = SavedTraversalStart;
+        Movement->TraversalTarget = SavedTraversalTarget;
+        Movement->TraversalExitVelocity = SavedTraversalExitVelocity;
+        Movement->TraversalElapsed = SavedTraversalElapsed;
+        Movement->TraversalDuration = SavedTraversalDuration;
+        Movement->TraversalVerb = SavedTraversalVerb;
+    }
+}
+
 bool UBreakerCharacterMovementComponent::IsMantleableWallNormal(float ImpactNormalZ)
 {
     // Near-vertical: the same 0.25-adjacent band FindRunnableWall uses, a

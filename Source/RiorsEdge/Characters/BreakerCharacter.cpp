@@ -262,28 +262,15 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
         ResetPlaytest();
         return;
     }
-    if (!bMantling) return;
+    // The traversal execution that ran here (the smoothstep SetActorLocation
+    // in MOVE_Flying) moved into the movement component's custom mode, where
+    // it runs inside the movement pipeline's own prediction pass.
+}
 
-    MantleElapsed += DeltaSeconds;
-    const float Alpha = FMath::Clamp(MantleElapsed / FMath::Max(ActiveTraversalDuration, 0.05f), 0.0f, 1.0f);
-    const float SmoothedAlpha = Alpha * Alpha * (3.0f - 2.0f * Alpha);
-    FHitResult MoveHit;
-    SetActorLocation(FMath::Lerp(MantleStart, MantleTarget, SmoothedAlpha), true, &MoveHit, ETeleportType::None);
-    if (MoveHit.bBlockingHit || Alpha >= 1.0f)
-    {
-        bMantling = false;
-        if (UBreakerCharacterMovementComponent* Movement = GetBreakerMovement())
-        {
-            Movement->SetMovementMode(MOVE_Falling);
-            Movement->Velocity = MoveHit.bBlockingHit ? FVector::ZeroVector : MantleExitVelocity;
-            // Only a COMPLETED traversal records (Part One-T): a blocked
-            // abort granted nothing a RecentlyMantled window should pay for.
-            if (!MoveHit.bBlockingHit)
-            {
-                Movement->NotifyLedgeTraversalCompleted();
-            }
-        }
-    }
+bool ABreakerCharacter::IsMantling() const
+{
+    const UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
+    return Movement && Movement->IsTraversingLedge();
 }
 
 void ABreakerCharacter::BeginPlay()
@@ -813,30 +800,15 @@ void ABreakerCharacter::HandleJumpInput()
 
 bool ABreakerCharacter::TryMantle()
 {
-    // The rules and the traces moved into Movement/ (Part One-R): the
-    // component resolves WHETHER and WHERE, and which verb the ledge height
-    // buys — vault through the low window, mantle through the high one. The
-    // pawn keeps only the execution: the smoothstep move at the resolved
-    // verb's own duration. Vault's shorter clock is the whole difference the
-    // player feels — a low ledge does not break stride.
-    if (bMantling || !GetWorld()) return false;
+    // The rules moved into Movement/ at Part One-R and the EXECUTION followed
+    // them there (the custom prediction mode): the component resolves whether
+    // and where, requests the glide through the saved-move stream, and runs
+    // the smoothstep at the resolved verb's own clock inside PhysCustom. The
+    // pawn's whole contribution is one input-chain question: did the jump key
+    // buy a traversal this press?
+    if (!GetWorld()) return false;
     UBreakerCharacterMovementComponent* Movement = GetBreakerMovement();
-    if (!Movement) return false;
-
-    FBreakerLedgeTraversal Traversal;
-    if (!Movement->ResolveLedgeTraversal(Traversal)) return false;
-
-    MantleTarget = Traversal.TargetLocation;
-    MantleExitVelocity = Movement->Velocity;
-    MantleExitVelocity.Z = 0.0f;
-    MantleStart = GetActorLocation();
-    MantleElapsed = 0.0f;
-    ActiveTraversalDuration = Traversal.Verb == EBreakerLedgeVerb::Vault
-        ? Movement->VaultDurationSeconds : Movement->MantleDurationSeconds;
-    bMantling = true;
-    Movement->StopMovementImmediately();
-    Movement->SetMovementMode(MOVE_Flying);
-    return true;
+    return Movement && Movement->TryBeginLedgeTraversal();
 }
 
 bool ABreakerCharacter::TryDash()

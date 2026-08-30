@@ -20,15 +20,3 @@ airborne generation credit (bAirborne false during MOVE_Flying refills the
 fix shape (traversal does not reset credits) is proposed and held for the
 report to be read.
 
-## When does the traversal move into a predicted movement mode?
-
-The execution is pawn-side SetActorLocation in MOVE_Flying — zero impact on
-the listen-server host (every playtest to date), and a hard rubber-band
-failure for any remote client, graded in the report as "not a bug in the
-slice; a wall the slice hits when a second player connects." A custom
-movement mode + saved-move pass costs an estimated 250-300 lines, needs no
-content or ruling, and also fixes three sibling defects at their shared root
-(the viewmodel's dead pose during traversal, the Momentum credit reset, the
-absent HUD/telemetry read — all predicates written against a mode that did
-not exist). **Question:** schedule it, or hold until multiplayer is nearer —
-the recon's numbers are in the report either way.
