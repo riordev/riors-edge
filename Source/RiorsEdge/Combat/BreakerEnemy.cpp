@@ -284,6 +284,20 @@ void ABreakerEnemy::ApplyBodyMesh()
     {
         if (Part) Part->SetVisibility(false);
     }
+    // THE WEAK POINT RIDES THE NAMED HEAD. Authored at the primitive
+    // humanoid's head height, it floated beside every mech like a balloon —
+    // all four mechs ship a Head bone (read from the FBX, not guessed), so
+    // the collision sphere and its visual snap onto it and track the gait.
+    // Deliberately a GAMEPLAY change (the shot lands where the eye aims,
+    // which is the point of a weak spot); a body without the bone keeps the
+    // authored position, and the primitive fallback never reaches this.
+    static const FName BreakerHeadBoneName(TEXT("Head"));
+    if (WeakPoint && NamedBody->GetBoneIndex(BreakerHeadBoneName) != INDEX_NONE)
+    {
+        WeakPoint->AttachToComponent(NamedBody,
+            FAttachmentTransformRules::SnapToTargetNotIncludingScale, BreakerHeadBoneName);
+        WeakPoint->SetRelativeLocation(FVector::ZeroVector);
+    }
 }
 
 void ABreakerEnemy::ApplyChassis()
