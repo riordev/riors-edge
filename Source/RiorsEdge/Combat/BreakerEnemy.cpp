@@ -119,6 +119,58 @@ static FAutoConsoleCommandWithWorldAndArgs BreakerBodyPaintProbeCommand(
         UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.BodyPaint %s on %d enemies (armed for later spawns)."), *Args[0], Driven);
     }));
 
+// Dev photography for the MODIFIER layer's tells: the gym's carriers draw
+// their modifiers from the seeded roll, so a specific tell cannot be
+// summoned for the camera — ten modifiers, random draws, and the one you
+// need never on screen. This drives the EXISTING exact-grant seam
+// (ConfigureWithExactModifiers, the door the through-actor test already
+// uses) on every live enemy, and ARMS for later spawns exactly like
+// Breaker.BodyPaint. Instrument only; the shipped draw stays the roll.
+//   Breaker.EnemyModifier <Name> | clear     (Volatile, Fleetfoot, Wakeful...)
+static FString BreakerEnemyModifierProbeName;
+
+static bool BreakerEnemyResolveModifierProbe(const FString& Name, EBreakerEnemyModifier& Out)
+{
+    const UEnum* Enum = StaticEnum<EBreakerEnemyModifier>();
+    if (!Enum) return false;
+    const int64 Value = Enum->GetValueByNameString(Name);
+    if (Value <= static_cast<int64>(EBreakerEnemyModifier::None)
+        || Value >= static_cast<int64>(EBreakerEnemyModifier::Count))
+    {
+        return false;
+    }
+    Out = static_cast<EBreakerEnemyModifier>(Value);
+    return true;
+}
+
+static FAutoConsoleCommandWithWorldAndArgs BreakerEnemyModifierProbeCommand(
+    TEXT("Breaker.EnemyModifier"),
+    TEXT("Grant one exact modifier to every live enemy and arm it for later spawns: <ModifierName> | clear."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+    {
+        if (!World || Args.Num() < 1) return;
+        if (Args[0].Equals(TEXT("clear"), ESearchCase::IgnoreCase))
+        {
+            BreakerEnemyModifierProbeName.Empty();
+            UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyModifier disarmed (live grants keep what they have)."));
+            return;
+        }
+        EBreakerEnemyModifier Modifier;
+        if (!BreakerEnemyResolveModifierProbe(Args[0], Modifier))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[BreakerEnemy] Breaker.EnemyModifier: '%s' names no modifier — nothing armed."), *Args[0]);
+            return;
+        }
+        BreakerEnemyModifierProbeName = Args[0];
+        int32 Driven = 0;
+        for (TActorIterator<ABreakerEnemy> It(World); It; ++It)
+        {
+            if (It->IsDeadEnemy()) continue;
+            if (It->ConfigureWithExactModifiers({ Modifier })) ++Driven;
+        }
+        UE_LOG(LogTemp, Display, TEXT("[BreakerEnemy] Breaker.EnemyModifier %s on %d enemies (armed for later spawns)."), *Args[0], Driven);
+    }));
+
 void ABreakerEnemy::DevDriveBodyPaintProbe(const FString& Mode)
 {
     if (!HitReaction) return;
@@ -320,6 +372,21 @@ void ABreakerEnemy::BeginPlay()
     if (!BreakerEnemyBodyPaintProbeMode.IsEmpty())
     {
         DevDriveBodyPaintProbe(BreakerEnemyBodyPaintProbeMode);
+    }
+    // The armed modifier probe reaches later spawns the same way the paint
+    // probe does — -ExecCmds runs before the gym spawns anybody, so the
+    // command's live sweep sees zero and THIS is where the arm actually
+    // lands. End of BeginPlay deliberately: the ability system is
+    // initialised above, which Warded's shield write requires. The game
+    // mode's own carrier/elite configuration runs later and may overwrite
+    // an instrumented grant — acceptable for a camera instrument.
+    if (!BreakerEnemyModifierProbeName.IsEmpty())
+    {
+        EBreakerEnemyModifier ProbeModifier;
+        if (BreakerEnemyResolveModifierProbe(BreakerEnemyModifierProbeName, ProbeModifier))
+        {
+            ConfigureWithExactModifiers({ ProbeModifier });
+        }
     }
 }
 
@@ -1214,6 +1281,11 @@ void ABreakerEnemy::EnterWakefulDowned()
     if (BodyHitBox) BodyHitBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     if (WeakPoint) WeakPoint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SetBodyVisible(false);
+    // The down's whole tell is ABSENCE, and SetBodyVisible only speaks
+    // primitive: a downed Wakeful mech kept standing in its idle loop,
+    // which reads as a bug rather than a down. The named body vanishes
+    // with the primitives; the rise below re-applies it, gait re-played.
+    if (NamedBody) NamedBody->SetVisibility(false);
 
     const float Delay = ModifierComponent ? ModifierComponent->GetWakefulReviveDelay() : 4.0f;
     FTimerHandle ReviveTimer;
@@ -1228,6 +1300,10 @@ void ABreakerEnemy::FinishWakefulRevive()
     if (BodyHitBox) BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     if (WeakPoint) WeakPoint->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     SetBodyVisible(true);
+    // The named body's half of the rise (see EnterWakefulDowned): visible
+    // again with the gait re-played and the fit restored. Idempotent for
+    // primitive bodies, the same one door every revive path takes.
+    ApplyBodyMesh();
     if (Combat) Combat->RestoreVitals();
     if (Attributes) Attributes->SetHealth(Attributes->GetMaxHealth() * Fraction);
     // The ward does NOT come back with it: a Wakeful Warded enemy would be two
