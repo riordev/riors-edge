@@ -918,4 +918,68 @@ bool FBreakerDeadLineRepairTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// WALL-RIDE'S LINE RETIRES ONTO THE SAFE PATH — O144's affix half, in O180's
+// ruled order: the repair above landed first, then the deletion, so a save
+// rolled before the retirement loads, refunds, and audits clean instead of
+// carrying a line that pays nothing forever.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWallRideLineRetiresTest,
+    "RiorsEdge.Items.WallRideLineRetires",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWallRideLineRetiresTest::RunTest(const FString& Parameters)
+{
+    UBreakerAccountSave* Account = NewObject<UBreakerAccountSave>();
+    Account->bNeverPersist = true;
+    UBreakerAccountSave::InjectForTesting(Account);
+
+    // The pool no longer offers the line, through the same resolver every
+    // consumer uses — this is the deletion, asserted where it bites.
+    TestNull(TEXT("Offense.WallRideDamage no longer resolves anywhere"),
+        UBreakerAffixLibrary::FindAffix(UBreakerAffixLibrary::GetSliceAffixPool(), TEXT("Offense.WallRideDamage")));
+
+    // A pre-retirement save: the line as the old pool rolled it (Prefix,
+    // {Boots, Waist, Gloves, BodyArmour}, condition WallRiding), beside a line
+    // that still resolves.
+    FBreakerItemInstance Item;
+    Item.ItemId = FGuid::NewGuid();
+    Item.DefinitionId = TEXT("PreRetirementBoots");
+    Item.Slot = EBreakerEquipSlot::Boots;
+    Item.Rarity = EBreakerItemRarity::Uncommon;
+    Item.ItemLevel = 30;
+    FBreakerRolledAffix WallRide;
+    WallRide.AffixId = TEXT("Offense.WallRideDamage");
+    WallRide.Tier = 6;
+    WallRide.Value = 20.0f;
+    WallRide.Category = EBreakerAffixCategory::Prefix;
+    Item.Affixes.Add(WallRide);
+    FBreakerRolledAffix Armour;
+    Armour.AffixId = TEXT("Core.Armour");
+    Armour.Tier = 6;
+    Armour.Value = 20.0f;
+    Armour.Category = EBreakerAffixCategory::Suffix;
+    Item.Affixes.Add(Armour);
+
+    const int32 ExpectedCredit = FMath::Max(1, UBreakerForgeLibrary::SalvageValue(Item).Get() / Item.Affixes.Num());
+
+    AActor* Owner = NewObject<AActor>();
+    UBreakerEquipmentComponent* Equipment = NewObject<UBreakerEquipmentComponent>(Owner);
+    Equipment->RestoreState({}, {Item});
+    FBreakerForgeWallet SavedWallet;
+    SavedWallet.Add(40);
+    Equipment->RestoreForgeWallet(SavedWallet);
+
+    if (!TestEqual(TEXT("the boots survive the load"), Equipment->GetBackpack().Num(), 1)) return false;
+    TestEqual(TEXT("the wall-ride line dropped"), Equipment->GetBackpack()[0].Affixes.Num(), 1);
+    TestEqual(TEXT("the armour line survived"),
+        Equipment->GetBackpack()[0].Affixes[0].AffixId, FName(TEXT("Core.Armour")));
+    TestEqual(TEXT("the retired line refunded at the fallback cost"),
+        Equipment->GetForgeWallet().Get(), 40 + ExpectedCredit);
+
+    UBreakerAccountSave::ResetCacheForTesting();
+    return true;
+}
+
 #endif

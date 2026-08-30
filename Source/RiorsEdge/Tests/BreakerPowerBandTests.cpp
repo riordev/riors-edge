@@ -1490,7 +1490,12 @@ bool FBreakerAffixBreadthTest::RunTest(const FString& Parameters)
 
     TestTrue(TEXT("The pool is materially wider than the twelve-line slice"), Pool.Num() >= 18);
     TestTrue(TEXT("Offence is a family, not a single line"), OffensiveCount >= 8);
-    TestTrue(TEXT("Conditional damage exists at all"), ConditionalCount >= 5);
+    // FLOOR MOVED 5 -> 4 DELIBERATELY (2026-08-30): Offense.WallRideDamage
+    // retired with its verb (O144's affix half), so the conditional family is
+    // Airborne / Sliding / Redline / RecentlyDashed. Not a widening — the
+    // line it counted was permanently never-true and is deleted, and every
+    // slot still keeps a conditional of its own (asserted below).
+    TestTrue(TEXT("Conditional damage exists at all"), ConditionalCount >= 4);
 
     for (int32 SlotIndex = 0; SlotIndex < static_cast<int32>(EBreakerEquipSlot::Count); ++SlotIndex)
     {

@@ -295,8 +295,16 @@ namespace
             {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Necklace, EBreakerEquipSlot::Primary}, 5.0f, 48.0f, 45.0f, EBreakerBuildCondition::Airborne));   // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.SlidingDamage"), TEXT("Damage while Sliding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::SlidingDamage, EBreakerStatBucket::IncreasedPercent,
             {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Secondary}, 5.0f, 48.0f, 45.0f, EBreakerBuildCondition::Sliding));  // O2 PLACEHOLDER
-        Pool.Add(MakeAffix(TEXT("Offense.WallRideDamage"), TEXT("Damage while Wall Riding"), EBreakerAffixCategory::Prefix, EBreakerStatTarget::WallRideDamage, EBreakerStatBucket::IncreasedPercent,
-            {EBreakerEquipSlot::Boots, EBreakerEquipSlot::Waist, EBreakerEquipSlot::Gloves, EBreakerEquipSlot::BodyArmour}, 6.0f, 57.0f, 40.0f, EBreakerBuildCondition::WallRiding));  // O2 PLACEHOLDER
+        // WALL-RIDE'S LINE RETIRED WITH ITS VERB (Part One-R / O144; the affix
+        // half ruled 2026-08-30). Offense.WallRideDamage lived here — {Boots,
+        // Waist, Gloves, BodyArmour}, 6->57, weight 40, condition WallRiding —
+        // and became a suffix-slot tax when the verb left Movement/: the
+        // condition is permanently never-true, so the line paid nothing except
+        // through UNBOUND's condition rewrite. A rolled copy on an old save
+        // now drops and refunds at load (RestoreState's dead-line repair, the
+        // O180 item half — which is what made this deletion safe to take).
+        // The WallRideDamage STAT TARGET and the WallRiding enumerator stay,
+        // append-only forever; nothing may re-author against either.
         Pool.Add(MakeAffix(TEXT("Offense.RedlineDamage"), TEXT("Damage at Redline"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RedlineDamage, EBreakerStatBucket::IncreasedPercent,
             {EBreakerEquipSlot::Necklace, EBreakerEquipSlot::BodyArmour, EBreakerEquipSlot::Helmet, EBreakerEquipSlot::Primary}, 4.5f, 44.0f, 45.0f, EBreakerBuildCondition::Redline));  // O2 PLACEHOLDER
         Pool.Add(MakeAffix(TEXT("Offense.DashDamage"), TEXT("Damage after Dashing"), EBreakerAffixCategory::Suffix, EBreakerStatTarget::RecentlyDashedDamage, EBreakerStatBucket::IncreasedPercent,
