@@ -270,6 +270,37 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
         break;
     }
 
+    // The named guns: the intake pack's meshes over the proxies, per archetype.
+    // Shotgun and Rocket author NO path on purpose — no vendored pack ships a
+    // candidate for either, so they keep the primitive read rather than wear a
+    // lie. Paths are the import script's contract
+    // (Content/Python/breaker_import_characters.py -> weapons/gun-pack); the
+    // NamedGunsResolve test loads every one, so a renamed asset fails the
+    // suite instead of silently restoring the primitives. All O2.
+    {
+        const TCHAR* NamedGun = nullptr;
+        switch (Archetype)
+        {
+        case EBreakerWeaponArchetype::Rifle:      NamedGun = TEXT("AR_1");     break;
+        case EBreakerWeaponArchetype::BurstRifle: NamedGun = TEXT("AR_4");     break;
+        case EBreakerWeaponArchetype::Machinegun: NamedGun = TEXT("AR_6");     break;
+        case EBreakerWeaponArchetype::SMG:        NamedGun = TEXT("SMG_1");    break;
+        case EBreakerWeaponArchetype::Sniper:     NamedGun = TEXT("Sniper_1"); break;
+        case EBreakerWeaponArchetype::Sidearm:    NamedGun = TEXT("Pistol_1"); break;
+        default: break;
+        }
+        if (NamedGun)
+        {
+            L.NamedMeshPath = FSoftObjectPath(FString::Printf(
+                TEXT("/Game/Breaker/Meshes/weapons/gun-pack/%s.%s"), NamedGun, NamedGun));
+            // The pack imports facing -X (muzzle at the camera): photographed
+            // once as every gun aiming 90° left under a +90 guess, which
+            // back-solves the source to -X. One yaw carries the pack onto
+            // rig +X forward.
+            L.NamedMeshRotation = FRotator(0.0f, 180.0f, 0.0f);
+        }
+    }
+
     return L;
 }
 

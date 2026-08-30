@@ -156,6 +156,11 @@ protected:
     // remainder, so a swap costs no allocation. Same discipline as the pooled
     // tracer renderer.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TArray<TObjectPtr<UStaticMeshComponent>> ViewmodelParts;
+    // The intake gun, when the layout names one: replaces the proxy PARTS
+    // whole and rides the same recoil-driven rig transform. Hidden whenever
+    // the layout's NamedMeshPath is unset or fails to load — the primitives
+    // are the fallback, ABreakerNPC's floor-still-works shape.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UStaticMeshComponent> NamedWeaponVisual;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon") TObjectPtr<UPointLightComponent> PrototypeMuzzleFlash;
     // Forearms and gloves. These hang off the RIG, not off the camera: the
     // hands hold the gun, so they must ride the recoil spring with it. Before

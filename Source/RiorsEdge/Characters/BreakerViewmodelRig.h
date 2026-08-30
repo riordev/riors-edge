@@ -148,6 +148,21 @@ struct RIORSEDGE_API FBreakerViewmodelLayout
     // to pin the ORDERING of the silhouettes (sidearm < SMG < ... < sniper)
     // without pinning the values, which are frozen under O2.
     float OverallLengthCm() const;
+
+    // --- THE NAMED GUN (asset-intake wiring) ------------------------------
+    // When this resolves to a static mesh it replaces the proxy PARTS whole:
+    // the intake gun scales so its longest bound equals OverallLengthCm() —
+    // the same figure the silhouette-ordering law reads, so a named sidearm
+    // stays shorter than a named sniper by construction — and its bounds
+    // centre lands halfway to the muzzle. Arms, muzzle flash and the recoil
+    // rig are untouched: the named gun rides the same driven transform. Unset
+    // (Shotgun and Rocket — no pack ships a candidate) the primitives stand,
+    // and a clean clone without Content still plays. All O2.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FSoftObjectPath NamedMeshPath;
+    // Source-axis correction onto rig X-forward, per pack convention.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Viewmodel")
+    FRotator NamedMeshRotation = FRotator::ZeroRotator;
 };
 
 namespace BreakerViewmodel
@@ -180,6 +195,26 @@ namespace BreakerViewmodel
 
     // The default table. O2 PLACEHOLDER throughout.
     RIORSEDGE_API FBreakerViewmodelLayout ArchetypeLayout(EBreakerWeaponArchetype Archetype);
+
+    // The named gun's fit, pure so it is provable without a component: scale
+    // the mesh's longest bound to the layout's overall length (silhouette
+    // ordering survives by construction), cancel the bounds origin at that
+    // scale, and land the bounds centre at CentreAtCm in rig space. Degenerate
+    // bounds refuse the fit at identity, the same rule as the enemy body.
+    inline void FitNamedWeapon(const FVector& BoundsOrigin, const FVector& BoundsExtent,
+        const float TargetLengthCm, const FVector& CentreAtCm,
+        float& OutScale, FVector& OutLocationCm)
+    {
+        OutScale = 1.0f;
+        OutLocationCm = FVector::ZeroVector;
+        const float LongestHalf = static_cast<float>(BoundsExtent.GetMax());
+        if (LongestHalf <= UE_KINDA_SMALL_NUMBER || TargetLengthCm <= UE_KINDA_SMALL_NUMBER)
+        {
+            return;
+        }
+        OutScale = (TargetLengthCm * 0.5f) / LongestHalf;
+        OutLocationCm = CentreAtCm - BoundsOrigin * OutScale;
+    }
 
     // Component scale and total rotation for a part, folding in the intrinsic
     // axis rotation of cylinders and cones. Pure; the character only applies it.

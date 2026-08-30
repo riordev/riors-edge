@@ -75,6 +75,16 @@ for category in ("Big", "Blob", "Flying"):
              ((".fbx"), ("",)), "/Game/Breaker/Meshes/enemies/monsters/" + category.lower(),
              per_source_folder=True)
 
+# Weapons: unrigged statics, so shared destination folders are safe. The
+# viewmodel's named-weapon seam reads gun-pack; the other two packs import
+# beside it so the whole intake is available to point at.
+add_glob(os.path.join("weapons", "sci-fi-modular-gun-pack"),
+         ((".fbx"), ("",)), "/Game/Breaker/Meshes/weapons/gun-pack")
+add_glob(os.path.join("weapons", "sci-fi-essentials"),
+         ((".fbx"), ("Gun_",)), "/Game/Breaker/Meshes/weapons/sci-fi")
+add_glob(os.path.join("weapons", "kenney-blaster-kit", "FBX"),
+         ((".fbx"), ("",)), "/Game/Breaker/Meshes/weapons/blaster")
+
 tasks = []
 for path, dest in IMPORTS:
     task = unreal.AssetImportTask()

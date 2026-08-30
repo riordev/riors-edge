@@ -141,6 +141,10 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
         ViewmodelParts.Add(MakeProxyPart(*FString::Printf(TEXT("ViewmodelPart_%02d"), Index)));
     }
 
+    // The named gun rides the same rig transform as the proxy pool; its mesh,
+    // fit and visibility are assigned in RebuildViewmodelParts with the rest.
+    NamedWeaponVisual = MakeProxyPart(TEXT("NamedWeaponVisual"));
+
     PrototypeMuzzleFlash = CreateDefaultSubobject<UPointLightComponent>(TEXT("PrototypeMuzzleFlash"));
     // Hung off the RIG rather than the camera: a flash nailed to the screen
     // does not move when the gun kicks, which is half the reason the recoil was
@@ -1056,7 +1060,14 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
     if (!Weapon) return;
 
     UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] cycling weapon archetypes every %.1fs."), Interval);
-    GetWorldTimerManager().SetTimer(ViewmodelCycleTimer, [this]()
+    // WEAK LAMBDAS, both timers. The autoplay TRAVELS now (Part One-E), and
+    // this instrument arms on the front-end pawn too; a raw [this] fired on
+    // that pawn after its destruction — first as a TActorIterator assert on
+    // the dead pawn's null world, then, guarded past that, as an access
+    // violation inside StartFire on a stale component. A weak binding makes a
+    // dead pawn's tick a no-op; the re-armed instrument on the destination
+    // pawn does the real photographing.
+    GetWorldTimerManager().SetTimer(ViewmodelCycleTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
     {
         if (!Weapon) return;
         const int32 Count = static_cast<int32>(EBreakerWeaponArchetype::Count);
@@ -1071,7 +1082,7 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
         Weapon->SetAiming(bAimed);
         UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] archetype -> %s (%s)"),
             *BreakerWeaponArchetypeNames::Display(Next), bAimed ? TEXT("ADS") : TEXT("hip"));
-    }, Interval, true, FMath::Max(0.5f, Interval * 0.5f));
+    }), Interval, true, FMath::Max(0.5f, Interval * 0.5f));
 
     // The capture pawn is classless with no nodes, so every projectile
     // channel is zero and the pierce/chain/ricochet legs — the thing the
@@ -1085,7 +1096,7 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
     // spring visibly moves the gun, and that the muzzle flash lands at the
     // muzzle. Semi-automatic archetypes need the release, hence a pulse rather
     // than a held trigger.
-    GetWorldTimerManager().SetTimer(ViewmodelFireTimer, [this]()
+    GetWorldTimerManager().SetTimer(ViewmodelFireTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
     {
         if (!Weapon) return;
         // Dev-capture aim assist. The harness photographs a stationary pawn,
@@ -1109,7 +1120,15 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
             float BestTrashSq = FMath::Square(200000.0f);
             float BestVisibleSq = FMath::Square(200000.0f);
             float BestAnySq = FMath::Square(200000.0f);
-            for (TActorIterator<ABreakerEnemy> It(GetWorld()); It; ++It)
+            // The autoplay TRAVELS now (Part One-E), so this timer can fire on
+            // the front-end pawn while its world is being torn down —
+            // TActorIterator asserts outright on a null world rather than
+            // iterating nothing. Photographed as a crash at the first named-gun
+            // capture; the re-armed instrument on the destination pawn does the
+            // real work.
+            UWorld* CaptureWorld = GetWorld();
+            if (!CaptureWorld) return;
+            for (TActorIterator<ABreakerEnemy> It(CaptureWorld); It; ++It)
             {
                 if (!*It || It->IsDeadEnemy()) continue;
                 const FVector Chest = It->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
@@ -1158,8 +1177,9 @@ void ABreakerCharacter::StartViewmodelCaptureCycle()
         }
         Weapon->StartFire();
         FTimerHandle Release;
-        GetWorldTimerManager().SetTimer(Release, [this]() { if (Weapon) Weapon->StopFire(); }, 0.12f, false);
-    }, 0.3f, true, 1.0f);
+        GetWorldTimerManager().SetTimer(Release,
+            FTimerDelegate::CreateWeakLambda(this, [this]() { if (Weapon) Weapon->StopFire(); }), 0.12f, false);
+    }), 0.3f, true, 1.0f);
 }
 
 FBreakerViewmodelLayout ABreakerCharacter::ResolveViewmodelLayout(EBreakerWeaponArchetype Archetype) const
@@ -1197,6 +1217,45 @@ void ABreakerCharacter::RebuildViewmodelParts()
     UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
 
     PrototypeWeaponVisual->SetRelativeScale3D(FVector(ViewmodelScale));
+
+    // THE NAMED GUN FIRST: when the layout's intake mesh resolves, it IS the
+    // weapon — every pool part hides and the assembly loop below is skipped.
+    // The imported mesh keeps its own materials (the intake guns carry their
+    // pack's look; the blockout tint is the primitives' language). On any
+    // failure the primitives assemble exactly as before.
+    UStaticMesh* NamedGun = ActiveLayout.NamedMeshPath.IsValid()
+        ? Cast<UStaticMesh>(ActiveLayout.NamedMeshPath.TryLoad()) : nullptr;
+    if (NamedWeaponVisual)
+    {
+        NamedWeaponVisual->SetVisibility(NamedGun != nullptr);
+        if (NamedGun)
+        {
+            if (NamedWeaponVisual->GetStaticMesh() != NamedGun) NamedWeaponVisual->SetStaticMesh(NamedGun);
+            const FBoxSphereBounds GunBounds = NamedGun->GetBounds();
+            float FitScale; FVector FitLocation;
+            BreakerViewmodel::FitNamedWeapon(GunBounds.Origin, GunBounds.BoxExtent,
+                ActiveLayout.OverallLengthCm(),
+                FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, 0.0f),
+                FitScale, FitLocation);
+            NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
+            NamedWeaponVisual->SetRelativeLocation(FitLocation);
+            NamedWeaponVisual->SetRelativeRotation(ActiveLayout.NamedMeshRotation);
+        }
+    }
+    if (NamedGun)
+    {
+        for (UStaticMeshComponent* Component : ViewmodelParts)
+        {
+            if (Component) Component->SetVisibility(false);
+        }
+        if (PrototypeMuzzleFlash)
+        {
+            PrototypeMuzzleFlash->SetRelativeLocation(ActiveLayout.MuzzleCm);
+        }
+        PoseArm(LeftArmVisual, LeftGloveVisual, SupportShoulderAnchorCm, ActiveLayout.SupportHandCm);
+        PoseArm(RightArmVisual, RightGloveVisual, FiringShoulderAnchorCm, ActiveLayout.FiringHandCm);
+        return;
+    }
 
     const int32 PartCount = ActiveLayout.Parts.Num();
     for (int32 Index = 0; Index < ViewmodelParts.Num(); ++Index)
