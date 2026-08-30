@@ -19,14 +19,32 @@ DEFAULT OFF — NoEnemyShipsANamedBody pins it, because rank paint and
 the tint ramp do not transfer to a named body; defaulting meshes on is
 FIELD's readability call. Breaker.EnemyBody <mesh> [idle] previews on
 live AND later-spawned enemies (photographed: gym cluster wearing the
-EyeDrone). STILL PENDING: Animated Mech / Ultimate Modular Women /
-Ultimate Space Kit not yet downloaded; audio wiring parked (the sound
-director parses PCM16 WAV only, Kenney packs are .ogg — needs a
-converter or a director extension, plus the fifth-verb ruling); zone-kit
-composition parked (composer needs system python + trimesh, quarantined
-on seat 2). Suite reading on seat 2 runs through the PowerShell port of
-status.py's two reconciliations (scratchpad only, not committed);
-Docs/STATE.md regenerates on the owner's box.
+EyeDrone). SINCE THAT BLOCK, SAME SESSION: the Animated Mech Pack was in
+Downloads all along wearing human names (George/Leela/Mike/Stan are
+MECHS — the misidentification story is in the pack's LICENSE-NOTE) and
+is vendored + imported; Space Kit is CUT (Lattice is composed
+primitives by ruling, recorded in Assets/enemies/LICENSE-NOTE.txt);
+Kess = Superhero_Female_FullBody. THE MECH CAST IS THE SHIPPED LOOK
+(owner ruling, be3b853): base melee/Skitter wears Stan, Skirmisher
+Leela, Warden/boss George, Altered Mike, Lattice primitives —
+MechCastResolvesAndLatticeStaysPrimitive pins it; rank paint and
+hit-tint still speak the hidden primitives' language and the skeletal
+crowd re-opens FIELD's density figures, both recorded at the default.
+SIX WEAPON ARCHETYPES wear gun-pack meshes through the viewmodel's
+NamedMeshPath seam (silhouette ordering survives via the pure fit;
+Shotgun/Rocket primitives, no candidate; EveryAuthoredGunResolves
+pins the mappings). The modifier halo is a ground DISC now — the old
+opaque sphere hid its owner whole. Fixed in passing: both
+-BreakerCycleWeapons timers fired on the travel-destroyed front-end
+pawn (weak-bound now). STILL PENDING: Ultimate Modular Women not
+downloaded; gun placement/cant pass; muzzle-flash exposure retune;
+mech texture bind (their FBX embed no texture refs); FP arms wait on
+the Fab mannequin/GASP delivery; audio wiring parked (PCM16-WAV-only
+director vs .ogg packs, plus the fifth-verb ruling); zone-kit
+composition parked (system python + trimesh, quarantined). Suite
+reading on seat 2 runs through the PowerShell port of status.py's two
+reconciliations (scratchpad only, not committed); Docs/STATE.md
+regenerates on the owner's box.
 
 KIT LANE, THE POST-VERBS FEEL RECON IS REPORTED (overnight item 4 —
 report only, nothing built until read; full findings in the session
