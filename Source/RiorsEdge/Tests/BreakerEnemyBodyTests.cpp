@@ -4,6 +4,8 @@
 #include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerRangedEnemy.h"
 #include "Materials/MaterialInterface.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "UObject/UObjectIterator.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
@@ -148,6 +150,63 @@ bool FBreakerEnemyBodyOverlayStrengthTest::RunTest(const FString& Parameters)
     State.HealthFraction = 0.0f;
     const float Drained = ResolveOverlayStrength(State);
     TestTrue(TEXT("drained wash is visible but never occludes"), Drained > 0.3f && Drained < 1.0f);
+    return true;
+}
+
+// A REVIVE RETURNS THE NAMED BODY TO THE FIT'S OWN TRANSFORM — all three
+// channels. The owner photographed live mechs frozen sideways: the death
+// one-shot's final frame, held forever, because the standing respawn path
+// never re-played the gait (the pool's revive did — one door of three).
+// Every revive routes through ApplyBodyMesh now, and ApplyBodyMesh resets
+// rotation alongside scale and location so no future writer of the third
+// channel can leak through a revive either (today none exists — every
+// mech sequence ships enable_root_motion=False, measured). NewObject, no
+// world, the BreakerGameModeTests idiom — ReviveFromPool's transform half
+// runs fine unregistered, and the unregistered part list paints nothing.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEnemyBodyReviveResetTest,
+    "RiorsEdge.Combat.EnemyBody.ReviveResetsNamedBodyTransform",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEnemyBodyReviveResetTest::RunTest(const FString& Parameters)
+{
+    // Gated exactly as the mech-cast pin is: a clean clone without the
+    // imported packs fights as primitives and has no transform to pin.
+    const FString MechDir = FPaths::ProjectContentDir() / TEXT("Breaker/Meshes/enemies/mechs");
+    if (!IFileManager::Get().DirectoryExists(*MechDir))
+    {
+        return true;
+    }
+
+    ABreakerEnemy* Enemy = NewObject<ABreakerEnemy>();
+    if (!Enemy)
+    {
+        AddError(TEXT("Could not construct an enemy to revive."));
+        return false;
+    }
+    Enemy->ApplyBodyMesh();
+    USkeletalMeshComponent* Body = Enemy->GetNamedBody();
+    TestNotNull(TEXT("The enemy carries a named body component"), Body);
+    if (!Body) return false;
+    TestNotNull(TEXT("The shipped mesh resolved onto it"), Body->GetSkeletalMeshAsset());
+
+    const FVector FitLocation = Body->GetRelativeLocation();
+    const FVector FitScale = Body->GetRelativeScale3D();
+
+    // What an accumulated root-motion death leaves behind: the component
+    // rotated and slid off the fit.
+    Body->SetRelativeRotation(FRotator(10.0f, 90.0f, 45.0f));
+    Body->AddRelativeLocation(FVector(120.0f, -40.0f, 15.0f));
+    Body->SetRelativeScale3D(FitScale * 1.5f);
+
+    Enemy->ReviveFromPool(FVector::ZeroVector);
+
+    TestTrue(TEXT("A revived body stands at identity rotation"),
+        Body->GetRelativeRotation().Equals(FRotator::ZeroRotator, 1.0e-4f));
+    TestTrue(TEXT("A revived body sits at the fit's own location"),
+        Body->GetRelativeLocation().Equals(FitLocation, 1.0e-3f));
+    TestTrue(TEXT("A revived body wears the fit's own scale"),
+        Body->GetRelativeScale3D().Equals(FitScale, 1.0e-4f));
     return true;
 }
 
