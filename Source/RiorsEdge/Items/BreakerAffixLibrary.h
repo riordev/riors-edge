@@ -5,6 +5,43 @@
 #include "Items/BreakerItemTypes.h"
 #include "BreakerAffixLibrary.generated.h"
 
+// One archetype's lean toward one affix line: a weight MULTIPLIER on the
+// generic roll, never a filter (see ArchetypeAffixWeightMultiplier).
+struct FBreakerAffixLean
+{
+    FName AffixId = NAME_None;
+    float Multiplier = 1.0f;
+};
+
+struct FBreakerArchetypeLeans
+{
+    EBreakerWeaponArchetype Archetype = EBreakerWeaponArchetype::Rifle;
+    TArray<FBreakerAffixLean> Rows;
+};
+
+// A ceiling on the SUMMED gear percentage for one stat target, applied in
+// UBreakerEquipmentComponent::AggregateStats before the sum reaches either
+// the display copy or the attribute push.
+struct FBreakerStatCap
+{
+    EBreakerStatTarget Target = EBreakerStatTarget::Health;
+    float Cap = 0.0f;
+};
+
+// Everything Data/affixes.json holds, as the library loaded it. The pools are
+// partitioned by the row's "pool" field; the census re-exports this struct
+// and RiorsEdge.Data.Affixes.Fresh pins the committed file to that export.
+struct FBreakerAffixLibraryData
+{
+    TArray<FBreakerAffixDefinition> Slice;
+    TArray<FBreakerAffixDefinition> Aberrant;
+    TArray<FBreakerAffixDefinition> Anomalous;
+    TArray<FBreakerAffixDefinition> Downsides;
+    FBreakerAffixDefinition Elemental;
+    TArray<FBreakerArchetypeLeans> Leans;
+    TArray<FBreakerStatCap> Caps;
+};
+
 UCLASS()
 class RIORSEDGE_API UBreakerAffixLibrary : public UBlueprintFunctionLibrary
 {
@@ -156,21 +193,29 @@ public:
     UFUNCTION(BlueprintPure, Category="Items|Affixes")
     static void AffixCountRangeForRarity(EBreakerItemRarity Rarity, int32& OutMinimum, int32& OutMaximum);
 
-    // The affix pool. Universal core six (Elemental DR still waits on a
-    // resistance model), three movement lines, both crit stats, an
-    // unconditional Increased and a flat Added damage line, and five
-    // conditional damage lines keyed to the movement pillar.
-    //
-    // Plus the non-damage breadth pass: flat Armour, Health and Resource on
-    // Kill, and Increased Damage over Time — the survivability, resource and
-    // DoT axes, each of which had a live consumer sitting unused.
-    //
-    // Twenty-two entries, ten of them offensive. It was twelve with exactly one
-    // offensive line that rolled on four of eight slots, which is the concrete
-    // reason "full level 50 gear" did not feel like anything (O27, Power-Curve
-    // §"More options in every avenue"). EVERY slot can now raise damage, and
-    // each does it with a different line — see the per-slot identity table in
-    // Docs/Item-Foundation.md.
+    // ---- The library, as data (O186) --------------------------------------
+    // Every affix row, every archetype lean and every stat cap lives in
+    // Data/affixes.json. This class LOADS it once, validates it (ids unique,
+    // tier anchors monotone in the sign of the floor, every enum name
+    // resolves, every bill resolves into the downside pool, roll weights at
+    // least 1) and serves the same four pools it always has. A file that
+    // fails validation loads as EMPTY pools behind an ensure, never as a
+    // nearest fit: a line that lies is this project's cardinal failure, and
+    // an empty pool is at least an honest one.
+    static FString DataRelativePath();
+    static const FBreakerAffixLibraryData& GetData();
+    // Every complaint the validator raised, or empty. RiorsEdge.Data.Affixes.Fresh
+    // reads this first so a broken file names its breaks instead of failing
+    // a byte comparison.
+    static const TArray<FString>& GetDataErrors();
+
+    // The affix pool the generic roll loop and the Forge iterate: the
+    // universal core lines, the movement lines, both crit stats, the three
+    // damage pools, flat Added Damage, Fire Rate, the five conditional damage
+    // lines keyed to the movement pillar, and the non-damage breadth pass
+    // (Armour, Health and Resource on Kill, Damage over Time). EVERY slot can
+    // raise damage, each with a different line — the per-slot identity table
+    // in Docs/Item-Foundation.md. Rows carrying pool "slice" in the data.
     static const TArray<FBreakerAffixDefinition>& GetSliceAffixPool();
 
     // ---- The high-rarity identity pools (O11's reserved seat) --------------
@@ -198,16 +243,30 @@ public:
     // (FBreakerEquipmentStats::ElementalResistancePercent ->
     // UBreakerCombatComponent::ReceiveDamage's Elemental branch), held out of
     // every droppable pool because no slice enemy deals Elemental damage yet
-    // — the full reasoning, and the one-line path into the pool when O5/O38
-    // land, is on the definition in the .cpp. Resolvable via FindAffix so an
-    // item carrying it never aggregates to a lie.
+    // — the reasoning is on EBreakerStatTarget::ElementalDamageReduction.
+    // The row carries pool "elemental" in the data; moving it into the drop
+    // pool the day elemental incoming exists is that one word changing to
+    // "slice". Resolvable via FindAffix so an item carrying it never
+    // aggregates to a lie.
     static const FBreakerAffixDefinition& GetElementalResistanceAffix();
 
     // The companion downsides some special affixes carry (PairedAffixId).
     // Never drawable: no roll loop iterates this array. Constant negative
     // values in ordinary buckets — see the field's comment on
-    // FBreakerAffixDefinition.
+    // FBreakerAffixDefinition. Rows carrying pool "downside" in the data.
     static const TArray<FBreakerAffixDefinition>& GetSpecialDownsidePool();
+
+    // ---- Stat caps ---------------------------------------------------------
+    // The ceiling Data/affixes.json publishes for a summed gear percentage,
+    // or the largest float when it publishes none: FMath::Min against that is
+    // the identity, so an uncapped target is not a special case anywhere.
+    // The shipped MoveSpeed cap is an O2 PLACEHOLDER sized above anything
+    // gear can sum today, so it binds nothing until the movement layer prices
+    // it (O192); the aggregator clamps against it regardless.
+    static float GetStatCap(EBreakerStatTarget Target);
+    // The rule the aggregator applies: the summed percentage, no higher than
+    // the cap. Negative sums (a downside) pass through untouched.
+    static float CapStat(EBreakerStatTarget Target, float SummedPercent);
 
     // ---- Per-archetype affix leans ----------------------------------------
     // Owner's instruction, verbatim: "make sure certain guns have certain
@@ -225,6 +284,8 @@ public:
     //
     // Returns 1.0 for any pairing with no authored opinion, and for every
     // non-weapon slot, so armour rolls exactly as it did before this existed.
+    // The table is the "leans" object in Data/affixes.json, one entry per
+    // archetype name.
     //
     // O2 PLACEHOLDER: the multipliers are shape, not balance.
     UFUNCTION(BlueprintPure, Category="Items|Affixes")

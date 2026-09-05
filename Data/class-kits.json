@@ -1,0 +1,74 @@
+{
+	"classKits": [
+		{
+			"classId": "Gunsmith",
+			"starterAbilityIds": [
+				"Gunsmith.SidearmRig",
+				"Gunsmith.Turret"
+			],
+			"unlockableAbilityIds": [
+				"Gunsmith.Overhaul",
+				"Gunsmith.AmmoCrate",
+				"Gunsmith.MineCluster",
+				"Gunsmith.Disruptor"
+			],
+			"baseUltimateId": "Gunsmith.FieldAssembly"
+		},
+		{
+			"classId": "Tank",
+			"starterAbilityIds": [
+				"Tank.Rend",
+				"Tank.AnchorPoint"
+			],
+			"unlockableAbilityIds": [
+				"Tank.Bloodline",
+				"Tank.Provoke",
+				"Tank.BreachCharge",
+				"Tank.GroundZero"
+			],
+			"baseUltimateId": "Tank.Hold"
+		},
+		{
+			"classId": "Support",
+			"starterAbilityIds": [
+				"Support.Patch",
+				"Support.Mark"
+			],
+			"unlockableAbilityIds": [
+				"Support.Purge",
+				"Support.Cadence",
+				"Support.Metronome",
+				"Support.Suppress"
+			],
+			"baseUltimateId": "Support.Conduit"
+		},
+		{
+			"classId": "Caster",
+			"starterAbilityIds": [
+				"Caster.Cleave",
+				"Caster.Rot"
+			],
+			"unlockableAbilityIds": [
+				"Caster.Closequarter",
+				"Caster.Siphon",
+				"Caster.Fracture",
+				"Caster.Resonance"
+			],
+			"baseUltimateId": "Caster.Unmake"
+		},
+		{
+			"classId": "Swift",
+			"starterAbilityIds": [
+				"Swift.Skim"
+			],
+			"unlockableAbilityIds": [
+				"Swift.Slipcut",
+				"Swift.Lead",
+				"Swift.CadenceBreak",
+				"Swift.HardStop",
+				"Swift.Sightline"
+			],
+			"baseUltimateId": "Swift.Overdrive"
+		}
+	]
+}

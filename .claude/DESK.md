@@ -12,18 +12,25 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - (sound) O193 as written has no sound; your desk line has one low sound. If you want it, add "one low sound" to O193's line and the sixth verb lands (`player_death.wav` slot → synth fallback) with its one call site in the HUD's fatal-hit branch.
 
 ## Cycle 6 — content out of C++ (DATA-2, DATA-4; O186)
-- [ ] Affix pools → `Data/affixes.json`: a tier value changes with no compile; `Items.Affixes.Breadth` holds; the census reads the file. One library, one commit.
-- [ ] Movement Speed affix on Boots with its cap (O192), as a row.
-- [ ] Ability definitions, quests, dialogue → data; the quartermaster's stock is a row (DATA-4). Split across builds if the first is not one build.
+- [ ] Affix pools → `Data/affixes.json` through the first runtime loader (`Data/BreakerDataFile`), output pinned identical by `Data.Affixes.Fresh`; the library becomes a loader with a validator; census and status.py read the file. The MoveSpeed cap lives in the file's `caps` object and is clamped in the aggregator (O186's "no compile" clause decides where the cap lives).
+- [ ] Movement Speed affix on Boots (O192): a data-only commit after the migration — `Core.MoveSpeed.allowedSlots` → Boots, the cap number set. No build; that is the proof.
+- [ ] The quartermaster's stock as a row: `Data/class-kits.json` (starter / unlockable / ultimate ids per class) read by `GetFallbackClassDefinition`; `Abilities.Catalogue.Partition` is the identical-output pin.
 
-## Cycle 7 — the flat-damage ruling lands (R1)
+## Cycle 7 — the rest of DATA-4 (one library per commit)
+- [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
+- [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
+- [ ] Abilities: only the numerics (`ResourceCost`, `CooldownSeconds`, `WindowDuration`, variant numbers) → `Data/abilities.json`; the registry, `AbilityClass` and tags stay a DataAsset (O186). The ~40 per-ability `O2 PLACEHOLDER` constants in the ability .cpp files are the real no-compile target and need their own item.
+- Owner question (content pipeline): dialogue and quest text are keyed rows. One home per string: `quests.json`/`dialogue.json` own their text, `Data/strings.json` owns UI chrome only. Amend the O195 line to "every player-facing `TEXT` in `UI/` and `Game/` not already a dialogue or quest row"?
+- ORDERS Part Five DATA-4 says "→ DataAssets"; O186 says JSON. Edit that line on your seat.
+
+## Cycle 8 — the flat-damage ruling lands (R1)
 - Owner rules R1 first: weapons and gear carry a true flat Added Damage fed by an affix and a weapon base line, or the Flat term leaves `power-and-scaling.md`. Then LEDGER-3 (affix pool 28 → 56) and the at-cap band re-measured (`PowerBand.AtCap` is expected red today).
 
-## Cycle 8 — the boss grammar and two more bosses (FIELD-3)
+## Cycle 9 — the boss grammar and two more bosses (FIELD-3)
 - [ ] Telegraph → punish window → phase gate → add wave → arena change as a pure header; the shield is the first punish window, not a wall.
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss.
 
-## Cycle 9 — the Niagara pass (GLASS-1, O179, O190)
+## Cycle 10 — the Niagara pass (GLASS-1, O179, O190)
 - [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash comes back here and nowhere earlier.
 - [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
 

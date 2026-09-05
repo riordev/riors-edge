@@ -339,8 +339,14 @@ public:
     static TArray<UBreakerProgressionTree*> GetTreesForClass(EBreakerClassId ClassId);
 
     // Fallback class definition so a component with no Data Asset can still
-    // resolve branch trees, starting abilities, and the ultimate.
+    // resolve branch trees, starting abilities, and the ultimate. The three
+    // ability id lists come from the class's row in ClassKitsRelativePath().
     static UBreakerClassDefinition* GetFallbackClassDefinition(EBreakerClassId ClassId);
+
+    // The quartermaster's stock: one row per class, read through
+    // BreakerDataFile. Empty errors means every class kit loaded.
+    static FString ClassKitsRelativePath();
+    static const TArray<FString>& GetClassKitDataErrors();
 
     UFUNCTION(BlueprintPure, Category="Progression|Content")
     static const UBreakerProgressionNode* FindFallbackNode(FName NodeId);

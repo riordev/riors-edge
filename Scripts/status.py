@@ -59,6 +59,11 @@ OUT = os.path.join(ROOT, "Docs", "STATE.md")
 # pinned to them by RiorsEdge.Data.Census.Fresh. `--from-data` reads the node
 # library from here instead of regex-parsing its C++ authoring shape.
 DATA = os.path.join(ROOT, "Data", "progression.json")
+# THE AFFIX LIBRARY, AS DATA. What UBreakerAffixLibrary loads, pinned to its
+# own re-export by RiorsEdge.Data.Affixes.Fresh. The stat-target counterpart
+# check reads it in BOTH modes: affixes are data, so no mode regex-parses
+# their C++.
+AFFIXES = os.path.join(ROOT, "Data", "affixes.json")
 # THE SUITE GETS ITS OWN FILE, and this is PREVENTION rather than detection.
 # riors_edge.log is the project's default log name, so the interactive editor, a
 # standalone run and the capture harness all open it and rotate whatever was
@@ -347,6 +352,32 @@ def load_census():
             f"{os.path.relpath(DATA, ROOT)}: only {total} nodes exported. Fix the export "
             "rather than trusting the number.")
     return census
+
+
+def load_affix_targets():
+    """The set of EBreakerStatTarget names any affix row lands in, every pool.
+
+    Refused with the same loudness as the census: a missing or empty affix
+    file is not "no affixes", and reporting every lane as empty off it would
+    be the silent zero this script exists to prevent.
+    """
+    try:
+        with open(AFFIXES, "rb") as f:
+            library = json.loads(f.read().decode("utf-8"))
+    except OSError:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)} is missing; it is the affix library.")
+    except ValueError as e:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)} is not JSON: {e}")
+    rows = library.get("affixes")
+    if not isinstance(rows, list) or not rows:
+        raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)}: no 'affixes' rows. The file shape changed.")
+    targets = set()
+    for row in rows:
+        target = row.get("target")
+        if not isinstance(target, str) or not target:
+            raise ParseError(f"{os.path.relpath(AFFIXES, ROOT)}: row {row.get('id')!r} has no 'target'.")
+        targets.add(target)
+    return targets
 
 
 def census_nodes(census, tag_map):
@@ -800,11 +831,11 @@ def build_sections(sources, census=None):
     """Every section, from source (census=None) or from Data/progression.json.
 
     WHAT STAYS SOURCE-SIDE IN BOTH MODES, and why: the consumer index, because
-    consumers are code and a census of data cannot say what reads it; the
+    consumers are code and a census of data cannot say what reads it; and the
     declared-tag map, because node tags are declared by C++ identifier and
     consumed by identifier, a code-to-code fact with no data form until the
-    tag library migrates; and the affix-counterpart check, because affixes are
-    a C++ library until DATA-2 lands.
+    tag library migrates. The affix-counterpart check reads Data/affixes.json
+    in both modes.
     """
     lib = sources[os.path.join(SRC, *LIB.split("/"))]
     types = sources[os.path.join(SRC, *TYPES.split("/"))]
@@ -877,7 +908,9 @@ def build_sections(sources, census=None):
     # affix-owned by ruling (O76) with no mapping here refuses the report —
     # loud, never a silent pass. A lane absent from this map has no affix
     # counterpart at all today (the projectile channels, the geometry scales,
-    # the five Core-atlas lanes' queued-but-unbuilt affix lines).
+    # the five Core-atlas lanes' queued-but-unbuilt affix lines). The affix
+    # side is read from Data/affixes.json — every pool, since a special or
+    # downside row lands in the same lane an ordinary one does.
     AFFIX_COUNTERPARTS = {
         "Health": "Health",
         "CriticalChance": "CriticalChance",
@@ -897,7 +930,7 @@ def build_sections(sources, census=None):
         "DashCooldown": "DashCooldownReduction",
         "IncomingDamageReduction": "PhysicalDamageReduction",
     }
-    affix_lib = strip_cpp_comments(sources[os.path.join(SRC, "Items", "BreakerAffixLibrary.cpp")])
+    affix_targets = load_affix_targets()
     for lane in sorted(affix_owned):
         if lane not in AFFIX_COUNTERPARTS:
             raise ParseError(
@@ -905,7 +938,7 @@ def build_sections(sources, census=None):
                 "affix counterpart for it; add the mapping so its authors can be counted.")
     affix_authored = set()
     for lane, counterpart in AFFIX_COUNTERPARTS.items():
-        if re.search(r'EBreakerStatTarget::' + counterpart + r'\b', affix_lib):
+        if counterpart in affix_targets:
             affix_authored.add(lane)
     empty_lanes = [t for t in targets
                    if t in paid and t not in authored_targets and t not in affix_authored]

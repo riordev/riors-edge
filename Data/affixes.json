@@ -1,0 +1,1005 @@
+{
+	"affixes": [
+		{
+			"id": "Core.Health",
+			"pool": "slice",
+			"displayName": "Health",
+			"category": "Suffix",
+			"target": "Health",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 25,
+			"valueAtT1": 400,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.ResourceRegen",
+			"pool": "slice",
+			"displayName": "Resource Regeneration",
+			"category": "Suffix",
+			"target": "ResourceRegen",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 0.5,
+			"valueAtT1": 7,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.ResourceEfficiency",
+			"pool": "slice",
+			"displayName": "Resource Efficiency",
+			"category": "Suffix",
+			"target": "ResourceEfficiency",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 26,
+			"rollWeight": 55,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.MaxResource",
+			"pool": "slice",
+			"displayName": "Maximum Resource",
+			"category": "Suffix",
+			"target": "MaxResource",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 100,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.MoveSpeed",
+			"pool": "slice",
+			"displayName": "Movement Speed",
+			"category": "Prefix",
+			"target": "MoveSpeed",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 18,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.DropChance",
+			"pool": "slice",
+			"displayName": "Drop Chance",
+			"category": "Suffix",
+			"target": "DropChance",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 31,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.PhysicalDR",
+			"pool": "slice",
+			"displayName": "Physical Damage Reduction",
+			"category": "Suffix",
+			"target": "PhysicalDamageReduction",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 26,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.AilmentAvoidance",
+			"pool": "slice",
+			"displayName": "Ailment Avoidance",
+			"category": "Suffix",
+			"target": "AilmentAvoidance",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Waist"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 30,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Move.SlideSpeed",
+			"pool": "slice",
+			"displayName": "Slide Speed",
+			"category": "Prefix",
+			"target": "SlideSpeed",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 44,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Move.AirControl",
+			"pool": "slice",
+			"displayName": "Air Control",
+			"category": "Prefix",
+			"target": "AirControl",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Necklace"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Move.DashCooldown",
+			"pool": "slice",
+			"displayName": "Dash Cooldown Reduction",
+			"category": "Prefix",
+			"target": "DashCooldownReduction",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Gloves",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 4,
+			"valueAtT1": 40,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.Chance",
+			"pool": "slice",
+			"displayName": "Critical Chance",
+			"category": "Prefix",
+			"target": "CriticalChance",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1,
+			"valueAtT1": 9,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Crit.Damage",
+			"pool": "slice",
+			"displayName": "Critical Damage",
+			"category": "Suffix",
+			"target": "CriticalDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 40,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.WeaponDamage",
+			"pool": "slice",
+			"displayName": "Weapon Damage",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 35,
+			"rollWeight": 80,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.AbilityDamage",
+			"pool": "slice",
+			"displayName": "Ability Damage",
+			"category": "Prefix",
+			"target": "AbilityDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 3,
+			"valueAtT1": 35,
+			"rollWeight": 80,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SharedDamage",
+			"pool": "slice",
+			"displayName": "Increased Damage",
+			"category": "Prefix",
+			"target": "SharedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1.5,
+			"valueAtT1": 15,
+			"rollWeight": 80,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.AddedDamage",
+			"pool": "slice",
+			"displayName": "Added Damage",
+			"category": "Suffix",
+			"target": "AddedDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 1,
+			"valueAtT1": 11,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Weapon.FireRate",
+			"pool": "slice",
+			"displayName": "Fire Rate",
+			"category": "Suffix",
+			"target": "FireRate",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 24,
+			"rollWeight": 60,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.AirborneDamage",
+			"pool": "slice",
+			"displayName": "Damage while Airborne",
+			"category": "Prefix",
+			"target": "AirborneDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace",
+				"Primary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "Airborne",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.SlidingDamage",
+			"pool": "slice",
+			"displayName": "Damage while Sliding",
+			"category": "Prefix",
+			"target": "SlidingDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Waist",
+				"BodyArmour",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "Sliding",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.WallRideDamage",
+			"pool": "slice",
+			"displayName": "Damage while Wall Riding",
+			"category": "Prefix",
+			"target": "WallRideDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Waist",
+				"Gloves",
+				"BodyArmour"
+			],
+			"valueAtT12": 6,
+			"valueAtT1": 57,
+			"rollWeight": 40,
+			"condition": "WallRiding",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.RedlineDamage",
+			"pool": "slice",
+			"displayName": "Damage at Redline",
+			"category": "Suffix",
+			"target": "RedlineDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Necklace",
+				"BodyArmour",
+				"Helmet",
+				"Primary"
+			],
+			"valueAtT12": 4.5,
+			"valueAtT1": 44,
+			"rollWeight": 45,
+			"condition": "Redline",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.DashDamage",
+			"pool": "slice",
+			"displayName": "Damage after Dashing",
+			"category": "Suffix",
+			"target": "RecentlyDashedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 45,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.Armour",
+			"pool": "slice",
+			"displayName": "Armour",
+			"category": "Suffix",
+			"target": "Armour",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Waist"
+			],
+			"valueAtT12": 6,
+			"valueAtT1": 75,
+			"rollWeight": 90,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.LifeOnKill",
+			"pool": "slice",
+			"displayName": "Health on Kill",
+			"category": "Suffix",
+			"target": "LifeOnKill",
+			"bucket": "Flat",
+			"slots": [
+				"BodyArmour",
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 92,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.ResourceOnKill",
+			"pool": "slice",
+			"displayName": "Resource on Kill",
+			"category": "Suffix",
+			"target": "ResourceOnKill",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 24,
+			"rollWeight": 70,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Offense.DoTDamage",
+			"pool": "slice",
+			"displayName": "Damage over Time",
+			"category": "Prefix",
+			"target": "DamageOverTime",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Necklace",
+				"Primary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 57,
+			"rollWeight": 55,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Riftburn",
+			"pool": "aberrant",
+			"displayName": "Riftburn",
+			"category": "Prefix",
+			"target": "DamageOverTime",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 12,
+			"valueAtT1": 130,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": "Downside.Riftburn"
+		},
+		{
+			"id": "Aberrant.TerminalVelocity",
+			"pool": "aberrant",
+			"displayName": "Terminal Velocity",
+			"category": "Prefix",
+			"target": "AirborneDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 12,
+			"valueAtT1": 110,
+			"rollWeight": 100,
+			"condition": "Airborne",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Ballast",
+			"pool": "aberrant",
+			"displayName": "Ballast",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"BodyArmour",
+				"Waist",
+				"Gloves"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 80,
+			"rollWeight": 100,
+			"condition": "Grounded",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Overwound",
+			"pool": "aberrant",
+			"displayName": "Overwound Receiver",
+			"category": "Suffix",
+			"target": "FireRate",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 5,
+			"valueAtT1": 48,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": "Downside.Overwound"
+		},
+		{
+			"id": "Aberrant.RedlineChorus",
+			"pool": "aberrant",
+			"displayName": "Redline Chorus",
+			"category": "Suffix",
+			"target": "RedlineDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Necklace",
+				"BodyArmour",
+				"Primary"
+			],
+			"valueAtT12": 10,
+			"valueAtT1": 100,
+			"rollWeight": 100,
+			"condition": "Redline",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Failsafe",
+			"pool": "aberrant",
+			"displayName": "Failsafe Override",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Necklace"
+			],
+			"valueAtT12": 15,
+			"valueAtT1": 120,
+			"rollWeight": 90,
+			"condition": "HealthLow",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Deadstill",
+			"pool": "aberrant",
+			"displayName": "Deadstill Protocol",
+			"category": "Suffix",
+			"target": "CriticalDamage",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Primary"
+			],
+			"valueAtT12": 15,
+			"valueAtT1": 95,
+			"rollWeight": 100,
+			"condition": "Stationary",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Aberrant.Tithe",
+			"pool": "aberrant",
+			"displayName": "Breaker's Tithe",
+			"category": "Suffix",
+			"target": "LifeOnKill",
+			"bucket": "Flat",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary",
+				"Boots"
+			],
+			"valueAtT12": 20,
+			"valueAtT1": 220,
+			"rollWeight": 90,
+			"condition": "Always",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Anomaly.EventHorizon",
+			"pool": "anomalous",
+			"displayName": "Event Horizon",
+			"category": "Prefix",
+			"target": "AirborneDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Boots",
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": 25,
+			"valueAtT1": 170,
+			"rollWeight": 100,
+			"condition": "Airborne",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Anomaly.PhaseShear",
+			"pool": "anomalous",
+			"displayName": "Phase Shear",
+			"category": "Suffix",
+			"target": "RecentlyDashedDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Gloves",
+				"Waist",
+				"Necklace",
+				"Secondary"
+			],
+			"valueAtT12": 20,
+			"valueAtT1": 150,
+			"rollWeight": 100,
+			"condition": "RecentlyDashed",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Anomaly.EntropyDebt",
+			"pool": "anomalous",
+			"displayName": "Entropy Debt",
+			"category": "Prefix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"Necklace",
+				"Primary",
+				"BodyArmour",
+				"Gloves",
+				"Waist"
+			],
+			"valueAtT12": 30,
+			"valueAtT1": 200,
+			"rollWeight": 80,
+			"condition": "ResourceDepleted",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Anomaly.SingularityFeed",
+			"pool": "anomalous",
+			"displayName": "Singularity Feed",
+			"category": "Suffix",
+			"target": "ResourceOnKill",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"Gloves",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary",
+				"BodyArmour",
+				"Boots"
+			],
+			"valueAtT12": 8,
+			"valueAtT1": 70,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Anomaly.Riftplate",
+			"pool": "anomalous",
+			"displayName": "Riftplate",
+			"category": "Suffix",
+			"target": "Armour",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Waist"
+			],
+			"valueAtT12": 30,
+			"valueAtT1": 400,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": "Downside.Riftplate"
+		},
+		{
+			"id": "Downside.Riftburn",
+			"pool": "downside",
+			"displayName": "Unstable Combustion",
+			"category": "Suffix",
+			"target": "WeaponDamage",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": -12,
+			"valueAtT1": -12,
+			"rollWeight": 1,
+			"condition": "Always",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Downside.Overwound",
+			"pool": "downside",
+			"displayName": "Thrown Pattern",
+			"category": "Prefix",
+			"target": "CriticalChance",
+			"bucket": "Flat",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": -3,
+			"valueAtT1": -3,
+			"rollWeight": 1,
+			"condition": "Always",
+			"minimumRarity": "Aberrant",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Downside.Riftplate",
+			"pool": "downside",
+			"displayName": "Dead Mass",
+			"category": "Prefix",
+			"target": "MoveSpeed",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Necklace",
+				"Waist",
+				"Primary",
+				"Secondary"
+			],
+			"valueAtT12": -10,
+			"valueAtT1": -10,
+			"rollWeight": 1,
+			"condition": "Always",
+			"minimumRarity": "Anomalous",
+			"pairedAffixId": ""
+		},
+		{
+			"id": "Core.ElementalResist",
+			"pool": "elemental",
+			"displayName": "Elemental Resistance",
+			"category": "Suffix",
+			"target": "ElementalDamageReduction",
+			"bucket": "IncreasedPercent",
+			"slots": [
+				"Helmet",
+				"BodyArmour",
+				"Gloves",
+				"Boots",
+				"Waist",
+				"Necklace"
+			],
+			"valueAtT12": 2,
+			"valueAtT1": 18,
+			"rollWeight": 100,
+			"condition": "Always",
+			"minimumRarity": "Standard",
+			"pairedAffixId": ""
+		}
+	],
+	"leans":
+	{
+		"SMG":
+		{
+			"Weapon.FireRate": 3,
+			"Crit.Chance": 1.8,
+			"Offense.AddedDamage": 1.5,
+			"Offense.DoTDamage": 2
+		},
+		"Machinegun":
+		{
+			"Offense.WeaponDamage": 3,
+			"Offense.AddedDamage": 2,
+			"Core.Health": 1.6
+		},
+		"Sidearm":
+		{
+			"Move.SlideSpeed": 3,
+			"Core.MoveSpeed": 2.2,
+			"Move.DashCooldown": 1.8,
+			"Offense.SlidingDamage": 1.8,
+			"Core.ResourceOnKill": 1.8
+		},
+		"Sniper":
+		{
+			"Crit.Damage": 3,
+			"Crit.Chance": 1.6,
+			"Offense.WeaponDamage": 1.5
+		},
+		"Shotgun":
+		{
+			"Offense.AddedDamage": 2.6,
+			"Core.Health": 1.8,
+			"Offense.SlidingDamage": 1.8,
+			"Core.LifeOnKill": 2
+		},
+		"Rocket":
+		{
+			"Offense.WeaponDamage": 2.6,
+			"Offense.AirborneDamage": 2
+		},
+		"BurstRifle":
+		{
+			"Crit.Chance": 2.2,
+			"Crit.Damage": 2,
+			"Weapon.FireRate": 1.6
+		},
+		"Rifle":
+		{
+			"Offense.WeaponDamage": 1.6,
+			"Crit.Chance": 1.4
+		}
+	},
+	"caps":
+	{
+		"MoveSpeed": 1000
+	}
+}

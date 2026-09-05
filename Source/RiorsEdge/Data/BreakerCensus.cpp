@@ -1,6 +1,7 @@
 #include "Data/BreakerCensus.h"
 
 #include "Dom/JsonValue.h"
+#include "Items/BreakerAffixLibrary.h"
 #include "Policies/PrettyJsonPrintPolicy.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionNode.h"
@@ -148,13 +149,94 @@ TSharedRef<FJsonObject> BreakerCensus::Export(const TArray<UBreakerProgressionTr
     return Census;
 }
 
+namespace
+{
+    // The committed-file rule shared by both exports: "\n" whatever the
+    // platform's LINE_TERMINATOR, one trailing newline.
+    void BreakerCensusFinish(FString& Out)
+    {
+        Out.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+        if (!Out.EndsWith(TEXT("\n"))) { Out += TEXT("\n"); }
+    }
+
+    using FBreakerCensusWriter = TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>;
+
+    void BreakerCensusAffixRow(FBreakerCensusWriter& Writer, const FBreakerAffixDefinition& Affix, const TCHAR* Pool)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Affix.AffixId.ToString());
+        Writer.WriteValue(TEXT("pool"), FString(Pool));
+        Writer.WriteValue(TEXT("displayName"), Affix.DisplayName.ToString());
+        Writer.WriteValue(TEXT("category"), BreakerCensusEnumName(Affix.Category));
+        Writer.WriteValue(TEXT("target"), BreakerCensusEnumName(Affix.StatTarget));
+        Writer.WriteValue(TEXT("bucket"), BreakerCensusEnumName(Affix.StatBucket));
+        Writer.WriteArrayStart(TEXT("slots"));
+        for (EBreakerEquipSlot Slot : Affix.AllowedSlots)
+        {
+            const FString Name = BreakerCensusEnumName(Slot);
+            Writer.WriteValue(Name);
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteValue(TEXT("valueAtT12"), Affix.ValueAtT12);
+        Writer.WriteValue(TEXT("valueAtT1"), Affix.ValueAtT1);
+        Writer.WriteValue(TEXT("rollWeight"), Affix.RollWeight);
+        Writer.WriteValue(TEXT("condition"), BreakerCensusEnumName(Affix.Condition));
+        Writer.WriteValue(TEXT("minimumRarity"), BreakerCensusEnumName(Affix.MinimumRarity));
+        Writer.WriteValue(TEXT("pairedAffixId"), Affix.PairedAffixId.IsNone() ? FString() : Affix.PairedAffixId.ToString());
+        Writer.WriteObjectEnd();
+    }
+}
+
 FString BreakerCensus::Serialize(const TSharedRef<FJsonObject>& Census)
 {
     FString Out;
-    TSharedRef<TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>> Writer =
-        TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
     FJsonSerializer::Serialize(Census, Writer);
-    Out.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
-    if (!Out.EndsWith(TEXT("\n"))) { Out += TEXT("\n"); }
+    BreakerCensusFinish(Out);
+    return Out;
+}
+
+FString BreakerCensus::AffixesRelativePath()
+{
+    return UBreakerAffixLibrary::DataRelativePath();
+}
+
+FString BreakerCensus::ExportAffixes(const FBreakerAffixLibraryData& Data)
+{
+    FString Out;
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+
+    Writer->WriteObjectStart();
+
+    Writer->WriteArrayStart(TEXT("affixes"));
+    for (const FBreakerAffixDefinition& Affix : Data.Slice) { BreakerCensusAffixRow(*Writer, Affix, TEXT("slice")); }
+    for (const FBreakerAffixDefinition& Affix : Data.Aberrant) { BreakerCensusAffixRow(*Writer, Affix, TEXT("aberrant")); }
+    for (const FBreakerAffixDefinition& Affix : Data.Anomalous) { BreakerCensusAffixRow(*Writer, Affix, TEXT("anomalous")); }
+    for (const FBreakerAffixDefinition& Affix : Data.Downsides) { BreakerCensusAffixRow(*Writer, Affix, TEXT("downside")); }
+    if (!Data.Elemental.AffixId.IsNone()) { BreakerCensusAffixRow(*Writer, Data.Elemental, TEXT("elemental")); }
+    Writer->WriteArrayEnd();
+
+    Writer->WriteObjectStart(TEXT("leans"));
+    for (const FBreakerArchetypeLeans& Table : Data.Leans)
+    {
+        Writer->WriteObjectStart(BreakerCensusEnumName(Table.Archetype));
+        for (const FBreakerAffixLean& Lean : Table.Rows)
+        {
+            Writer->WriteValue(Lean.AffixId.ToString(), Lean.Multiplier);
+        }
+        Writer->WriteObjectEnd();
+    }
+    Writer->WriteObjectEnd();
+
+    Writer->WriteObjectStart(TEXT("caps"));
+    for (const FBreakerStatCap& Cap : Data.Caps)
+    {
+        Writer->WriteValue(BreakerCensusEnumName(Cap.Target), Cap.Cap);
+    }
+    Writer->WriteObjectEnd();
+
+    Writer->WriteObjectEnd();
+    Writer->Close();
+    BreakerCensusFinish(Out);
     return Out;
 }

@@ -36,7 +36,8 @@ namespace BreakerAggregationTestHelpers
         return Rolled;
     }
 
-    // +150 flat health and +8% increased movement speed across two slots.
+    // +150 flat health across two slots and +8% increased movement speed on
+    // the boots, where Movement Speed rolls.
     void MakeTestGear(TArray<FBreakerItemInstance>& OutItems)
     {
         FBreakerItemInstance Boots;
@@ -44,12 +45,12 @@ namespace BreakerAggregationTestHelpers
         Boots.Slot = EBreakerEquipSlot::Boots;
         Boots.Affixes.Add(MakeRolled(TEXT("Core.Health"), 100.0f, EBreakerAffixCategory::Suffix));
         Boots.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 5.0f, EBreakerAffixCategory::Prefix));
+        Boots.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 3.0f, EBreakerAffixCategory::Prefix));
 
         FBreakerItemInstance Helmet;
         Helmet.ItemId = FGuid::NewGuid();
         Helmet.Slot = EBreakerEquipSlot::Helmet;
         Helmet.Affixes.Add(MakeRolled(TEXT("Core.Health"), 50.0f, EBreakerAffixCategory::Suffix));
-        Helmet.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 3.0f, EBreakerAffixCategory::Prefix));
 
         OutItems.Add(Boots);
         OutItems.Add(Helmet);

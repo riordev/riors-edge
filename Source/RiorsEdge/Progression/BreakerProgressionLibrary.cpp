@@ -1,6 +1,7 @@
 #include "Progression/BreakerProgressionLibrary.h"
 
 #include "Abilities/BreakerAbilityTags.h"
+#include "Data/BreakerDataFile.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
@@ -4049,6 +4050,198 @@ TArray<UBreakerProgressionTree*> UBreakerProgressionLibrary::GetTreesForClass(EB
     return Result;
 }
 
+// ---------------------------------------------------------------------------
+// The quartermaster's stock is a row in Data/class-kits.json: what a class
+// starts with, what it sells and in which order (the screen offers
+// Unlockable[0] first), and its ultimate. A row that fails any check fails
+// the WHOLE file: every class keeps empty lists behind an ensure, because a
+// file that served four classes and dropped one would ship a class whose
+// loadout resolves to nothing.
+namespace
+{
+    using BreakerDataFile::FBreakerDataErrors;
+
+    struct FBreakerClassKitRow
+    {
+        EBreakerClassId ClassId = EBreakerClassId::None;
+        TArray<FName> StarterAbilityIds;
+        TArray<FName> UnlockableAbilityIds;
+        FName BaseUltimateId;
+    };
+
+    struct FBreakerClassKitLoad
+    {
+        TArray<FBreakerClassKitRow> Rows;
+        TArray<FString> Errors;
+    };
+
+    // One string array into one id list; every id non-empty and unseen in
+    // this row so far.
+    bool BreakerClassKitReadIds(const FJsonObject& Row, const TCHAR* Field, const FString& Context,
+        TArray<FName>& Out, TSet<FName>& SeenInRow, FBreakerDataErrors& Errors)
+    {
+        Out.Reset();
+        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        if (!Row.TryGetArrayField(Field, Values))
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"%s\" is missing or not an array"), *Context, Field));
+            return false;
+        }
+        bool bOk = true;
+        for (const TSharedPtr<FJsonValue>& Value : *Values)
+        {
+            FString Id;
+            if (!Value.IsValid() || !Value->TryGetString(Id) || Id.IsEmpty())
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"%s\" holds an empty or non-string id"), *Context, Field));
+                bOk = false;
+                continue;
+            }
+            const FName Name(*Id);
+            if (SeenInRow.Contains(Name))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"%s\" appears twice in the row"), *Context, *Id));
+                bOk = false;
+                continue;
+            }
+            SeenInRow.Add(Name);
+            Out.Add(Name);
+        }
+        return bOk;
+    }
+
+    bool BreakerClassKitReadRow(const FJsonObject& Row, FBreakerClassKitRow& Out, FBreakerDataErrors& Errors)
+    {
+        FString ClassName;
+        if (!Row.TryGetStringField(TEXT("classId"), ClassName)
+            || !BreakerDataFile::ParseEnum(ClassName, Out.ClassId)
+            || Out.ClassId == EBreakerClassId::None)
+        {
+            Errors.Add(FString::Printf(TEXT("class-kits: \"classId\" \"%s\" is not a class with a kit"), *ClassName));
+            return false;
+        }
+        const FString Context = ClassName;
+
+        TSet<FName> SeenInRow;
+        bool bOk = BreakerClassKitReadIds(Row, TEXT("starterAbilityIds"), Context, Out.StarterAbilityIds, SeenInRow, Errors);
+        bOk = BreakerClassKitReadIds(Row, TEXT("unlockableAbilityIds"), Context, Out.UnlockableAbilityIds, SeenInRow, Errors) && bOk;
+        // Slot one seeds from Starter[0]; a class with no starter has no
+        // level-one loadout.
+        if (Out.StarterAbilityIds.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"starterAbilityIds\" is empty"), *Context));
+            bOk = false;
+        }
+
+        FString Ultimate;
+        if (!Row.TryGetStringField(TEXT("baseUltimateId"), Ultimate) || Ultimate.IsEmpty())
+        {
+            Errors.Add(FString::Printf(TEXT("%s: \"baseUltimateId\" is missing or empty"), *Context));
+            bOk = false;
+        }
+        else
+        {
+            Out.BaseUltimateId = FName(*Ultimate);
+            if (SeenInRow.Contains(Out.BaseUltimateId))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: \"%s\" appears twice in the row"), *Context, *Ultimate));
+                bOk = false;
+            }
+        }
+        return bOk;
+    }
+
+    FBreakerClassKitLoad BreakerClassKitLoadData()
+    {
+        FBreakerClassKitLoad Load;
+        FBreakerDataErrors Errors;
+        TArray<FBreakerClassKitRow> Rows;
+        const FString File = UBreakerProgressionLibrary::ClassKitsRelativePath();
+
+        const TSharedPtr<FJsonObject> Root = BreakerDataFile::Load(File, Errors);
+        if (Root.IsValid())
+        {
+            const TArray<TSharedPtr<FJsonValue>>* RowValues = nullptr;
+            if (!Root->TryGetArrayField(TEXT("classKits"), RowValues))
+            {
+                Errors.Add(FString::Printf(TEXT("%s: no \"classKits\" array"), *File));
+            }
+            else
+            {
+                for (const TSharedPtr<FJsonValue>& Value : *RowValues)
+                {
+                    const TSharedPtr<FJsonObject>* RowObject = nullptr;
+                    if (!Value.IsValid() || !Value->TryGetObject(RowObject))
+                    {
+                        Errors.Add(FString::Printf(TEXT("%s: a \"classKits\" entry is not an object"), *File));
+                        continue;
+                    }
+                    FBreakerClassKitRow Row;
+                    if (BreakerClassKitReadRow(**RowObject, Row, Errors))
+                    {
+                        Rows.Add(Row);
+                    }
+                }
+            }
+
+            // Exactly one row per class with a kit: None has none, and the
+            // generated _MAX is a bound, not a class.
+            const UEnum* ClassEnum = StaticEnum<EBreakerClassId>();
+            for (int32 Index = 0; Index < ClassEnum->NumEnums() - 1; ++Index)
+            {
+                const EBreakerClassId ClassId = static_cast<EBreakerClassId>(ClassEnum->GetValueByIndex(Index));
+                if (ClassId == EBreakerClassId::None) { continue; }
+                int32 Count = 0;
+                for (const FBreakerClassKitRow& Row : Rows) { if (Row.ClassId == ClassId) { ++Count; } }
+                if (Count != 1)
+                {
+                    Errors.Add(FString::Printf(TEXT("%s: %d rows for %s; exactly one is expected"),
+                        *File, Count, *ClassEnum->GetNameStringByIndex(Index)));
+                }
+            }
+        }
+
+        if (!Errors.IsClean())
+        {
+            Load.Errors = Errors.Messages;
+            ensureMsgf(false, TEXT("%s failed to load; every class kit is EMPTY.\n%s"), *File, *Errors.Join());
+            return Load;
+        }
+        Load.Rows = MoveTemp(Rows);
+        return Load;
+    }
+
+    const FBreakerClassKitLoad& BreakerClassKitLoaded()
+    {
+        static const FBreakerClassKitLoad Load = BreakerClassKitLoadData();
+        return Load;
+    }
+
+    // The three id lists of a definition, from its class's row. A definition
+    // whose row did not load keeps its default-constructed empty lists.
+    void BreakerClassKitApply(UBreakerClassDefinition& Definition)
+    {
+        for (const FBreakerClassKitRow& Row : BreakerClassKitLoaded().Rows)
+        {
+            if (Row.ClassId != Definition.ClassId) { continue; }
+            Definition.StarterAbilityIds = Row.StarterAbilityIds;
+            Definition.UnlockableAbilityIds = Row.UnlockableAbilityIds;
+            Definition.BaseUltimateId = Row.BaseUltimateId;
+            return;
+        }
+    }
+}
+
+FString UBreakerProgressionLibrary::ClassKitsRelativePath()
+{
+    return TEXT("Data/class-kits.json");
+}
+
+const TArray<FString>& UBreakerProgressionLibrary::GetClassKitDataErrors()
+{
+    return BreakerClassKitLoaded().Errors;
+}
+
 UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId ClassId)
 {
     // O39 SLICE CLASS HONESTY: a class gets a row here only once its kit
@@ -4058,8 +4251,8 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // definition registered ahead of executing abilities is the exact ordering
     // that made every Caster ability read as locked (T7 step order).
     //
-    // Each catalogue below mirrors the ability fallback registry's ids EXACTLY
-    // (Abilities/BreakerAbilityDefinition.cpp), all seven per class, starters
+    // Each class's kit row lives in Data/class-kits.json and mirrors the ability
+    // fallback registry's ids EXACTLY (Abilities/BreakerAbilityDefinition.cpp), all seven per class, starters
     // first — IsAbilityUnlocked answers from this list, and gating any id
     // behind an unpurchased node would repeat the "grants nothing reachable"
     // failure the Caster row's own comment documents.
@@ -4081,7 +4274,7 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     //      is a resource bar that sits at zero forever.
     //   3. Write the UGameplayAbility subclasses and assign AbilityClass on
     //      every row.
-    //   4. Add the row HERE, mirroring the registry ids exactly.
+    //   4. Add the row to Data/class-kits.json, mirroring the registry ids exactly.
     //   5. Add the class to DefaultAbilityIdForSlot
     //      (Abilities/BreakerAbilityDefinition.cpp).
     //   6. Add the resource to the HUD.
@@ -4105,12 +4298,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Gunsmith->Description = LOCTEXT("GunsmithDescription",
             "Scrap: a ledger of work already done -- no idle income, no decay. Deployables spend it; the gun in your hands costs nothing.");
         // Starters first (Sidearm Rig / Turret, Class-Kits-Gunsmith §3), so a
-        // loadout seeded from [0]/[1] matches DefaultAbilityIdForSlot.
-        Gunsmith->StarterAbilityIds = {TEXT("Gunsmith.SidearmRig"), TEXT("Gunsmith.Turret")};
-        Gunsmith->UnlockableAbilityIds = {
-            TEXT("Gunsmith.Overhaul"), TEXT("Gunsmith.AmmoCrate"),
-            TEXT("Gunsmith.MineCluster"), TEXT("Gunsmith.Disruptor")};
-        Gunsmith->BaseUltimateId = TEXT("Gunsmith.FieldAssembly");
+        // loadout seeded from [0]/[1] matches DefaultAbilityIdForSlot. The
+        // row is in Data/class-kits.json.
+        BreakerClassKitApply(*Gunsmith);
         // Class-Kits-Gunsmith §4 order: Armory, Field Tech, Tinkerer.
         Gunsmith->BranchTrees.Add(GetGunsmithArmoryTree());
         Gunsmith->BranchTrees.Add(GetGunsmithFieldTechTree());
@@ -4131,12 +4321,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Tank->DisplayName = LOCTEXT("TankName", "Tank");
         Tank->Description = LOCTEXT("TankDescription",
             "Grit: banked by taking hits and holding ground, bleeding on a lapse timer. Stronger for being hit, never wanting to be hit more than necessary.");
-        // Starters first (Rend / Anchor Point, Class-Kits-Tank §2).
-        Tank->StarterAbilityIds = {TEXT("Tank.Rend"), TEXT("Tank.AnchorPoint")};
-        Tank->UnlockableAbilityIds = {
-            TEXT("Tank.Bloodline"), TEXT("Tank.Provoke"),
-            TEXT("Tank.BreachCharge"), TEXT("Tank.GroundZero")};
-        Tank->BaseUltimateId = TEXT("Tank.Hold");
+        // Starters first (Rend / Anchor Point, Class-Kits-Tank §2). The row is
+        // in Data/class-kits.json.
+        BreakerClassKitApply(*Tank);
         // Class-Kits-Tank §3-5 order: Leech, Bastion, Demolitionist.
         Tank->BranchTrees.Add(GetTankLeechTree());
         Tank->BranchTrees.Add(GetTankBastionTree());
@@ -4157,12 +4344,9 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         Support->DisplayName = LOCTEXT("SupportName", "Support");
         Support->Description = LOCTEXT("SupportDescription",
             "Charge: banked by healing, shielding, buff uptime and marked-target damage. Solo pays exactly what a party pays, source for source.");
-        // Starters first (Patch / Mark, Class-Kits-Support §3).
-        Support->StarterAbilityIds = {TEXT("Support.Patch"), TEXT("Support.Mark")};
-        Support->UnlockableAbilityIds = {
-            TEXT("Support.Purge"), TEXT("Support.Cadence"),
-            TEXT("Support.Metronome"), TEXT("Support.Suppress")};
-        Support->BaseUltimateId = TEXT("Support.Conduit");
+        // Starters first (Patch / Mark, Class-Kits-Support §3). The row is in
+        // Data/class-kits.json.
+        BreakerClassKitApply(*Support);
         // Class-Kits-Support §4 order: Medic, Conductor, Warden.
         Support->BranchTrees.Add(GetSupportMedicTree());
         Support->BranchTrees.Add(GetSupportConductorTree());
@@ -4202,11 +4386,8 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
         // trees' Tier-3 nodes therefore carry their OTHER Class-Kits content
         // (the rule-rewrite half of "Grants X") and leave the grant itself
         // exactly as catalogued here.
-        Caster->StarterAbilityIds = {TEXT("Caster.Cleave"), TEXT("Caster.Rot")};   // Class-Kits §2.2 starters
-        Caster->UnlockableAbilityIds = {
-            TEXT("Caster.Closequarter"), TEXT("Caster.Siphon"),
-            TEXT("Caster.Fracture"), TEXT("Caster.Resonance")};
-        Caster->BaseUltimateId = TEXT("Caster.Unmake");
+        // Class-Kits §2.2 starters first; the row is in Data/class-kits.json.
+        BreakerClassKitApply(*Caster);
         // O39's "honest emptiness" is closed: Spellblade, Void Whisperer and
         // Multispell are now authored (Class-Kits §2.3-2.5), so BranchTrees
         // is populated exactly like Swift's, Core tree included. The seven
@@ -4240,18 +4421,16 @@ UBreakerClassDefinition* UBreakerProgressionLibrary::GetFallbackClassDefinition(
     // tree node granted at level one — a node, never a slot occupant — and
     // ClassAbilityTwo ships EMPTY until the first quartermaster unlock. The
     // visibly empty slot is the feature: it is the first thing a token fills.
-    Swift->StarterAbilityIds = {TEXT("Swift.Skim")};
-    // All six remaining class abilities are unlockables — Slipcut first in
-    // the list because the quartermaster offers in this order and Slipcut is
+    //
+    // The five remaining class abilities are unlockables — Slipcut first in
+    // the row because the quartermaster offers in this order and Slipcut is
     // Frenzy's ignition, the fantasy the ruling moved off the starter row;
     // Lead joins them (it was only ever a starter because the old single
     // list held two). Five purchases against the DERIVED token schedule
     // (AbilityTokenLevelForIndex, O138) — the count reads this list, so all
     // five are reachable and the last lands at the shared completion level.
-    Swift->UnlockableAbilityIds = {
-        TEXT("Swift.Slipcut"), TEXT("Swift.Lead"), TEXT("Swift.CadenceBreak"),
-        TEXT("Swift.HardStop"), TEXT("Swift.Sightline")};
-    Swift->BaseUltimateId = TEXT("Swift.Overdrive");
+    // The row is in Data/class-kits.json.
+    BreakerClassKitApply(*Swift);
     // Class-Kits §1.3-1.5 order: Frenzy, Kinetic, Marksman. The branch strip
     // reads this list, so it now shows the three chips the design names.
     Swift->BranchTrees.Add(GetSwiftFrenzyTree());

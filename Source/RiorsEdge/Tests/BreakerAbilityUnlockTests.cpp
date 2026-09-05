@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Abilities/BreakerAbilityDefinition.h"
+#include "Data/BreakerDataFile.h"
 #include "Progression/BreakerClassDefinition.h"
 #include "Progression/BreakerExperience.h"
 #include "Progression/BreakerProgressionComponent.h"
@@ -103,6 +104,61 @@ bool FBreakerAbilityCataloguePartitionTest::RunTest(const FString& Parameters)
             TestTrue(*(Context + TEXT(" catalogues registered id ") + Id.ToString()), Partitioned.Contains(Id));
         }
     }
+    return true;
+}
+
+// (a2) The shipped stock file. The catalogue is a row in Data/class-kits.json;
+// this reads the file the way the library does and pins the one fact the
+// quartermaster screen makes player-visible: Swift's first offer is Slipcut.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerClassKitsShippedTest,
+    "RiorsEdge.Data.ClassKits.Shipped",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerClassKitsShippedTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = UBreakerProgressionLibrary::GetClassKitDataErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    BreakerDataFile::FBreakerDataErrors Errors;
+    const TSharedPtr<FJsonObject> Root = BreakerDataFile::Load(UBreakerProgressionLibrary::ClassKitsRelativePath(), Errors);
+    if (!TestTrue(TEXT("Data/class-kits.json reads as a JSON object"), Root.IsValid() && Errors.IsClean()))
+    {
+        AddError(Errors.Join());
+        return false;
+    }
+    const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+    if (!TestTrue(TEXT("the file carries a \"classKits\" array"), Root->TryGetArrayField(TEXT("classKits"), Rows)))
+    {
+        return false;
+    }
+    TestEqual(TEXT("one row per shipped class"), Rows->Num(), BreakerUnlockTest::UnlockTestAllClasses().Num());
+    for (const TSharedPtr<FJsonValue>& Value : *Rows)
+    {
+        const TSharedPtr<FJsonObject>* Row = nullptr;
+        FString ClassName;
+        EBreakerClassId ClassId = EBreakerClassId::None;
+        const bool bRowIsObject = Value.IsValid() && Value->TryGetObject(Row);
+        TestTrue(TEXT("a row is an object"), bRowIsObject);
+        if (!bRowIsObject) continue;
+        (*Row)->TryGetStringField(TEXT("classId"), ClassName);
+        TestTrue(*FString::Printf(TEXT("\"%s\" parses to an EBreakerClassId"), *ClassName),
+            BreakerDataFile::ParseEnum(ClassName, ClassId) && ClassId != EBreakerClassId::None);
+    }
+
+    // The offer order is the row order: Slipcut is Frenzy's ignition and the
+    // first thing Swift's first token can buy.
+    const UBreakerClassDefinition* Swift = UBreakerProgressionLibrary::GetFallbackClassDefinition(EBreakerClassId::Swift);
+    if (!TestNotNull(TEXT("Swift has a definition"), Swift)) return false;
+    if (!TestTrue(TEXT("Swift sells something"), Swift->UnlockableAbilityIds.Num() > 0)) return false;
+    TestEqual(TEXT("Swift's first offer is Slipcut"), Swift->UnlockableAbilityIds[0], FName(TEXT("Swift.Slipcut")));
     return true;
 }
 

@@ -81,8 +81,8 @@ enum class EBreakerStatTarget : uint8
     // holds it, resolvable but never rolled) so no player spends a suffix on
     // a stat the slice cannot test them with — the "lies to nobody" rule,
     // one step up: the LINE is honest, so the POOL has to be. The day
-    // elemental incoming lands, pool entry is one Add() in
-    // BuildSliceAffixPool.
+    // elemental incoming lands, pool entry is one row in
+    // Data/affixes.json.
     ElementalDamageReduction,
     CriticalChance,
     CriticalDamage,

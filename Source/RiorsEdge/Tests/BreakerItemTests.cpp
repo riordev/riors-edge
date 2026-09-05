@@ -372,12 +372,12 @@ bool FBreakerEquipmentAggregationTest::RunTest(const FString& Parameters)
     Boots.Slot = EBreakerEquipSlot::Boots;
     Boots.Affixes.Add(MakeRolled(TEXT("Core.Health"), 100.0f, EBreakerAffixCategory::Suffix));
     Boots.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 5.0f, EBreakerAffixCategory::Prefix));
+    Boots.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 3.0f, EBreakerAffixCategory::Prefix));
 
     FBreakerItemInstance Helmet;
     Helmet.ItemId = FGuid::NewGuid();
     Helmet.Slot = EBreakerEquipSlot::Helmet;
     Helmet.Affixes.Add(MakeRolled(TEXT("Core.Health"), 50.0f, EBreakerAffixCategory::Suffix));
-    Helmet.Affixes.Add(MakeRolled(TEXT("Core.MoveSpeed"), 3.0f, EBreakerAffixCategory::Prefix));
     Helmet.Affixes.Add(MakeRolled(TEXT("Crit.Chance"), 6.0f, EBreakerAffixCategory::Prefix));
 
     // Two sources of increased Weapon Damage must land in one additive bucket.
@@ -452,6 +452,69 @@ bool FBreakerEquipmentContributionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Unequipping restores the pre-equip health exactly"), Attributes->GetMaxHealth(), BaseHealth);
     TestEqual(TEXT("Unequipping restores the pre-equip move speed exactly"), Attributes->GetMoveSpeed(), BaseSpeed);
     TestEqual(TEXT("The base value is never overwritten"), Attributes->GetAttributeBase(EBreakerAggregatedAttribute::MaxHealth), BaseHealth);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE MOVESPEED CAP (O192)
+// ---------------------------------------------------------------------------
+// Data/affixes.json publishes a ceiling on the SUMMED gear Movement Speed
+// percentage, and AggregateStats clamps against it before the display copy
+// and before the attribute push. The rule is pinned as arithmetic on the
+// library first, then once through the aggregator at both of its exits, so
+// the two can never read a different number.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMoveSpeedCapTest,
+    "RiorsEdge.Items.Affixes.MoveSpeedCap",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMoveSpeedCapTest::RunTest(const FString& Parameters)
+{
+    using ALib = UBreakerAffixLibrary;
+    constexpr EBreakerStatTarget Target = EBreakerStatTarget::MoveSpeed;
+
+    // The shipped configuration: the cap is a published, positive number.
+    const float Cap = ALib::GetStatCap(Target);
+    TestTrue(TEXT("Data/affixes.json publishes a positive MoveSpeed cap"), Cap > 0.0f);
+    TestTrue(TEXT("The MoveSpeed cap is a number, not the uncapped sentinel"), Cap < TNumericLimits<float>::Max());
+    AddInfo(FString::Printf(TEXT("MoveSpeed cap: %.0f%% (O2 PLACEHOLDER)"), Cap));
+
+    // The rule.
+    TestEqual(TEXT("A sum below the cap is untouched"), ALib::CapStat(Target, Cap * 0.5f), Cap * 0.5f);
+    TestEqual(TEXT("A sum at the cap is the cap"), ALib::CapStat(Target, Cap), Cap);
+    TestEqual(TEXT("A sum above the cap is clamped to the cap"), ALib::CapStat(Target, Cap + 50.0f), Cap);
+    TestEqual(TEXT("A negative sum (a bill) is not raised"), ALib::CapStat(Target, -10.0f), -10.0f);
+
+    // Both exits of the aggregator read the SAME clamped number: the display
+    // multiplier on the stats and the raw percentage handed to the attribute
+    // set. Boots, because Movement Speed is a boots line.
+    auto MakeBoots = [](float MoveSpeedValue)
+    {
+        FBreakerItemInstance Boots;
+        Boots.ItemId = FGuid::NewGuid();
+        Boots.Slot = EBreakerEquipSlot::Boots;
+        FBreakerRolledAffix Rolled;
+        Rolled.AffixId = TEXT("Core.MoveSpeed");
+        Rolled.Tier = 1;
+        Rolled.Value = MoveSpeedValue;
+        Rolled.Category = EBreakerAffixCategory::Prefix;
+        Boots.Affixes.Add(Rolled);
+        return Boots;
+    };
+
+    FBreakerAttributeContribution Under;
+    const FBreakerEquipmentStats UnderStats = UBreakerEquipmentComponent::AggregateStats({MakeBoots(Cap * 0.25f)}, &Under);
+    TestEqual(TEXT("Below the cap the display multiplier is the raw sum"),
+        UnderStats.MoveSpeedMultiplier, 1.0f + Cap * 0.25f / 100.0f, 0.0001f);
+    TestEqual(TEXT("Below the cap the attribute push is the raw sum"),
+        Under.GetIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed), Cap * 0.25f, 0.0001f);
+
+    FBreakerAttributeContribution Over;
+    const FBreakerEquipmentStats OverStats = UBreakerEquipmentComponent::AggregateStats({MakeBoots(Cap * 0.75f), MakeBoots(Cap * 0.75f)}, &Over);
+    TestEqual(TEXT("Above the cap the display multiplier is the cap"),
+        OverStats.MoveSpeedMultiplier, 1.0f + Cap / 100.0f, 0.0001f);
+    TestEqual(TEXT("Above the cap the attribute push is the cap"),
+        Over.GetIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed), Cap, 0.0001f);
     return true;
 }
 

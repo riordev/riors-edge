@@ -993,7 +993,13 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     }
     Stats.ResourceRegenPerSecond = FlatByTarget[static_cast<int32>(EBreakerStatTarget::ResourceRegen)];
     Stats.BonusMaxResource = FlatByTarget[static_cast<int32>(EBreakerStatTarget::MaxResource)];
-    Stats.MoveSpeedMultiplier = Increased(EBreakerStatTarget::MoveSpeed);
+    // The summed gear percentage is clamped to the cap Data/affixes.json
+    // publishes BEFORE it reaches either the display copy here or the
+    // attribute push below, so the two can never disagree about what gear is
+    // worth. The cap is the data file's, not a literal here (O192).
+    const float MoveSpeedPercent = UBreakerAffixLibrary::CapStat(EBreakerStatTarget::MoveSpeed,
+        IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)]);
+    Stats.MoveSpeedMultiplier = 1.0f + MoveSpeedPercent / 100.0f;
     Stats.DropChancePercent = IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::DropChance)];
     // RELENTLESS rewrites this cap. The clamp was a bare 60.0f literal; it is
     // now the one number the rule set publishes, and the resolved value is
@@ -1078,7 +1084,7 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         OutContribution->AddFlat(EBreakerAggregatedAttribute::MaxClassResource, Stats.BonusMaxResource);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalChance, Stats.CriticalChanceBonus);
         OutContribution->AddFlat(EBreakerAggregatedAttribute::CriticalMultiplier, Stats.CriticalMultiplierBonus);
-        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::MoveSpeed)]);
+        OutContribution->AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, MoveSpeedPercent);
         // Slide speed, air control and dash cooldown reduction were the last
         // stats that reached gameplay WITHOUT passing through the aggregator:
         // the movement component read the composed multipliers below and the
