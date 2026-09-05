@@ -97,6 +97,56 @@ bool FBreakerWaveCadenceTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerWaveAutoAdvanceTest,
+    "RiorsEdge.Game.Waves.AutoAdvance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerWaveAutoAdvanceTest::RunTest(const FString& Parameters)
+{
+    // A RIFT'S WAVES FOLLOW EACH OTHER WITHOUT A KEY; THE GYM'S WAIT FOR ONE.
+    // The gym is the TTK instrument and F4 is its pacing; a run is the
+    // player's loop and a yard that empties and then waits for a test-bench
+    // key is the "empty yard" defect one wave later.
+    using ELib = UBreakerWaveBudgetLibrary;
+    float Delay = -1.0f;
+
+    // The shipped configuration: default-constructed params are the gym's,
+    // and the gym never advances itself, on any kind of wave.
+    const FBreakerWaveBudgetParams Gym;
+    TestFalse(TEXT("the gym's params are not a rift's"), Gym.bRiftInstance);
+    for (const int32 Wave : {1, 5, 6, 12})
+    {
+        TestFalse(FString::Printf(TEXT("gym wave %d does not advance itself"), Wave),
+            ELib::GetAutoAdvanceDelay(Wave, Gym, Delay));
+    }
+
+    // The rift the door builds: wave 1 and 2 carry on after the standard
+    // breather, and nothing follows the boss on 3.
+    const FBreakerWaveBudgetParams Rift = ELib::MakeRiftWaveBudget(3);
+    TestTrue(TEXT("the door's params are a rift's"), Rift.bRiftInstance);
+    TestFalse(TEXT("nothing has cleared before wave 1"), ELib::GetAutoAdvanceDelay(0, Rift, Delay));
+    TestTrue(TEXT("rift wave 1 advances on the clear"), ELib::GetAutoAdvanceDelay(1, Rift, Delay));
+    TestEqual(TEXT("after a standard wave the breather is the clear breather"),
+        Delay, Rift.WaveClearBreatherSeconds);
+    TestTrue(TEXT("rift wave 2 advances on the clear"), ELib::GetAutoAdvanceDelay(2, Rift, Delay));
+    TestFalse(TEXT("nothing follows the boss wave: the run ends through O168"),
+        ELib::GetAutoAdvanceDelay(3, Rift, Delay));
+
+    // A longer rift tier that reaches a rest wave honours the rest breather
+    // there, not the clear breather.
+    FBreakerWaveBudgetParams Tier = ELib::MakeRiftWaveBudget(5);
+    Tier.RestWaveInterval = 2;
+    TestEqual(TEXT("wave 2 of the tier rests"), ELib::GetWaveKind(2, Tier), EBreakerWaveKind::Rest);
+    TestTrue(TEXT("a rest wave still advances"), ELib::GetAutoAdvanceDelay(2, Tier, Delay));
+    TestEqual(TEXT("after a rest wave the breather is the rest breather"),
+        Delay, Tier.RestBreatherSeconds);
+    TestTrue(TEXT("the rest breather is the longer of the two"),
+        Tier.RestBreatherSeconds > Tier.WaveClearBreatherSeconds);
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWaveCompositionTest,
     "RiorsEdge.Game.Waves.Composition",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

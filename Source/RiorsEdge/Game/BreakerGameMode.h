@@ -579,6 +579,13 @@ private:
     // separates the two builds of one map \u2014 the yard has a rift door and no
     // fight, the instance has a fight and no door.
     bool bRiftInstance = false;
+    // THE RUN CARRIES ITSELF (GROUND-7). Wave 1 arrives with the build; every
+    // later wave arrives on the clear, after the breather the budget names
+    // (UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay). Negative means no
+    // countdown is running. Ticked rather than timed so a re-solve or a
+    // completion mid-breather simply stops it.
+    float WaveAdvanceCountdown = -1.0f;
+    void TickWaveAdvance(float DeltaSeconds);
     // THE FIELD THE SPAWNER IS CONTAINED IN. MakeCoverFieldParams builds the
     // GYM's band from this actor's own properties, which is right on the gym
     // and wrong everywhere else: an authored zone carries its own band, its own

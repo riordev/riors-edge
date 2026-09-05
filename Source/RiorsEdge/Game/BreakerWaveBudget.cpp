@@ -71,6 +71,27 @@ EBreakerWaveKind UBreakerWaveBudgetLibrary::GetWaveKind(int32 Wave, const FBreak
     return EBreakerWaveKind::Standard;
 }
 
+bool UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay(int32 ClearedWave, const FBreakerWaveBudgetParams& Params, float& OutDelaySeconds)
+{
+    OutDelaySeconds = 0.0f;
+    // The gym never advances itself: it is the instrument, and its pacing is
+    // the tester's key.
+    if (!Params.bRiftInstance || ClearedWave <= 0) return false;
+    switch (GetWaveKind(ClearedWave, Params))
+    {
+    case EBreakerWaveKind::Boss:
+        // Nothing follows the boss. The run ends when the terminator dies
+        // (O168), and a wave after it would be a run that cannot end.
+        return false;
+    case EBreakerWaveKind::Rest:
+        OutDelaySeconds = FMath::Max(Params.RestBreatherSeconds, 0.0f);
+        return true;
+    default:
+        OutDelaySeconds = FMath::Max(Params.WaveClearBreatherSeconds, 0.0f);
+        return true;
+    }
+}
+
 int32 UBreakerWaveBudgetLibrary::GetMaximumLiveEnemies(int32 PartySize, const FBreakerWaveBudgetParams& Params)
 {
     return FMath::Max(PartySize, 1) * FMath::Max(Params.MaximumLiveEnemiesPerPlayer, 1);

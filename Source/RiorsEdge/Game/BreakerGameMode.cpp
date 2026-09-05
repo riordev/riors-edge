@@ -73,6 +73,7 @@ void ABreakerGameMode::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     TickSupplyCrate(DeltaSeconds);
+    TickWaveAdvance(DeltaSeconds);
     TickCrowdSampler(DeltaSeconds);
 }
 
@@ -546,10 +547,12 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
         }
         if (bRiftInstance)
         {
-            // THE RUN STARTS ITSELF. A rift the player has to press a key to
-            // populate is a test bench, and the gym already is one; walking
-            // through a tear and finding an empty yard is the opposite of a
-            // felt loop.
+            // THE RUN STARTS ITSELF, AND THEN CARRIES ITSELF. A rift the
+            // player has to press a key to populate is a test bench, and the
+            // gym already is one; walking through a tear and finding an empty
+            // yard is the opposite of a felt loop. Wave 1 arrives here; every
+            // later wave arrives on the clear (TickWaveAdvance), so F4 is
+            // never needed between the door and the boss.
             //
             // THE BOSS ARRIVES ON RiftBossWave, NOT THE GYM'S TWELVE. Twelve
             // waves is a wave-mode endurance figure and the ruling's success
@@ -2623,6 +2626,36 @@ void ABreakerGameMode::RefillPlayerAmmo()
     if (UBreakerWeaponComponent* Weapon = PlayerPawn ? PlayerPawn->FindComponentByClass<UBreakerWeaponComponent>() : nullptr)
     {
         Weapon->ResetAmmunition();
+    }
+}
+
+void ABreakerGameMode::TickWaveAdvance(float DeltaSeconds)
+{
+    // Only a run advances itself. The gym waits for F4 because it is the
+    // instrument, and a completed run is over: the latch is O168's, and a
+    // wave after it would be a run that cannot end.
+    if (!bRiftInstance || bRiftRunCompleted || CurrentWave <= 0) return;
+    if (IsWaveActive())
+    {
+        // A live wave, including one Breaker.Rift.Population just re-solved
+        // mid-breather: the countdown belongs to a clear that is no longer
+        // the current one.
+        WaveAdvanceCountdown = -1.0f;
+        return;
+    }
+    if (WaveAdvanceCountdown < 0.0f)
+    {
+        float Delay = 0.0f;
+        if (!UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay(CurrentWave, WaveBudget, Delay)) return;
+        WaveAdvanceCountdown = Delay;
+        UE_LOG(LogTemp, Display, TEXT("[Rift] wave %d cleared; wave %d in %.0fs."),
+            CurrentWave, CurrentWave + 1, Delay);
+    }
+    WaveAdvanceCountdown -= DeltaSeconds;
+    if (WaveAdvanceCountdown <= 0.0f)
+    {
+        WaveAdvanceCountdown = -1.0f;
+        StartNextWave();
     }
 }
 

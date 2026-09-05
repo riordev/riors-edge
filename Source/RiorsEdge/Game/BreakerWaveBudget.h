@@ -78,6 +78,10 @@ struct RIORSEDGE_API FBreakerWaveBudgetParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Cadence", meta=(ClampMin="0", ClampMax="1")) float RestBudgetFraction = 0.5f;   // O2 PLACEHOLDER
     // §4.3's breather. Nothing spawns for this long after a rest wave clears.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Cadence", meta=(ClampMin="0")) float RestBreatherSeconds = 20.0f;   // O2 PLACEHOLDER
+    // The pause between a STANDARD wave clearing and the next arriving, inside
+    // a rift. A run carries itself from door to boss (GetAutoAdvanceDelay);
+    // the gym does not, so this is never read there.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Waves|Cadence", meta=(ClampMin="0")) float WaveClearBreatherSeconds = 4.0f;   // O2 PLACEHOLDER
 
     // First wave each archetype may appear on. Lattice from 2 and Warden from 3
     // are §4.2's example compositions; the Skirmisher is placed at 4 because it
@@ -212,6 +216,14 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetWaveBudget(int32 Wave, const FBreakerWaveBudgetParams& Params);
     UFUNCTION(BlueprintPure, Category="Waves") static EBreakerWaveKind GetWaveKind(int32 Wave, const FBreakerWaveBudgetParams& Params);
+    // WHETHER WAVE ClearedWave+1 ARRIVES ON ITS OWN, and how long after the
+    // clear. True only inside a rift: the gym is the TTK instrument and F4 is
+    // its pacing, so a wave there waits for the tester. False after the boss
+    // wave, because the run ends through O168's terminator seam and not
+    // through a wave that follows the boss. The breather after a rest wave is
+    // the rest breather; after a standard wave it is WaveClearBreatherSeconds.
+    UFUNCTION(BlueprintPure, Category="Waves")
+    static bool GetAutoAdvanceDelay(int32 ClearedWave, const FBreakerWaveBudgetParams& Params, float& OutDelaySeconds);
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetMaximumLiveEnemies(int32 PartySize, const FBreakerWaveBudgetParams& Params);
     UFUNCTION(BlueprintPure, Category="Waves") static int32 GetMaximumElites(int32 PartySize, const FBreakerWaveBudgetParams& Params);
 

@@ -166,6 +166,7 @@ It does not own:
 | Forbidden modifier pairs never generate, across a large roll sample | `Encounter.Modifiers.ForbiddenPairs` |
 | A multi-modifier elite always draws from at least two pressure kinds | `Encounter.Modifiers.Diversity` |
 | Every density cap holds, and budget shortfall is reported rather than absorbed | `Game.WaveBudget.Caps` |
+| A rift's waves follow each other without a key; the gym's wait for one | `Game.Waves.AutoAdvance` |
 | Campaign rift enemy level never exceeds its margin above the player | `Game.RiftTier.LevelClamp` |
 | The shipped boot path reaches every map role, in the shipped configuration | `Game.BootFlow.ShippedConfiguration` |
 | The cover field is legal: no piece inside an instrument, no sub-dash gate | `Game.CoverRegistry.IsLayoutLegal` |
