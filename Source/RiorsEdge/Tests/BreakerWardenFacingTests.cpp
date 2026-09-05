@@ -1,19 +1,19 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "AI/BreakerEnemyMovementComponent.h"
+#include "Combat/BreakerEnemy.h"
 #include "Combat/BreakerWardenEnemy.h"
 
-// The turn-rate cap (owner playtest: "the shield guys instantly turn to you
-// so its hard to hit their weakspot") lives entirely in
-// ABreakerWardenEnemy::ComputeCappedFacing, which is pure and world-free by
-// design — this exercises exactly that function.
+// The turn-rate cap lives entirely in ABreakerEnemy::ComputeCappedFacing,
+// which is pure and world-free by design — this exercises exactly that
+// function, through the Warden, the archetype whose counterplay depends on it.
 //
-// What this file does NOT cover: that TickEngagedBehaviour actually feeds
-// ComputeCappedFacing's result into DesiredFacing every tick, and that the
-// base ABreakerEnemy::Tick's SetActorRotation call actually applies it to a
-// live actor's rotation. Neither can be exercised without a UWorld and a
-// running tick, which nothing in this suite constructs (see the file header
-// convention in BreakerBossAndArchetypeTests.cpp).
+// What this file does NOT cover: that the base ABreakerEnemy::Tick's
+// SetActorRotation call actually applies the capped facing to a live actor's
+// rotation. That cannot be exercised without a UWorld and a running tick,
+// which nothing in this suite constructs (see the file header convention in
+// BreakerBossAndArchetypeTests.cpp).
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerWardenFacingTurnRateTest,
@@ -86,6 +86,37 @@ bool FBreakerWardenFacingTurnRateTest::RunTest(const FString& Parameters)
                 FMath::RadiansToDegrees(PlayerSprintCmPerSecond / EngagementRadiusCm);
             TestTrue(TEXT("The player can out-turn the Warden's default cap at sweep range"),
                 PlayerAngularDegreesPerSecond > WardenDefaults->MaxTurnRateDegreesPerSecond);
+        }
+    }
+
+    // The shipped configuration of the cap every archetype turns through: a
+    // zero or non-finite cap would freeze every body's facing, or free it.
+    {
+        const ABreakerEnemy* EnemyDefaults = GetDefault<ABreakerEnemy>();
+        if (TestNotNull(TEXT("The enemy has a default object"), EnemyDefaults))
+        {
+            TestTrue(TEXT("The default turn-rate cap is positive"),
+                EnemyDefaults->MaxTurnRateDegreesPerSecond > 0.0f);
+            TestTrue(TEXT("The default turn-rate cap is finite"),
+                FMath::IsFinite(EnemyDefaults->MaxTurnRateDegreesPerSecond));
+
+            // The patrol hold: a body steering at its target stops at one
+            // capsule radius, so the mover's stopping distance from MoveSpeed
+            // (v^2 / 2a at its deceleration) must fit inside that radius or the
+            // body overshoots the hold and steers back through it every pass.
+            const UBreakerEnemyMovementComponent* MoverDefaults = EnemyDefaults->GetEnemyMovement();
+            if (TestNotNull(TEXT("The enemy default object carries its mover"), MoverDefaults))
+            {
+                const float MoveSpeed = EnemyDefaults->GetMoveSpeed();
+                const float Deceleration = MoverDefaults->Deceleration;
+                TestTrue(TEXT("The mover's default deceleration is positive"), Deceleration > 0.0f);
+                if (Deceleration > 0.0f)
+                {
+                    const float StoppingDistanceCm = (MoveSpeed * MoveSpeed) / (2.0f * Deceleration);
+                    TestTrue(TEXT("The patrol stopping distance fits inside the default capsule radius"),
+                        StoppingDistanceCm < EnemyDefaults->GetBodyCapsuleRadius());
+                }
+            }
         }
     }
 

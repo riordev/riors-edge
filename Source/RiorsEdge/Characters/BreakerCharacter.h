@@ -313,12 +313,17 @@ private:
 
     // ---- Viewmodel motion channel (sway / bob / landing dip) --------------
     // Tuning lives in the world-free params struct; the character only owns
-    // the two pieces of state a pure function cannot: the distance-driven bob
-    // phase, and the last airborne fall speed (Landed fires after the
-    // movement component has already zeroed the vertical velocity, so the dip
-    // reads the cached value from the final falling frame).
+    // the state a pure function cannot: the distance-driven bob phase, the
+    // two eased gait fractions (speed and sprint, each chasing the gait the
+    // feet are actually doing over GaitEaseSeconds so a jump, slide or
+    // landing never snaps the gun), and the last airborne fall speed (Landed
+    // fires after the movement component has already zeroed the vertical
+    // velocity, so the dip reads the cached value from the final falling
+    // frame).
     FBreakerViewmodelMotionParams ViewmodelMotion;
     float ViewmodelBobPhase = 0.0f;
+    float ViewmodelSpeedFraction = 0.0f;
+    float ViewmodelSprintFraction = 0.0f;
     float LastFallingSpeed = 0.0f;
     // The traversal exit dip (D3): bound to the movement component's
     // completed-only broadcast, pays the verb's authored kick into the

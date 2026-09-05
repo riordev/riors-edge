@@ -322,10 +322,19 @@ public:
     // player's level, gear or build — a playtester walks the curve by turning
     // GymAreaLevel up, not by levelling a character.
     //
+    // The fallback value is the area level a starter kit is on-level for: the
+    // issue rifle is item level 1, and monster health grows 9% per area level
+    // while weapon damage grows 9% per item level, so the two curves meet only
+    // where the gym's level equals the kit's. A rift travel overrides this
+    // with the rift's own area level before anything is built from it; this
+    // value stands for sessions with no chosen rift — PIE drop-ins and the
+    // capture harness. Combat.PowerCurve.GymEntry asserts the starter rifle
+    // breaks a ward and kills the boss inside O18's band at this level.
+    //
     // Both values are EditAnywhere so a playtest can sweep the curve without a
     // recompile. Area level also drives drop item level, which is the mechanism
     // that makes rising item level correspond to gameplay.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 10;   // O2 PLACEHOLDER
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Playtest|Area", meta=(ClampMin="1", ClampMax="100")) int32 GymAreaLevel = 1;   // O2 PLACEHOLDER
 
     // Logs what the gym built, so a headless smoke run can prove the
     // encounter spawned rather than merely that the process started.

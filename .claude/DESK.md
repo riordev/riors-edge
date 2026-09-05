@@ -5,37 +5,74 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Cycle 2 — what the owner felt after cycle 1 (one build)
-- [ ] Enemies spin hard until inside their effective range, and even then do not walk properly. Facing now reads correctly once close (screenshot: the pack looks at the player). Find what feeds `Facing` while closing — target direction vs path/steer direction alternating (PATH/STEER mode flips in the probe log), an unclamped yaw per tick, or the mover and `SetActorRotation` fighting — and why the gait does not read as walking at range. A yaw-rate cap is the O2 start if the source is legitimate flipping.
-- [ ] Shields make the boss, and every shielded enemy, effectively immortal. Find where shield damage routes (`ShieldDamage`, `bShieldBroken`, regen, `bOverhealToShield`) and why health never falls: a regen faster than the rifle, a break that never latches, or damage discarded when the shield is up. Pin the rifle-versus-shield break time on the shipped numbers.
-- [ ] Sprint, dash and slide race the bob. `AdvanceBobPhase` advances on raw `GroundSpeed`, so a dash or slide multiplies the footfall rate. Clamp the phase speed to the sprint cap and hold or decay the bob during dash/slide/air rather than racing it. Walking is right now; do not touch the walk numbers.
-- [ ] Sprint pose snaps on jump/slide: `SprintFraction` and `SpeedFraction` drop to 0 in one frame when `bGroundedStride` flips (`BreakerCharacter.cpp` ~1039–1057). A one-pole ease on the sprint fraction. Same header as the item above; one hands.
-- [ ] Muzzle flash off (owner, 2026-09-05): the Muzzle fallback moment draws nothing until a real flash asset exists. Death fallback untouched. `MuzzleClearsReticle` becomes the assertion that the moment is off; the size question is closed for now.
+## Open questions for the owner (bosses)
+- At area level 1 a rear-only boss kill is 241 rifle rounds against 150 carried; the fight's ammo comes from add kills and the supply crate. Is a boss meant to be sustainable on one loadout, or paced by add-kill ammo? `PowerCurve.GymEntry` prints the gap every run.
+- The "shield" on the boss is the Warden's frontal armour slab (90 armour, 47 % mitigation; the rear is unarmoured). O175 keeps it as the puzzle you flank. Should the front feel breakable instead?
 
-## Cycle 3 — what a death and a fight look like
+## Cycle 3 — enemies that move like enemies (NAV-2, NAV-3)
+- [ ] Ranged enemies use cover: lose line of sight, path to a cover point from the registry, re-acquire — on film from two vantages.
+- [ ] Squad shape: closers arrive from two angles, band-holders hold the band, the Warden fronts the player. Three archetypes at once give three reasons to move. Photographed.
+- [ ] Nav.Probe grows a squad frame and a cover frame so both cannot regress silently.
+
+## Cycle 4 — what a death and a fight look like (O193, O194)
 - [ ] O193 death beat: weapon lowers → camera drops/tilts and desaturates ~0.8 s → one low sound → black ~1.2 s → fade-in at tileset start, input on first visible frame. `HandlePlayerDeath` is the site.
 - [ ] Health bar reads `0 —— 0` while dead; should read `0 —— 100`.
 - [ ] O194 rank law: Elite +15 % scale + halo; Champion +30 % + two diamonds; ELITE leaves the label; CLOSING/HELD leave the screen.
 - [ ] Gun forward axis: eight meshes checked through `NamedMeshPath`; muzzle is the far end; photographed at rest.
 - [ ] Lighting settles before the fade-in ends: hold the fade until Lumen's surface cache is warm on runtime-spawned geometry; travel flicker is the same fix.
 
-## Cycle 4 — the voice
+## Cycle 5 — content out of C++ (DATA-2, DATA-4; O186)
+- [ ] Affix pools → `Data/affixes.json`: a tier value changes with no compile; `Items.Affixes.Breadth` holds; the census reads the file. One library, one commit.
+- [ ] Movement Speed affix on Boots with its cap (O192), as a row.
+- [ ] Ability definitions, quests, dialogue → data; the quartermaster's stock is a row (DATA-4). Split across builds if the first is not one build.
+
+## Cycle 6 — the flat-damage ruling lands (R1)
+- Owner rules R1 first: weapons and gear carry a true flat Added Damage fed by an affix and a weapon base line, or the Flat term leaves `power-and-scaling.md`. Then LEDGER-3 (affix pool 28 → 56) and the at-cap band re-measured (`PowerBand.AtCap` is expected red today).
+
+## Cycle 7 — the boss grammar and two more bosses (FIELD-3)
+- [ ] Telegraph → punish window → phase gate → add wave → arena change as a pure header; the shield is the first punish window, not a wall.
+- [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss.
+
+## Cycle 8 — the Niagara pass (GLASS-1, O179, O190)
+- [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash comes back here and nowhere earlier.
+- [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
+
+## Then, in this order, each sized when it reaches the top
+1. Elements and the reaction matrix; statuses as the cross-class combo language (KIT-3: Rot spread by pierce, Provoke grouping for MineCluster; no class-pair specials).
+2. Volatile enemies as player weapons; Momentum reads off the gun (KIT-2: spread and tracer brightness follow the bar).
+3. Rift interiors (GROUND-1): three to five room shapes measured against the gap rules, feeding the wave solver.
+4. Ten authored legendaries with printed forfeits (LEDGER-4, O66/O67).
+5. Anomalies as the first real endgame (GROUND-3): key → run → payout as a functional test.
+6. Two-seat listen-server smoke every cycle (O185), then Dungeons, then Raids.
+
+## The voice (O195) — slots in whenever a cycle has room
 - [ ] O195 string table: every player-facing `TEXT("…")` in `UI/` and `Game/` → `Data/strings.json`; TILESET / BANKED / SETTLED never reach the screen.
 - [ ] Menu checklist: every screen photographed; hover/press states, transitions, type hierarchy, density, faded-disabled — a list the owner marks.
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
 - [ ] Movement Speed affix on Boots (O192), after affixes are data.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- Ranged enemies have no walk sequence and move in ref pose; STEER frames call StopMovement and rebuild velocity from zero each flip (the stutter at range). Both recorded at the site in `BreakerEnemy.cpp` Tick.
+- `BossBand`'s 20/45 s constants are function-local; `PromotedBossSecondsFloor/Ceiling` duplicate them. One line in BossBand to share the pair.
 - NAV-2 cover on the nav · DATA-2 affixes to data · FIELD-3 boss grammar · GROUND-4 functional tests · GLASS-3 the 11K-line split · NAV cover/squad · Anomalies
 - `SlideEntrySpeed = 550` is still absolute (0.92 of the 595 walk; was reachable in the top 45 cm/s of a walk only) — a fraction of `WalkSpeed` like the Momentum gates.
 - `BreakerGameMode.h` field grammar comments derive `DashRefreshDistance 4400` and `OneJumpGap 700` from a 1100 sprint; the sprint is 990.
 - A sprint-only bob frequency needs a `SprintStrideLengthCm` and a lerp; `StrideLengthCm 360` is shared with the walk.
+
+## Filing notes
+Every note the owner writes carries one of these tags so the queue reads by category: AI (behaviour, not roster) · bosses · animation · VFX/hit feedback · networking/party/social · loot & economy · encounter/level tooling · content authoring pipeline · onboarding/first hour · endgame loop · performance budget · telemetry · accessibility/input · persistence · systems · core gameplay · weapons · abilities · classes · maps · enemies · story · build diversity · fun interactions · visuals · sound · movement · ui · npcs.
 
 ## Owner only
 - Fab mannequin/GASP, Ultimate Modular Women, Sonniss extract (arms, anims, real audio all wait on these)
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+
+### Cycle 2
+- [x] Enemies turn through one cap: `MaxTurnRateDegreesPerSecond` (100) hoisted from the Warden to every enemy; PATROL idles within its capsule radius instead of flipping 180° per tick on the overshoot; the walk sequence's play rate follows speed over `MoveSpeed`. Nav.Probe prints `turn=`; TURN FAIL past cap + 10.
+- [x] Nothing was wrong with shields. The gym ran at area level 10 against an item-level-1 rifle (2.17× health). `GymAreaLevel` 10 → 1; `PowerCurve.GymEntry` pins the starter kit against the gym: ward breaks in 14 rounds / 1.4 s, boss in 24.1 s.
+- [x] Dash and slide no longer race the bob: the phase speed is clamped to the sprint cap; the sprint pose and bob envelope ease over 0.12 s instead of snapping on jump, slide or landing. The sprint's own 2.75 footfalls/s is unchanged.
+- [x] Muzzle flash off: the Muzzle fallback draws nothing; the slot waits for NS_Muzzle in Cycle 8. Death fallback unchanged.
 
 ### Cycle 1
 - [x] `lane/batch1-field`: already on main as rebased copies (5d45a6c, 4b10f98, 12147d4, 310eb8a, 7c12c4d); nothing merged.

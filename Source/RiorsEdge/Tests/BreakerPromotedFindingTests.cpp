@@ -4,8 +4,11 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerBossEnemy.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerEnemyModifiers.h"
 #include "Combat/BreakerMonsterChassis.h"
+#include "Game/BreakerGameMode.h"
 #include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerEquipmentComponent.h"
 #include "Items/BreakerItemTypes.h"
 #include "Tests/BreakerBaselineLoadout.h"
 #include "Tests/BreakerStatusEmit.h"
@@ -67,6 +70,11 @@ namespace BreakerPromotedFindingTest
     // so a TTK figure below says what it is a target FOR — a Warden trash mob
     // at x3.2 kills in 2.9s and that is on target, not 3x adrift.
     constexpr float PromotedReferenceArchetype = 1.0f;
+
+    // O18's seed band for a baseline boss kill. The same two figures BossBand
+    // asserts at area level 50; GymEntry asserts them at the gym's own level.
+    constexpr float PromotedBossSecondsFloor = 20.0f;
+    constexpr float PromotedBossSecondsCeiling = 45.0f;
 
     float PromotedWeaponGrowth()
     {
@@ -553,6 +561,95 @@ bool FBreakerBossBandTest::RunTest(const FString& Parameters)
         Seconds >= BossSecondsFloor);
     TestTrue(*FString::Printf(TEXT("A baseline boss kill (%.1fs) is at most %.0fs"), Seconds, BossSecondsCeiling),
         Seconds <= BossSecondsCeiling);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE GYM'S FRONT DOOR, WITH THE KIT ONE WALKS IN HOLDING
+// ---------------------------------------------------------------------------
+// Every TTK figure above measures a weapon at the DROP item level of the area
+// it fights in: on-level gear against on-level monsters. The gym is not that.
+// A fresh character arrives holding the issue rifle at item level 1, and the
+// gym's monsters are built at the game mode's fallback area level, whatever it
+// is. Those two numbers are set in two files with nothing between them, and
+// when they disagree the monsters carry 1.09 to the power of the gap in health
+// the rifle is not scaled for: a ward sized to break inside half a magazine
+// eats a whole one and recharges before the reload finishes, and reads as a
+// shield defect.
+//
+// So this asserts the pair. Both are READ: the area level off the game mode's
+// CDO, the item level off the starter rifle the equipment component actually
+// issues. The weapon is the same slot resolution the other tests use; only the
+// item level differs, because the question is what the KIT does, not what
+// on-level gear would.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerGymEntryTest,
+    "RiorsEdge.Combat.PowerCurve.GymEntry",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerGymEntryTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerPromotedFindingTest;
+    const FBreakerMonsterChassisParams Chassis;
+    const FBreakerEnemyModifierParams Modifiers;
+
+    const int32 AreaLevel = GetDefault<ABreakerGameMode>()->GymAreaLevel;
+    const int32 StarterItemLevel = UBreakerEquipmentComponent::MakeStarterRifle().ItemLevel;
+    AddInfo(FString::Printf(TEXT("GYM ENTRY  gym area level %d, starter rifle item level %d"),
+        AreaLevel, StarterItemLevel));
+
+    const UBreakerWeaponDefinition* Definition = PromotedBaselineWeapon();
+    if (!TestNotNull(TEXT("The baseline slot resolves to a weapon definition"), Definition)) return false;
+
+    // The starter rifle's output, at ITS item level rather than the area's.
+    const float PerShot = FBreakerWeaponMath::WeaponBaseDamage(
+        Definition->Damage, StarterItemLevel, PromotedWeaponGrowth())
+        * FMath::Max(1, Definition->PelletsPerShot);
+    const float SecondsPerRound = 60.0f / FMath::Max(Definition->RoundsPerMinute, UE_SMALL_NUMBER);
+    const float DamagePerSecond = PerShot / SecondsPerRound;
+    const int32 Carried = Definition->MagazineSize + Definition->StartingReserveAmmo;
+
+    // (a) A Warded carrier's ward breaks inside one magazine and before the
+    // recharge delay can start refilling it. A carrier is ModifierBearing rank
+    // on the reference archetype, the same convention TrashTtk names.
+    const float CarrierHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+        AreaLevel, EBreakerMonsterRank::ModifierBearing, Chassis, PromotedReferenceArchetype);
+    const float Ward = UBreakerEnemyModifierLibrary::GetWardShieldAmount(CarrierHealth, Modifiers);
+    const int32 WardRounds = FMath::CeilToInt(Ward / FMath::Max(PerShot, UE_SMALL_NUMBER));
+    const float WardSeconds = WardRounds * SecondsPerRound;
+
+    AddInfo(FString::Printf(
+        TEXT("GYM ENTRY  ward %.0f on a %.0f-health carrier: %d rounds of %.1f, %.2fs (magazine %d, recharge delay %.1fs)"),
+        Ward, CarrierHealth, WardRounds, PerShot, WardSeconds, Definition->MagazineSize, Modifiers.WardRechargeDelaySeconds));
+
+    TestTrue(*FString::Printf(TEXT("The starter rifle breaks a gym ward in one magazine (%d rounds of %d)"),
+        WardRounds, Definition->MagazineSize),
+        WardRounds <= Definition->MagazineSize);
+    TestTrue(*FString::Printf(TEXT("The starter rifle breaks a gym ward (%.2fs) before it can recharge (%.1fs)"),
+        WardSeconds, Modifiers.WardRechargeDelaySeconds),
+        WardSeconds < Modifiers.WardRechargeDelaySeconds);
+
+    // (b) The fielded boss, rear fire with no armour in the way, dies inside
+    // O18's band to the kit alone.
+    const float BossArchetype = GetDefault<ABreakerBossEnemy>()->GetArchetypeHealthMultiplier();
+    const float BossHealth = UBreakerMonsterChassisLibrary::GetMonsterHealth(
+        AreaLevel, EBreakerMonsterRank::Boss, Chassis, BossArchetype);
+    const float BossSeconds = BossHealth / FMath::Max(DamagePerSecond, UE_SMALL_NUMBER);
+    const int32 BossRounds = FMath::CeilToInt(BossHealth / FMath::Max(PerShot, UE_SMALL_NUMBER));
+
+    AddInfo(FString::Printf(TEXT("GYM ENTRY  boss %.0f health: %.1fs (O18 target %.0f-%.0fs)"),
+        BossHealth, BossSeconds, PromotedBossSecondsFloor, PromotedBossSecondsCeiling));
+    AddInfo(FString::Printf(
+        TEXT("GYM ENTRY  boss needs %d rounds; the kit carries %d (%d magazine + %d reserve), %d short before any pickup"),
+        BossRounds, Carried, Definition->MagazineSize, Definition->StartingReserveAmmo,
+        FMath::Max(0, BossRounds - Carried)));
+
+    TestTrue(*FString::Printf(TEXT("A starter-kit boss kill at the gym's level (%.1fs) is at least %.0fs"),
+        BossSeconds, PromotedBossSecondsFloor),
+        BossSeconds >= PromotedBossSecondsFloor);
+    TestTrue(*FString::Printf(TEXT("A starter-kit boss kill at the gym's level (%.1fs) is at most %.0fs"),
+        BossSeconds, PromotedBossSecondsCeiling),
+        BossSeconds <= PromotedBossSecondsCeiling);
     return true;
 }
 

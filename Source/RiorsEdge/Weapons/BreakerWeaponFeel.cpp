@@ -206,6 +206,16 @@ float FBreakerWeaponFeel::SprintFraction(float GroundSpeed, float WalkCap, float
     return FMath::Clamp((GroundSpeed - WalkCap) / (SprintCap - WalkCap), 0.0f, 1.0f);
 }
 
+float FBreakerWeaponFeel::EaseFraction(float Current, float Target, float DeltaSeconds, float TimeConstantSeconds)
+{
+    if (TimeConstantSeconds <= 0.0f || DeltaSeconds <= 0.0f)
+    {
+        return Target;
+    }
+    const float Alpha = 1.0f - FMath::Exp(-DeltaSeconds / TimeConstantSeconds);
+    return Current + (Target - Current) * Alpha;
+}
+
 FBreakerViewmodelMotionOffset FBreakerWeaponFeel::MotionOffsets(const FBreakerViewmodelMotionParams& Params,
     float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale, float SprintFraction)
 {

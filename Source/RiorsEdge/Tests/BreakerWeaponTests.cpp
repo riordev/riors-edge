@@ -1656,6 +1656,44 @@ bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
         FBreakerWeaponFeel::SprintFraction(Movement->WalkSpeed, Movement->GetWalkSpeedCap(), Movement->GetSprintSpeedCap()), 0.0f, 0.0f);
     TestEqual(TEXT("The shipped sprint cap is a full sprint in the hands"),
         FBreakerWeaponFeel::SprintFraction(Movement->SprintSpeed, Movement->GetWalkSpeedCap(), Movement->GetSprintSpeedCap()), 1.0f, 0.0f);
+
+    // The gait ease: the sprint pose and bob envelope chase the gait the feet
+    // are doing, so a jump or slide cannot drop them to zero in one frame and
+    // a landing cannot snap them back.
+    const float Frame = 1.0f / 60.0f;
+    const float OneFrameFromFull = FBreakerWeaponFeel::EaseFraction(1.0f, 0.0f, Frame, Params.GaitEaseSeconds);
+    TestTrue(TEXT("One airborne frame does not silence the gait"), OneFrameFromFull > 0.0f && OneFrameFromFull < 1.0f);
+    TestTrue(TEXT("One frame moves exactly the one-pole step"),
+        OneFrameFromFull < 1.0f - (1.0f - FMath::Exp(-1.0f / (60.0f * 0.12f))) + 0.0001f
+        && OneFrameFromFull > 1.0f - (1.0f - FMath::Exp(-1.0f / (60.0f * 0.12f))) - 0.0001f);
+    TestEqual(TEXT("A zero time constant is the target exactly"), FBreakerWeaponFeel::EaseFraction(0.3f, 0.8f, Frame, 0.0f), 0.8f, 0.0f);
+    TestEqual(TEXT("A non-positive frame is the target exactly"), FBreakerWeaponFeel::EaseFraction(0.3f, 0.8f, 0.0f, Params.GaitEaseSeconds), 0.8f, 0.0f);
+    float Eased = 0.0f;
+    for (int32 Index = 0; Index < 30; ++Index)
+    {
+        Eased = FBreakerWeaponFeel::EaseFraction(Eased, 1.0f, Frame, Params.GaitEaseSeconds);
+    }
+    TestTrue(TEXT("Half a second of landing settles the gait"), FMath::Abs(1.0f - Eased) < 0.02f);
+    TestTrue(TEXT("The gait ease has a duration"), Params.GaitEaseSeconds > 0.0f);
+    TestEqual(TEXT("The gait ease ships at 0.12 s"), Params.GaitEaseSeconds, 0.12f, 0.0001f);
+
+    // The stride clamp: the feet cannot fall faster than a sprint, so a dash
+    // above the cap advances the phase at sprint tempo. The clamp is
+    // load-bearing on the shipped numbers because a dash IS above the cap.
+    const float SprintCap = Movement->GetSprintSpeedCap();
+    TestEqual(TEXT("A speed above the sprint cap strides at the cap"),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, FMath::Min(3000.0f, SprintCap), Frame, Params.StrideLengthCm),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, Params.StrideLengthCm), 0.0f);
+    TestTrue(TEXT("The shipped dash is above the sprint cap"), Movement->DashSpeedFloor + Movement->DashSpeedBonus > SprintCap);
+    TestTrue(TEXT("The sprint cap advances the phase faster than the walk"),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, SprintCap, Frame, Params.StrideLengthCm)
+        > FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, Params.StrideLengthCm));
+
+    // Walk unchanged: one frame at the shipped walk speed over the shipped
+    // stride is 2π · 595 / (360 · 60) radians.
+    TestEqual(TEXT("The shipped walk's footfall rate is 595 over a 360 stride"),
+        FBreakerWeaponFeel::AdvanceBobPhase(0.0f, Movement->WalkSpeed, Frame, 360.0f),
+        2.0f * UE_PI * 595.0f / (360.0f * 60.0f), 0.00001f);
     return true;
 }
 

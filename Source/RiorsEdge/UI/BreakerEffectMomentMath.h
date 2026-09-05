@@ -105,9 +105,10 @@ namespace BreakerFX
     constexpr float MuzzleReticleClearanceRadians = 1.5f * (PI / 180.0f);
 
     // What the pooled renderer draws for a moment whose system is not
-    // authored yet. bDrawn false means "something else already is the
-    // fallback": the tracer renderer's spark is the impact, and a second glow
-    // on the same point would double-draw. All magnitudes O2 PLACEHOLDER.
+    // authored yet. bDrawn false means the moment has no primitive stand-in:
+    // the impact's fallback is the tracer renderer's spark, and a second glow
+    // on the same point would double-draw; the muzzle draws only from an
+    // authored NS_Muzzle. All magnitudes O2 PLACEHOLDER.
     struct FMomentFallback
     {
         bool bDrawn = true;
@@ -124,16 +125,9 @@ namespace BreakerFX
         switch (Moment)
         {
         case EBreakerEffectMoment::Muzzle:
-            // A flash, not a glow: gone before the next round at any cadence.
-            // Sized under MuzzleFallbackRadiusCeilingCm at the shipped aimed
-            // offset (95 fwd, 2 right, 6 down: a ceiling of 3.8 cm), which
-            // governs; the hip offset allows 23 cm. The 14 cm this shipped
-            // with was a world size at a camera distance: a 275 px disc on a
-            // 1920 px frame that covered the crosshair on every aimed shot.
-            F.RadiusCm = 3.5f;             // O2 PLACEHOLDER
-            F.Intensity = 4.5f;            // O2 PLACEHOLDER
-            F.Timing.DurationSeconds = 0.06f;   // O2 PLACEHOLDER
-            F.Timing.FadeOutSeconds = 0.04f;    // O2 PLACEHOLDER
+            // The muzzle has no primitive stand-in; it draws only when
+            // NS_Muzzle is authored. Any future fallback passes MuzzleFallbackRadiusCeilingCm.
+            F.bDrawn = false;
             break;
         case EBreakerEffectMoment::Impact:
             F.bDrawn = false;

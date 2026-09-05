@@ -58,6 +58,10 @@ namespace
     // plane. The fit yaws the mesh onto +X, so anything past this is a mech
     // looking sideways — the gym's "everyone looking left" as a number.
     constexpr float BreakerNavProbeFacingToleranceDeg = 15.0f;  // O2 PLACEHOLDER
+    // Slack over the enemy's own turn cap before a sample reads as a spin: the
+    // probe samples every half second, so a cap applied per tick can land a
+    // few degrees over the cap across one sample without being wrong.
+    constexpr float BreakerNavProbeTurnSlackDegPerSecond = 10.0f;  // O2 PLACEHOLDER
 
     float BreakerNavProbeDegreesBetween2D(const FVector& A, const FVector& B)
     {
@@ -124,6 +128,10 @@ namespace
         double StartTime = 0.0;
         bool bReached = false;
         bool bOnA = true;
+        // The actor yaw at the previous report, so the next one can print
+        // the turn rate across the sample interval.
+        float PreviousYaw = 0.0f;
+        bool bHasPreviousYaw = false;
     };
 
     void BreakerNavProbePlaceNow(UWorld* World, ABreakerCharacter* Player)
@@ -256,12 +264,26 @@ namespace
             const float ToPlayer = BreakerNavProbeDegreesBetween2D(BodyForward,
                 Target->GetActorLocation() - Enemy->GetActorLocation());
             const FString StateLabel = Enemy->GetEnemyStateLabel();
-            UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f"),
-                Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer);
+            // turn: the actor's yaw delta across the sample interval, in
+            // deg/s. The first sample has nothing to differ against and
+            // prints zero.
+            const float Yaw = static_cast<float>(Enemy->GetActorRotation().Yaw);
+            const float Turn = State->bHasPreviousYaw
+                ? FMath::Abs(FMath::FindDeltaAngleDegrees(State->PreviousYaw, Yaw)) / BreakerNavProbeReportSeconds
+                : 0.0f;
+            State->PreviousYaw = Yaw;
+            State->bHasPreviousYaw = true;
+            UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f turn=%.0f"),
+                Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer, Turn);
             if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL"))
             {
                 UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FACING FAIL body forward is %.0f deg off the actor's forward (tolerance %.0f)"),
                     Facing, BreakerNavProbeFacingToleranceDeg);
+            }
+            if (Turn > Enemy->MaxTurnRateDegreesPerSecond + BreakerNavProbeTurnSlackDegPerSecond)
+            {
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] TURN FAIL actor turned %.0f deg/s over the sample (cap %.0f)"),
+                    Turn, Enemy->MaxTurnRateDegreesPerSecond);
             }
             if (!State->bReached && Distance <= Enemy->GetAttackRange() + 45.0f)
             {

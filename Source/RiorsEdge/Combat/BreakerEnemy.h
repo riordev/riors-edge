@@ -225,6 +225,42 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalInnerRatio() const { return ArrivalInnerRatio; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetArrivalHysteresisCm() const { return ArrivalHysteresisCm; }
     UFUNCTION(BlueprintPure, Category="Enemy") float GetLungeRange() const { return LungeRange; }
+    // The body capsule's scaled radius, read-only. The patrol hold below uses
+    // it as its arrival threshold, so the shipped-configuration test must be
+    // able to compare it against the mover's stopping distance.
+    UFUNCTION(BlueprintPure, Category="Enemy") float GetBodyCapsuleRadius() const;
+
+    // --- Facing turn rate ---------------------------------------------------
+    // Every enemy turns through this cap. Tick rotates the actor's current
+    // forward toward the frame's facing by at most this many degrees per
+    // second before SetActorRotation; a body whose target flips behind it
+    // turns round rather than snapping.
+    //
+    // SEED ARITHMETIC (O2 placeholder, derived not guessed). Player sprint is
+    // 950 cm/s — the design-canon figure this codebase already cites at
+    // Combat/BreakerRangedEnemy.h:83 and Tests/BreakerBossAndArchetypeTests.cpp:182
+    // (the raw UBreakerCharacterMovementComponent::SprintSpeed literal is 1100,
+    // authored headroom above that canon figure, not the number to plan around).
+    // At the Warden's sweep range (SweepRangeCm = 320cm — the distance at which
+    // "engaged" actually starts mattering for that archetype) a player strafing
+    // at full sprint sweeps an angle at v/r radians/sec:
+    //   omega_player = 950 / 320 = 2.969 rad/s = 170.1 deg/s.
+    // The cap must sit strictly below that or the Warden's flank counterplay is
+    // unbeatable by definition. 100 deg/s is ~59% of the player's angular
+    // ceiling: a clear, visible turn-rate deficit (O2's "perceptible") while
+    // leaving the player roughly 1.7x angular headroom, enough to win the flank
+    // with an imperfect strafe rather than a frame-perfect one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Facing", meta=(ClampMin="0"))
+    float MaxTurnRateDegreesPerSecond = 100.0f;   // O2 PLACEHOLDER (see arithmetic above)
+
+    // Pure maths behind the cap: rotates CurrentForward toward DesiredDirection
+    // by at most MaxDegreesPerSecond * DeltaSeconds, turning the short way
+    // round. World-free and deliberately usable with no enemy instance at all,
+    // matching the UBreakerRangedBehaviorLibrary / CanBeginWallRide /
+    // ComputeGravityMultiplier idiom for anything that has to be testable
+    // without a running game.
+    static FVector ComputeCappedFacing(const FVector& CurrentForward, const FVector& DesiredDirection,
+        float MaxDegreesPerSecond, float DeltaSeconds);
     UFUNCTION(BlueprintPure, Category="Enemy") bool DoesRespawn() const { return bRespawns; }
     UFUNCTION(BlueprintPure, Category="Enemy") bool DoesExplodeOnDeath() const { return bExplodesOnDeath; }
 

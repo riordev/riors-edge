@@ -791,6 +791,34 @@ FString ABreakerEnemy::GetEnemyStateLabel() const
     return StateLabel;
 }
 
+float ABreakerEnemy::GetBodyCapsuleRadius() const
+{
+    return BodyCollision ? BodyCollision->GetScaledCapsuleRadius() : 0.0f;
+}
+
+FVector ABreakerEnemy::ComputeCappedFacing(const FVector& CurrentForward, const FVector& DesiredDirection,
+    float MaxDegreesPerSecond, float DeltaSeconds)
+{
+    const FVector Current = CurrentForward.GetSafeNormal2D();
+    const FVector Desired = DesiredDirection.GetSafeNormal2D();
+    if (Desired.IsNearlyZero()) return Current;
+    if (Current.IsNearlyZero()) return Desired;
+
+    const float DotClamped = FMath::Clamp(FVector::DotProduct(Current, Desired), -1.0f, 1.0f);
+    const float AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(DotClamped));
+    const float MaxStepDegrees = FMath::Max(0.0f, MaxDegreesPerSecond) * FMath::Max(0.0f, DeltaSeconds);
+    if (AngleDegrees <= MaxStepDegrees || AngleDegrees <= KINDA_SMALL_NUMBER)
+    {
+        return Desired;
+    }
+
+    // Signed by the Z component of the cross product so the body turns the
+    // SHORT way toward its target rather than always pivoting one direction.
+    const float Cross = Current.X * Desired.Y - Current.Y * Desired.X;
+    const float SignedStepDegrees = (Cross >= 0.0f ? 1.0f : -1.0f) * MaxStepDegrees;
+    return Current.RotateAngleAxis(SignedStepDegrees, FVector::UpVector);
+}
+
 void ABreakerEnemy::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -849,13 +877,27 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     {
         PatrolPhase += DeltaSeconds * 0.7f;
         const FVector PatrolTarget = LeashOrigin + FVector(0.0f, FMath::Sin(PatrolPhase) * 350.0f, 0.0f);
-        DesiredDirection = (PatrolTarget - GetActorLocation()).GetSafeNormal2D();
+        // Within one capsule radius of the target the body is THERE: it hands
+        // the mover a zero direction and holds its facing. The target drifts
+        // slower than the body walks, so a body that kept steering would sit
+        // on the target and flip its direction every time it overshot by a
+        // step; the radius is the arrival threshold, the same number the
+        // capsule already carries.
+        const FVector ToTarget = PatrolTarget - GetActorLocation();
+        DesiredDirection = ToTarget.Size2D() <= BodyCollision->GetScaledCapsuleRadius()
+            ? FVector::ZeroVector
+            : ToTarget.GetSafeNormal2D();
         StateLabel = TEXT("PATROL");
     }
 
     // Facing is decided before movement so an archetype that strafes sideways
-    // while aiming at the player still points its muzzle at the player.
-    const FVector Facing = DesiredFacing.IsNearlyZero() ? DesiredDirection : DesiredFacing;
+    // while aiming at the player still points its muzzle at the player. The
+    // turn is rate-capped here, once, for every archetype: whatever the
+    // behaviour asked for, the body rotates toward it by at most
+    // MaxTurnRateDegreesPerSecond this frame. The lunge and skitter lock a
+    // DIRECTION, not a facing, and are not touched by this.
+    FVector Facing = DesiredFacing.IsNearlyZero() ? DesiredDirection : DesiredFacing;
+    Facing = ComputeCappedFacing(GetActorForwardVector(), Facing, MaxTurnRateDegreesPerSecond, DeltaSeconds);
     if (!Facing.IsNearlyZero()) SetActorRotation(Facing.Rotation());
 
     // The safe-zone edge is decided here, on the behaviour's own step, before
@@ -878,6 +920,23 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     if (Mover)
     {
         Mover->Drive(DesiredDirection, SpeedScale, NearestPlayer, Distance, AttackRange, MoveSpeed);
+    }
+
+    // THE GAIT FOLLOWS THE GROUND SPEED. The named body's walk plays as a
+    // single-node loop; its rate is the body's planar speed over MoveSpeed,
+    // so a held body stands still instead of treadmilling and a closing body
+    // strides faster instead of sliding.
+    // O2 PLACEHOLDER: the reference speed is MoveSpeed until each sequence's
+    // stride is measured; a sequence whose authored stride does not cover
+    // MoveSpeed per cycle still slides by the ratio.
+    // Recorded gaps, not fixed here: the Ranged archetype ships no sequence
+    // and moves in its reference pose, so it has no gait to drive; and STEER
+    // frames call StopMovement and rebuild the velocity from the direction,
+    // so on those frames the velocity read here is the rebuilt one.
+    if (Mover && NamedBody && MoveSpeed > 0.0f && NamedBody->IsPlaying())
+    {
+        constexpr float MaxRate = 2.0f;   // O2 PLACEHOLDER
+        NamedBody->SetPlayRate(FMath::Clamp(Mover->Velocity.Size2D() / MoveSpeed, 0.0f, MaxRate));
     }
 }
 

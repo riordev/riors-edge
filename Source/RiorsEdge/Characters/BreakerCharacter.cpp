@@ -1021,9 +1021,9 @@ void ABreakerCharacter::UpdateViewmodelKick()
     // locomotion bob from ground covered, all of it quieted by ADS through
     // the same aim-blended multiplier the kick uses, and silenced while
     // sliding or airborne — a slide is a posture, not a stride. Pure maths in
-    // BreakerWeaponFeel; the two state members are on the character because
-    // this is the one place that ticks every frame regardless of the
-    // weapon's own feel-tick gating.
+    // BreakerWeaponFeel; the state members (phase and the two eased gait
+    // fractions) are on the character because this is the one place that
+    // ticks every frame regardless of the weapon's own feel-tick gating.
     FBreakerViewmodelMotionOffset Motion;
     if (const UWorld* MotionWorld = GetWorld())
     {
@@ -1038,23 +1038,36 @@ void ABreakerCharacter::UpdateViewmodelKick()
         const bool bTraversing = Move && Move->IsTraversingLedge();
         const bool bGroundedStride = Move && !bTraversing && !Move->IsFalling() && !Move->IsSliding();
         const bool bStriding = bGroundedStride || bTraversing;
+        // The grounded stride is clamped to the sprint cap: feet cannot fall
+        // faster than a sprint, so a dash (which writes well above the cap
+        // and bleeds back down over half a second) advances the phase at
+        // sprint tempo, not at dash speed. The traversal glide reads its own
+        // speed unclamped.
         const float StrideSpeed = bTraversing
             ? Move->GetLedgeTraversalStrideSpeed()
-            : (Move ? static_cast<float>(Move->Velocity.Size2D()) : 0.0f);
+            : (Move ? FMath::Min(static_cast<float>(Move->Velocity.Size2D()), Move->GetSprintSpeedCap()) : 0.0f);
         const float Delta = MotionWorld->GetDeltaSeconds();
         if (bStriding)
         {
             ViewmodelBobPhase = FBreakerWeaponFeel::AdvanceBobPhase(
                 ViewmodelBobPhase, StrideSpeed, Delta, ViewmodelMotion.StrideLengthCm);
         }
-        const float SpeedFraction = (bStriding && ViewmodelMotion.FullBobSpeed > 0.0f)
+        const float SpeedFractionTarget = (bStriding && ViewmodelMotion.FullBobSpeed > 0.0f)
             ? FMath::Clamp(StrideSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
         // THE SPRINT GAIT (KIT-4): read off actual ground speed between the
         // two composed caps, never off the toggle — a sprinting player
         // standing still gets no sprint gun. A traversal glide is not a gait.
-        const float SprintFraction = bGroundedStride
+        const float SprintFractionTarget = bGroundedStride
             ? FBreakerWeaponFeel::SprintFraction(StrideSpeed, Move->GetWalkSpeedCap(), Move->GetSprintSpeedCap())
             : 0.0f;
+        // Both fractions ease toward their targets rather than jumping: a
+        // jump or slide takes the feet off the ground in one frame, and the
+        // gun follows over GaitEaseSeconds instead of snapping the sprint
+        // pose off and back on at the landing.
+        ViewmodelSpeedFraction = FBreakerWeaponFeel::EaseFraction(
+            ViewmodelSpeedFraction, SpeedFractionTarget, Delta, ViewmodelMotion.GaitEaseSeconds);
+        ViewmodelSprintFraction = FBreakerWeaponFeel::EaseFraction(
+            ViewmodelSprintFraction, SprintFractionTarget, Delta, ViewmodelMotion.GaitEaseSeconds);
         // ADS quiets motion exactly as it quiets the kick: through the
         // profile's aim-blended viewmodel multiplier.
         float MotionScale = 1.0f;
@@ -1064,8 +1077,8 @@ void ABreakerCharacter::UpdateViewmodelKick()
             MotionScale = FMath::Lerp(1.0f, Profile.AimViewmodelMultiplier, Weapon->GetAimAlpha());
         }
         Motion = FBreakerWeaponFeel::MotionOffsets(ViewmodelMotion,
-            static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, SpeedFraction, MotionScale,
-            SprintFraction);
+            static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, ViewmodelSpeedFraction, MotionScale,
+            ViewmodelSprintFraction);
     }
     Rotation.Pitch += Motion.PitchDegrees;
     Rotation.Roll += Motion.RollDegrees;

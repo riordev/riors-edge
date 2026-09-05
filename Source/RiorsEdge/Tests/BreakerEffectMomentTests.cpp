@@ -2,7 +2,6 @@
 #include "UI/BreakerEffectMomentMath.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerUIStyle.h"
-#include "Weapons/BreakerWeaponComponent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -85,9 +84,8 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
     // The impact's fallback is the tracer renderer's spark, which already
     // exists; drawing a glow on top would double every hit.
     TestFalse(TEXT("Impact draws no second fallback"), MomentFallback(EBreakerEffectMoment::Impact).bDrawn);
+    TestTrue(TEXT("Death draws a fallback"), MomentFallback(EBreakerEffectMoment::Death).bDrawn);
 
-    float MuzzleDuration = 0.0f;
-    float LongestOther = 0.0f;
     for (EBreakerEffectMoment Moment : BreakerMomentAll)
     {
         const FMomentFallback F = MomentFallback(Moment);
@@ -104,16 +102,7 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Gone after the clip"), SampleEffect(F.Timing, F.Timing.DurationSeconds + 0.001f).bFinished);
         // A blink light, when asked for, is a real light.
         if (F.LightRadiusCm > 0.0f) TestTrue(TEXT("A lit fallback has intensity"), F.LightIntensity > 0.0f);
-
-        if (Moment == EBreakerEffectMoment::Muzzle) MuzzleDuration = F.Timing.DurationSeconds;
-        else LongestOther = FMath::Max(LongestOther, F.Timing.DurationSeconds);
     }
-    // A muzzle flash must be gone before the next round at any cadence the
-    // weapon table ships. The fastest shipped weapon is 900 rpm (one round
-    // every 0.0667 s); a flash that outlives that reads as a lamp, not a shot.
-    // It is the shortest moment.
-    TestTrue(TEXT("Muzzle is the shortest moment"), MuzzleDuration > 0.0f && MuzzleDuration < LongestOther);
-    TestTrue(TEXT("Muzzle clears a 900 rpm cadence"), MuzzleDuration <= 60.0f / 900.0f + KINDA_SMALL_NUMBER);
 
     // Shipped configuration: the pools exist and the pending ring can hold a
     // full spread's landed pellets plus the kill they made.
@@ -122,14 +111,13 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
     return true;
 }
 
-// The muzzle fallback is the one moment drawn at a fixed offset from the
-// player's own camera, so its size is a screen question: the flash must not
-// reach the reticle at either shipped muzzle offset (GLASS-5). The finding
-// this pins: the 14 cm radius GLASS-1 shipped, at the 95 cm the visual muzzle
-// stands from the viewpoint, was a disc sixteen degrees across — about 275 px
-// on a 1920 px frame at the default 90-degree field of view — whose edge came
-// within 2.5 degrees of the crosshair hip-fired and covered it outright
-// aimed, where the muzzle centre sits under four degrees off the axis.
+// The muzzle draws only from an authored NS_Muzzle; there is no primitive
+// stand-in. The muzzle is the one moment drawn at a fixed offset from the
+// player's own camera, so its size is a screen question: a flash must not
+// reach the reticle at either shipped muzzle offset (GLASS-5, O179's camera
+// law). MuzzleFallbackRadiusCeilingCm is the size law any future fallback
+// must pass; this test proves the law on synthetic offsets and that the
+// shipped configuration draws nothing at the muzzle.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerEffectMomentMuzzleReticleTest,
     "RiorsEdge.UI.EffectMoment.MuzzleClearsReticle",
@@ -163,20 +151,10 @@ bool FBreakerEffectMomentMuzzleReticleTest::RunTest(const FString& Parameters)
         MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 18.0f, 0.0f), Clearance),
         MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 0.0f, -18.0f), Clearance), 1.0e-3f));
 
-    // Shipped configuration: the constant the renderer draws sits under the
-    // ceiling at BOTH shipped offsets, read from the weapon component's own
-    // defaults rather than restated here, so an offset change that brings
-    // the muzzle back under the crosshair goes red at this line.
-    const UBreakerWeaponComponent* CDO = GetDefault<UBreakerWeaponComponent>();
-    if (!TestNotNull(TEXT("Weapon component defaults"), CDO)) return false;
-    const FMomentFallback Muzzle = MomentFallback(EBreakerEffectMoment::Muzzle);
-    TestTrue(TEXT("The muzzle fallback still draws"), Muzzle.bDrawn && Muzzle.RadiusCm >= 0.5f);
-    const float HipCeiling = MuzzleFallbackRadiusCeilingCm(CDO->MuzzleViewOffset, Clearance);
-    const float AimedCeiling = MuzzleFallbackRadiusCeilingCm(CDO->AimedMuzzleViewOffset, Clearance);
-    TestTrue(FString::Printf(TEXT("Hip-fired flash clears the reticle (%.2f cm under %.2f cm)"), Muzzle.RadiusCm, HipCeiling),
-        Muzzle.RadiusCm <= HipCeiling);
-    TestTrue(FString::Printf(TEXT("Aimed flash clears the reticle (%.2f cm under %.2f cm)"), Muzzle.RadiusCm, AimedCeiling),
-        Muzzle.RadiusCm <= AimedCeiling);
+    // Shipped configuration: nothing is drawn at the muzzle, so nothing can
+    // reach the reticle; the death fallback is untouched by that rule.
+    TestFalse(TEXT("The muzzle fallback is off"), MomentFallback(EBreakerEffectMoment::Muzzle).bDrawn);
+    TestTrue(TEXT("Death keeps its fallback"), MomentFallback(EBreakerEffectMoment::Death).bDrawn);
     return true;
 }
 

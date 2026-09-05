@@ -279,6 +279,11 @@ struct FBreakerViewmodelMotionParams
     float SprintLowerCm = 1.5f;           // O2 PLACEHOLDER
     float SprintBackCm = 1.0f;            // O2 PLACEHOLDER
     float SprintPitchDegrees = 3.0f;      // O2 PLACEHOLDER, muzzle dips
+    // The sprint pose and the bob envelope ease toward the gait the feet are
+    // actually doing (one-pole, this time constant), so a jump, a slide or a
+    // landing does not snap the gun between gaits in a single frame. The
+    // phase itself is untouched: it holds while airborne or sliding.
+    float GaitEaseSeconds = 0.12f;        // O2 PLACEHOLDER
 
     // Landing dip: the fall's vertical speed converted into a downward-and-
     // back impulse on the EXISTING kick spring, so the dip and the recoil
@@ -427,6 +432,14 @@ public:
      * degenerate pair (SprintCap <= WalkCap) is 0.
      */
     static float SprintFraction(float GroundSpeed, float WalkCap, float SprintCap);
+
+    /**
+     * One-pole ease of a gait fraction toward its target:
+     * Current + (Target - Current) * (1 - exp(-DeltaSeconds / TimeConstantSeconds)).
+     * A time constant of zero or less, or a non-positive frame, returns
+     * Target exactly, so the ease can be switched off without a second path.
+     */
+    static float EaseFraction(float Current, float Target, float DeltaSeconds, float TimeConstantSeconds);
 
     /**
      * The landing dip's impulse magnitude, in the kick spring's units, for a
