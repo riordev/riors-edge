@@ -103,22 +103,30 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBreakerWaveAutoAdvanceTest::RunTest(const FString& Parameters)
 {
-    // A RIFT'S WAVES FOLLOW EACH OTHER WITHOUT A KEY; THE GYM'S WAIT FOR ONE.
-    // The gym is the TTK instrument and F4 is its pacing; a run is the
-    // player's loop and a yard that empties and then waits for a test-bench
-    // key is the "empty yard" defect one wave later.
+    // WAVES FOLLOW EACH OTHER WITHOUT A KEY, IN THE GYM AS IN A RIFT. A yard
+    // that empties and then waits for a test-bench key is the "empty yard"
+    // defect one wave later; F4 shortens the breather, it does not grant it.
     using ELib = UBreakerWaveBudgetLibrary;
     float Delay = -1.0f;
 
-    // The shipped configuration: default-constructed params are the gym's,
-    // and the gym never advances itself, on any kind of wave.
+    // The shipped configuration: default-constructed params are the gym's.
+    // Standard clears wait 8 s, a rest clear waits 20 s, nothing follows the
+    // boss, and nothing counts down before wave 1.
     const FBreakerWaveBudgetParams Gym;
     TestFalse(TEXT("the gym's params are not a rift's"), Gym.bRiftInstance);
-    for (const int32 Wave : {1, 5, 6, 12})
+    TestEqual(TEXT("the shipped clear breather is 8 s"), Gym.WaveClearBreatherSeconds, 8.0f);
+    TestEqual(TEXT("the shipped rest breather is 20 s"), Gym.RestBreatherSeconds, 20.0f);
+    TestFalse(TEXT("nothing has cleared before gym wave 1"), ELib::GetAutoAdvanceDelay(0, Gym, Delay));
+    for (const int32 Wave : {1, 5})
     {
-        TestFalse(FString::Printf(TEXT("gym wave %d does not advance itself"), Wave),
+        TestTrue(FString::Printf(TEXT("gym wave %d advances on the clear"), Wave),
             ELib::GetAutoAdvanceDelay(Wave, Gym, Delay));
+        TestEqual(FString::Printf(TEXT("gym wave %d waits the clear breather"), Wave), Delay, 8.0f);
     }
+    TestEqual(TEXT("gym wave 6 rests"), ELib::GetWaveKind(6, Gym), EBreakerWaveKind::Rest);
+    TestTrue(TEXT("gym wave 6 advances on the clear"), ELib::GetAutoAdvanceDelay(6, Gym, Delay));
+    TestEqual(TEXT("gym wave 6 waits the rest breather"), Delay, 20.0f);
+    TestFalse(TEXT("nothing follows the gym's boss wave"), ELib::GetAutoAdvanceDelay(12, Gym, Delay));
 
     // The rift the door builds: wave 1 and 2 carry on after the standard
     // breather, and nothing follows the boss on 3.

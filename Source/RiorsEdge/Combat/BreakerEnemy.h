@@ -425,6 +425,22 @@ public:
     // Read-only view for the suite: the pin that every revive returns the
     // named body to the fit's own transform has to SEE the component.
     class USkeletalMeshComponent* GetNamedBody() const { return NamedBody; }
+    // The VISUAL forward: the mesh-space axis the fit yawed onto +X, pushed
+    // through the body component's world rotation. Equals the actor's forward
+    // when the fit holds — the Breaker.Nav.Probe facing line reads the two
+    // against each other so a mech looking sideways is a logged number, not
+    // a photograph someone has to notice. Without a named body it is the
+    // actor's own forward: the primitives are built facing +X.
+    FVector GetNamedBodyWorldForward() const;
+    // Which way a body mesh faces in its own space, read from its rig: the
+    // first left/right bone pair found among the shoulders, upper arms and
+    // upper legs (in that order — Leela ships no arms), placed in component
+    // space by walking the reference pose to the root, then handed to
+    // BreakerEnemyBody::BodyForwardAxisFromBilateralBones. Zero when the rig
+    // offers no pair; the caller records that at the site rather than
+    // assuming an axis. Static and public so the suite proves the read on
+    // the shipped meshes.
+    static FVector ReadBodyMeshForwardAxis(const class USkeletalMesh* Mesh);
     // Optional looped idle so a named body poses instead of T-posing; the
     // imported packs ship *_Idle sequences beside every mesh.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy") FSoftObjectPath BodyIdleAnimation;
@@ -434,6 +450,9 @@ public:
 protected:
     // Hidden until BodyMeshAsset resolves.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> NamedBody;
+    // The mesh-space forward ApplyBodyMesh read from the rig and yawed onto
+    // +X; Zero until a body resolves or when its rig offers no bilateral pair.
+    FVector NamedBodyMeshForward = FVector::ZeroVector;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerAttributeSet> Attributes;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UBreakerCombatComponent> Combat;

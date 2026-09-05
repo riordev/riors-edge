@@ -265,7 +265,7 @@ struct FBreakerViewmodelMotionParams
     float StrideLengthCm = 360.0f;        // O2 PLACEHOLDER
     // Ground speed at which the bob reaches full amplitude; below it the bob
     // scales linearly, so a creep barely breathes and a sprint works.
-    float FullBobSpeed = 600.0f;          // O2 PLACEHOLDER
+    float FullBobSpeed = 510.0f;          // O2 PLACEHOLDER, under the O192 walk speed
 
     // Sprint gait (KIT-4): the shipped walk cap already sits above
     // FullBobSpeed, so the speed lane saturates on a walk and a sprint was
@@ -275,7 +275,7 @@ struct FBreakerViewmodelMotionParams
     // and settles the gun lower, back and muzzle-down. Firing is not blocked
     // while sprinting, so the pose stays small: SUBTLE is the ruled
     // constraint, and the sights must still be reachable from here.
-    float SprintBobMultiplier = 1.6f;     // O2 PLACEHOLDER
+    float SprintBobMultiplier = 1.3f;     // O2 PLACEHOLDER, > 1.0 so a sprint bobs harder than a walk
     float SprintLowerCm = 1.5f;           // O2 PLACEHOLDER
     float SprintBackCm = 1.0f;            // O2 PLACEHOLDER
     float SprintPitchDegrees = 3.0f;      // O2 PLACEHOLDER, muzzle dips

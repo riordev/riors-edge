@@ -74,9 +74,8 @@ EBreakerWaveKind UBreakerWaveBudgetLibrary::GetWaveKind(int32 Wave, const FBreak
 bool UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay(int32 ClearedWave, const FBreakerWaveBudgetParams& Params, float& OutDelaySeconds)
 {
     OutDelaySeconds = 0.0f;
-    // The gym never advances itself: it is the instrument, and its pacing is
-    // the tester's key.
-    if (!Params.bRiftInstance || ClearedWave <= 0) return false;
+    // Nothing has cleared before wave 1, so nothing counts down to it.
+    if (ClearedWave <= 0) return false;
     switch (GetWaveKind(ClearedWave, Params))
     {
     case EBreakerWaveKind::Boss:

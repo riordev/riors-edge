@@ -265,8 +265,11 @@ public:
     UFUNCTION(BlueprintPure, Category="Movement|Jump") int32 GetGrantedJumpCount() const { return GrantedJumpCount; }
     UFUNCTION(BlueprintCallable, Category="Movement|Jump") void RefreshJumpGrant();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 700.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 1100.0f;   // O2 PLACEHOLDER
+    // O192: the base kit is slower at level 1 so the tree's movement nodes
+    // have room to be felt. Momentum's speed gates are fractions of WalkSpeed
+    // and follow it; the crouch cap in the constructor does too.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float WalkSpeed = 595.0f;   // O2 PLACEHOLDER (O192)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Grounded Movement", meta=(ClampMin="0")) float SprintSpeed = 990.0f;   // O2 PLACEHOLDER (O192)
 
     // --- Weight (owner report: "movement should be less floaty") ---------
     // Everything in this category is new; the OLD behaviour is "no curve at

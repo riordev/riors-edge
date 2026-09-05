@@ -54,6 +54,19 @@ namespace
     // first frame (6 s) lands a second into the approach rather than after
     // it — the first film had the whole walk before shot 0.
     constexpr int32 BreakerNavProbeMinAttempts = 10;
+    // The body's visual forward against the actor's forward, in the ground
+    // plane. The fit yaws the mesh onto +X, so anything past this is a mech
+    // looking sideways — the gym's "everyone looking left" as a number.
+    constexpr float BreakerNavProbeFacingToleranceDeg = 15.0f;  // O2 PLACEHOLDER
+
+    float BreakerNavProbeDegreesBetween2D(const FVector& A, const FVector& B)
+    {
+        const FVector FlatA = A.GetSafeNormal2D();
+        const FVector FlatB = B.GetSafeNormal2D();
+        if (FlatA.IsNearlyZero() || FlatB.IsNearlyZero()) return 0.0f;
+        return FMath::RadiansToDegrees(static_cast<float>(
+            FMath::Acos(FMath::Clamp(FVector::DotProduct(FlatA, FlatB), -1.0, 1.0))));
+    }
 
     UWorld* BreakerNavProbeCurrentWorld()
     {
@@ -233,8 +246,23 @@ namespace
             const TCHAR* Nav = !NavSys ? TEXT("none")
                 : !NavSys->GetDefaultNavDataInstance() ? TEXT("MISSING")
                 : NavSys->IsNavigationBuildInProgress() ? TEXT("building") : TEXT("built");
-            UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s"),
-                Elapsed, Distance, *Enemy->GetEnemyStateLabel(), Mode, Touches, Nav);
+            // facing: the body's visual forward against the actor's forward —
+            // the invariant the fit holds in every state, detour or not.
+            // toplayer: that same visual forward against the line to the
+            // player, which legitimately opens up mid-detour, so it is read
+            // and not judged.
+            const FVector BodyForward = Enemy->GetNamedBodyWorldForward();
+            const float Facing = BreakerNavProbeDegreesBetween2D(BodyForward, Enemy->GetActorForwardVector());
+            const float ToPlayer = BreakerNavProbeDegreesBetween2D(BodyForward,
+                Target->GetActorLocation() - Enemy->GetActorLocation());
+            const FString StateLabel = Enemy->GetEnemyStateLabel();
+            UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] t=%.1f dist=%.0f state=%s mode=%s touches=%d nav=%s facing=%.0f toplayer=%.0f"),
+                Elapsed, Distance, *StateLabel, Mode, Touches, Nav, Facing, ToPlayer);
+            if (Facing > BreakerNavProbeFacingToleranceDeg && StateLabel != TEXT("PATROL"))
+            {
+                UE_LOG(LogTemp, Display, TEXT("[BreakerNavProbe] FACING FAIL body forward is %.0f deg off the actor's forward (tolerance %.0f)"),
+                    Facing, BreakerNavProbeFacingToleranceDeg);
+            }
             if (!State->bReached && Distance <= Enemy->GetAttackRange() + 45.0f)
             {
                 State->bReached = true;

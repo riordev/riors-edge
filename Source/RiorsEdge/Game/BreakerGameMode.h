@@ -312,6 +312,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetCurrentWave() const { return CurrentWave; }
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") int32 GetWaveEnemiesAlive() const;
     UFUNCTION(BlueprintPure, Category="Playtest|Waves") bool IsWaveActive() const { return CurrentWave > 0 && GetWaveEnemiesAlive() > 0; }
+    // Seconds until the next wave arrives on its own; negative means no
+    // countdown is running. The HUD prints it; F4 skips it.
+    UFUNCTION(BlueprintPure, Category="Playtest|Waves") float GetWaveAdvanceRemaining() const { return WaveAdvanceCountdown; }
 
     // --- Area level (O27 / Power-Curve.md) ---------------------------------
     // The gym IS a piece of content, so it has an area level, and that level is
@@ -579,11 +582,11 @@ private:
     // separates the two builds of one map \u2014 the yard has a rift door and no
     // fight, the instance has a fight and no door.
     bool bRiftInstance = false;
-    // THE RUN CARRIES ITSELF (GROUND-7). Wave 1 arrives with the build; every
-    // later wave arrives on the clear, after the breather the budget names
-    // (UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay). Negative means no
-    // countdown is running. Ticked rather than timed so a re-solve or a
-    // completion mid-breather simply stops it.
+    // WAVES CARRY THEMSELVES (GROUND-7), in the rift and the gym alike. Every
+    // wave after the first arrives on the clear, after the breather the budget
+    // names (UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay); F4 skips the
+    // wait. Negative means no countdown is running. Ticked rather than timed
+    // so a re-solve, a completion or an F4 mid-breather simply stops it.
     float WaveAdvanceCountdown = -1.0f;
     void TickWaveAdvance(float DeltaSeconds);
     // THE FIELD THE SPAWNER IS CONTAINED IN. MakeCoverFieldParams builds the

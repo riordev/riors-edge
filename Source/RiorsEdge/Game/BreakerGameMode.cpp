@@ -551,8 +551,8 @@ void ABreakerGameMode::HandleStartingNewPlayer_Implementation(APlayerController*
             // player has to press a key to populate is a test bench, and the
             // gym already is one; walking through a tear and finding an empty
             // yard is the opposite of a felt loop. Wave 1 arrives here; every
-            // later wave arrives on the clear (TickWaveAdvance), so F4 is
-            // never needed between the door and the boss.
+            // later wave arrives on the clear (TickWaveAdvance), as it does in
+            // the gym, so F4 only ever shortens a breather.
             //
             // THE BOSS ARRIVES ON RiftBossWave, NOT THE GYM'S TWELVE. Twelve
             // waves is a wave-mode endurance figure and the ruling's success
@@ -2631,10 +2631,11 @@ void ABreakerGameMode::RefillPlayerAmmo()
 
 void ABreakerGameMode::TickWaveAdvance(float DeltaSeconds)
 {
-    // Only a run advances itself. The gym waits for F4 because it is the
-    // instrument, and a completed run is over: the latch is O168's, and a
-    // wave after it would be a run that cannot end.
-    if (!bRiftInstance || bRiftRunCompleted || CurrentWave <= 0) return;
+    // Every mode advances itself once a wave has gone live; F4 (StartWave)
+    // skips the breather, and the live wave that follows resets the countdown
+    // below. A completed run is over: the latch is O168's, and a wave after
+    // it would be a run that cannot end.
+    if (bRiftRunCompleted || CurrentWave <= 0) return;
     if (IsWaveActive())
     {
         // A live wave, including one Breaker.Rift.Population just re-solved
@@ -2648,7 +2649,7 @@ void ABreakerGameMode::TickWaveAdvance(float DeltaSeconds)
         float Delay = 0.0f;
         if (!UBreakerWaveBudgetLibrary::GetAutoAdvanceDelay(CurrentWave, WaveBudget, Delay)) return;
         WaveAdvanceCountdown = Delay;
-        UE_LOG(LogTemp, Display, TEXT("[Rift] wave %d cleared; wave %d in %.0fs."),
+        UE_LOG(LogTemp, Display, TEXT("[BreakerWaves] wave %d cleared; wave %d in %.0fs (F4 skips)."),
             CurrentWave, CurrentWave + 1, Delay);
     }
     WaveAdvanceCountdown -= DeltaSeconds;
@@ -3470,11 +3471,11 @@ void ABreakerGameMode::StartNextWave()
     {
         // §4.3: the rest wave exists so wave mode measures COMBAT rather than
         // endurance. Half budget, no elites, loot on, and a breather — the
-        // breather is the player's to take, because F4 is what starts the next
-        // wave, so what this does is restock and say so.
+        // breather itself is TickWaveAdvance's (the rest breather runs on the
+        // clear, F4 cuts it short), so what this does is restock and say so.
         RefillPlayerAmmo();
         UE_LOG(LogTemp, Display,
-            TEXT("[BreakerGym] wave %d is a REST wave: half budget, no elites, loot enabled, ammo restocked. Take %.0fs before F4."),
+            TEXT("[BreakerGym] wave %d is a REST wave: half budget, no elites, loot enabled, ammo restocked. The next wave follows the clear by %.0fs; F4 skips the wait."),
             CurrentWave, WaveBudget.RestBreatherSeconds);
     }
 }

@@ -24,11 +24,12 @@ UBreakerCharacterMovementComponent::UBreakerCharacterMovementComponent()
     // engine default, and raising it further reads as twitchy, not heavy.
     BrakingDecelerationWalking = 2400.0f; // OLD: 1800.0f
     GroundFriction = 8.5f; // OLD: 7.5f
-    // Air control is NOT reduced. The audit asks for restrained air control and
-    // this is already restrained; cutting it further would remove the player's
-    // authority in the air, which reads as MORE drift, not less.
-    AirControl = 0.55f;
-    AirControlBoostMultiplier = 1.4f;
+    // O192: air control at level 1 is restrained so the tree's air-control
+    // nodes and the Move.AirControl affix are felt as a gain. The engine's
+    // low-speed boost is trimmed with it so a near-stationary jump does not
+    // steer better than a moving one.
+    AirControl = 0.35f;   // O2 PLACEHOLDER (O192)
+    AirControlBoostMultiplier = 1.15f;   // O2 PLACEHOLDER (O192)
     AirControlBoostVelocityThreshold = 300.0f;
     // Jump impulse is deliberately left alone. The gravity change below already
     // lowers the apex (185 cm -> ~156 cm) and shortens the arc; cutting the

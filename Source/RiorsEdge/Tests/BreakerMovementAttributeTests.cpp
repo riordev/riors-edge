@@ -139,7 +139,7 @@ bool FBreakerMovementAttributeCompositionTest::RunTest(const FString& Parameters
     Speed.AddIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed, 20.0f);
     Published->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, Speed);
     Published->ApplyAttributeContribution(EBreakerAttributeContributor::Progression, Speed);
-    // 20 + 20 additive against a 700 walk speed: 980, not 1008.
+    // 20 + 20 additive against a 595 walk speed: 833, not 857.
     TestEqual(TEXT("Move speed composes additively over the published base"),
         Published->GetMoveSpeed(), Movement->WalkSpeed * 1.40f, 0.01f);
     return true;

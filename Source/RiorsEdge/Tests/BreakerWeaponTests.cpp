@@ -1644,6 +1644,7 @@ bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
 
     // The shipped configuration, default-constructed.
     TestTrue(TEXT("A sprint bobs harder than a walk"), Params.SprintBobMultiplier > 1.0f);
+    TestEqual(TEXT("Sprint bob multiplier ships at 1.3"), Params.SprintBobMultiplier, 1.3f, 0.0001f);
     TestTrue(TEXT("The sprint pose has a sign"),
         Params.SprintLowerCm >= 0.0f && Params.SprintBackCm >= 0.0f && Params.SprintPitchDegrees >= 0.0f);
     // The finding itself: the walk saturates the speed lane, so ONLY the

@@ -410,20 +410,27 @@ void ABreakerEnemy::ApplyBodyMesh()
     }
     NamedBody->SetSkeletalMesh(Named);
     const FBoxSphereBounds MeshBounds = Named->GetBounds();
+    // The fit owns the WHOLE relative transform: scale, location AND the yaw
+    // that turns the mesh's own forward onto the actor's +X. The mechs are
+    // authored facing +Y (a Blender/glTF biped), so an identity rotation
+    // stands every one of them looking to the actor's right while the actor
+    // itself is turned correctly by SetActorRotation(Facing.Rotation()).
+    // The forward is READ from the rig, never authored per mesh; a rig with
+    // no bilateral pair is a recorded gap, and the fit falls back to
+    // identity while the log says so. Every revive routes back through here,
+    // so the same three channels are re-applied after a death pose.
+    NamedBodyMeshForward = ReadBodyMeshForwardAxis(Named);
+    if (NamedBodyMeshForward.IsNearlyZero())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[BreakerEnemy] %s: body mesh %s offers no left/right bone pair to read a forward from — standing at identity yaw; it may face sideways."),
+            *GetName(), *BodyMeshAsset.ToString());
+    }
     const BreakerEnemyBody::FBreakerBodyFit Fit = BreakerEnemyBody::FitBodyToCapsule(
-        MeshBounds.Origin, MeshBounds.BoxExtent, BodyCollision->GetUnscaledCapsuleHalfHeight());
+        MeshBounds.Origin, MeshBounds.BoxExtent, BodyCollision->GetUnscaledCapsuleHalfHeight(),
+        NamedBodyMeshForward);
     NamedBody->SetRelativeScale3D(FVector(Fit.Scale));
     NamedBody->SetRelativeLocation(Fit.RelativeLocation);
-    // The fit owns the WHOLE relative transform, not two thirds of it.
-    // Scale and location were reset here and rotation was not — the one
-    // channel this contract left to whoever dirtied it last. Measured
-    // (breaker_report_mech_anim_flags.py): every mech sequence ships
-    // enable_root_motion=False, so today nothing animates the COMPONENT —
-    // the owner's sideways mechs were the death one-shot's final frame
-    // held through a revive, fixed where the revives are. This line is the
-    // contract's third channel so that stays true when an authored asset
-    // stops being so polite.
-    NamedBody->SetRelativeRotation(FRotator::ZeroRotator);
+    NamedBody->SetRelativeRotation(Fit.RelativeRotation);
     if (UAnimSequence* Idle = Cast<UAnimSequence>(BodyIdleAnimation.TryLoad()))
     {
         NamedBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -457,6 +464,54 @@ void ABreakerEnemy::ApplyBodyMesh()
             FAttachmentTransformRules::SnapToTargetNotIncludingScale, BreakerHeadBoneName);
         WeakPoint->SetRelativeLocation(FVector::ZeroVector);
     }
+}
+
+FVector ABreakerEnemy::ReadBodyMeshForwardAxis(const USkeletalMesh* Mesh)
+{
+    if (!Mesh) return FVector::ZeroVector;
+    const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+    // A bone's component-space ref-pose position: its local pose composed up
+    // through every parent to the root (child * parent in FTransform order).
+    const auto ComponentSpaceRefPosition = [&Ref](int32 BoneIndex) -> FVector
+    {
+        const TArray<FTransform>& Pose = Ref.GetRefBonePose();
+        FTransform Composed = FTransform::Identity;
+        for (int32 Bone = BoneIndex; Bone != INDEX_NONE; Bone = Ref.GetParentIndex(Bone))
+        {
+            Composed = Composed * Pose[Bone];
+        }
+        return Composed.GetLocation();
+    };
+    // Ordered: the widest, most reliably horizontal pair first. Leela ships
+    // no arms, so the legs are a real leg of the search, not a formality.
+    static const FName BreakerBilateralPairs[][2] =
+    {
+        { FName(TEXT("Shoulder_L")), FName(TEXT("Shoulder_R")) },
+        { FName(TEXT("UpperArm_L")), FName(TEXT("UpperArm_R")) },
+        { FName(TEXT("UpperLeg_L")), FName(TEXT("UpperLeg_R")) },
+    };
+    for (const auto& Pair : BreakerBilateralPairs)
+    {
+        const int32 Left = Ref.FindBoneIndex(Pair[0]);
+        const int32 Right = Ref.FindBoneIndex(Pair[1]);
+        if (Left == INDEX_NONE || Right == INDEX_NONE) continue;
+        const FVector Axis = BreakerEnemyBody::BodyForwardAxisFromBilateralBones(
+            ComponentSpaceRefPosition(Left), ComponentSpaceRefPosition(Right));
+        if (!Axis.IsNearlyZero()) return Axis;
+    }
+    return FVector::ZeroVector;
+}
+
+FVector ABreakerEnemy::GetNamedBodyWorldForward() const
+{
+    if (!NamedBody || !NamedBody->GetSkeletalMeshAsset())
+    {
+        return GetActorForwardVector();
+    }
+    // A rig that offered no pair stood at identity yaw, so its forward is
+    // presumed +X in mesh space — the same presumption the fit made.
+    const FVector MeshForward = NamedBodyMeshForward.IsNearlyZero() ? FVector::ForwardVector : NamedBodyMeshForward;
+    return NamedBody->GetComponentRotation().RotateVector(MeshForward);
 }
 
 void ABreakerEnemy::ApplyChassis()

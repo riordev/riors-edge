@@ -12,11 +12,11 @@
 // ---------------------------------------------------------------------------
 // Written in the shape of the retired RiorsEdge.Movement.WallRideEntry, which exists
 // because the wall-ride gate shipped set to exactly WalkSpeed and could not be
-// satisfied. This is the same bug in the same file family: the momentum gate
-// sat at 750 against a 700 walk speed, and aiming multiplies move speed by 0.45
-// to 0.92, so every aimed state fell under it and a Swift who aimed switched
-// their own resource off. The wall-ride fix was found by a person; this one was
-// found by reading that comment. These assertions are so neither recurs.
+// satisfied. The momentum gate is the same shape in the same file family: a
+// gate at or above the walk speed, with aiming multiplying move speed by 0.45
+// to 0.92, puts every aimed state under it and a Swift who aims switches their
+// own resource off. The gates are fractions of the authored WalkSpeed (O192),
+// so the assertions resolve them the way AdvanceLoop does.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerMomentumThresholdReachableTest,
     "RiorsEdge.Classes.MomentumThresholdReachable",
@@ -34,23 +34,26 @@ bool FBreakerMomentumThresholdReachableTest::RunTest(const FString& Parameters)
     // floor is what a gate has to clear.
     constexpr float WorstAimMoveSpeedMultiplier = 0.45f;   // the machinegun
     const float AimedSprint = Movement->SprintSpeed * WorstAimMoveSpeedMultiplier;
+    // Resolved against the AUTHORED walk speed, exactly as AdvanceLoop does.
+    const float ThresholdSpeed = Momentum->GroundThresholdFraction * Movement->WalkSpeed;
+    const float UpperSpeed = Momentum->GroundUpperFraction * Movement->WalkSpeed;
 
     TestTrue(*FString::Printf(
         TEXT("A sprint under the worst aim penalty (%.0f) still clears the momentum gate (%.0f)"),
-        AimedSprint, Momentum->GroundThresholdSpeed),
-        AimedSprint > Momentum->GroundThresholdSpeed);
+        AimedSprint, ThresholdSpeed),
+        AimedSprint > ThresholdSpeed);
 
     // The wall-ride lesson stated directly: a gate at or above the ceiling it
     // is measured against is not a gate, it is an off switch.
     TestTrue(*FString::Printf(
         TEXT("The momentum gate (%.0f) sits strictly below the sprint speed it is measured against (%.0f)"),
-        Momentum->GroundThresholdSpeed, Movement->SprintSpeed),
-        Momentum->GroundThresholdSpeed < Movement->SprintSpeed);
+        ThresholdSpeed, Movement->SprintSpeed),
+        ThresholdSpeed < Movement->SprintSpeed);
 
     // And the generation band still has room to discriminate, so lowering the
     // floor did not flatten the curve into a single rate.
     TestTrue(TEXT("The generation band is a band, not a point"),
-        Momentum->GroundUpperSpeed > Momentum->GroundThresholdSpeed);
+        UpperSpeed > ThresholdSpeed);
     TestTrue(TEXT("Moving faster still pays more"),
         Momentum->GroundRateAtUpperSpeed > Momentum->GroundRateAtThreshold);
     return true;
@@ -251,7 +254,7 @@ bool FBreakerMomentumAdvanceLoopTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("The bank holds what it was given"), Momentum->GetMomentum(), 50.0f);
 
     // Zero velocity (the movement component's untouched default) is well
-    // under SettledSpeed, so AdvanceLoop's decay branch runs once the grace
+    // under the settled speed, so AdvanceLoop's decay branch runs once the grace
     // period elapses — exactly the old TickComponent body's behaviour.
     for (int32 Step = 0; Step < 15; ++Step)
     {

@@ -1212,8 +1212,14 @@ void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
     {
         Title = FString::Printf(TEXT("WAVE %02d"), GameMode->GetCurrentWave());
         AliveCount = GameMode->GetWaveEnemiesAlive();
+        // Between waves the row counts the breather down to the next arrival
+        // (ABreakerGameMode::GetWaveAdvanceRemaining, negative when nothing is
+        // counting), so the pause reads as a pause and not as a stall; F4
+        // remains the skip, and is what the row names when no countdown runs.
+        const float Remaining = GameMode->GetWaveAdvanceRemaining();
         Status = bActive ? FString::Printf(TEXT("%d HOSTILE"), AliveCount)
-                         : FString(TEXT("CLEAR — F4"));
+            : Remaining >= 0.f ? FString::Printf(TEXT("CLEAR — %d"), FMath::CeilToInt(Remaining))
+            : FString(TEXT("CLEAR — F4"));
     }
     else
     {
@@ -1227,7 +1233,7 @@ void ABreakerPlaytestHUD::DrawEncounterReadout(const FVector2D& Center)
             : PreviewCase == 2 ? FString(TEXT("WAVE 07")) : FString(TEXT("BOSS"));
         Status = PreviewCase == 0 ? FString(TEXT("4 HOSTILE"))
             : PreviewCase == 1 ? FString(TEXT("24 HOSTILE"))
-            : PreviewCase == 2 ? FString(TEXT("CLEAR — F4"))
+            : PreviewCase == 2 ? FString(TEXT("CLEAR — 8"))
             : FString::Printf(TEXT("PHASE %d / %d"), 2, BreakerHUDBossPhaseCount());
         if (PreviewCase == 1) { AliveCount = 24; KnownTotal = 40; }
     }

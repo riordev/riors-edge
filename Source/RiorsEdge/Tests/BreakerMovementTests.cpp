@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Characters/BreakerCharacter.h"
+#include "Classes/BreakerMomentumComponent.h"
 #include "Game/BreakerGameMode.h"
 #include "Movement/BreakerCharacterMovementComponent.h"
 #include "Progression/BreakerProgressionTypes.h"
@@ -655,6 +656,40 @@ bool FBreakerLedgeVerbsTest::RunTest(const FString& Parameters)
     // until then it is the tripwire that stops the two drifting apart again.
     TestEqual(TEXT("The grammar's MantleStepHeight equals the published ceiling"),
         GetDefault<ABreakerGameMode>()->MantleStepHeight, FMove::MantleStepHeightCm, 0.0f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE LEVEL-1 BASE KIT (O192)
+// ---------------------------------------------------------------------------
+// The base kit is slower and steers less in the air at level 1 so the tree's
+// movement nodes and the movement affixes are felt as gains. Pinned here so
+// the numbers cannot drift without the pin moving with them, and so
+// Momentum's fractional gates, resolved against the authored walk speed,
+// keep their shape around the two caps.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMovementShippedSpeedsTest,
+    "RiorsEdge.Movement.ShippedSpeeds",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMovementShippedSpeedsTest::RunTest(const FString& Parameters)
+{
+    const UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    const UBreakerMomentumComponent* Momentum = NewObject<UBreakerMomentumComponent>();
+    if (!TestNotNull(TEXT("Movement constructs"), Movement)) return false;
+    if (!TestNotNull(TEXT("Momentum constructs"), Momentum)) return false;
+
+    TestEqual(TEXT("Walk speed ships at 595"), Movement->WalkSpeed, 595.0f, 0.0001f);
+    TestEqual(TEXT("Sprint speed ships at 990"), Movement->SprintSpeed, 990.0f, 0.0001f);
+    TestEqual(TEXT("Air control ships at 0.35"), Movement->AirControl, 0.35f, 0.0001f);
+    TestEqual(TEXT("Air control boost ships at 1.15"), Movement->AirControlBoostMultiplier, 1.15f, 0.0001f);
+
+    // Momentum's gates follow the walk speed: the threshold sits under a walk
+    // (so an aimed state can still reach it) and the upper speed sits past a
+    // sprint (so the band still has room to discriminate at the top).
+    TestTrue(TEXT("The momentum threshold sits under the walk speed"), Momentum->GroundThresholdFraction < 1.0f);
+    TestTrue(TEXT("The momentum upper speed sits past the sprint speed"),
+        Momentum->GroundUpperFraction * Movement->WalkSpeed > Movement->SprintSpeed);
     return true;
 }
 

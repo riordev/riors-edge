@@ -165,29 +165,24 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Momentum") FBreakerMomentumStateChanged OnMomentumStateChanged;
 
-    // O92: the generation threshold was a trap and it moves. It was 750
-    // against a WalkSpeed of 700, so walking paid nothing and — the part that
-    // made it a trap rather than a choice — EVERY aimed state fell under the
-    // bar, because aiming multiplies move speed by 0.45 to 0.92. A Swift who
-    // aimed disabled their own resource, on a permanent class, and the most
-    // natural way to play the projectile class is down the sights.
+    // O92 / O192: the ground speed gates are FRACTIONS of the movement
+    // component's authored WalkSpeed, resolved in AdvanceLoop each tick, so
+    // they move with the base kit (O192) and never with a Movement Speed
+    // affix — a faster pair of boots raises the body, not the bar.
     //
-    // THIS EXACT BUG WAS ALREADY FIXED ONCE, THREE FILES AWAY: the retired
-    // wall-ride's entry gate shipped at exactly WalkSpeed, unreachable. Same
-    // shape, same file family, caught once and missed here.
-    //
-    // 450 is that same gate, so the three movement floors now agree — wall ride
-    // 450, slide entry 550, this. It was chosen rather than tuned because
-    // LOWERING ALONE CANNOT KEEP WALKING FREE: the worst aimed sprint is
-    // 1100 x 0.45 = 495, so any threshold an aimed sprint clears is already
-    // below the 700 walk speed. Walking therefore generates, at the floor rate
-    // of 6/s against a sprint's 9.25/s, and the rate curve is what separates
-    // committed movement from ambling. If walking paying at all turns out to be
-    // wrong in a playtest, the other half of O92 is the answer — exempt aimed
-    // states and put the threshold back above the walk ceiling — and that is a
-    // change to what is measured, not to this number.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundThresholdSpeed = 450.0f;   // O2 PLACEHOLDER
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundUpperSpeed = 1250.0f;   // O2 PLACEHOLDER
+    // The threshold sits below the walk speed on purpose. Aiming multiplies
+    // move speed by 0.45 to 0.92, so a gate at or above the walk ceiling
+    // switches the resource off for every aimed state — the retired
+    // wall-ride's entry gate shipped at exactly WalkSpeed and was unreachable
+    // for the same reason. A gate an aimed sprint (sprint x 0.45) can clear is
+    // necessarily under the walk speed, so walking generates at the floor
+    // rate and the rate curve, threshold to upper, is what separates committed
+    // movement from ambling. If walking paying at all is wrong in a playtest,
+    // the other half of O92 is the answer — exempt aimed states and put the
+    // threshold above the walk ceiling — a change to what is measured, not to
+    // these fractions.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundThresholdFraction = 0.643f;   // O2 PLACEHOLDER (of WalkSpeed)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundUpperFraction = 1.786f;   // O2 PLACEHOLDER (of WalkSpeed)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundRateAtThreshold = 6.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GroundRateAtUpperSpeed = 10.0f;   // O2 PLACEHOLDER
     // Anti-farm: running into a wall must generate nothing, so ground credit
@@ -220,7 +215,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation") bool bWeakPointRequiresAirborneOrSlide = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Generation", meta=(ClampMin="0")) float GlobalGenerationCap = 25.0f;   // O2 PLACEHOLDER
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SettledSpeed = 400.0f;
+    // Fraction of the authored WalkSpeed under which the body counts as
+    // settled and the bank decays at the fast rate.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SettledFraction = 0.571f;   // O2 PLACEHOLDER (of WalkSpeed)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SettledDecayRate = 15.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float SlowDecayRate = 6.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Momentum|Decay", meta=(ClampMin="0")) float DecayGraceSeconds = 1.0f;

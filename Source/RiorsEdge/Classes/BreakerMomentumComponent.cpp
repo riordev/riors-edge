@@ -567,6 +567,11 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     bHasLastLocation = true;
 
     const float Speed = Movement->GetHorizontalSpeed();
+    // The speed gates are fractions of the AUTHORED walk speed, not of
+    // GetWalkSpeedCap(): a Movement Speed affix raises the body, never the bar.
+    const float ThresholdSpeed = Movement->WalkSpeed * GroundThresholdFraction;
+    const float UpperSpeed = Movement->WalkSpeed * GroundUpperFraction;
+    const float SettledSpeed = Movement->WalkSpeed * SettledFraction;
     const bool bAirborne = Movement->IsFalling();
     const bool bSliding = Movement->IsSliding();
     const bool bTraversing = Movement->IsTraversingLedge();
@@ -620,10 +625,10 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     float Rate = 0.0f;
     if (!bAirborne && !bSliding && DisplacementRate >= GroundDisplacementPerSecond)
     {
-        Rate += GroundSpeedRate(Speed, GroundThresholdSpeed, GroundUpperSpeed, GroundRateAtThreshold, GroundRateAtUpperSpeed);
+        Rate += GroundSpeedRate(Speed, ThresholdSpeed, UpperSpeed, GroundRateAtThreshold, GroundRateAtUpperSpeed);
     }
     if (bAirborne && AirborneCreditRemaining > 0.0f) Rate += AirborneRate;
-    if (bSliding && Speed >= GroundThresholdSpeed) Rate += SlideRate;
+    if (bSliding && Speed >= ThresholdSpeed) Rate += SlideRate;
 
     // An active loop override (Overdrive) multiplies both the generated rate
     // and the per-second cap, so doubling generation is not silently eaten by
@@ -659,7 +664,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
     // A running traversal blocks decay for the same reason a slide does: it
     // is a committed movement verb, and the glide deliberately zeroes
     // Velocity, so without this term a vault could tick the decay clock.
-    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bTraversing || Speed >= GroundThresholdSpeed;
+    const bool bDecayBlocked = IsDecaySuspended() || bAirborne || bSliding || bTraversing || Speed >= ThresholdSpeed;
     if (bDecayBlocked)
     {
         SettledElapsed = 0.0f;
@@ -673,7 +678,7 @@ void UBreakerMomentumComponent::AdvanceLoop(float DeltaTime)
         // The loop valve's decay lane: the tree's composed ClassResourceDecay
         // multiplier (and any ability-pushed override) scales the rate here,
         // at the one place decay is actually paid.
-        ApplyMomentumDelta(-DecayRateForSpeed(Speed, SettledSpeed, GroundThresholdSpeed, SettledDecayRate, SlowDecayRate)
+        ApplyMomentumDelta(-DecayRateForSpeed(Speed, SettledSpeed, ThresholdSpeed, SettledDecayRate, SlowDecayRate)
             * GetDecayRateMultiplier() * DeltaTime);
     }
     RefreshState();
