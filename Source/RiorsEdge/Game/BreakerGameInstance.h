@@ -2,8 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Game/BreakerArrivalMath.h"
 #include "Game/BreakerRiftDefinition.h"
+#include "Containers/Ticker.h"
 #include "BreakerGameInstance.generated.h"
+
+class SWidget;
 
 // ---------------------------------------------------------------------------
 // WHAT SURVIVES A LEVEL LOAD
@@ -57,19 +61,65 @@ public:
     // MoviePlayer screen structurally impossible. The animated time sits
     // AROUND the blocking OpenLevel: an animated deploy hold before, a frozen
     // frame during, an arrival beat after.
+    //
+    // EVERY TRAVEL ARRIVES UNDER COVER. A travel with a set PendingRift wears
+    // the briefing; every other travel wears a plain black. Either cover
+    // lifts through the same gated reveal (BreakerArrivalMath.h): the
+    // destination's first rendered frames are cold Lumen and a re-adapting
+    // exposure, and the cover stays until both the frame and the seconds
+    // gate are met, then fades. Only a headless run — no game window to put
+    // a cover on — travels bare.
     virtual void Init() override;
+    virtual void Shutdown() override;
+
+    // The gate's one source: the runtime reads it every frame of a reveal,
+    // the suite asserts it. Owner-tunable live through the Breaker.Arrive*
+    // console variables, which bind to the same struct.
+    static const FBreakerArrivalHold& ShippedArrivalHold();
+
+    // The cover as a seam for beats that are not travels. HoldBlack puts the
+    // plain black up if no cover is up; ReleaseBlack starts the gated reveal
+    // from this moment. The death beat's black is meant to call into these.
+    void HoldBlack();
+    void ReleaseBlack();
+    // True while any cover is on the window, opaque or mid-fade. The capture
+    // harness's -BreakerCaptureArrival waits on this rather than on a clock.
+    bool IsArrivalCoverUp() const { return Cover.IsValid(); }
 
 private:
     void HandlePostLoadMap(UWorld* LoadedWorld);
-    // The beat's three steps: show-and-hold, load, arrive-and-leave. Only a
-    // travel with a SET PendingRift gets one — dev drops, captures and every
-    // legacy path stay instant, because a briefing with nothing to say is a
-    // wait after all.
+    // The travel's steps: cover, hold (briefing only), load, reveal.
     void BeginTravel(FName MapName);
-    void EndDeployBeat();
+    // Puts a cover on the game window. Returns false with no window to put it
+    // on. Removes any cover already up first, so a cover never stacks.
+    bool AddCover(TSharedRef<SWidget> Widget);
+    // The plain black: an opaque SBorder over the whole window.
+    static TSharedRef<SWidget> MakeBlackCover();
+    // Starts the per-frame ticker that reads the reveal alpha onto the
+    // cover's opacity and calls RevealWorld at 1. Never adds twice.
+    void BeginReveal();
+    // The cover leaves, in whatever state it is in.
+    void RevealWorld();
+    // The cover on the window: the briefing pane or the plain black.
+    TSharedPtr<SWidget> Cover;
+    // Set only while the cover is the briefing pane, for the stage line.
     TSharedPtr<class SBreakerLoadingScreen> DeployScreen;
-    TWeakPtr<class SWindow> DeployWindow;
-    bool bDeployBeatActive = false;
+    TWeakPtr<class SWindow> CoverWindow;
+    FTSTicker::FDelegateHandle RevealTicker;
+    // Bounds the wait for PostLoadMapWithWorld: a travel the engine refuses
+    // (a bad map name in PIE stays in the current world and broadcasts
+    // nothing) must not leave an opaque cover on the window. Armed when a
+    // cover goes up for a travel, disarmed by the post-load delegate.
+    FTSTicker::FDelegateHandle CoverWatchdog;
+    void ArmCoverWatchdog();
+    void DisarmCoverWatchdog();
+    // A travel is in the deploy hold and its OpenLevel is scheduled.
+    bool bTravelPending = false;
+    // False from the door until PostLoadMapWithWorld; a reveal cannot start
+    // against a world that is not there.
+    bool bWorldReady = true;
+    double ReadyTimeSeconds = 0.0;
+    uint64 ReadyFrame = 0;
 
 public:
 

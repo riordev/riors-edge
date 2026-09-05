@@ -1322,12 +1322,28 @@ void ABreakerGameMode::BuildFieldFrame(const APawn* Pawn)
 void ABreakerGameMode::ScheduleScreenshots()
 {
     int32 Count = 0;
-    if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshots="), Count) || Count <= 0) return;
+    // -BreakerCaptureArrival photographs the arrival itself: breaker_00 is
+    // the first frame after the arrival cover leaves, breaker_01 one second
+    // later. Two frames unless -BreakerScreenshots=N says otherwise.
+    bCaptureAwaitsArrival = FParse::Param(FCommandLine::Get(), TEXT("BreakerCaptureArrival"));
+    if (!FParse::Value(FCommandLine::Get(), TEXT("BreakerScreenshots="), Count) && bCaptureAwaitsArrival) Count = 2; // O2 PLACEHOLDER
+    if (Count <= 0) return;
     ScreenshotsRemaining = FMath::Clamp(Count, 1, 60);
     ScreenshotIndex = 0;
-    NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotFirstDelaySeconds);
-    UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first at %.1fs, every %.1fs after."),
-        ScreenshotsRemaining, ScreenshotFirstDelaySeconds, ScreenshotIntervalSeconds);
+    if (bCaptureAwaitsArrival)
+    {
+        ScreenshotIntervalSeconds = 1.0f; // O2 PLACEHOLDER
+        NextScreenshotTime = 0.0;
+        const FBreakerArrivalHold& Hold = UBreakerGameInstance::ShippedArrivalHold();
+        UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first when the arrival cover leaves (>= %.2fs and %d frames after load, then a %.2fs fade), every %.1fs after."),
+            ScreenshotsRemaining, Hold.MinHoldSeconds, Hold.MinSettleFrames, Hold.FadeInSeconds, ScreenshotIntervalSeconds);
+    }
+    else
+    {
+        NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotFirstDelaySeconds);
+        UE_LOG(LogTemp, Display, TEXT("[BreakerCapture] %d screenshots, first at %.1fs, every %.1fs after."),
+            ScreenshotsRemaining, ScreenshotFirstDelaySeconds, ScreenshotIntervalSeconds);
+    }
 
     // Shot 0 is the SPAWN EYE VIEW even on a tour: it is the one frame that
     // answers "what does a player see when the level loads", which is the
@@ -1350,6 +1366,11 @@ void ABreakerGameMode::ScheduleScreenshots()
     ScreenshotTickHandle = FTSTicker::GetCoreTicker().AddTicker(
         FTickerDelegate::CreateWeakLambda(this, [this](float) -> bool
         {
+            if (bCaptureAwaitsArrival)
+            {
+                const UBreakerGameInstance* Session = GetGameInstance<UBreakerGameInstance>();
+                if (Session && Session->IsArrivalCoverUp()) return true;
+            }
             if (FPlatformTime::Seconds() >= NextScreenshotTime)
             {
                 NextScreenshotTime = FPlatformTime::Seconds() + FMath::Max(0.1f, ScreenshotIntervalSeconds);

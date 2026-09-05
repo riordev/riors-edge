@@ -359,6 +359,11 @@ public:
     // are the thing most worth capturing and they are ALWAYS paused.
     FTSTicker::FDelegateHandle ScreenshotTickHandle;
     double NextScreenshotTime = 0.0;
+    // -BreakerCaptureArrival: shot 0 waits for the arrival cover to leave
+    // rather than for a clock. ScheduleScreenshots runs inside LoadMap, before
+    // the cover's ready moment exists, and the cover's frame gate makes the
+    // reveal moment a state, not a number.
+    bool bCaptureAwaitsArrival = false;
     int32 ScreenshotsRemaining = 0;
     int32 ScreenshotIndex = 0;
     // First shot waits this long so the gym has spawned, the HUD has ticked and

@@ -9,7 +9,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Styling/CoreStyle.h"
 #include "UI/BreakerLoadingScreen.h"
+#include "Widgets/Layout/SBorder.h"
 #include "Widgets/SWindow.h"
 
 namespace
@@ -72,15 +74,40 @@ bool UBreakerGameInstance::IsGymMapName(const FString& Name)
 // over a quarter-second load: it is not a wait to optimise away, it is the
 // arrival being named. Owner-tunable live (they are console variables), and
 // O2 PLACEHOLDER until the owner has read a few.
+//
+// The arrive side is the gate in BreakerArrivalMath.h: one static struct
+// that ShippedArrivalHold() hands to the reveal ticker and to the suite, with
+// each member bound to a console variable so the owner can tune it live.
+// A static rather than a UPROPERTY on the instance: the game instance class
+// is set by name in DefaultEngine.ini with no Blueprint subclass to carry
+// edited defaults, so a property here would be a second place for the same
+// figure that nothing edits.
 // ---------------------------------------------------------------------------
 static float GBreakerDeployHoldSeconds = 2.6f;   // O2 PLACEHOLDER
 static FAutoConsoleVariableRef CVarBreakerDeployHold(
     TEXT("Breaker.DeployHoldSeconds"), GBreakerDeployHoldSeconds,
     TEXT("How long the deployment briefing holds before the travel begins. Tuned for reading the briefing, not for covering the load."));
-static float GBreakerArriveHoldSeconds = 0.9f;   // O2 PLACEHOLDER
+static FBreakerArrivalHold GBreakerArrivalHold;   // O2 PLACEHOLDER — defaults in BreakerArrivalMath.h
+// The longest a travel cover may wait for the far side before it leaves on
+// its own: the deploy hold plus a load, with room for a slow disk.
+static float GBreakerCoverWatchdogSeconds = 12.0f;   // O2 PLACEHOLDER
+static FAutoConsoleVariableRef CVarBreakerCoverWatchdogSeconds(
+    TEXT("Breaker.CoverWatchdogSeconds"), GBreakerCoverWatchdogSeconds,
+    TEXT("Seconds a travel cover waits for the loaded world before it leaves on its own."));
 static FAutoConsoleVariableRef CVarBreakerArriveHold(
-    TEXT("Breaker.ArriveHoldSeconds"), GBreakerArriveHoldSeconds,
-    TEXT("How long the briefing lingers after the destination has loaded, while the stage line says the arrival."));
+    TEXT("Breaker.ArriveHoldSeconds"), GBreakerArrivalHold.MinHoldSeconds,
+    TEXT("The shortest the arrival cover holds after the destination has loaded, while the stage line says the arrival."));
+static FAutoConsoleVariableRef CVarBreakerArriveSettleFrames(
+    TEXT("Breaker.ArriveSettleFrames"), GBreakerArrivalHold.MinSettleFrames,
+    TEXT("The fewest frames the destination renders under the cover before it lifts, so Lumen and exposure have settled."));
+static FAutoConsoleVariableRef CVarBreakerArriveFadeIn(
+    TEXT("Breaker.ArriveFadeInSeconds"), GBreakerArrivalHold.FadeInSeconds,
+    TEXT("How long the arrival cover takes to fade once both gates are met."));
+
+const FBreakerArrivalHold& UBreakerGameInstance::ShippedArrivalHold()
+{
+    return GBreakerArrivalHold;
+}
 
 void UBreakerGameInstance::Init()
 {
@@ -88,6 +115,15 @@ void UBreakerGameInstance::Init()
     // The far side of the load: the arrival beat's cue. The deploy side needs
     // no delegate — BeginTravel is the door.
     FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UBreakerGameInstance::HandlePostLoadMap);
+}
+
+void UBreakerGameInstance::Shutdown()
+{
+    // The ticker holds a weak reference and would skip a dead instance, but a
+    // cover left on the window outlives the session; take both down.
+    RevealWorld();
+    FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
+    Super::Shutdown();
 }
 
 void UBreakerGameInstance::TravelTo(const UObject* WorldContext, FName MapName)
@@ -107,7 +143,7 @@ void UBreakerGameInstance::TravelTo(const UObject* WorldContext, FName MapName)
 
 void UBreakerGameInstance::BeginTravel(FName MapName)
 {
-    if (bDeployBeatActive) return;
+    if (bTravelPending) return;
 
     // The capture harness cannot author a rift and the beat is exactly the
     // kind of surface that must not ship unphotographed — the FORGEBENCH
@@ -123,72 +159,194 @@ void UBreakerGameInstance::BeginTravel(FName MapName)
         PendingRift.Tier = EBreakerRiftTier::Campaign;
     }
 
-    // Only a travel with something to say gets the beat: dev drops, captures
-    // and every legacy path stay instant. OpenLevel rather than a seamless
-    // transition, as before — the maps share no geometry and this object is
-    // the only thing that must survive the load.
-    TSharedPtr<SWindow> Window = (PendingRift.IsSet() && GEngine && GEngine->GameViewport)
-        ? GEngine->GameViewport->GetWindow() : nullptr;
-    if (!Window.IsValid())
+    // OpenLevel rather than a seamless transition — the maps share no
+    // geometry and this object is the only thing that must survive the load.
+    // A travel with something to say wears the briefing and holds it for
+    // reading; every other travel wears a plain black and loads at once. Both
+    // lift through the same gated reveal on the far side.
+    if (PendingRift.IsSet())
+    {
+        // The briefing composes through the game's own derivations: the
+        // elite loot bonus from the enemy's authored default (read, never
+        // transcribed) and O82's solo budget feeding O123's readout —
+        // campaign ignores it, and the endgame decrement stays parked behind
+        // O122 either way.
+        const int32 EliteBonus = GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus();
+        const FBreakerDeploymentBriefing Briefing = SBreakerLoadingScreen::MakeBriefing(
+            PendingRift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+
+        TSharedRef<SBreakerLoadingScreen> Pane = SNew(SBreakerLoadingScreen).Briefing(Briefing);
+        Pane->SetStage(FText::FromString(TEXT("OPENING THE RIFT")));
+        if (!AddCover(Pane))
+        {
+            // Headless: no window to put a cover on.
+            UGameplayStatics::OpenLevel(this, MapName);
+            return;
+        }
+        DeployScreen = Pane;
+        bWorldReady = false;
+        ArmCoverWatchdog();
+        bTravelPending = true;
+
+        // A CORE ticker, not a world timer, for the capture harness's stated
+        // reason: every briefing travel starts from a paused menu, and a
+        // paused world's timers never fire. Weak, so a dying session cancels
+        // its own travel instead of crashing it.
+        const FName CapturedMap = MapName;
+        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+            [this, CapturedMap](float)
+            {
+                bTravelPending = false;
+                UGameplayStatics::OpenLevel(this, CapturedMap);
+                return false;
+            }), FMath::Max(GBreakerDeployHoldSeconds, 0.0f));
+        return;
+    }
+
+    // The plain black. OpenLevel defers the load to the next engine tick and
+    // Slate paints after this one, so the cover is on screen before the load
+    // blocks; a black already up from HoldBlack is kept as it is.
+    if (!Cover.IsValid() && !AddCover(MakeBlackCover()))
     {
         UGameplayStatics::OpenLevel(this, MapName);
         return;
     }
+    if (RevealTicker.IsValid())
+    {
+        // A reveal in flight is cancelled: the cover goes back to opaque and
+        // the destination gets its own.
+        FTSTicker::GetCoreTicker().RemoveTicker(RevealTicker);
+        RevealTicker.Reset();
+    }
+    Cover->SetRenderOpacity(1.0f);
+    bWorldReady = false;
+    ArmCoverWatchdog();
+    UGameplayStatics::OpenLevel(this, MapName);
+}
 
-    // The briefing composes through the game's own derivations: the elite
-    // loot bonus from the enemy's authored default (read, never transcribed)
-    // and O82's solo budget feeding O123's readout — campaign ignores it,
-    // and the endgame decrement stays parked behind O122 either way.
-    const int32 EliteBonus = GetDefault<ABreakerEnemy>()->GetEliteDropItemLevelBonus();
-    const FBreakerDeploymentBriefing Briefing = SBreakerLoadingScreen::MakeBriefing(
-        PendingRift, EliteBonus, UBreakerRiftLibrary::SoloEndgameDeathBudget);
+void UBreakerGameInstance::ArmCoverWatchdog()
+{
+    DisarmCoverWatchdog();
+    CoverWatchdog = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+        [this](float)
+        {
+            CoverWatchdog.Reset();
+            if (!bWorldReady && Cover.IsValid())
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[BreakerTravel] no loaded world after %.1f s; the cover leaves on its own."),
+                    GBreakerCoverWatchdogSeconds);
+                bWorldReady = true;
+                RevealWorld();
+            }
+            return false;
+        }), FMath::Max(GBreakerCoverWatchdogSeconds, 0.1f));
+}
 
-    DeployScreen = SNew(SBreakerLoadingScreen).Briefing(Briefing);
-    DeployScreen->SetStage(FText::FromString(TEXT("OPENING THE RIFT")));
-    DeployWindow = Window;
+void UBreakerGameInstance::DisarmCoverWatchdog()
+{
+    if (CoverWatchdog.IsValid())
+    {
+        FTSTicker::GetCoreTicker().RemoveTicker(CoverWatchdog);
+        CoverWatchdog.Reset();
+    }
+}
+
+TSharedRef<SWidget> UBreakerGameInstance::MakeBlackCover()
+{
+    // An opaque border over the whole window. SBorder rather than SColorBlock
+    // because a border is also a hit-test wall: nothing under the cover takes
+    // a click while the world is not yet shown.
+    return SNew(SBorder)
+        .BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+        .BorderBackgroundColor(FLinearColor::Black)
+        .Padding(0.0f);
+}
+
+bool UBreakerGameInstance::AddCover(TSharedRef<SWidget> Widget)
+{
+    TSharedPtr<SWindow> Window = (GEngine && GEngine->GameViewport) ? GEngine->GameViewport->GetWindow() : nullptr;
+    if (!Window.IsValid()) return false;
+    RevealWorld();
+    Cover = Widget;
+    CoverWindow = Window;
     Window->AddOverlaySlot(1000)
     [
-        DeployScreen.ToSharedRef()
+        Widget
     ];
-    bDeployBeatActive = true;
-
-    // A CORE ticker, not a world timer, for the capture harness's stated
-    // reason: every beat-eligible travel starts from a paused menu, and a
-    // paused world's timers never fire. Weak, so a dying session cancels its
-    // own travel instead of crashing it.
-    const FName CapturedMap = MapName;
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
-        [this, CapturedMap](float)
-        {
-            UGameplayStatics::OpenLevel(this, CapturedMap);
-            return false;
-        }), FMath::Max(GBreakerDeployHoldSeconds, 0.0f));
+    return true;
 }
 
 void UBreakerGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
 {
-    if (!bDeployBeatActive || !DeployScreen.IsValid()) return;
-    // The far side: the stage line says the arrival, lingers long enough to
-    // be read as one, and the pane leaves.
-    DeployScreen->SetStage(FText::FromString(TEXT("ON SITE")));
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
-        [this](float)
-        {
-            EndDeployBeat();
-            return false;
-        }), FMath::Max(GBreakerArriveHoldSeconds, 0.0f));
+    bWorldReady = true;
+    DisarmCoverWatchdog();
+    if (!Cover.IsValid()) return;
+    // The far side: the stage line says the arrival, and the cover lifts
+    // through the gate.
+    if (DeployScreen.IsValid())
+    {
+        DeployScreen->SetStage(FText::FromString(TEXT("ON SITE")));
+    }
+    BeginReveal();
 }
 
-void UBreakerGameInstance::EndDeployBeat()
+void UBreakerGameInstance::HoldBlack()
 {
-    if (TSharedPtr<SWindow> Window = DeployWindow.Pin())
-    {
-        if (DeployScreen.IsValid())
+    if (Cover.IsValid()) return;
+    AddCover(MakeBlackCover());
+}
+
+void UBreakerGameInstance::ReleaseBlack()
+{
+    if (!Cover.IsValid()) return;
+    BeginReveal();
+}
+
+void UBreakerGameInstance::BeginReveal()
+{
+    if (RevealTicker.IsValid()) return;
+    ReadyTimeSeconds = FPlatformTime::Seconds();
+    ReadyFrame = GFrameCounter;
+    // A CORE ticker for the same reason as the deploy hold, at 0 so it runs
+    // every frame: the frame gate is counted in frames. Weak, so a dying
+    // session drops its own reveal.
+    RevealTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+        [this](float)
         {
-            Window->RemoveOverlaySlot(DeployScreen.ToSharedRef());
+            if (!Cover.IsValid())
+            {
+                RevealTicker.Reset();
+                return false;
+            }
+            const float Alpha = BreakerArrivalRevealAlpha(bWorldReady,
+                FPlatformTime::Seconds() - ReadyTimeSeconds, GFrameCounter - ReadyFrame, ShippedArrivalHold());
+            Cover->SetRenderOpacity(1.0f - Alpha);
+            if (Alpha >= 1.0f)
+            {
+                RevealTicker.Reset();
+                RevealWorld();
+                return false;
+            }
+            return true;
+        }), 0.0f);
+}
+
+void UBreakerGameInstance::RevealWorld()
+{
+    DisarmCoverWatchdog();
+    if (RevealTicker.IsValid())
+    {
+        FTSTicker::GetCoreTicker().RemoveTicker(RevealTicker);
+        RevealTicker.Reset();
+    }
+    if (TSharedPtr<SWindow> Window = CoverWindow.Pin())
+    {
+        if (Cover.IsValid())
+        {
+            Window->RemoveOverlaySlot(Cover.ToSharedRef());
         }
     }
+    Cover.Reset();
     DeployScreen.Reset();
-    DeployWindow.Reset();
-    bDeployBeatActive = false;
+    CoverWindow.Reset();
 }
