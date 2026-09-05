@@ -184,7 +184,18 @@ def parse_nodes(lib_text):
             for e in re.finditer(r'EBreakerBuildCondition::(\w+)', l):
                 if e.group(1) != "Always":
                     node["conditions"].append(e.group(1))
-            for t in re.finditer(r'BreakerNodeTags::(\w+)', l):
+            # Any Breaker*Tags namespace: the keystones grant
+            # BreakerAbilityTags::Keystone_*, and a read of BreakerNodeTags
+            # alone reported them silent.
+            for t in re.finditer(r'Breaker\w*Tags::(\w+)', l):
+                node["tags"].append(t.group(1))
+            # A tag granted by string rather than by identifier — most
+            # doctrine keystones grant their Keystone.* tag this way, and the
+            # identifier-only read reported ten keystones silent whose tag
+            # the class abilities read by that very string. The census as
+            # data (Data/progression.json) sees the tag either way; this is
+            # what made the source read match it.
+            for t in re.finditer(r'RequestGameplayTag\(\s*TEXT\("([^"]+)"\)', l):
                 node["tags"].append(t.group(1))
             if "bCornerstone = true" in l:
                 node["cornerstone"] = True
@@ -287,7 +298,21 @@ def parse_declared_tags(lib_text):
     nothing in that file mentions Node_Overpenetration at all. Matching only the
     identifier reported two genuinely-consumed tags as dead.
     """
-    return dict(re.findall(r'UE_DEFINE_GAMEPLAY_TAG\((\w+),\s*"([^"]+)"', lib_text))
+    return dict(re.findall(r'UE_DEFINE_GAMEPLAY_TAG(?:_STATIC)?\((\w+),\s*"([^"]+)"', lib_text))
+
+
+def parse_tag_map(sources):
+    """{identifier: string} for EVERY tag production code declares.
+
+    The node library declares the Node_* tags, and the dead-tags section is
+    about those. But a node may grant a tag declared elsewhere -- every
+    doctrine keystone grants BreakerAbilityTags::Keystone_* -- and its
+    consumers name the IDENTIFIER (Cleave reads Keystone_Caster_Edgework), so
+    a map built from the library alone cannot connect the granted string to
+    the read and reports the keystone silent. This map is the one node tags
+    are resolved through; parse_declared_tags(lib) stays the dead-tags roster.
+    """
+    return parse_declared_tags("\n".join(non_test_sources(sources).values()))
 
 
 # --------------------------------------------------------------------------
@@ -324,19 +349,19 @@ def load_census():
     return census
 
 
-def census_nodes(census, declared_tags):
+def census_nodes(census, tag_map):
     """parse_nodes' dict shape, from the census.
 
     Tags are exported as strings; the consumer index is asked by identifier OR
-    string, so each is mapped back to its Node_X identifier through the
-    declared-tag map when one exists. A string with no identifier is kept as
-    the string and is consumed only by the string.
+    string, so each is mapped back to its identifier through the project-wide
+    tag map (parse_tag_map) when one exists. A string with no identifier is
+    kept as the string and is consumed only by the string.
 
     `exclusive` is the group key a mutually-exclusive set offers one point
     under. Source mode keys it on the trio's base id; here it is the smallest
     id in the set (self included), which is the same partition.
     """
-    by_string = {s: ident for ident, s in declared_tags.items()}
+    by_string = {s: ident for ident, s in tag_map.items()}
     nodes = []
     for tree in census["trees"]:
         for raw in tree["nodes"]:
@@ -535,7 +560,13 @@ def build_consumer_index(sources):
     every tag would otherwise consume all of them.
     """
     prod = stripped_sources(sources, exclude_substrings=("Progression/BreakerProgressionLibrary",))
-    return "\n".join(prod.values())
+    text = "\n".join(prod.values())
+    # A DECLARATION IS NOT A CONSUMER, wherever it lives. Excluding the node
+    # library handles the Node_* tags; the keystone tags are declared in the
+    # ability files by UE_DEFINE_GAMEPLAY_TAG_STATIC with their string, and
+    # the string matched its own declaration and reported ten keystones as
+    # heard by nothing but the line that named them.
+    return re.sub(r'UE_(?:DEFINE|DECLARE)_GAMEPLAY_TAG\w*\([^)]*\)', ' ', text)
 
 
 def tag_consumed(index, tag, tag_string=None):
@@ -780,6 +811,7 @@ def build_sections(sources, census=None):
     conds_text = read(os.path.join(SRC, "Progression", "BreakerBuildConditions.h"))
 
     declared_tags = parse_declared_tags(lib)
+    tag_map = parse_tag_map(sources)
     if census is None:
         nodes = parse_nodes(lib)
         targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
@@ -790,7 +822,7 @@ def build_sections(sources, census=None):
         authored_conds = {m.group(1) for m in re.finditer(r'EBreakerBuildCondition::(\w+)', lib)}
         currency_of = {}
     else:
-        nodes = census_nodes(census, declared_tags)
+        nodes = census_nodes(census, tag_map)
         targets, paid, rider_delivered, affix_owned = census_lane_register(census)
         conditions = [c for c in census["conditions"] if c != "Count"]
         core_budget = int(census["budgets"]["core"])
@@ -805,7 +837,7 @@ def build_sections(sources, census=None):
     silent = []
     for n in nodes:
         pays = any(e in paid for e in n["effects"])
-        heard = any(tag_consumed(index, t, declared_tags.get(t)) for t in n["tags"]) or id_consumed(index, n["id"])
+        heard = any(tag_consumed(index, t, tag_map.get(t)) for t in n["tags"]) or id_consumed(index, n["id"])
         if not pays and not heard:
             silent.append(n)
     per_tree = defaultdict(int)
@@ -1070,7 +1102,7 @@ def build_sections(sources, census=None):
     # wiring problem where this is an authoring one.
     all_nopay = sum(1 for n in nodes
                     if not n["effects"] and not n["conditions"]
-                    and not any(tag_consumed(index, t, declared_tags.get(t)) for t in n["tags"])
+                    and not any(tag_consumed(index, t, tag_map.get(t)) for t in n["tags"])
                     and not id_consumed(index, n["id"]))
     sections.append({
         "key": "node-shape-composition", "title": "Node-shape composition, per tree",
