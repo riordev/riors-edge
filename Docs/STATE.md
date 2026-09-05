@@ -34,7 +34,7 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 512
+- passing: 514
 - expected red: 3
 - **unexpected red: 0**
 - asserted invariants with no test: 38

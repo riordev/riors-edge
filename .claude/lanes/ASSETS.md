@@ -1,6 +1,6 @@
 # ASSETS
-branch: assets/placeholder-intake   base: 2526cfc   suite: 488 / 3 / 0
-current: placeholder packs vendored under Assets/ and wired — mech cast is the shipped look (be3b853), six weapon archetypes through NamedMeshPath, modifier halo is a ground disc
-next: Ultimate Modular Women download; gun placement/cant pass; muzzle-flash exposure retune; mech texture bind; FP arms wait on the Fab mannequin/GASP delivery; audio wiring and zone-kit composition parked
-blocked-on: owner downloads; python quarantine on seat 2 (zone-kit composer)
-crossings this cycle: none
+branch: main   base: 65247d4   suite: 514 / 3 / 0
+current: ASSETS-3a — the named guns' muzzle axis is read from their vertices and pinned to rig +X; the 180° yaw was backwards and is gone
+next: gun placement/cant pass — the named guns sit low-right at hip and the sniper's muzzle does not reach the reticle; then muzzle-flash exposure retune, mech texture bind
+blocked-on: owner downloads (Ultimate Modular Women, Fab mannequin/GASP for FP arms); the ASSETS rules file (Part Six) is not in the repo
+crossings this cycle: Characters/BreakerViewmodelRig.h:FitNamedWeapon, Characters/BreakerViewmodelRig.cpp:NamedMeshRotation, Characters/BreakerCharacter.cpp:RebuildViewmodelParts → KIT
