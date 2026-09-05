@@ -60,6 +60,22 @@ bool FBreakerLocomotionModeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("No target (patrol) steers"),
         BreakerLocomotionModeOf(Closing, FVector::ZeroVector, false, true, 1000.0f, Accept), static_cast<int32>(EBreakerLocomotionMode::Steer));
 
+    // The goal override (NAV-2): a body walking to a firing flank is walking
+    // AWAY from the player's line, so the alignment cone that keeps strafes
+    // and retreats out of the path follower must not apply. A blocked line to
+    // the goal paths whatever the direction's angle to the player.
+    const float Capsule = 45.0f;   // the enemy capsule's radius, the goal acceptance
+    TestEqual(TEXT("A goal behind a wall paths even when the direction is a strafe to the player"),
+        static_cast<int32>(ChooseGoalMode(Strafe, true, 1000.0f, Capsule)), static_cast<int32>(EBreakerLocomotionMode::Path));
+    TestEqual(TEXT("A goal behind a wall paths even when the direction is a retreat from the player"),
+        static_cast<int32>(ChooseGoalMode(Retreat, true, 1000.0f, Capsule)), static_cast<int32>(EBreakerLocomotionMode::Path));
+    TestEqual(TEXT("A goal with a clear line steers"),
+        static_cast<int32>(ChooseGoalMode(Strafe, false, 1000.0f, Capsule)), static_cast<int32>(EBreakerLocomotionMode::Steer));
+    TestEqual(TEXT("A goal the body has arrived at hands back to the behaviour"),
+        static_cast<int32>(ChooseGoalMode(Strafe, true, Capsule, Capsule)), static_cast<int32>(EBreakerLocomotionMode::Steer));
+    TestEqual(TEXT("A zero direction with a goal is still a hold"),
+        static_cast<int32>(ChooseGoalMode(FVector::ZeroVector, true, 1000.0f, Capsule)), static_cast<int32>(EBreakerLocomotionMode::Idle));
+
     const FVector Goal(500.0f, 500.0f, 0.0f);
     TestTrue(TEXT("An idle move always re-plans"), ShouldReplan(Goal, Goal, true));
     TestFalse(TEXT("A goal that has not moved keeps its path"), ShouldReplan(Goal, Goal + FVector(100.0f, 0, 0), false));
@@ -68,6 +84,76 @@ bool FBreakerLocomotionModeTest::RunTest(const FString& Parameters)
 
     TestEqual(TEXT("Max speed is MoveSpeed x scale"), MaxSpeed(330.0f, 1.5f), 495.0f);
     TestEqual(TEXT("A negative scale clamps to a stop"), MaxSpeed(330.0f, -1.0f), 0.0f);
+    return true;
+}
+
+// NAV-3. The arrival angle: a closer walks to a point on the ring off its own
+// bearing, signed by its seed, so two closers split and the NAV-1 detour still
+// reads the approach as closing. Proven without a world.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerLocomotionArrivalGoalTest,
+    "RiorsEdge.AI.Locomotion.ArrivalGoal",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerLocomotionArrivalGoalTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerLocomotionMath;
+
+    // The sign alternates over the game mode's seed step (Index x 1.3).
+    TestEqual(TEXT("Seed 0.0 reads +1"), ArrivalSign(0.0f), 1.0f);
+    TestEqual(TEXT("Seed 1.3 reads -1"), ArrivalSign(1.3f), -1.0f);
+    TestEqual(TEXT("Seed 2.6 reads +1"), ArrivalSign(2.6f), 1.0f);
+    TestEqual(TEXT("Seed 3.9 reads -1"), ArrivalSign(3.9f), -1.0f);
+    TestEqual(TEXT("A negative seed reads by its magnitude"), ArrivalSign(-1.3f), -1.0f);
+
+    const float Ring = 260.0f;
+    const FVector Target(0.0f, 0.0f, 120.0f);
+    const FVector Pawn(2000.0f, 0.0f, 90.0f);
+    const FVector Left = ArrivalGoal(Target, Pawn, Ring, 1.0f, ArrivalOffsetDeg);
+    const FVector Right = ArrivalGoal(Target, Pawn, Ring, -1.0f, ArrivalOffsetDeg);
+
+    TestTrue(TEXT("The +1 goal lies on the ring"), FMath::IsNearlyEqual(FVector::Dist2D(Left, Target), Ring, 0.01f));
+    TestTrue(TEXT("The -1 goal lies on the ring"), FMath::IsNearlyEqual(FVector::Dist2D(Right, Target), Ring, 0.01f));
+    TestEqual(TEXT("The goal keeps the target's height (the snap owns Z)"), Left.Z, Target.Z);
+
+    const FVector BearingLeft = (Left - Target).GetSafeNormal2D();
+    const FVector BearingRight = (Right - Target).GetSafeNormal2D();
+    const float Split = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(BearingLeft, BearingRight)));
+    TestTrue(TEXT("The two goals stand 2 x OffsetDeg apart in bearing"), FMath::IsNearlyEqual(Split, 2.0f * ArrivalOffsetDeg, 0.01f));
+    TestTrue(TEXT("The two goals stand on opposite sides of the bearing"), BearingLeft.Y * BearingRight.Y < 0.0f);
+
+    // From the far edge of the approach the direction to the goal is well
+    // inside the alignment cone, so a blocked line still paths (NAV-1).
+    const FVector ToTarget = (Target - Pawn).GetSafeNormal2D();
+    const FVector Approach = (Left - Pawn).GetSafeNormal2D();
+    TestTrue(TEXT("From 2000 cm the approach reads as closing on the target"),
+        FVector::DotProduct(Approach, ToTarget) >= PathAlignCos);
+    TestEqual(TEXT("The approach to a ring goal paths when the line is blocked"),
+        static_cast<int32>(ChooseMode(Approach, ToTarget, true, true, 2000.0f, AcceptanceRadius(Ring))),
+        static_cast<int32>(EBreakerLocomotionMode::Path));
+
+    // The sign is the seed's, not the position's: a pawn that moves keeps its
+    // side, so the pair never swaps mid-approach.
+    // The sign is the seed's, not the position's, so a pair never swaps sides
+    // mid-approach; and the goal's side of the bearing follows the sign
+    // wherever the pawn stands.
+    const auto SideOf = [](const FVector& From, const FVector& Bearing, const FVector& Goal)
+    {
+        return FVector::CrossProduct((From - Bearing).GetSafeNormal2D(), (Goal - Bearing).GetSafeNormal2D()).Z;
+    };
+    const FVector Moved(1500.0f, 400.0f, 90.0f);
+    const FVector LeftMoved = ArrivalGoal(Target, Moved, Ring, 1.0f, ArrivalOffsetDeg);
+    TestEqual(TEXT("The seed's sign does not change when the pawn moves"), ArrivalSign(1.3f), ArrivalSign(1.3f));
+    TestTrue(TEXT("The +1 goal stays on the same side of the bearing after the pawn moves"),
+        SideOf(Pawn, Target, Left) * SideOf(Moved, Target, LeftMoved) > 0.0f);
+    TestTrue(TEXT("The -1 goal stands on the other side"), SideOf(Pawn, Target, Left) * SideOf(Pawn, Target, Right) < 0.0f);
+
+    // Shipped configuration: the offset is real, and the split covers at
+    // least the chord a 150 cm body spacing subtends on the 260 cm ring.
+    TestTrue(TEXT("The arrival offset is positive"), ArrivalOffsetDeg > 0.0f);
+    const float BodySpacingChordDeg = FMath::RadiansToDegrees(2.0f * FMath::Asin(75.0f / 260.0f));
+    TestTrue(TEXT("The split is at least one 150 cm body spacing on the 260 cm ring"),
+        2.0f * ArrivalOffsetDeg >= BodySpacingChordDeg);
     return true;
 }
 

@@ -425,6 +425,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UBreakerEnemyMovementComponent> Mover;
 public:
     class UBreakerEnemyMovementComponent* GetEnemyMovement() const { return Mover; }
+    // How far this enemy notices a player, read-only: the cover search must
+    // never look further than the body can see, and a test asserts that.
+    float GetDetectionRange() const { return DetectionRange; }
 protected:
     // Primitive humanoid assembly. BodyVisual is the torso; the rest are
     // cosmetic siblings under BodyCollision, all NoCollision.
@@ -662,6 +665,13 @@ protected:
     // you are moving", which is the melee behaviour. A ranged enemy strafes
     // sideways while facing the player, so it sets this every frame.
     FVector DesiredFacing = FVector::ZeroVector;
+    // Optional destination override for one frame, the same shape as
+    // DesiredFacing: an archetype that wants to be SOMEWHERE rather than at
+    // the player (the Lattice walking to a firing flank) sets both every frame
+    // it holds that intent, and the mover traces, measures and paths to the
+    // goal instead of the player. Cleared before every behaviour tick.
+    FVector PathGoal = FVector::ZeroVector;
+    bool bHasPathGoal = false;
 
     // Composed into the chassis alongside ArchetypeHealthMultiplier. DERIVED
     // from the modifier count (Encounter-Design §1.1's "+0.35x per modifier

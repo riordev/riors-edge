@@ -25,8 +25,15 @@ public:
     // already normalised (or zero for "hold"); SpeedScale multiplies MoveSpeed
     // exactly as Tick used to. Target may be null (patrol). Returns the mode
     // that was chosen so a caller can print it.
+    //
+    // bHasGoal / Goal is the archetype's "go HERE, not at the player" channel
+    // (NAV-2). With a goal the closing line is traced to the goal, the
+    // acceptance is the pawn's own capsule radius — the number PATROL already
+    // arrives by — and a path, when one is needed, is requested to the goal.
+    // The target is still passed so the trace can ignore it.
     EBreakerLocomotionMode Drive(const FVector& Direction, float SpeedScale, AActor* Target,
-        float DistanceToTarget, float AttackRange, float MoveSpeed);
+        float DistanceToTarget, float AttackRange, float MoveSpeed,
+        bool bHasGoal = false, const FVector& Goal = FVector::ZeroVector);
 
     // Blocking impacts against upright world geometry since the last reset —
     // the number the nav probe reports as "touches". A floor contact does not
@@ -42,8 +49,10 @@ public:
 
 protected:
     // True when world-static geometry stands on the straight line from the
-    // pawn to the target. One line trace per call.
-    bool IsClosingLineBlocked(const AActor* Target) const;
+    // pawn to To. One line trace per call. Ignore (the target) is stepped
+    // over by the trace so a body is never "blocked" by the thing it is
+    // closing on.
+    bool IsClosingLineBlocked(const FVector& To, const AActor* Ignore) const;
 
     // The ground snap, moved here verbatim from ABreakerEnemy::Tick: trace
     // down, plant the capsule base on whatever is below — snap down

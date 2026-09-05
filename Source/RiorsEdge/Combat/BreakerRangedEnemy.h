@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/BreakerEnemy.h"
+#include "Combat/BreakerCoverBehavior.h"
 #include "Combat/BreakerRangedBehavior.h"
 #include "BreakerRangedEnemy.generated.h"
 
@@ -36,6 +37,10 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged") EBreakerRangedBand GetBand() const { return Band; }
     UFUNCTION(BlueprintPure, Category="Enemy|Ranged") bool IsWindingUp() const { return bWindingUp; }
+    // The last engaged tick's line-of-sight read, and the firing flank it is
+    // walking to when that read was blocked. Both exist for the nav probe.
+    UFUNCTION(BlueprintPure, Category="Enemy|Ranged") bool HasLineOfSightToTarget() const { return bLastLineOfSight; }
+    bool GetCoverGoal(FVector& Out) const { Out = CoverGoal; return bHasCoverGoal; }
 
     // THE FIELD MARSHAL's FIRE order (Encounter-Design §3.4 phase 2): "both
     // Lattices volley simultaneously at the player's position, ignoring their
@@ -70,6 +75,15 @@ public:
     // Strafe direction flips on this cadence so it never orbits forever in one
     // direction and become trivially trackable. Desynced by PatrolPhase.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Band", meta=(ClampMin="0.1")) float StrafeReverseSeconds = 2.1f;
+
+    // --- Cover (NAV-2) -----------------------------------------------------
+    // When the line to the player breaks, the Lattice walks to a FIRING FLANK
+    // beside a registered cover piece — a point it can see the player from —
+    // rather than straight at the player through the wall. The preferred band
+    // is the engagement band, set in the constructor from Min/MaxEngagement-
+    // Distance so there is one authored band, not two. SearchRadiusCm keeps
+    // the struct's default.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Ranged|Cover") FBreakerCoverParams Cover;
 
     // --- Fire cycle (O2 PLACEHOLDER) ---------------------------------------
     // The telegraph. A dodgeable projectile is only fair if the player knows
@@ -115,7 +129,15 @@ protected:
     void FireVolley(const AActor* Target);
     void UpdateTelegraph(float Alpha);
     bool HasLineOfSightTo(const AActor* Target) const;
+    // The same world-static trace from an arbitrary point, so a candidate
+    // flank is judged by the trace the shot itself will take.
+    bool HasLineOfSightFrom(const FVector& From, const AActor* Target) const;
     FVector GetMuzzleLocation() const;
+    // Asks the level's cover registry for anchors within Cover.SearchRadiusCm,
+    // builds their flanks, keeps the ones with an open line to the player and
+    // chooses among them. False means there is no flank here and the band's
+    // straight advance is the honest answer.
+    bool ChooseCoverGoal(const AActor* Player, FVector& OutGoal) const;
 
     // The "core node" of Encounter-Design §2.2: dim between volleys, hot and
     // wide during the wind-up. It is the tell, and it is also where the shot
@@ -130,4 +152,9 @@ private:
     double WindupStartTime = -1000.0;
     float StrafeTimer = 0.0f;
     float StrafeSign = 1.0f;
+    bool bLastLineOfSight = false;
+    // The flank it is walking to, held across ticks until the line to the
+    // player is open again or the body arrives without one.
+    FVector CoverGoal = FVector::ZeroVector;
+    bool bHasCoverGoal = false;
 };

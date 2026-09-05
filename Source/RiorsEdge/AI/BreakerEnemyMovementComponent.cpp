@@ -19,30 +19,52 @@ UBreakerEnemyMovementComponent::UBreakerEnemyMovementComponent(const FObjectInit
 }
 
 EBreakerLocomotionMode UBreakerEnemyMovementComponent::Drive(const FVector& Direction, float SpeedScale,
-    AActor* Target, float DistanceToTarget, float AttackRange, float MoveSpeed)
+    AActor* Target, float DistanceToTarget, float AttackRange, float MoveSpeed,
+    bool bHasGoal, const FVector& Goal)
 {
     MaxSpeed = BreakerLocomotionMath::MaxSpeed(MoveSpeed, SpeedScale);
 
     ABreakerEnemyController* Controller = PawnOwner
         ? Cast<ABreakerEnemyController>(PawnOwner->GetController()) : nullptr;
 
-    const FVector ToTarget = (Target && PawnOwner)
-        ? (Target->GetActorLocation() - PawnOwner->GetActorLocation()) : FVector::ZeroVector;
-    const float Acceptance = BreakerLocomotionMath::AcceptanceRadius(AttackRange);
-    // The trace is the one world fact the rule needs, and it is only asked
-    // for when the answer could matter: a target, a controller to path with,
-    // and a direction that is not a hold.
-    const bool bCouldPath = Target && Controller && !Direction.IsNearlyZero();
-    const bool bBlocked = bCouldPath && IsClosingLineBlocked(Target);
+    EBreakerLocomotionMode Mode = EBreakerLocomotionMode::Idle;
+    FVector PathTo = FVector::ZeroVector;
+    float Acceptance = 0.0f;
 
-    EBreakerLocomotionMode Mode = BreakerLocomotionMath::ChooseMode(
-        Direction, ToTarget, Target != nullptr, bBlocked, DistanceToTarget, Acceptance);
+    if (bHasGoal && PawnOwner)
+    {
+        // The goal override: the closing line, the distance and the path all
+        // run to the goal. Acceptance is the capsule radius the pawn already
+        // carries, the same arrival threshold PATROL uses.
+        const FVector ToGoal = Goal - PawnOwner->GetActorLocation();
+        const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(UpdatedComponent);
+        Acceptance = Capsule ? Capsule->GetScaledCapsuleRadius() : 0.0f;
+        const bool bCouldPath = Controller && !Direction.IsNearlyZero();
+        const bool bBlocked = bCouldPath && IsClosingLineBlocked(Goal, Target);
+        Mode = BreakerLocomotionMath::ChooseGoalMode(Direction, bBlocked, ToGoal.Size2D(), Acceptance);
+        PathTo = Goal;
+    }
+    else
+    {
+        const FVector ToTarget = (Target && PawnOwner)
+            ? (Target->GetActorLocation() - PawnOwner->GetActorLocation()) : FVector::ZeroVector;
+        Acceptance = BreakerLocomotionMath::AcceptanceRadius(AttackRange);
+        // The trace is the one world fact the rule needs, and it is only asked
+        // for when the answer could matter: a target, a controller to path with,
+        // and a direction that is not a hold.
+        const bool bCouldPath = Target && Controller && !Direction.IsNearlyZero();
+        const bool bBlocked = bCouldPath && IsClosingLineBlocked(Target ? Target->GetActorLocation() : FVector::ZeroVector, Target);
+
+        Mode = BreakerLocomotionMath::ChooseMode(
+            Direction, ToTarget, Target != nullptr, bBlocked, DistanceToTarget, Acceptance);
+        if (Target) PathTo = Target->GetActorLocation();
+    }
 
     if (Mode == EBreakerLocomotionMode::Path)
     {
         // A refused path (no navmesh yet, the first second of a level) is not
         // a hold: the body steers this frame and asks again next frame.
-        if (!Controller->Chase(Target->GetActorLocation(), Acceptance))
+        if (!Controller || !Controller->Chase(PathTo, Acceptance))
         {
             Mode = EBreakerLocomotionMode::Steer;
         }
@@ -60,15 +82,15 @@ EBreakerLocomotionMode UBreakerEnemyMovementComponent::Drive(const FVector& Dire
     return Mode;
 }
 
-bool UBreakerEnemyMovementComponent::IsClosingLineBlocked(const AActor* Target) const
+bool UBreakerEnemyMovementComponent::IsClosingLineBlocked(const FVector& To, const AActor* Ignore) const
 {
     UWorld* World = GetWorld();
-    if (!World || !PawnOwner || !Target || !UpdatedComponent) return false;
+    if (!World || !PawnOwner || !UpdatedComponent) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerEnemyClosingLine), false, PawnOwner);
-    Params.AddIgnoredActor(Target);
+    if (Ignore) Params.AddIgnoredActor(Ignore);
     FHitResult Hit;
     return World->LineTraceSingleByChannel(Hit, UpdatedComponent->GetComponentLocation(),
-        Target->GetActorLocation(), ECC_WorldStatic, Params);
+        To, ECC_WorldStatic, Params);
 }
 
 void UBreakerEnemyMovementComponent::ResetForRevive()

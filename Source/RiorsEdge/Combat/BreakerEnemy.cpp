@@ -1,6 +1,7 @@
 #include "Combat/BreakerEnemy.h"
 #include "AI/BreakerEnemyController.h"
 #include "AI/BreakerEnemyMovementComponent.h"
+#include "AI/BreakerLocomotionMath.h"
 
 #include "Combat/BreakerEnemyBodyMath.h"
 #include "Combat/BreakerHitReactionComponent.h"
@@ -869,6 +870,7 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // Speed multiplier for this frame. 1.0 = the old constant walk.
     float SpeedScale = 1.0f;
     DesiredFacing = FVector::ZeroVector;
+    bHasPathGoal = false;
     if (NearestPlayer && Distance <= DetectionRange)
     {
         TickEngagedBehaviour(NearestPlayer, Distance, DeltaSeconds, DesiredDirection, SpeedScale);
@@ -919,7 +921,8 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     // only line in Combat/ that moves an enemy.
     if (Mover)
     {
-        Mover->Drive(DesiredDirection, SpeedScale, NearestPlayer, Distance, AttackRange, MoveSpeed);
+        Mover->Drive(DesiredDirection, SpeedScale, NearestPlayer, Distance, AttackRange, MoveSpeed,
+            bHasPathGoal, PathGoal);
     }
 
     // THE GAIT FOLLOWS THE GROUND SPEED. The named body's walk plays as a
@@ -966,6 +969,24 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     // govern a leap that has already been announced to the player.
     ArrivalBand = UBreakerRangedBehaviorLibrary::ClassifyBand(Distance,
         AttackRange * ArrivalInnerRatio, AttackRange, ArrivalHysteresisCm, ArrivalBand);
+    // THE ARRIVAL ANGLE. Advance walks to a point ON the ring, not to the
+    // player: the target-to-body bearing rotated by this body's signed
+    // ArrivalOffsetDeg, handed to the mover through the goal channel so a
+    // blocked line still paths to it. Two closers seeded apart split left and
+    // right and arrive from two angles instead of stacking on one point. The
+    // weave below folds onto this approach vector. A subclass with no contact
+    // range has no ring and closes straight on the player.
+    FVector Approach = ToPlayer;
+    if (ArrivalBand == EBreakerRangedBand::Advance && AttackRange > 0.0f)
+    {
+        const FVector Goal = BreakerLocomotionMath::ArrivalGoal(Player->GetActorLocation(), GetActorLocation(),
+            AttackRange, BreakerLocomotionMath::ArrivalSign(PatrolPhase), BreakerLocomotionMath::ArrivalOffsetDeg);
+        PathGoal = Goal;
+        bHasPathGoal = true;
+        const FVector ToGoal = (Goal - GetActorLocation()).GetSafeNormal2D();
+        if (!ToGoal.IsNearlyZero()) Approach = ToGoal;
+        OutDirection = Approach;
+    }
     if (ArrivalBand != EBreakerRangedBand::Advance)
     {
         const float RadialSign = UBreakerRangedBehaviorLibrary::GetBandRadialSign(ArrivalBand);
@@ -1005,9 +1026,9 @@ void ABreakerEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float Distan
     if (!IsEliteOrBetter() && Distance > AttackRange)
     {
         WeaveTime += DeltaSeconds;
-        const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToPlayer).GetSafeNormal2D();
+        const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Approach).GetSafeNormal2D();
         const float Weave = FMath::Sin((WeaveTime + PatrolPhase) * WeaveFrequency) * WeaveStrength;
-        OutDirection = (ToPlayer + Lateral * Weave).GetSafeNormal2D();
+        OutDirection = (Approach + Lateral * Weave).GetSafeNormal2D();
     }
 
     // (c) SKITTER's committed leap (Encounter-Design §2.1). Three stages:

@@ -266,6 +266,18 @@ bool FBreakerRangedFairnessTest::RunTest(const FString& Parameters)
         Orb->MaximumLifetime * Defaults->ProjectileSpeed > Defaults->MaxEngagementDistance);
     TestTrue(TEXT("The projectile carries its own light so it reads against bright ground"),
         Orb->GlowIntensity > 0.0f && Orb->GlowRadius > 0.0f);
+
+    // The cover search (NAV-2) ships ONE band: a firing flank is only worth
+    // walking to if it stands where the archetype already shoots from, and a
+    // second authored band would drift from the first without a red.
+    TestEqual(TEXT("The flank band's floor is the engagement band's floor"),
+        Defaults->Cover.PreferredMinRangeCm, Defaults->MinEngagementDistance);
+    TestEqual(TEXT("The flank band's ceiling is the engagement band's ceiling"),
+        Defaults->Cover.PreferredMaxRangeCm, Defaults->MaxEngagementDistance);
+    TestTrue(TEXT("It never looks for cover further than it can see"),
+        Defaults->Cover.SearchRadiusCm <= Defaults->GetDetectionRange());
+    TestTrue(TEXT("A flank stands off the piece, not inside it"),
+        Defaults->Cover.FlankStandoffCm > 0.0f);
     return true;
 }
 

@@ -356,6 +356,73 @@ bool FBreakerCoverBehaviorTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// NAV-2. The firing flank is the Skirmisher's cover point turned inside out:
+// a spot BESIDE a piece from which the player can be seen. The geometry is
+// pure — two points per anchor, perpendicular to the anchor-to-threat line,
+// at the standoff — and the choice reuses the same band rejection and travel
+// scoring as hiding does, so one rule governs both verbs.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerCoverFlankTest,
+    "RiorsEdge.Combat.Archetypes.CoverFlank",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerCoverFlankTest::RunTest(const FString& Parameters)
+{
+    using ECover = UBreakerCoverLibrary;
+    FBreakerCoverParams Params;
+    TestEqual(TEXT("The standoff ships at the distance the field already stands a body off an anchor"),
+        Params.FlankStandoffCm, 260.0f);
+
+    const FVector Threat(2000.0f, 0.0f, 0.0f);
+    // One anchor mid-band, one almost on the threat.
+    const FVector InBand(500.0f, 0.0f, 0.0f);
+    const FVector TooClose(1800.0f, 0.0f, 0.0f);
+    const TArray<FVector> Candidates = ECover::BuildFlankCandidates({ InBand, TooClose }, Threat, Params);
+    TestEqual(TEXT("Every anchor yields two flanks"), Candidates.Num(), 4);
+
+    const TArray<FVector> Anchors = { InBand, InBand, TooClose, TooClose };
+    for (int32 Index = 0; Index < Candidates.Num() && Index < Anchors.Num(); ++Index)
+    {
+        const FVector Offset = Candidates[Index] - Anchors[Index];
+        const FVector ToThreat = (Threat - Anchors[Index]).GetSafeNormal2D();
+        TestEqual(FString::Printf(TEXT("Flank %d sits at the standoff"), Index),
+            static_cast<float>(Offset.Size2D()), Params.FlankStandoffCm, 0.01f);
+        TestEqual(FString::Printf(TEXT("Flank %d is perpendicular to the threat line"), Index),
+            static_cast<float>(FVector::DotProduct(Offset.GetSafeNormal2D(), ToThreat)), 0.0f, 0.001f);
+        TestEqual(FString::Printf(TEXT("Flank %d keeps the anchor's height"), Index),
+            static_cast<float>(Candidates[Index].Z), static_cast<float>(Anchors[Index].Z), 0.001f);
+    }
+    // The two flanks of one anchor are on opposite sides.
+    TestTrue(TEXT("An anchor's two flanks face each other across it"),
+        (Candidates[0] - InBand).Equals(-(Candidates[1] - InBand), 0.01f));
+
+    // A flank inside the minimum band is not a firing position: it is the
+    // player's face.
+    TestEqual(TEXT("A flank inside the minimum band is rejected"),
+        ECover::ScoreCoverCandidate(Candidates[2], FVector::ZeroVector, Threat, Params), ECover::GetRejectedCoverScore());
+    TestEqual(TEXT("...and so is its twin"),
+        ECover::ScoreCoverCandidate(Candidates[3], FVector::ZeroVector, Threat, Params), ECover::GetRejectedCoverScore());
+
+    // From a body standing on the +Y side, the +Y flank of the in-band anchor
+    // is the nearer legal one and wins.
+    const FVector Current(0.0f, 300.0f, 0.0f);
+    FVector Chosen;
+    TestTrue(TEXT("It chooses a flank when one is in band"),
+        ECover::ChooseCoverPoint(Candidates, Current, Threat, Params, Chosen));
+    TestTrue(TEXT("...the nearer in-band flank"),
+        Chosen.Equals(FVector(500.0f, 260.0f, 0.0f), 0.01f));
+
+    // No anchors, no flanks; and an anchor standing on the threat has no
+    // perpendicular to offer.
+    TestEqual(TEXT("Empty input yields no candidates"),
+        ECover::BuildFlankCandidates({}, Threat, Params).Num(), 0);
+    TestFalse(TEXT("Empty input chooses nothing"),
+        ECover::ChooseCoverPoint(ECover::BuildFlankCandidates({}, Threat, Params), Current, Threat, Params, Chosen));
+    TestEqual(TEXT("An anchor on the threat yields nothing"),
+        ECover::BuildFlankCandidates({ Threat }, Threat, Params).Num(), 0);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerSkirmisherDefaultsTest,
     "RiorsEdge.Combat.Archetypes.SkirmisherShipsFair",

@@ -72,6 +72,23 @@ bool UBreakerCoverLibrary::ChooseCoverPoint(const TArray<FVector>& BlockedCandid
     return bFound;
 }
 
+TArray<FVector> UBreakerCoverLibrary::BuildFlankCandidates(const TArray<FVector>& AnchorLocations,
+    const FVector& ThreatLocation, const FBreakerCoverParams& Params)
+{
+    TArray<FVector> Candidates;
+    Candidates.Reserve(AnchorLocations.Num() * 2);
+    const float Standoff = FMath::Max(0.0f, Params.FlankStandoffCm);
+    for (const FVector& Anchor : AnchorLocations)
+    {
+        const FVector ToThreat = (ThreatLocation - Anchor).GetSafeNormal2D();
+        if (ToThreat.IsNearlyZero()) continue;
+        const FVector Lateral = FVector::CrossProduct(FVector::UpVector, ToThreat).GetSafeNormal2D();
+        Candidates.Add(Anchor + Lateral * Standoff);
+        Candidates.Add(Anchor - Lateral * Standoff);
+    }
+    return Candidates;
+}
+
 FString UBreakerCoverLibrary::GetCoverStateName(EBreakerCoverState State)
 {
     switch (State)

@@ -53,6 +53,12 @@ struct RIORSEDGE_API FBreakerCoverParams
     // it is running away.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float TravelCostWeight = 1.0f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float RangeCostWeight = 0.35f;   // O2 PLACEHOLDER
+    // How far beside a cover anchor a FIRING FLANK sits: the point a ranged
+    // enemy walks to so it can see the player past the piece, not hide behind
+    // it. Seeded from the 260 cm the game mode already stands a Skirmisher
+    // off an anchor — clear of the block's own footprint (the pocket blocks
+    // are up to 260 cm on their long axis).
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) float FlankStandoffCm = 260.0f;   // O2 PLACEHOLDER
 };
 
 UCLASS()
@@ -90,6 +96,19 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Cover")
     static bool ChooseCoverPoint(const TArray<FVector>& BlockedCandidates, const FVector& CurrentLocation,
         const FVector& ThreatLocation, const FBreakerCoverParams& Params, FVector& OutPoint);
+
+    // Firing flanks (NAV-2). For every anchor, the two points either side of
+    // it, perpendicular in the ground plane to the anchor-to-threat line, at
+    // FlankStandoffCm. A flank is the opposite of what the Skirmisher wants:
+    // it is where a ranged enemy can SEE the player past the piece. Whether
+    // the line from a flank to the threat is actually open is the caller's
+    // trace, exactly as the blocked test is for ChooseCoverPoint. An anchor
+    // standing on the threat has no perpendicular and yields nothing. Anchor
+    // locations rather than registry anchors so this header stays free of
+    // the level's types.
+    UFUNCTION(BlueprintPure, Category="Enemy|Cover")
+    static TArray<FVector> BuildFlankCandidates(const TArray<FVector>& AnchorLocations,
+        const FVector& ThreatLocation, const FBreakerCoverParams& Params);
 
     UFUNCTION(BlueprintPure, Category="Enemy|Cover")
     static FString GetCoverStateName(EBreakerCoverState State);

@@ -503,6 +503,12 @@ public:
     // Where a session starts. PLAY puts the chosen character here, and the
     // hub's travel point is what reaches the gym from it.
     UFUNCTION(BlueprintCallable, Category="Breaker|Hub") void TeleportPawnToHub(APawn* Pawn);
+    // Every piece of hard cover the level built, read-only: an archetype
+    // choosing a firing flank asks this rather than tracing the whole field.
+    const FBreakerCoverRegistry& GetCoverRegistry() const { return CoverRegistry; }
+    // Records one piece of hard cover. The field calls it per piece it builds;
+    // a probe calls it for the blocks it stands up.
+    void RegisterCoverAnchor(const FVector& WorldLocation, EBreakerCoverClass Class, float HeightCm);
 private:
     FVector HubOrigin = FVector::ZeroVector;
     // Where arriving players actually stand — the gate-side spot from
@@ -742,7 +748,6 @@ private:
     // from UBreakerCoverLayoutLibrary and records every piece with its class and
     // height, which is what lets the Skirmisher ask for a LINE BREAK rather than
     // for the nearest lump of geometry.
-    void RegisterCoverAnchor(const FVector& WorldLocation, EBreakerCoverClass Class, float HeightCm);
     // Nearest recorded cover to Around, within MaxDistance. False means "there
     // is no cover here", which is a real answer. Kept as the class-agnostic
     // query for callers that only need a position; SpawnSkirmisherNearCover uses

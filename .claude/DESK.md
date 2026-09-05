@@ -9,11 +9,6 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - At area level 1 a rear-only boss kill is 241 rifle rounds against 150 carried; the fight's ammo comes from add kills and the supply crate. Is a boss meant to be sustainable on one loadout, or paced by add-kill ammo? `PowerCurve.GymEntry` prints the gap every run.
 - The "shield" on the boss is the Warden's frontal armour slab (90 armour, 47 % mitigation; the rear is unarmoured). O175 keeps it as the puzzle you flank. Should the front feel breakable instead?
 
-## Cycle 3 — enemies that move like enemies (NAV-2, NAV-3)
-- [ ] Ranged enemies use cover: lose line of sight, path to a cover point from the registry, re-acquire — on film from two vantages.
-- [ ] Squad shape: closers arrive from two angles, band-holders hold the band, the Warden fronts the player. Three archetypes at once give three reasons to move. Photographed.
-- [ ] Nav.Probe grows a squad frame and a cover frame so both cannot regress silently.
-
 ## Cycle 4 — what a death and a fight look like (O193, O194)
 - [ ] O193 death beat: weapon lowers → camera drops/tilts and desaturates ~0.8 s → one low sound → black ~1.2 s → fade-in at tileset start, input on first visible frame. `HandlePlayerDeath` is the site.
 - [ ] Health bar reads `0 —— 0` while dead; should read `0 —— 100`.
@@ -52,6 +47,8 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [ ] Movement Speed affix on Boots (O192), after affixes are data.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- The Warden overrides the base engaged tick wholesale: no arrival ring, no arrival angle, so two Wardens stack on one line and it walks through the player between sweeps (`BreakerWardenEnemy.cpp` TickEngagedBehaviour).
+- Nav.Probe Squad's LATTICE FAIL reads the band without `BandHysteresis` (150 cm); a moving pawn can print an honest fail at the band edge.
 - Ranged enemies have no walk sequence and move in ref pose; STEER frames call StopMovement and rebuild velocity from zero each flip (the stutter at range). Both recorded at the site in `BreakerEnemy.cpp` Tick.
 - `BossBand`'s 20/45 s constants are function-local; `PromotedBossSecondsFloor/Ceiling` duplicate them. One line in BossBand to share the pair.
 - NAV-2 cover on the nav · DATA-2 affixes to data · FIELD-3 boss grammar · GROUND-4 functional tests · GLASS-3 the 11K-line split · NAV cover/squad · Anomalies
@@ -67,6 +64,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - Four Niagara systems at `/Game/Breaker/FX/NS_<Moment>` with a `Color` user parameter, or a free Fab VFX pack placed there
 
 ## Done (last three cycles; older is git)
+
+### Cycle 3
+- [x] Cover rides the nav: every enemy has a path-goal channel beside its facing; the mover paths to a goal that is not the player. The Lattice, on losing line of sight, asks the cover registry for anchors, stands off 260 cm on the flank it can see the player from, and paths there. Probe: RE-ACQUIRED after 2.5 s, zero touches.
+- [x] Squad shape: closers derive a ±30° arrival goal on the contact ring from their spawn phase and arrive from two angles; band-holders hold; the Warden fronts. Probe: closers arrived 53° apart at 6.0 s, Warden front error 0°, Lattice inside [900, 1900].
+- [x] Nav.Probe takes Melee, Cover or Squad and prints los=, cover=, split=, band and front with FAIL lines for each.
 
 ### Cycle 2
 - [x] Enemies turn through one cap: `MaxTurnRateDegreesPerSecond` (100) hoisted from the Warden to every enemy; PATROL idles within its capsule radius instead of flipping 180° per tick on the overshoot; the walk sequence's play rate follows speed over `MoveSpeed`. Nav.Probe prints `turn=`; TURN FAIL past cap + 10.

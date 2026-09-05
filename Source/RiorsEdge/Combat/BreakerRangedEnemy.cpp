@@ -2,11 +2,13 @@
 
 #include "Combat/BreakerBodyPaint.h"
 
+#include "AI/BreakerLocomotionMath.h"
 #include "Characters/BreakerCharacter.h"
 #include "Combat/BreakerEnemyProjectile.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Game/BreakerGameMode.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -63,6 +65,11 @@ ABreakerRangedEnemy::ABreakerRangedEnemy()
     AttackRange = 0.0f;         // no contact attack — the base melee path is disabled
     AttackCooldown = 0.0f;
 
+    // One band. A firing flank is worth walking to only if it stands inside
+    // the range the archetype already shoots from.
+    Cover.PreferredMinRangeCm = MinEngagementDistance;
+    Cover.PreferredMaxRangeCm = MaxEngagementDistance;
+
     ProjectileClass = ABreakerEnemyProjectile::StaticClass();
 
     // Layer 1, declared, then painted from the same value.
@@ -107,8 +114,9 @@ void ABreakerRangedEnemy::BeginPlay()
     }
     if (EmitterLight) EmitterLight->SetLightColor(TelegraphHotColor);
     // PatrolPhase is the per-enemy desync seed the base class already uses;
-    // reusing it means a pack of these never strafes in lockstep.
-    StrafeSign = FMath::Fmod(FMath::Abs(PatrolPhase), 2.0f) < 1.0f ? 1.0f : -1.0f;
+    // reusing it means a pack of these never strafes in lockstep. The sign
+    // rule is the one the melee arrival angle reads, so one seed drives both.
+    StrafeSign = BreakerLocomotionMath::ArrivalSign(PatrolPhase);
     StrafeTimer = FMath::Fmod(FMath::Abs(PatrolPhase), StrafeReverseSeconds);
     UpdateTelegraph(0.0f);
     StateLabel = TEXT("LATTICE PATROL");
@@ -128,19 +136,49 @@ void ABreakerRangedEnemy::TickEngagedBehaviour(ABreakerCharacter* Player, float 
     DesiredFacing = ToPlayer;
 
     const bool bLineOfSight = HasLineOfSightTo(Player);
+    bLastLineOfSight = bLineOfSight;
 
     // --- Band: advance / hold / retreat ------------------------------------
     if (!bLineOfSight)
     {
-        // Something is between us. Closing is the reliable way to recover an
-        // angle; strafing alone can hug a pillar forever.
+        // Something is between us. The answer is a FIRING FLANK: a point
+        // beside a registered cover piece from which the line to the player
+        // is open, walked to through the mover's goal channel so the path
+        // follower can take it round the wall. Held until the line clears.
         Band = EBreakerRangedBand::Advance;
-        OutDirection = ToPlayer;
         OutSpeedScale = AdvanceSpeedMultiplier;
         StateLabel = TEXT("REPOSITION");
+
+        if (!bHasCoverGoal)
+        {
+            bHasCoverGoal = ChooseCoverGoal(Player, CoverGoal);
+        }
+        if (bHasCoverGoal)
+        {
+            const FVector ToGoal = CoverGoal - GetActorLocation();
+            // Arrived and still blind: the player moved. Drop the flank; the
+            // next tick chooses again against where the player is now.
+            if (ToGoal.Size2D() <= BodyCollision->GetScaledCapsuleRadius())
+            {
+                bHasCoverGoal = false;
+            }
+        }
+        if (bHasCoverGoal)
+        {
+            OutDirection = (CoverGoal - GetActorLocation()).GetSafeNormal2D();
+            PathGoal = CoverGoal;
+            bHasPathGoal = true;
+        }
+        else
+        {
+            // No flank within reach. Closing is the reliable way to recover
+            // an angle; strafing alone can hug a pillar forever.
+            OutDirection = ToPlayer;
+        }
     }
     else
     {
+        bHasCoverGoal = false;
         Band = UBreakerRangedBehaviorLibrary::ClassifyBand(
             Distance, MinEngagementDistance, MaxEngagementDistance, BandHysteresis, Band);
         OutSpeedScale = UBreakerRangedBehaviorLibrary::GetBandSpeedScale(
@@ -302,6 +340,11 @@ void ABreakerRangedEnemy::UpdateTelegraph(float Alpha)
 
 bool ABreakerRangedEnemy::HasLineOfSightTo(const AActor* Target) const
 {
+    return HasLineOfSightFrom(GetMuzzleLocation(), Target);
+}
+
+bool ABreakerRangedEnemy::HasLineOfSightFrom(const FVector& From, const AActor* Target) const
+{
     const UWorld* World = GetWorld();
     if (!World || !Target) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BreakerRangedLineOfSight), false, this);
@@ -309,8 +352,39 @@ bool ABreakerRangedEnemy::HasLineOfSightTo(const AActor* Target) const
     FHitResult Blocked;
     // World statics only: the level's cover, ruins and pillars break the shot;
     // other enemies never do.
-    return !World->LineTraceSingleByChannel(Blocked, GetMuzzleLocation(),
+    return !World->LineTraceSingleByChannel(Blocked, From,
         Target->GetActorLocation(), ECC_WorldStatic, Params);
+}
+
+bool ABreakerRangedEnemy::ChooseCoverGoal(const AActor* Player, FVector& OutGoal) const
+{
+    const UWorld* World = GetWorld();
+    const ABreakerGameMode* GameMode = World ? World->GetAuthGameMode<ABreakerGameMode>() : nullptr;
+    if (!GameMode || !Player) return false;
+
+    const FVector Here = GetActorLocation();
+    const float SearchSq = FMath::Square(FMath::Max(0.0f, Cover.SearchRadiusCm));
+    TArray<FVector> Anchors;
+    for (const FBreakerCoverAnchor& Anchor : GameMode->GetCoverRegistry().Anchors)
+    {
+        if (FVector::DistSquared2D(Anchor.Location, Here) > SearchSq) continue;
+        Anchors.Add(Anchor.Location);
+    }
+    if (Anchors.IsEmpty()) return false;
+
+    // A flank is judged from where the MUZZLE will be once the body stands
+    // there: the anchor's Z is the piece's centre, not the floor, so the
+    // candidate is dropped to this body's height before the muzzle offset is
+    // added. The ground snap owns the rest.
+    const float MuzzleRise = GetMuzzleLocation().Z - Here.Z;
+    TArray<FVector> Open;
+    for (FVector Candidate : UBreakerCoverLibrary::BuildFlankCandidates(Anchors, Player->GetActorLocation(), Cover))
+    {
+        Candidate.Z = Here.Z;
+        if (!HasLineOfSightFrom(Candidate + FVector(0.0f, 0.0f, MuzzleRise), Player)) continue;
+        Open.Add(Candidate);
+    }
+    return UBreakerCoverLibrary::ChooseCoverPoint(Open, Here, Player->GetActorLocation(), Cover, OutGoal);
 }
 
 FVector ABreakerRangedEnemy::GetMuzzleLocation() const
@@ -325,6 +399,7 @@ void ABreakerRangedEnemy::SetBodyVisible(bool bVisible)
     // charge state has to be cleared — a corpse must not keep glowing, and a
     // respawn must not resume mid-wind-up.
     bWindingUp = false;
+    bHasCoverGoal = false;
     UpdateTelegraph(0.0f);
     if (EmitterVisual) EmitterVisual->SetVisibility(bVisible, true);
     if (EmitterLight) EmitterLight->SetVisibility(bVisible, true);
