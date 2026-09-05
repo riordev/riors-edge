@@ -31,7 +31,7 @@ More, and a tree rewrite is a build committed to where an item rewrite is a
 build found.
 
 **Parry is the only tree-granted verb.** Walk, sprint, two jumps, crouch, dash,
-slide, wall ride, wall jump, passive block and passive dodge are all base kit
+slide, vault, mantle, passive block and passive dodge are all base kit
 from level one. Trees improve movement verbs; gear never grants one.
 
 **A node that reads as a flat percentage is doing the affix layer's job.**

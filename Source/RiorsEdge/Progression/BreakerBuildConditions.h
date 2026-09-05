@@ -168,12 +168,11 @@ enum class EBreakerBuildCondition : uint8
     //
     // Bleed and Poison are the only two status tags in
     // Config/DefaultGameplayTags.ini that anything actually applies AND that are
-    // not elemental. Burn, Frost and Shock are elemental and Void is the Void
-    // element's own status, so all four are out under O38. There is deliberately
-    // no TargetImpaired/TargetSlowed either: no slow or stun tag exists at all,
-    // and the nearest thing (Status.Frost, "frost buildup and slow") is
-    // elemental. Adding a control-state predicate would mean either inventing
-    // a tag or keying off an element, and both are somebody else's ruling.
+    // not elemental. Shock is elemental and Void is the Void element's own
+    // status, so both are out under O38. There is deliberately no
+    // TargetImpaired/TargetSlowed either: no slow or stun tag exists at all.
+    // Adding a control-state predicate would mean either inventing a tag or
+    // keying off an element, and both are somebody else's ruling.
     TargetPoisoned,
     // Carries at least MultiStatusThreshold distinct status types. This is O30's
     // "stacking" axis, and it is the predicate Caster.Multispell.Cascade's

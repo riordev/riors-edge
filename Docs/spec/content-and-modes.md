@@ -69,7 +69,7 @@ scales with its size rather than being flat, because solo is the primary
 balance target and it is cheaper to start generous and tighten.
 
 **Procedural assembly requires a movement contract per tile.** Every module
-publishes at minimum one continuous wall-ride surface, one sliding descent, and
+publishes at minimum one mantle or vault line, one sliding descent, and
 one route requiring neither. A tile that fails is rejected at cook time. In a
 procedural system a movement pillar is an authoring requirement, not a level
 designer's instinct.
@@ -98,9 +98,9 @@ three different speeds in three different corridor widths, with nothing about
 the character changed.
 
 The rest of the grammar derives the same way: one-, two- and three-jump gaps
-from the jump arc; mantle height from the movement window; wall-ride length
-from ride duration times sprint; cover pitch from enemy wind-up plus closing
-time; and sightline depth from the ranged enemy's engagement band.
+from the jump arc; mantle height from the movement window; cover pitch from
+enemy wind-up plus closing time; and sightline depth from the ranged enemy's
+engagement band.
 
 ### Enemy modifiers
 
