@@ -4,8 +4,8 @@ A first-person looter shooter with ARPG progression, Unreal 5.8, C++-first.
 `Docs/VISION.md` says what the game is. `Docs/spec/` says how each system is
 meant to work. `Docs/DECISIONS.md` holds live rulings (O-numbers). `Docs/ORDERS.md`
 is the design seat's work queue. `Docs/STATE.md` is generated — never edit it.
-Your lane's current pointer is `.claude/lanes/<LANE>.md` — read it first, keep
-it under fifteen lines, update it last.
+The desk's queue is `.claude/DESK.md` — read it first, move landed items to
+its Done list last.
 
 ## The cycle
 
@@ -27,25 +27,21 @@ Clean means zero *unexpected* `Result={Fail}`. Use `/cycle` to run it.
 with the finding it encodes and the condition that deletes it. Any other red is
 a regression. Never widen an asserted range to make a red go green.
 
-## Lanes and git
+## The desk and git
 
-- Every Code session runs in its own worktree under `.claude/worktrees/`
-  (the desktop app makes it). The main checkout is the owner's — never work
-  in it. Name the session after the lane and keep its worktree on exit so
-  the Unreal build survives; `/clear` on resume gives fresh context.
-- A fresh worktree has no `Binaries/`, `Intermediate/` or `Saved/`: the
-  first build is full, and if meshes are pointer files run `git lfs pull`.
-- End of cycle: fetch, rebase onto `origin/main`, `git push origin HEAD:main`.
-  Fast-forward or refusal. Never force. Rebase before you plan, not after you build.
+- One session per box, working in the checkout on `main`. No worktrees, no
+  lane branches. Close the editor before a session starts.
+- Work happens only through `/desk`. It takes the top block of
+  `.claude/DESK.md` and nothing else.
+- A cycle is one build, one suite, one commit. Then the owner plays and
+  writes what he felt into the top of `.claude/DESK.md`. A block that needs
+  a second build is too big: split it and say so.
 - Stage files by name. Never `git add -A` or `git add .`.
-- Never hand-edit `.uasset` / `.umap`. Binary assets cannot merge — coordinate
-  ownership, never resolve conflicts in them.
-- Ownership by directory: KIT `Movement/ Abilities/ Characters/ Classes/`,
-  FIELD `Combat/`, GROUND `Game/ Playtest/ Interaction/`, GLASS `UI/ Audio/`,
-  LEDGER `Items/ Progression/ Save/`. Touching another lane's directory is a
-  declared crossing: name the member and direction in the commit message.
-- Fab/launcher packs are per-seat and gitignored. LFS must be installed
-  before pulling.
+- Push `git push origin HEAD:main`. Fast-forward or refusal. Never force.
+  `git pull --ff-only` before you plan, not after you build.
+- Never hand-edit `.uasset` / `.umap`. Binary assets cannot merge.
+- If meshes are pointer files run `git lfs pull`. Fab/launcher packs are
+  per-seat and gitignored. LFS must be installed before pulling.
 
 ## Code discipline
 
@@ -83,25 +79,24 @@ a regression. Never widen an asserted range to make a red go green.
 - Rulings live in `DECISIONS.md`, one line each, live only. Superseded rulings
   are deleted; git has them. A ruling needing a paragraph is not yet a ruling.
 - History lives in git. No archive dirs, no dated log entries, no "kept for
-  the record". Session narrative goes in the commit message and `/report`,
-  never in this file.
-- Lane questions for the design seat go in `Docs/reports/<LANE>.md`; delete
-  each question in the commit that lands its answer.
+  the record". Session narrative goes in the commit message, never in this
+  file.
+- Questions for the owner go in `.claude/DESK.md` beside the item that
+  raised them; delete each in the commit that lands its answer.
 
 ## Session discipline
 
-- Read `.claude/lanes/<LANE>.md`, then `Docs/ORDERS.md` (your section),
-  `Docs/STATE.md` summary, and the DECISIONS you'll touch. Two or three
-  source files, not the tree. Use `/lane <LANE>`.
-- **Plan mode for anything touching more than one file.** Approve plans, not
-  diffs. A plan that "reconciles", "preserves" or "carries forward" is wrong —
-  re-scope.
-- One work item per session. Fresh context each session.
-- Finish with `/report`: update the lane pointer, write the session report
-  in the commit message, push or state exactly why not.
-- If the owner is away, take the next item in your ORDERS section. If that is
-  blocked, extend the last recon. Never idle on an unruled question — file it
-  in the lane report and move on.
+- Read `.claude/DESK.md`, `Docs/STATE.md` summary, and the DECISIONS the top
+  block cites. Two or three source files, not the tree. Then `/desk`.
+- **Scouts read, hands edit, the reviewer blocks.** Findings before edits;
+  disjoint file lists; a finding that "reconciles", "preserves" or "carries
+  forward" is wrong — re-scope.
+- One block per session. Fresh context each session.
+- Finish the cycle: one commit whose message lists each item as landed,
+  found-not-built, or reverted with the numbers measured; push or state
+  exactly why not; move landed items to Done. Then stop — the owner plays.
+- Never idle on an unruled question — record it in `.claude/DESK.md` and
+  take the next item in the block.
 
 ## Capture harness
 

@@ -44,7 +44,7 @@
       {
         "matcher": "compact",
         "hooks": [
-          { "type": "command", "command": "cat \"$CLAUDE_PROJECT_DIR\"/.claude/lanes/*.md 2>/dev/null | head -60; echo 'Reminder: one item per session; /cycle before commit; /report to finish; plan mode for multi-file changes.'" }
+          { "type":"command", "command":"sed -n '/^## Cycle/,/^## Later/p' \"$CLAUDE_PROJECT_DIR\"/.claude/DESK.md 2>/dev/null | head -60; echo 'Reminder: work happens only through /desk; one build, one suite, one commit, then stop for the owner to play.'" }
         ]
       }
     ]
