@@ -127,12 +127,24 @@ bool FBreakerModifierCarrierThroughActorTest::RunTest(const FString& Parameters)
     Elite->ConfigureElite();
     const EBreakerMonsterRank AuthoredRank = Elite->GetMonsterRank();
     TestEqual(TEXT("ConfigureElite grants rank Elite"), AuthoredRank, EBreakerMonsterRank::Elite);
+    // O194, through the actor: the silhouette carries rank. A NewObject enemy
+    // never ran BeginPlay, so its spawned scale is the default OneVector and
+    // the actor's scale IS the rank multiplier. The rank word is gone from the
+    // state label; the halo, the scale and the gold edge carry it.
+    TestEqual(TEXT("An elite stands at +15 % of its spawned scale"),
+        static_cast<float>(Elite->GetActorScale3D().X), 1.15f, 0.0001f);
+    TestFalse(TEXT("The elite's state label carries no rank word"),
+        Elite->GetEnemyStateLabel().Contains(TEXT("ELITE")));
     TestTrue(TEXT("The elite's own modifier grant succeeds"), Elite->ConfigureWithExactModifiers(SafeSingleModifier()));
     TestNotEqual(TEXT("ConfigureWithExactModifiers alone WOULD demote the elite (the bug GrantModifiers exists to prevent)"),
         Elite->GetMonsterRank(), AuthoredRank);
+    TestEqual(TEXT("The promotion to Champion stands at +30 %, not compounded on the elite's size"),
+        static_cast<float>(Elite->GetActorScale3D().X), 1.30f, 0.0001f);
     // The demotion-guard GrantModifiers applies, reproduced here directly so
     // the contrast does not depend on calling the game mode's private method.
     Elite->SetMonsterRank(AuthoredRank);
+    TestEqual(TEXT("The restore lands the elite back at exactly +15 %"),
+        static_cast<float>(Elite->GetActorScale3D().X), 1.15f, 0.0001f);
     const int32 EliteModifierCount = Elite->GetModifierComponent() ? Elite->GetModifierComponent()->GetModifierCount() : 0;
     const EBreakerKillBucket EliteBucket = UBreakerKillBucketLibrary::ClassifyKill(
         Elite->GetMonsterRank(), Elite->IsRangedForTelemetry(), EliteModifierCount);

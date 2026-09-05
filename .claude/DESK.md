@@ -5,30 +5,28 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Open questions for the owner (bosses)
-- At area level 1 a rear-only boss kill is 241 rifle rounds against 150 carried; the fight's ammo comes from add kills and the supply crate. Is a boss meant to be sustainable on one loadout, or paced by add-kill ammo? `PowerCurve.GymEntry` prints the gap every run.
-- The "shield" on the boss is the Warden's frontal armour slab (90 armour, 47 % mitigation; the rear is unarmoured). O175 keeps it as the puzzle you flank. Should the front feel breakable instead?
+## Open questions for the owner
+- (bosses) At area level 1 a rear-only boss kill is 241 rifle rounds against 150 carried; the fight's ammo comes from add kills and the supply crate. Is a boss meant to be sustainable on one loadout, or paced by add-kill ammo? `PowerCurve.GymEntry` prints the gap every run.
+- (bosses) The "shield" on the boss is the Warden's frontal armour slab (90 armour, 47 % mitigation; the rear is unarmoured). O175 keeps it as the puzzle you flank. Should the front feel breakable instead?
+- (ui) The vitals row is `[shield current] —— [health current]`, no max drawn by design (HUD v2). `0 —— 0` dead is true. Do you want a max shown (`current / max`, a design reversal), and should a zero-max shield draw its empty track and `0` at all? Today it does, which is what made the row read as current/max.
+- (sound) O193 as written has no sound; your desk line has one low sound. If you want it, add "one low sound" to O193's line and the sixth verb lands (`player_death.wav` slot → synth fallback) with its one call site in the HUD's fatal-hit branch.
 
-## Cycle 4 — what a death and a fight look like (O193, O194)
-- [ ] O193 death beat: weapon lowers → camera drops/tilts and desaturates ~0.8 s → one low sound → black ~1.2 s → fade-in at tileset start, input on first visible frame. `HandlePlayerDeath` is the site.
-- [ ] Health bar reads `0 —— 0` while dead; should read `0 —— 100`.
-- [ ] O194 rank law: Elite +15 % scale + halo; Champion +30 % + two diamonds; ELITE leaves the label; CLOSING/HELD leave the screen.
-- [ ] Gun forward axis: eight meshes checked through `NamedMeshPath`; muzzle is the far end; photographed at rest.
-- [ ] Lighting settles before the fade-in ends: hold the fade until Lumen's surface cache is warm on runtime-spawned geometry; travel flicker is the same fix.
+## Cycle 5 — every travel arrives under cover (one build)
+- [ ] There is no fade-in in the project: rift travel shows a briefing plate and hard-cuts after 0.9 s; every other travel (AutoPlay, hub picks, the Anchor return) opens on the cold first frame. That is the travel flicker. Add `Game/BreakerArrivalMath.h` (a reveal alpha gated on world-ready AND a minimum frame count AND a minimum hold, then a ramp; all O2), a cover on every travel in `BreakerGameInstance` (briefing pane for a rift, plain black otherwise), `RevealWorld`/`HoldBlack` exposed so the death beat's teleport moves to the start of its black and reveals through the same gate. Nothing in C++ can read Lumen warmth; the gate is frames + seconds and the pin is two frames one second apart via a `-BreakerCaptureArrival` switch.
 
-## Cycle 5 — content out of C++ (DATA-2, DATA-4; O186)
+## Cycle 6 — content out of C++ (DATA-2, DATA-4; O186)
 - [ ] Affix pools → `Data/affixes.json`: a tier value changes with no compile; `Items.Affixes.Breadth` holds; the census reads the file. One library, one commit.
 - [ ] Movement Speed affix on Boots with its cap (O192), as a row.
 - [ ] Ability definitions, quests, dialogue → data; the quartermaster's stock is a row (DATA-4). Split across builds if the first is not one build.
 
-## Cycle 6 — the flat-damage ruling lands (R1)
+## Cycle 7 — the flat-damage ruling lands (R1)
 - Owner rules R1 first: weapons and gear carry a true flat Added Damage fed by an affix and a weapon base line, or the Flat term leaves `power-and-scaling.md`. Then LEDGER-3 (affix pool 28 → 56) and the at-cap band re-measured (`PowerBand.AtCap` is expected red today).
 
-## Cycle 7 — the boss grammar and two more bosses (FIELD-3)
+## Cycle 8 — the boss grammar and two more bosses (FIELD-3)
 - [ ] Telegraph → punish window → phase gate → add wave → arena change as a pure header; the shield is the first punish window, not a wall.
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss.
 
-## Cycle 8 — the Niagara pass (GLASS-1, O179, O190)
+## Cycle 9 — the Niagara pass (GLASS-1, O179, O190)
 - [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash comes back here and nowhere earlier.
 - [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
 
@@ -47,6 +45,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [ ] Movement Speed affix on Boots (O192), after affixes are data.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- The split copy's 0.7 scale has no pin: `ConfigureAsSplitCopy` writes health through GAS, which no test outside a world can call. It waits on the map-loading functional tests (GROUND-4).
 - The Warden overrides the base engaged tick wholesale: no arrival ring, no arrival angle, so two Wardens stack on one line and it walks through the player between sweeps (`BreakerWardenEnemy.cpp` TickEngagedBehaviour).
 - Nav.Probe Squad's LATTICE FAIL reads the band without `BandHysteresis` (150 cm); a moving pawn can print an honest fail at the band edge.
 - Ranged enemies have no walk sequence and move in ref pose; STEER frames call StopMovement and rebuild velocity from zero each flip (the stutter at range). Both recorded at the site in `BreakerEnemy.cpp` Tick.
@@ -65,6 +64,12 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Cycle 4
+- [x] O193 death beat: weapon lowers into the holster pose, camera drops 18 cm and rolls 9° / pitches −12° while the world desaturates over 0.8 s, black 1.2 s with the HUD hidden, teleport under black, fade-in 0.4 s with input on from the first visible frame. All numbers O2 in `Game/BreakerDeathBeatMath.h`; pinned by `DeathBeatTimeline`. No sound (needs the sixth verb; question above). Motion: owed your eyes.
+- [x] O194 rank law: Trash / Elite / Champion stand at 1.0 / 1.15 / 1.30 through `ApplyChassis`, so every promotion and demotion lands the same absolute scale; Elite wears a drawn ring halo, Champion two diamonds; ELITE leaves the label; the state word leaves the shipped bar (F3 still prints it). Photographed on the four-rank bar matrix. Split copies shrink through the chassis base scale.
+- [x] Gun forward axis: already landed by 65247d4 with three tests; photographed across the weapon cycle — six named guns barrel-forward, Shotgun and Rocket on primitives (no candidate in the pack). The rule is the thin end, not the far end.
+- [x] Health bar `0 —— 0` dead: found-not-built. The row is shield current / health current, no max by design; `0 —— 0` is true. Two questions above.
+
 ### Cycle 3
 - [x] Cover rides the nav: every enemy has a path-goal channel beside its facing; the mover paths to a goal that is not the player. The Lattice, on losing line of sight, asks the cover registry for anchors, stands off 260 cm on the flank it can see the player from, and paths there. Probe: RE-ACQUIRED after 2.5 s, zero touches.
 - [x] Squad shape: closers derive a ±30° arrival goal on the contact ring from their spawn phase and arrive from two angles; band-holders hold; the Warden fronts. Probe: closers arrived 53° apart at 6.0 s, Warden front error 0°, Lattice inside [900, 1900].
@@ -74,11 +79,5 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Enemies turn through one cap: `MaxTurnRateDegreesPerSecond` (100) hoisted from the Warden to every enemy; PATROL idles within its capsule radius instead of flipping 180° per tick on the overshoot; the walk sequence's play rate follows speed over `MoveSpeed`. Nav.Probe prints `turn=`; TURN FAIL past cap + 10.
 - [x] Nothing was wrong with shields. The gym ran at area level 10 against an item-level-1 rifle (2.17× health). `GymAreaLevel` 10 → 1; `PowerCurve.GymEntry` pins the starter kit against the gym: ward breaks in 14 rounds / 1.4 s, boss in 24.1 s.
 - [x] Dash and slide no longer race the bob: the phase speed is clamped to the sprint cap; the sprint pose and bob envelope ease over 0.12 s instead of snapping on jump, slide or landing. The sprint's own 2.75 footfalls/s is unchanged.
-- [x] Muzzle flash off: the Muzzle fallback draws nothing; the slot waits for NS_Muzzle in Cycle 8. Death fallback unchanged.
+- [x] Muzzle flash off: the Muzzle fallback draws nothing; the slot waits for NS_Muzzle in the Niagara pass. Death fallback unchanged.
 
-### Cycle 1
-- [x] `lane/batch1-field`: already on main as rebased copies (5d45a6c, 4b10f98, 12147d4, 310eb8a, 7c12c4d); nothing merged.
-- [x] Enemies face where the actor faces: the fit reads each rig's left/right bone pair and yaws the mesh forward onto +X; Nav.Probe prints `facing=` and `FACING FAIL` past 15°. NAV-1 was not the cause; the identity yaw was.
-- [x] Sprint bob: `SprintBobMultiplier` 1.6 → 1.3, `FullBobSpeed` 600 → 510. No third harmonic exists; the one-frame pose snap is the Cycle 2 item above.
-- [x] Waves auto-advance in every mode: clear → `CLEAR — N` countdown (8 s; rest waves 20 s) → next; F4 skips. Boss waves still wait for F4. The rift's standard breather moved 4 → 8 with it.
-- [x] O192: walk 700 → 595, sprint 1100 → 990, `AirControl` 0.55 → 0.35, boost 1.4 → 1.15; Momentum gates are fractions of `WalkSpeed` (0.643 / 1.786 / 0.571).

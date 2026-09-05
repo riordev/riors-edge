@@ -235,6 +235,29 @@ namespace
         HUD.DrawLine(CentreX - HalfExtent, CentreY, CentreX, CentreY - HalfExtent, Colour, Thickness);
     }
 
+    // The elite halo: a ring as a closed line-segment polygon. Enough sides
+    // that it reads as round at the near end; few enough that at the far end,
+    // where HalfExtent is the bar's own height, the segments are still longer
+    // than the line is thick. O2 PLACEHOLDER.
+    constexpr int32 BreakerEnemyBarHaloSegments = 14;
+
+    void BreakerEnemyBarDrawHalo(AHUD& HUD, float CentreX, float CentreY, float HalfExtent,
+        const FLinearColor& Colour, float Thickness)
+    {
+        const float Step = 2.0f * PI / static_cast<float>(BreakerEnemyBarHaloSegments);
+        float PreviousX = CentreX + HalfExtent;
+        float PreviousY = CentreY;
+        for (int32 Segment = 1; Segment <= BreakerEnemyBarHaloSegments; ++Segment)
+        {
+            const float Angle = Step * static_cast<float>(Segment);
+            const float X = CentreX + HalfExtent * FMath::Cos(Angle);
+            const float Y = CentreY + HalfExtent * FMath::Sin(Angle);
+            HUD.DrawLine(PreviousX, PreviousY, X, Y, Colour, Thickness);
+            PreviousX = X;
+            PreviousY = Y;
+        }
+    }
+
     // Anchored by its RIGHT edge so the mark grows leftward away from the bar,
     // and a two-glyph rank never pushes the bar sideways.
     void BreakerEnemyBarDrawRankGlyph(AHUD& HUD, float RightEdgeX, float CentreY, float HalfExtent,
@@ -243,13 +266,12 @@ namespace
         switch (Rank)
         {
         case EBreakerMonsterRank::Elite:
-            // A hollow SQUARE: the one rank whose mark is a different shape
+            // A HALO (O194): the one rank whose mark is a different shape
             // rather than a different count, so elite never reads as "some
             // number of diamonds" at the distance where counting gets hard.
-            HUD.DrawLine(RightEdgeX - HalfExtent * 2.0f, CentreY - HalfExtent, RightEdgeX, CentreY - HalfExtent, Colour, Thickness);
-            HUD.DrawLine(RightEdgeX, CentreY - HalfExtent, RightEdgeX, CentreY + HalfExtent, Colour, Thickness);
-            HUD.DrawLine(RightEdgeX, CentreY + HalfExtent, RightEdgeX - HalfExtent * 2.0f, CentreY + HalfExtent, Colour, Thickness);
-            HUD.DrawLine(RightEdgeX - HalfExtent * 2.0f, CentreY + HalfExtent, RightEdgeX - HalfExtent * 2.0f, CentreY - HalfExtent, Colour, Thickness);
+            // Drawn geometry, never a glyph — a closed line polygon of
+            // BreakerEnemyBarHaloSegments sides at the caller's HalfExtent and colour.
+            BreakerEnemyBarDrawHalo(HUD, RightEdgeX - HalfExtent, CentreY, HalfExtent, Colour, Thickness);
             break;
         case EBreakerMonsterRank::ModifierBearing:
             // TWO hollow diamonds. Champion is elite-and-more, so its mark is
@@ -535,9 +557,9 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             DrawBorder(Bar.X, Bar.Y, Bar.W, Bar.H, BreakerUI::Alpha(BreakerUI::Gold, BarAlpha), ScaleUnit * Bar.Scale);
         }
 
-        // The rank glyph, outside the left cap. Colour follows the rank word it
-        // outlives, so the two agree while both are legible and the glyph
-        // carries alone once the word is not.
+        // The rank glyph, outside the left cap. Colour follows the gold edge
+        // it outlives, so the two agree while both are legible and the glyph
+        // carries alone once the edge is not.
         {
             const float GlyphHalf = FMath::Max(2.0f, Bar.H * BreakerEnemyBar::GlyphHeightRatio);
             const float GlyphRight = Bar.X - BreakerEnemyBar::GlyphGapPixels * ScaleUnit * Bar.Scale;
@@ -562,13 +584,14 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         //    is identifiable within 1.5s of the enemy entering view, and an
         //    unannounced modifier is an unfair death rather than a challenge.
         //    Culling it to declutter would trade legibility for legibility.
-        //  - The STATE line (CHASE / CLOSING / WIND-UP) prints only for the
-        //    enemy under the crosshair. It was the loudest line and the least
-        //    informative: the enemy's own telegraph already shows a wind-up as
-        //    a scaling, brightening emitter, so the text was restating in
-        //    words, six times over, something the world was already saying.
-        //  - ELITE prints; HOSTILE does not. "HOSTILE" on every hostile is not
-        //    information — the health bar already says it is an enemy.
+        //  - The STATE line (CHASE / CLOSING / WIND-UP / HELD) does not print
+        //    on the shipped screen at all (O194): it is an instrument reading,
+        //    and the enemy's own telegraph already shows a wind-up as a
+        //    scaling, brightening emitter. The F3 diagnostics pass in
+        //    UI/BreakerPlaytestHUD.cpp is where the state words live.
+        //  - BOSS prints. ELITE does not (O194): rank is carried by the
+        //    silhouette scale, the halo or diamonds and the gold edge. HOSTILE
+        //    does not — the health bar already says it is an enemy.
         // A9: THE MODIFIER ANNOUNCEMENT GOES DISTANCE-PROGRESSIVE. It printed
         // in full at every range and was most of the text bloat at distance —
         // "OVERCHARGE | WARDED | CAUTERIZE" is three words of prose on a body
@@ -587,9 +610,8 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
         const bool bNear = Distance <= BreakerEnemyBar::NearDistance;
         const FString ModifierBanner = Enemy->GetEnemyModifierBanner();
         TArray<FString> Lines;
-        if (bElite) Lines.Add(bBossRank ? TEXT("BOSS") : TEXT("ELITE"));
+        if (bBossRank) Lines.Add(TEXT("BOSS"));
         if (bNear && !ModifierBanner.IsEmpty()) Lines.Add(ModifierBanner);
-        if (bFocused) Lines.Add(Enemy->GetEnemyStateLabel());
 
         TArray<FString> Marks;
         if (!bNear)

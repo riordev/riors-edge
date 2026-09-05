@@ -537,6 +537,11 @@ void ABreakerEnemy::ApplyChassis()
     AttackDamage = UBreakerMonsterChassisLibrary::GetMonsterDamage(
         AreaLevel, MonsterRank, Chassis, ArchetypeDamageMultiplier);
 
+    // O194: the silhouette carries rank. An absolute write against the spawned
+    // scale, never a multiply of the current one, so every promoter, the
+    // demotion restore and a pool revive land the same size for the same rank.
+    SetActorScale3D(PooledBaseScale * UBreakerMonsterChassisLibrary::GetRankScaleMultiplier(MonsterRank));
+
     if (Attributes)
     {
         // The modifier count step composes with the archetype ratio and the
@@ -691,7 +696,9 @@ void ABreakerEnemy::ConfigureAsSplitCopy(int32 InAreaLevel, float HealthFraction
     bRespawns = false;
     // A copy that chain-detonates would make Splitting a pack-clearing gift.
     bExplodesOnDeath = false;
-    SetActorScale3D(GetActorScale3D() * 0.7f);
+    // The copy is a smaller body for good: the shrink goes into the base the
+    // chassis scales from, so every later ApplyChassis keeps it.
+    PooledBaseScale *= 0.7f; // O2 PLACEHOLDER
     // Rank Trash, no modifiers: this is what stops a split from splitting.
     MonsterRank = EBreakerMonsterRank::Trash;
     ModifierCountHealthMultiplier = 1.0f;
@@ -735,13 +742,13 @@ void ABreakerEnemy::ConfigureElite()
     // hardcoded 440 health and a *= 1.5f damage, a second source of truth
     // sitting alongside the base chassis' hardcoded 220. Both are gone: rank
     // is now a row in the chassis rank table, and ApplyChassis composes it.
-    // What stays here is what is genuinely elite PRESENTATION and BEHAVIOUR:
-    // the bigger silhouette, the slower implacable advance, the loot floor.
+    // What stays here is what is genuinely elite BEHAVIOUR: the slower
+    // implacable advance. The bigger silhouette is the rank's, not this
+    // function's — ApplyChassis writes it from the rank scale row (O194).
     MonsterRank = EBreakerMonsterRank::Elite;
-    SetActorScale3D(GetActorScale3D() * 1.25f);
     MoveSpeed *= 0.85f;
     ApplyChassis();
-    StateLabel = TEXT("ELITE PATROL");
+    StateLabel = TEXT("PATROL");
 }
 
 FString ABreakerEnemy::GetEnemyModifierBanner() const

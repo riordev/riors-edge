@@ -19,6 +19,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/HUD.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Input/BreakerInputConfig.h"
 #include "Settings/BreakerGameSettings.h"
 #include "InputAction.h"
@@ -79,6 +81,8 @@ ABreakerCharacter::ABreakerCharacter(const FObjectInitializer& ObjectInitializer
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(-10.0, 0.0, 64.0));
     FirstPersonCamera->bUsePawnControlRotation = true;
+    // The death beat's drop is an offset from THIS, and Done restores it.
+    CameraRestLocation = FirstPersonCamera->GetRelativeLocation();
     // O25 base kit. This is the authored default; at runtime
     // UBreakerCharacterMovementComponent::RefreshJumpGrant owns the budget,
     // because the third jump is class- and level-gated and has to survive a
@@ -248,6 +252,7 @@ void ABreakerCharacter::Tick(float DeltaSeconds)
     UpdateDashCameraFeedback(DeltaSeconds);
     UpdateCameraFieldOfView();
     UpdateCameraShake(DeltaSeconds);
+    UpdateDeathBeat(DeltaSeconds);
     if (bTraversalDemoArmed)
     {
         TickTraversalDemo();
@@ -637,6 +642,22 @@ void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
         GEngine->GameViewport->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
         MenuWidget.Reset();
     }
+    // A pawn destroyed or travelling mid-beat leaves the camera manager and
+    // the HUD it wrote to standing behind it: hand both back before going.
+    if (DeathBeatElapsed >= 0.0f)
+    {
+        DeathBeatElapsed = -1.0f;
+        LastDeathBeatOffset = FRotator::ZeroRotator;
+        if (APlayerController* PC = Cast<APlayerController>(Controller))
+        {
+            if (PC->PlayerCameraManager)
+            {
+                PC->PlayerCameraManager->SetManualCameraFade(0.0f, FLinearColor::Black, false);
+                PC->PlayerCameraManager->StopCameraFade();
+            }
+            if (AHUD* HUD = PC->GetHUD()) HUD->bShowHUD = true;
+        }
+    }
     Super::EndPlay(EndPlayReason);
 }
 
@@ -965,15 +986,24 @@ namespace
     constexpr float BreakerHolsterYawDegrees = 8.0f;    // O2 PLACEHOLDER
 }
 
+float ABreakerCharacter::GetDeathWeaponLowerFraction() const
+{
+    return BreakerDeathBeat::Sample(DeathBeat, DeathBeatElapsed).WeaponLowerFraction;
+}
+
 FVector ABreakerCharacter::GetWeaponRestLocation() const
 {
     // Holstered wins over everything, including a stale ADS flag: an Anchor
     // pawn is holstered for its whole life and its rig must never present a
-    // ready pose. Location-only here; the matching pitch-down lives in
-    // UpdateViewmodelKick, which owns the rig's rotation.
-    if (bWeaponsHolstered)
+    // ready pose. The death beat lowers into the SAME pose over its fall, so
+    // the holster is a blend at fraction 1 rather than a branch. Location-only
+    // here; the matching pitch-down lives in UpdateViewmodelKick, which owns
+    // the rig's rotation.
+    const float LowerFraction = bWeaponsHolstered ? 1.0f : GetDeathWeaponLowerFraction();
+    if (LowerFraction > 0.0f)
     {
-        return ActiveLayout.HipOffsetCm + FVector(-BreakerHolsterPullBackCm, 0.0f, -BreakerHolsterDropCm);
+        const FVector HolsterPose = ActiveLayout.HipOffsetCm + FVector(-BreakerHolsterPullBackCm, 0.0f, -BreakerHolsterDropCm);
+        return FMath::Lerp(ActiveLayout.HipOffsetCm, HolsterPose, LowerFraction);
     }
     // ADS is DERIVED, not authored: the rig comes forward and drops by exactly
     // this weapon's sight height, which puts its own sight on the crosshair.
@@ -1009,13 +1039,15 @@ void ABreakerCharacter::UpdateViewmodelKick()
     FRotator Rotation = Weapon ? Weapon->GetViewmodelRotationOffset() : FRotator::ZeroRotator;
     // Holstered: the muzzle pitches down and eases slightly across the body,
     // finishing what the dropped rest location starts — lowered and out of
-    // the eyeline for the whole life of an Anchor pawn. Composed onto the
+    // the eyeline for the whole life of an Anchor pawn, and for the fall of
+    // the death beat, which glides into the same pose. Composed onto the
     // spring's rotation rather than replacing it, though holstered pawns
     // cannot fire so the spring is at rest anyway.
-    if (bWeaponsHolstered)
+    const float LowerFraction = bWeaponsHolstered ? 1.0f : GetDeathWeaponLowerFraction();
+    if (LowerFraction > 0.0f)
     {
-        Rotation.Pitch += BreakerHolsterPitchDegrees;
-        Rotation.Yaw += BreakerHolsterYawDegrees;
+        Rotation.Pitch += FMath::Lerp(0.0f, BreakerHolsterPitchDegrees, LowerFraction);
+        Rotation.Yaw += FMath::Lerp(0.0f, BreakerHolsterYawDegrees, LowerFraction);
     }
     // The motion channel rides on top of the spring: idle sway from time,
     // locomotion bob from ground covered, all of it quieted by ADS through
@@ -1467,13 +1499,31 @@ void ABreakerCharacter::HandlePlayerDeath()
     {
         DisableInput(PC);
     }
+    // The beat owns the control roll from here: a dash punch still in flight
+    // writes roll absolutely every frame and would fight the beat's delta.
+    if (bDashRollApplied && Controller)
+    {
+        FRotator ControlRotation = Controller->GetControlRotation();
+        ControlRotation.Roll = 0.0f;
+        Controller->SetControlRotation(ControlRotation);
+    }
+    DashFeedbackElapsed = -1.0f;
+    bDashRollApplied = false;
+    // The beat starts now; the teleport lands under the black. The rest
+    // location is re-read from the live camera, which is at rest with no beat
+    // running: a Blueprint child that re-seats the camera would otherwise
+    // have Done snap it back to the C++ constructor's figure.
+    if (FirstPersonCamera) CameraRestLocation = FirstPersonCamera->GetRelativeLocation();
+    DeathBeatElapsed = 0.0f;
     GetWorldTimerManager().SetTimer(RespawnTimer, this,
-        &ABreakerCharacter::RespawnAtTilesetStart, FMath::Max(RespawnDelaySeconds, 0.1f), false);
+        &ABreakerCharacter::RespawnAtTilesetStart,
+        FMath::Max(BreakerDeathBeat::TeleportAtSeconds(DeathBeat), 0.1f), false);
 }
 
 void ABreakerCharacter::RespawnAtTilesetStart()
 {
     bRespawnPending = false;
+    // This is the first FadeIn frame: input comes back with the world.
     if (APlayerController* PC = Cast<APlayerController>(Controller))
     {
         EnableInput(PC);
@@ -1500,9 +1550,65 @@ void ABreakerCharacter::RespawnAtTilesetStart()
     DashFeedbackElapsed = -1.0f;
     bDashRollApplied = false;
     ApplyBaseFieldOfView();
+    // The spawn rotation replaces the tilted one outright, so there is no
+    // tilt left for the beat's next frame to subtract.
+    LastDeathBeatOffset = FRotator::ZeroRotator;
     if (Controller) Controller->SetControlRotation(PlaytestSpawnTransform.Rotator());
     if (Weapon) Weapon->ResetAmmunition();
     if (Combat) Combat->RestoreVitals();
+}
+
+void ABreakerCharacter::UpdateDeathBeat(float DeltaSeconds)
+{
+    if (DeathBeatElapsed < 0.0f) return;
+    DeathBeatElapsed += DeltaSeconds;
+    const FBreakerDeathBeatSample Beat = BreakerDeathBeat::Sample(DeathBeat, DeathBeatElapsed);
+    const bool bDone = Beat.Phase == EBreakerDeathBeatPhase::Done;
+
+    // The drop is a relative offset under the rest location; the tilt rides
+    // the control rotation as a net-zero delta, the shake's technique, because
+    // the camera runs bUsePawnControlRotation and would discard a relative
+    // roll or pitch of its own.
+    if (FirstPersonCamera)
+    {
+        FirstPersonCamera->SetRelativeLocation(CameraRestLocation - FVector(0.0, 0.0, Beat.CameraDropCm));
+        // Colour drains through the camera's own post-process slot; the
+        // blend weight rides the same channel so a full-colour frame costs
+        // the renderer nothing.
+        FirstPersonCamera->PostProcessSettings.bOverride_ColorSaturation = true;
+        FirstPersonCamera->PostProcessSettings.ColorSaturation = FVector4(Beat.Saturation, Beat.Saturation, Beat.Saturation, 1.0f);
+        FirstPersonCamera->PostProcessBlendWeight = bDone ? 0.0f : 1.0f - Beat.Saturation;
+    }
+    const FRotator NewOffset(Beat.CameraPitchDegrees, 0.0f, Beat.CameraRollDegrees);
+    if (Controller && (!NewOffset.IsNearlyZero() || !LastDeathBeatOffset.IsNearlyZero()))
+    {
+        FRotator Rotation = Controller->GetControlRotation();
+        Rotation.Pitch += NewOffset.Pitch - LastDeathBeatOffset.Pitch;
+        Rotation.Roll += NewOffset.Roll - LastDeathBeatOffset.Roll;
+        Controller->SetControlRotation(Rotation);
+    }
+    LastDeathBeatOffset = NewOffset;
+
+    if (APlayerController* PC = Cast<APlayerController>(Controller))
+    {
+        if (PC->PlayerCameraManager)
+        {
+            PC->PlayerCameraManager->SetManualCameraFade(Beat.FadeAlpha, FLinearColor::Black, false);
+            if (bDone)
+            {
+                // Manual fade to zero, then the fade channel off entirely so
+                // an idle camera manager is not holding a zero overlay.
+                PC->PlayerCameraManager->StopCameraFade();
+            }
+        }
+        if (AHUD* HUD = PC->GetHUD()) HUD->bShowHUD = Beat.bHudVisible;
+    }
+
+    if (bDone)
+    {
+        DeathBeatElapsed = -1.0f;
+        LastDeathBeatOffset = FRotator::ZeroRotator;
+    }
 }
 
 // ---------------------------------------------------------------------------

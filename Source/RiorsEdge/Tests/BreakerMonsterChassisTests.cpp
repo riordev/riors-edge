@@ -160,6 +160,39 @@ bool FBreakerChassisRankTest::RunTest(const FString& Parameters)
     return true;
 }
 
+// O194: rank is read off the silhouette. Standard, Elite and Champion stand at
+// +0 / +15 / +30 % of the spawned scale; the boss authors its own size and
+// takes no rank multiplier. Pure — the actor path that applies it is asserted
+// in RiorsEdge.Game.ModifierCarrierThroughActor.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerChassisRankScaleTest,
+    "RiorsEdge.Combat.Chassis.RankScale",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerChassisRankScaleTest::RunTest(const FString& Parameters)
+{
+    using ELib = UBreakerMonsterChassisLibrary;
+
+    TestEqual(TEXT("Standard stands at the spawned scale"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Trash), 1.0f, 0.0001f);
+    TestEqual(TEXT("Elite stands at +15 %"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Elite), 1.15f, 0.0001f);
+    TestEqual(TEXT("Champion stands at +30 %"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::ModifierBearing), 1.30f, 0.0001f);
+    TestEqual(TEXT("The boss takes no rank scale; it authors its own"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Boss), 1.0f, 0.0001f);
+
+    // The order is the design statement, pinned independently of the values.
+    TestTrue(TEXT("Elite is larger than standard"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Elite)
+        > ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Trash));
+    TestTrue(TEXT("Champion is larger than elite"),
+        ELib::GetRankScaleMultiplier(EBreakerMonsterRank::ModifierBearing)
+        > ELib::GetRankScaleMultiplier(EBreakerMonsterRank::Elite));
+
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerChassisContentScaledTest,
     "RiorsEdge.Combat.Chassis.ContentScaled",

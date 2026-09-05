@@ -8,6 +8,7 @@
 #include "Combat/BreakerCombatTypes.h"
 #include "Characters/BreakerViewmodelRig.h"
 #include "Weapons/BreakerWeaponFeel.h"
+#include "Game/BreakerDeathBeatMath.h"
 #include "BreakerCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -458,15 +459,32 @@ private:
     float ShakeTrauma = 0.0f;
     FRotator LastShakeOffset = FRotator::ZeroRotator;
 
-    // The death beat: input dead, HUD reads REDEPLOYING, then the respawn.
-    // Long enough to register as a consequence, short enough that unlimited
-    // campaign respawn stays a rhythm rather than a punishment. O2 PLACEHOLDER.
-    float RespawnDelaySeconds = 2.0f;
+    // The death beat (O193): weapon lowers, camera drops and tilts as the
+    // colour drains, black, then the fade-in at the tileset start with input
+    // live on the first visible frame. The rhythm itself is
+    // Game/BreakerDeathBeatMath.h; the character copies one sample per frame
+    // onto the camera, the rig, the fade and the HUD flag. The respawn
+    // teleport fires at BreakerDeathBeat::TeleportAtSeconds, under the black.
+    void UpdateDeathBeat(float DeltaSeconds);
+    // Negative = no beat in flight.
+    float DeathBeatElapsed = -1.0f;
+    // The camera's authored relative location, captured in the constructor
+    // so the drop is a pure offset and Done puts it back byte-identical.
+    FVector CameraRestLocation = FVector::ZeroVector;
+    // Last frame's roll/pitch, so each frame's write is a net-zero delta on
+    // the control rotation exactly as the shake's is (LastShakeOffset).
+    FRotator LastDeathBeatOffset = FRotator::ZeroRotator;
     bool bRespawnPending = false;
     FTimerHandle RespawnTimer;
 public:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Camera|Death Beat")
+    FBreakerDeathBeatTimeline DeathBeat;
     // The HUD's read for the death beat's own line.
     bool IsAwaitingRespawn() const { return bRespawnPending; }
+    // 0 at the ready pose, 1 at the holster pose: how far the beat has
+    // lowered the rig this frame. The viewmodel rest pose and pitch blend on
+    // it; an Anchor pawn's permanent holster is the 1 case.
+    float GetDeathWeaponLowerFraction() const;
 private:
     UPROPERTY() TObjectPtr<UBreakerQuestJournal> Quests;
     float LookSensitivity = 1.0f;

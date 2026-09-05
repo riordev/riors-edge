@@ -720,8 +720,8 @@ private:
     bool bLungeWindingUp = false;
     float WeakPointBaseScale = 0.4f;
     // Actor scale as spawned, captured in BeginPlay before any promotion can
-    // touch it: ConfigureElite's 1.25x multiplies the CURRENT scale, so a
-    // pooled body revived without this restore would grow every reuse.
+    // touch it. ApplyChassis writes PooledBaseScale times the rank's scale
+    // multiplier (O194), so rank never compounds and a pool revive restores it.
     bool bPooledByGameMode = false;
     FVector PooledBaseScale = FVector::OneVector;
     FTimerHandle PoolParkTimer;

@@ -159,6 +159,29 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Chassis")
     static float GetRankDamageMultiplier(EBreakerMonsterRank Rank, const FBreakerMonsterChassisParams& Params);
 
+    // O194: rank is read off the silhouette before anything else. Standard,
+    // Elite and Champion stand at +0 / +15 / +30 % of the body's spawned scale.
+    // The boss authors its own scale in its constructor and takes no rank
+    // multiplier here, so the rank row never compounds on that authored size.
+    // Applied as an ABSOLUTE write against the spawned scale by ApplyChassis,
+    // so a promotion, a demotion and a pool revive all land the same number.
+    static constexpr float TrashScaleMultiplier = 1.0f;             // O2 PLACEHOLDER
+    static constexpr float EliteScaleMultiplier = 1.15f;            // O2 PLACEHOLDER
+    static constexpr float ModifierBearingScaleMultiplier = 1.30f;  // O2 PLACEHOLDER
+    static constexpr float BossScaleMultiplier = 1.0f;              // O2 PLACEHOLDER
+
+    static float GetRankScaleMultiplier(EBreakerMonsterRank Rank)
+    {
+        switch (Rank)
+        {
+        case EBreakerMonsterRank::Elite:           return EliteScaleMultiplier;
+        case EBreakerMonsterRank::ModifierBearing: return ModifierBearingScaleMultiplier;
+        case EBreakerMonsterRank::Boss:            return BossScaleMultiplier;
+        case EBreakerMonsterRank::Trash:
+        default:                                   return TrashScaleMultiplier;
+        }
+    }
+
     // The full composition. ArchetypeMultiplier is the per-archetype ratio an
     // encounter design authors on top of rank — Encounter-Design §2.2's 1.6x
     // Lattice, for instance. It is NOT rank and NOT area level; it is what
