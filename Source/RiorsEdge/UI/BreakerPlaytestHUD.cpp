@@ -20,6 +20,7 @@
 #include "UI/BreakerUIStyle.h"
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
+#include "UI/BreakerEffectRenderer.h"
 #include "Audio/BreakerSoundDirector.h"
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponDefinition.h"
@@ -2521,6 +2522,18 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
         Sound->PlayWeaponFire(BoundWeapon ? BoundWeapon->GetArchetype() : EBreakerWeaponArchetype::Rifle);
     }
 
+    // THE MUZZLE MOMENT (GLASS-1). Every trigger pull, launcher included, at
+    // the visual muzzle and down the barrel, in the weapon/heat role. The
+    // character's own point light (KIT's) keeps flashing underneath; this is
+    // the world flash that becomes NS_Muzzle the day the owner authors it.
+    const FVector AimDirection = (Shot.TraceEnd - Shot.TraceStart).GetSafeNormal();
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+    {
+        Effects->PlayMoment(EBreakerEffectMoment::Muzzle,
+            BoundWeapon ? BoundWeapon->GetVisualMuzzleLocation() : Shot.TraceStart,
+            AimDirection, BreakerFX::MomentColor(EBreakerEffectMoment::Muzzle, false));
+    }
+
     // A launcher already puts a real actor in the world; a hitscan streak on
     // top of it drew a second, faster, ghost round every time the rocket fired.
     const UBreakerWeaponDefinition* FiredDefinition = BoundWeapon ? BoundWeapon->GetActiveDefinition() : nullptr;
@@ -2586,6 +2599,28 @@ void ABreakerPlaytestHUD::HandlePlayerShot(const FBreakerShotResult& Shot)
             if (ABreakerTracerRenderer* Renderer = GetTracerRenderer())
             {
                 Renderer->AddImpact(Shot.ImpactPoint, Shot.bWeakPoint, FlightSeconds);
+            }
+        }
+
+        // THE IMPACT MOMENT (GLASS-1), on the same arrival clock as the spark
+        // above. The spark IS the pooled fallback, so this draws nothing until
+        // NS_Impact exists — then every landed pellet gets one, facing back
+        // up the shot, Gold where the pellet found a weak point.
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+        {
+            if (bDrawSpread)
+            {
+                for (const FBreakerPelletImpact& Pellet : Shot.Pellets)
+                {
+                    if (!Pellet.bHit) continue;
+                    Effects->PlayMoment(EBreakerEffectMoment::Impact, Pellet.End, -AimDirection,
+                        BreakerFX::MomentColor(EBreakerEffectMoment::Impact, Pellet.bWeakPoint), FlightSeconds);
+                }
+            }
+            else if (Shot.bHit)
+            {
+                Effects->PlayMoment(EBreakerEffectMoment::Impact, Shot.ImpactPoint, -AimDirection,
+                    BreakerFX::MomentColor(EBreakerEffectMoment::Impact, Shot.bWeakPoint), FlightSeconds);
             }
         }
 
@@ -2748,6 +2783,17 @@ void ABreakerPlaytestHUD::HandlePlayerHitDealt(const FBreakerHitContext& Hit)
         LastKillConfirmTime = ArrivalTime;
         bKillConfirmWeakPoint = bWeak;
         ScheduleArrivalSound(ArrivalDelay, /*bKill*/ true);
+
+        // THE DEATH MOMENT (GLASS-1), where the body stood, when the round
+        // lands — the same clock as the crosshair confirm and the number, in
+        // the same colour (Harm; Gold for a weak-point kill).
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(World))
+        {
+            const FVector Where = Hit.WorldLocation.IsNearlyZero() && Hit.Target
+                ? Hit.Target->GetActorLocation() : Hit.WorldLocation;
+            Effects->PlayMoment(EBreakerEffectMoment::Death, Where, FVector::UpVector,
+                BreakerFX::MomentColor(EBreakerEffectMoment::Death, bWeak), ArrivalDelay);
+        }
     }
 
     // MERGE rather than spawn. A shotgun resolves eight pellets as eight hits,
@@ -2956,6 +3002,31 @@ void ABreakerPlaytestHUD::TickCapturePreview(const ABreakerCharacter* Character)
             : Hit.bDoT ? BreakerHUD::DamageDoTLifetime
             : BreakerHUD::DamageNumberLifetime;
         PushDamageNumber(Number);
+
+        // THE DEATH MOMENT, fabricated with the killing blow (GLASS-1). Same
+        // renderer, same colour law, same point the number rises from; the
+        // only fake is the event, as with everything else here. Without this
+        // the fallback glow is unphotographable: -BreakerAutoPlay kills nothing.
+        if (Hit.bKilled)
+        {
+            if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+            {
+                Effects->PlayMoment(EBreakerEffectMoment::Death, Number.World, FVector::UpVector,
+                    BreakerFX::MomentColor(EBreakerEffectMoment::Death, Hit.bWeak));
+            }
+        }
+    }
+
+    // THE MUZZLE MOMENT, fabricated at the visual muzzle on the same cadence
+    // (the harness pulls no trigger). Its 60 ms life is shorter than a frame
+    // interval at capture rate, so it is caught by the tick that seeds it.
+    if (BoundWeapon)
+    {
+        if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+        {
+            Effects->PlayMoment(EBreakerEffectMoment::Muzzle, BoundWeapon->GetVisualMuzzleLocation(),
+                Forward, BreakerFX::MomentColor(EBreakerEffectMoment::Muzzle, false));
+        }
     }
 
     // The crosshair kill confirm and the level-up moment, fabricated on the

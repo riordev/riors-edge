@@ -3,9 +3,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "UI/BreakerEffectMath.h"
+#include "UI/BreakerEffectMomentMath.h"
 #include "BreakerEffectRenderer.generated.h"
 
 class UMaterialInstanceDynamic;
+class UNiagaraComponent;
+class UNiagaraSystem;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
@@ -118,6 +121,22 @@ public:
     // tearing down after its target already died wants.
     void EndEffect(int32 Handle, float FadeOutSeconds);
 
+    // THE FOUR MOMENTS (GLASS-1). Plays the moment's Niagara system if the
+    // owner has authored `/Game/Breaker/FX/NS_<Moment>` — resolved once per
+    // moment, cached, "none authored" cached too — through a pooled
+    // UNiagaraComponent with Color handed in as the `Color` user parameter.
+    // Until the asset exists it draws BreakerFX::MomentFallback through the
+    // glow and light pools, so nothing is silent now and nothing re-plumbs
+    // later. Direction orients the system (a muzzle flash points down the
+    // barrel); zero is treated as up. DelaySeconds schedules the birth, so a
+    // death can land with the round that caused it.
+    //
+    // Returns the fallback glow's handle when the fallback drew, 0 otherwise:
+    // a Niagara play is fire-and-forget and an undrawn fallback (Impact —
+    // the tracer spark already is that fallback) has nothing to end.
+    int32 PlayMoment(EBreakerEffectMoment Moment, const FVector& Location, const FVector& Direction,
+        const FLinearColor& Color, float DelaySeconds = 0.0f);
+
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
@@ -130,14 +149,48 @@ private:
     static constexpr int32 GlowSlots = 16;
     static constexpr int32 StrokeSlots = 48;
     static constexpr int32 EffectLightSlots = 4;
+    // Niagara components for the four moments. A component is reused, never
+    // respawned: SetAsset + Activate(reset) on the oldest slot. Sized for a
+    // shotgun's landed pellets plus a kill in the same frame.
+    static constexpr int32 MomentSlots = 12;
+    // Moments scheduled into the future (a death arriving with its round).
+    // A full spread's landed pellets plus the kill they made, once NS_Impact
+    // exists and impacts start queueing.
+    static constexpr int32 PendingMomentSlots = 16;
 
 public:
     // Public for the suite's pool-arithmetic assertions, like the tracer's.
     static constexpr int32 GetGlowSlots() { return GlowSlots; }
     static constexpr int32 GetStrokeSlots() { return StrokeSlots; }
     static constexpr int32 GetEffectLightSlots() { return EffectLightSlots; }
+    static constexpr int32 GetMomentSlots() { return MomentSlots; }
+    static constexpr int32 GetPendingMomentSlots() { return PendingMomentSlots; }
 
 private:
+    struct FPendingMoment
+    {
+        EBreakerEffectMoment Moment = EBreakerEffectMoment::Cast;
+        FVector Location = FVector::ZeroVector;
+        FVector Direction = FVector::UpVector;
+        FLinearColor Color = FLinearColor::White;
+        double FireTime = 0.0;
+        bool bActive = false;
+    };
+
+    // The resolve, with the sound director's sentinel: a probed moment with a
+    // null system means "none authored", so a moment with no file costs one
+    // failed load per session rather than one per shot. Indexed by moment;
+    // the enum is not reflected, so this is two arrays rather than a map.
+    UPROPERTY() TArray<TObjectPtr<UNiagaraSystem>> MomentSystems;
+    bool bMomentProbed[BreakerFX::EffectMomentCount] = {};
+    UPROPERTY() TArray<TObjectPtr<UNiagaraComponent>> MomentComponents;
+    FPendingMoment PendingMoments[PendingMomentSlots];
+    int32 NextMomentSlot = 0;
+    int32 NextPendingMoment = 0;
+
+    UNiagaraSystem* ResolveMomentSystem(EBreakerEffectMoment Moment);
+    int32 PlayMomentNow(EBreakerEffectMoment Moment, const FVector& Location, const FVector& Direction,
+        const FLinearColor& Color);
     struct FEffectSlot
     {
         // Glow: A is the centre, B unused. Stroke: A to B.

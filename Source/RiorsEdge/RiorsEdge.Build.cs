@@ -14,7 +14,10 @@ public class RiorsEdge : ModuleRules
             // RenderCore (RenderTimer.h), the GPU cycle counter in RHI.
             "RHI", "RenderCore",
             // Data/BreakerCensus.cpp: the census export is JSON.
-            "Json"
+            "Json",
+            // UI/BreakerEffectRenderer.cpp: the four moments play an authored
+            // Niagara system through a pooled component when one exists.
+            "Niagara"
         });
         if (Target.bBuildEditor)
         {

@@ -5,6 +5,8 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "UI/BreakerGlowMaterial.h"
 
 namespace
@@ -93,6 +95,108 @@ ABreakerEffectRenderer::ABreakerEffectRenderer()
         }
         EffectLights.Add(Light);
     }
+
+    // The moment pool. Dormant until PlayMoment hands a slot a system: no
+    // asset in the constructor, no auto-activate, never auto-destroyed — a
+    // slot outlives every effect it plays, which is the whole point of a pool.
+    MomentComponents.Reserve(MomentSlots);
+    for (int32 Index = 0; Index < MomentSlots; ++Index)
+    {
+        UNiagaraComponent* Niagara = CreateDefaultSubobject<UNiagaraComponent>(
+            *FString::Printf(TEXT("EffectMoment%d"), Index));
+        if (Niagara)
+        {
+            Niagara->SetupAttachment(Root);
+            Niagara->SetAutoActivate(false);
+            Niagara->SetAutoDestroy(false);
+            Niagara->SetUsingAbsoluteLocation(true);
+            Niagara->SetUsingAbsoluteRotation(true);
+            Niagara->SetUsingAbsoluteScale(true);
+            Niagara->SetCastShadow(false);
+        }
+        MomentComponents.Add(Niagara);
+    }
+    MomentSystems.SetNum(BreakerFX::EffectMomentCount);
+}
+
+UNiagaraSystem* ABreakerEffectRenderer::ResolveMomentSystem(EBreakerEffectMoment Moment)
+{
+    const int32 Index = static_cast<int32>(Moment);
+    if (Index < 0 || Index >= BreakerFX::EffectMomentCount) return nullptr;
+    if (MomentSystems.Num() != BreakerFX::EffectMomentCount) MomentSystems.SetNum(BreakerFX::EffectMomentCount);
+    if (bMomentProbed[Index]) return MomentSystems[Index].Get();
+
+    // Probe once. The path is fixed by the math header so the owner names a
+    // system after its moment and nothing here has to learn it. A miss is
+    // the normal state until the asset is authored and is not logged: one
+    // line per session when a system IS found is the useful signal.
+    bMomentProbed[Index] = true;
+    UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, *BreakerFX::MomentAssetPath(Moment));
+    MomentSystems[Index] = System;
+    if (System)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[BreakerFX] %s: authored Niagara system loaded; the pooled fallback stands down."),
+            BreakerFX::MomentAssetName(Moment));
+    }
+    return System;
+}
+
+int32 ABreakerEffectRenderer::PlayMoment(EBreakerEffectMoment Moment, const FVector& Location,
+    const FVector& Direction, const FLinearColor& Color, float DelaySeconds)
+{
+    if (DelaySeconds <= KINDA_SMALL_NUMBER) return PlayMomentNow(Moment, Location, Direction, Color);
+
+    // A moment that would draw nothing (unauthored, and its fallback is
+    // somebody else's primitive) must not occupy a pending slot: a shotgun's
+    // landed pellets would otherwise evict the death scheduled beside them.
+    if (!ResolveMomentSystem(Moment) && !BreakerFX::MomentFallback(Moment).bDrawn) return 0;
+
+    // A Niagara component cannot be told "start in 0.18 s", so a scheduled
+    // moment waits in a fixed ring the tick drains. Oldest-first like every
+    // pool here: nine deaths landing inside one tracer flight is not a load,
+    // it is a bug this makes graceful.
+    FPendingMoment& Pending = PendingMoments[NextPendingMoment];
+    Pending.Moment = Moment;
+    Pending.Location = Location;
+    Pending.Direction = Direction;
+    Pending.Color = Color;
+    Pending.FireTime = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + DelaySeconds;
+    Pending.bActive = true;
+    NextPendingMoment = (NextPendingMoment + 1) % PendingMomentSlots;
+    return 0;
+}
+
+int32 ABreakerEffectRenderer::PlayMomentNow(EBreakerEffectMoment Moment, const FVector& Location,
+    const FVector& Direction, const FLinearColor& Color)
+{
+    if (UNiagaraSystem* System = ResolveMomentSystem(Moment))
+    {
+        UNiagaraComponent* Niagara = MomentComponents.IsValidIndex(NextMomentSlot)
+            ? MomentComponents[NextMomentSlot].Get() : nullptr;
+        NextMomentSlot = (NextMomentSlot + 1) % MomentSlots;
+        if (Niagara)
+        {
+            const FVector Facing = Direction.IsNearlyZero() ? FVector::UpVector : Direction.GetSafeNormal();
+            if (Niagara->GetAsset() != System) Niagara->SetAsset(System);
+            Niagara->SetWorldLocationAndRotation(Location, FRotationMatrix::MakeFromX(Facing).Rotator());
+            // The one parameter every moment system is asked to expose. A
+            // system without it simply ignores the write and plays its
+            // authored colour — the O179 law is then the author's to keep.
+            Niagara->SetVariableLinearColor(TEXT("Color"), Color);
+            Niagara->Activate(/*bReset*/ true);
+            return 0;
+        }
+    }
+
+    // Not authored yet: the pooled primitives stand in.
+    const BreakerFX::FMomentFallback Fallback = BreakerFX::MomentFallback(Moment);
+    if (!Fallback.bDrawn) return 0;
+    const int32 Handle = AddGlow(Location, Fallback.RadiusCm, Color, Fallback.Intensity, Fallback.Timing);
+    if (Fallback.LightRadiusCm > 0.0f)
+    {
+        AddBlinkLight(Location, Fallback.LightRadiusCm, Color, Fallback.LightIntensity, Fallback.Timing);
+    }
+    return Handle;
 }
 
 void ABreakerEffectRenderer::BeginPlay()
@@ -225,6 +329,15 @@ void ABreakerEffectRenderer::Tick(float DeltaSeconds)
     const UWorld* World = GetWorld();
     if (!World) return;
     const double Now = World->GetTimeSeconds();
+
+    // Scheduled moments fire first so a fallback glow born this frame is
+    // drawn this frame, not next.
+    for (FPendingMoment& Pending : PendingMoments)
+    {
+        if (!Pending.bActive || Now < Pending.FireTime) continue;
+        Pending.bActive = false;
+        PlayMomentNow(Pending.Moment, Pending.Location, Pending.Direction, Pending.Color);
+    }
 
     for (int32 Index = 0; Index < GlowSlots; ++Index)
     {
