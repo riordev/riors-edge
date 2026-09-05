@@ -27,3 +27,6 @@ Scripts/__pycache__/
 # gets an explicit ignore entry here when adopted. Only individually curated
 # pieces may be committed, deliberately, outside these folders.
 /Content/ParagonSevarog/
+
+# Seat-specific paths; each machine keeps its own copy.
+CLAUDE.local.md

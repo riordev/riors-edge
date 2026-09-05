@@ -3908,3 +3908,145 @@ licenses a change that silently breaks an unlisted caller.
 The `EnemyBlips` producer/consumer contract between FIELD's TU and GLASS's
 minimap is the same shape wearing a member variable instead of an API, and O155
 already rules it a declared crossing.
+
+# PART FIVE — THE GAME LAYER
+
+The review at `2526cfc` reads the project as a balance engine waiting for a
+game to balance. This part is the game. Every item names its lane, its
+definition of done, and the test that pins it. Items are ordered within a
+lane; lanes run in parallel. Nothing here changes a ruling; where an item
+needs one, it says so and the owner rules first.
+
+## Owner rulings needed before their items start
+
+- **R1 — Flat damage.** `sum(Flat)` is structurally zero; every build is
+  `Base × (1+Inc) × More` at different scales. Either weapons and gear carry
+  a true flat `Added Damage` (PoE's shape, fed by an affix and a weapon base
+  line), or the Flat term is deleted from `power-and-scaling.md`. LEDGER-3
+  waits on this. (Part One-K recorded it; nobody ruled.)
+- **R2 — Multiplayer in the slice.** Either NAV-4 (a two-seat listen-server
+  smoke that runs every cycle) is authorised, or the slice is ruled
+  single-player and `HasAuthority()` discipline stays but stops expanding.
+- **R3 — The DATA lane exists.** A sixth lane, owning `Data/` and the
+  migration of C++ content libraries to data. Without it every O2
+  measurement costs a compile.
+
+## HYGIENE — half a day, any lane, first
+
+- **H1** Delete the drift. `progression-and-trees.md:34` and
+  `content-and-modes.md:72,101` still carry wall-ride (retired, O144).
+  `Config/DefaultGameplayTags.ini` carries `Ability.Movement.Grapple`,
+  `Resource.Stamina`, `Damage.Elemental.Fire/Frost/Shock`, `Status.Burn/Frost`,
+  `Item.Rarity.Common/Rare/Legendary` — none referenced by code. Remove them.
+  Done when: grep for each string is empty outside git history.
+- **H2** `CLAUDE.md` → the slim file. The "Current work" narrative moves into
+  the commit messages that already carry it; each lane's pointer moves to
+  `.claude/lanes/<LANE>.md`. Done when: `CLAUDE.md` is under 200 lines and
+  every lane can start a session from its pointer alone.
+
+## NAV — enemy locomotion (new lane)
+
+- **NAV-1** Enemies get an `AAIController` and a movement component
+  (`UFloatingPawnMovement` keeps today's no-gravity feel; switch to
+  `ACharacter` only if steps and slopes demand it). NavMesh bounds on
+  Gym, Fernhall and the rift yard. `Tick`'s `AddActorWorldOffset` becomes
+  `MoveTo`; the band classifier stays the goal selector. Done when: an enemy
+  spawned behind a wall in the gym reaches the player without touching it,
+  photographed from two vantages, and every O18 TTK test is still green.
+- **NAV-2** Cover behaviour rides the nav: `BreakerCoverBehavior` picks a
+  cover point from the registry and paths to it. Done when: a ranged enemy
+  loses line of sight and re-acquires it by moving, on film.
+- **NAV-3** Squad shape: closers arrive from two angles, band-holders hold
+  the band, the Warden's front faces the player. No new archetype. Done
+  when: three archetypes engaging at once produce the "different reasons to
+  move" the combat spec promises, photographed.
+- **NAV-4** (gated on R2) Two-seat listen-server smoke: resources, HUD
+  state, the custom movement mode, one enemy kill and one drop, over a real
+  connection. Pinned as a functional test or a documented manual script.
+
+## DATA — content out of C++ (new lane, gated on R3)
+
+- **DATA-1** The census moves to a commandlet. `Scripts/status.py` gains a
+  mode that reads exported data, not source. Done when: STATE.md's node
+  sections regenerate from `Data/` with identical numbers.
+- **DATA-2** Affix pools → DataTable (`FBreakerAffixDefinition` rows). Done
+  when: a tier value changes with no C++ diff and `Items.Affixes.Breadth`
+  still passes.
+- **DATA-3** Tree nodes → DataTable per tree. Ids never move (O103). Done
+  when: `BreakerProgressionLibrary.cpp` is a loader, not a library, and the
+  save migration test suite is green.
+- **DATA-4** Ability definitions, quests and dialogue → DataAssets. Done
+  when: the quartermaster's stock is a row.
+
+## FIELD
+
+- **FIELD-1** Enemy body table: family × archetype → mesh, idle, paint base.
+  One lookup. Done when: swapping every placeholder mesh is a content change
+  with no C++ diff (Part One-K's test, unmet today).
+- **FIELD-2** Phasing gets its tell. Its own comment rules the tell
+  mandatory and none exists. Done when: photographed at 12 m and 35 m.
+- **FIELD-3** A boss grammar: telegraph → punish window → phase gate → add
+  wave → arena change, as a pure header (`BreakerBossPhases.h` grows) plus
+  two new bosses. Second boss tests add-clear under pressure; third tests
+  mobility/sustain. Done when: `Combat.PowerCurve.BossBand` holds for all
+  three against the baseline fixture and O31's "every build participates"
+  is asserted per boss.
+
+## KIT
+
+- **KIT-1** Cache the player list on the game mode; enemies stop iterating
+  `TActorIterator<ABreakerCharacter>` per tick. (Trivial; do it with FIELD.)
+- **KIT-2** Momentum reads off the gun: spread and tracer brightness follow
+  the bar. Done when: photographed at empty, half and full.
+- **KIT-3** Statuses as the cross-class language: Rot spread by pierce,
+  Provoke grouping for MineCluster. No class-pair specials. Done when: each
+  combo is one status interaction with a test and works solo.
+
+## GLASS
+
+- **GLASS-1** Niagara. Muzzle, impact, cast moment, death — under the O179
+  verb-colour law. Done when: the "feedback needs to be better" screenshot
+  is re-taken and the four items in Part One-B are visibly answered.
+- **GLASS-2** Per-archetype weapon fire (the lazy `weapon_fire_<archetype>.wav`
+  resolve GLASS already proposed). Ruled yes here. Done when: sidearm, rifle
+  and shotgun are distinguishable blind.
+- **GLASS-3** Split `BreakerMenu.cpp` by screen into owned TUs. Done when:
+  no file in `UI/` exceeds 3,000 lines and the capture harness frames every
+  screen identically before and after.
+
+## LEDGER
+
+- **LEDGER-1** The at-cap band and parity gap are one problem; wait on R1.
+- **LEDGER-2** Riftglass fold: atomic write or journal. Done when: the three
+  crash-window cases in LEDGER's report each have a test that kills the
+  process mid-fold and loses nothing.
+- **LEDGER-3** (gated on R1) Finish the affix pool 28 → 56 against the
+  breadth invariant, then re-measure `Progression.PowerBand.AtCap`.
+- **LEDGER-4** Ten legendaries with authored major rewrites, weighted to
+  delivery and economy kinds (O66), each with a printed forfeit (O67). Done
+  when: `Progression.RuleBandImpact.Major` holds for every one.
+- **LEDGER-5** A baseline-viability pin: zero-point, starter-gear character
+  clears on-level content inside O18's bands at levels 1, 25 and 50. Then a
+  recommended spend per doctrine at commitment, opt-out, Forge-respecable.
+
+## GROUND
+
+- **GROUND-1** Rift interiors: three to five room shapes, each measured
+  against `LargestUncoveredGap`, `LargestGapToLineBreak` and the corridor
+  rule, feeding the wave solver's cap block (O166/O167). Gated on NAV-1 —
+  a room measured with enemies that cannot use it measures nothing.
+- **GROUND-2** The tile movement contract updates for vault/mantle; the
+  wall-ride surface requirement is deleted with H1.
+- **GROUND-3** Anomalies as the first endgame type: consumable key (O122),
+  tier bonus sourcing ilvl 101–120, death budget (O82), ten-minute solo
+  target. Done when: a run from key to payout is a functional test.
+- **GROUND-4** Three to five map-loading functional tests: spawn → shoot →
+  kill → drop → pick up → equip → save → load. The class of bug playtests
+  keep finding ("Caster had Swift's tree") gets an instrument.
+
+## Order across lanes
+
+H1, H2 first, in one session. Then NAV-1 and DATA-1 in parallel with
+FIELD-1 and GLASS-1; everything downstream keys on those four. Elements,
+the reaction matrix, Dungeons and Raids are Part Five and are not started
+until GROUND-3 has been played.
