@@ -7,6 +7,7 @@
 #include "Weapons/BreakerWeaponComponent.h"
 #include "Weapons/BreakerWeaponFeel.h"
 #include "Weapons/BreakerWeaponMath.h"
+#include "Movement/BreakerCharacterMovementComponent.h"
 #include "Characters/BreakerShakeMath.h"
 #include "UI/BreakerTracerMath.h"
 #include "UI/BreakerTracerRenderer.h"
@@ -1580,6 +1581,80 @@ bool FBreakerViewmodelMotionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A bigger fall dips harder"), Drop > Kerb);
     TestEqual(TEXT("A skydive is clamped at the authored ceiling"),
         FBreakerWeaponFeel::LandingKickUnits(Params, 100000.0f), Params.MaxLandingKickUnits, 0.0001f);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// THE SPRINT GAIT (KIT-4). The finding: the shipped walk cap sits above
+// FullBobSpeed, so the speed lane saturates on a walk and a sprint was the
+// same amplitude at a faster phase. The sprint fraction is the second lane
+// that separates the gaits, and it reads ACTUAL ground speed between the two
+// caps — sprint is a toggle, and the toggle says nothing about the body.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerSprintFeelTest,
+    "RiorsEdge.Weapons.SprintFeel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerSprintFeelTest::RunTest(const FString& Parameters)
+{
+    const FBreakerViewmodelMotionParams Params;
+
+    // The fraction: pinned at both caps, monotonic between, and nothing for
+    // a pair of caps that cannot separate.
+    TestEqual(TEXT("The walk cap is no sprint"), FBreakerWeaponFeel::SprintFraction(700.0f, 700.0f, 1100.0f), 0.0f, 0.0f);
+    TestEqual(TEXT("Below the walk cap is no sprint"), FBreakerWeaponFeel::SprintFraction(300.0f, 700.0f, 1100.0f), 0.0f, 0.0f);
+    TestEqual(TEXT("The sprint cap is a full sprint"), FBreakerWeaponFeel::SprintFraction(1100.0f, 700.0f, 1100.0f), 1.0f, 0.0f);
+    TestEqual(TEXT("A boosted run clamps at a full sprint"), FBreakerWeaponFeel::SprintFraction(1600.0f, 700.0f, 1100.0f), 1.0f, 0.0f);
+    TestEqual(TEXT("Halfway between the caps is half a sprint"), FBreakerWeaponFeel::SprintFraction(900.0f, 700.0f, 1100.0f), 0.5f, 0.0001f);
+    TestTrue(TEXT("The fraction rises with speed"),
+        FBreakerWeaponFeel::SprintFraction(800.0f, 700.0f, 1100.0f) < FBreakerWeaponFeel::SprintFraction(1000.0f, 700.0f, 1100.0f));
+    TestEqual(TEXT("Caps that cannot separate give no sprint"), FBreakerWeaponFeel::SprintFraction(900.0f, 1100.0f, 700.0f), 0.0f, 0.0f);
+
+    // No sprint is the old channel exactly: the walk did not change.
+    const FBreakerViewmodelMotionOffset Walk = FBreakerWeaponFeel::MotionOffsets(Params, 3.3f, 1.2f, 1.0f, 1.0f);
+    const FBreakerViewmodelMotionOffset WalkExplicit = FBreakerWeaponFeel::MotionOffsets(Params, 3.3f, 1.2f, 1.0f, 1.0f, 0.0f);
+    TestTrue(TEXT("Zero sprint fraction is the walk, byte for byte"),
+        Walk.BackCm == WalkExplicit.BackCm && Walk.LateralCm == WalkExplicit.LateralCm
+        && Walk.VerticalCm == WalkExplicit.VerticalCm && Walk.PitchDegrees == WalkExplicit.PitchDegrees
+        && Walk.RollDegrees == WalkExplicit.RollDegrees);
+    TestEqual(TEXT("A walk carries no back offset"), Walk.BackCm, 0.0f, 0.0f);
+
+    // The full sprint: the pose settles lower, back and muzzle-down, and the
+    // bob grows by the multiplier. Sway-free (time 0) so the bob is isolated.
+    const FBreakerViewmodelMotionOffset WalkBob = FBreakerWeaponFeel::MotionOffsets(Params, 0.0f, 1.2f, 1.0f, 1.0f, 0.0f);
+    const FBreakerViewmodelMotionOffset SprintBob = FBreakerWeaponFeel::MotionOffsets(Params, 0.0f, 1.2f, 1.0f, 1.0f, 1.0f);
+    TestEqual(TEXT("A sprint pushes the gun back"), SprintBob.BackCm, Params.SprintBackCm, 0.0001f);
+    TestEqual(TEXT("A sprint's lateral bob grows by the multiplier"),
+        SprintBob.LateralCm, WalkBob.LateralCm * Params.SprintBobMultiplier, 0.0001f);
+    TestEqual(TEXT("A sprint's vertical bob grows by the multiplier and the pose lowers"),
+        SprintBob.VerticalCm, WalkBob.VerticalCm * Params.SprintBobMultiplier - Params.SprintLowerCm, 0.0001f);
+    TestTrue(TEXT("A sprint's muzzle dips"), SprintBob.PitchDegrees < WalkBob.PitchDegrees);
+
+    // Half a sprint lands between the two gaits, and ADS quiets the whole
+    // channel — pose included — exactly as it quiets the walk.
+    const FBreakerViewmodelMotionOffset HalfSprint = FBreakerWeaponFeel::MotionOffsets(Params, 0.0f, 1.2f, 1.0f, 1.0f, 0.5f);
+    TestTrue(TEXT("Half a sprint sits between the gaits"),
+        HalfSprint.BackCm > 0.0f && HalfSprint.BackCm < SprintBob.BackCm
+        && HalfSprint.VerticalCm < WalkBob.VerticalCm && HalfSprint.VerticalCm > SprintBob.VerticalCm);
+    const FBreakerViewmodelMotionOffset Quiet = FBreakerWeaponFeel::MotionOffsets(Params, 3.3f, 1.2f, 1.0f, 0.0f, 1.0f);
+    TestTrue(TEXT("Zero motion scale silences the sprint pose too"),
+        Quiet.BackCm == 0.0f && Quiet.LateralCm == 0.0f && Quiet.VerticalCm == 0.0f
+        && Quiet.PitchDegrees == 0.0f && Quiet.RollDegrees == 0.0f);
+
+    // The shipped configuration, default-constructed.
+    TestTrue(TEXT("A sprint bobs harder than a walk"), Params.SprintBobMultiplier > 1.0f);
+    TestTrue(TEXT("The sprint pose has a sign"),
+        Params.SprintLowerCm >= 0.0f && Params.SprintBackCm >= 0.0f && Params.SprintPitchDegrees >= 0.0f);
+    // The finding itself: the walk saturates the speed lane, so ONLY the
+    // sprint lane separates the gaits — and the shipped caps separate them
+    // fully, walk to none and sprint to all.
+    const UBreakerCharacterMovementComponent* Movement = NewObject<UBreakerCharacterMovementComponent>();
+    TestTrue(TEXT("The shipped walk saturates the speed-driven bob"), Movement->WalkSpeed >= Params.FullBobSpeed);
+    TestEqual(TEXT("The shipped walk cap is no sprint in the hands"),
+        FBreakerWeaponFeel::SprintFraction(Movement->WalkSpeed, Movement->GetWalkSpeedCap(), Movement->GetSprintSpeedCap()), 0.0f, 0.0f);
+    TestEqual(TEXT("The shipped sprint cap is a full sprint in the hands"),
+        FBreakerWeaponFeel::SprintFraction(Movement->SprintSpeed, Movement->GetWalkSpeedCap(), Movement->GetSprintSpeedCap()), 1.0f, 0.0f);
     return true;
 }
 

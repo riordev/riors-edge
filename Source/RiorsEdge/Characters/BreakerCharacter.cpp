@@ -1049,6 +1049,12 @@ void ABreakerCharacter::UpdateViewmodelKick()
         }
         const float SpeedFraction = (bStriding && ViewmodelMotion.FullBobSpeed > 0.0f)
             ? FMath::Clamp(StrideSpeed / ViewmodelMotion.FullBobSpeed, 0.0f, 1.0f) : 0.0f;
+        // THE SPRINT GAIT (KIT-4): read off actual ground speed between the
+        // two composed caps, never off the toggle — a sprinting player
+        // standing still gets no sprint gun. A traversal glide is not a gait.
+        const float SprintFraction = bGroundedStride
+            ? FBreakerWeaponFeel::SprintFraction(StrideSpeed, Move->GetWalkSpeedCap(), Move->GetSprintSpeedCap())
+            : 0.0f;
         // ADS quiets motion exactly as it quiets the kick: through the
         // profile's aim-blended viewmodel multiplier.
         float MotionScale = 1.0f;
@@ -1058,7 +1064,8 @@ void ABreakerCharacter::UpdateViewmodelKick()
             MotionScale = FMath::Lerp(1.0f, Profile.AimViewmodelMultiplier, Weapon->GetAimAlpha());
         }
         Motion = FBreakerWeaponFeel::MotionOffsets(ViewmodelMotion,
-            static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, SpeedFraction, MotionScale);
+            static_cast<float>(MotionWorld->GetTimeSeconds()), ViewmodelBobPhase, SpeedFraction, MotionScale,
+            SprintFraction);
     }
     Rotation.Pitch += Motion.PitchDegrees;
     Rotation.Roll += Motion.RollDegrees;

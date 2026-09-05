@@ -248,6 +248,11 @@ public:
     // ruling nobody has made. Returns exactly 1.0 with no weapon component, so
     // a bare test object and a hip-firing player are bit-identical to before.
     UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetAimSpeedMultiplier() const;
+    // The two grounded caps regardless of the sprint toggle, each the resting
+    // figure under the same three multipliers, so the viewmodel's sprint
+    // fraction (KIT-4) reads where the body actually is between the gaits.
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetWalkSpeedCap() const;
+    UFUNCTION(BlueprintPure, Category="Movement|Stats") float GetSprintSpeedCap() const;
     // Cooldown SCALE, so 0.80 is a 20% shorter dash cooldown. The attribute
     // stores the reduction (x1.20) because that is the shape an additive
     // bucket can hold; this is its reciprocal, which is what the dash wants.

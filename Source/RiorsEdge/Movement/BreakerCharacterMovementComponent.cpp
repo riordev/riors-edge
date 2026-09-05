@@ -430,10 +430,19 @@ float UBreakerCharacterMovementComponent::GetComposedDashCooldownMultiplier() co
     return Equipment ? Equipment->GetStats().DashCooldownMultiplier : 1.0f;
 }
 
+float UBreakerCharacterMovementComponent::GetWalkSpeedCap() const
+{
+    return WalkSpeed * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
+}
+
+float UBreakerCharacterMovementComponent::GetSprintSpeedCap() const
+{
+    return SprintSpeed * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
+}
+
 float UBreakerCharacterMovementComponent::GetGroundedSpeedCap() const
 {
-    return (bWantsToSprint ? SprintSpeed : WalkSpeed)
-        * GetComposedMoveSpeedMultiplier() * GetSpeedMultiplier() * GetAimSpeedMultiplier();
+    return bWantsToSprint ? GetSprintSpeedCap() : GetWalkSpeedCap();
 }
 
 float UBreakerCharacterMovementComponent::GetMaxSpeed() const

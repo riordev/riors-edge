@@ -267,6 +267,19 @@ struct FBreakerViewmodelMotionParams
     // scales linearly, so a creep barely breathes and a sprint works.
     float FullBobSpeed = 600.0f;          // O2 PLACEHOLDER
 
+    // Sprint gait (KIT-4): the shipped walk cap already sits above
+    // FullBobSpeed, so the speed lane saturates on a walk and a sprint was
+    // the same amplitude at a faster phase — the two gaits read identically
+    // in the hands. The sprint fraction (0 at the walk cap, 1 at the sprint
+    // cap, driven by ACTUAL ground speed, never the toggle) scales the bob
+    // and settles the gun lower, back and muzzle-down. Firing is not blocked
+    // while sprinting, so the pose stays small: SUBTLE is the ruled
+    // constraint, and the sights must still be reachable from here.
+    float SprintBobMultiplier = 1.6f;     // O2 PLACEHOLDER
+    float SprintLowerCm = 1.5f;           // O2 PLACEHOLDER
+    float SprintBackCm = 1.0f;            // O2 PLACEHOLDER
+    float SprintPitchDegrees = 3.0f;      // O2 PLACEHOLDER, muzzle dips
+
     // Landing dip: the fall's vertical speed converted into a downward-and-
     // back impulse on the EXISTING kick spring, so the dip and the recoil
     // share one recovery character per archetype and there is no second
@@ -396,11 +409,24 @@ public:
      * figure-8 (lateral at the phase, vertical at DOUBLE the phase — two
      * footfalls per stride cycle); MotionScale scales the whole channel and is
      * where ADS quiets it (pass the profile's aim-blended viewmodel
-     * multiplier). Pure, so a test can pin: zero speed leaves only sway, zero
-     * scale leaves nothing.
+     * multiplier). SprintFraction [0,1] (KIT-4) scales the bob toward
+     * SprintBobMultiplier and adds the sprint pose, both under MotionScale so
+     * ADS quiets them with the rest; zero is byte-identical to no sprint.
+     * Pure, so a test can pin: zero speed leaves only sway, zero scale leaves
+     * nothing.
      */
     static FBreakerViewmodelMotionOffset MotionOffsets(const FBreakerViewmodelMotionParams& Params,
-        float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale);
+        float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale,
+        float SprintFraction = 0.0f);
+
+    /**
+     * How far into the sprint gait the body actually is: 0 at or below the
+     * walk cap, 1 at or above the sprint cap, linear between. Speed-driven
+     * by construction — sprint is a toggle, and a toggled player standing
+     * still or strafing at walk pace is not sprinting in the hands. A
+     * degenerate pair (SprintCap <= WalkCap) is 0.
+     */
+    static float SprintFraction(float GroundSpeed, float WalkCap, float SprintCap);
 
     /**
      * The landing dip's impulse magnitude, in the kick spring's units, for a

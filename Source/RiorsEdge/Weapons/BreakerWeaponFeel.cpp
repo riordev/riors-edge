@@ -197,8 +197,17 @@ float FBreakerWeaponFeel::AdvanceBobPhase(float PhaseRadians, float GroundSpeed,
     return FMath::Fmod(Advanced, 2.0f * UE_PI);
 }
 
+float FBreakerWeaponFeel::SprintFraction(float GroundSpeed, float WalkCap, float SprintCap)
+{
+    if (SprintCap <= WalkCap)
+    {
+        return 0.0f;
+    }
+    return FMath::Clamp((GroundSpeed - WalkCap) / (SprintCap - WalkCap), 0.0f, 1.0f);
+}
+
 FBreakerViewmodelMotionOffset FBreakerWeaponFeel::MotionOffsets(const FBreakerViewmodelMotionParams& Params,
-    float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale)
+    float TimeSeconds, float BobPhaseRadians, float SpeedFraction, float MotionScale, float SprintFraction)
 {
     FBreakerViewmodelMotionOffset Offset;
     const float Scale = FMath::Max(0.0f, MotionScale);
@@ -214,10 +223,20 @@ FBreakerViewmodelMotionOffset FBreakerWeaponFeel::MotionOffsets(const FBreakerVi
     Offset.VerticalCm = Params.SwayVerticalCm * FMath::Sin(SwayPhase * 0.618f) * Scale;
     Offset.PitchDegrees = Params.SwayPitchDegrees * FMath::Sin(SwayPhase * 0.618f) * Scale;
 
+    // The sprint gait (KIT-4), composed AFTER the sway's assignments: the
+    // pose settles the gun lower, back and muzzle-down in proportion to how
+    // far into the sprint the body actually is, and the bob below is
+    // amplified by the same fraction.
+    const float Sprint = FMath::Clamp(SprintFraction, 0.0f, 1.0f) * Scale;
+    Offset.VerticalCm -= Params.SprintLowerCm * Sprint;
+    Offset.BackCm += Params.SprintBackCm * Sprint;
+    Offset.PitchDegrees -= Params.SprintPitchDegrees * Sprint;
+    const float BobGain = FMath::Lerp(1.0f, FMath::Max(0.0f, Params.SprintBobMultiplier), FMath::Clamp(SprintFraction, 0.0f, 1.0f));
+
     // Locomotion bob, faded in by speed: lateral at the stride phase,
     // vertical at DOUBLE it — two footfalls per full cycle, which is what
     // makes it read as steps rather than as a float.
-    const float Bob = FMath::Clamp(SpeedFraction, 0.0f, 1.0f) * Scale;
+    const float Bob = FMath::Clamp(SpeedFraction, 0.0f, 1.0f) * Scale * BobGain;
     if (Bob > 0.0f)
     {
         Offset.LateralCm += Params.BobLateralCm * FMath::Sin(BobPhaseRadians) * Bob;
