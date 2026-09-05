@@ -17,7 +17,11 @@ public class RiorsEdge : ModuleRules
             "Json",
             // UI/BreakerEffectRenderer.cpp: the four moments play an authored
             // Niagara system through a pooled component when one exists.
-            "Niagara"
+            "Niagara",
+            // NAV-1: enemies possess an AAIController and path through a
+            // runtime-generated navmesh (AI/BreakerEnemyController,
+            // AI/BreakerNavBounds).
+            "AIModule", "NavigationSystem"
         });
         if (Target.bBuildEditor)
         {

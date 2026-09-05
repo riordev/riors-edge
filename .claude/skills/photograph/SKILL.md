@@ -17,7 +17,9 @@ First argument is the map (`Anchor`, `Gym`, `Fernhall`); anything after is
 passed through. Useful switches: `-BreakerCaptureMenu=INVENTORY|SKILLTREES|SETTINGS|CLASS|PAUSE|CHARACTERSELECT|CHARACTERCREATE|DEVSANDBOX`
 (anything else silently falls back to the main screen), `-BreakerCaptureBoard=CORE|COMPARE|BRANCH<n>`,
 `-BreakerCaptureTour`, `-BreakerCaptureHUD`, `-BreakerCycleWeapons=<s>`,
-`-BreakerBossOnStart`, `-BreakerEnemyModifier <n>`, `-BreakerCrowdLoad=patrol|engaged`.
+`-BreakerBossOnStart`, `-BreakerEnemyModifier <n>`, `-BreakerCrowdLoad=patrol|engaged`,
+`-ExecCmds="Breaker.Nav.Probe"` (Gym: a wall ahead of the pawn, one enemy behind it, two
+vantages alternating from frame 1; the log prints `REACHED … touches=N`).
 
 Then **open every frame and read it**. Say what you saw, at which vantage,
 and what the harness cannot show: it cannot move a mouse (no hover, tooltip

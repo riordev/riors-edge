@@ -1,4 +1,6 @@
 #include "Combat/BreakerEnemy.h"
+#include "AI/BreakerEnemyController.h"
+#include "AI/BreakerEnemyMovementComponent.h"
 
 #include "Combat/BreakerEnemyBodyMath.h"
 #include "Combat/BreakerHitReactionComponent.h"
@@ -208,6 +210,12 @@ ABreakerEnemy::ABreakerEnemy()
     SetRootComponent(BodyCollision);
     BodyCollision->InitCapsuleSize(45.0f, 90.0f);
     BodyCollision->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore);
+
+    // NAV-1: the body is possessed by an enemy controller the moment it is
+    // spawned, and moves through its mover. Both live in AI/.
+    Mover = CreateDefaultSubobject<UBreakerEnemyMovementComponent>(TEXT("Movement"));
+    AIControllerClass = ABreakerEnemyController::StaticClass();
+    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
     // Humanoid silhouette from basic shapes: torso, head, two arms, two legs.
     // Purely cosmetic — every piece is NoCollision and the capsule, hit box
@@ -795,39 +803,26 @@ void ABreakerEnemy::Tick(float DeltaSeconds)
     const FVector Facing = DesiredFacing.IsNearlyZero() ? DesiredDirection : DesiredFacing;
     if (!Facing.IsNearlyZero()) SetActorRotation(Facing.Rotation());
 
-    if (!DesiredDirection.IsNearlyZero())
+    // The safe-zone edge is decided here, on the behaviour's own step, before
+    // the mover sees anything: a held body hands the mover a zero direction
+    // rather than a return, so it still decelerates and still ground-snaps.
+    if (!DesiredDirection.IsNearlyZero() && GameMode)
     {
-        const FVector Step = DesiredDirection * MoveSpeed * SpeedScale * DeltaSeconds;
-        const FVector NextLocation = GetActorLocation() + Step;
-        if (GameMode && GameMode->IsInSafeZone(NextLocation))
+        const FVector NextLocation = GetActorLocation() + DesiredDirection * MoveSpeed * SpeedScale * DeltaSeconds;
+        if (GameMode->IsInSafeZone(NextLocation))
         {
             StateLabel = TEXT("HELD");
-            return;
+            DesiredDirection = FVector::ZeroVector;
         }
-        FHitResult MoveHit;
-        AddActorWorldOffset(Step, true, &MoveHit);
     }
 
-    // Ground snap: enemies move by offset with no gravity, so without this
-    // they hover over the apron slabs or float where spawn height was off.
-    // Trace down, plant the capsule base on whatever is below.
+    // NAV-1: the mover (AI/BreakerEnemyMovementComponent) steers along the
+    // direction, or paths to the player when the straight line is blocked,
+    // and owns the ground snap that used to close this function. This is the
+    // only line in Combat/ that moves an enemy.
+    if (Mover)
     {
-        const float HalfHeight = BodyCollision ? BodyCollision->GetScaledCapsuleHalfHeight() : 88.0f;
-        const FVector TraceStart = GetActorLocation() + FVector(0, 0, 60.0f);
-        const FVector TraceEnd = TraceStart - FVector(0, 0, 4000.0f);
-        FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(BreakerEnemyGround), false, this);
-        FHitResult Ground;
-        if (GetWorld()->LineTraceSingleByChannel(Ground, TraceStart, TraceEnd, ECC_WorldStatic, GroundParams))
-        {
-            const float TargetZ = Ground.ImpactPoint.Z + HalfHeight;
-            const float CurrentZ = GetActorLocation().Z;
-            // Snap down instantly, step up smoothly, so slabs read as steps
-            // rather than teleports.
-            const float NewZ = CurrentZ > TargetZ
-                ? FMath::Max(TargetZ, CurrentZ - 1200.0f * DeltaSeconds)
-                : FMath::Min(TargetZ, CurrentZ + 600.0f * DeltaSeconds);
-            SetActorLocation(FVector(GetActorLocation().X, GetActorLocation().Y, NewZ), false);
-        }
+        Mover->Drive(DesiredDirection, SpeedScale, NearestPlayer, Distance, AttackRange, MoveSpeed);
     }
 }
 
@@ -1193,6 +1188,10 @@ void ABreakerEnemy::ParkPooledBody()
     SetActorHiddenInGame(true);
     SetActorEnableCollision(false);
     SetActorTickEnabled(false);
+    // A parked body is still: its path is dropped and its velocity zeroed,
+    // so a revive never inherits a chase from a previous life.
+    if (ABreakerEnemyController* EnemyController = Cast<ABreakerEnemyController>(GetController())) EnemyController->StopChase();
+    if (Mover) Mover->ResetForRevive();
     // Statuses stop the silent way: zeroing durations lets each expire
     // through its own teardown on the component's next tick (popping the
     // seam-lane keys it pushed), where ConsumeAllStatuses would broadcast
@@ -1219,6 +1218,7 @@ void ABreakerEnemy::ReviveFromPool(const FVector& SpawnLocation)
     SetActorEnableCollision(true);
     SetActorTickEnabled(true);
     SetActorLocation(SpawnLocation);
+    if (Mover) Mover->ResetForRevive();
     SetActorScale3D(PooledBaseScale);
     BodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     BodyHitBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);

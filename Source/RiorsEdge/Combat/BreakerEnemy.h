@@ -383,6 +383,13 @@ protected:
         FVector& OutDirection, float& OutSpeedScale);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UCapsuleComponent> BodyCollision;
+    // The mover (NAV-1, NAV's, in AI/). Tick hands it the behaviour's direction
+    // and speed scale once per authoritative frame; it steers or paths, and it
+    // owns the ground snap. Nothing in Combat/ moves the body any other way.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UBreakerEnemyMovementComponent> Mover;
+public:
+    class UBreakerEnemyMovementComponent* GetEnemyMovement() const { return Mover; }
+protected:
     // Primitive humanoid assembly. BodyVisual is the torso; the rest are
     // cosmetic siblings under BodyCollision, all NoCollision.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> BodyVisual;
