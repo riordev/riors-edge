@@ -339,3 +339,21 @@ Numbers are permanent and never reused.
 **O185** — The slice ships solo. A two-player PIE listen-server smoke runs every cycle, judged from the client seat: resources, HUD, the custom movement mode, one kill, one drop. No sessions, lobby, party UI or OnlineSubsystem before Anomalies has been played. No new system may read per-player state through a local-only path.
 
 **O186** — A DATA lane owns `Data/`, the loader and the validator. Tabular content is JSON, the source of truth for the game, the tests and the census alike; DataAssets are for asset-referencing tables only. A library migrates in one commit with its output pinned identical; a magnitude change is done when it needs no compile.
+
+**O187** — Gameplay tags are defined natively at their first consumer; the ini declares nothing no consumer requests. The twenty unreferenced tags go.
+
+**O188** — An account lives on its player's machine. The host holds the host's account only; a remote pawn's wallet is seeded from and written back to its owning client's account across the connection. The smoke's shared pool is a defect; GROUND-5 builds the seam.
+
+**O189** — A death flashes Harm, Gold on a weak-point kill — the kill confirm's pair, one event one colour in the world and on the HUD. The killing verb's colour is drawn at the verb's own site, never at the death.
+
+**O190** — Any asset only the editor can author (a Niagara system, an AnimBP graph, a material) is an ASSETS item: the lane that needs it ships the slot, the fallback and a written recipe, and closes on those, never on the frame. The four NS_ systems are ASSETS-5.
+
+**O191** — The safe zone is a null nav area: no body plans across it. A body whose target is inside holds at the nearest reachable boundary point. The Breaker.Nav.Probe switch joins the capture list in CLAUDE.md.
+
+**O192** — base kit slower at level 1, air control 0.55 → ~0.35, and Movement Speed becomes a Boots-only affix with a cap. The MoveSpeed aggregation lane already exists, so it's an affix and a number, not a system. Momentum's thresholds move with it.
+
+**O193** — you found the hole: an earlier ruling removed the death sting as "over-produced," and now the beat is a caption and a timer. This restores it as weapon-lower → camera drop → black → fade-in, sequenced by GROUND with KIT/GLASS/AUDIO crossings.
+
+**O194** — Standard/Elite/Champion at +0/+15/+30% scale with the halo and diamonds; ELITE leaves the label; and CLOSING/HELD leaves entirely — that's an instrument reading that went out in the shipped HUD.
+
+**O195** — "TILESET START," "BANKED," "SETTLED" are dev vocabulary on screen. Every player-facing string moves to a string table under Data/ so you rewrite copy without a compile. "Cringey text" becomes a data edit, not a lane request.
