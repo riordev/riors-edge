@@ -40,7 +40,9 @@
 #include "Abilities/BreakerAbilityComponent.h"
 #include "Items/BreakerEquipmentComponent.h"
 #include "Save/BreakerSaveGame.h"
+#include "Save/BreakerAccountSave.h"
 #include "Save/BreakerCharacterRoster.h"
+#include "Save/BreakerRiftglassFold.h"
 #include "Characters/BreakerShakeMath.h"
 #include "Game/BreakerGameInstance.h"
 #include "Save/BreakerQuestJournal.h"
@@ -443,7 +445,25 @@ void ABreakerCharacter::SaveGameState()
     Save->Progression = Progression->GetProgressionState();
     Save->EquippedItems = Equipment->GetEquipped();
     Save->BackpackItems = Equipment->GetBackpack();
-    Save->ForgeWallet = Equipment->GetForgeWallet();
+    // RIFTGLASS IS THE ACCOUNT'S (O51). Once this pawn's wallet was seeded
+    // from the account, the balance goes back there and the character file
+    // carries zero under its receipt — no currency crosses two files any
+    // more. A pawn that never loaded writes the old shape, unfolded, so the
+    // next load journals and folds it; it must not forge a receipt.
+    Save->CharacterId = ActiveCharacterId;
+    if (bRiftglassBoundToAccount)
+    {
+        Save->bRiftglassFoldedToAccount = true;
+        if (UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate())
+        {
+            Account->Riftglass = Equipment->GetForgeWallet().Get();
+            Account->SaveAccount();
+        }
+    }
+    else
+    {
+        Save->ForgeWallet = Equipment->GetForgeWallet();
+    }
     Save->SlotOneArchetype = Weapon->GetSlotArchetype(1);
     Save->SlotTwoArchetype = Weapon->GetSlotArchetype(2);
     if (Quests)
@@ -548,27 +568,65 @@ void ABreakerCharacter::EnterWorldAsCharacter(const FGuid& CharacterId)
 void ABreakerCharacter::LoadGameState()
 {
     if (!HasAuthority() || !Progression || !Equipment || !Weapon) return;
-    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(ActiveSaveSlotName(), 0));
-    if (!Save) return;
-    // Migrate BEFORE reading anything out of the payload. A file written by an
-    // older build is not wrong, it is old; reading it with today's assumptions
-    // is what silently misinterprets it.
-    FString MigrationNote;
-    if (!UBreakerSaveGame::MigrateToCurrent(*Save, MigrationNote))
+    const FString SlotName = ActiveSaveSlotName();
+    UBreakerSaveGame* Save = Cast<UBreakerSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
+    if (Save)
     {
-        // Refuse-to-load, per Save-Architecture 5.2: a file from a NEWER build
-        // is not opened, not repaired, and not overwritten. Leaving the
-        // character at defaults is recoverable; overwriting is not.
-        UE_LOG(LogTemp, Error, TEXT("BreakerSave: refusing to load — %s"), *MigrationNote);
-        return;
+        // Migrate BEFORE reading anything out of the payload. A file written by
+        // an older build is not wrong, it is old; reading it with today's
+        // assumptions is what silently misinterprets it.
+        FString MigrationNote;
+        if (!UBreakerSaveGame::MigrateToCurrent(*Save, MigrationNote))
+        {
+            // Refuse-to-load, per Save-Architecture 5.2: a file from a NEWER
+            // build is not opened, not repaired, and not overwritten. Leaving
+            // the character at defaults is recoverable; overwriting is not.
+            UE_LOG(LogTemp, Error, TEXT("BreakerSave: refusing to load — %s"), *MigrationNote);
+            return;
+        }
+        if (!MigrationNote.IsEmpty()) UE_LOG(LogTemp, Log, TEXT("BreakerSave: %s"), *MigrationNote);
+        Progression->LoadProgressionState(Save->Progression);
+        Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
+        Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
+        Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
+        if (Quests) Quests->RestoreFrom(Save->QuestFlags, Save->QuestCounters);
     }
-    if (!MigrationNote.IsEmpty()) UE_LOG(LogTemp, Log, TEXT("BreakerSave: %s"), *MigrationNote);
-    Progression->LoadProgressionState(Save->Progression);
-    Equipment->RestoreState(Save->EquippedItems, Save->BackpackItems);
-    Equipment->RestoreForgeWallet(Save->ForgeWallet);
-    Weapon->SetSlotArchetype(1, Save->SlotOneArchetype);
-    Weapon->SetSlotArchetype(2, Save->SlotTwoArchetype);
-    if (Quests) Quests->RestoreFrom(Save->QuestFlags, Save->QuestCounters);
+
+    // RIFTGLASS IS THE ACCOUNT'S (O51) — LEDGER's crossing into this file.
+    // The character file's balance is folded into the account exactly once
+    // through the journal (Save/BreakerRiftglassFold.h), and the wallet is
+    // then seeded from the account whether or not a character file exists.
+    // A probe session touches no save, so it reads the account and folds
+    // nothing; it never binds, and SaveGameState refuses it anyway.
+    UBreakerAccountSave* Account = UBreakerAccountSave::LoadOrCreate();
+    if (!Account) return;
+    FString ProbeValueScratch;
+    const bool bProbeSession = FParse::Param(FCommandLine::Get(), TEXT("BreakerAbilityProbe"))
+        || FParse::Value(FCommandLine::Get(), TEXT("BreakerAbilityProbe="), ProbeValueScratch);
+    if (!bProbeSession)
+    {
+        if (Save)
+        {
+            const FBreakerForgeWallet OnDiskWallet = Save->ForgeWallet;
+            FBreakerSlotFoldWriter Writer;
+            if (!FBreakerRiftglassFold::FoldCharacter(*Account, *Save, SlotName, Writer))
+            {
+                // A write failed mid-fold. The state on disk is one the next
+                // load replays from; binding now would let SaveGameState
+                // stamp a receipt over a balance the account never received.
+                // The pawn plays on the balance the FILE held (the in-memory
+                // payload may already be zeroed), unbound, so the next save
+                // writes it back unfolded and the next load re-journals it.
+                UE_LOG(LogTemp, Error, TEXT("BreakerSave: the Riftglass fold could not write; the wallet stays in the character file until the next load."));
+                Equipment->RestoreForgeWallet(OnDiskWallet);
+                return;
+            }
+        }
+        bRiftglassBoundToAccount = true;
+    }
+    FBreakerForgeWallet AccountWallet;
+    AccountWallet.Riftglass = Account->Riftglass;
+    Equipment->RestoreForgeWallet(AccountWallet);
 }
 
 void ABreakerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)

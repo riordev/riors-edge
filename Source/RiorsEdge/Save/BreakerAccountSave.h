@@ -20,14 +20,29 @@
 //    reached. Written by the first-clear rule (One-AA: a first clear pays
 //    the LADDER, a re-clear pays the LOOT), read by everything that gates
 //    on how far the account has been.
-//  * The stash and the account Riftglass join in One-X's commit, beside the
-//    transfer journal. The object exists first so the record does not wait
-//    on the stash's larger surface.
+//  * The stash and its transfer journal (One-X).
+//  * Riftglass (O51: account-wide and scalar). The one balance lives here;
+//    each character file's wallet is folded in exactly once through the
+//    journal in Save/BreakerRiftglassFold.h.
 //
 // LOADING mirrors the roster exactly, including the newer-version refusal:
 // silently downgrading a file this build does not understand is how a player
-// loses an account.
+// loses an account. Version 2 means the Riftglass roster sweep has run.
 // ---------------------------------------------------------------------------
+
+// One journaled fold: a character slot whose balance has been recorded here
+// and not yet credited. The slot name is the identity because it is the one
+// the loader already has; the amount is what will be credited, whatever the
+// file says by then.
+USTRUCT()
+struct RIORSEDGE_API FBreakerRiftglassFoldEntry
+{
+    GENERATED_BODY()
+
+    UPROPERTY() FString SlotName;
+    UPROPERTY() int32 Amount = 0;
+};
+
 UCLASS()
 class RIORSEDGE_API UBreakerAccountSave : public USaveGame
 {
@@ -35,7 +50,7 @@ class RIORSEDGE_API UBreakerAccountSave : public USaveGame
 
 public:
     static FString AccountSlotName() { return TEXT("BreakerAccount"); }
-    static constexpr int32 CurrentAccountVersion = 1;
+    static constexpr int32 CurrentAccountVersion = 2;
 
     // Loads the account save, creating a fresh one when none exists; returns
     // null only for the newer-version refusal. Cached per process so every
@@ -62,6 +77,15 @@ public:
 
     // The ladder's memory (Part One-Z item 2). 0 = nothing cleared.
     UPROPERTY() int32 HighestClearedAreaLevel = 0;
+
+    // ---- RIFTGLASS (O51) ---------------------------------------------------
+    // The one balance. The live copy during play is the equipment
+    // component's replicated wallet, seeded from here at load and written
+    // back here at save; the character file carries zero once folded.
+    UPROPERTY() int32 Riftglass = 0;
+    // The fold journal (Save/BreakerRiftglassFold.h): slots whose balance is
+    // recorded and not yet credited. Empty once every character has loaded.
+    UPROPERTY() TArray<FBreakerRiftglassFoldEntry> PendingRiftglassFolds;
 
     // ---- THE STASH (Part One-X) ------------------------------------------
     // A TRANSFER POINT, NOT A WAREHOUSE — the backpack is unbounded, so an

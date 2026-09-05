@@ -509,6 +509,9 @@ bool FBreakerSaveMigrationV4ToV5Test::RunTest(const FString& Parameters)
     TestEqual(TEXT("It arrives at the head version"), V3->SaveVersion, UBreakerSaveGame::CurrentSaveVersion);
     TestTrue(TEXT("The v3 to v4 wallet step still ran"), V3->ForgeWallet.Get() > 0);
     TestEqual(TEXT("The v4 to v5 unlock step also ran"), V3->Progression.UnlockedAbilityIds.Num(), 6);
+    // The v7 -> v8 step is additive: the balance stays in the file, unfolded,
+    // for the two-file fold to move — a pure step must not zero it.
+    TestFalse(TEXT("A migrated file is not yet folded"), V3->bRiftglassFoldedToAccount);
 
     // IDEMPOTENCE. A v5 save is left exactly as it is; a migration that ran
     // again on an already-migrated file would re-seed a character who has since

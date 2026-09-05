@@ -136,6 +136,10 @@ FGuid UBreakerCharacterRoster::CreateCharacter(const FString& CharacterName, EBr
     Save->SaveVersion = UBreakerSaveGame::CurrentSaveVersion;
     Save->Progression.PermanentClass = ClassId;
     Save->Progression.CharacterLevel = 1;
+    // Born folded: a new character has no wallet of its own to move, and
+    // stamping it here keeps the fold from ever journaling a zero for it.
+    Save->bRiftglassFoldedToAccount = true;
+    Save->CharacterId = Summary.CharacterId;
     if (!UGameplayStatics::SaveGameToSlot(Save, SlotNameForCharacter(Summary.CharacterId), 0))
     {
         OutFailureReason = LOCTEXT("SaveWriteFailed", "The character's save could not be written.");
@@ -241,6 +245,16 @@ FGuid UBreakerCharacterRoster::AdoptLegacySaveIfPresent()
     Copy->QuestFlags = Legacy->QuestFlags;
     Copy->QuestCounters = Legacy->QuestCounters;
     Copy->ForgeWallet = Legacy->ForgeWallet;
+    // The receipt travels with the balance: a legacy file already folded
+    // carries zero and must not be journaled again under its new slot; an
+    // unfolded one folds under the new slot at its first load. The legacy
+    // slot itself is left untouched and, if it is ever played again, folds
+    // the balance it still holds — which is the copy's balance, already
+    // credited once. Recorded here, not hidden: the legacy slot is a PIE
+    // convenience, and a PIE drop-in after adoption is the one path that
+    // can credit a pre-roster balance twice.
+    Copy->bRiftglassFoldedToAccount = Legacy->bRiftglassFoldedToAccount;
+    Copy->CharacterId = Summary.CharacterId;
     if (!UGameplayStatics::SaveGameToSlot(Copy, SlotNameForCharacter(Summary.CharacterId), 0)) return FGuid();
 
     Characters.Add(Summary);

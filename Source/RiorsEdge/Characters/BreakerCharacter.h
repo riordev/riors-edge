@@ -84,6 +84,12 @@ public:
     // written over the roster's just-created save — "i made a caster and had
     // swifts skill tree and abilities" was this one ordering.
     bool bRefuseSavesForPendingCharacter = false;
+    // LEDGER's crossing (O51): set by LoadGameState once the wallet has been
+    // seeded from the account save. While set, SaveGameState writes the
+    // balance to the account and the character file carries zero; while
+    // clear, the balance goes into the character file unfolded so the next
+    // load folds it — a pawn that never loaded must not stamp a receipt.
+    bool bRiftglassBoundToAccount = false;
     // Interaction + quest-state groundwork: F talks to the nearest NPC in
     // range; dialogue choices set persistent quest flags.
     UFUNCTION(BlueprintPure, Category="Interaction") ABreakerNPC* FindNearbyNPC() const;

@@ -203,7 +203,12 @@ progression, no item-derived materials.
 
 **One currency: Riftglass** — vitrified breach edge, chipped from closed rifts.
 Account-wide and scalar. One ladder means the economy can be read in one line
-and can never invert against itself.
+and can never invert against itself. The balance lives in the account save;
+a character file written before that folds in exactly once through a journal
+in the account file — record the slot and amount, zero and stamp the
+character file, credit and clear — so a crash after any write replays to the
+same total. The fold is not a migration step: a step is pure on one file and
+this moves value between two.
 
 | Verb | Moves | Keeps |
 |---|---|---|
@@ -248,6 +253,8 @@ This spec owns the item, the ladder, the roll, and the Forge. It does not own:
 | A craft on an equipped item moves the composed attribute | `Items.Forge.Loop` |
 | An on-kill affix pays through a real kill and stops exactly on unequip | `Items.Affixes.OnKillReachesGameplay` |
 | Equip caps hold at equip time and at save load | `Items.Equipment.PerAxisCaps` |
+| A crash after any one of the fold's three writes replays to the balance credited exactly once | `Save.RiftglassFold.CrashAfterJournal`, `Save.RiftglassFold.CrashAfterCharacterWrite`, `Save.RiftglassFold.CrashAfterCredit` |
+| The roster sweep journals every unfolded balance in one write and credits nothing | `Save.RiftglassFold.Sweep` |
 | A three-minor same-tag stack lands inside its band ceiling | `Progression.RuleBandImpact.MinorStack` |
 | A major rewrite, or a legendary's authored pair, lands inside its band ceiling | `Progression.RuleBandImpact.Major` |
 | The band holds for a build wearing a top-tier item | `Progression.PowerBand.Singular` |

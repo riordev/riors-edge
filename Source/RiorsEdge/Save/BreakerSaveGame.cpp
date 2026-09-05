@@ -182,6 +182,13 @@ bool UBreakerSaveGame::MigrateToCurrent(UBreakerSaveGame& Save, FString& OutNote
             // Seeding the counter is what makes the change cost nothing.
             MigrateDoctrineEntitlementV6ToV7(Save.Progression);
             break;
+        case 7:
+            // Additive, the v2 -> v3 shape: bRiftglassFoldedToAccount
+            // deserializes false and CharacterId invalid on a v7 file, and
+            // both are the truth for a file written before they existed.
+            // The balance is deliberately LEFT IN ForgeWallet here — the
+            // fold that moves it writes two files, and a pure step cannot.
+            break;
         default:
             // Unreachable while every version below CurrentSaveVersion has a
             // step. Left as a hard stop so ADDING a version without adding its

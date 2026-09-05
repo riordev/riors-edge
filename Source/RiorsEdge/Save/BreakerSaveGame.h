@@ -38,6 +38,20 @@ public:
     // crafting currency) at the conversion stated in
     // FBreakerForgeWallet::CollapseLegacyDenominations.
     UPROPERTY() FBreakerForgeWallet ForgeWallet;
+    // THE FOLD RECEIPT (O51, Save/BreakerRiftglassFold.h). True once this
+    // file's balance has been zeroed on the way to the account; ForgeWallet
+    // is dead weight from then on and is written as zero. Additive since
+    // version 7: a v7 file deserializes false, which is the truth — it has
+    // not been folded. A FIELD rather than the version number, because
+    // MigrateToCurrent bumps the version in memory before the fold reads
+    // the balance, so the version cannot double as the receipt.
+    UPROPERTY() bool bRiftglassFoldedToAccount = false;
+    // The character's own id, carried in the payload (approved with One-AD's
+    // fold ruling). The slot name held it alone before; a payload that knows
+    // whose it is lets the stash journal's claim release name its claimant.
+    // Additive since version 7: an unset guid is a pre-v8 file. Invalid on
+    // the legacy single slot, which has no roster row.
+    UPROPERTY() FGuid CharacterId;
     // Version 1 shipped. Version 2 renamed the first-contract flag into the
     // Quest.FirstContract.* family and added QuestCounters. Version 3 added
     // ForgeWallet. Version 4 collapsed the wallet's three denominations into
@@ -51,8 +65,11 @@ public:
     // Version 5 split the class kit into free starters and token-bought
     // unlockables (O100); the step hands every pre-v5 character the kit it
     // could already reach and stamps its token counter so it is not paid
-    // retroactively for abilities it already has.
-    static constexpr int32 CurrentSaveVersion = 7;
+    // retroactively for abilities it already has. Version 8 added the fold
+    // receipt and the character id, both additive; the Riftglass fold itself
+    // is NOT a migration step, because it writes two files and a pure
+    // in-memory step cannot — see Save/BreakerRiftglassFold.h.
+    static constexpr int32 CurrentSaveVersion = 8;
 
     UPROPERTY() int32 SaveVersion = 1;
 
