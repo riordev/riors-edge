@@ -19,3 +19,5 @@ decide the crossing contract.
   which lane is the other end.
 - Two lanes never edit the same translation unit in one cycle. A file over
   3,000 lines is a legitimate split-by-owner work item.
+- `.claude/OWNER_SEAT` (gitignored) marks the owner's seat: with it present, the
+  protect-docs hook stands down so the design seat can edit protected docs.

@@ -30,3 +30,6 @@ Scripts/__pycache__/
 
 # Seat-specific paths; each machine keeps its own copy.
 CLAUDE.local.md
+
+# Owner-seat marker; stands protect-docs down on the owner's box. Never shared.
+.claude/OWNER_SEAT
