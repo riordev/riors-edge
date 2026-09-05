@@ -201,8 +201,16 @@ namespace BreakerViewmodel
     // ordering survives by construction), cancel the bounds origin at that
     // scale, and land the bounds centre at CentreAtCm in rig space. Degenerate
     // bounds refuse the fit at identity, the same rule as the enemy body.
+    //
+    // The cancel happens THROUGH the source-axis rotation the component wears:
+    // a relative transform scales, then rotates, then translates, so a pivot
+    // sitting off the bounds centre rotates with the mesh before the location
+    // lands. The first fit cancelled it unrotated, which under the pack's
+    // 180° yaw would have put a gun 2·Scale·(Ox, Oy, 0) from where the fit
+    // said — invisible on a mesh pivoted at its bounds centre, a full
+    // receiver-length off on one pivoted at the grip.
     inline void FitNamedWeapon(const FVector& BoundsOrigin, const FVector& BoundsExtent,
-        const float TargetLengthCm, const FVector& CentreAtCm,
+        const float TargetLengthCm, const FVector& CentreAtCm, const FQuat& Rotation,
         float& OutScale, FVector& OutLocationCm)
     {
         OutScale = 1.0f;
@@ -213,7 +221,61 @@ namespace BreakerViewmodel
             return;
         }
         OutScale = (TargetLengthCm * 0.5f) / LongestHalf;
-        OutLocationCm = CentreAtCm - BoundsOrigin * OutScale;
+        OutLocationCm = CentreAtCm - Rotation.RotateVector(BoundsOrigin * OutScale);
+    }
+
+    // Which way a gun mesh points, read from its geometry rather than from a
+    // photograph. Take the longest bounds axis; compare the front and back
+    // QUARTER slabs of vertices along it by their largest perpendicular
+    // extent. A gun's barrel end is the thin one — stock, grip, magazine and
+    // receiver all sit fatter than a barrel in every pack this project has
+    // vendored — so the muzzle is the thinner slab. Returns a unit axis in
+    // MESH space (±X, ±Y or ±Z); the caller rotates it by the layout's
+    // NamedMeshRotation and expects rig +X. Degenerate or ambiguous input
+    // (no vertices, a cube, slabs within 5 % of each other) returns Zero so
+    // the caller fails loudly instead of trusting a coin flip.
+    inline FVector MuzzleAxisFromVertices(TArrayView<const FVector3f> Positions)
+    {
+        if (Positions.Num() < 4) return FVector::ZeroVector;
+        FVector3f Min(FLT_MAX), Max(-FLT_MAX);
+        for (const FVector3f& P : Positions)
+        {
+            Min = FVector3f::Min(Min, P);
+            Max = FVector3f::Max(Max, P);
+        }
+        const FVector3f Size = Max - Min;
+        int32 Axis = 0;
+        if (Size.Y > Size[Axis]) Axis = 1;
+        if (Size.Z > Size[Axis]) Axis = 2;
+        const float Length = Size[Axis];
+        if (Length <= UE_KINDA_SMALL_NUMBER) return FVector::ZeroVector;
+        const int32 SideA = (Axis + 1) % 3;
+        const int32 SideB = (Axis + 2) % 3;
+        const float FrontFrom = Max[Axis] - 0.25f * Length;
+        const float BackTo = Min[Axis] + 0.25f * Length;
+        FVector2f FrontMin(FLT_MAX), FrontMax(-FLT_MAX), BackMin(FLT_MAX), BackMax(-FLT_MAX);
+        for (const FVector3f& P : Positions)
+        {
+            const FVector2f Side(P[SideA], P[SideB]);
+            if (P[Axis] >= FrontFrom)
+            {
+                FrontMin = FVector2f::Min(FrontMin, Side);
+                FrontMax = FVector2f::Max(FrontMax, Side);
+            }
+            if (P[Axis] <= BackTo)
+            {
+                BackMin = FVector2f::Min(BackMin, Side);
+                BackMax = FVector2f::Max(BackMax, Side);
+            }
+        }
+        const float FrontGirth = (FrontMax - FrontMin).GetMax();
+        const float BackGirth = (BackMax - BackMin).GetMax();
+        const float Fatter = FMath::Max(FrontGirth, BackGirth);
+        if (Fatter <= UE_KINDA_SMALL_NUMBER) return FVector::ZeroVector;
+        if (FMath::Abs(FrontGirth - BackGirth) / Fatter < 0.05f) return FVector::ZeroVector;
+        FVector Out = FVector::ZeroVector;
+        Out[Axis] = (FrontGirth < BackGirth) ? 1.0 : -1.0;
+        return Out;
     }
 
     // Component scale and total rotation for a part, folding in the intrinsic

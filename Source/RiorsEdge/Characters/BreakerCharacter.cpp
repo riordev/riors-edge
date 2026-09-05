@@ -1320,10 +1320,13 @@ void ABreakerCharacter::RebuildViewmodelParts()
             // Centred 4 cm BELOW the rig origin: the primitives author their
             // mass under the sight line and the first fit centred the gun ON
             // it, which put the receiver across the crosshair in every hip
-            // frame of the review reel. O2.
+            // frame of the review reel. O2. The fit cancels the pivot THROUGH
+            // the source-axis yaw applied below, since the component rotates
+            // before it translates.
             BreakerViewmodel::FitNamedWeapon(GunBounds.Origin, GunBounds.BoxExtent,
                 ActiveLayout.OverallLengthCm(),
                 FVector(ActiveLayout.MuzzleCm.X * 0.5f, 0.0f, -4.0f),
+                ActiveLayout.NamedMeshRotation.Quaternion(),
                 FitScale, FitLocation);
             NamedWeaponVisual->SetRelativeScale3D(FVector(FitScale));
             NamedWeaponVisual->SetRelativeLocation(FitLocation);

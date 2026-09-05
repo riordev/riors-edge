@@ -293,11 +293,17 @@ FBreakerViewmodelLayout BreakerViewmodel::ArchetypeLayout(EBreakerWeaponArchetyp
         {
             L.NamedMeshPath = FSoftObjectPath(FString::Printf(
                 TEXT("/Game/Breaker/Meshes/weapons/gun-pack/%s.%s"), NamedGun, NamedGun));
-            // The pack imports facing -X (muzzle at the camera): photographed
-            // once as every gun aiming 90° left under a +90 guess, which
-            // back-solves the source to -X. One yaw carries the pack onto
-            // rig +X forward.
-            L.NamedMeshRotation = FRotator(0.0f, 180.0f, 0.0f);
+            // The pack imports facing +X, muzzle already on rig forward, so
+            // no source-axis correction. MEASURED, not photographed: the
+            // EveryNamedGunFacesForward test reads each mesh's vertices and
+            // finds the thin end (the barrel) at +X on all six guns, and the
+            // capture reel under the earlier 180° yaw showed every barrel
+            // aimed at the camera. The first reading of one photograph
+            // back-solved the source to -X; a photograph of a blockout gun
+            // cannot tell a stock from a barrel, a vertex buffer can. The
+            // field stays so a pack authored down another axis pays one
+            // rotator here and the test still guards it.
+            L.NamedMeshRotation = FRotator::ZeroRotator;
         }
     }
 
