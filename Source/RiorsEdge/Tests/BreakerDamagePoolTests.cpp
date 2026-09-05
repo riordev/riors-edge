@@ -5,6 +5,9 @@
 #include "Attributes/BreakerAttributeSet.h"
 #include "Combat/BreakerCombatTypes.h"
 #include "Combat/BreakerDamageLibrary.h"
+#include "Items/BreakerAffixLibrary.h"
+#include "Items/BreakerEquipmentComponent.h"
+#include "Items/BreakerItemTypes.h"
 #include "Progression/BreakerProgressionTypes.h"
 
 // ---------------------------------------------------------------------------
@@ -237,6 +240,120 @@ bool FBreakerDamagePoolFillSourcePoolsTest::RunTest(const FString& Parameters)
     UBreakerDamageLibrary::FillSourcePools(nullptr, EBreakerDamageDelivery::Weapon, Hazard);
     TestEqual(TEXT("No attribute set composes to the identity"), Hazard.SourceDamageMultiplier, 1.0f, 0.0001f);
     TestFalse(TEXT("No attribute set carries no split"), Hazard.bHasSourceSplit);
+
+    return true;
+}
+
+// (e) O196: the flat layer multiplies BEFORE the Increased bucket, never inside
+// it. (Base + Flat) x (1 + Increased/100) x More is the law; Base x (1 + Flat +
+// Increased/100) x More is the defect, and the two agree whenever either term
+// is zero, which is why the fixture carries both. The shipped clause pins the
+// one gear line that bids Flat to the lane, the bucket and the category O196
+// names, and checks its value has exactly one curve.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerDamagePoolFlatOrderTest,
+    "RiorsEdge.Combat.Pools.FlatOrder",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerDamagePoolFlatOrderTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerDamagePoolTest;
+
+    // Flat as a fraction of base (the unit AggregateStats bids in), Increased
+    // in percentage points, one More inside the single ceiling.
+    const float Flat = 0.25f;
+    const float Increased = 40.0f;
+    const float More = 1.20f;
+    const float Lawful = (1.0f + Flat) * (1.0f + Increased / 100.0f) * More;
+    const float Defect = (1.0f + Flat + Increased / 100.0f) * More;
+    TestTrue(TEXT("The fixture separates the law from the defect"), !FMath::IsNearlyEqual(Lawful, Defect, 0.01f));
+
+    FBreakerAttributeContribution Offer;
+    Offer.AddFlat(EBreakerAggregatedAttribute::DamageMultiplier, Flat);
+    Offer.AddIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier, Increased);
+    Offer.ComposeMore(EBreakerAggregatedAttribute::DamageMultiplier, More);
+
+    // The aggregator alone, world-free.
+    FBreakerAttributeAggregator Aggregator;
+    float Bases[FBreakerAttributeAggregator::AttributeCount] = {};
+    Bases[static_cast<int32>(EBreakerAggregatedAttribute::DamageMultiplier)] = 1.0f;
+    Aggregator.CaptureBases(Bases);
+    Aggregator.SetContribution(EBreakerAttributeContributor::Equipment, Offer);
+    const float Composed = Aggregator.Compose(EBreakerAggregatedAttribute::DamageMultiplier);
+    TestEqual(TEXT("Compose is (1 + f)(1 + i/100)m"), Composed, Lawful, 0.0001f);
+    TestTrue(TEXT("Compose is not (1 + f + i/100)m"), !FMath::IsNearlyEqual(Composed, Defect, 0.001f));
+
+    // Through the seam every weapon hit walks: attribute set -> FillSourcePools
+    // -> ResolveDamage. RawDamage has to be Base x the lawful composition.
+    UBreakerAttributeSet* Attributes = PoolTestMakeAttributes();
+    Attributes->ApplyAttributeContribution(EBreakerAttributeContributor::Equipment, Offer);
+
+    const float Base = 80.0f;
+    FBreakerDamageRequest Request;
+    Request.BaseDamage = Base;
+    Request.DamageFamily = EBreakerDamageFamily::TrueDamage;
+    Request.bCanCritical = false;
+    UBreakerDamageLibrary::FillSourcePools(Attributes, EBreakerDamageDelivery::Weapon, Request);
+    FBreakerDefenseState Bare;
+    Bare.Health = 100000.0f;
+    const FBreakerDamageResult Result = UBreakerDamageLibrary::ResolveDamage(Request, Bare);
+
+    TestEqual(TEXT("RawDamage is (Base + Base f)(1 + i/100)m"),
+        Result.RawDamage, (Base + Base * Flat) * (1.0f + Increased / 100.0f) * More, 0.01f);
+    TestTrue(TEXT("RawDamage is not Base(1 + f + i/100)m"),
+        !FMath::IsNearlyEqual(Result.RawDamage, Base * Defect, 0.05f));
+
+    // SHIPPED CONFIGURATION: the one gear line that bids Flat.
+    const TArray<FBreakerAffixDefinition>& Pool = UBreakerAffixLibrary::GetSliceAffixPool();
+    const FBreakerAffixDefinition* Added = UBreakerAffixLibrary::FindAffix(Pool, TEXT("Offense.AddedDamage"));
+    TestNotNull(TEXT("Offense.AddedDamage is in the slice pool"), Added);
+    if (Added)
+    {
+        TestEqual(TEXT("Added Damage bids the Flat bucket"),
+            static_cast<int32>(Added->StatBucket), static_cast<int32>(EBreakerStatBucket::Flat));
+        TestEqual(TEXT("Added Damage names the AddedDamage target"),
+            static_cast<int32>(Added->StatTarget), static_cast<int32>(EBreakerStatTarget::AddedDamage));
+        TestEqual(TEXT("Added Damage is a Prefix (O196)"),
+            static_cast<int32>(Added->Category), static_cast<int32>(EBreakerAffixCategory::Prefix));
+
+        // The fraction the Flat lane receives is ValueForTier / 100 and nothing
+        // else: one tier curve, no second scaling hidden between the roll and
+        // the bid. Higher item level, better tier, larger fraction.
+        const float LowFraction = UBreakerAffixLibrary::ValueForTier(*Added, UBreakerAffixLibrary::BestTierForItemLevel(1)) / 100.0f;
+        const float HighFraction = UBreakerAffixLibrary::ValueForTier(*Added, UBreakerAffixLibrary::BestTierForItemLevel(100)) / 100.0f;
+        TestTrue(TEXT("Added Damage at ilvl 1 is a positive fraction of base"), LowFraction > 0.0f);
+        TestTrue(*FString::Printf(TEXT("Added Damage grows with item level on one curve (%.3f -> %.3f)"), LowFraction, HighFraction),
+            HighFraction > LowFraction);
+        // ...and that fraction is what the equipment fold actually bids. An
+        // item carrying only this line at each tier must land exactly
+        // ValueForTier / 100 in the Flat lane and nothing in the Increased one.
+        auto BidFor = [Added](int32 ItemLevel)
+        {
+            FBreakerItemInstance Item;
+            Item.ItemId = FGuid::NewGuid();
+            Item.DefinitionId = TEXT("FlatOrder");
+            Item.Slot = EBreakerEquipSlot::Necklace;
+            Item.Rarity = EBreakerItemRarity::Standard;
+            Item.ItemLevel = ItemLevel;
+            FBreakerRolledAffix Rolled;
+            Rolled.AffixId = Added->AffixId;
+            Rolled.Tier = UBreakerAffixLibrary::BestTierForItemLevel(ItemLevel);
+            Rolled.Category = Added->Category;
+            Rolled.Value = UBreakerAffixLibrary::ValueForTier(*Added, Rolled.Tier);
+            Item.Affixes.Add(Rolled);
+            FBreakerAttributeContribution Bid;
+            UBreakerEquipmentComponent::AggregateStats({Item}, &Bid);
+            return Bid;
+        };
+        const FBreakerAttributeContribution LowBid = BidFor(1);
+        const FBreakerAttributeContribution HighBid = BidFor(100);
+        TestEqual(TEXT("The ilvl-1 Flat bid is exactly ValueForTier / 100"),
+            LowBid.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier), LowFraction, 0.000001f);
+        TestEqual(TEXT("The ilvl-100 Flat bid is exactly ValueForTier / 100"),
+            HighBid.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier), HighFraction, 0.000001f);
+        TestEqual(TEXT("Added Damage alone puts nothing in the Increased bucket (O196)"),
+            HighBid.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier), 0.0f, 0.0001f);
+    }
 
     return true;
 }

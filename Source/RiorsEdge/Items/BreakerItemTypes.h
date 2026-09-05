@@ -227,11 +227,9 @@ enum class EBreakerItemRule : uint8
     // conditional family and least to one who has none, which is what makes it
     // a build item rather than a bonus.
     Unbound,
-    // OVERFLOW. Each point of Added Damage also grants 1% Increased Damage.
-    // A bucket-CROSSING rule: Added Damage is Flat and multiplies before the
-    // bucket, and this makes the same roll count in both lanes at once. It is
-    // not a More — it moves a number the player already has from one lane into
-    // two.
+    // OVERFLOW. The enum is serialized, so the value stays for saves that
+    // carry it; it resolves to no rule (O196: a flat value never crosses into
+    // the Increased bucket) and nothing rolls it.
     Overflow,
     // PROLIFIC. Every affix on THIS item resolves one tier better, T1 -> T0 ->
     // T-1. Rewrites tier resolution, and it is the only path to the T0/T-1

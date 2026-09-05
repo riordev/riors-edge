@@ -76,8 +76,6 @@ struct RIORSEDGE_API FBreakerItemRuleSet
     // making every other conditional line free. Narrower than bUnbound on
     // purpose — the legendary is a redirection, not a superset.
     bool bAirborneAlsoGroundTraversal = false;
-    // Overflow: each point of Added Damage also grants 1% Increased Damage.
-    bool bAddedDamageAlsoIncreased = false;
     // Relentless: the Physical DR cap. Defaults to the same named constant
     // FBreakerEquipmentStats::PhysicalDamageReductionCap displays when no
     // rewrite is in force (audit item 11 — the two were previously separate

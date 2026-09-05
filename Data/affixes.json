@@ -358,7 +358,7 @@
 			"id": "Offense.AddedDamage",
 			"pool": "slice",
 			"displayName": "Added Damage",
-			"category": "Suffix",
+			"category": "Prefix",
 			"target": "AddedDamage",
 			"bucket": "Flat",
 			"slots": [
@@ -956,7 +956,6 @@
 		"Sidearm":
 		{
 			"Move.SlideSpeed": 3,
-			"Core.MoveSpeed": 2.2,
 			"Move.DashCooldown": 1.8,
 			"Offense.SlidingDamage": 1.8,
 			"Core.ResourceOnKill": 1.8

@@ -421,18 +421,24 @@ bool FBreakerEquipmentContributionTest::RunTest(const FString& Parameters)
     Health.Category = EBreakerAffixCategory::Suffix;
     Gloves.Affixes.Add(Health);
 
+    // Movement Speed rolls on Boots only (Data/affixes.json), so the speed line
+    // sits on a Boots piece: the fixture grants no slot a line it cannot roll.
+    FBreakerItemInstance Boots;
+    Boots.ItemId = FGuid::NewGuid();
+    Boots.Slot = EBreakerEquipSlot::Boots;
+
     FBreakerRolledAffix Speed;
     Speed.AffixId = TEXT("Core.MoveSpeed");
     Speed.Tier = 4;
     Speed.Value = 6.0f;
     Speed.Category = EBreakerAffixCategory::Prefix;
-    Gloves.Affixes.Add(Speed);
+    Boots.Affixes.Add(Speed);
 
     // The contribution carries RAW buckets, not composed multipliers: the
     // Increased percentage has to reach the attribute set unmerged so it can
     // join the tree's percentages in one additive bucket.
     FBreakerAttributeContribution Contribution;
-    UBreakerEquipmentComponent::AggregateStats({Gloves}, &Contribution);
+    UBreakerEquipmentComponent::AggregateStats({Gloves, Boots}, &Contribution);
     TestEqual(TEXT("Flat health lands in the flat lane"), Contribution.GetFlat(EBreakerAggregatedAttribute::MaxHealth), 120.0f);
     TestEqual(TEXT("Increased move speed stays a raw percentage"), Contribution.GetIncreasedPercent(EBreakerAggregatedAttribute::MoveSpeed), 6.0f);
     TestEqual(TEXT("Gear authors no More multipliers"), Contribution.GetMore(EBreakerAggregatedAttribute::MoveSpeed), 1.0f);
@@ -445,10 +451,12 @@ bool FBreakerEquipmentContributionTest::RunTest(const FString& Parameters)
     const float BaseSpeed = Attributes->GetMoveSpeed();
 
     TestTrue(TEXT("Equip succeeds"), Equipment->EquipItem(Gloves));
+    TestTrue(TEXT("Equipping the boots succeeds"), Equipment->EquipItem(Boots));
     TestEqual(TEXT("Equipping raises max health"), Attributes->GetMaxHealth(), BaseHealth + 120.0f);
     TestEqual(TEXT("Equipping raises move speed"), Attributes->GetMoveSpeed(), BaseSpeed * 1.06f, 0.001f);
 
     TestTrue(TEXT("Unequip succeeds"), Equipment->UnequipSlot(EBreakerEquipSlot::Gloves));
+    TestTrue(TEXT("Unequipping the boots succeeds"), Equipment->UnequipSlot(EBreakerEquipSlot::Boots));
     TestEqual(TEXT("Unequipping restores the pre-equip health exactly"), Attributes->GetMaxHealth(), BaseHealth);
     TestEqual(TEXT("Unequipping restores the pre-equip move speed exactly"), Attributes->GetMoveSpeed(), BaseSpeed);
     TestEqual(TEXT("The base value is never overwritten"), Attributes->GetAttributeBase(EBreakerAggregatedAttribute::MaxHealth), BaseHealth);

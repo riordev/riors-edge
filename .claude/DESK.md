@@ -8,23 +8,26 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 ## Direction (owner, 2026-09-05)
 No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
-## Cycle 7 — flat damage is the weapon's (O196; one build)
-- [ ] Added Damage is a flat sum onto the weapon's item-level base, applied before Increased and More. Today `AggregateStats` folds the AddedDamage flat into `TotalIncreasedDamagePercent` under `bAddedDamageAlsoIncreased` ("a point is a percent"): that is the defect O196 names. The weapon's base line already scales with item level (`WeaponBaseDamage`); the aggregator publishes ΣFlat as its own term, the weapon adds it to base before the multipliers, the spec's line 46 is the law. Then LEDGER-3: the affix pool grows 28 → 56 with flat Added Damage prefixes as data rows, and `PowerBand.AtCap` is re-measured (expected red today; the pin is deleted when it goes green, not widened).
-- [ ] O199 vitals: a zero-max shield draws nothing on the row (`DrawVitalsCentred`); no max is drawn. Pure formatter + test.
-- [ ] The Gloves `Core.MoveSpeed` test roll moves to Boots; the inert Sidearm lean row goes.
+## Open questions for the owner
+- Owner question (loot & economy): LEDGER-3 grows the pool 27 → 56, but `PowerBand.AtCap` composes two hand-listed fixtures, so new rows move nothing until a fixture rolls them. Rule the measurement basis: keep the hand-listed fixture and add the new rows to it by name, or measure AtCap from a rolled best-in-slot at the cap's item level?
+- Owner question (persistence): a save carrying `Rule = Overflow` resolves to an empty rule and prints nothing on the item card. Blank, or a one-line "retired rule" label?
 
-## Cycle 8 — a boss that fights back (O198, FIELD-3; one build each)
+## Cycle 8 — LEDGER-3 and the at-cap band (one build)
+- [ ] The second flat-into-Increased site (O196): `BreakerDamageLibrary.cpp` ~:48-51 derives the source's Increased half as `(Composed / More − 1) × 100`, which folds the flat layer in, so a target-side Increased rider is never multiplied by the flat. `FBreakerDamageRequest` carries a flat term; the rider site in `BreakerCombatComponent` recomposes `(Base + Flat)(1 + (Inc + R)/100)·More`. FIELD's files; `Pools.FlatOrder` gains the rider case.
+- [ ] 29 new affix rows as data (Breadth: every row rolls on ≥1 slot, none MorePercent; per slot ≥2 offensive, ≥1 conditional, ≥1 weapon line, ≥1 ability line). Conditional flat Added Damage prefixes are legal data-only. Then re-measure `PowerBand.AtCap` on the ruled basis; the pin is deleted when it reads inside the band, never widened.
+
+## Cycle 9 — a boss that fights back (O198, FIELD-3; one build each)
 - [ ] The Warden's front is a shield pool of 15 % of its bearer's max health: frontal hits deplete it, it breaks with a tell and stays broken for the fight, the rear stays unarmoured. `FrontalArmor` mitigation is replaced, not stacked. The boss inherits the rule. Pinned on the shipped numbers: the level-1 rifle breaks a Warden's front in N rounds; the boss's in the O18 band.
 - [ ] Boss grammar as a pure header: telegraph → punish window → phase gate → add wave → arena change; the shield break is the first punish window.
 - [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss. Split across builds.
 
-## Cycle 9 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
+## Cycle 10 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
 - [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash returns here.
 - [ ] The sixth verb: `PlayPlayerDeath`, `player_death.wav` slot → synth fallback, one call site in the fatal-hit branch; the O193 beat's one low sound.
 - [ ] Hit feedback re-photographed: the "feedback needs to be better" frame from Part One-B, before and after.
 - [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
 
-## Cycle 10 — the rest of DATA-4 (one library per commit; O186, O195)
+## Cycle 11 — the rest of DATA-4 (one library per commit; O186, O195)
 - [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
 - [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
 - [ ] Abilities: only the numerics (`ResourceCost`, `CooldownSeconds`, `WindowDuration`, variant numbers) → `Data/abilities.json`; the registry, `AbilityClass` and tags stay a DataAsset (O186). The ~40 per-ability `O2 PLACEHOLDER` constants in the ability .cpp files are the real no-compile target and need their own item.
@@ -65,6 +68,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Cycle 7
+- [x] O196: the pipeline already composes (Base + ΣFlat) × (1 + ΣInc) × ΠMore and `Offense.AddedDamage` is a Flat row as a fraction of the weapon's item-level base. The one defect, the Overflow rule's flat-into-Increased rewrite, is deleted; the enum value stays for saves and resolves to no rule; the row is a Prefix. `Pools.FlatOrder` pins the order and the no-second-curve contribution. A second, subtler site in the damage library's pool split is the next block's first item.
+- [x] O199: a zero-max shield draws nothing on the vitals row; no max is drawn. `HUD.VitalsReadout` pins it.
+- [x] The Gloves `Core.MoveSpeed` test roll is on Boots; the inert Sidearm lean row is gone; the export still matches byte for byte.
+
 ### Cycle 6
 - [x] Affixes are data: `Data/affixes.json` (27 slice / 8 aberrant / 5 anomalous / 3 downside / 1 elemental, 26 leans, caps) through the first runtime loader `Data/BreakerDataFile`; the library is a loader with a validator, signatures unchanged; the commandlet's export matches the file byte for byte; status.py reads it; Data/ is staged.
 - [x] Movement Speed is a Boots-only affix with a cap of 25 % (O192), landed as a data-only commit with no build.
@@ -73,11 +81,6 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 ### Cycle 5
 - [x] Every travel arrives under cover: a briefing pane for a rift, plain black otherwise, and the cover lifts only when the world is loaded AND 24 frames AND 0.9 s have passed, then a 0.35 s ramp (all O2, live as CVars). A 12 s watchdog lifts a cover whose travel the engine refused. `-BreakerCaptureArrival` photographs the first revealed frame and one second later: mean luminance 67 and 67, identical. Pinned by `Arrival.SettleHold`.
 
-### Cycle 4
-- [x] O193 death beat: weapon lowers into the holster pose, camera drops 18 cm and rolls 9° / pitches −12° while the world desaturates over 0.8 s, black 1.2 s with the HUD hidden, teleport under black, fade-in 0.4 s with input on from the first visible frame. All numbers O2 in `Game/BreakerDeathBeatMath.h`; pinned by `DeathBeatTimeline`. No sound (needs the sixth verb; question above). Motion: owed your eyes.
-- [x] O194 rank law: Trash / Elite / Champion stand at 1.0 / 1.15 / 1.30 through `ApplyChassis`, so every promotion and demotion lands the same absolute scale; Elite wears a drawn ring halo, Champion two diamonds; ELITE leaves the label; the state word leaves the shipped bar (F3 still prints it). Photographed on the four-rank bar matrix. Split copies shrink through the chassis base scale.
-- [x] Gun forward axis: already landed by 65247d4 with three tests; photographed across the weapon cycle — six named guns barrel-forward, Shotgun and Rocket on primitives (no candidate in the pack). The rule is the thin end, not the far end.
-- [x] Health bar `0 —— 0` dead: found-not-built. The row is shield current / health current, no max by design; `0 —— 0` is true. Two questions above.
 
 
 

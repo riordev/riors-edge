@@ -204,10 +204,10 @@ namespace BreakerPowerBandTest
         // additive bucket and which More product fed them, which is exactly the
         // comparison the parity figure wants to make.
         float ComposedAbilityMultiplier = 1.0f;
-        // Structurally 1.0 today, and that is a measurement rather than a
-        // placeholder: Added Damage bids Flat into the WEAPON lane only, and
-        // O54's three pools are three INCREASED pools — the flat half has no
-        // ability counterpart at all. Printed so the report says so.
+        // Structurally 1.0, by ruling: O196 makes the flat layer the weapon's.
+        // Added Damage bids Flat into the WEAPON lane only, and O54's three
+        // pools are three INCREASED pools — the ability lane has no flat half.
+        // Printed so the report says so.
         float AbilityFlatLayer = 1.0f;
         float AbilityIncreasedLayer = 1.0f;
         float AbilityMoreLayer = 1.0f;

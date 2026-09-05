@@ -807,26 +807,34 @@ void ABreakerPlaytestHUD::DrawVitalsCentred(const ABreakerCharacter* Character)
     const float ShieldY = HealthY - BarGap - ShieldH;
     const float BarX = BlockX + ValueW + Gap;
 
-    // O84: shield renders ABOVE health, so depletion reads downward.
+    // O84: shield renders ABOVE health, so depletion reads downward. O199: a
+    // zero-max shield draws nothing — no track, no number. The shield's row
+    // and the left column stay reserved as blank space so the health bar and
+    // the health number never move when a shield is gained or lost.
     const float MaxShield = Attributes->GetMaxShield();
     const float MaxHealth = Attributes->GetMaxHealth();
-    DrawTrack(BarX, ShieldY, BarW, ShieldH,
-        MaxShield > UE_SMALL_NUMBER ? Attributes->GetShield() / MaxShield : 0.0f,
-        MaxShield > UE_SMALL_NUMBER ? BreakerUI::Cyan : BreakerUI::Panel20, BreakerUI::Panel10);
+    const BreakerUI::FVitalsRow Vitals =
+        BreakerUI::FormatVitalsRow(Attributes->GetShield(), MaxShield, Attributes->GetHealth());
+    if (Vitals.bDrawShield)
+    {
+        DrawTrack(BarX, ShieldY, BarW, ShieldH, Attributes->GetShield() / MaxShield,
+            BreakerUI::Cyan, BreakerUI::Panel10);
+    }
     DrawTrack(BarX, HealthY, BarW, HealthH,
         MaxHealth > UE_SMALL_NUMBER ? Attributes->GetHealth() / MaxHealth : 0.0f,
         BreakerUI::RarityStandard, BreakerUI::Panel10);
 
     // Both values sit on the bar block's vertical centre, in fixed columns, so
     // a four-digit pool never shifts a three-digit one.
-    const FString ShieldText = BreakerUI::FormatTicker(Attributes->GetShield());
-    const FString HealthText = BreakerUI::FormatTicker(Attributes->GetHealth());
-    const FVector2D ShieldSize = MeasureSpecText(ShieldText, Pixels);
-    const FVector2D HealthSize = MeasureSpecText(HealthText, Pixels);
+    const FVector2D HealthSize = MeasureSpecText(Vitals.HealthText, Pixels);
     const float ValueCentreY = (ShieldY + BarsBottom) * 0.5f;
-    DrawSpecTextRight(ShieldText, BlockX + ValueW, ValueCentreY - ShieldSize.Y * 0.5f,
-        MaxShield > UE_SMALL_NUMBER ? BreakerUI::Cyan : BreakerUI::TextDisabled, Pixels);
-    DrawSpecText(HealthText, BarX + BarW + Gap, ValueCentreY - HealthSize.Y * 0.5f,
+    if (Vitals.bDrawShield)
+    {
+        const FVector2D ShieldSize = MeasureSpecText(Vitals.ShieldText, Pixels);
+        DrawSpecTextRight(Vitals.ShieldText, BlockX + ValueW, ValueCentreY - ShieldSize.Y * 0.5f,
+            BreakerUI::Cyan, Pixels);
+    }
+    DrawSpecText(Vitals.HealthText, BarX + BarW + Gap, ValueCentreY - HealthSize.Y * 0.5f,
         BreakerUI::RarityStandard, Pixels);
 
     // Armour: 88x11 border-box, 1px border and 1px padding, three cells with

@@ -355,6 +355,29 @@ namespace BreakerUI
         return Whole < 0 ? FString(TEXT("-")) + Digits : Digits;
     }
 
+    // --- The vitals row (O199) ----------------------------------------------
+    // Shield current beside health current, and no max on either: the number
+    // that matters mid-fight is the one you have left. A character with no
+    // shield pool at all draws no shield — no track, no number — so the row
+    // never shows a dead "0" beside a bar that can never fill. The column
+    // stays reserved either way so the health number does not move when a
+    // shield is gained or lost.
+    struct FVitalsRow
+    {
+        FString ShieldText;
+        bool bDrawShield = false;
+        FString HealthText;
+    };
+
+    inline FVitalsRow FormatVitalsRow(float Shield, float MaxShield, float Health)
+    {
+        FVitalsRow Row;
+        Row.bDrawShield = MaxShield > 0.0f;
+        Row.ShieldText = Row.bDrawShield ? FormatTicker(Shield) : FString();
+        Row.HealthText = FormatTicker(Health);
+        return Row;
+    }
+
     // --- Damage numbers abbreviate; every other ticker does not -------------
     // FormatTicker is right for a readout in a FIXED column — the magazine, a
     // health pool, a reserve — where the space is reserved whatever the value

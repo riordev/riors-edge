@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "UI/BreakerHUDResourceRow.h"
 #include "UI/BreakerUIStyle.h"
+#include "Attributes/BreakerAttributeSet.h"
 #include "Engine/Font.h"
 #include "Fonts/SlateFontInfo.h"
 
@@ -199,6 +200,57 @@ bool FBreakerDamageFormatTest::RunTest(const FString& Parameters)
     // formatter is shared and a dropped sign would be a silent lie if anything
     // ever does.
     TestEqual(TEXT("Negative abbreviates with its sign"), FormatDamage(-12400.0f), FString(TEXT("-12.4k")));
+    return true;
+}
+
+// --------------------------------------------------------------------------
+// The vitals row (O199): shield current beside health current, no max on
+// either, and a zero-max shield draws nothing. Asserted against the
+// default-constructed attribute set, so the shipped starting state — a
+// character with no shield pool — is the case pinned, not a hand-typed one.
+// --------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerHUDVitalsReadoutTest,
+    "RiorsEdge.UI.HUD.VitalsReadout",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerHUDVitalsReadoutTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerUI;
+
+    // The shipped starting state, read from the class rather than retyped.
+    const UBreakerAttributeSet* Defaults = GetDefault<UBreakerAttributeSet>();
+    if (!TestNotNull(TEXT("The attribute set has a default object"), Defaults)) return false;
+    TestEqual(TEXT("A fresh character has no shield pool"), Defaults->GetMaxShield(), 0.0f);
+    {
+        const FVitalsRow Row = FormatVitalsRow(Defaults->GetShield(), Defaults->GetMaxShield(), Defaults->GetHealth());
+        TestFalse(TEXT("A zero-max shield draws nothing"), Row.bDrawShield);
+        TestTrue(TEXT("A zero-max shield has no number"), Row.ShieldText.IsEmpty());
+        TestEqual(TEXT("Health current reads as the default pool"), Row.HealthText, FormatTicker(Defaults->GetHealth()));
+        TestEqual(TEXT("The default pool is 100"), Row.HealthText, FString(TEXT("100")));
+        TestFalse(TEXT("Health draws no max"), Row.HealthText.Contains(TEXT("/")));
+    }
+
+    // Empty health is still a number, not an absence.
+    {
+        const FVitalsRow Row = FormatVitalsRow(Defaults->GetShield(), Defaults->GetMaxShield(), 0.0f);
+        TestEqual(TEXT("Zero health reads 0"), Row.HealthText, FString(TEXT("0")));
+        TestFalse(TEXT("Zero health still draws no shield"), Row.bDrawShield);
+    }
+
+    // A shield pool, partly spent: the current value and only the current.
+    {
+        const FVitalsRow Row = FormatVitalsRow(20.0f, 50.0f, Defaults->GetHealth());
+        TestTrue(TEXT("A shield pool draws"), Row.bDrawShield);
+        TestEqual(TEXT("Shield current reads 20"), Row.ShieldText, FString(TEXT("20")));
+        TestFalse(TEXT("Shield draws no max"), Row.ShieldText.Contains(TEXT("/")));
+        TestFalse(TEXT("Health draws no max beside a shield"), Row.HealthText.Contains(TEXT("/")));
+    }
+
+    // A pool that exists but is empty still draws: the track reads as spent,
+    // which is the information the player wants.
+    TestTrue(TEXT("An emptied shield pool still draws its track"), FormatVitalsRow(0.0f, 50.0f, 100.0f).bDrawShield);
+    TestEqual(TEXT("An emptied shield pool reads 0"), FormatVitalsRow(0.0f, 50.0f, 100.0f).ShieldText, FString(TEXT("0")));
     return true;
 }
 

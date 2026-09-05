@@ -932,10 +932,10 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
     //
     // O54: this sum is the WEAPON-delivered pool. The conditional family rides
     // it because every one of those lines is a weapon-state condition — being
-    // airborne, sliding, wall-riding, in Redline, recently dashed — and the two
-    // bucket-crossing rewrites below feed it because Added Damage and Fire Rate
-    // are both weapon-side. The ability pool and the shared pool are summed
-    // separately just below; nothing here is silently doing double duty.
+    // airborne, sliding, wall-riding, in Redline, recently dashed — and the one
+    // bucket-crossing rewrite below feeds it because Fire Rate is weapon-side.
+    // The ability pool and the shared pool are summed separately just below;
+    // nothing here is silently doing double duty.
     float TotalIncreasedDamagePercent =
         IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::WeaponDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::AirborneDamage)]
@@ -944,20 +944,15 @@ FBreakerEquipmentStats UBreakerEquipmentComponent::AggregateStats(const TArray<F
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RedlineDamage)]
         + IncreasedByTarget[static_cast<int32>(EBreakerStatTarget::RecentlyDashedDamage)];
 
-    // ---- The two bucket-CROSSING rewrites ---------------------------------
-    // Both add to the SAME single additive bucket every other Increased
-    // percentage lands in. Neither is a More, and that is the point: they take
-    // a number the player already owns in one lane and make it count in a
+    // ---- The one bucket-CROSSING rewrite ----------------------------------
+    // It adds to the SAME single additive bucket every other Increased
+    // percentage lands in. It is not a More, and that is the point: it takes a
+    // number the player already owns in one lane and makes it count in a
     // second, which changes what is worth stacking without adding a multiplier
-    // against the O3 budget.
+    // against the O3 budget. Only an Increased-bucket number may cross here:
+    // O196 rules that a Flat value summed into this bucket is a defect, which
+    // is why Added Damage never appears in this sum — it bids Flat, below.
     //
-    // OVERFLOW: each point of Added Damage also grants 1% Increased Damage.
-    // Added Damage is authored in percentage points of base weapon damage, so
-    // "a point is a percent" is a real exchange rate rather than a coincidence.
-    if (Rules.bAddedDamageAlsoIncreased)
-    {
-        TotalIncreasedDamagePercent += FlatByTarget[static_cast<int32>(EBreakerStatTarget::AddedDamage)];
-    }
     // CADENCE: half of Fire Rate also counts as Increased Damage. Fire Rate is
     // a peer of Weapon Damage that lands on a different attribute, so the two
     // normally cannot compound at all; this is the one item that makes them.

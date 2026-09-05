@@ -176,8 +176,11 @@ bool FBreakerItemRuleUnboundTest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// OVERFLOW — a bucket-CROSSING rewrite, not a new bucket.
+// OVERFLOW — O196: a flat value summed into the Increased bucket is a defect.
 // ---------------------------------------------------------------------------
+// The enum value survives because save enums are append-only. Everything else
+// about it is gone: it does not roll, it has no definition, and an item that
+// carries it from a save aggregates exactly like the same item without a rule.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBreakerItemRuleOverflowTest,
     "RiorsEdge.Items.Rules.Overflow",
@@ -196,16 +199,27 @@ bool FBreakerItemRuleOverflowTest::RunTest(const FString& Parameters)
     FBreakerAttributeContribution OverflowOffer;
     UBreakerEquipmentComponent::AggregateStats(Overflow, &OverflowOffer);
 
-    const float Added = PlainStats.AddedDamagePercent;
-    TestTrue(TEXT("The fixture actually carries Added Damage"), Added > 0.0f);
-    TestEqual(TEXT("Overflow adds exactly one point of Increased per point of Added"),
+    TestTrue(TEXT("The fixture actually carries Added Damage"), PlainStats.AddedDamagePercent > 0.0f);
+    TestTrue(TEXT("The fixture's Added Damage reaches the Flat lane"),
+        PlainOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier) > 0.0f);
+    // The whole of O196 at the aggregation seam: no point of Added Damage is
+    // counted in the Increased bucket, rule or no rule.
+    TestEqual(TEXT("A saved Overflow item adds nothing to the Increased bucket"),
         OverflowOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier),
-        PlainOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier) + Added, 0.001f);
-    // The Flat lane is untouched: the point still counts where it always did.
-    // If it moved instead of doubling, this is the assertion that notices.
-    TestEqual(TEXT("Overflow does not move Added Damage out of the Flat lane"),
+        PlainOffer.GetIncreasedPercent(EBreakerAggregatedAttribute::DamageMultiplier), 0.001f);
+    TestEqual(TEXT("A saved Overflow item bids the same Flat as the plain item"),
         OverflowOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier),
         PlainOffer.GetFlat(EBreakerAggregatedAttribute::DamageMultiplier), 0.0001f);
+
+    // The rule is inert as a RULE SET too, not merely at one consumer.
+    TestTrue(TEXT("Overflow resolves to the identity rule set"),
+        UBreakerItemRuleLibrary::ResolveRules(Overflow).IsIdentity());
+    // ...and it cannot arrive on a new drop.
+    TestFalse(TEXT("Overflow is not on the roll table"),
+        UBreakerItemRuleLibrary::GetRollableRules().Contains(EBreakerItemRule::Overflow));
+    const FBreakerItemRuleDefinition Definition = UBreakerItemRuleLibrary::FindRule(EBreakerItemRule::Overflow);
+    TestTrue(TEXT("Overflow has no definition to print"),
+        Definition.Rule == EBreakerItemRule::None && Definition.DisplayName.IsEmpty() && !Definition.bRollable);
     return true;
 }
 
@@ -335,6 +349,8 @@ bool FBreakerItemRarityMeaningTest::RunTest(const FString& Parameters)
             EBreakerEquipSlot::Necklace, EBreakerItemRarity::Anomalous, 50, Seed);
         ++AnomalousTotal;
         if (Anomalous.HasRule()) { ++AnomalousWithRule; Seen.Add(Anomalous.Rule); }
+        // O196: the enum value with no definition never reaches a drop.
+        TestFalse(TEXT("Overflow never rolls"), Anomalous.Rule == EBreakerItemRule::Overflow);
     }
 
     TestEqual(TEXT("Every Anomalous drop carries a rewrite"), AnomalousWithRule, AnomalousTotal);

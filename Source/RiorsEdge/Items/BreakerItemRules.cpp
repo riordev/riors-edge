@@ -6,7 +6,6 @@ bool FBreakerItemRuleSet::IsIdentity() const
 {
     return !bAllConditionsSatisfied
         && !bAirborneAlsoGroundTraversal
-        && !bAddedDamageAlsoIncreased
         && !bRegenGatedOnTraversal
         && FMath::IsNearlyEqual(PhysicalDamageReductionCap, FBreakerEquipmentStats::DefaultPhysicalDamageReductionCap)
         && FireRateToIncreasedDamage == 0.0f
@@ -33,16 +32,17 @@ namespace
         TArray<FBreakerItemRuleDefinition> Table;
 
         // ---- Rollable Anomalous rewrites ----------------------------------
-        // Consumer for all four: UBreakerEquipmentComponent::AggregateStats,
+        // Consumer for all three: UBreakerEquipmentComponent::AggregateStats,
         // whose output is submitted to UBreakerAttributeSet and read by
         // UBreakerCombatComponent. Nothing here stops at a card.
+        //
+        // EBreakerItemRule::Overflow has no row. O196: a flat value summed into
+        // the Increased bucket is a defect, so no rule may make that sum.
+        // The enum value stays (save enums are append-only); it resolves to no
+        // definition and no rule, see FindRule.
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Unbound,
             LOCTEXT("Rule_Unbound", "UNBOUND"),
             LOCTEXT("Rule_Unbound_Desc", "Conditional affixes are always active."),
-            true));
-        Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Overflow,
-            LOCTEXT("Rule_Overflow", "OVERFLOW"),
-            LOCTEXT("Rule_Overflow_Desc", "Each point of Added Damage also grants 1% Increased Damage."),
             true));
         Table.Add(BreakerMakeRuleDefinition(EBreakerItemRule::Prolific,
             LOCTEXT("Rule_Prolific", "PROLIFIC"),
@@ -163,6 +163,13 @@ FBreakerItemRuleDefinition UBreakerItemRuleLibrary::FindRule(EBreakerItemRule Ru
     {
         if (Definition.Rule == Rule) return Definition;
     }
+    // GAP, recorded rather than faked: a saved item carrying
+    // EBreakerItemRule::Overflow reaches this line. The value is still in the
+    // enum, the table has no row for it, so the item resolves to an empty
+    // definition — the card prints no rule name and no description, and
+    // ResolveRules leaves the set at identity. Nothing tells the player the
+    // line went dark. A refund or a re-roll on load is the honest treatment
+    // and is not built here.
     return FBreakerItemRuleDefinition();
 }
 
@@ -225,9 +232,6 @@ FBreakerItemRuleSet UBreakerItemRuleLibrary::ResolveRules(const TArray<FBreakerI
         case EBreakerItemRule::Unbound:
             Set.bAllConditionsSatisfied = true;
             break;
-        case EBreakerItemRule::Overflow:
-            Set.bAddedDamageAlsoIncreased = true;
-            break;
         case EBreakerItemRule::Relentless:
             // Loosest wins, so two sources cannot compose into something
             // neither of them authored.
@@ -248,7 +252,9 @@ FBreakerItemRuleSet UBreakerItemRuleLibrary::ResolveRules(const TArray<FBreakerI
             // Prolific is resolved per ITEM in TierUpliftForItem, not here: it
             // rewrites the tier of the affixes on the item carrying it, and
             // folding it into a wearer-wide set would leak it onto every other
-            // piece.
+            // piece. Overflow lands here too and contributes nothing: O196
+            // rules the flat-into-Increased sum a defect, so a saved Overflow
+            // item is inert (see FindRule).
             break;
         }
     }
