@@ -1,4 +1,28 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(bash Scripts/ue-build.sh*)",
+      "Bash(bash Scripts/ue-suite.sh*)",
+      "Bash(bash Scripts/ue-capture.sh*)",
+      "Bash(python Scripts/status.py*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git fetch*)",
+      "Bash(git rebase origin/main*)",
+      "Bash(git add *)",
+      "Bash(git commit*)",
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git lfs pull*)",
+      "Bash(git worktree list*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git checkout -- Docs/STATE.md*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

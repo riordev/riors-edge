@@ -1,30 +1,19 @@
 ---
 name: cycle
 description: Run BUILD → SUITE → status.py and report the result honestly. Use before any commit, and whenever asked whether the tree is clean.
-allowed-tools: Bash(python *) Bash(git status *) Bash(git diff *)
+allowed-tools: Bash(bash Scripts/ue-build.sh*) Bash(bash Scripts/ue-suite.sh*) Bash(python Scripts/status.py*) Bash(git status*) Bash(git diff*)
 ---
 
 Run the cycle in order. Stop at the first failure and report it; do not
 continue past a red build or a refused status report.
 
-This worktree's Windows path (use it where the commands say `<repo>`):
-!`pwd -W 2>/dev/null || pwd`
-
-Fresh worktree? `Binaries/` and `Intermediate/` are per-worktree, so the
-first build here is a full build (allow 10–20 min). If meshes under
-`Content/Breaker/Meshes` are tiny text files, run `git lfs pull` first.
+A fresh worktree has no `Binaries/`, so its first build is a full one — allow
+10–20 minutes. The build script pulls LFS content first.
 
 ## 1. Build
 
-Editor open? Check first — Live Coding holds the lock:
-!`tasklist 2>/dev/null | grep -i UnrealEditor.exe || echo "no editor process visible"`
-
-You are in a lane worktree, so `-NoHotReloadFromIDE` is already on the
-command below (the lock is a false positive here — it keys off the shared
-UnrealEditor.exe, not this worktree's DLL). Then:
-
 ```
-"C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" RiorsEdgeEditor Win64 Development -Project="<repo>/riors_edge.uproject" -WaitMutex -NoHotReloadFromIDE
+bash Scripts/ue-build.sh
 ```
 
 Check the exit code directly. Never pipe the build through `tail`.
@@ -32,10 +21,10 @@ Check the exit code directly. Never pipe the build through `tail`.
 ## 2. Suite
 
 ```
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "<repo>/riors_edge.uproject" -ExecCmds="Automation RunTests RiorsEdge; SoftQuit" -unattended -nop4 -nosplash -nullrhi -abslog="<repo>/Saved/Logs/suite.log"
+bash Scripts/ue-suite.sh
 ```
 
-`SoftQuit`, never `Quit`. Results are in `Saved/Logs/suite.log` only.
+Results are in `Saved/Logs/suite.log` only, never stdout.
 
 ## 3. Read the result
 

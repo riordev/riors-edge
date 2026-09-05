@@ -2,21 +2,19 @@
 name: photograph
 description: Run the capture harness and read the frames. Use for any visual work — HUD, menus, enemy readability, viewmodel, levels — before reporting it done.
 argument-hint: [Anchor|Gym|Fernhall] [extra -Breaker switches]
+allowed-tools: Bash(bash Scripts/ue-capture.sh*)
 ---
 
 Frames land in `Saved/Screenshots/breaker_NN.png`; the process exits ~2.5 s
-after the last frame. Capture runs on a core ticker, so menus are safe.
-A capture needs a built editor binary in this worktree — run `/cycle` first
-if `Binaries/` is empty.
-
-This worktree's Windows path (use it where the command says `<repo>`):
-!`pwd -W 2>/dev/null || pwd`
+after the last frame. A capture needs a built editor binary here — run
+`/cycle` first if `Binaries/` is empty.
 
 ```
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "<repo>/riors_edge.uproject" -game -windowed -ResX=1920 -ResY=1080 -BreakerAutoPlay=$0 -BreakerScreenshots=4 $ARGUMENTS
+bash Scripts/ue-capture.sh $ARGUMENTS
 ```
 
-Useful switches: `-BreakerCaptureMenu=INVENTORY|SKILLTREES|SETTINGS|CLASS|PAUSE|CHARACTERSELECT|CHARACTERCREATE|DEVSANDBOX`
+First argument is the map (`Anchor`, `Gym`, `Fernhall`); anything after is
+passed through. Useful switches: `-BreakerCaptureMenu=INVENTORY|SKILLTREES|SETTINGS|CLASS|PAUSE|CHARACTERSELECT|CHARACTERCREATE|DEVSANDBOX`
 (anything else silently falls back to the main screen), `-BreakerCaptureBoard=CORE|COMPARE|BRANCH<n>`,
 `-BreakerCaptureTour`, `-BreakerCaptureHUD`, `-BreakerCycleWeapons=<s>`,
 `-BreakerBossOnStart`, `-BreakerEnemyModifier <n>`, `-BreakerCrowdLoad=patrol|engaged`.
