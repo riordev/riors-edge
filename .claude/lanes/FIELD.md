@@ -1,6 +1,6 @@
 # FIELD
-branch: lane/batch1-field   base: 755eede   suite: 492 / 3 / 0
-current: Batch One session A landed — RespawnEnemy's held death frames fixed (every revive through ApplyBodyMesh), [BreakerWeakPoint] SUMMARY instrument, modifier tells surveyed, Wakeful's down hides the named body
-next: Lattice ranged-silhouette build (tripod + mast + dish, 30 m squint test), owner's photo-veto loop; Phasing telegraph has no visual — recorded, not built
-blocked-on: nothing (deliberately not rebased over the audio merge; no overlap)
-crossings this cycle: none
+branch: main   base: 3ed15e9   suite: 509 / 3 / 0
+current: Batch One session A is on main (5d45a6c..7c12c4d) with NAV-1's Mover crossing rebased over it; lane/batch1-field is fully absorbed and can be deleted
+next: FIELD-1 enemy body table (family × archetype → mesh, idle, paint base, one lookup); Lattice ranged-silhouette build and the owner's photo-veto loop follow it
+blocked-on: nothing
+crossings this cycle: none (NAV -> FIELD Mover member in Combat/BreakerEnemy.{h,cpp} was declared by NAV in abd205e)
