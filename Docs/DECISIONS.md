@@ -267,7 +267,7 @@ Numbers are permanent and never reused.
 
 **O117** — Rift-archetype first-clears are TWO GROUPED grants, not eight individual ones, and the mission table already answered it. A1-5 and A2-7 each pay a first-clear AND a Core Point, and A2-7 reads “Set complete → Core Point #7” — under individual grants both rows would be paying twice for the same clear and the word “set” would mean nothing. Two grouped slots is also what the canon fifteen-source list allots, so the alternative could not fit inside the total without displacing something else. The eight archetypes themselves are authored — Clear, Sever, Hold, Hunt, Escort, Carry, Collapse, Silence, sited across A1-4 to A2-7 — and what is missing is not vocabulary but a rift completion event to fire on.
 
-**O175** — Swift's kit completes to the designed 6+1: Slipcut, Hard Stop and Sightline land as `Swift.Slipcut` / `Swift.HardStop` / `Swift.Sightline` with §1.2's costs and cooldowns (20/4s, 30/6s, 25/6s) under the O2 placeholder banner. Sightline's "cannot be blocked by cover-state enemies" clause is RETIRED (Part One-U: a dead sentence gets no new referent, and the Warden's shield stays the puzzle you flank); its pierce grant is a count on the existing channel stack, so the per-target falloff and the geometry stop stay the weapon's rules.
+**O175** — Swift's kit completes to the designed 6+1: Slipcut, Hard Stop and Sightline land as `Swift.Slipcut` / `Swift.HardStop` / `Swift.Sightline` with §1.2's costs and cooldowns (20/4s, 30/6s, 25/6s) under the O2 placeholder banner. Sightline's "cannot be blocked by cover-state enemies" clause is RETIRED (Part One-U: a dead sentence gets no new referent); its pierce grant is a count on the existing channel stack, so the per-target falloff and the geometry stop stay the weapon's rules.
 
 **O176** — Swift's starters are an enhanced-dash passive plus Skim (owner overturn of this ruling's first form, ORDERS Part One §1): the passive is a TREE NODE granted at level one, never a slot occupant, so Swift's slot one holds Skim, slot two ships EMPTY until the first quartermaster unlock — the empty slot is the feature — and Lead, Slipcut, Cadence Break, Hard Stop and Sightline are the five unlockables. Executes as LEDGER's class-definition bucket lines plus a fifth token milestone (five purchases need five tokens by 50, or ReachableByFifty is red forever) landing together with KIT's DefaultAbilityIdForSlot flip and the StarterPair reshape; until that landing the three catalogue tests it moves are enumerated red. The dash node's shape is LEDGER's report before its magnitude. The v4→v5 save snapshot stays frozen at its history.
 
@@ -352,8 +352,16 @@ Numbers are permanent and never reused.
 
 **O192** — base kit slower at level 1, air control 0.55 → ~0.35, and Movement Speed becomes a Boots-only affix with a cap. The MoveSpeed aggregation lane already exists, so it's an affix and a number, not a system. Momentum's thresholds move with it.
 
-**O193** — you found the hole: an earlier ruling removed the death sting as "over-produced," and now the beat is a caption and a timer. This restores it as weapon-lower → camera drop → black → fade-in, sequenced by GROUND with KIT/GLASS/AUDIO crossings.
+**O193** — you found the hole: an earlier ruling removed the death sting as "over-produced," and now the beat is a caption and a timer. This restores it as weapon-lower → camera drop → black → fade-in with one low sound, sequenced by GROUND with KIT/GLASS/AUDIO crossings.
 
 **O194** — Standard/Elite/Champion at +0/+15/+30% scale with the halo and diamonds; ELITE leaves the label; and CLOSING/HELD leaves entirely — that's an instrument reading that went out in the shipped HUD.
 
-**O195** — "TILESET START," "BANKED," "SETTLED" are dev vocabulary on screen. Every player-facing string moves to a string table under Data/ so you rewrite copy without a compile. "Cringey text" becomes a data edit, not a lane request.
+**O195** — "TILESET START," "BANKED," "SETTLED" are dev vocabulary on screen. Every player-facing string not already a dialogue or quest row moves to a string table under Data/ so you rewrite copy without a compile; dialogue and quest rows own their own text, one home per string. "Cringey text" becomes a data edit, not a lane request
+
+**O196** — Flat damage is real and it is the weapon's. Every weapon has a base damage line that scales with its item level; prefix affixes on weapons and gear roll flat Added Damage that sums onto that base before any Increased or More applies (`(Base + ΣFlat) × (1 + ΣIncreased) × ΠMore`). A flat value summed into the Increased bucket is a defect.
+
+**O197** — A boss fight is not balanced to one loadout's reserve. Kit growth pays the gap between rounds carried and rounds needed; no ammo rule is written for it.
+
+**O198** — A shield breaks. The Warden's frontal shield is a pool of 15 % of its bearer's max health that absorbs frontal damage until it breaks, then is gone for the fight; flanking still finds the unarmoured rear. The boss's shield follows the same rule.
+
+**O199** — The vitals row is shield current beside health current and draws no max. A zero-max shield draws nothing: no track, no number..

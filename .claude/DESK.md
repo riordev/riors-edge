@@ -5,29 +5,29 @@ system. A cycle takes the top block, lands it in ONE build and ONE suite,
 pushes, and stops so the owner can play. His notes go straight in here.
 Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 
-## Open questions for the owner
-- (bosses) At area level 1 a rear-only boss kill is 241 rifle rounds against 150 carried; the fight's ammo comes from add kills and the supply crate. Is a boss meant to be sustainable on one loadout, or paced by add-kill ammo? `PowerCurve.GymEntry` prints the gap every run.
-- (bosses) The "shield" on the boss is the Warden's frontal armour slab (90 armour, 47 % mitigation; the rear is unarmoured). O175 keeps it as the puzzle you flank. Should the front feel breakable instead?
-- (ui) The vitals row is `[shield current] —— [health current]`, no max drawn by design (HUD v2). `0 —— 0` dead is true. Do you want a max shown (`current / max`, a design reversal), and should a zero-max shield draw its empty track and `0` at all? Today it does, which is what made the row read as current/max.
-- (sound) O193 as written has no sound; your desk line has one low sound. If you want it, add "one low sound" to O193's line and the sixth verb lands (`player_death.wav` slot → synth fallback) with its one call site in the HUD's fatal-hit branch.
+## Direction (owner, 2026-09-05)
+No playtest until the core loop has more oomph. The next blocks are the ones that change what a trigger pull, a shield and a kill feel like: flat damage that is really the weapon's, a boss that fights back with a shield you break, and a Niagara pass with a sound for every verb. Content plumbing waits behind them.
 
-## Cycle 7 — the rest of DATA-4 (one library per commit)
+## Cycle 7 — flat damage is the weapon's (O196; one build)
+- [ ] Added Damage is a flat sum onto the weapon's item-level base, applied before Increased and More. Today `AggregateStats` folds the AddedDamage flat into `TotalIncreasedDamagePercent` under `bAddedDamageAlsoIncreased` ("a point is a percent"): that is the defect O196 names. The weapon's base line already scales with item level (`WeaponBaseDamage`); the aggregator publishes ΣFlat as its own term, the weapon adds it to base before the multipliers, the spec's line 46 is the law. Then LEDGER-3: the affix pool grows 28 → 56 with flat Added Damage prefixes as data rows, and `PowerBand.AtCap` is re-measured (expected red today; the pin is deleted when it goes green, not widened).
+- [ ] O199 vitals: a zero-max shield draws nothing on the row (`DrawVitalsCentred`); no max is drawn. Pure formatter + test.
+- [ ] The Gloves `Core.MoveSpeed` test roll moves to Boots; the inert Sidearm lean row goes.
+
+## Cycle 8 — a boss that fights back (O198, FIELD-3; one build each)
+- [ ] The Warden's front is a shield pool of 15 % of its bearer's max health: frontal hits deplete it, it breaks with a tell and stays broken for the fight, the rear stays unarmoured. `FrontalArmor` mitigation is replaced, not stacked. The boss inherits the rule. Pinned on the shipped numbers: the level-1 rifle breaks a Warden's front in N rounds; the boss's in the O18 band.
+- [ ] Boss grammar as a pure header: telegraph → punish window → phase gate → add wave → arena change; the shield break is the first punish window.
+- [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss. Split across builds.
+
+## Cycle 9 — the Niagara and sound pass (GLASS-1, O179, O190, O193)
+- [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash returns here.
+- [ ] The sixth verb: `PlayPlayerDeath`, `player_death.wav` slot → synth fallback, one call site in the fatal-hit branch; the O193 beat's one low sound.
+- [ ] Hit feedback re-photographed: the "feedback needs to be better" frame from Part One-B, before and after.
+- [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
+
+## Cycle 10 — the rest of DATA-4 (one library per commit; O186, O195)
 - [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
 - [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
 - [ ] Abilities: only the numerics (`ResourceCost`, `CooldownSeconds`, `WindowDuration`, variant numbers) → `Data/abilities.json`; the registry, `AbilityClass` and tags stay a DataAsset (O186). The ~40 per-ability `O2 PLACEHOLDER` constants in the ability .cpp files are the real no-compile target and need their own item.
-- Owner question (content pipeline): dialogue and quest text are keyed rows. One home per string: `quests.json`/`dialogue.json` own their text, `Data/strings.json` owns UI chrome only. Amend the O195 line to "every player-facing `TEXT` in `UI/` and `Game/` not already a dialogue or quest row"?
-- ORDERS Part Five DATA-4 says "→ DataAssets"; O186 says JSON. Edit that line on your seat.
-
-## Cycle 8 — the flat-damage ruling lands (R1)
-- Owner rules R1 first: weapons and gear carry a true flat Added Damage fed by an affix and a weapon base line, or the Flat term leaves `power-and-scaling.md`. Then LEDGER-3 (affix pool 28 → 56) and the at-cap band re-measured (`PowerBand.AtCap` is expected red today).
-
-## Cycle 9 — the boss grammar and two more bosses (FIELD-3)
-- [ ] Telegraph → punish window → phase gate → add wave → arena change as a pure header; the shield is the first punish window, not a wall.
-- [ ] Second boss: add-clear under pressure. Third: mobility and sustain. `Combat.PowerCurve.BossBand` holds for all three; O31 asserted per boss.
-
-## Cycle 10 — the Niagara pass (GLASS-1, O179, O190)
-- [ ] Muzzle, impact, cast moment, death: the four `NS_<Moment>` slots filled (owner asset or Fab pack), verb-colour law kept. The muzzle flash comes back here and nowhere earlier.
-- [ ] Delete the drift (H1): wall-ride out of the specs, dead gameplay tags out of the ini; grep-empty.
 
 ## Then, in this order, each sized when it reaches the top
 1. Elements and the reaction matrix; statuses as the cross-class combo language (KIT-3: Rot spread by pierce, Provoke grouping for MineCluster; no class-pair specials).
@@ -41,7 +41,6 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [ ] O195 string table: every player-facing `TEXT("…")` in `UI/` and `Game/` → `Data/strings.json`; TILESET / BANKED / SETTLED never reach the screen.
 - [ ] Menu checklist: every screen photographed; hover/press states, transitions, type hierarchy, density, faded-disabled — a list the owner marks.
 - [ ] Per-archetype weapon fire: `weapon_fire_<archetype>.wav` → `weapon_fire.wav` → synth.
-- [ ] Movement Speed affix on Boots (O192), after affixes are data.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
 - After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.

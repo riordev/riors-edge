@@ -3975,7 +3975,7 @@ needs one, it says so and the owner rules first.
 - **DATA-3** Tree nodes → DataTable per tree. Ids never move (O103). Done
   when: `BreakerProgressionLibrary.cpp` is a loader, not a library, and the
   save migration test suite is green.
-- **DATA-4** Ability definitions, quests and dialogue → DataAssets. Done
+- **DATA-4** Ability definitions, quests and dialogue → JSON under Data/ (O186; classes and asset references stay DataAssets). Done
   when: the quartermaster's stock is a row.
 
 ## FIELD
