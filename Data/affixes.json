@@ -104,14 +104,7 @@
 			"target": "MoveSpeed",
 			"bucket": "IncreasedPercent",
 			"slots": [
-				"Helmet",
-				"BodyArmour",
-				"Gloves",
-				"Boots",
-				"Necklace",
-				"Waist",
-				"Primary",
-				"Secondary"
+				"Boots"
 			],
 			"valueAtT12": 2,
 			"valueAtT1": 18,
@@ -1000,6 +993,6 @@
 	},
 	"caps":
 	{
-		"MoveSpeed": 1000
+		"MoveSpeed": 25
 	}
 }

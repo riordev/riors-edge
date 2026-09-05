@@ -11,11 +11,6 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - (ui) The vitals row is `[shield current] —— [health current]`, no max drawn by design (HUD v2). `0 —— 0` dead is true. Do you want a max shown (`current / max`, a design reversal), and should a zero-max shield draw its empty track and `0` at all? Today it does, which is what made the row read as current/max.
 - (sound) O193 as written has no sound; your desk line has one low sound. If you want it, add "one low sound" to O193's line and the sixth verb lands (`player_death.wav` slot → synth fallback) with its one call site in the HUD's fatal-hit branch.
 
-## Cycle 6 — content out of C++ (DATA-2, DATA-4; O186)
-- [ ] Affix pools → `Data/affixes.json` through the first runtime loader (`Data/BreakerDataFile`), output pinned identical by `Data.Affixes.Fresh`; the library becomes a loader with a validator; census and status.py read the file. The MoveSpeed cap lives in the file's `caps` object and is clamped in the aggregator (O186's "no compile" clause decides where the cap lives).
-- [ ] Movement Speed affix on Boots (O192): a data-only commit after the migration — `Core.MoveSpeed.allowedSlots` → Boots, the cap number set. No build; that is the proof.
-- [ ] The quartermaster's stock as a row: `Data/class-kits.json` (starter / unlockable / ultimate ids per class) read by `GetFallbackClassDefinition`; `Abilities.Catalogue.Partition` is the identical-output pin.
-
 ## Cycle 7 — the rest of DATA-4 (one library per commit)
 - [ ] Quests → `Data/quests.json` (`BreakerQuestContent.cpp` becomes a loader; 4 quests, the flag registry, `ValidateQuestContent` runs on the file).
 - [ ] Dialogue → `Data/dialogue.json` (`BreakerNPC.cpp` MakeXDialogue become loaders; ~26 nodes, ~70 choices; the lexicon test reads the file).
@@ -49,6 +44,7 @@ Nothing in this file is a ruling; rulings are in Docs/DECISIONS.md.
 - [ ] Movement Speed affix on Boots (O192), after affixes are data.
 
 ## Later (infrastructure only when it unblocks a felt item this week)
+- After the Boots-only MoveSpeed row: the Gloves `Core.MoveSpeed` roll in `Items.Equipment.AttributeContribution` (~BreakerItemTests.cpp:425) grants a slot a line it cannot roll; move it to Boots in the next build. The Sidearm lean on `Core.MoveSpeed` in `affixes.json` is inert (leans apply on weapon slots); delete the row when the leans are next touched.
 - The death beat's black is a camera fade and its teleport lands at the end of black; `HoldBlack`/`ReleaseBlack` on the game instance are the seam to move the teleport to the start of black and reveal through the arrival gate. Felt only if the respawn frame reads cold.
 - The boot's first front-end frame is still uncovered; only travels get the cover.
 - The split copy's 0.7 scale has no pin: `ConfigureAsSplitCopy` writes health through GAS, which no test outside a world can call. It waits on the map-loading functional tests (GROUND-4).
@@ -70,6 +66,11 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 
 ## Done (last three cycles; older is git)
 
+### Cycle 6
+- [x] Affixes are data: `Data/affixes.json` (27 slice / 8 aberrant / 5 anomalous / 3 downside / 1 elemental, 26 leans, caps) through the first runtime loader `Data/BreakerDataFile`; the library is a loader with a validator, signatures unchanged; the commandlet's export matches the file byte for byte; status.py reads it; Data/ is staged.
+- [x] Movement Speed is a Boots-only affix with a cap of 25 % (O192), landed as a data-only commit with no build.
+- [x] The quartermaster's stock is a row: `Data/class-kits.json`, five classes, read by `GetFallbackClassDefinition`; the catalogue partition test is the identical-output pin.
+
 ### Cycle 5
 - [x] Every travel arrives under cover: a briefing pane for a rift, plain black otherwise, and the cover lifts only when the world is loaded AND 24 frames AND 0.9 s have passed, then a 0.35 s ramp (all O2, live as CVars). A 12 s watchdog lifts a cover whose travel the engine refused. `-BreakerCaptureArrival` photographs the first revealed frame and one second later: mean luminance 67 and 67, identical. Pinned by `Arrival.SettleHold`.
 
@@ -79,9 +80,5 @@ Every note the owner writes carries one of these tags so the queue reads by cate
 - [x] Gun forward axis: already landed by 65247d4 with three tests; photographed across the weapon cycle — six named guns barrel-forward, Shotgun and Rocket on primitives (no candidate in the pack). The rule is the thin end, not the far end.
 - [x] Health bar `0 —— 0` dead: found-not-built. The row is shield current / health current, no max by design; `0 —— 0` is true. Two questions above.
 
-### Cycle 3
-- [x] Cover rides the nav: every enemy has a path-goal channel beside its facing; the mover paths to a goal that is not the player. The Lattice, on losing line of sight, asks the cover registry for anchors, stands off 260 cm on the flank it can see the player from, and paths there. Probe: RE-ACQUIRED after 2.5 s, zero touches.
-- [x] Squad shape: closers derive a ±30° arrival goal on the contact ring from their spawn phase and arrive from two angles; band-holders hold; the Warden fronts. Probe: closers arrived 53° apart at 6.0 s, Warden front error 0°, Lattice inside [900, 1900].
-- [x] Nav.Probe takes Melee, Cover or Squad and prints los=, cover=, split=, band and front with FAIL lines for each.
 
 
