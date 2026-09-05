@@ -12,7 +12,9 @@ public class RiorsEdge : ModuleRules
             "GameplayAbilities", "GameplayTags", "GameplayTasks", "Slate", "SlateCore",
             // The crowd probe's dominance readout: thread clocks live in
             // RenderCore (RenderTimer.h), the GPU cycle counter in RHI.
-            "RHI", "RenderCore"
+            "RHI", "RenderCore",
+            // Data/BreakerCensus.cpp: the census export is JSON.
+            "Json"
         });
         if (Target.bBuildEditor)
         {

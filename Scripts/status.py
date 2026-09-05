@@ -4,6 +4,9 @@
 Docs state intent. This states what is actually true, and the two must never be
 kept in sync by hand: that is what produced a 37,000-line corpus.
 
+    python Scripts/status.py               the node library read from its C++
+    python Scripts/status.py --from-data   the node library read from Data/progression.json
+
 HOW TO READ A SECTION
 ---------------------
 Every section declares a DIRECTION, and the direction is not the same for all
@@ -51,6 +54,11 @@ SRC = os.path.join(ROOT, "Source", "RiorsEdge")
 SPEC = os.path.join(ROOT, "Docs", "spec")
 PINS = os.path.join(ROOT, "Scripts", "status-pins.json")
 OUT = os.path.join(ROOT, "Docs", "STATE.md")
+# THE CENSUS, AS DATA. Written by the BreakerCensus commandlet
+# (`bash Scripts/ue-census.sh`) from the trees the game actually builds, and
+# pinned to them by RiorsEdge.Data.Census.Fresh. `--from-data` reads the node
+# library from here instead of regex-parsing its C++ authoring shape.
+DATA = os.path.join(ROOT, "Data", "progression.json")
 # THE SUITE GETS ITS OWN FILE, and this is PREVENTION rather than detection.
 # riors_edge.log is the project's default log name, so the interactive editor, a
 # standalone run and the capture harness all open it and rotate whatever was
@@ -280,6 +288,89 @@ def parse_declared_tags(lib_text):
     identifier reported two genuinely-consumed tags as dead.
     """
     return dict(re.findall(r'UE_DEFINE_GAMEPLAY_TAG\((\w+),\s*"([^"]+)"', lib_text))
+
+
+# --------------------------------------------------------------------------
+# The census as data — Data/progression.json
+# --------------------------------------------------------------------------
+# The same nodes parse_nodes finds, read off the built objects instead of the
+# authoring text. Every section below consumes the ONE dict shape, so the two
+# modes are interchangeable at the section level and any number that differs
+# between them is a defect in one parser, never a reconciliation.
+
+def load_census():
+    """The exported census, refused with the same loudness parse_nodes refuses.
+
+    A missing or empty file is not "no nodes" -- it is an export nobody ran,
+    and reporting zero silent nodes off it would be the silent-zero this
+    script exists to prevent.
+    """
+    try:
+        with open(DATA, "rb") as f:
+            census = json.loads(f.read().decode("utf-8"))
+    except OSError:
+        raise ParseError(f"{os.path.relpath(DATA, ROOT)} is missing; run "
+                         "`bash Scripts/ue-census.sh` to export it.")
+    except ValueError as e:
+        raise ParseError(f"{os.path.relpath(DATA, ROOT)} is not JSON: {e}")
+    for key in ("budgets", "statTargets", "conditions", "trees"):
+        if key not in census:
+            raise ParseError(f"{os.path.relpath(DATA, ROOT)}: no '{key}' surface. The export shape changed.")
+    total = sum(len(t.get("nodes", [])) for t in census["trees"])
+    if total < 100:
+        raise ParseError(
+            f"{os.path.relpath(DATA, ROOT)}: only {total} nodes exported. Fix the export "
+            "rather than trusting the number.")
+    return census
+
+
+def census_nodes(census, declared_tags):
+    """parse_nodes' dict shape, from the census.
+
+    Tags are exported as strings; the consumer index is asked by identifier OR
+    string, so each is mapped back to its Node_X identifier through the
+    declared-tag map when one exists. A string with no identifier is kept as
+    the string and is consumed only by the string.
+
+    `exclusive` is the group key a mutually-exclusive set offers one point
+    under. Source mode keys it on the trio's base id; here it is the smallest
+    id in the set (self included), which is the same partition.
+    """
+    by_string = {s: ident for ident, s in declared_tags.items()}
+    nodes = []
+    for tree in census["trees"]:
+        for raw in tree["nodes"]:
+            effects = [e["target"] for e in raw["effects"]]
+            conditions = []
+            for e in raw["effects"]:
+                if e["condition"] != "Always":
+                    conditions.append(e["condition"])
+                conditions.extend(c for c in e.get("alsoRequires", []) if c != "Always")
+            node = {
+                "id": raw["id"], "tier": int(raw["tier"]),
+                "ranks": int(raw["ranks"]), "cost": int(raw["cost"]),
+                "tree": tree["id"], "line": 0,
+                "effects": effects,
+                "tags": [by_string.get(t, t) for t in raw["tags"]],
+                "cornerstone": bool(raw["cornerstone"]),
+                "conditions": conditions,
+                "more": any(e["bucket"] == "MorePercent" for e in raw["effects"]),
+            }
+            if raw.get("exclusive"):
+                node["exclusive"] = min([raw["id"]] + list(raw["exclusive"]))
+            nodes.append(node)
+    return nodes
+
+
+def census_lane_register(census):
+    """(targets, paid, rider, affix_owned) from the exported lane register."""
+    targets = [t["name"] for t in census["statTargets"]]
+    paid = {t["name"] for t in census["statTargets"] if t["lane"]}
+    rider = {t["name"] for t in census["statTargets"] if t["rider"]}
+    affix_owned = {t["name"] for t in census["statTargets"] if t["affixOwned"]}
+    if not paid:
+        raise ParseError(f"{os.path.relpath(DATA, ROOT)}: lane register exported as empty.")
+    return targets, paid, rider, affix_owned
 
 
 # --------------------------------------------------------------------------
@@ -674,15 +765,38 @@ def classify(node):
     return "notable"
 
 
-def build_sections(sources):
+def build_sections(sources, census=None):
+    """Every section, from source (census=None) or from Data/progression.json.
+
+    WHAT STAYS SOURCE-SIDE IN BOTH MODES, and why: the consumer index, because
+    consumers are code and a census of data cannot say what reads it; the
+    declared-tag map, because node tags are declared by C++ identifier and
+    consumed by identifier, a code-to-code fact with no data form until the
+    tag library migrates; and the affix-counterpart check, because affixes are
+    a C++ library until DATA-2 lands.
+    """
     lib = sources[os.path.join(SRC, *LIB.split("/"))]
     types = sources[os.path.join(SRC, *TYPES.split("/"))]
     conds_text = read(os.path.join(SRC, "Progression", "BreakerBuildConditions.h"))
 
-    nodes = parse_nodes(lib)
-    targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
-    conditions = parse_conditions(conds_text)
     declared_tags = parse_declared_tags(lib)
+    if census is None:
+        nodes = parse_nodes(lib)
+        targets, paid, rider_delivered, affix_owned = parse_lane_register(types)
+        conditions = parse_conditions(conds_text)
+        core_budget, doctrine_budget = parse_point_budgets()
+        # Source mode reads the raw library text, comments and helpers
+        # included; data mode reads the union of what the nodes carry.
+        authored_conds = {m.group(1) for m in re.finditer(r'EBreakerBuildCondition::(\w+)', lib)}
+        currency_of = {}
+    else:
+        nodes = census_nodes(census, declared_tags)
+        targets, paid, rider_delivered, affix_owned = census_lane_register(census)
+        conditions = [c for c in census["conditions"] if c != "Count"]
+        core_budget = int(census["budgets"]["core"])
+        doctrine_budget = int(census["budgets"]["doctrine"])
+        authored_conds = {c for n in nodes for c in n["conditions"]}
+        currency_of = {t["id"]: t["currency"] for t in census["trees"]}
     index = build_consumer_index(sources)
 
     sections = []
@@ -791,9 +905,6 @@ def build_sections(sources):
     })
 
     # --- dead conditions --------------------------------------------------
-    authored_conds = set()
-    for m in re.finditer(r'EBreakerBuildCondition::(\w+)', lib):
-        authored_conds.add(m.group(1))
     unused_conds = [c for c in conditions if c not in authored_conds and c != "Always"]
     sections.append({
         "key": "dead-conditions", "title": "Conditions no content authors",
@@ -873,7 +984,6 @@ def build_sections(sources):
     # all of it arrives at commitment -- so it is the whole budget a doctrine is
     # ever measured against, not a cap it climbs to. Both are READ from the
     # library rather than written here; see parse_point_budgets.
-    core_budget, doctrine_budget = parse_point_budgets()
     by_tree = defaultdict(list)
     for n in nodes:
         by_tree[n["tree"]].append(n)
@@ -892,7 +1002,10 @@ def build_sections(sources):
                     continue
                 seen_groups.add(group)
             offered += n["cost"] * max(1, n["ranks"])
-        budget = core_budget if "Core" in tree else doctrine_budget
+        # The census carries the tree's currency; the source parser has only
+        # the getter's name to go on.
+        is_core = currency_of[tree] == "CorePoints" if tree in currency_of else "Core" in tree
+        budget = core_budget if is_core else doctrine_budget
         ratios.append((tree, len(ns), offered, round(offered / budget, 2)))
     worst = min((r[3] for r in ratios), default=0)
     floor_pin = pinned_field("offered-to-spendable", "min")
@@ -1434,9 +1547,11 @@ def render(sections, asserted, suite, pins, emitted, unknown_emitted, open_gates
 
 
 def main():
+    from_data = "--from-data" in sys.argv[1:]
     try:
         sources = load_sources()
-        sections, asserted = build_sections(sources)
+        census = load_census() if from_data else None
+        sections, asserted = build_sections(sources, census)
     except ParseError as e:
         sys.stderr.write(f"status: PARSE FAILURE — {e}\n")
         sys.stderr.write("status: refusing to emit a report that would understate the "

@@ -4,6 +4,7 @@
       "Bash(bash Scripts/ue-build.sh*)",
       "Bash(bash Scripts/ue-suite.sh*)",
       "Bash(bash Scripts/ue-capture.sh*)",
+      "Bash(bash Scripts/ue-census.sh*)",
       "Bash(python Scripts/status.py*)",
       "Bash(git status*)",
       "Bash(git diff*)",
