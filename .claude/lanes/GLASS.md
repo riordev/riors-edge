@@ -1,6 +1,6 @@
 # GLASS
-branch: claude/glass-h1-lane-0bd6c1 → main   base: 0bf3b1e   suite: 507 / 3 / 0
-current: GLASS-1 — the four moments (muzzle, impact, cast, death) have a Niagara slot each behind ABreakerEffectRenderer::PlayMoment, lazily resolved from /Game/Breaker/FX/NS_<Moment>, pooled fallback until the owner authors a system; HUD fires muzzle, impact and death; cast is KIT's to call at its sites
+branch: claude/competent-goodall-e3a1b5 → main   base: 3ed15e9   suite: 510 / 3 / 0
+current: GLASS-5 — the muzzle fallback is sized on screen, not in the world: BreakerFX::MuzzleFallbackRadiusCeilingCm bounds it by reticle clearance at the shipped muzzle view offsets (3.5 cm under a 3.8 cm aimed ceiling, was 14 cm), pinned by RiorsEdge.UI.EffectMoment.MuzzleClearsReticle
 next: GLASS-2 — per-archetype weapon fire cue (weapon_fire_<archetype>.wav → weapon_fire.wav → synth), ruled yes; then GLASS-3 the BreakerMenu.cpp split
 blocked-on: nothing — three questions open in Docs/reports/GLASS.md (consumer-less tags, death colour, who authors the four NS assets)
-crossings this cycle: UI/BreakerEffectRenderer.h public surface grew PlayMoment → KIT/FIELD/GROUND (published path, additive, nothing of theirs changes)
+crossings this cycle: none — the new test reads UBreakerWeaponComponent's public MuzzleViewOffset / AimedMuzzleViewOffset defaults; Weapons/ is not edited

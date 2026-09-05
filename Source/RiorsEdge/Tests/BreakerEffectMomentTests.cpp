@@ -2,6 +2,7 @@
 #include "UI/BreakerEffectMomentMath.h"
 #include "UI/BreakerEffectRenderer.h"
 #include "UI/BreakerUIStyle.h"
+#include "Weapons/BreakerWeaponComponent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -118,6 +119,64 @@ bool FBreakerEffectMomentFallbackTest::RunTest(const FString& Parameters)
     // full spread's landed pellets plus the kill they made.
     TestTrue(TEXT("Moment pool is not empty"), ABreakerEffectRenderer::GetMomentSlots() > 0);
     TestTrue(TEXT("Pending ring holds eight pellets and a death"), ABreakerEffectRenderer::GetPendingMomentSlots() >= 9);
+    return true;
+}
+
+// The muzzle fallback is the one moment drawn at a fixed offset from the
+// player's own camera, so its size is a screen question: the flash must not
+// reach the reticle at either shipped muzzle offset (GLASS-5). The finding
+// this pins: the 14 cm radius GLASS-1 shipped, at the 95 cm the visual muzzle
+// stands from the viewpoint, was a disc sixteen degrees across — about 275 px
+// on a 1920 px frame at the default 90-degree field of view — whose edge came
+// within 2.5 degrees of the crosshair hip-fired and covered it outright
+// aimed, where the muzzle centre sits under four degrees off the axis.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerEffectMomentMuzzleReticleTest,
+    "RiorsEdge.UI.EffectMoment.MuzzleClearsReticle",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerEffectMomentMuzzleReticleTest::RunTest(const FString& Parameters)
+{
+    using namespace BreakerFX;
+    const float Clearance = MuzzleReticleClearanceRadians;
+    TestTrue(TEXT("Clearance is a real gap"), Clearance > 0.0f);
+
+    // The rule, on synthetic offsets.
+    TestEqual(TEXT("A muzzle dead down the axis has no room"),
+        MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 0.0f, 0.0f), Clearance), 0.0f);
+    TestEqual(TEXT("A muzzle behind the camera has no room"),
+        MuzzleFallbackRadiusCeilingCm(FVector(-95.0f, 18.0f, -18.0f), Clearance), 0.0f);
+    // An offset sitting exactly at the clearance angle leaves nothing to draw.
+    const float AtClearanceLateral = 95.0f * FMath::Tan(Clearance);
+    TestTrue(TEXT("A muzzle on the clearance edge has no room"),
+        MuzzleFallbackRadiusCeilingCm(FVector(95.0f, AtClearanceLateral, 0.0f), Clearance) <= KINDA_SMALL_NUMBER);
+    // Further off axis at the same distance: more room.
+    const float Near = MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 6.0f, 0.0f), Clearance);
+    const float Far = MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 18.0f, 0.0f), Clearance);
+    TestTrue(TEXT("Off-axis muzzle earns room"), Near > 0.0f && Far > Near);
+    // Same angle, twice the distance: twice the room (the disc subtends the same angle).
+    const float Once = MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 18.0f, -18.0f), Clearance);
+    const float Twice = MuzzleFallbackRadiusCeilingCm(FVector(190.0f, 36.0f, -36.0f), Clearance);
+    TestTrue(TEXT("Room scales with distance at a fixed angle"), FMath::IsNearlyEqual(Twice, Once * 2.0f, 1.0e-3f));
+    // The lateral axes are interchangeable: right and down are one distance off axis.
+    TestTrue(TEXT("Right and down are the same offset"), FMath::IsNearlyEqual(
+        MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 18.0f, 0.0f), Clearance),
+        MuzzleFallbackRadiusCeilingCm(FVector(95.0f, 0.0f, -18.0f), Clearance), 1.0e-3f));
+
+    // Shipped configuration: the constant the renderer draws sits under the
+    // ceiling at BOTH shipped offsets, read from the weapon component's own
+    // defaults rather than restated here, so an offset change that brings
+    // the muzzle back under the crosshair goes red at this line.
+    const UBreakerWeaponComponent* CDO = GetDefault<UBreakerWeaponComponent>();
+    if (!TestNotNull(TEXT("Weapon component defaults"), CDO)) return false;
+    const FMomentFallback Muzzle = MomentFallback(EBreakerEffectMoment::Muzzle);
+    TestTrue(TEXT("The muzzle fallback still draws"), Muzzle.bDrawn && Muzzle.RadiusCm >= 0.5f);
+    const float HipCeiling = MuzzleFallbackRadiusCeilingCm(CDO->MuzzleViewOffset, Clearance);
+    const float AimedCeiling = MuzzleFallbackRadiusCeilingCm(CDO->AimedMuzzleViewOffset, Clearance);
+    TestTrue(FString::Printf(TEXT("Hip-fired flash clears the reticle (%.2f cm under %.2f cm)"), Muzzle.RadiusCm, HipCeiling),
+        Muzzle.RadiusCm <= HipCeiling);
+    TestTrue(FString::Printf(TEXT("Aimed flash clears the reticle (%.2f cm under %.2f cm)"), Muzzle.RadiusCm, AimedCeiling),
+        Muzzle.RadiusCm <= AimedCeiling);
     return true;
 }
 

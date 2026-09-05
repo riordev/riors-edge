@@ -73,6 +73,37 @@ namespace BreakerFX
         return BreakerUI::Cyan;
     }
 
+    // THE MUZZLE IS SIZED ON SCREEN, NOT IN THE WORLD. Three of the four
+    // moments are drawn metres from the player, where a world centimetre is
+    // the right unit. The muzzle is drawn at a FIXED offset from the player's
+    // own camera (UBreakerWeaponComponent::GetVisualMuzzleLocation is the
+    // viewpoint plus a camera-space offset), so its screen size is a function
+    // of that offset and nothing else, and the thing it must not do is reach
+    // the reticle: O179's camera law, met at the one primitive that sits in
+    // front of the camera every shot. This is the largest glow radius whose
+    // disc, drawn at that offset, stays clear of the view axis by the
+    // clearance. Angle against angle, so it holds at any field of view,
+    // including under the aim narrow. Zero when the muzzle itself sits inside
+    // the clearance (a gun drawn dead down the axis has no flash the reticle
+    // can survive).
+    inline float MuzzleFallbackRadiusCeilingCm(const FVector& MuzzleViewOffsetCm, float ReticleClearanceRadians)
+    {
+        const float Forward = static_cast<float>(MuzzleViewOffsetCm.X);
+        if (Forward <= 0.0f) return 0.0f;
+        const float Lateral = static_cast<float>(FMath::Sqrt(
+            MuzzleViewOffsetCm.Y * MuzzleViewOffsetCm.Y + MuzzleViewOffsetCm.Z * MuzzleViewOffsetCm.Z));
+        const float OffAxis = FMath::Atan2(Lateral, Forward);
+        const float Spare = OffAxis - FMath::Max(ReticleClearanceRadians, 0.0f);
+        if (Spare <= 0.0f) return 0.0f;
+        return static_cast<float>(MuzzleViewOffsetCm.Size()) * FMath::Tan(Spare);
+    }
+
+    // How far the flash's edge stays from the view axis. The kicked crosshair
+    // is 12 px of arm at 1080p, about 0.7 degrees at the 90-degree default
+    // field of view, and every shot is a kicked frame; a degree and a half
+    // gives it a gap its own width. O2 PLACEHOLDER.
+    constexpr float MuzzleReticleClearanceRadians = 1.5f * (PI / 180.0f);
+
     // What the pooled renderer draws for a moment whose system is not
     // authored yet. bDrawn false means "something else already is the
     // fallback": the tracer renderer's spark is the impact, and a second glow
@@ -94,7 +125,12 @@ namespace BreakerFX
         {
         case EBreakerEffectMoment::Muzzle:
             // A flash, not a glow: gone before the next round at any cadence.
-            F.RadiusCm = 14.0f;            // O2 PLACEHOLDER
+            // Sized under MuzzleFallbackRadiusCeilingCm at the shipped aimed
+            // offset (95 fwd, 2 right, 6 down: a ceiling of 3.8 cm), which
+            // governs; the hip offset allows 23 cm. The 14 cm this shipped
+            // with was a world size at a camera distance: a 275 px disc on a
+            // 1920 px frame that covered the crosshair on every aimed shot.
+            F.RadiusCm = 3.5f;             // O2 PLACEHOLDER
             F.Intensity = 4.5f;            // O2 PLACEHOLDER
             F.Timing.DurationSeconds = 0.06f;   // O2 PLACEHOLDER
             F.Timing.FadeOutSeconds = 0.04f;    // O2 PLACEHOLDER
