@@ -1,0 +1,160 @@
+{
+	"version": 1,
+	"rifts": [
+		{
+			"id": "fernhall.entry",
+			"yard": ""
+		},
+		{
+			"id": "fernhall.substation",
+			"yard": "substation"
+		}
+	],
+	"missions": [
+		{
+			"id": "Act1.Fernhall",
+			"act": 1,
+			"title": "",
+			"quests": [
+				"Quest.FirstContract",
+				"Quest.KessSalvage",
+				"Quest.Pattern",
+				"Quest.Deeper"
+			],
+			"beats": [
+				{
+					"id": "Job",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "Job",
+					"completesOn": "Quest.FirstContract.Accepted"
+				},
+				{
+					"id": "Travel",
+					"kind": "Travel",
+					"destination": "Fernhall",
+					"completesOn": "Mission.Act1.Fernhall.Arrived"
+				},
+				{
+					"id": "Spill",
+					"kind": "Encounter",
+					"rift": "fernhall.entry",
+					"quest": "Quest.FirstContract",
+					"objectives": [
+						"Thin",
+						"Elite"
+					]
+				},
+				{
+					"id": "JobTurnIn",
+					"kind": "Return",
+					"npc": "Quartermaster",
+					"node": "ReadyTurnIn",
+					"completesOn": "Quest.FirstContract.TurnedIn"
+				},
+				{
+					"id": "JobReward",
+					"kind": "Reward",
+					"quest": "Quest.FirstContract"
+				},
+				{
+					"id": "Salvage",
+					"kind": "Dialogue",
+					"npc": "ForgeKeeper",
+					"node": "Salvage",
+					"completesOn": "Quest.KessSalvage.Accepted"
+				},
+				{
+					"id": "Feedstock",
+					"kind": "Encounter",
+					"rift": "fernhall.entry",
+					"quest": "Quest.KessSalvage",
+					"objectives": [
+						"Feedstock"
+					]
+				},
+				{
+					"id": "SalvageTurnIn",
+					"kind": "Return",
+					"npc": "ForgeKeeper",
+					"node": "SalvageTurnIn",
+					"completesOn": "Quest.KessSalvage.TurnedIn"
+				},
+				{
+					"id": "SalvageReward",
+					"kind": "Reward",
+					"quest": "Quest.KessSalvage"
+				},
+				{
+					"id": "FirstForge",
+					"kind": "Unlock",
+					"corePoint": "FirstForge"
+				},
+				{
+					"id": "Pattern",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "Pattern",
+					"completesOn": "Quest.Pattern.Accepted"
+				},
+				{
+					"id": "Marked",
+					"kind": "Encounter",
+					"rift": "fernhall.entry",
+					"quest": "Quest.Pattern",
+					"objectives": [
+						"Marked"
+					]
+				},
+				{
+					"id": "PatternTurnIn",
+					"kind": "Return",
+					"npc": "Quartermaster",
+					"node": "PatternTurnIn",
+					"completesOn": "Quest.Pattern.TurnedIn"
+				},
+				{
+					"id": "PatternReward",
+					"kind": "Reward",
+					"quest": "Quest.Pattern"
+				},
+				{
+					"id": "Deeper",
+					"kind": "Dialogue",
+					"npc": "Quartermaster",
+					"node": "Deeper",
+					"completesOn": "Quest.Deeper.Accepted"
+				},
+				{
+					"id": "Undercroft",
+					"kind": "Boss",
+					"rift": "fernhall.substation",
+					"boss": "",
+					"completesOn": "Quest.Deeper.SweepDone"
+				},
+				{
+					"id": "DeeperTurnIn",
+					"kind": "Return",
+					"npc": "Quartermaster",
+					"node": "DeeperTurnIn",
+					"completesOn": "Quest.Deeper.TurnedIn"
+				},
+				{
+					"id": "DeeperReward",
+					"kind": "Reward",
+					"quest": "Quest.Deeper"
+				},
+				{
+					"id": "ActOneBoss",
+					"kind": "Unlock",
+					"corePoint": "ActOneBoss"
+				},
+				{
+					"id": "Doctrine",
+					"kind": "Unlock",
+					"doctrinePoints": 2
+				}
+			]
+		}
+	]
+}

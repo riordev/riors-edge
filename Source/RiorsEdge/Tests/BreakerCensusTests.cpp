@@ -6,6 +6,8 @@
 #include "Items/BreakerAffixLibrary.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Progression/BreakerWorldPoints.h"
+#include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestContent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -255,6 +257,96 @@ bool FBreakerDialogueFreshTest::RunTest(const FString& Parameters)
         AddError(FString::Printf(
             TEXT("%s is not in canonical form against what the NPCs loaded. ")
             TEXT("Run `bash Scripts/ue-census.sh` and commit Data/dialogue.json in the same change."),
+            *Path));
+        return false;
+    }
+    return true;
+}
+
+// THE COMMITTED MISSION FILE IS THE LOADED STORY, OR THIS IS RED.
+//
+// Data/missions.json is what UBreakerMissionLibrary loads: the rift list and
+// the act-one mission over the four quests. Same pin as the other data files,
+// plus the shipped configuration: one mission, its beat count, the arrival
+// flag the loader registers, both Core point sources known, and the doctrine
+// grant at one benchmark's worth for the one act authored. The unnamed boss
+// is the file's one recorded gap and is counted as such.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerMissionsFreshTest,
+    "RiorsEdge.Data.Missions.Fresh",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerMissionsFreshTest::RunTest(const FString& Parameters)
+{
+    const TArray<FString>& LoadErrors = UBreakerMissionLibrary::GetDataErrors();
+    for (const FString& Error : LoadErrors)
+    {
+        AddError(Error);
+    }
+    if (!LoadErrors.IsEmpty())
+    {
+        return false;
+    }
+
+    const TArray<FBreakerMissionRift>& Rifts = UBreakerMissionLibrary::GetRifts();
+    const TArray<FBreakerMissionDefinition>& Missions = UBreakerMissionLibrary::GetMissions();
+
+    TestEqual(TEXT("Two rifts"), Rifts.Num(), 2);
+    TestEqual(TEXT("One mission, act one"), Missions.Num(), 1);
+    if (Missions.Num() != 1)
+    {
+        return false;
+    }
+    const FBreakerMissionDefinition& ActOne = Missions[0];
+    TestEqual(TEXT("The mission is Act1.Fernhall"), ActOne.MissionId, FName(TEXT("Act1.Fernhall")));
+    TestEqual(TEXT("It is act one"), ActOne.Act, 1);
+    TestEqual(TEXT("It runs the four-quest chain"), ActOne.Quests.Num(), 4);
+    TestEqual(TEXT("Twenty beats"), ActOne.Beats.Num(), 20);
+    TestTrue(TEXT("The loader registers the arrival flag"),
+        UBreakerMissionLibrary::IsRegisteredMissionFlag(FName(TEXT("Mission.Act1.Fernhall.Arrived"))));
+    TestFalse(TEXT("A quest flag is not a mission flag"),
+        UBreakerMissionLibrary::IsRegisteredMissionFlag(BreakerQuestFlags::FirstContractTurnedIn));
+
+    int32 DoctrineSum = 0;
+    TArray<FName> CorePoints;
+    int32 UnnamedBosses = 0;
+    for (const FBreakerMissionBeat& Beat : ActOne.Beats)
+    {
+        DoctrineSum += Beat.DoctrinePoints;
+        if (!Beat.CorePoint.IsNone()) { CorePoints.Add(Beat.CorePoint); }
+        if (Beat.Kind == EBreakerMissionBeatKind::Boss && Beat.Boss.IsNone()) { ++UnnamedBosses; }
+    }
+    // One act authored, one benchmark paid. The remaining benchmarks are the
+    // unauthored acts' gap, counted here rather than granted early.
+    TestEqual(TEXT("Act one pays one benchmark of doctrine points"), DoctrineSum, UBreakerProgressionLibrary::DoctrinePointsPerBenchmark);
+    TestTrue(TEXT("The file stays within the whole doctrine grant"), DoctrineSum <= UBreakerProgressionLibrary::DoctrinePointGrant);
+    TestEqual(TEXT("Two Core points"), CorePoints.Num(), 2);
+    TestTrue(TEXT("FirstForge is a known source"), CorePoints.Contains(FName(TEXT("FirstForge"))) && UBreakerWorldPointLibrary::IsKnownSource(FName(TEXT("FirstForge"))));
+    TestTrue(TEXT("ActOneBoss is a known source"), CorePoints.Contains(FName(TEXT("ActOneBoss"))) && UBreakerWorldPointLibrary::IsKnownSource(FName(TEXT("ActOneBoss"))));
+    TestEqual(TEXT("The Field Marshal is the one unnamed boss"), UnnamedBosses, 1);
+    TestEqual(TEXT("The loader counts it as a warning"), UBreakerMissionLibrary::GetDataWarnings().Num(), 1);
+    AddInfo(FString::Printf(TEXT("Missions: %d missions, %d beats, %d rifts; %d of %d doctrine points granted, %d of %d Core points; %d warnings"),
+        Missions.Num(), ActOne.Beats.Num(), Rifts.Num(),
+        DoctrineSum, UBreakerProgressionLibrary::DoctrinePointGrant,
+        CorePoints.Num(), UBreakerProgressionLibrary::CoreWorldPointGrant,
+        UBreakerMissionLibrary::GetDataWarnings().Num()));
+
+    const FString Fresh = BreakerCensus::ExportMissions(Rifts, Missions);
+
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::MissionsRelativePath());
+    FString Committed;
+    if (!FFileHelper::LoadFileToString(Committed, *Path))
+    {
+        AddError(FString::Printf(TEXT("%s is missing. Run `bash Scripts/ue-census.sh` and commit the file."), *Path));
+        return false;
+    }
+    Committed.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+
+    if (Committed != Fresh)
+    {
+        AddError(FString::Printf(
+            TEXT("%s is not in canonical form against what the library loaded. ")
+            TEXT("Run `bash Scripts/ue-census.sh` and commit Data/missions.json in the same change."),
             *Path));
         return false;
     }

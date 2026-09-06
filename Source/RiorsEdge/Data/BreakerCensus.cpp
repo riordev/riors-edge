@@ -8,6 +8,7 @@
 #include "Progression/BreakerProgressionNode.h"
 #include "Progression/BreakerProgressionTree.h"
 #include "Progression/BreakerProgressionTypes.h"
+#include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestContent.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -289,6 +290,73 @@ namespace
         Writer.WriteArrayEnd();
         Writer.WriteObjectEnd();
     }
+
+    // Exactly the fields the kind has, in the schema's order, after "id" and
+    // "kind". The loader refuses a field on the wrong kind, so this and the
+    // reader are the same list twice by construction.
+    void BreakerCensusMissionBeat(FBreakerCensusWriter& Writer, const FBreakerMissionBeat& Beat)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Beat.BeatId.ToString());
+        Writer.WriteValue(TEXT("kind"), BreakerCensusEnumName(Beat.Kind));
+        switch (Beat.Kind)
+        {
+        case EBreakerMissionBeatKind::Dialogue:
+        case EBreakerMissionBeatKind::Return:
+            Writer.WriteValue(TEXT("npc"), BreakerCensusNameOrEmpty(Beat.Npc));
+            Writer.WriteValue(TEXT("node"), BreakerCensusNameOrEmpty(Beat.Node));
+            Writer.WriteValue(TEXT("completesOn"), BreakerCensusNameOrEmpty(Beat.CompletesOn));
+            break;
+        case EBreakerMissionBeatKind::Travel:
+            Writer.WriteValue(TEXT("destination"), BreakerCensusNameOrEmpty(Beat.Destination));
+            Writer.WriteValue(TEXT("completesOn"), BreakerCensusNameOrEmpty(Beat.CompletesOn));
+            break;
+        case EBreakerMissionBeatKind::Encounter:
+            Writer.WriteValue(TEXT("rift"), BreakerCensusNameOrEmpty(Beat.Rift));
+            Writer.WriteValue(TEXT("quest"), BreakerCensusNameOrEmpty(Beat.Quest));
+            BreakerCensusNameArray(Writer, TEXT("objectives"), Beat.Objectives);
+            break;
+        case EBreakerMissionBeatKind::Boss:
+            Writer.WriteValue(TEXT("rift"), BreakerCensusNameOrEmpty(Beat.Rift));
+            Writer.WriteValue(TEXT("boss"), BreakerCensusNameOrEmpty(Beat.Boss));
+            Writer.WriteValue(TEXT("completesOn"), BreakerCensusNameOrEmpty(Beat.CompletesOn));
+            break;
+        case EBreakerMissionBeatKind::Reward:
+            Writer.WriteValue(TEXT("quest"), BreakerCensusNameOrEmpty(Beat.Quest));
+            break;
+        case EBreakerMissionBeatKind::Unlock:
+            if (Beat.DoctrinePoints > 0)
+            {
+                Writer.WriteValue(TEXT("doctrinePoints"), Beat.DoctrinePoints);
+            }
+            if (!Beat.CorePoint.IsNone())
+            {
+                Writer.WriteValue(TEXT("corePoint"), Beat.CorePoint.ToString());
+            }
+            if (!Beat.AbilityToken.IsNone())
+            {
+                Writer.WriteValue(TEXT("abilityToken"), Beat.AbilityToken.ToString());
+            }
+            break;
+        }
+        Writer.WriteObjectEnd();
+    }
+
+    void BreakerCensusMissionRow(FBreakerCensusWriter& Writer, const FBreakerMissionDefinition& Mission)
+    {
+        Writer.WriteObjectStart();
+        Writer.WriteValue(TEXT("id"), Mission.MissionId.ToString());
+        Writer.WriteValue(TEXT("act"), Mission.Act);
+        Writer.WriteValue(TEXT("title"), Mission.Title);
+        BreakerCensusNameArray(Writer, TEXT("quests"), Mission.Quests);
+        Writer.WriteArrayStart(TEXT("beats"));
+        for (const FBreakerMissionBeat& Beat : Mission.Beats)
+        {
+            BreakerCensusMissionBeat(Writer, Beat);
+        }
+        Writer.WriteArrayEnd();
+        Writer.WriteObjectEnd();
+    }
 }
 
 FString BreakerCensus::Serialize(const TSharedRef<FJsonObject>& Census)
@@ -384,6 +452,39 @@ FString BreakerCensus::ExportDialogue(const FBreakerDialogueData& Data)
     for (const FBreakerDialogueRow& Row : Data.Npcs)
     {
         BreakerCensusDialogueRow(*Writer, Row);
+    }
+    Writer->WriteArrayEnd();
+    Writer->WriteObjectEnd();
+    Writer->Close();
+    BreakerCensusFinish(Out);
+    return Out;
+}
+
+FString BreakerCensus::MissionsRelativePath()
+{
+    return UBreakerMissionLibrary::DataRelativePath();
+}
+
+FString BreakerCensus::ExportMissions(const TArray<FBreakerMissionRift>& Rifts, const TArray<FBreakerMissionDefinition>& Missions)
+{
+    FString Out;
+    TSharedRef<FBreakerCensusWriter> Writer = TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(&Out);
+
+    Writer->WriteObjectStart();
+    Writer->WriteValue(TEXT("version"), 1);
+    Writer->WriteArrayStart(TEXT("rifts"));
+    for (const FBreakerMissionRift& Rift : Rifts)
+    {
+        Writer->WriteObjectStart();
+        Writer->WriteValue(TEXT("id"), Rift.RiftId.ToString());
+        Writer->WriteValue(TEXT("yard"), BreakerCensusNameOrEmpty(Rift.Yard));
+        Writer->WriteObjectEnd();
+    }
+    Writer->WriteArrayEnd();
+    Writer->WriteArrayStart(TEXT("missions"));
+    for (const FBreakerMissionDefinition& Mission : Missions)
+    {
+        BreakerCensusMissionRow(*Writer, Mission);
     }
     Writer->WriteArrayEnd();
     Writer->WriteObjectEnd();

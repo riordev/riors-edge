@@ -6,6 +6,8 @@
 class UBreakerProgressionTree;
 struct FBreakerAffixLibraryData;
 struct FBreakerDialogueData;
+struct FBreakerMissionDefinition;
+struct FBreakerMissionRift;
 struct FBreakerQuestDefinition;
 
 // The census: every built tree and the progression vocabulary, as JSON, and
@@ -64,4 +66,15 @@ namespace BreakerCensus
     // authoring order. The file carries em dashes; the caller writes it UTF-8
     // without BOM and the writer leaves characters above 0x7F unescaped.
     RIORSEDGE_API FString ExportDialogue(const FBreakerDialogueData& Data);
+
+    // Data/missions.json, the path the mission library loads from.
+    RIORSEDGE_API FString MissionsRelativePath();
+
+    // The rift list and the missions as their data file: "version", then
+    // "rifts" by id and yard, then "missions" in act order with each
+    // mission's quests and beats. A beat writes "id" and "kind" first and
+    // then exactly the fields its kind has; an absent field is omitted, never
+    // written empty. NAME_None prints as "". Same printer, same line-ending
+    // rule as ExportQuests.
+    RIORSEDGE_API FString ExportMissions(const TArray<FBreakerMissionRift>& Rifts, const TArray<FBreakerMissionDefinition>& Missions);
 }

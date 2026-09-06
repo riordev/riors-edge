@@ -7,6 +7,7 @@
 #include "Misc/Paths.h"
 #include "Progression/BreakerProgressionLibrary.h"
 #include "Progression/BreakerProgressionTree.h"
+#include "Save/BreakerMissionContent.h"
 #include "Save/BreakerQuestContent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogBreakerCensus, Log, All);
@@ -95,7 +96,7 @@ int32 UBreakerCensusCommandlet::Main(const FString& Params)
     UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d quests, %d objectives, %d flags"),
         *QuestPath, Quests.Num(), ObjectiveCount, Flags.Num());
 
-    // The dialogue, last. The file carries em dashes, so it is written UTF-8
+    // The dialogue. The file carries em dashes, so it is written UTF-8
     // without BOM like the others and the writer leaves them unescaped.
     const TArray<FString>& DialogueErrors = ABreakerNPC::GetDialogueErrors();
     if (!DialogueErrors.IsEmpty())
@@ -126,5 +127,35 @@ int32 UBreakerCensusCommandlet::Main(const FString& Params)
     }
     UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d npcs, %d nodes, %d choices, %d entries"),
         *DialoguePath, Dialogue.Npcs.Num(), DialogueNodes, DialogueChoices, DialogueEntries);
+
+    // The missions, last, after the registries they resolve against. Same
+    // rule: a dirty load is an EMPTY list and is never written back.
+    const TArray<FString>& MissionErrors = UBreakerMissionLibrary::GetDataErrors();
+    if (!MissionErrors.IsEmpty())
+    {
+        for (const FString& Error : MissionErrors)
+        {
+            UE_LOG(LogBreakerCensus, Error, TEXT("%s"), *Error);
+        }
+        UE_LOG(LogBreakerCensus, Error, TEXT("%s did not load clean; not rewriting it"), *BreakerCensus::MissionsRelativePath());
+        return 1;
+    }
+    for (const FString& Warning : UBreakerMissionLibrary::GetDataWarnings())
+    {
+        UE_LOG(LogBreakerCensus, Warning, TEXT("%s"), *Warning);
+    }
+    const TArray<FBreakerMissionRift>& Rifts = UBreakerMissionLibrary::GetRifts();
+    const TArray<FBreakerMissionDefinition>& Missions = UBreakerMissionLibrary::GetMissions();
+    const FString MissionJson = BreakerCensus::ExportMissions(Rifts, Missions);
+    const FString MissionPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / BreakerCensus::MissionsRelativePath());
+    if (!FFileHelper::SaveStringToFile(MissionJson, *MissionPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+    {
+        UE_LOG(LogBreakerCensus, Error, TEXT("could not write %s"), *MissionPath);
+        return 1;
+    }
+    int32 BeatCount = 0;
+    for (const FBreakerMissionDefinition& Mission : Missions) { BeatCount += Mission.Beats.Num(); }
+    UE_LOG(LogBreakerCensus, Display, TEXT("wrote %s: %d missions, %d beats, %d rifts"),
+        *MissionPath, Missions.Num(), BeatCount, Rifts.Num());
     return 0;
 }
