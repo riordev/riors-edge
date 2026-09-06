@@ -30,6 +30,10 @@ namespace BreakerSound
     constexpr float KillDurationSeconds = 0.30f;   // O2 PLACEHOLDER
     constexpr float TakeHitDurationSeconds = 0.22f; // O2 PLACEHOLDER
     constexpr float AbilityCastDurationSeconds = 0.20f; // O2 PLACEHOLDER
+    // The player's own death (O193): one low sound at the hard cut. Short,
+    // because it lands at the instant the screen goes black and the black
+    // itself is the weight; the ring-out is the sine's slow decay, not length.
+    constexpr float PlayerDeathDurationSeconds = 0.4f; // O2 PLACEHOLDER
 
     inline int32 SampleCount(float DurationSeconds)
     {
@@ -136,9 +140,32 @@ namespace BreakerSound
         return 0.40f * (Fundamental + Octave) / 1.33f * Envelope(T, AbilityCastDurationSeconds, 5.0f);
     }
 
+    // PLAYER DEATH: the sixth verb (O193, "one low sound"). One sine and
+    // nothing else — no noise, no fifth, no octave — gliding from 110 Hz to
+    // 55 Hz across the whole duration under a slow decay. EVERY PARTIAL SITS
+    // BELOW 200 HZ, which is what separates it from the take-hit thud directly
+    // above it (180 Hz with grit) and from anything the weapon does: the cue
+    // is felt more than heard, and it plays at the cut to black where nothing
+    // else is happening.
+    //
+    // The glide is integrated rather than written as Sin(2π·Hz(T)·T): the
+    // instantaneous frequency of that shortcut is Hz(T) + T·Hz'(T), which for a
+    // fall this long would hit zero before the end. Phase = 2π(F0·T + (F1-F0)·T²/2D)
+    // has instantaneous frequency F0 + (F1-F0)·T/D, exactly the line described.
+    inline float PlayerDeathSample(int32 Index)
+    {
+        const float T = static_cast<float>(Index) / SampleRate;
+        constexpr float StartHz = 110.0f;   // O2 PLACEHOLDER
+        constexpr float EndHz = 55.0f;      // O2 PLACEHOLDER
+        const float Phase = 2.0f * PI * (StartHz * T + (EndHz - StartHz) * T * T / (2.0f * PlayerDeathDurationSeconds));
+        // Decay 4: roughly -7 dB across the 0.4 s, a ring-out rather than a hit.
+        return 0.6f * FMath::Sin(Phase) * Envelope(T, PlayerDeathDurationSeconds, 4.0f);   // O2 PLACEHOLDER
+    }
+
     inline void RenderWeaponFire(TArray<int16>& Out) { RenderPcm16(Out, FireDurationSeconds, &WeaponFireSample); }
     inline void RenderHitConfirm(TArray<int16>& Out) { RenderPcm16(Out, HitDurationSeconds, &HitConfirmSample); }
     inline void RenderKill(TArray<int16>& Out)       { RenderPcm16(Out, KillDurationSeconds, &KillSample); }
     inline void RenderTakeHit(TArray<int16>& Out)    { RenderPcm16(Out, TakeHitDurationSeconds, &TakeHitSample); }
     inline void RenderAbilityCast(TArray<int16>& Out) { RenderPcm16(Out, AbilityCastDurationSeconds, &AbilityCastSample); }
+    inline void RenderPlayerDeath(TArray<int16>& Out) { RenderPcm16(Out, PlayerDeathDurationSeconds, &PlayerDeathSample); }
 }

@@ -8,7 +8,7 @@ sixtieth of a second. Silhouette and value contrast are the entire budget.
 
 The interface has a harder job than the world: gear is the whole endgame, so
 the item card and the comparison view are the most important screens in the
-game, not the HUD. A beautiful enemy the player cannot parse while wall-riding
+game, not the HUD. A beautiful enemy the player cannot parse mid-dash
 is a failed asset, and a tooltip that hides which of two items is better is a
 failed screen.
 

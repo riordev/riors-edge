@@ -166,10 +166,9 @@ enum class EBreakerBuildCondition : uint8
     TargetBleeding,
     // Carries Status.Poison.
     //
-    // Bleed and Poison are the only two status tags in
-    // Config/DefaultGameplayTags.ini that anything actually applies AND that are
-    // not elemental. Shock is elemental and Void is the Void element's own
-    // status, so both are out under O38. There is deliberately no
+    // Bleed and Poison are the two non-elemental status tags anything applies;
+    // Void is the Void element's own status, so it is out under O38. There is
+    // deliberately no
     // TargetImpaired/TargetSlowed either: no slow or stun tag exists at all.
     // Adding a control-state predicate would mean either inventing a tag or
     // keying off an element, and both are somebody else's ruling.

@@ -3068,20 +3068,40 @@ void ABreakerPlaytestHUD::HandlePlayerDamageReceived(const FBreakerDamageResult&
     // only for damage that actually landed: a dodge or a fully blocked hit
     // already has its own readout and earned its silence.
     //
-    // NOT ON THE KILLING BLOW (ruled: "the death sound needs to go"). There was
-    // never a death sound to delete — this verb IS what played when the player
-    // died, because the fatal hit is a hit and the project has no other audio
-    // source at all. Deleting the call would have taken being-hit out of the
-    // whole game to silence one moment of it, so the removal is this condition
-    // and nothing else. NOT REPLACED with a quieter sting: the ruling is a
-    // verdict on a sound existing at that moment, and the moment already
-    // carries a full-screen line and a respawn. The death beat is now silent.
+    // NOT ON THE KILLING BLOW: the fatal hit is silent, and the death beat
+    // carries the one sound the player's death has (O193) — a low cue at the
+    // hard cut to black, scheduled below at the character's own
+    // LowerAndDropSeconds so the sound and the black arrive together.
     if (!Result.bKilled && (Result.HealthDamage > 0.0f || Result.ShieldDamage > 0.0f))
     {
         if (ABreakerSoundDirector* Sound = GetSoundDirector())
         {
             Sound->PlayTakeHit();
         }
+    }
+    else if (Result.bKilled)
+    {
+        // The delay is read from the pawn's authored timeline, not a copy of
+        // it: the character's beat and this cue cannot drift apart. A pawn
+        // that is not a BreakerCharacter has no death beat and no cut for the
+        // cue to land on, so it plays nothing. Discarded handle, as the
+        // hit-confirm arrival timer: nothing later has grounds to cancel it.
+        const ABreakerCharacter* Character = Cast<ABreakerCharacter>(GetOwningPawn());
+        UWorld* World = GetWorld();
+        if (!Character || !World) return;
+        const float DelaySeconds = Character->DeathBeat.LowerAndDropSeconds;
+        TWeakObjectPtr<ABreakerPlaytestHUD> WeakThis(this);
+        FTimerHandle Discarded;
+        World->GetTimerManager().SetTimer(Discarded, FTimerDelegate::CreateLambda([WeakThis]()
+        {
+            if (ABreakerPlaytestHUD* HUD = WeakThis.Get())
+            {
+                if (ABreakerSoundDirector* Sound = HUD->GetSoundDirector())
+                {
+                    Sound->PlayPlayerDeath();
+                }
+            }
+        }), FMath::Max(DelaySeconds, UE_KINDA_SMALL_NUMBER), false);
     }
 }
 

@@ -9,12 +9,13 @@ class UAudioComponent;
 class USoundWaveProcedural;
 
 // ---------------------------------------------------------------------------
-// The game's combat sounds, and deliberately only four of them.
+// The game's combat sounds, and deliberately only six of them.
 //
-// FIVE VERBS (ruled): weapon fire, hit confirm, kill, taking a hit — which
-// matters more than the other three — and, since ORDERS ruling 2, the ability
-// cast. There is still no generic PlaySound(AnyWave) surface: the roster grows
-// by a ruling adding a verb, never by a caller passing a wave.
+// SIX VERBS (ruled): weapon fire, hit confirm, kill, taking a hit — which
+// matters more than the other three — the ability cast (ORDERS ruling 2) and,
+// since O193, the player's own death. There is still no generic
+// PlaySound(AnyWave) surface: the roster grows by a ruling adding a verb,
+// never by a caller passing a wave.
 //
 // THE FIFTH VERB TAKES AN ABILITY ID, and that is the whole of the override
 // mechanism. The owner will author per-ability sounds "eventually", so the cue
@@ -86,17 +87,23 @@ public:
     // Something the player hit died of it.
     //
     // NO CALLER, BY RULING, AND THAT IS NOT THE DEAD-API DEFECT. "No death
-    // sound for now" (owner, 2026-08-26) retired both death stings — the
-    // player's and this one — and the kill now falls through to
-    // PlayHitConfirm at the arrival-clock site, so a killing shot still
-    // confirms it connected. Kept rather than deleted because the ruling is
-    // explicitly "for now" and the open question is what a kill should SOUND
-    // like, not whether the verb should exist. The distinction that matters:
-    // GetPromptLabel spent a milestone uncalled because nobody knew it was
-    // there. This one is uncalled on purpose and says so.
+    // sound for now" (owner, 2026-08-26) retired both death stings. O193
+    // restores the PLAYER'S — one low cue at the cut, PlayPlayerDeath below —
+    // and leaves this one retired: the kill still falls through to
+    // PlayHitConfirm at the arrival-clock site, so a killing shot confirms it
+    // connected and nothing more. Kept rather than deleted because the ruling
+    // is explicitly "for now" and the open question is what a kill should
+    // SOUND like, not whether the verb should exist. The distinction that
+    // matters: GetPromptLabel spent a milestone uncalled because nobody knew
+    // it was there. This one is uncalled on purpose and says so.
     void PlayKill();
     // The player took real damage. Immediate — being hit has no flight.
     void PlayTakeHit();
+    // The player died (O193): one low sound at the death beat's hard cut to
+    // black. The HUD schedules it at the character's DeathBeat
+    // LowerAndDropSeconds, so the cue lands with the black rather than with
+    // the fatal hit — the fatal hit is silent on purpose (take-hit skips it).
+    void PlayPlayerDeath();
     // An ability was cast. AbilityId selects a per-ability override if one has
     // been authored; NAME_None, or an id with no file, plays the shared
     // default. Resolved on first use per id and cached, so the miss costs one
@@ -116,11 +123,13 @@ private:
     // One voice for every ability: a cast cuts the previous cast, exactly as
     // the other four verbs cut themselves.
     UPROPERTY() TObjectPtr<UAudioComponent> AbilityVoice;
+    UPROPERTY() TObjectPtr<UAudioComponent> PlayerDeathVoice;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> FireWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> HitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> KillWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> TakeHitWave;
     UPROPERTY() TObjectPtr<USoundWaveProcedural> AbilityDefaultWave;
+    UPROPERTY() TObjectPtr<USoundWaveProcedural> PlayerDeathWave;
     // Per-ability overrides, resolved lazily. A key present with a NULL value
     // means "probed, no override authored" — the sentinel is what stops a
     // missing file being re-opened on every cast.
@@ -136,6 +145,7 @@ private:
     TArray<int16> KillPcm;
     TArray<int16> TakeHitPcm;
     TArray<int16> AbilityDefaultPcm;
+    TArray<int16> PlayerDeathPcm;
     TMap<FName, TArray<int16>> AbilityPcm;
     TMap<EBreakerWeaponArchetype, TArray<int16>> ArchetypeFirePcm;
 

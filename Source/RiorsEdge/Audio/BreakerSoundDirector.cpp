@@ -33,6 +33,7 @@ ABreakerSoundDirector::ABreakerSoundDirector()
     KillVoice = MakeVoice(TEXT("KillVoice"));
     TakeHitVoice = MakeVoice(TEXT("TakeHitVoice"));
     AbilityVoice = MakeVoice(TEXT("AbilityVoice"));
+    PlayerDeathVoice = MakeVoice(TEXT("PlayerDeathVoice"));
 }
 
 USoundWaveProcedural* ABreakerSoundDirector::MakeWave(int32 SampleRate)
@@ -89,6 +90,8 @@ void ABreakerSoundDirector::BeginPlay()
     // nothing. They resolve on first cast instead. Nothing here is sized to
     // that count: resolution is per-id and lazy, so the number is prose.
     const int32 AbilityRate = LoadOrSynth(TEXT("ability_cast.wav"), &BreakerSound::RenderAbilityCast, AbilityDefaultPcm);
+    // The sixth verb (O193): one low cue at the death beat's cut to black.
+    const int32 PlayerDeathRate = LoadOrSynth(TEXT("player_death.wav"), &BreakerSound::RenderPlayerDeath, PlayerDeathPcm);
 
     FireWave = MakeWave(FireRate);
     HitWave = MakeWave(HitRate);
@@ -100,6 +103,8 @@ void ABreakerSoundDirector::BeginPlay()
     TakeHitVoice->SetSound(TakeHitWave);
     AbilityDefaultWave = MakeWave(AbilityRate);
     AbilityVoice->SetSound(AbilityDefaultWave);
+    PlayerDeathWave = MakeWave(PlayerDeathRate);
+    PlayerDeathVoice->SetSound(PlayerDeathWave);
 }
 
 void ABreakerSoundDirector::Trigger(UAudioComponent* Voice, USoundWaveProcedural* Wave, const TArray<int16>& Pcm)
@@ -223,3 +228,4 @@ void ABreakerSoundDirector::PlayWeaponFire(EBreakerWeaponArchetype Archetype)
 void ABreakerSoundDirector::PlayHitConfirm() { Trigger(HitVoice, HitWave, HitPcm); }
 void ABreakerSoundDirector::PlayKill()       { Trigger(KillVoice, KillWave, KillPcm); }
 void ABreakerSoundDirector::PlayTakeHit()    { Trigger(TakeHitVoice, TakeHitWave, TakeHitPcm); }
+void ABreakerSoundDirector::PlayPlayerDeath() { Trigger(PlayerDeathVoice, PlayerDeathWave, PlayerDeathPcm); }

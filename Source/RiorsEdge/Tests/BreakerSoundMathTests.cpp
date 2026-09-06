@@ -35,7 +35,11 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         {TEXT("Kill"), BreakerSound::KillDurationSeconds, &BreakerSound::RenderKill},
         {TEXT("TakeHit"), BreakerSound::TakeHitDurationSeconds, &BreakerSound::RenderTakeHit},
         {TEXT("AbilityCast"), BreakerSound::AbilityCastDurationSeconds, &BreakerSound::RenderAbilityCast},
+        {TEXT("PlayerDeath"), BreakerSound::PlayerDeathDurationSeconds, &BreakerSound::RenderPlayerDeath},
     };
+    // Six verbs: the roster grows by a ruling adding one (O193 added the
+    // player's death), and a renderer that misses this table is unproven.
+    TestEqual(TEXT("six verbs are rendered"), static_cast<int32>(UE_ARRAY_COUNT(Cases)), 6);
 
     for (const FCase& Case : Cases)
     {
@@ -63,6 +67,33 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
         TArray<int16> Again;
         Case.Render(Again);
         TestTrue(FString::Printf(TEXT("%s renders deterministically"), Case.Name), Pcm == Again);
+    }
+
+    // --- The player's death cue (O193): "one low sound" ----------------------
+    // Shipped duration, and the only spectral fact a zero-crossing count can
+    // prove: the implied fundamental across the whole render stays below
+    // 200 Hz, which is what keeps the cue under the take-hit thud rather than
+    // beside it. A 110 -> 55 Hz glide over 0.4 s crosses zero about 66 times;
+    // 200 Hz would be 160. Zeros are skipped so the quantized tail does not
+    // count as chatter.
+    {
+        TestEqual(TEXT("PlayerDeath ships at 0.4 s"), BreakerSound::PlayerDeathDurationSeconds, 0.4f);
+
+        TArray<int16> Pcm;
+        BreakerSound::RenderPlayerDeath(Pcm);
+        int32 Crossings = 0;
+        int32 LastSign = 0;
+        for (const int16 Sample : Pcm)
+        {
+            const int32 Sign = Sample > 0 ? 1 : (Sample < 0 ? -1 : 0);
+            if (Sign == 0) continue;
+            if (LastSign != 0 && Sign != LastSign) ++Crossings;
+            LastSign = Sign;
+        }
+        const float ImpliedHz = static_cast<float>(Crossings) / (2.0f * BreakerSound::PlayerDeathDurationSeconds);
+        TestTrue(FString::Printf(TEXT("PlayerDeath's implied fundamental (%.1f Hz) stays below 200 Hz"), ImpliedHz),
+            ImpliedHz < 200.0f);
+        TestTrue(TEXT("PlayerDeath is a tone, not a click"), Crossings >= 20);
     }
 
     // --- The WAV reader: the sample path's pure half -------------------------
@@ -144,6 +175,9 @@ bool FBreakerSoundSynthShapeTest::RunTest(const FString& Parameters)
     // The per-ability overrides (ability_<Id>.wav) never join, because every
     // one of them is optional by construction, and candidates/ is invisible
     // here on purpose — audition copies are consumed by nothing.
+    // player_death.wav (O193) is named eagerly by the director but is not on
+    // this list: no sample is authored and the synth is its floor. It joins
+    // the day one is, under the same condition ability_cast.wav met.
     {
         const FString AudioDir = FPaths::ProjectContentDir() / TEXT("Breaker/Audio");
         if (IFileManager::Get().DirectoryExists(*AudioDir))

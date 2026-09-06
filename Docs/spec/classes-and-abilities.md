@@ -25,7 +25,7 @@ whether the abilities run, never from a list someone maintains — a row-count
 proxy would offer a permanent, irreversible lock onto nothing.
 
 **Generation is capped per second, per source.** This is the anti-farm rule and
-it is not optional: it is what stops wall-riding for Momentum and self-harm for
+it is not optional: it is what stops sprint-looping for Momentum and self-harm for
 Grit. Generation events carry a proc coefficient, so a tick generates at its
 coefficient rather than at full value.
 
