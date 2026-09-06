@@ -29,8 +29,9 @@ enum class EBreakerBossPhase : uint8
     // has to be earned.
     Suppression,
     // 33% -> 0%. It stops commanding and fights: faster, shorter slam
-    // cooldown, hazards accumulate, frontal armour halves, and the command
-    // apparatus stays permanently exposed.
+    // cooldown, hazards accumulate, and the command apparatus stays
+    // permanently exposed. The front is O198's pool, spent once and gone;
+    // nothing about it changes with phase.
     Commitment
 };
 
@@ -68,7 +69,7 @@ struct RIORSEDGE_API FBreakerBossPhaseParams
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Orders", meta=(ClampMin="0.1"))
     float FireIntervalSeconds = 15.0f;   // O2 PLACEHOLDER
 
-    // The apparatus raise. This is the punish window and §3.4 calls it
+    // The apparatus raise. This is the ORDER punish window and §3.4 calls it
     // "generous" on purpose: it is the only time in phases 1 and 2 that the
     // rear weak point is visible from the FRONT, and O1's passive defence means
     // the player answers with position rather than a reaction.
@@ -76,6 +77,17 @@ struct RIORSEDGE_API FBreakerBossPhaseParams
     float DeployRaiseSeconds = 2.5f;   // O2 PLACEHOLDER
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Orders", meta=(ClampMin="0"))
     float FireRaiseSeconds = 2.0f;   // O2 PLACEHOLDER
+
+    // The FRONT BREAK punish window (O198). The first punish window of the
+    // fight is the one the player earns rather than waits for: spending the
+    // front pool opens the apparatus for this long, once, in whatever phase
+    // the break lands. Its punish is the exposed 1.75x weak point plus the
+    // front that no longer mitigates — nothing more. combat.md leaves the
+    // stagger/interrupt model open, so there is no stagger here and no damage
+    // multiplier standing in for one; when that ruling lands it is a new beat
+    // in the grammar below, not a number on this one.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Orders", meta=(ClampMin="0"))
+    float FrontBreakPunishSeconds = 2.5f;   // O2 PLACEHOLDER
     // Adds appear this long after the raise completes, so the pointed alcove is
     // previewed before anything comes out of it (§5.1: spawns are always
     // previewed).
@@ -89,8 +101,58 @@ struct RIORSEDGE_API FBreakerBossPhaseParams
     float CommitmentSweepCadenceScale = 0.70f;   // O2 PLACEHOLDER (-30%)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="0"))
     float CommitmentSlamCooldownSeconds = 4.0f;   // O2 PLACEHOLDER (7s -> 4s)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Boss|Commitment", meta=(ClampMin="0", ClampMax="1"))
-    float CommitmentArmorFraction = 0.50f;   // O2 PLACEHOLDER (90 -> 45)
+};
+
+// THE BOSS GRAMMAR. Five kinds of beat, and every phase of the fight is a
+// sentence in them. The grammar is DERIVED from the params and the actor's
+// counts by MakeShippedGrammar, never authored beside them, so it cannot drift
+// from the numbers the fight actually runs on: it is the fight's shape made
+// checkable, and the place a new beat (a stagger, a second arena change) is
+// added when its plumbing exists.
+//
+// NOT SERIALIZED, on purpose. This enum is a description of the runtime and is
+// never written to a save or an asset, so it is free to grow and reorder; the
+// append-only rule binds EBreakerBossPhase above, not this.
+enum class EBreakerBossBeat : uint8
+{
+    // A tell the player can read before anything lands.
+    Telegraph,
+    // The weak point is open. Seconds < 0 means for the rest of the fight.
+    PunishWindow,
+    // A health fraction the boss crosses into the next phase.
+    PhaseGate,
+    // Adds arrive, AddCount of them, Seconds after the beat before it.
+    AddWave,
+    // The room itself changes what it is.
+    ArenaChange
+};
+
+struct RIORSEDGE_API FBreakerBossBeat
+{
+    EBreakerBossBeat Beat = EBreakerBossBeat::Telegraph;
+    // Duration for a Telegraph or PunishWindow; delay for an AddWave. -1 on a
+    // PunishWindow is permanent.
+    float Seconds = 0.0f;
+    // PhaseGate only; -1 otherwise.
+    float GateFraction = -1.0f;
+    // AddWave only.
+    int32 AddCount = 0;
+    // Which tell, which window, which change — for a test or a log to name.
+    FName Tag;
+};
+
+struct RIORSEDGE_API FBreakerBossGrammar
+{
+    // Beats that can land in any phase.
+    TArray<FBreakerBossBeat> FightLevel;
+    // Indexed by EBreakerBossPhase's value. Three because the phase enum has
+    // three; the enum is not extended to carry this.
+    TArray<FBreakerBossBeat> PerPhase[3];
+
+    const TArray<FBreakerBossBeat>& ForPhase(EBreakerBossPhase Phase) const
+    {
+        return PerPhase[FMath::Clamp(static_cast<int32>(Phase), 0, 2)];
+    }
 };
 
 UCLASS()
@@ -134,8 +196,6 @@ public:
     static float GetPhaseSweepCooldown(EBreakerBossPhase Phase, float BaseCooldown, const FBreakerBossPhaseParams& Params);
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static float GetPhaseSlamCooldown(EBreakerBossPhase Phase, float BaseCooldown, const FBreakerBossPhaseParams& Params);
-    UFUNCTION(BlueprintPure, Category="Boss|Phases")
-    static float GetPhaseFrontalArmor(EBreakerBossPhase Phase, float BaseArmor, const FBreakerBossPhaseParams& Params);
 
     // The rear weak point is exposed during an order raise in phases 1 and 2,
     // and PERMANENTLY in phase 3 — because it has stopped commanding. §3.4's
@@ -143,6 +203,32 @@ public:
     // commander."
     UFUNCTION(BlueprintPure, Category="Boss|Phases")
     static bool IsApparatusExposed(EBreakerBossPhase Phase, bool bOrderRaiseActive);
+
+    // The full rule for the weak point: an order raise, a live front-break
+    // window (O198), or Commitment. The actor reads this and nothing else.
+    UFUNCTION(BlueprintPure, Category="Boss|Grammar")
+    static bool IsPunishWindowOpen(EBreakerBossPhase Phase, bool bOrderRaiseActive, float FrontBreakWindowRemaining);
+
+    // The health fraction that ends this phase; negative in Commitment, which
+    // ends only with the boss.
+    UFUNCTION(BlueprintPure, Category="Boss|Grammar")
+    static float NextGate(EBreakerBossPhase Phase, const FBreakerBossPhaseParams& Params);
+
+    // One step of the front-break window. Returns true on the step that CLOSES
+    // it, exactly once; Remaining never goes below zero and a closed window
+    // stays closed.
+    UFUNCTION(BlueprintCallable, Category="Boss|Grammar")
+    static bool AdvanceBreakWindow(UPARAM(ref) float& Remaining, float DeltaSeconds);
+
+    // The shipped grammar, derived. SweepTellSeconds is the Warden's draw-back:
+    // it lives on the archetype, not in the params, and is passed in rather
+    // than authored a second time here.
+    static FBreakerBossGrammar MakeShippedGrammar(const FBreakerBossPhaseParams& Params,
+        int32 AddsPerDeploy, int32 GalleryLatticeCount, float SweepTellSeconds);
+
+    // The first PunishWindow in the grammar: fight-level beats first, then the
+    // phases in order. Null if there is none.
+    static const FBreakerBossBeat* FirstPunishWindow(const FBreakerBossGrammar& Grammar);
 
     // Phase 3 stops spawning; anything alive stays alive.
     UFUNCTION(BlueprintPure, Category="Boss|Phases")

@@ -14,6 +14,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerKillDealt, const FBreakerHit
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealEvent, const FBreakerHealResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FBreakerHealDealt, const FBreakerHealContext&, Heal);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerVitalsRestored);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerFrontShieldBroken);
 
 // One push/pop-able outgoing damage modifier. Keyed so the pusher (an ability
 // window, a node) can remove exactly its own entry; expiry is a safety net for
@@ -211,6 +212,32 @@ public:
     UFUNCTION(BlueprintPure, Category="Defense|Facing")
     bool IsRearArcHit(const FVector& SourceLocation) const;
 
+    // --- The front pool (O198) --------------------------------------------
+    // A bearer's frontal shield: a pool the archetype arms off its max health
+    // (Combat/BreakerShieldMath.h holds the arithmetic). In ReceiveDamage a
+    // hit that carries a source location, does not bypass shields, and is
+    // NOT a rear-arc hit pays this pool BEFORE the attribute shield and
+    // health; the hit that spends it to zero latches bFrontShieldBroken and
+    // broadcasts OnFrontShieldBroken once. Broken stays broken until the next
+    // ArmFrontShield — there is no recharge, by construction. A rear-arc hit
+    // never touches it, which is what leaves the flank the answer.
+    //
+    // The attribute shield (the Warded ward, the player's gear shield) is a
+    // separate pool with its own recharge and its own writers; nothing here
+    // reads or writes it beyond routing the spill on to it.
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Defense|Front")
+    void ArmFrontShield(float Amount);
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShield() const { return FrontShield; }
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetFrontShieldMax() const { return FrontShieldMax; }
+    UFUNCTION(BlueprintPure, Category="Defense|Front") bool IsFrontShieldBroken() const { return bFrontShieldBroken; }
+    // What a bar draws as "shield": the attribute shield plus the standing
+    // front pool. A broken pool contributes nothing to either figure, so the
+    // bar reads "gone for the fight" rather than an empty segment.
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetDisplayShield() const;
+    UFUNCTION(BlueprintPure, Category="Defense|Front") float GetDisplayMaxShield() const;
+    // Raised on the frame the front pool reaches zero, after the vitals write.
+    UPROPERTY(BlueprintAssignable, Category="Defense|Front") FBreakerFrontShieldBroken OnFrontShieldBroken;
+
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDamageReceived OnDamageReceived;
     UPROPERTY(BlueprintAssignable, Category="Combat") FBreakerDeathEvent OnDeath;
     // Raised by RestoreVitals — spawn, respawn, and the F1 playtest reset.
@@ -265,6 +292,12 @@ private:
     // armour reduction is authored FLAT.
     TMap<FName, float> ArmorReductions;
     UPROPERTY() TObjectPtr<UBreakerAttributeSet> Attributes;
+    // The front pool (O198): standing amount, the amount it was armed with,
+    // and the once-per-fight latch. 0 / 0 / false is "no front pool" — every
+    // enemy and player that never arms one takes the ordinary shield step.
+    float FrontShield = 0.0f;
+    float FrontShieldMax = 0.0f;
+    bool bFrontShieldBroken = false;
     // TargetBandBroken's one bit — see WasBandBrokenByPreviousHit above.
     bool bBandBrokenByPreviousHit = false;
     bool bDeathBroadcast = false;

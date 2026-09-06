@@ -5,6 +5,7 @@
 #include "Combat/BreakerCombatComponent.h"
 #include "Combat/BreakerModifierComponent.h"
 #include "Combat/BreakerRangedBehavior.h"
+#include "Combat/BreakerShieldMath.h"
 #include "Combat/BreakerZoneActor.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
@@ -13,6 +14,8 @@
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "UI/BreakerEffectRenderer.h"
+#include "UI/BreakerUIStyle.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace BreakerWardenDetail
@@ -48,11 +51,11 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     //
     // DIVERGENCE [O18], recorded rather than fixed: 3.2x health on a Trash-rank
     // enemy is a long fight against the "trash a little under 1 second" target,
-    // even before its frontal armour roughly doubles effective health from the
-    // front. §2.3's own answer is that the Warden is not meant to be fought
-    // frontally at all and a flanking player does "triple the damage" — whether
-    // that closes the gap is a measurement, not an assertion, and O2 freezes it
-    // until wave mode reports.
+    // even before the front pool adds 15% of it to a frontal approach. §2.3's
+    // own answer is that the Warden is not meant to be fought frontally at all
+    // and a flanking player does "triple the damage" — whether that closes the
+    // gap is a measurement, not an assertion, and O2 freezes it until wave
+    // mode reports.
     ArchetypeHealthMultiplier = 3.2f;   // O2 PLACEHOLDER (§2.3)
     ArchetypeDamageMultiplier = 1.86f;  // O2 PLACEHOLDER (§2.3: 26 sweep damage)
 
@@ -92,8 +95,9 @@ ABreakerWardenEnemy::ABreakerWardenEnemy()
     // blocks the player weapon trace channel exactly the way BodyHitBox does
     // (ignore everything, block ECC_GameTraceChannel2, query only): a shot
     // into the shield face registers as a frontal hit on the Warden and pays
-    // the frontal armour, which is the archetype's whole lesson. QueryOnly so
+    // the front pool, which is the archetype's whole lesson. QueryOnly so
     // it never pushes physics; movement and enemy projectiles are untouched.
+    // Once the pool breaks the slab is hidden and stops blocking (OnFrontBroken).
     ShieldVisual->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     ShieldVisual->SetCollisionResponseToAllChannels(ECR_Ignore);
     ShieldVisual->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);
@@ -119,15 +123,67 @@ void ABreakerWardenEnemy::BeginPlay()
     ShieldMaterial = BreakerWardenDetail::BreakerMakeWardenMaterial(ShieldVisual, ShieldColor);
     SlamRingMaterial = BreakerWardenDetail::BreakerMakeWardenMaterial(SlamRingVisual, SlamRingColor);
 
-    if (Attributes) Attributes->SetArmor(FMath::Max(0.0f, FrontalArmor));
-    // The facing rule, published onto the shared combat component. The armour
-    // number and the arc live together on the archetype; the PIPELINE just
-    // applies whatever it is told, which is what keeps the rule out of six
-    // different damage call sites.
-    if (Combat) Combat->RearArcArmorMultiplier = FMath::Clamp(RearArmorFraction, 0.0f, 1.0f);
+    // The front pool (O198). The archetype owns the fraction and the tell;
+    // the combat component owns the pool and decides facing per hit, which is
+    // what keeps the rule out of six different damage call sites. No armour
+    // is written: the front is a pool, and armour on this body is whatever the
+    // attribute set defaults to.
+    //
+    // RECORDED, NOT FAKED: a bBypassShield DoT (a Bleed on the front) now
+    // pays nothing to the front, where the armour it replaced took a share of
+    // every tick. The pool is a shield and a shield-bypassing tick bypasses
+    // it by definition; whether the front needs a DoT answer of its own is a
+    // measurement for wave mode, not a second armour number here.
+    if (Combat)
+    {
+        Combat->OnVitalsRestored.AddUniqueDynamic(this, &ABreakerWardenEnemy::ArmFront);
+        Combat->OnFrontShieldBroken.AddUniqueDynamic(this, &ABreakerWardenEnemy::OnFrontBroken);
+    }
+    // The chassis's first restore ran inside Super::BeginPlay, before the
+    // binding above existed, so the first arming is explicit.
+    ArmFront();
 
     // §2.3 gives it high stagger resistance. There is no stagger system yet
     // (Encounter-Design OPEN QUESTION 9), so this is recorded and not faked.
+}
+
+bool ABreakerWardenEnemy::IsFrontBroken() const
+{
+    return Combat && Combat->IsFrontShieldBroken();
+}
+
+void ABreakerWardenEnemy::ArmFront()
+{
+    if (!Combat || !Attributes) return;
+    Combat->ArmFrontShield(BreakerShield::FrontPool(Attributes->GetMaxHealth(), FrontShieldFractionOfMaxHealth));
+    SetSlabVisible(true);
+}
+
+void ABreakerWardenEnemy::OnFrontBroken()
+{
+    // The slab goes with the pool: hidden and no longer blocking, so a round
+    // aimed at where it was reaches the body behind it. The sweep's draw-back
+    // tell moved this slab, so after the break the sweep reads through its
+    // hot colour alone on an invisible mesh — RECORDED here, not answered: the
+    // arm that draws back needs a body part that survives the break, and the
+    // named mech's animation pass is where that lives.
+    SetSlabVisible(false);
+    if (ABreakerEffectRenderer* Effects = ABreakerEffectRenderer::FindOrSpawn(GetWorld()))
+    {
+        // Gold is O179's weak-point promise: the unarmoured front just opened.
+        // Direction is back toward the shooter, the way an impact faces.
+        const FVector Where = ShieldVisual ? ShieldVisual->GetComponentLocation() : GetActorLocation();
+        Effects->PlayMoment(EBreakerEffectMoment::Impact, Where, -GetActorForwardVector(), BreakerUI::Gold);
+    }
+}
+
+void ABreakerWardenEnemy::SetSlabVisible(bool bVisible)
+{
+    if (!ShieldVisual) return;
+    ShieldVisual->SetVisibility(bVisible, true);
+    // Collision tracks visibility: an invisible slab that still ate bullets
+    // would be the lie this component exists not to tell.
+    ShieldVisual->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 }
 
 float ABreakerWardenEnemy::GetSweepDamage() const
@@ -147,16 +203,12 @@ float ABreakerWardenEnemy::GetSlamDamage() const
 void ABreakerWardenEnemy::SetBodyVisible(bool bVisible)
 {
     Super::SetBodyVisible(bVisible);
-    if (ShieldVisual)
-    {
-        ShieldVisual->SetVisibility(bVisible, true);
-        // Collision tracks visibility: every path that hides the body (death,
-        // Wakeful downed, a Phase modifier's untargetable window) also stops
-        // the shield blocking, and every path that shows it re-arms it. An
-        // invisible slab that still ate bullets would be the same lie this
-        // component just stopped telling, mirrored.
-        ShieldVisual->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
-    }
+    // Every path that hides the body (death, Wakeful downed, a Phase
+    // modifier's untargetable window) hides the slab and stops it blocking.
+    // Showing the body shows the slab only while the front is unbroken: a
+    // broken front is gone for the fight, and only a vitals restore (ArmFront)
+    // brings it back.
+    SetSlabVisible(bVisible && !IsFrontBroken());
     // The ring is driven by the slam and must never be left on by a death or a
     // respawn, so it goes away regardless of which way bVisible points.
     if (SlamRingVisual) SlamRingVisual->SetVisibility(false, true);

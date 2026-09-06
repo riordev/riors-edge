@@ -165,8 +165,6 @@ bool FBreakerBossCommitmentTest::RunTest(const FString& Parameters)
             EBoss::GetPhaseSweepCooldown(Early, 2.2f, Params), 2.2f, 0.0001f);
         TestEqual(TEXT("Early phases keep the authored slam cooldown"),
             EBoss::GetPhaseSlamCooldown(Early, 7.0f, Params), 7.0f, 0.0001f);
-        TestEqual(TEXT("Early phases keep full frontal armour"),
-            EBoss::GetPhaseFrontalArmor(Early, 90.0f, Params), 90.0f, 0.0001f);
     }
 
     TestTrue(TEXT("Commitment is faster"),
@@ -175,8 +173,6 @@ bool FBreakerBossCommitmentTest::RunTest(const FString& Parameters)
         EBoss::GetPhaseSweepCooldown(EBreakerBossPhase::Commitment, 2.2f, Params) < 2.2f);
     TestTrue(TEXT("Commitment slams more often"),
         EBoss::GetPhaseSlamCooldown(EBreakerBossPhase::Commitment, 7.0f, Params) < 7.0f);
-    TestEqual(TEXT("Commitment halves the frontal armour"),
-        EBoss::GetPhaseFrontalArmor(EBreakerBossPhase::Commitment, 90.0f, Params), 45.0f, 0.0001f);
 
     // §3.2's "deliberately slower than the player": phase 3's +40% must still
     // leave it under the 950 cm/s sprint, or the fight becomes a chase the
@@ -206,6 +202,114 @@ bool FBreakerBossCommitmentTest::RunTest(const FString& Parameters)
     // rotates rather than pointing at the same corner every time.
     TestTrue(TEXT("There are multiple alcoves to choose between"), Boss->AlcoveOffsets.Num() >= 2);
     TestTrue(TEXT("There are galleries for the Lattices"), Boss->GalleryOffsets.Num() >= 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBreakerBossGrammarTest,
+    "RiorsEdge.Combat.Boss.Grammar",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBreakerBossGrammarTest::RunTest(const FString& Parameters)
+{
+    // The grammar is derived from the shipped numbers, so this reads the
+    // default params and the default boss rather than authoring a fight of
+    // its own.
+    const FBreakerBossPhaseParams Params;
+    const ABreakerBossEnemy* Boss = GetDefault<ABreakerBossEnemy>();
+    if (!TestNotNull(TEXT("The boss has a default object"), Boss)) return false;
+    const FBreakerBossGrammar Grammar = EBoss::MakeShippedGrammar(
+        Params, Boss->AddsPerDeploy, Boss->GalleryLatticeCount, Boss->SweepWindupSeconds);
+
+    // Every TIMED punish window is announced first, in its own list. The one
+    // permanent window (Commitment) has no tell of its own: its tell is the
+    // gate the phase before it ends on, which is asserted below.
+    auto CheckTelegraphed = [this](const TArray<FBreakerBossBeat>& List, const TCHAR* Name)
+    {
+        bool bSeenTelegraph = false;
+        for (const FBreakerBossBeat& B : List)
+        {
+            if (B.Beat == EBreakerBossBeat::Telegraph) bSeenTelegraph = true;
+            if (B.Beat == EBreakerBossBeat::PunishWindow && B.Seconds >= 0.0f)
+            {
+                TestTrue(FString::Printf(TEXT("%s: a timed punish window is preceded by a telegraph (%s)"),
+                    Name, *B.Tag.ToString()), bSeenTelegraph);
+            }
+        }
+    };
+    CheckTelegraphed(Grammar.FightLevel, TEXT("Fight-level"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Deployment), TEXT("Deployment"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Suppression), TEXT("Suppression"));
+    CheckTelegraphed(Grammar.ForPhase(EBreakerBossPhase::Commitment), TEXT("Commitment"));
+
+    // The first punish window of the fight is the front break (O198), and it is
+    // a real window rather than a frame.
+    const FBreakerBossBeat* First = EBoss::FirstPunishWindow(Grammar);
+    if (!TestNotNull(TEXT("The grammar has a punish window"), First)) return false;
+    TestEqual(TEXT("The first punish window is the front break"), First->Tag, FName(TEXT("FrontBreak")));
+    TestEqual(TEXT("The front-break window is the authored length"),
+        First->Seconds, Params.FrontBreakPunishSeconds, 0.0001f);
+    TestTrue(TEXT("The front-break window is open for a real duration"), Params.FrontBreakPunishSeconds > 0.0f);
+
+    // Gates descend across the phases and Commitment has none.
+    const float Gate1 = EBoss::NextGate(EBreakerBossPhase::Deployment, Params);
+    const float Gate2 = EBoss::NextGate(EBreakerBossPhase::Suppression, Params);
+    TestTrue(TEXT("Deployment's gate is below full health"), Gate1 < 1.0f && Gate1 > 0.0f);
+    TestTrue(TEXT("Gates are strictly descending"), Gate2 < Gate1 && Gate2 > 0.0f);
+    TestTrue(TEXT("Commitment has no next gate"), EBoss::NextGate(EBreakerBossPhase::Commitment, Params) < 0.0f);
+    // The grammar's gate beats carry the same numbers.
+    const TArray<FBreakerBossBeat>& Suppression = Grammar.ForPhase(EBreakerBossPhase::Suppression);
+    TestTrue(TEXT("Suppression ends on the gate that is Commitment's tell"),
+        Suppression.Num() > 0 && Suppression.Last().Beat == EBreakerBossBeat::PhaseGate
+        && FMath::IsNearlyEqual(Suppression.Last().GateFraction, Gate2, 0.0001f));
+    const TArray<FBreakerBossBeat>& Commitment = Grammar.ForPhase(EBreakerBossPhase::Commitment);
+    TestTrue(TEXT("Commitment's window is permanent"),
+        Commitment.Num() > 0 && Commitment[0].Beat == EBreakerBossBeat::PunishWindow && Commitment[0].Seconds < 0.0f);
+
+    // Phase 3 stops commanding: nothing arrives after its entry, and the room
+    // itself is what changes instead.
+    bool bArenaChange = false;
+    for (const FBreakerBossBeat& B : Commitment)
+    {
+        TestTrue(TEXT("No add wave after Commitment's entry"), B.Beat != EBreakerBossBeat::AddWave);
+        if (B.Beat == EBreakerBossBeat::ArenaChange) bArenaChange = true;
+    }
+    TestTrue(TEXT("Commitment changes the arena"), bArenaChange);
+
+    // §5.3's ceiling: no single wave can outrun the live-add cap.
+    for (const FBreakerBossBeat& B : Grammar.ForPhase(EBreakerBossPhase::Deployment))
+    {
+        if (B.Beat == EBreakerBossBeat::AddWave)
+        {
+            TestTrue(TEXT("A deploy wave fits under the live-add ceiling"), B.AddCount <= Boss->MaximumLiveAdds);
+            TestTrue(TEXT("Adds arrive after the raise, not with it"), B.Seconds > 0.0f);
+        }
+    }
+
+    // The window rule the actor reads.
+    TestFalse(TEXT("No order, no break window: closed"),
+        EBoss::IsPunishWindowOpen(EBreakerBossPhase::Deployment, false, 0.0f));
+    TestTrue(TEXT("A running break window holds it open"),
+        EBoss::IsPunishWindowOpen(EBreakerBossPhase::Deployment, false, 0.1f));
+    TestTrue(TEXT("An order raise holds it open"),
+        EBoss::IsPunishWindowOpen(EBreakerBossPhase::Suppression, true, 0.0f));
+    TestTrue(TEXT("Commitment holds it open with nothing else"),
+        EBoss::IsPunishWindowOpen(EBreakerBossPhase::Commitment, false, 0.0f));
+
+    // The break window closes exactly once and never reads negative.
+    float Remaining = Params.FrontBreakPunishSeconds;
+    int32 Closes = 0;
+    for (int32 Frame = 0; Frame < 600; ++Frame)
+    {
+        if (EBoss::AdvanceBreakWindow(Remaining, 1.0f / 60.0f)) ++Closes;
+        TestTrue(TEXT("The break window never goes negative"), Remaining >= 0.0f);
+    }
+    TestEqual(TEXT("The break window closes exactly once"), Closes, 1);
+    TestEqual(TEXT("A closed window reads zero"), Remaining, 0.0f);
+    TestFalse(TEXT("A closed window does not close again"), EBoss::AdvanceBreakWindow(Remaining, 1.0f));
+    Remaining = 0.5f;
+    TestTrue(TEXT("A hitch closes it once"), EBoss::AdvanceBreakWindow(Remaining, 60.0f));
+    TestEqual(TEXT("A hitch leaves it at zero, not below"), Remaining, 0.0f);
     return true;
 }
 
@@ -263,16 +367,16 @@ bool FBreakerFacingArmorTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A zero forward vector changes nothing"),
         ELib::GetFacingArmorMultiplier(FVector::ZeroVector, Self, FVector(-1000.0f, 0.0f, 0.0f), 0.0f, 0.0f), 1.0f);
 
-    // A partial rear multiplier (the boss's phase 3 does not zero its armour,
-    // it halves it) passes through rather than snapping to 0 or 1.
+    // A partial rear multiplier passes through rather than snapping to 0 or 1:
+    // the geometry honours whatever fraction its caller hands it.
     TestEqual(TEXT("A partial rear multiplier is honoured"),
         ELib::GetFacingArmorMultiplier(Forward, Self, FVector(-1000.0f, 0.0f, 0.0f), 0.4f, 0.0f), 0.4f);
 
     // The archetypes that depend on it are actually wired to use it.
     const ABreakerWardenEnemy* Warden = GetDefault<ABreakerWardenEnemy>();
     if (!TestNotNull(TEXT("The Warden has a default object"), Warden)) return false;
-    TestTrue(TEXT("The Warden is frontally armoured"), Warden->FrontalArmor > 0.0f);
-    TestEqual(TEXT("The Warden's rear is unarmoured"), Warden->RearArmorFraction, 0.0f);
+    TestEqual(TEXT("The Warden's front is a pool of 15% of its max health (O198)"),
+        Warden->FrontShieldFractionOfMaxHealth, 0.15f, 0.0001f);
     // Both telegraphs are spatial windows, not reaction frames (O1, §0).
     TestTrue(TEXT("The sweep draw-back is a real window"), Warden->SweepWindupSeconds >= 0.4f);
     TestTrue(TEXT("The slam ring is a long, readable growth"), Warden->SlamWindupSeconds >= 0.8f);

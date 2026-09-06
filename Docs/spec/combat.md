@@ -25,10 +25,12 @@ a step without writing it here first.
 3. **Critical**, rolled or taken from the snapshot.
 4. **Passive dodge**, then **passive block**. Neither applies to damage over
    time.
-5. **Facing selects the base armour value**, then armour composition, then the
-   mitigation curve.
+5. **Armour composition**, then the mitigation curve.
 6. **Per-element resistance.**
-7. **Shield routing**, unless the event bypasses shields.
+7. **Shield routing**, unless the event bypasses shields. Facing selects
+   whether the bearer's front pool stands in this step: a frontal hit pays
+   the front pool, then the ward, then health; a rear-arc hit pays the ward,
+   then health. A front pool spent to zero is broken for the fight.
 8. **Remaining damage to health.**
 9. **Shield-break, damage, dodge, block and death events.**
 
@@ -37,8 +39,8 @@ True damage skips 5 and 6.
 **Armour composition, with an explicit floor:**
 
 ```
-FacingArmour = facing selects the base value
-AfterFlat    = max(FacingArmour - flat reductions, 0)
+Armour       = the enemy's armour attribute
+AfterFlat    = max(Armour - flat reductions, 0)
 AfterBypass  = AfterFlat * (1 - bypass fraction)
 Mitigation   = AfterBypass / (AfterBypass + K), capped
 BossClamp    = on a boss, total REDUCTION may not exceed the boss cap
@@ -49,10 +51,7 @@ at zero forbids it. **The boss cap clamps the reduction, not the mitigation**,
 so status builds still function against bosses instead of being deleted by the
 one rule meant to protect them.
 
-**Facing-dependent armour is real armour on every armoured enemy**, not a
-gimmick on one. It is the mechanism that makes positioning a damage stat
-without converting momentum into damage, and a rear arc that pays on one enemy
-and nothing else teaches the player that flanking does not work.
+**Facing-dependent defence is the front shield pool on every shielded enemy**, not a gimmick on one: frontal hits spend a pool of 15 % of the bearer's max health until it breaks, then the front is open for the fight, and the rear was never covered. Positioning is a damage stat without converting momentum into damage.
 
 **Block and dodge are passive chance layers.** No stamina pool exists and none
 may be authored. A dodge is full evasion and returns immediately, raising
@@ -87,7 +86,7 @@ cannot be tuned away.
 
 **Advanced movement is never required** to land a routine shot or avoid a
 baseline attack. Ordinary forward movement does not self-accelerate past
-sprint; wall riding preserves flow but generates no speed; dash solves a
+sprint; dash solves a
 positioning problem rather than being the fastest way to travel; sliding has a
 clear beginning and end.
 

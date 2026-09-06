@@ -99,9 +99,6 @@ void ABreakerBossEnemy::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Captured AFTER the Warden's BeginPlay has published its armour, so the
-    // phase-3 halving works off the real number rather than a copy of it.
-    BaseFrontalArmor = FrontalArmor;
     BaseSweepCooldown = SweepCooldownSeconds;
     BaseSlamCooldown = SlamCooldownSeconds;
     BaseBossMoveSpeed = MoveSpeed;
@@ -139,7 +136,20 @@ void ABreakerBossEnemy::BeginPlay()
 
 bool ABreakerBossEnemy::IsApparatusExposed() const
 {
-    return UBreakerBossPhaseLibrary::IsApparatusExposed(Phase, bOrderRaiseActive);
+    return UBreakerBossPhaseLibrary::IsPunishWindowOpen(Phase, bOrderRaiseActive, FrontBreakWindowRemaining);
+}
+
+void ABreakerBossEnemy::OnFrontBroken()
+{
+    // The Warden hides the slab and stops it blocking; the boss adds its beat.
+    Super::OnFrontBroken();
+    // THE FIRST PUNISH WINDOW. Earned, not waited for: the front pool is spent
+    // (O198) and the apparatus opens for the authored window, once per fight,
+    // in whatever phase this lands. The punish is the exposed weak point plus
+    // the front that no longer mitigates — no stagger, no multiplier, because
+    // combat.md leaves that model open and this class does not fake one.
+    FrontBreakWindowRemaining = FMath::Max(0.0f, PhaseParams.FrontBreakPunishSeconds);
+    SetApparatusExposed(true);
 }
 
 void ABreakerBossEnemy::SetApparatusExposed(bool bExposed)
@@ -170,6 +180,15 @@ void ABreakerBossEnemy::Tick(float DeltaSeconds)
 
     UpdatePhase();
     TickGalleryRespawn(DeltaSeconds);
+
+    // The front-break window runs down here, not in the engaged tick, so a
+    // boss that loses its player mid-window still closes it on time. When it
+    // expires the apparatus closes — unless an order raise or Commitment is
+    // holding it open, which the pure rule decides.
+    if (UBreakerBossPhaseLibrary::AdvanceBreakWindow(FrontBreakWindowRemaining, DeltaSeconds))
+    {
+        SetApparatusExposed(UBreakerBossPhaseLibrary::IsPunishWindowOpen(Phase, bOrderRaiseActive, FrontBreakWindowRemaining));
+    }
 
     // The DEPLOY spawn delay: adds appear this long after the raise finishes,
     // so the pointed alcove is previewed before anything comes out of it
@@ -206,12 +225,12 @@ void ABreakerBossEnemy::EnterPhase(EBreakerBossPhase NewPhase)
     MoveSpeed = BaseBossMoveSpeed * UBreakerBossPhaseLibrary::GetPhaseSpeedMultiplier(Phase, PhaseParams);
     SweepCooldownSeconds = UBreakerBossPhaseLibrary::GetPhaseSweepCooldown(Phase, BaseSweepCooldown, PhaseParams);
     SlamCooldownSeconds = UBreakerBossPhaseLibrary::GetPhaseSlamCooldown(Phase, BaseSlamCooldown, PhaseParams);
-    FrontalArmor = UBreakerBossPhaseLibrary::GetPhaseFrontalArmor(Phase, BaseFrontalArmor, PhaseParams);
-    if (Attributes) Attributes->SetArmor(FMath::Max(0.0f, FrontalArmor));
 
     // An order in flight does not survive a phase change: the phase decides
     // what the order MEANS, and resolving a DEPLOY as a FIRE would be
-    // incomprehensible.
+    // incomprehensible. The front-break window DOES survive it: it is earned
+    // once per fight, and FrontBreakWindowRemaining is deliberately not
+    // touched here.
     bOrderRaiseActive = false;
     ActiveOrder = EBreakerBossOrder::None;
     OrderRaiseElapsed = 0.0f;
@@ -349,8 +368,9 @@ void ABreakerBossEnemy::ResolveOrder()
     }
 
     ActiveOrder = EBreakerBossOrder::None;
-    // The window closes — unless phase 3 has already opened it for good.
-    SetApparatusExposed(UBreakerBossPhaseLibrary::IsApparatusExposed(Phase, false));
+    // The order window closes — unless the front-break window is still running
+    // or phase 3 has already opened it for good.
+    SetApparatusExposed(UBreakerBossPhaseLibrary::IsPunishWindowOpen(Phase, false, FrontBreakWindowRemaining));
     UpdateApparatus(Phase == EBreakerBossPhase::Commitment ? 1.0f : 0.0f);
 }
 

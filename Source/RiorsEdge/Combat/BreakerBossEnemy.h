@@ -32,8 +32,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBreakerBossDefeated);
 //   3. The apparatus raise (new)          -> an ORDER is coming, and WHERE it
 //      points says which. §3.4 deliberately reuses ONE animation for both
 //      orders so the player has to read the direction rather than the pose.
-// The apparatus raise is also the punish window: it lifts the rear weak point
+// The apparatus raise is also a punish window: it lifts the rear weak point
 // above the shoulder line so it is visible and hittable FROM THE FRONT.
+//
+// THE FIRST PUNISH WINDOW is the one the player earns: spending the front
+// pool (O198) opens the weak point for FrontBreakPunishSeconds, once per
+// fight, in whichever phase the break lands, and a gate does not take it
+// back. The whole grammar — tells, windows, gates, waves, the arena change —
+// is derived in Combat/BreakerBossPhases.h and this class only reads it.
 //
 // WHAT IS NOT BUILT HERE, and why: the arena. §3.3 specs a 4000x4000 room with
 // two pillars, two +600 galleries and four corner alcoves. Levels are editor
@@ -130,6 +136,9 @@ protected:
         FVector& OutDirection, float& OutSpeedScale) override;
     virtual void HandleDeath() override;
     virtual void SetBodyVisible(bool bVisible) override;
+    // The Warden's front-pool break, plus the boss's beat: the front-break
+    // punish window opens here.
+    virtual void OnFrontBroken() override;
 
     // Phase transitions. Idempotent per phase: entering a phase runs its
     // one-time setup exactly once even if the health fraction wobbles.
@@ -149,8 +158,8 @@ protected:
     // alcove is telegraphed before the spawn").
     FVector PickOrderTargetOffset();
 
-    // The rear weak point, exposed only during orders in phases 1-2 and
-    // permanently in phase 3.
+    // The rear weak point: open during orders in phases 1-2, for the front-break
+    // window wherever it lands, and permanently in phase 3.
     void SetApparatusExposed(bool bExposed);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> ApparatusVisual;
@@ -169,11 +178,13 @@ private:
     float OrderRaiseElapsed = 0.0f;
     float DeploySpawnCountdown = -1.0f;
     float GalleryRespawnCountdown = -1.0f;
+    // Seconds left on the front-break punish window; zero when closed. Not
+    // cleared by EnterPhase — the window is once per fight and survives a gate.
+    float FrontBreakWindowRemaining = 0.0f;
     bool bOrderRaiseActive = false;
     bool bApparatusExposed = false;
     int32 OrdersGiven = 0;
     int32 OrderTargetIndex = 0;
-    float BaseFrontalArmor = 90.0f;
     float BaseSweepCooldown = 2.2f;
     float BaseSlamCooldown = 7.0f;
     float BaseBossMoveSpeed = 300.0f;

@@ -17,13 +17,14 @@ class UStaticMeshComponent;
 // approaching from the front." That is a different question, and it is the
 // only one of the three whose answer is a DIRECTION rather than a speed.
 //
-// WHAT IT DEMANDS. A player who trades with it frontally loses: 90 armour is
-// roughly 47% mitigation at slice values, and its sweep out-damages anything
-// the player gains by standing there. A player who gets behind it pays no
-// armour at all AND hits a 1.75x weak point. §2.3: "the POSITIONING is the
-// multiplier, via armour geometry, not a stat" — this is how movement becomes
-// a damage stat without master sheet 3.3's retired momentum-to-damage
-// conversion coming back.
+// WHAT IT DEMANDS. A player who trades with it frontally first has to break
+// a shield: the front is a pool of 15% of its max health that absorbs frontal
+// damage until it is spent, then is gone for the fight (O198), and its sweep
+// out-damages anything the player gains by standing there while the pool
+// holds. A player who gets behind it never meets the pool AND hits a 1.75x
+// weak point. §2.3: "the POSITIONING is the multiplier, via armour geometry,
+// not a stat" — this is how movement becomes a damage stat without master
+// sheet 3.3's retired momentum-to-damage conversion coming back.
 //
 // It is the first enemy that fights with two attacks rather than one, and both
 // are telegraphed spatially: the sweep draws its shield arm back for 0.5s, and
@@ -49,16 +50,19 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|Warden") bool IsSweeping() const { return bSweepWindup; }
     UFUNCTION(BlueprintPure, Category="Enemy|Warden") bool IsSlamming() const { return bSlamWindup; }
 
-    // --- Facing armour (§2.3, §7) -----------------------------------------
-    // Frontally armoured, rear unarmoured. Authored here and published onto the
-    // combat component in BeginPlay, so the ONE armour number lives with the
-    // archetype that means it rather than in two places.
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Armor", meta=(ClampMin="0"))
-    float FrontalArmor = 90.0f;   // O2 PLACEHOLDER (§2.3: ~47% mitigation at slice values)
-    // 0 means a rear or flank hit lands on unarmoured flesh. §2.3 is explicit:
-    // "rear and flank hits bypass it entirely".
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Armor", meta=(ClampMin="0", ClampMax="1"))
-    float RearArmorFraction = 0.0f;   // O2 PLACEHOLDER
+    // --- The front shield (O198, §2.3, §7) --------------------------------
+    // The front is a POOL, not armour: this fraction of max health, armed on
+    // every vitals restore and spent by frontal hits until it breaks. The
+    // combat component holds the pool and decides facing per hit; the
+    // archetype owns the one number and the tell. Rear and flank hits never
+    // meet it — §2.3: "rear and flank hits bypass it entirely".
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Front", meta=(ClampMin="0", ClampMax="1"))
+    float FrontShieldFractionOfMaxHealth = 0.15f;   // O2 PLACEHOLDER
+
+    // Whether the front pool has been spent this fight. The slab is hidden
+    // and stops blocking while this is true; the boss's phase machine reads
+    // it too.
+    UFUNCTION(BlueprintPure, Category="Enemy|Warden") bool IsFrontBroken() const;
 
     // --- Attack A: shield sweep -------------------------------------------
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy|Warden|Sweep", meta=(ClampMin="0"))
@@ -135,6 +139,20 @@ protected:
     // The base contact attack is replaced by the sweep, which has a wind-up and
     // an arc. Left empty rather than deleted so nothing inherited calls it.
     virtual void PerformAttack(APawn* TargetPawn) override {}
+
+    // Bound to the combat component's OnFrontShieldBroken. The base hides the
+    // slab, stops it blocking, and plays the Gold impact moment at the slab —
+    // O179's weak-point promise: the unarmoured front just opened. Virtual so
+    // the boss can add its own beat under the same name; an override that
+    // wants the slab gone still calls Super.
+    UFUNCTION() virtual void OnFrontBroken();
+    // Bound to OnVitalsRestored: arms the pool off the CURRENT max health and
+    // shows the slab again. Also called once at the end of BeginPlay, because
+    // the chassis's first restore fires before anything here is bound.
+    UFUNCTION() void ArmFront();
+    // The slab's one visibility-and-collision write, so the body rule and the
+    // break rule cannot disagree about whether an invisible slab eats rounds.
+    void SetSlabVisible(bool bVisible);
 
     // Both attacks resolve through the ordinary damage contract with this actor
     // as Instigator, so armour, shields, the passive dodge/block layer, the

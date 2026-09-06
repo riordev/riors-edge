@@ -548,8 +548,13 @@ void ABreakerPlaytestHUD::DrawEnemyHealthBars(const ABreakerCharacter* Character
             Enemy->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f),
             [this](const FVector& P) { return Project(P, false); });
         const FBreakerEnemyBarRect Bar = BreakerEnemyBarPlace(Projected, Distance, ScaleUnit, BodyWidthPixels);
+        // The shield line is the ward plus the standing front pool (O198),
+        // read through the component that holds both figures.
+        const UBreakerCombatComponent* EnemyCombat = Enemy->FindComponentByClass<UBreakerCombatComponent>();
         BreakerEnemyBarDrawBody(*this, Bar, Health, MaxHealth,
-            EnemyAttributes->GetShield(), EnemyAttributes->GetMaxShield(), ScaleUnit, BarAlpha,
+            EnemyCombat ? EnemyCombat->GetDisplayShield() : EnemyAttributes->GetShield(),
+            EnemyCombat ? EnemyCombat->GetDisplayMaxShield() : EnemyAttributes->GetMaxShield(),
+            ScaleUnit, BarAlpha,
             BreakerHealthBands::SegmentCountFor(Enemy->GetMonsterRank()));
         if (bElite)
         {

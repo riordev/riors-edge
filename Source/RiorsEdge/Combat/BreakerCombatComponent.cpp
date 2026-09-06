@@ -67,6 +67,17 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
     FBreakerDefenseState Defense;
     Defense.Health = Attributes->GetHealth();
     Defense.Shield = Attributes->GetShield();
+    // THE FRONT POOL (O198). Facing decides whether the bearer's front pool
+    // stands in the shield step for this hit: a frontal hit that does not
+    // bypass shields sees the pool ahead of the ward, a rear-arc hit sees the
+    // ward alone. The library resolves one combined shield figure; the split
+    // below the resolve hands the pool its share first and the ward the spill.
+    // Decided per hit off the request's own source location, the same
+    // geometry IsRearArcHit answers with, so presentation and payment agree.
+    const float WardBefore = Defense.Shield;
+    const bool bFrontPoolStands = FrontShieldMax > 0.0f && !bFrontShieldBroken && FrontShield > 0.0f
+        && !Request.bBypassShield && Request.bHasSourceLocation && !IsRearArcHit(Request.SourceLocation);
+    if (bFrontPoolStands) Defense.Shield += FrontShield;
     // Flat strippers (Rot, Disruptor) come off here, clamped at zero: negative
     // armour would invert the mitigation formula into a damage bonus.
     Defense.Armor = GetEffectiveArmor();
@@ -189,12 +200,31 @@ FBreakerDamageResult UBreakerCombatComponent::ReceiveDamage(const FBreakerDamage
         OnDamageReceived.Broadcast(Result);
         return Result;
     }
+    // The front pool pays first; what spills goes on to the ward. The result's
+    // RemainingShield is rewritten to the WARD's remainder so the attribute
+    // write below stays the ward's alone — the pool lives on this component,
+    // never in the attribute set, and a bar reads the sum through
+    // GetDisplayShield. The break is latched here and broadcast after the
+    // vitals write, so a listener sees the state the hit left.
+    bool bFrontBrokeThisHit = false;
+    if (bFrontPoolStands)
+    {
+        const BreakerShield::FFrontSpend Spend = BreakerShield::SpendFrontPool(FrontShield, Result.ShieldDamage);
+        FrontShield = Spend.Remaining;
+        Result.RemainingShield = FMath::Max(0.0f, WardBefore - Spend.Spill);
+        if (Spend.bBroke)
+        {
+            bFrontShieldBroken = true;
+            bFrontBrokeThisHit = true;
+        }
+    }
     // Same null-safe route the healing path uses: identical to the generated
     // setters when there is an ability system, and writable (rather than an
     // ensure) when there is not, which is what lets automation exercise a
     // whole damage submission instead of only the pure resolver.
     Attributes->ApplyShield(Result.RemainingShield);
     Attributes->ApplyHealth(Result.RemainingHealth);
+    if (bFrontBrokeThisHit) OnFrontShieldBroken.Broadcast();
     // TargetBandBroken's write: did THIS hit move the health-band index?
     // Defense.Health is the pre-damage read from the top of this function, so
     // the pair brackets exactly the damage that just landed. Overwritten by
@@ -391,6 +421,29 @@ bool UBreakerCombatComponent::IsRearArcHit(const FVector& SourceLocation) const
     return UBreakerDamageLibrary::GetFacingArmorMultiplier(
         GetOwner()->GetActorForwardVector(), GetOwner()->GetActorLocation(),
         SourceLocation, 0.0f, RearArcCosine) < 1.0f;
+}
+
+void UBreakerCombatComponent::ArmFrontShield(float Amount)
+{
+    // Sets both figures and clears the latch: the one refill the pool has.
+    // RestoreVitals does NOT call this — the archetype that means a front
+    // pool binds OnVitalsRestored to its own arming, so a body that never
+    // armed one never grows one on a reset.
+    FrontShieldMax = FMath::Max(0.0f, Amount);
+    FrontShield = FrontShieldMax;
+    bFrontShieldBroken = false;
+}
+
+float UBreakerCombatComponent::GetDisplayShield() const
+{
+    const float Ward = Attributes ? Attributes->GetShield() : 0.0f;
+    return Ward + (bFrontShieldBroken ? 0.0f : FrontShield);
+}
+
+float UBreakerCombatComponent::GetDisplayMaxShield() const
+{
+    const float Ward = Attributes ? Attributes->GetMaxShield() : 0.0f;
+    return Ward + (bFrontShieldBroken ? 0.0f : FrontShieldMax);
 }
 
 void UBreakerCombatComponent::PushOutgoingModifier(FName Key, float FlatBonus, float MoreMultiplier, float ExpirySeconds)

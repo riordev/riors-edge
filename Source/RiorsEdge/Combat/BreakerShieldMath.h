@@ -34,4 +34,55 @@ namespace BreakerShield
         if (Current >= Max) return Current;
         return FMath::Min(Max, Current + Max * FMath::Max(FractionPerSecond, 0.0f) * DeltaSeconds);
     }
+
+    // -----------------------------------------------------------------------
+    // THE FRONT POOL (O198). A bearer's frontal shield is a pool of a fraction
+    // of its max health that absorbs frontal damage until it is spent, and is
+    // then gone for the fight. It sits AHEAD of the attribute shield (the
+    // Warded ward) in the shield step: the pool pays first, whatever spills
+    // goes on to the ward, and what the ward cannot hold reaches health.
+    //
+    // THERE IS NO RECHARGE FUNCTION HERE, BY CONSTRUCTION. RechargeStep above
+    // is the player-side ward's; the front pool has no source once armed, so a
+    // "refill" can only ever be ArmFrontShield at a vitals restore. A recharge
+    // written for this pool is the rule being un-ruled.
+    // -----------------------------------------------------------------------
+
+    struct FFrontSpend
+    {
+        // What is left in the pool after this hit.
+        float Remaining = 0.0f;
+        // The part of the hit the pool could not hold; the ward's problem next.
+        float Spill = 0.0f;
+        // True on the hit that took the pool to zero — the tell fires once.
+        bool bBroke = false;
+    };
+
+    // The pool a bearer arms: its max health times the archetype's fraction.
+    inline float FrontPool(float MaxHealth, float Fraction)
+    {
+        return FMath::Max(0.0f, MaxHealth) * FMath::Clamp(Fraction, 0.0f, 1.0f);
+    }
+
+    // The pool pays first. ShieldDamage is the whole amount the shield step
+    // routed; the pool keeps what it can and hands the rest on.
+    inline FFrontSpend SpendFrontPool(float Pool, float ShieldDamage)
+    {
+        FFrontSpend Spend;
+        const float Before = FMath::Max(0.0f, Pool);
+        const float Paid = FMath::Min(Before, FMath::Max(0.0f, ShieldDamage));
+        Spend.Remaining = Before - Paid;
+        Spend.Spill = FMath::Max(0.0f, ShieldDamage) - Paid;
+        Spend.bBroke = Before > 0.0f && Spend.Remaining <= 0.0f;
+        return Spend;
+    }
+
+    // Rounds of a flat per-round damage needed to break a pool: ceil. A pool
+    // of nothing breaks in zero rounds; a round of nothing never breaks it.
+    inline int32 RoundsToBreak(float Pool, float DamagePerRound)
+    {
+        if (Pool <= 0.0f) return 0;
+        if (DamagePerRound <= 0.0f) return TNumericLimits<int32>::Max();
+        return FMath::CeilToInt(Pool / DamagePerRound);
+    }
 }
