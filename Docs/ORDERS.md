@@ -195,9 +195,9 @@ way.
 First hands-on since the lanes started. Two notes, both rulings, plus what the
 screenshot shows that he did not have to say.
 
-## RULED: the death sound goes
+## RULED: one low sound at the cut (O193)
 
-Owner: *"the death sound needs to go."* **GLASS: identify it and remove it.**
+The player's death is one low cue on the beat's hard cut; the kill sting stays retired.
 
 Do not replace it with a quieter one without asking. "Needs to go" is a verdict
 on the sound existing at that moment, not on its mix — a redeploy is already
@@ -886,8 +886,7 @@ nothing has ever ruled on it. GLASS answered "the death sound" as the player's;
 the owner may have meant the noise an enemy makes dying — which he hears far more
 often, and which is still there.
 
-**ANSWERED 2026-08-26: NO DEATH SOUND FOR NOW.** The owner: *"no death sound for
-now."* Both of them go — the player's already did, and `PlayKill` follows.
+**ANSWERED: O193 restores the player's cue at the cut; `PlayKill` stays retired.**
 
 **GLASS: a kill falls through to `PlayHitConfirm`, it does not go silent.** The
 site is `if (bKill) Sound->PlayKill(); else Sound->PlayHitConfirm();` at `:2475`
@@ -1921,123 +1920,6 @@ re-ask the question.
 
 ---
 
-# PART ONE-X — THE STASH IS ALREADY RULED, ALREADY ANNOUNCED, AND NOWHERE IMPLEMENTED
-
-Owner, 2026-08-27: *"can we add an account wide stash?"*
-
-**It was ruled two weeks ago, and the game already tells the player it exists.**
-
-- `Docs/DECISIONS.md` **O17** — *"The stash is account-wide. Characters are
-  builds; gear is an account asset."*
-- `UI/BreakerMenu.cpp:5372`, the roster screen header, on screen right now:
-  **`GEAR · RIFTGLASS · STASH ARE ACCOUNT-WIDE`**
-- `UI/BreakerMenu.cpp:5691`, the character-creation rail — `GEAR: ACCOUNT-WIDE`
-  — with a comment saying it says so *"at the moment of creation, when it
-  matters most."*
-
-And nothing stands behind any of it:
-
-- **No stash object exists anywhere in `Source/`.** Not a class, not a struct,
-  not a slot name.
-- **Gear is per-character.** `UBreakerSaveGame` holds `EquippedItems` and
-  `BackpackItems`, and there is one save per character GUID
-  (`SlotNameForCharacter`).
-- **And Riftglass — which O51 rules *"account-wide and scalar"* — is stored in
-  `FBreakerForgeWallet`, inside that same per-character save.**
-
-So this is not a feature request. It is three promises with no backing, and one
-of them is **a ruling contradicted by its own storage**: the same shape as the
-pin whose prose was frozen while its number was live, and the headline
-contradicted by its own detail. The difference is that this one is said out loud
-to the player, on the screen where they choose a permanent class.
-
-## What the stash is FOR, and it is not storage
-
-`AddToBackpack` appends and **nothing caps it** — the backpack is unbounded. So
-a stash added for storage reasons is a second unbounded pile with a screen for
-moving things between them, which is strictly worse than one pile. **Storage
-pressure is not the reason and must not become the brief.**
-
-The reason is **transfer**. Class choice is permanent, five characters exist,
-and items carry no class restriction at all — nothing in `FBreakerItemInstance`
-names a class. So a Caster-shaped drop landing on a Swift character today is
-garbage that should have been treasure, and there is no path for it: no mail, no
-trade, no shared container. That is a dead end in the loot loop, and closing it
-is the whole job.
-
-Which sets the brief precisely: **the stash is a transfer point, not a
-warehouse. Cap it.** A cap is what makes putting something in a decision.
-
-## The architecture, and the roster already argues for it
-
-A third save object in its own slot, sibling to the roster.
-
-**Not inside the roster** — its own header says *"the roster is the index, NOT
-the data… listing characters must never mean deserializing their inventories,"*
-and a stash in the roster breaks exactly the invariant that comment exists to
-protect. **Not inside a character save**, which is what account-wide excludes.
-
-## THE DUPLICATION HAZARD IS THE WHOLE ENGINEERING PROBLEM
-
-Two save files and no atomic write across them. A transfer is remove-here and
-add-there, and a crash between the two writes either **duplicates** the item or
-**destroys** it. Duplication is the worse failure: it is permanent, it is
-reproducible on purpose by killing the process at the right moment, and an ARPG
-economy does not recover from it.
-
-`FBreakerItemInstance` already carries an `FGuid ItemId`, which is what makes
-the fix cheap. **The stash file is the commit point:**
-
-1. **Stash:** add the item AND record `PendingRemoval{CharacterId, ItemId}`. Write.
-2. **Character:** remove the item. Write.
-3. **Stash:** clear the record. Write.
-
-On load, a surviving record means the crash landed in the middle: the stash copy
-is authoritative, so the character's copy is dropped if it is still there and the
-record is cleared. Never duplicates, never loses, and it costs one struct and one
-reconcile on load.
-
-**Do not build this as "move the item, save both files."** That is the version
-with the bug in it, and the bug does not show up in testing — it shows up in a
-player's save six months from now.
-
-## Riftglass comes with it, and it is the cheaper half
-
-O51 already rules it account-wide and it is one `int32`. It moves onto the stash
-object in the same commit and leaves `FBreakerForgeWallet`, with a migration
-that **sums** the per-character balances into the account balance — the only
-migration that cannot rob anyone. `SaveVersion` bumps, and the wallet already
-carries the precedent for exactly this kind of fold in
-`CollapseLegacyDenominations`, so the shape is written and tested.
-
-## Lanes
-
-- **LEDGER owns it** — `Items/` and `Save/`. The save object, the journal, the
-  migration, the tests. Your queue is the thinnest of the six and this is the
-  largest thing in it.
-- **GLASS owns the screen, and not yet.** The completion moment first; a stash
-  with no UI is still a working stash for one console command, and a completion
-  moment that nobody sees is a loop with no ending.
-- **Report before building**, on two things specifically: whether the
-  summed-balance migration has any case that loses currency, and what the cap
-  should be — propose a number and the seat will rule it.
-
-## Two questions that are the owner's
-
-1. **Does the backpack get a capacity?** The stash is a transfer point either
-   way. But while the backpack is unbounded, "stash it" never competes with
-   "carry it," and the screen gets used once per alt and then forgotten. A
-   backpack cap is what turns the stash into a habit. Separate ruling, not
-   required for this work, and worth answering before the cap number is set.
-
-2. **Is EQUIPPED gear account-wide too?** O17 says *"gear is an account asset"*
-   and the creation rail says `GEAR: ACCOUNT-WIDE`, which a player reads as
-   *every item*, not merely stashed ones. The strict reading means two
-   characters cannot wear the same helmet at once and every piece follows
-   whoever claims it — a far larger change than a stash, and I do not believe it
-   is what O17 meant. But the screen says it. **So either the implementation or
-   the caption is wrong, and only the owner can say which** — and until he does,
-   nobody should quietly pick the cheap reading and call it done.
 
 ---
 
@@ -2085,37 +1967,6 @@ Anchor the hub it was already ruled to be rather than a corridor to the travel
 point. Overturn me if you want gear-swapping between waves; I do not think you
 do.
 
-## AND THE THING THE QUESTION IMPLIES, WHICH IS ALREADY SOLVED
-
-A transfer stash means **a level-1 alt can wear a level-120 item the moment it
-exists.** I checked for a gate and there is none: `EquipFromBackpack` goes
-straight to `EquipItem`, and there is no `RequiredLevel`, no
-`LevelRequirement`, no character-level read anywhere in `Items/`.
-
-The size of it, so it is a number rather than a worry. A body piece's base life
-is `30 + 2.2 × (ItemLevel − 1)` — **30 at level 1, 291.8 at 120, about 9.7×** —
-and a level-120 item also rolls the top affix tiers, where the Health T1 anchor
-alone is 400. A twinked fresh character is not slightly ahead. It is an order of
-magnitude ahead of anything its own level drops.
-
-In most games that demands a required-level field on the item. **Here it does
-not, and the reason is a decision already made:** `FBreakerRiftDefinition
-::AreaLevel` is **player-set**, clamped 1..100, and monster health, drop item
-level, XP and Riftglass all scale from it. The player authors the difficulty of
-every run. **There is no fixed early game to trivialise** — a geared alt simply
-sets a higher number, meets monsters scaled to it, and earns rewards scaled to
-it. The twink corrects itself by being boring at a level the player chose.
-
-**RULED: no equip level requirement.** Do not add one, and do not let it arrive
-quietly as "a small safety check" on the stash withdrawal path.
-
-**And the condition under which that stops being true, so it is watched rather
-than assumed:** the moment any content runs at a *fixed* area level — a
-scripted campaign beat, a tutorial, anything with an authored difficulty the
-player cannot dial — twinking bites exactly there and nowhere else, and the
-guard belongs on that content, not on the item. `EBreakerRiftTier` is a death
-rule and not a level gate, so nothing today has one. **LEDGER: if you ever
-author a fixed area level, that commit is where this gets revisited.**
 
 ---
 
@@ -3647,20 +3498,6 @@ against the record from item 2. `RiftglassForCompletion` and `XpForCompletion`
 stay pure functions of area level; what changes is whether the completion purse
 is paid at all.
 
-**4. The stash (One-X, One-Y).** The largest thing in your queue.
-   - The save object in its own slot, sibling to the roster — **not inside the
-     roster**, whose own header forbids it.
-   - **The transfer journal is the design**, not an implementation detail:
-     stash-add-with-`PendingRemoval` → character-remove → clear-record, with
-     reconcile on load. Build it any other way and the bug ships invisibly.
-   - Withdrawal calls the required-level predicate from item 1.
-   - Access is **Anchor-only**.
-   - Cap: propose a number as `O2 PLACEHOLDER` and say what it is derived from.
-
-**5. Riftglass moves to account scope (One-X).** It is one `int32`, O51 already
-rules it, and the migration **sums** the per-character balances. The wallet's
-`CollapseLegacyDenominations` is the precedent for the shape.
-
 **6. Traction's re-target (One-T).** BLOCKED on KIT recording the mantle exit —
 their item 1. Take it the moment their commit lands; do not author against
 absent plumbing.
@@ -3810,10 +3647,7 @@ it. Sequence behind their item 3.
 not survive the ability** — a tint that outlives its cause is the same bug as
 the accidental wash, authored on purpose.
 
-**8. The two account-wide captions (One-Y). LAST, AND GATED.** Neither string
-may land before LEDGER's stash exists. A caption that becomes true later is
-precisely the defect Part One-X is about, and shipping the fix early recreates
-it pointing the other way.
+
 
 **Fallback:** photograph a UI surface that has never been captured, and say what
 the capture shows that the code does not. Both of the last two readability

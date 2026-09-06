@@ -21,6 +21,7 @@
 #include "Progression/BreakerProgressionTree.h"
 #include "Interaction/BreakerNPC.h"
 #include "Interaction/BreakerTravelPoint.h"
+#include "Interaction/BreakerStashPoint.h"
 // The breakpoint sandbox's three suppliers: the XP curve arithmetic, the
 // seeded loot roll, and the gym's area level (a public BlueprintReadWrite
 // tunable on the game mode — written directly, the same access the editor
@@ -832,6 +833,9 @@ void SBreakerMenu::ShowDialogue(ABreakerNPC* NPC)
 
 void SBreakerMenu::ShowTravel(ABreakerTravelPoint* InTravelPoint)
 {
+    // A stash point is a travel point only so the F path finds it; it opens
+    // the stash, never a picker. Diverted here rather than in Characters/.
+    if (Cast<ABreakerStashPoint>(InTravelPoint)) { ShowStash(); return; }
     TravelPoint = InTravelPoint;
     TravelStatus = FText::GetEmpty();
     // Open with the first available destination marked. The screen is never
@@ -872,7 +876,7 @@ void SBreakerMenu::HandleEscape()
     // having done nothing. Escape on the travel screen must NOT travel — it is
     // the "I walked up to the wrong thing" key, and a picker that departed on
     // the way out would be the single worst button in the game.
-    if (CurrentScreen == EBreakerMenuScreen::Dialogue || CurrentScreen == EBreakerMenuScreen::Travel)
+    if (CurrentScreen == EBreakerMenuScreen::Dialogue || CurrentScreen == EBreakerMenuScreen::Travel || CurrentScreen == EBreakerMenuScreen::Stash)
     {
         if (Character.IsValid()) Character->ResumeFromMenu();
         return;
@@ -1073,6 +1077,7 @@ void SBreakerMenu::ApplyScreen(EBreakerMenuScreen NewScreen)
         case EBreakerMenuScreen::Travel: ContentHost->SetContent(BuildTravelScreen()); break;
         case EBreakerMenuScreen::DevSandbox: ContentHost->SetContent(BuildDevSandboxScreen()); break;
         case EBreakerMenuScreen::CharacterSheet: ContentHost->SetContent(BuildCharacterSheetScreen()); break;
+        case EBreakerMenuScreen::Stash: ContentHost->SetContent(BuildStashScreen()); break;
         default: ContentHost->SetContent(BuildMainScreen()); break;
     }
 

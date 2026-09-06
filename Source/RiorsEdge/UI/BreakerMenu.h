@@ -80,7 +80,17 @@ enum class EBreakerMenuScreen : uint8
     // deliberately. A peer rather than a mode of Inventory: it reads the
     // COMPOSED character where Inventory reads the items, and the two answer
     // different questions. Appended last, same rule as Travel and DevSandbox.
-    CharacterSheet
+    CharacterSheet,
+    // The stash: the account's transfer point (Save/BreakerAccountSave.h,
+    // Part One-X), opened by F on ABreakerStashPoint in the Anchor. A peer of
+    // Travel and Dialogue — entered from a world interactable, left by
+    // resuming the game — and, like Quartermaster, deliberately ABSENT from
+    // BuildScreenTabs and BuildPauseScreen: the component refuses every
+    // deposit and withdrawal outside the Anchor, so a pause-menu door would
+    // open onto a screen whose two buttons both refuse. The screen builds in
+    // its own TU (UI/BreakerStashScreen.cpp). Appended last, same rule as
+    // Travel.
+    Stash
 };
 
 // ---------------------------------------------------------------------------
@@ -415,6 +425,11 @@ public:
     // the screen says what it has. The caller is free to keep travelling
     // directly when there is exactly one — see the note in BuildTravelScreen.
     void ShowTravel(class ABreakerTravelPoint* InTravelPoint);
+    // The stash's front door, in ShowTravel's shape: ShowTravel diverts here
+    // when the interactable it was handed is an ABreakerStashPoint, so the F
+    // path in Characters/ needed no change. RootScreen is Pause for the same
+    // reason ShowDialogue's is. Defined in UI/BreakerStashScreen.cpp.
+    void ShowStash();
     void HandleEscape();
     // Enter/Space, routed from the input component rather than from Slate
     // focus - see ABreakerCharacter::ConfirmMenuKey for why.
@@ -742,6 +757,23 @@ private:
     // disarms.
     bool bForgeSalvageArm = false;
     int32 ForgeRespecArm = -1;
+    // ---- The stash screen (UI/BreakerStashScreen.cpp) ---------------------
+    // Two grids over two containers: the account's stash and the character's
+    // backpack. The arithmetic and the text rules are BreakerStashLayout
+    // (UI/BreakerStashLayout.h); this TU's builder is a thin caller.
+    TSharedRef<SWidget> BuildStashScreen();
+    // Which tab filters the stash grid: 0 ALL, 1 WEAPONS, 2 ARMOUR, an index
+    // into BreakerStashLayout::TabLabels. An int for the same reason
+    // SettingsPane and CharacterSheetTab are: the layout header includes this
+    // one for WearOrder, so the enum cannot be named here without a cycle.
+    int32 StashTab = 0;
+    // The last refusal echoed under the grids; cleared on entry and on any
+    // move that succeeds.
+    FText StashStatus;
+    // Which cell holds the ring, found by id in EITHER container on every
+    // rebuild — so the same selection survives its own move across the two
+    // grids, and an id that left both resolves to "no selection".
+    FGuid StashSelectedItemId;
     // Abilities tab: result line echoed under the slot that was last clicked,
     // so a refusal (e.g. a Caster's "That ability has not been unlocked.")
     // stays readable after the rebuild it triggers.

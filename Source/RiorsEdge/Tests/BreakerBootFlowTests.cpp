@@ -147,6 +147,12 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
                 Menu.Contains(TEXT("AddTab(TEXT(\"QUARTERMASTER\")")));
             TestFalse(TEXT("The Forge has no tab-strip entry either"),
                 Menu.Contains(TEXT("AddTab(TEXT(\"FORGE\")")));
+            // The stash is the third Anchor interaction: the component
+            // refuses every deposit and withdrawal outside the Anchor map, so
+            // a tab or a pause button would open a screen whose two verbs both
+            // refuse. Its one door is the stash point the hub spawns.
+            TestFalse(TEXT("The stash has no tab-strip entry"),
+                Menu.Contains(TEXT("AddTab(TEXT(\"STASH\")")));
             const int32 PauseBegin = Menu.Find(TEXT("SBreakerMenu::BuildPauseScreen"));
             if (PauseBegin != INDEX_NONE)
             {
@@ -159,11 +165,30 @@ bool FBreakerBootFlowConfigTest::RunTest(const FString& Parameters)
                     PauseBody.Contains(TEXT("Quartermaster")));
                 TestFalse(TEXT("The pause menu has no path to the Forge"),
                     PauseBody.Contains(TEXT("Forge")));
+                TestFalse(TEXT("The pause menu has no path to the stash"),
+                    PauseBody.Contains(TEXT("Stash")));
             }
         }
         else
         {
             AddInfo(TEXT("Menu source not present (packaged build?); the absence scan was skipped."));
+        }
+        // The presence half for the stash, by the same source scan: the hub
+        // builder is the one spawner of ABreakerStashPoint, and BuildHub
+        // needs a world this suite does not have (BreakerHubTests.cpp says
+        // the same). A hub that stopped spawning it would strand the whole
+        // stash behind a capture switch.
+        const FString HubPath = FPaths::Combine(FPaths::ProjectDir(),
+            TEXT("Source"), TEXT("RiorsEdge"), TEXT("Game"), TEXT("BreakerHubBuilder.cpp"));
+        FString Hub;
+        if (FFileHelper::LoadFileToString(Hub, *HubPath))
+        {
+            TestTrue(TEXT("The hub spawns the stash point (the stash's only door)"),
+                Hub.Contains(TEXT("SpawnActor<ABreakerStashPoint>")));
+        }
+        else
+        {
+            AddInfo(TEXT("Hub source not present (packaged build?); the presence scan was skipped."));
         }
     }
 

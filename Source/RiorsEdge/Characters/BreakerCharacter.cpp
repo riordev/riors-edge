@@ -2152,6 +2152,9 @@ void ABreakerCharacter::OpenMenuScreenForCapture(const FString& ScreenName)
     // which is exactly what the Anchor gating exists to prevent. A capture run
     // is a non-shipping build by definition, so nothing is lost.
     else if (Wanted == TEXT("QUARTERMASTER")) Screen = EBreakerMenuScreen::Quartermaster;
+    // The stash, guarded for the same reason: its only in-game door is the
+    // stash point in the Anchor, and a capture switch is a second door.
+    else if (Wanted == TEXT("STASH")) Screen = EBreakerMenuScreen::Stash;
 #endif
 
     MenuWidget->ShowScreenForCapture(Screen);

@@ -1,6 +1,7 @@
 #include "Game/BreakerHubBuilder.h"
 
 #include "Interaction/BreakerNPC.h"
+#include "Interaction/BreakerStashPoint.h"
 #include "Interaction/BreakerTravelPoint.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -241,6 +242,22 @@ void UBreakerHubBuilder::BuildVendors(UWorld* World, const FBreakerHubFrame& Fra
         HubAttachPropLight(Crate, FVector(0, 0, 90.0f), FLinearColor(1.0f, 0.68f, 0.28f), 700.0f, 600.0f);
     }
     ABreakerNPC::SpawnQuartermaster(World, Frame.At(VendorForward - 80.0f, VendorLateral, 100.0f), Frame.Right.Rotation());
+
+    // THE STASH POINT, on the arrival side of the vendor crossbar: the
+    // player walks up the spine from the gate, and the stash stands on it
+    // before the vendors, facing back down the walk. It is the Anchor's
+    // transfer point (Save/BreakerAccountSave.h) made into a place —
+    // UBreakerEquipmentComponent refuses every deposit and withdrawal outside
+    // this map, so this is the only spawn of it. Six metres short of the
+    // crossbar keeps it outside both NPCs' interaction radii, so F at the
+    // stash cannot open a conversation. O2 PLACEHOLDER position.
+    FActorSpawnParameters StashParams;
+    StashParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    if (ABreakerStashPoint* Stash = World->SpawnActor<ABreakerStashPoint>(
+        ABreakerStashPoint::StaticClass(), Frame.At(VendorForward - 600.0f, 0.0f, 100.0f), (-Frame.Forward).Rotation(), StashParams))
+    {
+        Stash->SetActorLabel(TEXT("Runtime_HubStash"));
+    }
 }
 
 FTransform UBreakerHubBuilder::ArrivalTransform(const FTransform& HubOrigin)
