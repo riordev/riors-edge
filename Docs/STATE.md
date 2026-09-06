@@ -17,7 +17,7 @@ measurement without judging it.
 | Node tags with no consumer | ceiling | 139 of 205 declared | ceiling 143 | ok |
 | Conditions no content authors | ceiling | 12 of 26 | ceiling 12 | ok |
 | Resource generation entry points with no caller | ceiling | 3 of 18 | ceiling 0 | **OUT** |
-| Asserted invariants with no test | ceiling | 40 of 111 asserted across 7 specs | ceiling 42, target 20 | ok |
+| Asserted invariants with no test | ceiling | 38 of 111 asserted across 7 specs | ceiling 42, target 20 | ok |
 | Offered-to-spendable ratio, per tree | floor | 2.25 worst tree | floor 3.0 | **OUT** |
 | Trees sitting exactly on the offered-to-spendable floor | ceiling | 9 of 16 | no pin — measurement only | — |
 | Node-shape composition, per tree | band | 57 % ranked minors, all trees | no pin — measurement only | — |
@@ -34,10 +34,10 @@ measurement without judging it.
 
 ## Tests
 
-- passing: 534
+- passing: 545
 - expected red: 3
 - **unexpected red: 0**
-- asserted invariants with no test: 40
+- asserted invariants with no test: 38
 
 Expected-red, unexpected-red and unimplemented are three different states.
 A test that was never written is the worst of the three: it looks asserted.
@@ -159,7 +159,7 @@ A generation hook nothing calls is a resource bar that sits at zero forever. Tes
 
 ## Asserted invariants with no test
 
-**ceiling** · 40 of 111 asserted across 7 specs · ceiling 42, target 20
+**ceiling** · 38 of 111 asserted across 7 specs · ceiling 42, target 20
 
 A named test that was never written looks asserted and is not. This is worse than a red test, and it is the reason this section exists.
 
@@ -194,8 +194,6 @@ A named test that was never written looks asserted and is not. This is worse tha
 - Game.CoverRegistry.IsLayoutLegal  —  content-and-modes.md
 - Game.Tiles.MovementContract  —  content-and-modes.md
 - Encounter.Revive.PressurePause  —  content-and-modes.md
-- Data.Missions.Fresh  —  content-and-modes.md
-- Missions.PointBudgets  —  content-and-modes.md
 - Progression.RuleBandImpact.MinorStack  —  items-and-crafting.md
 - Progression.PowerBand.Singular  —  items-and-crafting.md
 - Progression.PowerBand.AbilityLaneMore  —  power-and-scaling.md
